@@ -1950,9 +1950,42 @@ const ProfilePage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 🚀 商家端：只显示商家资料，不显示会员/充值信息 */}
+                {/* 🚀 商家端：只显示商家管理相关的操作按钮 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  {/* 修改密码按钮 */}
+                  {/* 编辑资料按钮 */}
+                  <button
+                    onClick={handleOpenEditProfile}
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      padding: '0.6rem 1.5rem',
+                      borderRadius: '14px',
+                      fontSize: '0.95rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      whiteSpace: 'nowrap',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>📝</span>
+                    {language === 'zh' ? '编辑资料' : language === 'en' ? 'Edit Profile' : 'ကိုယ်ရေးအချက်အလက်ပြင်ဆင်ရန်'}
+                  </button>
+
+                  {/* 安全设置按钮 */}
                   <button
                     onClick={() => setShowPasswordModal(true)}
                     style={{
@@ -1964,7 +1997,7 @@ const ProfilePage: React.FC = () => {
                       fontSize: '0.95rem',
                       fontWeight: '700',
                       cursor: 'pointer',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'all 0.3s ease',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.6rem',
@@ -1974,12 +2007,10 @@ const ProfilePage: React.FC = () => {
                     }}
                     onMouseOver={(e) => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
@@ -1987,6 +2018,7 @@ const ProfilePage: React.FC = () => {
                     {language === 'zh' ? '安全设置' : language === 'en' ? 'Security' : 'လုံခြုံရေး'}
                   </button>
 
+                  {/* 管理商品按钮 */}
                   <button
                     onClick={() => setShowProductsModal(true)}
                     style={{
@@ -1998,7 +2030,7 @@ const ProfilePage: React.FC = () => {
                       fontSize: '0.95rem',
                       fontWeight: '700',
                       cursor: 'pointer',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'all 0.3s ease',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.6rem',
@@ -2008,12 +2040,10 @@ const ProfilePage: React.FC = () => {
                     }}
                     onMouseOver={(e) => {
                       e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
-                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.6)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
-                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
@@ -2021,28 +2051,6 @@ const ProfilePage: React.FC = () => {
                     {language === 'zh' ? '管理商品' : language === 'en' ? 'Products' : 'ပစ္စည်းစီမံရန်'}
                   </button>
                 </div>
-                      gap: '0.6rem',
-                      whiteSpace: 'nowrap',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
-                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.6)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.2)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
-                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                    }}
-                  >
-                    <span style={{ fontSize: '1.1rem' }}>🛍️</span>
-                    {t.myProducts}
-                  </button>
-                )}
               </div>
               
               {isPartnerStore && storeInfo ? (
