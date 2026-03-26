@@ -1038,9 +1038,9 @@ const BannerManagement: React.FC = () => {
               <div key={screen.id} style={{ ...cardStyle, padding: '0', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: '140px', background: `linear-gradient(135deg, ${screen.bg_color_start}, ${screen.bg_color_end})`, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {screen.image_url ? (
-                    <Image src={screen.image_url} style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
+                    <img src={screen.image_url} style={{ width: '60px', height: '60px', objectFit: 'contain' }} alt="welcome" />
                   ) : (
-                    <Text style={{ fontSize: '2rem' }}>👋</Text>
+                    <span style={{ fontSize: '2rem' }}>👋</span>
                   )}
                   {screen.is_active && (
                     <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#10b981', padding: '4px 12px', borderRadius: '20px', fontSize: '0.7rem', color: 'white', fontWeight: 700 }}>活跃中</div>
