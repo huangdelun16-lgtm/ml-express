@@ -396,10 +396,6 @@ const TrackingPage: React.FC = () => {
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
         onLogout={handleLogout}
-        onShowRegisterModal={(isLoginMode) => {
-          navigate('/', { state: { showModal: true, isLoginMode } });
-        }} 
-        
       />
       {/* 搜索区域 */}
 

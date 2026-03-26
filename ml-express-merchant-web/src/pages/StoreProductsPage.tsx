@@ -189,9 +189,6 @@ const StoreProductsPage: React.FC = () => {
           onLanguageChange={setLanguage}
           currentUser={currentUser}
           onLogout={handleLogout}
-          onShowRegisterModal={(isLoginMode) => {
-            navigate('/', { state: { showModal: true, isLoginMode } });
-          }}
         />
         
         <div style={{ maxWidth: '1200px', margin: '2rem auto 0', color: 'white' }}>

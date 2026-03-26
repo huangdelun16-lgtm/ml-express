@@ -1800,10 +1800,6 @@ const ProfilePage: React.FC = () => {
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
         onLogout={handleLogout}
-        onShowRegisterModal={(isLoginMode) => {
-          navigate('/', { state: { showModal: true, isLoginMode } });
-        }} 
-        
       />
 
       {/* 主要内容区域 */}
