@@ -13,11 +13,14 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
+import { welcomeScreenService, WelcomeScreen as WelcomeScreenData } from '../services/supabase';
 
 const { width, height } = Dimensions.get('window');
 export default function WelcomeScreen({ navigation }: any) {
   const { language } = useApp();
   const [countdown, setCountdown] = useState(5);
+  const [dynamicScreen, setDynamicScreen] = useState<WelcomeScreenData | null>(null);
+  const [loading, setLoading] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const t = {
@@ -42,6 +45,24 @@ export default function WelcomeScreen({ navigation }: any) {
     },
   };
   const currentT = t[language] || t.zh;
+
+  useEffect(() => {
+    const loadDynamicContent = async () => {
+      try {
+        const screen = await welcomeScreenService.getActiveWelcomeScreen();
+        if (screen) {
+          setDynamicScreen(screen);
+          setCountdown(screen.countdown || 5);
+        }
+      } catch (error) {
+        console.warn('Failed to load dynamic welcome screen');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDynamicContent();
+  }, []);
+
   const navigateToNextScreen = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -88,7 +109,7 @@ export default function WelcomeScreen({ navigation }: any) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
+        colors={dynamicScreen ? [dynamicScreen.bg_color_start!, dynamicScreen.bg_color_end!] : ['#b0d3e8', '#7895a3']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
@@ -115,35 +136,51 @@ export default function WelcomeScreen({ navigation }: any) {
             ]}
           >
             <View style={styles.logoCircle}>
-              <Image
-                source={require('../../assets/logo-large.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+              {dynamicScreen?.image_url ? (
+                <Image
+                  source={{ uri: dynamicScreen.image_url }}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Image
+                  source={require('../../assets/logo-large.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              )}
             </View>
           </Animated.View>
           <View style={styles.textContainer}>
-            <Text style={styles.welcomeTitle}>{currentT.welcomeTitle}</Text>
+            <Text style={styles.welcomeTitle}>
+              {dynamicScreen ? (language === 'zh' ? dynamicScreen.title_zh : (language === 'en' ? (dynamicScreen.title_en || dynamicScreen.title_zh) : (dynamicScreen.title_my || dynamicScreen.title_zh))) : currentT.welcomeTitle}
+            </Text>
             <View style={{ alignItems: 'center' }}>
-              <Text style={[styles.brandName, { letterSpacing: 1 }]}>MARKET LINK</Text>
-              <Text style={[styles.brandName, { 
-                fontStyle: 'italic', 
-                fontSize: 36, 
-                color: '#f59e0b', // 金色
-                marginTop: -8,
-                letterSpacing: 2,
-                textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                textShadowOffset: { width: 0, height: 2 },
-                textShadowRadius: 4,
-              }]}>EXPRESS</Text>
+              {!dynamicScreen && <Text style={[styles.brandName, { letterSpacing: 1 }]}>MARKET LINK</Text>}
+              {!dynamicScreen && (
+                <Text style={[styles.brandName, { 
+                  fontStyle: 'italic', 
+                  fontSize: 36, 
+                  color: '#f59e0b', // 金色
+                  marginTop: -8,
+                  letterSpacing: 2,
+                  textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                  textShadowOffset: { width: 0, height: 2 },
+                  textShadowRadius: 4,
+                }]}>EXPRESS</Text>
+              )}
               
-              <View style={styles.dividerContainer}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>DELIVERY SERVICES</Text>
-                <View style={styles.dividerLine} />
-              </View>
+              {!dynamicScreen && (
+                <View style={styles.dividerContainer}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>DELIVERY SERVICES</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+              )}
               
-              <Text style={styles.description}>{currentT.description}</Text>
+              <Text style={styles.description}>
+                {dynamicScreen ? (language === 'zh' ? dynamicScreen.description_zh : (language === 'en' ? (dynamicScreen.description_en || dynamicScreen.description_zh) : (dynamicScreen.description_my || dynamicScreen.description_zh))) : currentT.description}
+              </Text>
             </View>
           </View>
         </View>
@@ -162,12 +199,14 @@ export default function WelcomeScreen({ navigation }: any) {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={['#ffffff', '#f0f9ff']}
+              colors={dynamicScreen ? [dynamicScreen.button_color_start!, dynamicScreen.button_color_end!] : ['#ffffff', '#f0f9ff']}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={styles.buttonGradient}
             >
-              <Text style={[styles.startButtonText, { color: '#0284c7' }]}>{currentT.start}</Text>
+              <Text style={[styles.startButtonText, { color: '#0284c7' }]}>
+                {dynamicScreen ? (language === 'zh' ? dynamicScreen.button_text_zh : (language === 'en' ? (dynamicScreen.button_text_en || dynamicScreen.button_text_zh) : (dynamicScreen.button_text_my || dynamicScreen.button_text_zh))) : currentT.start}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>

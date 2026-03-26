@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { bannerService, tutorialService, Banner, Tutorial } from '../services/supabase';
+import { bannerService, tutorialService, welcomeScreenService, Banner, Tutorial, WelcomeScreen } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { fileUploadService } from '../services/FileUploadService';
 
@@ -10,6 +10,7 @@ const BannerManagement: React.FC = () => {
   const tutorialFileInputRef = useRef<HTMLInputElement>(null); // 🚀 新增：专门给教学图片用的 Ref
   const [banners, setBanners] = useState<Banner[]>([]);
   const [tutorials, setTutorials] = useState<Tutorial[]>([]);
+  const [welcomeScreens, setWelcomeScreens] = useState<WelcomeScreen[]>([]);
   const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -18,6 +19,9 @@ const BannerManagement: React.FC = () => {
   const [showTutorialMainModal, setShowTutorialMainModal] = useState(false); // 🚀 窗口1：使用教学管理
   const [showTutorialEditModal, setShowTutorialEditModal] = useState(false); // 🚀 窗口2：配置教学步骤
   const [editingTutorial, setEditingTutorial] = useState<Tutorial | null>(null);
+  const [showWelcomeMainModal, setShowWelcomeMainModal] = useState(false); // 🚀 窗口3：欢迎页面管理
+  const [showWelcomeEditModal, setShowWelcomeEditModal] = useState(false); // 🚀 窗口4：编辑欢迎页面
+  const [editingWelcomeScreen, setEditingWelcomeScreen] = useState<WelcomeScreen | null>(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -44,6 +48,25 @@ const BannerManagement: React.FC = () => {
     is_active: true
   });
 
+  const [welcomeFormData, setWelcomeFormData] = useState({
+    title_zh: '',
+    title_en: '',
+    title_my: '',
+    description_zh: '',
+    description_en: '',
+    description_my: '',
+    button_text_zh: '',
+    button_text_en: '',
+    button_text_my: '',
+    image_url: '',
+    bg_color_start: '#b0d3e8',
+    bg_color_end: '#7895a3',
+    button_color_start: '#ffffff',
+    button_color_end: '#f0f9ff',
+    countdown: 5,
+    is_active: false
+  });
+
   const readFileAsBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -67,12 +90,14 @@ const BannerManagement: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const [bannerData, tutorialData] = await Promise.all([
+    const [bannerData, tutorialData, welcomeData] = await Promise.all([
       bannerService.getAllBanners(),
-      tutorialService.getAllTutorials()
+      tutorialService.getAllTutorials(),
+      welcomeScreenService.getAllWelcomeScreens()
     ]);
     setBanners(bannerData);
     setTutorials(tutorialData);
+    setWelcomeScreens(welcomeData);
     setLoading(false);
   };
 
@@ -84,6 +109,11 @@ const BannerManagement: React.FC = () => {
   const loadTutorials = async () => {
     const data = await tutorialService.getAllTutorials();
     setTutorials(data);
+  };
+
+  const loadWelcomeScreens = async () => {
+    const data = await welcomeScreenService.getAllWelcomeScreens();
+    setWelcomeScreens(data);
   };
 
   const handleBannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,6 +204,14 @@ const BannerManagement: React.FC = () => {
   const handleTutorialInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as any;
     setTutorialFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (e.target as any).checked : value
+    }));
+  };
+
+  const handleWelcomeInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target as any;
+    setWelcomeFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as any).checked : value
     }));
@@ -283,6 +321,65 @@ const BannerManagement: React.FC = () => {
     }
   };
 
+  const handleWelcomeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingWelcomeScreen) {
+        const success = await welcomeScreenService.updateWelcomeScreen(editingWelcomeScreen.id!, welcomeFormData);
+        if (success) {
+          alert('欢迎页面更新成功！');
+          setEditingWelcomeScreen(null);
+          setShowWelcomeEditModal(false);
+          loadWelcomeScreens();
+        }
+      } else {
+        const success = await welcomeScreenService.createWelcomeScreen(welcomeFormData);
+        if (success) {
+          alert('欢迎页面创建成功！');
+          setShowWelcomeEditModal(false);
+          loadWelcomeScreens();
+        }
+      }
+    } catch (error) {
+      console.error('保存欢迎页面失败:', error);
+      alert('保存失败，请重试');
+    }
+  };
+
+  const handleWelcomeEdit = (screen: WelcomeScreen) => {
+    setEditingWelcomeScreen(screen);
+    setWelcomeFormData({
+      title_zh: screen.title_zh,
+      title_en: screen.title_en || '',
+      title_my: screen.title_my || '',
+      description_zh: screen.description_zh,
+      description_en: screen.description_en || '',
+      description_my: screen.description_my || '',
+      button_text_zh: screen.button_text_zh,
+      button_text_en: screen.button_text_en || '',
+      button_text_my: screen.button_text_my || '',
+      image_url: screen.image_url || '',
+      bg_color_start: screen.bg_color_start || '#b0d3e8',
+      bg_color_end: screen.bg_color_end || '#7895a3',
+      button_color_start: screen.button_color_start || '#ffffff',
+      button_color_end: screen.button_color_end || '#f0f9ff',
+      countdown: screen.countdown || 5,
+      is_active: screen.is_active ?? false
+    });
+    setShowForm(false);
+    setShowTutorialMainModal(false);
+    setShowWelcomeEditModal(true);
+  };
+
+  const handleWelcomeDelete = async (id: string) => {
+    if (window.confirm('确定要删除这个欢迎页面吗？')) {
+      const success = await welcomeScreenService.deleteWelcomeScreen(id);
+      if (success) {
+        loadWelcomeScreens();
+      }
+    }
+  };
+
   const cardStyle: React.CSSProperties = {
     background: 'rgba(255, 255, 255, 0.05)',
     backdropFilter: 'blur(20px)',
@@ -336,6 +433,17 @@ const BannerManagement: React.FC = () => {
           <button 
             onClick={() => {
               setShowForm(false);
+              setShowTutorialMainModal(false);
+              setShowWelcomeMainModal(!showWelcomeMainModal);
+            }}
+            style={{ padding: '12px 24px', borderRadius: '14px', background: showWelcomeMainModal ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #f59e0b, #d97706)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showWelcomeMainModal ? 'none' : '0 4px 12px rgba(245, 158, 11, 0.3)', transition: 'all 0.3s' }}
+          >
+            {showWelcomeMainModal ? '取消' : '+ 欢迎页面'}
+          </button>
+          <button 
+            onClick={() => {
+              setShowForm(false);
+              setShowWelcomeMainModal(false);
               setShowTutorialMainModal(!showTutorialMainModal);
             }}
             style={{ padding: '12px 24px', borderRadius: '14px', background: showTutorialMainModal ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #10b981, #059669)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showTutorialMainModal ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)', transition: 'all 0.3s' }}
@@ -358,6 +466,8 @@ const BannerManagement: React.FC = () => {
               });
               setShowTutorialMainModal(false);
               setShowTutorialEditModal(false);
+              setShowWelcomeMainModal(false);
+              setShowWelcomeEditModal(false);
               setShowForm(!showForm);
             }}
             style={{ padding: '12px 24px', borderRadius: '14px', background: showForm ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showForm ? 'none' : '0 4px 12px rgba(37, 99, 235, 0.3)', transition: 'all 0.3s' }}
@@ -400,6 +510,229 @@ const BannerManagement: React.FC = () => {
             >
               + 新增教学步骤
             </button>
+          </div>
+        </div>
+      )}
+
+      {showWelcomeMainModal && (
+        <div style={{ ...cardStyle, border: '1px solid rgba(245, 158, 11, 0.2)', position: 'relative', overflow: 'hidden', maxWidth: '400px', margin: '0 auto 24px' }}>
+          <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '20px', fontWeight: 700 }}>配置欢迎页面</h2>
+            <button 
+              onClick={() => {
+                setEditingWelcomeScreen(null);
+                setWelcomeFormData({
+                  title_zh: '',
+                  title_en: '',
+                  title_my: '',
+                  description_zh: '',
+                  description_en: '',
+                  description_my: '',
+                  button_text_zh: '',
+                  button_text_en: '',
+                  button_text_my: '',
+                  image_url: '',
+                  bg_color_start: '#b0d3e8',
+                  bg_color_end: '#7895a3',
+                  button_color_start: '#ffffff',
+                  button_color_end: '#f0f9ff',
+                  countdown: 5,
+                  is_active: false
+                });
+                setShowWelcomeEditModal(true);
+              }}
+              style={{ width: '100%', padding: '14px', borderRadius: '12px', background: 'white', color: '#f59e0b', border: '2px dashed #f59e0b', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#fffbeb';
+                e.currentTarget.style.transform = 'scale(1.02)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'white';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              + 新增欢迎页面
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showWelcomeEditModal && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10000,
+          padding: '20px'
+        }}>
+          <div style={{ 
+            background: '#1e293b',
+            borderRadius: '28px',
+            border: '1px solid rgba(245, 158, 11, 0.4)', 
+            width: '100%', 
+            maxWidth: '600px', 
+            maxHeight: '90vh', 
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.6)'
+          }}>
+            {/* 固定头部 */}
+            <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b', margin: 0 }}>配置欢迎页面内容</h2>
+              <button 
+                onClick={() => setShowWelcomeEditModal(false)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: 'white', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >✕</button>
+            </div>
+            
+            {/* 可滚动内容区 */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+              <form id="welcomeForm" onSubmit={handleWelcomeSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* 标题部分 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div style={{ gridColumn: '1 / span 2' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>欢迎标题 (中文)</label>
+                    <input name="title_zh" value={welcomeFormData.title_zh} onChange={handleWelcomeInputChange} placeholder="例如：欢迎使用 MARKET LINK EXPRESS" style={inputStyle} required />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>标题 (英文)</label>
+                    <input name="title_en" value={welcomeFormData.title_en} onChange={handleWelcomeInputChange} placeholder="Welcome to..." style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>标题 (缅文)</label>
+                    <input name="title_my" value={welcomeFormData.title_my} onChange={handleWelcomeInputChange} placeholder="ကြိုဆိုပါတယ်" style={inputStyle} />
+                  </div>
+                </div>
+
+                {/* 描述部分 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>描述内容 (中文)</label>
+                    <textarea name="description_zh" value={welcomeFormData.description_zh} onChange={handleWelcomeInputChange} placeholder="描述信息..." style={{ ...inputStyle, height: '80px' }} required />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>描述 (英文)</label>
+                    <textarea name="description_en" value={welcomeFormData.description_en} onChange={handleWelcomeInputChange} style={{ ...inputStyle, height: '80px' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>描述 (缅文)</label>
+                    <textarea name="description_my" value={welcomeFormData.description_my} onChange={handleWelcomeInputChange} style={{ ...inputStyle, height: '80px' }} />
+                  </div>
+                </div>
+
+                {/* 按钮文字部分 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>按钮 (中)</label>
+                    <input name="button_text_zh" value={welcomeFormData.button_text_zh} onChange={handleWelcomeInputChange} placeholder="立即体验" style={inputStyle} required />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>按钮 (英)</label>
+                    <input name="button_text_en" value={welcomeFormData.button_text_en} onChange={handleWelcomeInputChange} placeholder="Start" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px', fontWeight: 700 }}>按钮 (缅)</label>
+                    <input name="button_text_my" value={welcomeFormData.button_text_my} onChange={handleWelcomeInputChange} style={inputStyle} />
+                  </div>
+                </div>
+
+                {/* 图片上传区域 */}
+                <div style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '20px', borderRadius: '20px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '12px', fontWeight: 700 }}>欢迎页 Logo/展示图</label>
+                  <button 
+                    type="button" 
+                    onClick={() => tutorialFileInputRef.current?.click()} 
+                    disabled={uploading} 
+                    style={{ 
+                      width: '100%',
+                      padding: '18px', 
+                      borderRadius: '16px', 
+                      background: uploading ? 'rgba(255,255,255,0.1)' : 'rgba(245, 158, 11, 0.1)', 
+                      border: '2px dashed #f59e0b', 
+                      color: '#f59e0b', 
+                      fontWeight: 800,
+                      cursor: uploading ? 'wait' : 'pointer', 
+                      fontSize: '1rem',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {uploading ? '⌛ 正在上传中...' : '📸 点击选择图片并上传'}
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={tutorialFileInputRef} 
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        setUploading(true);
+                        const base64 = await readFileAsBase64(file);
+                        const response = await fetch('/.netlify/functions/upload-banner', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ fileName: file.name, contentType: file.type, base64 })
+                        });
+                        const result = await response.json();
+                        if (!response.ok || !result?.url) throw new Error(result?.error || '上传失败');
+                        setWelcomeFormData(prev => ({ ...prev, image_url: result.url }));
+                      } catch (error) {
+                        console.error('上传图片异常:', error);
+                        alert('上传失败');
+                      } finally {
+                        setUploading(false);
+                      }
+                    }} 
+                    accept="image/*" 
+                    style={{ display: 'none' }} 
+                  />
+                  {welcomeFormData.image_url && (
+                    <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#f59e0b', fontSize: '0.85rem', fontWeight: 700 }}>
+                      <span>✅ 图片已就绪</span>
+                      <img src={welcomeFormData.image_url} alt="preview" style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* 颜色与倒计时设置 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px' }}>背景渐变(起)</label>
+                    <input type="color" name="bg_color_start" value={welcomeFormData.bg_color_start} onChange={handleWelcomeInputChange} style={{ ...inputStyle, height: '45px', padding: '4px' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px' }}>背景渐变(终)</label>
+                    <input type="color" name="bg_color_end" value={welcomeFormData.bg_color_end} onChange={handleWelcomeInputChange} style={{ ...inputStyle, height: '45px', padding: '4px' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '8px' }}>倒计时(秒)</label>
+                    <input type="number" name="countdown" value={welcomeFormData.countdown} onChange={handleWelcomeInputChange} style={inputStyle} />
+                  </div>
+                </div>
+
+                {/* 设置部分 */}
+                <div style={{ display: 'flex', gap: '12px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                  <input type="checkbox" id="welcome_is_active" name="is_active" checked={welcomeFormData.is_active} onChange={handleWelcomeInputChange} style={{ width: '20px', height: '20px' }} />
+                  <label htmlFor="welcome_is_active" style={{ fontSize: '0.9rem', fontWeight: 600 }}>立即启用该欢迎页 (注意：只能有一个活跃欢迎页)</label>
+                </div>
+              </form>
+            </div>
+
+            {/* 固定底部按钮 */}
+            <div style={{ padding: '24px', borderTop: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15, 23, 42, 0.5)' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  onClick={() => setShowWelcomeEditModal(false)}
+                  style={{ flex: 1, padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontWeight: 700, cursor: 'pointer' }}
+                >取消</button>
+                <button 
+                  form="welcomeForm"
+                  type="submit" 
+                  style={{ flex: 2, padding: '16px', borderRadius: '16px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 8px 20px rgba(245, 158, 11, 0.3)' }}
+                >
+                  {editingWelcomeScreen ? '保存修改' : '确认发布'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -690,6 +1023,46 @@ const BannerManagement: React.FC = () => {
         </div>
       ) : (
         <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', marginTop: '40px' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ width: '4px', height: '24px', background: '#f59e0b', borderRadius: '2px' }} />
+              当前欢迎页面
+            </h2>
+            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', color: '#f59e0b', fontWeight: 600 }}>
+              {welcomeScreens.length} 个配置
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+            {welcomeScreens.map(screen => (
+              <div key={screen.id} style={{ ...cardStyle, padding: '0', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ height: '140px', background: `linear-gradient(135deg, ${screen.bg_color_start}, ${screen.bg_color_end})`, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {screen.image_url ? (
+                    <Image src={screen.image_url} style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
+                  ) : (
+                    <Text style={{ fontSize: '2rem' }}>👋</Text>
+                  )}
+                  {screen.is_active && (
+                    <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#10b981', padding: '4px 12px', borderRadius: '20px', fontSize: '0.7rem', color: 'white', fontWeight: 700 }}>活跃中</div>
+                  )}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px', background: 'linear-gradient(to top, rgba(0,0,0,0.5), transparent)' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'white' }}>{screen.title_zh}</h3>
+                  </div>
+                </div>
+                <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', margin: 0 }}>{screen.description_zh.substring(0, 50)}...</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#f59e0b' }}>倒计时: {screen.countdown}s</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleWelcomeEdit(screen)} style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '0.8rem', cursor: 'pointer' }}>编辑</button>
+                      <button onClick={() => screen.id && handleWelcomeDelete(screen.id)} style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer' }}>删除</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', marginTop: '40px' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ width: '4px', height: '24px', background: '#10b981', borderRadius: '2px' }} />

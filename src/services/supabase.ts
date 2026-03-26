@@ -238,6 +238,29 @@ export interface AuditLog {
   created_at?: string;
 }
 
+// 欢迎页面接口
+export interface WelcomeScreen {
+  id?: string;
+  title_zh: string;
+  title_en?: string;
+  title_my?: string;
+  description_zh: string;
+  description_en?: string;
+  description_my?: string;
+  button_text_zh: string;
+  button_text_en?: string;
+  button_text_my?: string;
+  image_url: string; // 对应 logo-large.png
+  bg_color_start?: string;
+  bg_color_end?: string;
+  button_color_start?: string;
+  button_color_end?: string;
+  countdown: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 🚀 新增：使用教学服务
 export const tutorialService = {
   async getAllTutorials(): Promise<Tutorial[]> {
@@ -287,6 +310,60 @@ export const tutorialService = {
       return true;
     } catch (err) {
       console.error('删除教学失败:', err);
+      return false;
+    }
+  }
+};
+
+// 🚀 新增：欢迎页面服务
+export const welcomeScreenService = {
+  async getAllWelcomeScreens(): Promise<WelcomeScreen[]> {
+    try {
+      const { data, error } = await supabase
+        .from('welcome_screens')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('获取欢迎页面列表失败:', error);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      console.error('获取欢迎页面列表异常:', err);
+      return [];
+    }
+  },
+
+  async createWelcomeScreen(screen: Omit<WelcomeScreen, 'id' | 'created_at' | 'updated_at'>): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('welcome_screens').insert([screen]);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('创建欢迎页面失败:', err);
+      return false;
+    }
+  },
+
+  async updateWelcomeScreen(id: string, screen: Partial<WelcomeScreen>): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('welcome_screens').update(screen).eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('更新欢迎页面失败:', err);
+      return false;
+    }
+  },
+
+  async deleteWelcomeScreen(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('welcome_screens').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('删除欢迎页面失败:', err);
       return false;
     }
   }

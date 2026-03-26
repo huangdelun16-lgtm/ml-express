@@ -159,6 +159,29 @@ export interface UserNotification {
   created_at: string;
 }
 
+// 欢迎页面接口
+export interface WelcomeScreen {
+  id?: string;
+  title_zh: string;
+  title_en?: string;
+  title_my?: string;
+  description_zh: string;
+  description_en?: string;
+  description_my?: string;
+  button_text_zh: string;
+  button_text_en?: string;
+  button_text_my?: string;
+  image_url: string; // 对应 logo-large.png
+  bg_color_start?: string;
+  bg_color_end?: string;
+  button_color_start?: string;
+  button_color_end?: string;
+  countdown: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // 教学步骤接口
 export interface Tutorial {
   id?: string;
@@ -2031,6 +2054,30 @@ export const tutorialService = {
     } catch (err) {
       LoggerService.error('获取教学列表异常:', err);
       return [];
+    }
+  }
+};
+
+// 🚀 新增：欢迎页面服务
+export const welcomeScreenService = {
+  async getActiveWelcomeScreen(): Promise<WelcomeScreen | null> {
+    try {
+      const { data, error } = await supabase
+        .from('welcome_screens')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) {
+        LoggerService.error('获取活跃欢迎页失败:', error);
+        return null;
+      }
+      return data;
+    } catch (err) {
+      LoggerService.error('获取活跃欢迎页异常:', err);
+      return null;
     }
   }
 };
