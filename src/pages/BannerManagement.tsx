@@ -142,6 +142,29 @@ const BannerManagement: React.FC = () => {
     }
   };
 
+  const handleWelcomeFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploading(true);
+      const base64 = await readFileAsBase64(file);
+      const response = await fetch('/.netlify/functions/upload-banner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type, base64 })
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.url) throw new Error(result?.error || '上传失败');
+      setWelcomeFormData(prev => ({ ...prev, image_url: result.url }));
+    } catch (error) {
+      console.error('上传图片异常:', error);
+      alert('上传失败');
+    } finally {
+      setUploading(false);
+      if (tutorialFileInputRef.current) tutorialFileInputRef.current.value = '';
+    }
+  };
+
   const handleTutorialFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -661,27 +684,7 @@ const BannerManagement: React.FC = () => {
                   <input 
                     type="file" 
                     ref={tutorialFileInputRef} 
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      try {
-                        setUploading(true);
-                        const base64 = await readFileAsBase64(file);
-                        const response = await fetch('/.netlify/functions/upload-banner', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ fileName: file.name, contentType: file.type, base64 })
-                        });
-                        const result = await response.json();
-                        if (!response.ok || !result?.url) throw new Error(result?.error || '上传失败');
-                        setWelcomeFormData(prev => ({ ...prev, image_url: result.url }));
-                      } catch (error) {
-                        console.error('上传图片异常:', error);
-                        alert('上传失败');
-                      } finally {
-                        setUploading(false);
-                      }
-                    }} 
+                    onChange={handleWelcomeFileChange} 
                     accept="image/*" 
                     style={{ display: 'none' }} 
                   />
