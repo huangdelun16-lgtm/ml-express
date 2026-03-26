@@ -1,19 +1,18 @@
 [build]
-  command = "npm install --legacy-peer-deps && npm run build"
+  # 即使 UI 强制加了前缀，我们在这里强行指定为当前目录下的 build
   publish = "build"
+  command = "npm install --legacy-peer-deps && npm run build"
   functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
   NPM_FLAGS = "--legacy-peer-deps"
 
-# SPA重定向配置
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# 缓存控制
 [[headers]]
   for = "/*"
   [headers.values]
