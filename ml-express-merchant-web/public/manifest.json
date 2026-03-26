@@ -1,0 +1,25 @@
+{
+  "short_name": "ML Express",
+  "name": "MARKET LINK EXPRESS - 缅甸专业快递服务",
+  "icons": [
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "any"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#428cc9",
+  "background_color": "#ffffff"
+}

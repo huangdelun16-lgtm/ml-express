@@ -1,0 +1,7 @@
+Manual rebuild trigger after optimizing partner business hours and 24h algorithm.
+Timestamp: 2026-01-01 19:00:00
+Changes: 
+- Optimized checkStoreOpenStatus with support for overnight hours (e.g., 22:00 - 02:00)
+- Improved ProfilePage UI with 24h time pickers for better mobile/web compatibility
+- Fixed time parsing bugs across Mall and Product pages
+- Synchronized business logic between Web and Mobile clients

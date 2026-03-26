@@ -1,0 +1,81 @@
+[build]
+  base = "ml-express-client-web"
+  command = "npm install --legacy-peer-deps && npm run build"
+  publish = "build"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# SPA重定向配置 - 解决React Router路由问题
+[[redirects]]
+  from = "/download"
+  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express.apk"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/download-rider"
+  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-rider.apk"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/download-rider"
+  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-rider.apk"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/download-rider"
+  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-rider.apk"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 缓存控制 - 强制浏览器和CDN获取最新版本
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    Pragma = "no-cache"
+    Expires = "0"
+    X-Content-Type-Options = "nosniff"
+    X-Cache-Control = "no-cache"
+
+# HTML文件绝对不缓存
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    Pragma = "no-cache"
+    Expires = "0"
+    X-Content-Type-Options = "nosniff"
+
+# JS和CSS文件 - 虽然文件名包含hash，但为了确保Safari更新，也设置不缓存
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    Pragma = "no-cache"
+    Expires = "0"
+
+# 环境变量
+# 注意：敏感信息（如 Supabase 密钥）应在 Netlify Dashboard 中配置
+# Dashboard 中的环境变量优先级高于此文件中的配置
+# 访问：Site settings → Environment variables
+
+[context.production.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+[context.deploy-preview.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+[context.branch-deploy.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+

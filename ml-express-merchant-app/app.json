@@ -1,0 +1,98 @@
+{
+  "expo": {
+    "name": "ML EXPRESS MERCHANTS",
+    "slug": "ml-express-merchants",
+    "version": "1.0.0", 
+    "scheme": "ml-express-merchants",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "description": "MARKET LINK EXPRESS - 专业的快递配送服务平台，提供快速、安全、可靠的包裹配送服务。支持实时追踪、多语言界面和智能路线规划。",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E86AB"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mlexpress.merchants",
+      "buildNumber": "57",
+      "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS需要访问您的位置信息以提供准确的配送服务和包裹追踪功能。",
+        "NSCameraUsageDescription": "MARKET LINK EXPRESS需要访问您的相机以扫描二维码和拍摄包裹验证照片。",
+        "NSPhotoLibraryUsageDescription": "MARKET LINK EXPRESS需要访问您的相册以保存二维码和包裹图片。",
+        "NSPhotoLibraryAddUsageDescription": "MARKET LINK EXPRESS需要访问您的相册以保存付款二维码。",
+        "CFBundleDisplayName": "MARKET LINK EXPRESS",
+        "CFBundleName": "MARKET LINK EXPRESS",
+        "CFBundleShortVersionString": "2.3.5",
+        "CFBundleVersion": "57",
+        "LSRequiresIPhoneOS": true,
+        "UILaunchStoryboardName": "SplashScreen",
+        "UIRequiredDeviceCapabilities": [
+          "armv7"
+        ],
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "AudioInterfaceOrientationLandscapeLeft",
+          "AudioInterfaceOrientationLandscapeRight"
+        ]
+      },
+      "config": {
+        "usesNonExemptEncryption": false,
+        "googleMapsApiKey": "AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI"
+      },
+      "associatedDomains": [
+        "applinks:mlexpress.com",
+        "applinks:www.mlexpress.com"
+      ]
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2E86AB"
+      },
+      "package": "com.mlexpress.merchants",
+      "versionCode": 57,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "80b0873d-1d76-429e-8c79-738a817d8a15"
+      },
+      "googleMapsApiKey": "AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI",
+      "googlePlacesApiKey": "AIzaSyC952oez7KyjH9A_Ria4Grbgv2qkW7vCYk"
+    },
+    "owner": "amt349"
+  }
+}
