@@ -716,57 +716,17 @@ const ProfilePage: React.FC = () => {
       try {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
-        setUserBalance(user.balance || 0); // 🚀 获取余额
         setIsGuest(false);
+        setIsPartnerStore(true); // 🚀 商家端强制为 true
 
-      // 🚀 实时从数据库同步最新余额和用户信息
-      if (user.id) {
-        try {
-          const isMerchant = user.user_type === 'merchant' || await checkIfPartnerStore(user);
-          const syncTable = isMerchant ? 'delivery_stores' : 'users';
-          const selectFields = isMerchant 
-            ? 'store_name, phone, email, address' 
-            : 'balance, user_type, name, phone, email, address';
-
-          const { data: latestRaw, error: userError } = await supabase
-            .from(syncTable)
-            .select(selectFields)
-            .eq('id', user.id)
-            .maybeSingle();
-          
-          if (!userError && latestRaw) {
-            console.log('✅ Web端用户信息同步成功:', latestRaw);
-            const rawData = latestRaw as any;
-            const latestUser: any = { ...user, ...rawData };
-            
-            if (isMerchant) {
-              latestUser.name = rawData.store_name;
-              latestUser.user_type = 'merchant';
-              setUserBalance(0);
-            } else {
-              setUserBalance(rawData.balance || 0);
-            }
-
-            setCurrentUser(latestUser);
-            localStorage.setItem('ml-express-customer', JSON.stringify(latestUser));
-          }
-        } catch (error) {
-          console.warn('获取最新用户信息失败');
-        }
-      }
-        
-        // 检查是否是合伙店铺账户
-        const isPartner = await checkIfPartnerStore(user);
-        setIsPartnerStore(isPartner);
-        
-        // 如果是合伙店铺，加载店铺信息
-        if (isPartner && (user.store_code || user.store_id)) {
+        // 🚀 加载店铺信息
+        if (user.id || user.store_id) {
           try {
+            const storeId = user.store_id || user.id;
             const { data: store, error } = await supabase
               .from('delivery_stores')
               .select('*')
-              .eq('store_code', user.store_code || '')
-              .or(`id.eq.${user.store_id || ''}`)
+              .eq('id', storeId)
               .maybeSingle();
             
             if (!error && store) {
@@ -784,15 +744,12 @@ const ProfilePage: React.FC = () => {
       } catch (error) {
         LoggerService.error('加载用户信息失败:', error);
         setCurrentUser(null);
-        setIsPartnerStore(false);
-        setIsGuest(true);
+        setIsPartnerStore(true);
       }
     } else {
-      // 如果未登录，重定向到首页
-      setIsGuest(true);
-      navigate('/');
+      navigate('/login');
     }
-  }, [navigate, checkIfPartnerStore]);
+  }, [navigate]);
 
   // 加载用户的包裹列表
   const loadUserPackages = useCallback(async () => {
@@ -1993,100 +1950,9 @@ const ProfilePage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 🚀 新增：余额显示和充值按钮 */}
-                {!isPartnerStore && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{
-                      background: 'rgba(251, 191, 36, 0.15)',
-                      padding: '0.6rem 1.5rem',
-                      borderRadius: '14px',
-                      border: '1px solid rgba(251, 191, 36, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.8rem',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }}>
-                      <span style={{ fontSize: '1.2rem' }}>💰</span>
-                      <div>
-                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>
-                          {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}
-                        </div>
-                        <div style={{ color: '#fbbf24', fontSize: '1.1rem', fontWeight: '900' }}>
-                          {userBalance.toLocaleString()} <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>MMK</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={() => setShowRechargeModal(true)}
-                      style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '0.8rem 1.8rem',
-                        borderRadius: '14px',
-                        fontSize: '1rem',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.5)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)';
-                      }}
-                    >
-                      {language === 'zh' ? '立即充值' : language === 'en' ? 'Recharge' : 'ငွေဖြည့်မည်'}
-                    </button>
-                  </div>
-                )}
-                
-                {/* 🚀 新增：编辑资料按钮 */}
-                {currentUser && (
-                  <button
-                    onClick={handleOpenEditProfile}
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.1)',
-                      color: 'white',
-                      border: '1px solid rgba(59, 130, 246, 0.3)',
-                      padding: '0.6rem 1.5rem',
-                      borderRadius: '14px',
-                      fontSize: '0.95rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.6rem',
-                      whiteSpace: 'nowrap',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
-                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.2)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
-                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                    }}
-                  >
-                    <span style={{ fontSize: '1.1rem' }}>📝</span>
-                    {language === 'zh' ? '编辑资料' : language === 'en' ? 'Edit Profile' : 'ကိုယ်ရေးအချက်အလက်ပြင်ဆင်ရန်'}
-                  </button>
-                )}
-
-                {/* 合伙店铺：修改密码按钮 */}
-                {isPartnerStore && (
+                {/* 🚀 商家端：只显示商家资料，不显示会员/充值信息 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  {/* 修改密码按钮 */}
                   <button
                     onClick={() => setShowPasswordModal(true)}
                     style={{
@@ -2110,22 +1976,17 @@ const ProfilePage: React.FC = () => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
                       e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.2)';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                       e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
                       e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                     }}
                   >
                     <span style={{ fontSize: '1.1rem' }}>🔐</span>
                     {language === 'zh' ? '安全设置' : language === 'en' ? 'Security' : 'လုံခြုံရေး'}
                   </button>
-                )}
 
-                {/* 🚀 新增：我的商品管理按钮 */}
-                {isPartnerStore && (
                   <button
                     onClick={() => setShowProductsModal(true)}
                     style={{
@@ -2140,6 +2001,26 @@ const ProfilePage: React.FC = () => {
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       alignItems: 'center',
+                      gap: '0.6rem',
+                      whiteSpace: 'nowrap',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.6)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>📦</span>
+                    {language === 'zh' ? '管理商品' : language === 'en' ? 'Products' : 'ပစ္စည်းစီမံရန်'}
+                  </button>
+                </div>
                       gap: '0.6rem',
                       whiteSpace: 'nowrap',
                       backdropFilter: 'blur(10px)',

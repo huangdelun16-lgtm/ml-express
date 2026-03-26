@@ -68,7 +68,7 @@ const LoginPage: React.FC = () => {
         store_code: store.store_code,
       };
 
-      localStorage.setItem('currentUser', JSON.stringify(merchantsUser));
+      localStorage.setItem('ml-express-customer', JSON.stringify(merchantsUser));
       localStorage.setItem('userType', 'merchant');
       
       navigate('/');
