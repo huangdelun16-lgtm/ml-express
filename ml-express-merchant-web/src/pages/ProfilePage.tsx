@@ -2947,12 +2947,14 @@ const ProfilePage: React.FC = () => {
                         onClick={() => handleUpdateStoreStatus(businessStatus)}
                         disabled={isSavingStatus}
                         style={{
+                          width: '123px',
+                          height: '56px',
                           background: isSavingStatus ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '16px',
-                          padding: '1rem 2.5rem',
-                          fontSize: '1.1rem',
+                          padding: 0,
+                          fontSize: '0.95rem',
                           fontWeight: '900',
                           cursor: isSavingStatus ? 'not-allowed' : 'pointer',
                           transition: 'all 0.3s ease',
@@ -2960,10 +2962,9 @@ const ProfilePage: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '0.8rem',
+                          gap: '8px',
                           zIndex: 1,
-                          whiteSpace: 'nowrap',
-                          minWidth: '140px'
+                          whiteSpace: 'nowrap'
                         }}
                         onMouseOver={(e) => {
                           if (!isSavingStatus) {
@@ -3003,20 +3004,21 @@ const ProfilePage: React.FC = () => {
                         onClick={handleExtendHour}
                         disabled={isSavingStatus}
                         style={{
-                          flex: 1,
+                          width: '123px',
+                          height: '56px',
                           background: 'rgba(16, 185, 129, 0.1)',
                           color: '#10b981',
                           border: '1px solid rgba(16, 185, 129, 0.3)',
-                          padding: '14px',
+                          padding: '4px',
                           borderRadius: '18px',
-                          fontSize: '1rem',
+                          fontSize: '0.8rem',
                           fontWeight: '800',
                           cursor: isSavingStatus ? 'not-allowed' : 'pointer',
                           transition: 'all 0.3s ease',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '10px'
+                          gap: '6px'
                         }}
                         onMouseOver={(e) => {
                           if (!isSavingStatus) {
@@ -3038,20 +3040,21 @@ const ProfilePage: React.FC = () => {
                         onClick={handleCloseImmediately}
                         disabled={isSavingStatus}
                         style={{
-                          flex: 1,
+                          width: '123px',
+                          height: '56px',
                           background: 'rgba(239, 68, 68, 0.1)',
                           color: '#ef4444',
                           border: '1px solid rgba(239, 68, 68, 0.3)',
-                          padding: '14px',
+                          padding: '4px',
                           borderRadius: '18px',
-                          fontSize: '1rem',
+                          fontSize: '0.8rem',
                           fontWeight: '800',
                           cursor: isSavingStatus ? 'not-allowed' : 'pointer',
                           transition: 'all 0.3s ease',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '10px'
+                          gap: '6px'
                         }}
                         onMouseOver={(e) => {
                           if (!isSavingStatus) {
