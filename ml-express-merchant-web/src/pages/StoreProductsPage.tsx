@@ -111,20 +111,22 @@ const StoreProductsPage: React.FC = () => {
               background: 'rgba(255, 255, 255, 0.1)',
               color: 'white', 
               border: '1px solid rgba(255, 255, 255, 0.2)', 
-              padding: '0.75rem 1.5rem', 
-              borderRadius: '14px',
+              padding: '0.6rem 1.2rem', 
+              borderRadius: '12px',
               fontWeight: '700', 
               cursor: 'pointer', 
               transition: 'all 0.3s ease',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '8px',
+              fontSize: '0.9rem',
+              whiteSpace: 'nowrap'
             }}
             onClick={() => navigate('/')}
             onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
             onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
           >
-            <span>←</span> {language === 'zh' ? '返回概况' : 'Back'}
+            <span>←</span> {language === 'zh' ? '返回' : 'Back'}
           </button>
         </div>
 

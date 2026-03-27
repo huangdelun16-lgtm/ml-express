@@ -82,12 +82,25 @@ const TrackingPage: React.FC = () => {
           </div>
           <button 
             style={{ 
-              background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)',
-              padding: '0.8rem 1.5rem', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer'
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: 'white', 
+              border: '1px solid rgba(255, 255, 255, 0.2)', 
+              padding: '0.6rem 1.2rem', 
+              borderRadius: '12px',
+              fontWeight: '700', 
+              cursor: 'pointer', 
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.9rem',
+              whiteSpace: 'nowrap'
             }}
             onClick={() => navigate('/')}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
           >
-            返回概况
+            <span>←</span> {language === 'zh' ? '返回' : 'Back'}
           </button>
         </div>
 
