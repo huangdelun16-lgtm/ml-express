@@ -3485,32 +3485,39 @@ const ProfilePage: React.FC = () => {
               ))}
               </div>
 
-              {/* 分页控件 */}
+              {/* 分页控件 - 指挥中心风格 */}
               {userPackages.length > packagesPerPage && (
                 <div style={{
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  gap: '1rem',
-                  marginTop: '2rem'
+                  gap: '0.75rem',
+                  marginTop: '2.5rem',
+                  padding: '1rem',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  alignSelf: 'center'
                 }}>
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
                     style={{
-                      background: currentPage === 1 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
+                      background: 'rgba(255, 255, 255, 0.05)',
                       color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      padding: '0.6rem 1.2rem',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      width: '40px',
+                      height: '40px',
                       borderRadius: '12px',
                       cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold',
-                      transition: 'all 0.3s ease',
-                      opacity: currentPage === 1 ? 0.5 : 1
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                      opacity: currentPage === 1 ? 0.3 : 1
                     }}
                   >
-                    {language === 'zh' ? '上一页' : language === 'en' ? 'Prev' : 'ယခင်'}
+                    <span style={{ fontSize: '1.2rem' }}>‹</span>
                   </button>
 
                   <div style={{
@@ -3523,16 +3530,17 @@ const ProfilePage: React.FC = () => {
                         key={page}
                         onClick={() => setCurrentPage(page)}
                         style={{
-                          background: currentPage === page ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
+                          background: currentPage === page ? '#3b82f6' : 'transparent',
                           color: 'white',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          border: currentPage === page ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
                           width: '36px',
                           height: '36px',
                           borderRadius: '10px',
                           cursor: 'pointer',
                           fontSize: '0.9rem',
-                          fontWeight: 'bold',
-                          transition: 'all 0.3s ease'
+                          fontWeight: '800',
+                          transition: 'all 0.2s ease',
+                          boxShadow: currentPage === page ? '0 4px 12px rgba(59, 130, 246, 0.4)' : 'none'
                         }}
                       >
                         {page}
@@ -3544,19 +3552,21 @@ const ProfilePage: React.FC = () => {
                     onClick={() => setCurrentPage(prev => Math.min(Math.ceil(userPackages.length / packagesPerPage), prev + 1))}
                     disabled={currentPage === Math.ceil(userPackages.length / packagesPerPage)}
                     style={{
-                      background: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
+                      background: 'rgba(255, 255, 255, 0.05)',
                       color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      padding: '0.6rem 1.2rem',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      width: '40px',
+                      height: '40px',
                       borderRadius: '12px',
                       cursor: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 'not-allowed' : 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold',
-                      transition: 'all 0.3s ease',
-                      opacity: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 0.5 : 1
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                      opacity: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 0.3 : 1
                     }}
                   >
-                    {language === 'zh' ? '下一页' : language === 'en' ? 'Next' : 'နောက်စာ'}
+                    <span style={{ fontSize: '1.2rem' }}>›</span>
                   </button>
                 </div>
               )}

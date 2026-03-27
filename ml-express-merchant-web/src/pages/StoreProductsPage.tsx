@@ -17,11 +17,15 @@ const StoreProductsPage: React.FC = () => {
   useEffect(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
     if (savedUser) {
-      const user = JSON.parse(savedUser);
-      setCurrentUser(user);
-      const storeId = user.store_id || user.id;
-      if (storeId) {
-        loadStoreData(storeId);
+      try {
+        const user = JSON.parse(savedUser);
+        setCurrentUser(user);
+        const storeId = user.store_id || user.id;
+        if (storeId) {
+          loadStoreData(storeId);
+        }
+      } catch (e) {
+        navigate('/login');
       }
     } else {
       navigate('/login');
@@ -53,7 +57,13 @@ const StoreProductsPage: React.FC = () => {
   const homeBackground = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
 
   return (
-    <div style={{ minHeight: '100vh', background: homeBackground, color: 'white', padding: '2rem' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: homeBackground, 
+      color: 'white', 
+      padding: window.innerWidth < 768 ? '1rem' : '2rem',
+      fontFamily: "'Inter', sans-serif"
+    }}>
       <NavigationBar 
         language={language}
         onLanguageChange={setLanguage}
@@ -62,47 +72,154 @@ const StoreProductsPage: React.FC = () => {
       />
 
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-          <div>
-            <h1 style={{ fontSize: '2.2rem', fontWeight: '900', margin: 0 }}>🛍️ {t?.profile?.myProducts || '商品管理'}</h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem' }}>管理您店铺的在线商品与库存</p>
+        {/* 精致页眉 */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '3rem',
+          background: 'rgba(255, 255, 255, 0.03)',
+          padding: '2rem',
+          borderRadius: '30px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <div style={{ 
+              width: '60px', 
+              height: '60px', 
+              borderRadius: '18px', 
+              background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2rem',
+              boxShadow: '0 10px 20px rgba(245, 158, 11, 0.3)'
+            }}>🛍️</div>
+            <div>
+              <h1 style={{ fontSize: '1.8rem', fontWeight: '900', margin: 0, letterSpacing: '-0.5px' }}>
+                {t?.profile?.myProducts || '商品管理'}
+              </h1>
+              <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '4px', fontSize: '0.9rem', fontWeight: '500' }}>
+                {store?.store_name} · 在线商品 {products.length} 件
+              </p>
+            </div>
           </div>
+          
           <button 
             style={{ 
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              color: 'white', border: 'none', padding: '0.8rem 1.5rem', borderRadius: '12px',
-              fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: 'white', 
+              border: '1px solid rgba(255, 255, 255, 0.2)', 
+              padding: '0.75rem 1.5rem', 
+              borderRadius: '14px',
+              fontWeight: '700', 
+              cursor: 'pointer', 
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
             onClick={() => navigate('/')}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
           >
-            返回概况
+            <span>←</span> {language === 'zh' ? '返回概况' : 'Back'}
           </button>
         </div>
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '10rem 0' }}>
-            <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.1)', borderTop: '4px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }}></div>
+            <div className="spinner" style={{ 
+              width: '40px', 
+              height: '40px', 
+              border: '4px solid rgba(255,255,255,0.1)', 
+              borderTop: '4px solid #fbbf24', 
+              borderRadius: '50%', 
+              animation: 'spin 1s linear infinite', 
+              margin: '0 auto' 
+            }}></div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '2rem' }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+            gap: '2rem' 
+          }}>
             {products.map((product) => (
-              <div key={product.id} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', backdropFilter: 'blur(10px)' }}>
-                <div style={{ height: '200px', background: 'rgba(255,255,255,0.02)', position: 'relative' }}>
+              <div 
+                key={product.id} 
+                style={{ 
+                  background: 'rgba(255,255,255,0.05)', 
+                  borderRadius: '28px', 
+                  border: '1px solid rgba(255,255,255,0.1)', 
+                  overflow: 'hidden', 
+                  backdropFilter: 'blur(15px)',
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                  cursor: 'default'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-10px)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                }}
+              >
+                <div style={{ height: '220px', background: 'rgba(255,255,255,0.02)', position: 'relative' }}>
                   {product.image_url ? (
                     <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '3rem' }}>📦</div>
+                    <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '4rem', opacity: 0.2 }}>📦</div>
                   )}
-                  <div style={{ position: 'absolute', top: '15px', right: '15px', background: product.is_available ? '#10b981' : '#ef4444', color: 'white', padding: '4px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                    {product.is_available ? '上架中' : '已下架'}
+                  
+                  {/* 状态标签 */}
+                  <div style={{ 
+                    position: 'absolute', 
+                    top: '20px', 
+                    right: '20px', 
+                    background: product.is_available ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)', 
+                    color: 'white', 
+                    padding: '6px 14px', 
+                    borderRadius: '12px', 
+                    fontSize: '0.75rem', 
+                    fontWeight: '800',
+                    backdropFilter: 'blur(4px)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                  }}>
+                    {product.is_available ? 'ON SALE' : 'OFF SHELF'}
                   </div>
                 </div>
-                <div style={{ padding: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: '0 0 0.5rem 0' }}>{product.name}</h3>
-                  <p style={{ color: '#fbbf24', fontSize: '1.4rem', fontWeight: '900', margin: '0 0 1rem 0' }}>{product.price.toLocaleString()} MMK</p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>
-                    <span>库存: {product.stock === -1 ? '无限' : product.stock}</span>
-                    <span>已售: {product.sales_count || 0}</span>
+
+                <div style={{ padding: '1.75rem' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '0 0 0.5rem 0', color: 'white' }}>{product.name}</h3>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '1.5rem' }}>
+                    <span style={{ color: '#fbbf24', fontSize: '1.6rem', fontWeight: '900' }}>{product.price.toLocaleString()}</span>
+                    <span style={{ color: '#fbbf24', fontSize: '0.9rem', fontWeight: '700' }}>MMK</span>
+                  </div>
+                  
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '1rem',
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(255,255,255,0.05)'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>库存状态</span>
+                      <span style={{ color: 'white', fontWeight: '800', fontSize: '0.95rem' }}>
+                        {product.stock === -1 ? '无限供应' : `${product.stock} 件`}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>累计销量</span>
+                      <span style={{ color: '#10b981', fontWeight: '800', fontSize: '0.95rem' }}>{product.sales_count || 0}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -111,9 +228,18 @@ const StoreProductsPage: React.FC = () => {
         )}
 
         {!loading && products.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '8rem 0', background: 'rgba(255,255,255,0.03)', borderRadius: '32px', border: '2px dashed rgba(255,255,255,0.1)' }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🛒</div>
-            <h3 style={{ color: 'rgba(255,255,255,0.5)' }}>暂无商品，请在移动端 App 或管理后台添加</h3>
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '10rem 0', 
+            background: 'rgba(255,255,255,0.02)', 
+            borderRadius: '40px', 
+            border: '2px dashed rgba(255,255,255,0.1)' 
+          }}>
+            <div style={{ fontSize: '5rem', marginBottom: '1.5rem', opacity: 0.3 }}>🛒</div>
+            <h3 style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.5rem', fontWeight: '700' }}>
+              暂无商品数据
+            </h3>
+            <p style={{ color: 'rgba(255,255,255,0.2)', marginTop: '0.5rem' }}>请在移动端 App 或管理后台同步商品</p>
           </div>
         )}
       </div>
