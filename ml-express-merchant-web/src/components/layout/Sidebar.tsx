@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Logo from '../Logo';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -7,16 +7,33 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
+  const [isAccountExpanded, setIsAccountExpanded] = useState(false);
 
-  const menuItems = [
+  // 🚀 自动根据路径展开菜单
+  useEffect(() => {
+    if (location.pathname === '/') {
+      setIsAccountExpanded(true);
+    }
+  }, [location.pathname]);
+
+  const mainMenuItems = [
     { id: '/', label: language === 'zh' ? '我的账号' : 'My Account', icon: '👤' },
     { id: '/orders', label: language === 'zh' ? '订单列表' : 'Orders', icon: '📋' },
     { id: '/products', label: language === 'zh' ? '商品管理' : 'Products', icon: '🛍️' },
+  ];
+
+  const subMenuItems = [
     { id: 'cod-stats', label: language === 'zh' ? '代收款统计' : 'COD Stats', icon: '💰' },
     { id: 'business-hours', label: language === 'zh' ? '营业时间' : 'Business Hours', icon: '⏰' },
   ];
 
   const handleMenuClick = (id: string) => {
+    if (id === '/') {
+      setIsAccountExpanded(!isAccountExpanded);
+      if (location.pathname !== '/') navigate('/');
+      return;
+    }
+
     if (id === 'cod-stats') {
       if (location.pathname !== '/') {
         navigate('/');
@@ -48,22 +65,53 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
       </div>
 
       <div style={menuContainerStyle}>
-        {menuItems.map((item) => {
+        {mainMenuItems.map((item) => {
           const isActive = location.pathname === item.id;
+          const hasSubMenu = item.id === '/';
+          
           return (
-            <div
-              key={item.id}
-              onClick={() => handleMenuClick(item.id)}
-              style={{
-                ...menuItemStyle,
-                background: isActive ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                color: isActive ? '#3b82f6' : 'rgba(255,255,255,0.6)',
-                borderRight: isActive ? '3px solid #3b82f6' : 'none',
-              }}
-            >
-              <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
-              <span style={{ fontWeight: isActive ? '800' : '500' }}>{item.label}</span>
-            </div>
+            <React.Fragment key={item.id}>
+              <div
+                onClick={() => handleMenuClick(item.id)}
+                style={{
+                  ...menuItemStyle,
+                  background: isActive ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                  color: isActive ? '#3b82f6' : 'rgba(255,255,255,0.6)',
+                  borderLeft: isActive ? '4px solid #3b82f6' : '4px solid transparent',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                  <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                  <span style={{ fontWeight: isActive ? '800' : '500' }}>{item.label}</span>
+                </div>
+                {hasSubMenu && (
+                  <span style={{ 
+                    fontSize: '0.8rem', 
+                    transform: isAccountExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s ease',
+                    opacity: 0.5
+                  }}>▼</span>
+                )}
+              </div>
+
+              {/* 🚀 子菜单区域 */}
+              {hasSubMenu && isAccountExpanded && (
+                <div style={subMenuWrapperStyle}>
+                  {subMenuItems.map(sub => (
+                    <div
+                      key={sub.id}
+                      onClick={() => handleMenuClick(sub.id)}
+                      style={subMenuItemStyle}
+                      onMouseOver={(e) => e.currentTarget.style.color = '#3b82f6'}
+                      onMouseOut={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.4)'}
+                    >
+                      <span style={{ fontSize: '1rem' }}>{sub.icon}</span>
+                      <span>{sub.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </React.Fragment>
           );
         })}
       </div>
@@ -77,7 +125,7 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
           </div>
         </div>
         <button onClick={onLogout} style={logoutButtonStyle}>
-          {language === 'zh' ? '安全退出' : 'Logout'} 退出
+          {language === 'zh' ? '安全退出' : 'Logout'}
         </button>
       </div>
     </div>
@@ -87,7 +135,7 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
 const sidebarStyle: React.CSSProperties = {
   width: '260px',
   height: '100vh',
-  background: 'rgba(15, 23, 42, 0.8)',
+  background: 'rgba(15, 23, 42, 0.95)',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
   borderRight: '1px solid rgba(255,255,255,0.05)',
@@ -119,11 +167,31 @@ const menuContainerStyle: React.CSSProperties = {
 const menuItemStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '12px',
-  padding: '1rem 1.5rem',
+  padding: '0.8rem 1.5rem',
   cursor: 'pointer',
   transition: 'all 0.3s ease',
   fontSize: '0.95rem',
+  marginBottom: '4px',
+};
+
+const subMenuWrapperStyle: React.CSSProperties = {
+  paddingLeft: '3.2rem',
+  marginBottom: '1rem',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+  marginTop: '8px',
+  animation: 'fadeIn 0.3s ease-out',
+};
+
+const subMenuItemStyle: React.CSSProperties = {
+  fontSize: '0.85rem',
+  color: 'rgba(255,255,255,0.4)',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  transition: 'color 0.2s ease',
 };
 
 const footerStyle: React.CSSProperties = {
