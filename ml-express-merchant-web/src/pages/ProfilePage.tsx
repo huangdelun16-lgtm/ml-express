@@ -32,7 +32,7 @@ const OrderQRCode: React.FC<{ orderId: string }> = ({ orderId }) => {
       QRCode.toDataURL(orderId).then(setQrUrl);
     }
   }, [orderId]);
-  return qrUrl ? <img src={qrUrl} style={{ width: '80px', height: '80px'  alt="QR" /> : null;
+  return qrUrl ? <img src={qrUrl} style={{ width: '80px', height: '80px' }} alt="QR" /> : null;
 };
 
 // 🚀 新增：高级滚动时间选择器组件
