@@ -77,7 +77,7 @@ const TimeWheelPicker: React.FC<{
         gap: '1.5rem',
         padding: '15px',
         background: 'rgba(0,0,0,0.3)',
-        borderRadius: '20px',
+        borderRadius: '24px',
         border: '1px solid rgba(255,255,255,0.05)',
         boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
       }}>
@@ -1838,7 +1838,7 @@ const ProfilePage: React.FC = () => {
         {/* 页面标题 */}
         <div style={{
           textAlign: 'left',
-          marginBottom: '3rem',
+          marginBottom: '1.5rem',
           marginTop: '1.5rem', // 🚀 增加顶部外边距，避开侧边栏
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
@@ -1846,7 +1846,7 @@ const ProfilePage: React.FC = () => {
         }}>
           <h1 style={{
             color: '#ffffff',
-            fontSize: '2.5rem',
+            fontSize: '1.75rem',
             marginBottom: '0.5rem',
             fontWeight: '900',
             letterSpacing: '-1px',
@@ -1861,8 +1861,8 @@ const ProfilePage: React.FC = () => {
         <div style={{
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(12px)',
-          borderRadius: '20px',
-          padding: '2rem',
+          borderRadius: '24px',
+          padding: '1.5rem',
           marginBottom: '2rem',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
@@ -1880,29 +1880,29 @@ const ProfilePage: React.FC = () => {
             borderBottom: '1px solid rgba(255,255,255,0.15)'
           }}>
             {/* 头像 */}
-            <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
+            
+            
+            {/* 用户基本信息 */}
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                  <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '16px',
               background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               border: '3px solid rgba(255, 255, 255, 0.9)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              fontSize: '2rem',
+              fontSize: '1.4rem',
               fontWeight: '700',
               color: '#0284c7',
               flexShrink: 0
             }}>
               {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
-            </div>
-            
-            {/* 用户基本信息 */}
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
-                  <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: '700' }}>
+            </div><div style={{ color: 'white', fontSize: '1.6rem', fontWeight: '900', letterSpacing: '0.5px' }}>
                     {currentUser.name || '-'}
                   </div>
                   <div style={{
@@ -2096,7 +2096,7 @@ const ProfilePage: React.FC = () => {
                     gap: '0.6rem',
                     background: 'rgba(255, 255, 255, 0.03)',
                     padding: '1.25rem',
-                    borderRadius: '20px',
+                    borderRadius: '24px',
                     border: '1px solid rgba(255, 255, 255, 0.05)',
                     transition: 'transform 0.3s ease'
                   }}>
@@ -2115,7 +2115,7 @@ const ProfilePage: React.FC = () => {
                     gap: '0.6rem',
                     background: 'rgba(255, 255, 255, 0.03)',
                     padding: '1.25rem',
-                    borderRadius: '20px',
+                    borderRadius: '24px',
                     border: '1px solid rgba(255, 255, 255, 0.05)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -2133,7 +2133,7 @@ const ProfilePage: React.FC = () => {
                     gap: '0.6rem',
                     background: 'rgba(255, 255, 255, 0.03)',
                     padding: '1.25rem',
-                    borderRadius: '20px',
+                    borderRadius: '24px',
                     border: '1px solid rgba(255, 255, 255, 0.05)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -2152,7 +2152,7 @@ const ProfilePage: React.FC = () => {
                     gap: '0.6rem',
                     background: 'rgba(255, 255, 255, 0.03)',
                     padding: '1.25rem',
-                    borderRadius: '20px',
+                    borderRadius: '24px',
                     border: '1px solid rgba(255, 255, 255, 0.05)',
                     gridColumn: window.innerWidth < 768 ? '1' : '1 / span 2',
                   }}>
@@ -2171,7 +2171,7 @@ const ProfilePage: React.FC = () => {
                     gap: '0.6rem',
                     background: 'rgba(255, 255, 255, 0.03)',
                     padding: '1.25rem',
-                    borderRadius: '20px',
+                    borderRadius: '24px',
                     border: '1px solid rgba(255, 255, 255, 0.05)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -2458,7 +2458,7 @@ const ProfilePage: React.FC = () => {
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center', 
-                  marginBottom: '3rem', 
+                  marginBottom: '1.5rem', 
                   flexWrap: 'wrap', 
                   gap: '2rem',
                   borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
@@ -3099,7 +3099,7 @@ const ProfilePage: React.FC = () => {
                   gap: '1.25rem',
                   background: 'rgba(255, 255, 255, 0.03)',
                   padding: '1.25rem',
-                  borderRadius: '20px',
+                  borderRadius: '24px',
                   border: '1px solid rgba(255, 255, 255, 0.05)'
                 }}>
                   <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.1)', width: '48px', height: '48px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🗓️</div>
@@ -3124,7 +3124,7 @@ const ProfilePage: React.FC = () => {
                   gap: '1.25rem',
                   background: 'rgba(255, 255, 255, 0.03)',
                   padding: '1.25rem',
-                  borderRadius: '20px',
+                  borderRadius: '24px',
                   border: '1px solid rgba(255, 255, 255, 0.05)'
                 }}>
                   <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.1)', width: '48px', height: '48px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📍</div>
@@ -3146,8 +3146,8 @@ const ProfilePage: React.FC = () => {
         <div style={{
           background: 'rgba(255, 255, 255, 0.15)',
           backdropFilter: 'blur(20px)',
-          borderRadius: '20px',
-          padding: '2rem',
+          borderRadius: '24px',
+          padding: '1.5rem',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
           opacity: isVisible ? 1 : 0,
@@ -3274,7 +3274,7 @@ const ProfilePage: React.FC = () => {
                       background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
                       color: 'white',
                       padding: '0.4rem 0.9rem',
-                      borderRadius: '20px',
+                      borderRadius: '24px',
                       fontSize: '0.85rem',
                       fontWeight: 'bold',
                       whiteSpace: 'nowrap'
@@ -3289,7 +3289,7 @@ const ProfilePage: React.FC = () => {
                         color: 'white',
                         border: `1px solid ${getPaymentMethodBorderColor(pkg.payment_method)}`,
                         padding: '0.4rem 0.9rem',
-                        borderRadius: '20px',
+                        borderRadius: '24px',
                         fontSize: '0.85rem',
                         fontWeight: 'bold',
                         whiteSpace: 'nowrap'
@@ -3308,7 +3308,7 @@ const ProfilePage: React.FC = () => {
                             color: '#fbbf24',
                             border: '1px solid rgba(251, 191, 36, 0.3)',
                             padding: '0.4rem 0.9rem',
-                            borderRadius: '20px',
+                            borderRadius: '24px',
                             fontSize: '0.85rem',
                             fontWeight: 'bold',
                             whiteSpace: 'nowrap'
@@ -3327,7 +3327,7 @@ const ProfilePage: React.FC = () => {
                         color: '#fca5a5',
                         border: '1px solid rgba(239, 68, 68, 0.3)',
                         padding: '0.4rem 0.9rem',
-                        borderRadius: '20px',
+                        borderRadius: '24px',
                         fontSize: '0.85rem',
                         fontWeight: 'bold',
                         whiteSpace: 'nowrap'
@@ -3480,7 +3480,7 @@ const ProfilePage: React.FC = () => {
                   marginTop: '2.5rem',
                   padding: '1rem',
                   background: 'rgba(255, 255, 255, 0.03)',
-                  borderRadius: '20px',
+                  borderRadius: '24px',
                   border: '1px solid rgba(255, 255, 255, 0.05)',
                   alignSelf: 'center'
                 }}>
@@ -3596,8 +3596,8 @@ const ProfilePage: React.FC = () => {
           <div style={{
             background: 'rgba(255, 255, 255, 0.15)',
             backdropFilter: 'blur(20px)',
-            borderRadius: '20px',
-            padding: '2rem',
+            borderRadius: '24px',
+            padding: '1.5rem',
             border: '1px solid rgba(255, 255, 255, 0.3)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
             maxWidth: '800px',
@@ -3663,7 +3663,7 @@ const ProfilePage: React.FC = () => {
                   background: getStatusColor(selectedPackage.status === '待收款' ? '待取件' : selectedPackage.status),
                   color: 'white',
                   padding: '0.5rem 1rem',
-                  borderRadius: '20px',
+                  borderRadius: '24px',
                   fontSize: '0.9rem',
                   fontWeight: 'bold'
                 }}>
@@ -4003,7 +4003,7 @@ const ProfilePage: React.FC = () => {
                   color: 'white',
                   border: '1px solid rgba(255,255,255,0.2)',
                   padding: '8px 16px',
-                  borderRadius: '20px',
+                  borderRadius: '24px',
                   cursor: 'pointer',
                   fontSize: '0.9rem',
                   transition: 'all 0.3s ease'
@@ -4669,7 +4669,7 @@ const ProfilePage: React.FC = () => {
                         e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
                       }}
                     >
-                      <div style={{ width: '100%', aspectRatio: '1', borderRadius: '20px', background: '#000', marginBottom: '1.25rem', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: '100%', aspectRatio: '1', borderRadius: '24px', background: '#000', marginBottom: '1.25rem', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {product.image_url && !product.image_url.startsWith('file://') ? (
                           <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
@@ -4759,7 +4759,7 @@ const ProfilePage: React.FC = () => {
                   width: '100%',
                   aspectRatio: '16/9',
                   background: 'rgba(255,255,255,0.03)',
-                  borderRadius: '20px',
+                  borderRadius: '24px',
                   border: '2px dashed rgba(255,255,255,0.1)',
                   display: 'flex',
                   flexDirection: 'column',
@@ -4774,7 +4774,7 @@ const ProfilePage: React.FC = () => {
                   <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📸</div>
+                    <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>📸</div>
                     <div style={{ color: 'rgba(255,255,255,0.5)', fontWeight: '700' }}>
                       {isUploading ? t.uploading : t.uploadImage}
                     </div>
@@ -4994,7 +4994,7 @@ const ProfilePage: React.FC = () => {
           <div style={{
             backgroundColor: '#1e293b',
             borderRadius: '32px',
-            padding: '2rem',
+            padding: '1.5rem',
             width: '100%',
             maxWidth: '480px',
             border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -5050,7 +5050,7 @@ const ProfilePage: React.FC = () => {
                 >
                   {!rechargeProofPreview && (
                     <>
-                      <span style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📸</span>
+                      <span style={{ fontSize: '1.75rem', marginBottom: '8px' }}>📸</span>
                       <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem', fontWeight: '600' }}>点击上传汇款记录</span>
                     </>
                   )}
@@ -5182,7 +5182,7 @@ const ProfilePage: React.FC = () => {
                       padding: '1.5rem',
                       marginBottom: '1rem',
                       background: 'rgba(255, 255, 255, 0.05)',
-                      borderRadius: '20px',
+                      borderRadius: '24px',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -5363,7 +5363,7 @@ const ProfilePage: React.FC = () => {
                     <div
                       key={pkg.id}
                       style={{
-                        padding: '2rem',
+                        padding: '1.5rem',
                         marginBottom: '2rem',
                         background: 'rgba(255, 255, 255, 0.05)',
                         borderRadius: '28px',
@@ -5579,7 +5579,7 @@ const ProfilePage: React.FC = () => {
                     
                     if (productItems.length === 0) {
                       return (
-                        <div style={{ padding: '2rem', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '2px dashed #e2e8f0' }}>
+                        <div style={{ padding: '1.5rem', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '2px dashed #e2e8f0' }}>
                           <p style={{ color: '#64748b', fontWeight: '600' }}>
                             {language === 'zh' ? '暂无详细商品清单，请核对包裹内容' : 'No detailed list, please check package content'}
                           </p>
@@ -5645,7 +5645,7 @@ const ProfilePage: React.FC = () => {
 
               {/* 订单备注 */}
               {packingOrderData.description && !packingOrderData.description.includes('商品清单') && (
-                <div style={{ background: '#fffbeb', padding: '1.5rem', borderRadius: '20px', border: '1px solid #fde68a', marginBottom: '2rem' }}>
+                <div style={{ background: '#fffbeb', padding: '1.5rem', borderRadius: '24px', border: '1px solid #fde68a', marginBottom: '2rem' }}>
                   <h4 style={{ color: '#92400e', margin: '0 0 0.5rem 0', fontSize: '0.95rem', fontWeight: '900' }}>💡 {language === 'zh' ? '客户备注' : 'Customer Note'}</h4>
                   <p style={{ color: '#b45309', margin: 0, fontSize: '1rem', fontWeight: '600' }}>{packingOrderData.description}</p>
                 </div>
@@ -5653,7 +5653,7 @@ const ProfilePage: React.FC = () => {
             </div>
 
             {/* 底部操作栏 */}
-            <div style={{ padding: '2rem', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ padding: '1.5rem', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
               <button
                 onClick={handleCompletePacking}
                 disabled={loading || (() => {
@@ -5665,7 +5665,7 @@ const ProfilePage: React.FC = () => {
                 style={{
                   width: '100%',
                   padding: '1.2rem',
-                  borderRadius: '20px',
+                  borderRadius: '24px',
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: 'white',
                   border: 'none',
@@ -5957,7 +5957,7 @@ const ProfilePage: React.FC = () => {
             {/* 页眉 */}
             <div style={{
               background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-              padding: '2rem',
+              padding: '1.5rem',
               textAlign: 'center',
               position: 'relative'
             }}>
@@ -5988,7 +5988,7 @@ const ProfilePage: React.FC = () => {
                       key={star}
                       onClick={() => setReviewRating(star)}
                       style={{ 
-                        fontSize: '2.5rem', 
+                        fontSize: '1.75rem', 
                         cursor: 'pointer',
                         color: star <= reviewRating ? '#fbbf24' : '#e2e8f0',
                         transition: 'transform 0.2s ease',
@@ -6022,7 +6022,7 @@ const ProfilePage: React.FC = () => {
                     minHeight: '120px', 
                     background: '#f8fafc', 
                     border: '2px solid #f1f5f9', 
-                    borderRadius: '20px', 
+                    borderRadius: '24px', 
                     padding: '1rem', 
                     color: '#1e293b', 
                     fontSize: '1rem', 
@@ -6086,14 +6086,14 @@ const ProfilePage: React.FC = () => {
             </div>
 
             {/* 底部按钮 */}
-            <div style={{ padding: '2rem', borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ padding: '1.5rem', borderTop: '1px solid #f1f5f9' }}>
               <button
                 onClick={handleSubmitReview}
                 disabled={isSubmittingReview || !reviewComment.trim()}
                 style={{
                   width: '100%',
                   padding: '1.2rem',
-                  borderRadius: '20px',
+                  borderRadius: '24px',
                   background: isSubmittingReview || !reviewComment.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
                   color: 'white',
                   border: 'none',
@@ -6318,7 +6318,7 @@ const ProfilePage: React.FC = () => {
             {/* 页眉 */}
             <div style={{
               background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-              padding: '2rem',
+              padding: '1.5rem',
               textAlign: 'center'
             }}>
               <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>📊</div>
