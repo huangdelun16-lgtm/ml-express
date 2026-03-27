@@ -1827,10 +1827,31 @@ const ProfilePage: React.FC = () => {
 
   return (
     <>
+      {/* 🚀 背景公司名称 (最下层) */}
+      <div style={{
+        position: 'fixed',
+        top: '10%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: '8rem',
+        fontWeight: '950',
+        color: 'rgba(255, 255, 255, 0.02)',
+        zIndex: 0,
+        pointerEvents: 'none',
+        whiteSpace: 'nowrap',
+        fontFamily: "'Montserrat', sans-serif",
+        letterSpacing: '-2px',
+        textTransform: 'uppercase'
+      }}>
+        MARKET LINK EXPRESS
+      </div>
+
       {/* 主要内容区域 */}
       <div style={{
         position: 'relative',
         zIndex: 5,
+        maxWidth: '920px', // 🚀 锁定宽度
+        margin: '0 auto',
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
         transition: 'all 0.6s ease'
@@ -1838,23 +1859,23 @@ const ProfilePage: React.FC = () => {
         {/* 页面标题 */}
         <div style={{
           textAlign: 'left',
-          marginBottom: '1.5rem',
-          marginTop: '1.5rem', // 🚀 增加顶部外边距，避开侧边栏
+          marginBottom: '1.2rem',
+          marginTop: '0.5rem',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
           transition: 'all 0.6s ease'
         }}>
           <h1 style={{
             color: '#ffffff',
-            fontSize: '1.75rem',
-            marginBottom: '0.5rem',
-            fontWeight: '900',
+            fontSize: '1.6rem',
+            marginBottom: '0.15rem',
+            fontWeight: '950',
             letterSpacing: '-1px',
-            textShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            textShadow: '0 2px 8px rgba(0,0,0,0.2)'
           }}>
             {t.title}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1rem' }}>欢迎回来，这里是您的经营实时看板</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', fontWeight: '600' }}>欢迎回来，这里是您的经营实时看板</p>
         </div>
 
         {/* 用户信息卡片 - 参考客户端app样式 */}
@@ -2805,14 +2826,18 @@ const ProfilePage: React.FC = () => {
                     <div style={{ 
                       display: 'flex', 
                       alignItems: 'center',
+                      justifyContent: 'space-between',
                       gap: '12px',
                       background: 'rgba(15, 23, 42, 0.4)',
-                      padding: '8px 16px',
+                      padding: '0 16px',
+                      width: '200px',
+                      height: '39px',
                       borderRadius: '16px',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      whiteSpace: 'nowrap'
                     }}>
-                      <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>{t.closedToday}</span>
+                      <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>今日暂停营业</span>
                       <button 
                         type="button"
                         onClick={(e) => {
@@ -2942,8 +2967,21 @@ const ProfilePage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* 🚀 操作按钮组 - 移动到右侧 */}
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', zIndex: 10 }}>
+                      {/* 🚀 操作按钮组 - 垂直排列在右侧 (对应截图标注位置) */}
+                      <div style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '10px', 
+                        padding: '1.25rem', 
+                        background: 'rgba(255,255,255,0.05)', 
+                        borderRadius: '24px', 
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        minWidth: '150px',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginLeft: '1rem',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+                      }}>
                         {/* 延长打烊按钮 */}
                         <button
                           onClick={handleExtendHour}
@@ -2951,31 +2989,28 @@ const ProfilePage: React.FC = () => {
                           style={{
                             width: '123px',
                             height: '56px',
-                            background: 'rgba(16, 185, 129, 0.1)',
+                            background: 'rgba(16, 185, 129, 0.15)',
                             color: '#10b981',
                             border: '1px solid rgba(16, 185, 129, 0.3)',
                             padding: '4px',
-                            borderRadius: '18px',
-                            fontSize: '0.8rem',
+                            borderRadius: '16px',
+                            fontSize: '0.85rem',
                             fontWeight: '800',
                             cursor: isSavingStatus ? 'not-allowed' : 'pointer',
                             transition: 'all 0.3s ease',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '6px',
-                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.1)'
+                            gap: '6px'
                           }}
                           onMouseOver={(e) => {
                             if (!isSavingStatus) {
-                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)';
                             }
                           }}
                           onMouseOut={(e) => {
                             if (!isSavingStatus) {
-                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
-                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
                             }
                           }}
                         >
@@ -2989,31 +3024,28 @@ const ProfilePage: React.FC = () => {
                           style={{
                             width: '123px',
                             height: '56px',
-                            background: 'rgba(239, 68, 68, 0.1)',
+                            background: 'rgba(239, 68, 68, 0.15)',
                             color: '#ef4444',
                             border: '1px solid rgba(239, 68, 68, 0.3)',
                             padding: '4px',
-                            borderRadius: '18px',
-                            fontSize: '0.8rem',
+                            borderRadius: '16px',
+                            fontSize: '0.85rem',
                             fontWeight: '800',
                             cursor: isSavingStatus ? 'not-allowed' : 'pointer',
                             transition: 'all 0.3s ease',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '6px',
-                            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)'
+                            gap: '6px'
                           }}
                           onMouseOver={(e) => {
                             if (!isSavingStatus) {
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
                             }
                           }}
                           onMouseOut={(e) => {
                             if (!isSavingStatus) {
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
                             }
                           }}
                         >
@@ -3032,8 +3064,8 @@ const ProfilePage: React.FC = () => {
                             border: 'none',
                             borderRadius: '16px',
                             padding: 0,
-                            fontSize: '0.95rem',
-                            fontWeight: '900',
+                            fontSize: '1rem',
+                            fontWeight: '950',
                             cursor: isSavingStatus ? 'not-allowed' : 'pointer',
                             transition: 'all 0.3s ease',
                             boxShadow: isSavingStatus ? 'none' : '0 8px 20px rgba(30, 64, 175, 0.3)',
@@ -3043,28 +3075,11 @@ const ProfilePage: React.FC = () => {
                             gap: '8px',
                             whiteSpace: 'nowrap'
                           }}
-                          onMouseOver={(e) => {
-                            if (!isSavingStatus) {
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 12px 25px rgba(30, 64, 175, 0.4)';
-                            }
-                          }}
-                          onMouseOut={(e) => {
-                            if (!isSavingStatus) {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 8px 20px rgba(30, 64, 175, 0.3)';
-                            }
-                          }}
                         >
                           {isSavingStatus ? (
-                            <>
-                              <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%' }}></div>
-                              <span>{language === 'zh' ? '正在保存...' : 'Saving...'}</span>
-                            </>
+                            <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%' }}></div>
                           ) : (
-                            <>
-                              <span>💾</span> {t.save}
-                            </>
+                            <><span style={{ fontSize: '1.2rem' }}>💾</span> {t.save}</>
                           )}
                         </button>
                       </div>
