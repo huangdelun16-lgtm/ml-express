@@ -2176,7 +2176,6 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-
           {/* 订单统计卡片 */}
           <div style={{
             display: 'grid',
@@ -3570,7 +3569,6 @@ const ProfilePage: React.FC = () => {
             </>
           )}
         </div>
-      </div>
 
       {/* 包裹详情模态框 */}
       {showPackageDetailModal && selectedPackage && (
