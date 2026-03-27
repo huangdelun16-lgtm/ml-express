@@ -1857,7 +1857,11 @@ const ProfilePage: React.FC = () => {
           }}>
             {t.title}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', fontWeight: '600' }}>欢迎回来，这里是您的经营实时看板</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', fontWeight: '600' }}>
+            {language === 'zh' ? '欢迎回来，这里是您的经营实时看板' : 
+             language === 'en' ? 'Welcome back, here is your real-time business dashboard' :
+             'ပြန်လည်ကြိုဆိုပါတယ်၊ ဤသည်မှာ သင်၏ အချိန်နှင့်တပြေးညီ လုပ်ငန်းစောင့်ကြည့်စနစ်ဖြစ်ပါသည်'}
+          </p>
         </div>
 
         {/* 用户信息卡片 - 参考客户端app样式 */}
