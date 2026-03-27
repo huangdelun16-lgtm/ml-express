@@ -2444,7 +2444,7 @@ const ProfilePage: React.FC = () => {
               marginBottom: '3rem'
             }}>
               {/* 代收款统计 */}
-              <div style={{
+              <div id="cod-stats-section" style={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 backdropFilter: 'blur(30px)',
                 borderRadius: '40px',
@@ -2851,7 +2851,7 @@ const ProfilePage: React.FC = () => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                   {/* 营业时间设置 */}
-                  <div style={{ 
+                  <div id="business-hours-section" style={{ 
                     background: 'rgba(15, 23, 42, 0.4)',
                     padding: '2.5rem',
                     borderRadius: '35px',

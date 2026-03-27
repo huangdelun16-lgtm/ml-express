@@ -9,10 +9,36 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
   const { language } = useLanguage();
 
   const menuItems = [
-    { id: '/', label: language === 'zh' ? '管理概况' : 'Dashboard', icon: '📊' },
+    { id: '/', label: language === 'zh' ? '我的账号' : 'My Account', icon: '👤' },
     { id: '/orders', label: language === 'zh' ? '订单列表' : 'Orders', icon: '📋' },
     { id: '/products', label: language === 'zh' ? '商品管理' : 'Products', icon: '🛍️' },
+    { id: 'cod-stats', label: language === 'zh' ? '代收款统计' : 'COD Stats', icon: '💰' },
+    { id: 'business-hours', label: language === 'zh' ? '营业时间' : 'Business Hours', icon: '⏰' },
   ];
+
+  const handleMenuClick = (id: string) => {
+    if (id === 'cod-stats') {
+      if (location.pathname !== '/') {
+        navigate('/');
+        setTimeout(() => {
+          document.getElementById('cod-stats-section')?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      } else {
+        document.getElementById('cod-stats-section')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else if (id === 'business-hours') {
+      if (location.pathname !== '/') {
+        navigate('/');
+        setTimeout(() => {
+          document.getElementById('business-hours-section')?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      } else {
+        document.getElementById('business-hours-section')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else {
+      navigate(id);
+    }
+  };
 
   return (
     <div style={sidebarStyle}>
@@ -27,7 +53,7 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
           return (
             <div
               key={item.id}
-              onClick={() => navigate(item.id)}
+              onClick={() => handleMenuClick(item.id)}
               style={{
                 ...menuItemStyle,
                 background: isActive ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
