@@ -63,6 +63,29 @@ const TrackingPage: React.FC = () => {
     navigate('/login');
   };
 
+  const getStatusColor = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      '待确认': '#fbbf24',
+      '打包中': '#10b981',
+      '待取件': '#f59e0b',
+      '已取件': '#3b82f6',
+      '运输中': '#8b5cf6',
+      '已送达': '#10b981',
+      '待收款': '#ef4444',
+      '已取消': '#94a3b8',
+      '已完成': '#6b7280'
+    };
+    return statusMap[status] || '#6b7280';
+  };
+
+  const getStatusText = (status: string) => {
+    if (status === '待收款') return language === 'zh' ? '待取件' : language === 'en' ? 'Pending Pickup' : 'ကောက်ယူရန်စောင့်ဆိုင်းနေသည်';
+    if (status === '待确认') return language === 'zh' ? '待接单' : language === 'en' ? 'Pending Accept' : 'လက်ခံရန်စောင့်ဆိုင်းနေသည်';
+    if (status === '打包中') return language === 'zh' ? '打包中' : language === 'en' ? 'Packing' : 'ထုပ်ပိုးနေသည်';
+    if (status === '已取消') return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်လိုက်သည်';
+    return status;
+  };
+
   const homeBackground = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
 
   return (
@@ -116,7 +139,16 @@ const TrackingPage: React.FC = () => {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '1.1rem', fontWeight: '900', color: 'white' }}>#{order.id}</span>
-                    <span style={{ background: '#3b82f6', color: 'white', padding: '2px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>{order.status}</span>
+                    <span style={{ 
+                      background: getStatusColor(order.status === '待收款' ? '待取件' : order.status), 
+                      color: 'white', 
+                      padding: '2px 10px', 
+                      borderRadius: '6px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 'bold' 
+                    }}>
+                      {order.status === '待收款' ? getStatusText(order.status) : order.status}
+                    </span>
                   </div>
                   <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.9rem' }}>客户: {order.receiver_name}</p>
                   <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.9rem' }}>地址: {order.receiver_address}</p>
