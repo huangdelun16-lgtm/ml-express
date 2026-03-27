@@ -1946,6 +1946,7 @@ const ProfilePage: React.FC = () => {
                   )}
                 </div>
 
+                {/* 🚀 商家端：只显示商家资料，不显示会员/充值信息 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   {/* 编辑资料按钮 */}
                   <button
@@ -2048,6 +2049,7 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
             </div>
+              </div>
               
               {isPartnerStore && storeInfo ? (
                 <div style={{ 
