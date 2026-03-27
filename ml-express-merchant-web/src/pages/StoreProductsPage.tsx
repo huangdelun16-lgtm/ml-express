@@ -57,20 +57,7 @@ const StoreProductsPage: React.FC = () => {
   const homeBackground = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: homeBackground, 
-      color: 'white', 
-      padding: window.innerWidth < 768 ? '1rem' : '2rem',
-      fontFamily: "'Inter', sans-serif"
-    }}>
-      <NavigationBar 
-        language={language}
-        onLanguageChange={setLanguage}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-      />
-
+    <>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* 精致页眉 */}
         <div style={{ 
@@ -106,28 +93,9 @@ const StoreProductsPage: React.FC = () => {
             </div>
           </div>
           
-          <button 
-            style={{ 
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'white', 
-              border: '1px solid rgba(255, 255, 255, 0.2)', 
-              padding: '0.4rem 1rem', 
-              borderRadius: '10px',
-              fontWeight: '700', 
-              cursor: 'pointer', 
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.85rem',
-              whiteSpace: 'nowrap'
-            }}
-            onClick={() => navigate('/')}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-          >
-            <span>←</span> {language === 'zh' ? '返回' : 'Back'}
-          </button>
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>
+            Merchant Command Center
+          </div>
         </div>
 
         {loading ? (
@@ -249,7 +217,7 @@ const StoreProductsPage: React.FC = () => {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
-    </div>
+    </>
   );
 };
 

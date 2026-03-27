@@ -1,33 +1,50 @@
-.App {
-  text-align: center;
+/* 极致现代感动画 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+@keyframes pulse-border {
+  0% { border-color: rgba(251, 191, 36, 0.3); box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.2); }
+  50% { border-color: rgba(251, 191, 36, 0.6); box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+  100% { border-color: rgba(251, 191, 36, 0.3); box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.App-header {
-  background-color: #282c34;
-  padding: 20px;
-  color: white;
+/* 全局字体与平滑优化 */
+body {
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0a0f1e;
+  overflow-x: hidden;
 }
 
-.App-link {
-  color: #61dafb;
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 移除重复的 NavigationBar */
+.NavigationBar-hidden {
+  display: none !important;
 }

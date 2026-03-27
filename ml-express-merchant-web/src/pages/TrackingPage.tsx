@@ -66,42 +66,43 @@ const TrackingPage: React.FC = () => {
   const homeBackground = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
 
   return (
-    <div style={{ minHeight: '100vh', background: homeBackground, color: 'white', padding: '2rem' }}>
-      <NavigationBar 
-        language={language}
-        onLanguageChange={setLanguage}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-      />
-
+    <>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-          <div>
-            <h1 style={{ fontSize: '2.2rem', fontWeight: '900', margin: 0 }}>📦 {t?.profile?.packages || '订单列表'}</h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem' }}>实时监控您店铺正在处理中的所有订单</p>
-          </div>
-          <button 
-            style={{ 
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'white', 
-              border: '1px solid rgba(255, 255, 255, 0.2)', 
-              padding: '0.4rem 1rem', 
-              borderRadius: '10px',
-              fontWeight: '700', 
-              cursor: 'pointer', 
-              transition: 'all 0.3s ease',
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '2.5rem',
+          background: 'rgba(255, 255, 255, 0.03)',
+          padding: '2rem',
+          borderRadius: '30px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <div style={{ 
+              width: '60px', 
+              height: '60px', 
+              borderRadius: '18px', 
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.85rem',
-              whiteSpace: 'nowrap'
-            }}
-            onClick={() => navigate('/')}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-          >
-            <span>←</span> {language === 'zh' ? '返回' : 'Back'}
-          </button>
+              justifyContent: 'center',
+              fontSize: '2rem',
+              boxShadow: '0 10px 20px rgba(37, 99, 235, 0.3)'
+            }}>📦</div>
+            <div>
+              <h1 style={{ fontSize: '1.8rem', fontWeight: '900', margin: 0, letterSpacing: '-0.5px' }}>
+                {t?.profile?.packages || '订单列表'}
+              </h1>
+              <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '4px', fontSize: '0.9rem', fontWeight: '500' }}>
+                正在处理中的订单 {activeOrders.length} 笔
+              </p>
+            </div>
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>
+            Live Monitoring
+          </div>
         </div>
 
         {loading ? (
@@ -140,7 +141,7 @@ const TrackingPage: React.FC = () => {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
-    </div>
+    </>
   );
 };
 

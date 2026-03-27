@@ -1826,56 +1826,34 @@ const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* 背景装饰 */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%)',
-        pointerEvents: 'none'
-      }} />
-
-      {/* 导航栏 */}
-      <NavigationBar
-        language={language}
-        onLanguageChange={handleLanguageChange}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-      />
-
+    <>
       {/* 主要内容区域 */}
       <div style={{
         position: 'relative',
         zIndex: 5,
-        padding: '2rem',
-        maxWidth: '1200px',
-        margin: '0 auto'
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+        transition: 'all 0.6s ease'
       }}>
         {/* 页面标题 */}
         <div style={{
           textAlign: 'left',
-          marginBottom: '2rem',
+          marginBottom: '3rem',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
           transition: 'all 0.6s ease'
         }}>
           <h1 style={{
             color: 'white',
-            fontSize: '1.75rem',
+            fontSize: '2.5rem',
             marginBottom: '0.5rem',
-            fontWeight: '700',
-            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            fontWeight: '900',
+            letterSpacing: '-1px',
+            textShadow: '0 4px 12px rgba(0,0,0,0.3)'
           }}>
             {t.title}
           </h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1rem' }}>欢迎回来，这里是您的经营实时看板</p>
         </div>
 
         {/* 用户信息卡片 - 参考客户端app样式 */}
@@ -6454,7 +6432,7 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
