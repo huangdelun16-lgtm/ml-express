@@ -36,13 +36,6 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <Logo size="small" />
-        <span style={{ 
-          fontSize: '1.2rem', 
-          fontWeight: '900', 
-          color: '#f59e0b', 
-          letterSpacing: '1px',
-          marginLeft: '10px'
-        }}>MERCHANTS</span>
       </div>
       
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>

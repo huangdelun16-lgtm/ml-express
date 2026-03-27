@@ -3491,9 +3491,8 @@ const ProfilePage: React.FC = () => {
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  marginTop: '2rem',
-                  flexWrap: 'wrap'
+                  gap: '1rem',
+                  marginTop: '2rem'
                 }}>
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -3501,61 +3500,39 @@ const ProfilePage: React.FC = () => {
                     style={{
                       background: currentPage === 1 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
                       color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      padding: '0.6rem 1.2rem',
+                      borderRadius: '12px',
                       cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
                       fontSize: '0.9rem',
                       fontWeight: 'bold',
                       transition: 'all 0.3s ease',
                       opacity: currentPage === 1 ? 0.5 : 1
                     }}
-                    onMouseOver={(e) => {
-                      if (currentPage !== 1) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.7)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (currentPage !== 1) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
-                      }
-                    }}
                   >
-                    {language === 'zh' ? '上一页' : language === 'en' ? 'Previous' : 'ယခင်စာမျက်နှာ'}
+                    {language === 'zh' ? '上一页' : language === 'en' ? 'Prev' : 'ယခင်'}
                   </button>
 
                   <div style={{
                     display: 'flex',
                     gap: '0.5rem',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    justifyContent: 'center'
+                    alignItems: 'center'
                   }}>
                     {Array.from({ length: Math.ceil(userPackages.length / packagesPerPage) }, (_, i) => i + 1).map((page) => (
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
                         style={{
-                          background: currentPage === page ? 'rgba(59, 130, 246, 0.7)' : 'rgba(255, 255, 255, 0.1)',
+                          background: currentPage === page ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
                           color: 'white',
-                          border: `1px solid ${currentPage === page ? 'rgba(59, 130, 246, 0.9)' : 'rgba(255, 255, 255, 0.3)'}`,
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '10px',
                           cursor: 'pointer',
                           fontSize: '0.9rem',
-                          fontWeight: currentPage === page ? 'bold' : 'normal',
-                          transition: 'all 0.3s ease',
-                          minWidth: '40px'
-                        }}
-                        onMouseOver={(e) => {
-                          if (currentPage !== page) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (currentPage !== page) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                          }
+                          fontWeight: 'bold',
+                          transition: 'all 0.3s ease'
                         }}
                       >
                         {page}
@@ -3569,27 +3546,17 @@ const ProfilePage: React.FC = () => {
                     style={{
                       background: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
                       color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      padding: '0.6rem 1.2rem',
+                      borderRadius: '12px',
                       cursor: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 'not-allowed' : 'pointer',
                       fontSize: '0.9rem',
                       fontWeight: 'bold',
                       transition: 'all 0.3s ease',
                       opacity: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 0.5 : 1
                     }}
-                    onMouseOver={(e) => {
-                      if (currentPage !== Math.ceil(userPackages.length / packagesPerPage)) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.7)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (currentPage !== Math.ceil(userPackages.length / packagesPerPage)) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
-                      }
-                    }}
                   >
-                    {language === 'zh' ? '下一页' : language === 'en' ? 'Next' : 'နောက်စာမျက်နှာ'}
+                    {language === 'zh' ? '下一页' : language === 'en' ? 'Next' : 'နောက်စာ'}
                   </button>
                 </div>
               )}

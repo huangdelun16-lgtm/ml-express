@@ -64,7 +64,7 @@ const StoreProductsPage: React.FC = () => {
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
           <div>
-            <h1 style={{ fontSize: '2.2rem', fontWeight: '900', margin: 0 }}>🛍️ {t.profile.myProducts || '商品管理'}</h1>
+            <h1 style={{ fontSize: '2.2rem', fontWeight: '900', margin: 0 }}>🛍️ {t?.profile?.myProducts || '商品管理'}</h1>
             <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem' }}>管理您店铺的在线商品与库存</p>
           </div>
           <button 

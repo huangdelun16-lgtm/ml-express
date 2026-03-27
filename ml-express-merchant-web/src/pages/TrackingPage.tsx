@@ -77,7 +77,7 @@ const TrackingPage: React.FC = () => {
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
           <div>
-            <h1 style={{ fontSize: '2.2rem', fontWeight: '900', margin: 0 }}>📦 {t.profile.packages || '订单列表'}</h1>
+            <h1 style={{ fontSize: '2.2rem', fontWeight: '900', margin: 0 }}>📦 {t?.profile?.packages || '订单列表'}</h1>
             <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '0.5rem' }}>实时监控您店铺正在处理中的所有订单</p>
           </div>
           <button 
