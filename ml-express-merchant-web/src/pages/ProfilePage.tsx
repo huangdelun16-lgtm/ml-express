@@ -2942,135 +2942,132 @@ const ProfilePage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* 保存按钮 */}
-                      <button
-                        onClick={() => handleUpdateStoreStatus(businessStatus)}
-                        disabled={isSavingStatus}
-                        style={{
-                          width: '123px',
-                          height: '56px',
-                          background: isSavingStatus ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '16px',
-                          padding: 0,
-                          fontSize: '0.95rem',
-                          fontWeight: '900',
-                          cursor: isSavingStatus ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.3s ease',
-                          boxShadow: isSavingStatus ? 'none' : '0 8px 20px rgba(30, 64, 175, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          zIndex: 1,
-                          whiteSpace: 'nowrap'
-                        }}
-                        onMouseOver={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 12px 25px rgba(30, 64, 175, 0.4)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(30, 64, 175, 0.3)';
-                          }
-                        }}
-                      >
-                        {isSavingStatus ? (
-                          <>
-                            <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%' }}></div>
-                            <span>{language === 'zh' ? '正在保存...' : 'Saving...'}</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>💾</span> {t.save}
-                          </>
-                        )}
-                      </button>
-                    </div>
+                      {/* 🚀 操作按钮组 - 移动到右侧 */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', zIndex: 10 }}>
+                        {/* 延长打烊按钮 */}
+                        <button
+                          onClick={handleExtendHour}
+                          disabled={isSavingStatus}
+                          style={{
+                            width: '123px',
+                            height: '56px',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#10b981',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            padding: '4px',
+                            borderRadius: '18px',
+                            fontSize: '0.8rem',
+                            fontWeight: '800',
+                            cursor: isSavingStatus ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.3s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.1)'
+                          }}
+                          onMouseOver={(e) => {
+                            if (!isSavingStatus) {
+                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (!isSavingStatus) {
+                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }
+                          }}
+                        >
+                          ⏳ {language === 'zh' ? '延长1h' : 'Ext 1h'}
+                        </button>
 
-                    {/* 🚀 快捷操作按钮 - 移入卡片内部底部 */}
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '1.5rem', 
-                      paddingTop: '2rem', 
-                      borderTop: '1px solid rgba(255,255,255,0.05)',
-                      zIndex: 1 
-                    }}>
-                      <button
-                        onClick={handleExtendHour}
-                        disabled={isSavingStatus}
-                        style={{
-                          width: '123px',
-                          height: '56px',
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          color: '#10b981',
-                          border: '1px solid rgba(16, 185, 129, 0.3)',
-                          padding: '4px',
-                          borderRadius: '18px',
-                          fontSize: '0.8rem',
-                          fontWeight: '800',
-                          cursor: isSavingStatus ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.3s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px'
-                        }}
-                        onMouseOver={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                          }
-                        }}
-                      >
-                        ⏳ {language === 'zh' ? '今晚延长打烊 1 小时' : 'Extend 1 Hour'}
-                      </button>
+                        {/* 即刻打烊按钮 */}
+                        <button
+                          onClick={handleCloseImmediately}
+                          disabled={isSavingStatus}
+                          style={{
+                            width: '123px',
+                            height: '56px',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            padding: '4px',
+                            borderRadius: '18px',
+                            fontSize: '0.8rem',
+                            fontWeight: '800',
+                            cursor: isSavingStatus ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.3s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)'
+                          }}
+                          onMouseOver={(e) => {
+                            if (!isSavingStatus) {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (!isSavingStatus) {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }
+                          }}
+                        >
+                          🛑 {language === 'zh' ? '即刻打烊' : 'Close Now'}
+                        </button>
 
-                      <button
-                        onClick={handleCloseImmediately}
-                        disabled={isSavingStatus}
-                        style={{
-                          width: '123px',
-                          height: '56px',
-                          background: 'rgba(239, 68, 68, 0.1)',
-                          color: '#ef4444',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          padding: '4px',
-                          borderRadius: '18px',
-                          fontSize: '0.8rem',
-                          fontWeight: '800',
-                          cursor: isSavingStatus ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.3s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px'
-                        }}
-                        onMouseOver={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                          }
-                        }}
-                      >
-                        🛑 {language === 'zh' ? '即刻打烊 (食材售罄)' : 'Close Immediately'}
-                      </button>
+                        {/* 保存按钮 */}
+                        <button
+                          onClick={() => handleUpdateStoreStatus(businessStatus)}
+                          disabled={isSavingStatus}
+                          style={{
+                            width: '123px',
+                            height: '56px',
+                            background: isSavingStatus ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '16px',
+                            padding: 0,
+                            fontSize: '0.95rem',
+                            fontWeight: '900',
+                            cursor: isSavingStatus ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.3s ease',
+                            boxShadow: isSavingStatus ? 'none' : '0 8px 20px rgba(30, 64, 175, 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            whiteSpace: 'nowrap'
+                          }}
+                          onMouseOver={(e) => {
+                            if (!isSavingStatus) {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 12px 25px rgba(30, 64, 175, 0.4)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (!isSavingStatus) {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 8px 20px rgba(30, 64, 175, 0.3)';
+                            }
+                          }}
+                        >
+                          {isSavingStatus ? (
+                            <>
+                              <div className="spinner" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTop: '3px solid white', borderRadius: '50%' }}></div>
+                              <span>{language === 'zh' ? '正在保存...' : 'Saving...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>💾</span> {t.save}
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
