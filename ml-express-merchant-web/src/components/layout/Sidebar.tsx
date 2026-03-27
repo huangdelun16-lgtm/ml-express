@@ -6,7 +6,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ currentUser, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [isAccountExpanded, setIsAccountExpanded] = useState(false);
 
   // 🚀 自动根据路径展开菜单
@@ -17,14 +17,14 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
   }, [location.pathname]);
 
   const mainMenuItems = [
-    { id: '/', label: language === 'zh' ? '我的账号' : 'My Account', icon: '👤' },
-    { id: '/orders', label: language === 'zh' ? '订单列表' : 'Orders', icon: '📋' },
-    { id: '/products', label: language === 'zh' ? '商品管理' : 'Products', icon: '🛍️' },
+    { id: '/', label: language === 'zh' ? '我的账号' : language === 'en' ? 'My Account' : 'ကျွန်ုပ်၏အကောင့်', icon: '👤' },
+    { id: '/orders', label: language === 'zh' ? '订单列表' : language === 'en' ? 'Orders' : 'အော်ဒါစာရင်း', icon: '📋' },
+    { id: '/products', label: language === 'zh' ? '商品管理' : language === 'en' ? 'Products' : 'ကုန်ပစ္စည်းစီမံမှု', icon: '🛍️' },
   ];
 
   const subMenuItems = [
-    { id: 'cod-stats', label: language === 'zh' ? '代收款统计' : 'COD Stats', icon: '💰' },
-    { id: 'business-hours', label: language === 'zh' ? '营业时间' : 'Business Hours', icon: '⏰' },
+    { id: 'cod-stats', label: language === 'zh' ? '代收款统计' : language === 'en' ? 'COD Stats' : 'COD စာရင်းအင်း', icon: '💰' },
+    { id: 'business-hours', label: language === 'zh' ? '营业时间' : language === 'en' ? 'Business Hours' : 'ဖွင့်ချိန်သတ်မှတ်ချက်', icon: '⏰' },
   ];
 
   const handleMenuClick = (id: string) => {
@@ -117,6 +117,28 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
       </div>
 
       <div style={footerStyle}>
+        {/* 🚀 语言切换选择器 */}
+        <div style={languageSelectorStyle}>
+          {[
+            { id: 'zh', label: '中' },
+            { id: 'en', label: '英' },
+            { id: 'my', label: '缅' }
+          ].map((lang) => (
+            <button
+              key={lang.id}
+              onClick={() => setLanguage(lang.id)}
+              style={{
+                ...langButtonStyle,
+                background: language === lang.id ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                color: language === lang.id ? 'white' : 'rgba(255,255,255,0.4)',
+                fontWeight: language === lang.id ? 'bold' : 'normal',
+              }}
+            >
+              {lang.label}
+            </button>
+          ))}
+        </div>
+
         <div style={userCardStyle}>
           <div style={avatarStyle}>{currentUser?.name?.charAt(0)}</div>
           <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -125,7 +147,7 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
           </div>
         </div>
         <button onClick={onLogout} style={logoutButtonStyle}>
-          {language === 'zh' ? '安全退出' : 'Logout'}
+          {language === 'zh' ? '安全退出' : language === 'en' ? 'Logout' : 'ထွက်ရန်'}
         </button>
       </div>
     </div>
@@ -246,6 +268,26 @@ const logoutButtonStyle: React.CSSProperties = {
   fontSize: '0.85rem',
   fontWeight: 'bold',
   transition: 'all 0.2s',
+};
+
+const languageSelectorStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+  marginBottom: '1.5rem',
+  background: 'rgba(255,255,255,0.02)',
+  padding: '4px',
+  borderRadius: '12px',
+  border: '1px solid rgba(255,255,255,0.05)',
+};
+
+const langButtonStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '0.5rem',
+  border: 'none',
+  borderRadius: '8px',
+  cursor: 'pointer',
+  fontSize: '0.85rem',
+  transition: 'all 0.2s ease',
 };
 
 export default Sidebar;
