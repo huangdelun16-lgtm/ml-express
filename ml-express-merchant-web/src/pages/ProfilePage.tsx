@@ -32,7 +32,7 @@ const OrderQRCode: React.FC<{ orderId: string }> = ({ orderId }) => {
       QRCode.toDataURL(orderId).then(setQrUrl);
     }
   }, [orderId]);
-  return qrUrl ? <img src={qrUrl} style={{ width: '80px', height: '80px' }} alt="QR" /> : null;
+  return qrUrl ? <img src={qrUrl} style={{ width: '80px', height: '80px'  alt="QR" /> : null;
 };
 
 // 🚀 新增：高级滚动时间选择器组件
@@ -756,6 +756,7 @@ const ProfilePage: React.FC = () => {
       }
         
         // 检查是否是合伙店铺账户
+        const isPartner = true;
         setIsPartnerStore(true);
         
         // 如果是合伙店铺，加载店铺信息
@@ -1834,7 +1835,7 @@ const ProfilePage: React.FC = () => {
         bottom: 0,
         background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%)',
         pointerEvents: 'none'
-      }} />
+       />
 
       {/* 导航栏 */}
       <NavigationBar
@@ -1842,6 +1843,10 @@ const ProfilePage: React.FC = () => {
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
         onLogout={handleLogout}
+         
+           
+         
+        
       />
 
       {/* 主要内容区域 */}
@@ -1988,72 +1993,58 @@ const ProfilePage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 🚀 商家端专属操作按钮 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <button
-                    onClick={() => setShowPasswordModal(true)}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                {/* 🚀 新增：余额显示和充值按钮 */}
+                {!isPartnerStore && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                      background: 'rgba(251, 191, 36, 0.15)',
                       padding: '0.6rem 1.5rem',
                       borderRadius: '14px',
-                      fontSize: '0.95rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
+                      border: '1px solid rgba(251, 191, 36, 0.3)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.6rem',
-                      whiteSpace: 'nowrap',
+                      gap: '0.8rem',
                       backdropFilter: 'blur(10px)',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <span style={{ fontSize: '1.1rem' }}>🔐</span>
-                    {language === 'zh' ? '安全设置' : language === 'en' ? 'Security' : 'လုံခြုံရေး'}
-                  </button>
-
-                  <button
-                    onClick={() => setShowProductsModal(true)}
-                    style={{
-                      background: 'rgba(16, 185, 129, 0.1)',
-                      color: 'white',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      padding: '0.6rem 1.5rem',
-                      borderRadius: '14px',
-                      fontSize: '0.95rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.6rem',
-                      whiteSpace: 'nowrap',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <span style={{ fontSize: '1.1rem' }}>📦</span>
-                    {language === 'zh' ? '管理商品' : language === 'en' ? 'Products' : 'ပစ္စည်းစီမံရန်'}
-                  </button>
-                </div>
+                    }}>
+                      <span style={{ fontSize: '1.2rem' }}>💰</span>
+                      <div>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>
+                          {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}
+                        </div>
+                        <div style={{ color: '#fbbf24', fontSize: '1.1rem', fontWeight: '900' }}>
+                          {userBalance.toLocaleString()} <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>MMK</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => setShowRechargeModal(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.8rem 1.8rem',
+                        borderRadius: '14px',
+                        fontSize: '1rem',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.5)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)';
+                      }}
+                    >
+                      {language === 'zh' ? '立即充值' : language === 'en' ? 'Recharge' : 'ငွေဖြည့်မည်'}
+                    </button>
+                  </div>
+                )}
                 
                 {/* 🚀 新增：编辑资料按钮 */}
                 {currentUser && (
@@ -2940,7 +2931,7 @@ const ProfilePage: React.FC = () => {
                           left: businessStatus.is_closed_today ? '27px' : '3px',
                           transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                           boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                        }} />
+                         />
                       </button>
                     </div>
                   </div>
@@ -2969,7 +2960,7 @@ const ProfilePage: React.FC = () => {
                       height: '150px',
                       background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
                       zIndex: 0
-                    }} />
+                     />
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1, flexWrap: 'wrap', gap: '2rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flex: 1, flexWrap: 'wrap' }}>
@@ -4791,7 +4782,7 @@ const ProfilePage: React.FC = () => {
                     >
                       <div style={{ width: '100%', aspectRatio: '1', borderRadius: '20px', background: '#000', marginBottom: '1.25rem', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {product.image_url && !product.image_url.startsWith('file://') ? (
-                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover'  />
                         ) : (
                           <span style={{ fontSize: '3rem' }}>🖼️</span>
                         )}
@@ -4891,7 +4882,7 @@ const ProfilePage: React.FC = () => {
                 }}
               >
                 {productForm.image_url ? (
-                  <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover'  />
                 ) : (
                   <>
                     <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📸</div>
@@ -4904,7 +4895,7 @@ const ProfilePage: React.FC = () => {
                   type="file" 
                   ref={productFileInputRef} 
                   onChange={handleImageUpload} 
-                  style={{ display: 'none' }} 
+                  style={{ display: 'none'  
                   accept="image/*"
                 />
               </div>
@@ -5180,7 +5171,7 @@ const ProfilePage: React.FC = () => {
                   ref={fileInputRef} 
                   onChange={handleFileChange} 
                   accept="image/*" 
-                  style={{ display: 'none' }} 
+                  style={{ display: 'none'  
                 />
               </div>
 
@@ -5947,7 +5938,7 @@ const ProfilePage: React.FC = () => {
                             key={`${review.id}-img-${idx}`} 
                             src={img} 
                             alt={`Review ${idx + 1}`} 
-                            style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid rgba(255,255,255,0.1)' }} 
+                            style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid rgba(255,255,255,0.1)'  
                             onClick={() => window.open(img, '_blank')}
                             onError={(e) => {
                               console.error('图片加载失败:', img);
@@ -6160,7 +6151,7 @@ const ProfilePage: React.FC = () => {
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   {reviewImages.map((img, index) => (
                     <div key={index} style={{ position: 'relative', width: '80px', height: '80px' }}>
-                      <img src={img} alt="Preview" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />
+                      <img src={img} alt="Preview" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover'  />
                       <button 
                         onClick={() => handleRemoveReviewImage(index)}
                         style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: 'white', border: 'none', width: '20px', height: '20px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}
@@ -6200,7 +6191,7 @@ const ProfilePage: React.FC = () => {
                   accept="image/*" 
                   ref={reviewImageInputRef} 
                   onChange={handleReviewImageUpload} 
-                  style={{ display: 'none' }} 
+                  style={{ display: 'none'  
                 />
               </div>
             </div>
