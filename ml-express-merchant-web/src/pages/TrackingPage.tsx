@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import LoggerService from '../services/LoggerService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { packageService } from '../services/supabase';
 import NavigationBar from '../components/home/NavigationBar';
@@ -11,6 +11,7 @@ const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 const TrackingPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
   
   const { isLoaded: isMapLoaded } = useJsApiLoader({
@@ -20,7 +21,12 @@ const TrackingPage: React.FC = () => {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 解析当前状态
+  const searchParams = new URLSearchParams(location.search);
+  const statusFilter = searchParams.get('status') || 'all';
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
@@ -32,6 +38,17 @@ const TrackingPage: React.FC = () => {
       navigate('/login');
     }
   }, [navigate]);
+
+  // 根据 URL 参数过滤订单
+  useEffect(() => {
+    if (statusFilter === 'all') {
+      setFilteredOrders(activeOrders.filter(pkg => 
+        !['已送达', '已取消', 'Delivered', 'Cancelled'].includes(pkg.status)
+      ));
+    } else {
+      setFilteredOrders(activeOrders.filter(pkg => pkg.status === statusFilter));
+    }
+  }, [activeOrders, statusFilter]);
 
   const loadActiveOrders = async (user: any) => {
     setLoading(true);
@@ -46,10 +63,7 @@ const TrackingPage: React.FC = () => {
         user.name
       );
       
-      const active = packages.filter(pkg => 
-        !['已送达', '已取消', 'Delivered', 'Cancelled'].includes(pkg.status)
-      );
-      setActiveOrders(active);
+      setActiveOrders(packages);
     } catch (error) {
       LoggerService.error('Failed to load orders:', error);
     } finally {
@@ -119,12 +133,12 @@ const TrackingPage: React.FC = () => {
                 {t?.profile?.packages || '订单列表'}
               </h1>
               <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '4px', fontSize: '0.9rem', fontWeight: '500' }}>
-                正在处理中的订单 {activeOrders.length} 笔
+                {statusFilter === 'all' ? '处理中的订单' : statusFilter} {filteredOrders.length} 笔
               </p>
             </div>
           </div>
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>
-            Live Monitoring
+            {statusFilter.toUpperCase()}
           </div>
         </div>
 
@@ -134,7 +148,7 @@ const TrackingPage: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '1.5rem' }}>
-            {activeOrders.map((order) => (
+            {filteredOrders.map((order) => (
               <div key={order.id} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '20px', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backdropFilter: 'blur(10px)' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
@@ -164,10 +178,10 @@ const TrackingPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && activeOrders.length === 0 && (
+        {!loading && filteredOrders.length === 0 && (
           <div style={{ textAlign: 'center', padding: '8rem 0', background: 'rgba(255,255,255,0.03)', borderRadius: '32px', border: '2px dashed rgba(255,255,255,0.1)' }}>
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✨</div>
-            <h3 style={{ color: 'rgba(255,255,255,0.5)' }}>当前暂无正在进行的订单</h3>
+            <h3 style={{ color: 'rgba(255,255,255,0.5)' }}>当前暂无该状态下的订单</h3>
           </div>
         )}
       </div>

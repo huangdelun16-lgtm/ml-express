@@ -8,11 +8,15 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
   const location = useLocation();
   const { language, setLanguage } = useLanguage();
   const [isAccountExpanded, setIsAccountExpanded] = useState(false);
+  const [isOrdersExpanded, setIsOrdersExpanded] = useState(false);
 
   // 🚀 自动根据路径展开菜单
   useEffect(() => {
     if (location.pathname === '/') {
       setIsAccountExpanded(true);
+    }
+    if (location.pathname.startsWith('/orders')) {
+      setIsOrdersExpanded(true);
     }
   }, [location.pathname]);
 
@@ -27,10 +31,32 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
     { id: 'business-hours', label: language === 'zh' ? '营业时间' : language === 'en' ? 'Business Hours' : 'ဖွင့်ချိန်သတ်မှတ်ချက်', icon: '⏰' },
   ];
 
+  const orderStatuses = [
+    { id: 'all', label: language === 'zh' ? '全部订单' : language === 'en' ? 'All Orders' : 'အော်ဒါအားလုံး', icon: '📦' },
+    { id: '待确认', label: language === 'zh' ? '待接单' : language === 'en' ? 'Pending Accept' : 'လက်ခံရန်စောင့်ဆိုင်း', icon: '🔔' },
+    { id: '打包中', label: language === 'zh' ? '打包中' : language === 'en' ? 'Packing' : 'ထုပ်ပိုးနေသည်', icon: '📦' },
+    { id: '待取件', label: language === 'zh' ? '待取件' : language === 'en' ? 'Pending Pickup' : 'လာယူရန်စောင့်ဆိုင်း', icon: '⏳' },
+    { id: '运输中', label: language === 'zh' ? '配送中' : language === 'en' ? 'In Transit' : 'ပို့ဆောင်နေသည်', icon: '🚚' },
+    { id: '已完成', label: language === 'zh' ? '已完成' : language === 'en' ? 'Completed' : 'ပြီးစီးသည်', icon: '✅' },
+    { id: '已取消', label: language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်သည်', icon: '❌' },
+  ];
+
   const handleMenuClick = (id: string) => {
     if (id === '/') {
       setIsAccountExpanded(!isAccountExpanded);
       if (location.pathname !== '/') navigate('/');
+      return;
+    }
+
+    if (id === '/orders') {
+      setIsOrdersExpanded(!isOrdersExpanded);
+      if (!location.pathname.startsWith('/orders')) navigate('/orders');
+      return;
+    }
+
+    if (id.startsWith('status-')) {
+      const status = id.replace('status-', '');
+      navigate(`/orders${status === 'all' ? '' : `?status=${status}`}`);
       return;
     }
 
@@ -59,15 +85,18 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
 
   return (
     <div style={sidebarStyle}>
-      <div style={{ padding: '2rem 1.5rem' }}>
+      <div style={{ padding: '2rem 1.5rem', flexShrink: 0 }}>
         <Logo size="small" />
         <div style={badgeStyle}>MERCHANTS</div>
       </div>
 
       <div style={menuContainerStyle}>
         {mainMenuItems.map((item) => {
-          const isActive = location.pathname === item.id;
-          const hasSubMenu = item.id === '/';
+          const isActive = item.id === '/' ? location.pathname === '/' : location.pathname.startsWith(item.id);
+          const isAccount = item.id === '/';
+          const isOrders = item.id === '/orders';
+          const isExpanded = isAccount ? isAccountExpanded : isOrders ? isOrdersExpanded : false;
+          const hasSubMenu = isAccount || isOrders;
           
           return (
             <React.Fragment key={item.id}>
@@ -87,15 +116,15 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
                 {hasSubMenu && (
                   <span style={{ 
                     fontSize: '0.8rem', 
-                    transform: isAccountExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
                     transition: 'transform 0.3s ease',
                     opacity: 0.5
                   }}>▼</span>
                 )}
               </div>
 
-              {/* 🚀 子菜单区域 */}
-              {hasSubMenu && isAccountExpanded && (
+              {/* 🚀 我的账号子菜单 */}
+              {isAccount && isAccountExpanded && (
                 <div style={subMenuWrapperStyle}>
                   {subMenuItems.map(sub => (
                     <div
@@ -109,6 +138,34 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
                       <span>{sub.label}</span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* 🚀 订单状态子菜单 */}
+              {isOrders && isOrdersExpanded && (
+                <div style={subMenuWrapperStyle}>
+                  {orderStatuses.map(status => {
+                    const searchParams = new URLSearchParams(location.search);
+                    const currentStatus = searchParams.get('status') || 'all';
+                    const isStatusActive = currentStatus === status.id;
+
+                    return (
+                      <div
+                        key={status.id}
+                        onClick={() => handleMenuClick(`status-${status.id}`)}
+                        style={{
+                          ...subMenuItemStyle,
+                          color: isStatusActive ? '#3b82f6' : 'rgba(255,255,255,0.4)',
+                          fontWeight: isStatusActive ? '700' : 'normal'
+                        }}
+                        onMouseOver={(e) => { if(!isStatusActive) e.currentTarget.style.color = '#3b82f6'; }}
+                        onMouseOut={(e) => { if(!isStatusActive) e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+                      >
+                        <span style={{ fontSize: '1rem' }}>{status.icon}</span>
+                        <span>{status.label}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </React.Fragment>
@@ -167,6 +224,8 @@ const sidebarStyle: React.CSSProperties = {
   left: 0,
   top: 0,
   zIndex: 1000,
+  overflowY: 'auto', // 🚀 开启垂直滚动
+  scrollbarWidth: 'none', // Firefox 隐藏滚动条
 };
 
 const badgeStyle: React.CSSProperties = {
@@ -219,6 +278,7 @@ const subMenuItemStyle: React.CSSProperties = {
 const footerStyle: React.CSSProperties = {
   padding: '1.5rem',
   borderTop: '1px solid rgba(255,255,255,0.05)',
+  flexShrink: 0, // 🚀 确保底部不被压缩
 };
 
 const userCardStyle: React.CSSProperties = {
