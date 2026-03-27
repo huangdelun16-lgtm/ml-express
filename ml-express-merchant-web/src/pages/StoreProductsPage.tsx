@@ -84,7 +84,7 @@ const StoreProductsPage: React.FC = () => {
               boxShadow: '0 10px 20px rgba(245, 158, 11, 0.3)'
             }}>🛍️</div>
             <div>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: '900', margin: 0, letterSpacing: '-0.5px' }}>
+              <h1 style={{ fontSize: '1.8rem', fontWeight: '900', margin: 0, letterSpacing: '-0.5px', color: '#ffffff' }}>
                 {t?.profile?.myProducts || '商品管理'}
               </h1>
               <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '4px', fontSize: '0.9rem', fontWeight: '500' }}>

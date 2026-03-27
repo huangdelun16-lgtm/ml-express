@@ -1845,7 +1845,7 @@ const ProfilePage: React.FC = () => {
           transition: 'all 0.6s ease'
         }}>
           <h1 style={{
-            color: 'white',
+            color: '#ffffff',
             fontSize: '2.5rem',
             marginBottom: '0.5rem',
             fontWeight: '900',
@@ -3155,7 +3155,7 @@ const ProfilePage: React.FC = () => {
           transition: 'all 0.6s ease 0.4s'
         }}>
           <h2 id="packages-section" style={{
-            color: 'white',
+            color: '#ffffff',
             fontSize: '1.5rem',
             marginBottom: '1.5rem',
             borderBottom: '2px solid rgba(255,255,255,0.3)',

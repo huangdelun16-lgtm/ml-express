@@ -40,6 +40,10 @@ function App() {
     setCurrentUser(null);
   };
 
+  const handleLogin = (user: any) => {
+    setCurrentUser(user);
+  };
+
   if (loading) return null;
 
   return (
@@ -47,7 +51,7 @@ function App() {
       <Router>
         <div className="App" style={{ minHeight: '100vh', background: '#0a0f1e' }}>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
             
             {/* 商家管理核心路由 - 统一包装在 MerchantLayout 中 */}
             <Route path="/" element={

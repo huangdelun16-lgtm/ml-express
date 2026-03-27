@@ -4,7 +4,7 @@ import { supabase } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import './LoginPage.css';
 
-const LoginPage: React.FC = () => {
+const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [storeCode, setStoreCode] = useState('');
@@ -71,6 +71,7 @@ const LoginPage: React.FC = () => {
       localStorage.setItem('ml-express-customer', JSON.stringify(merchantsUser));
       localStorage.setItem('userType', 'merchant');
       
+      onLogin(merchantsUser);
       navigate('/');
     } catch (err) {
       setError(currentT.error);
