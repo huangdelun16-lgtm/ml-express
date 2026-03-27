@@ -1838,7 +1838,7 @@ const ProfilePage: React.FC = () => {
         {/* 页面标题 */}
         <div style={{
           textAlign: 'center', // 🚀 移动到页面中间
-          marginBottom: '1.5rem',
+          marginBottom: '1.2rem',
           marginTop: '1.5rem',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
@@ -1849,15 +1849,15 @@ const ProfilePage: React.FC = () => {
         }}>
           <h1 style={{
             color: '#ffffff',
-            fontSize: '1.75rem',
-            marginBottom: '0.25rem',
+            fontSize: '1.6rem',
+            marginBottom: '0.15rem',
             fontWeight: '950', // 🚀 极重字重，更集中
             letterSpacing: '-1px', // 🚀 紧凑字间距
             textShadow: '0 2px 8px rgba(0,0,0,0.2)'
           }}>
             {t.title}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', fontWeight: '600' }}>欢迎回来，这里是您的经营实时看板</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', fontWeight: '600' }}>欢迎回来，这里是您的经营实时看板</p>
         </div>
 
         {/* 用户信息卡片 - 参考客户端app样式 */}
@@ -2795,39 +2795,53 @@ const ProfilePage: React.FC = () => {
                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                       whiteSpace: 'nowrap'
                     }}>
-                      <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>今日暂停营业</span>
-                      <button 
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setBusinessStatus(prev => ({ ...prev, is_closed_today: !prev.is_closed_today }));
-                        }}
-                        style={{
-                          width: '48px',
-                          height: '24px',
-                          borderRadius: '12px',
-                          backgroundColor: businessStatus.is_closed_today ? '#ef4444' : 'rgba(255,255,255,0.2)',
-                          position: 'relative',
-                          cursor: 'pointer',
-                          border: 'none',
-                          transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                          padding: 0,
-                          zIndex: 100
-                        }}
-                      >
-                        <div style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '9px',
-                          backgroundColor: 'white',
-                          position: 'absolute',
-                          top: '3px',
-                          left: businessStatus.is_closed_today ? '27px' : '3px',
-                          transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                        }} />
-                      </button>
+                      <span style={{ 
+                        color: 'white', 
+                        fontWeight: '800', 
+                        fontSize: '0.85rem',
+                        lineHeight: '1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        flex: 1,
+                        textAlign: 'left'
+                      }}>
+                        {t.closedToday}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setBusinessStatus(prev => ({ ...prev, is_closed_today: !prev.is_closed_today }));
+                          }}
+                          style={{
+                            width: '42px',
+                            height: '22px',
+                            borderRadius: '11px',
+                            backgroundColor: businessStatus.is_closed_today ? '#ef4444' : 'rgba(255,255,255,0.2)',
+                            position: 'relative',
+                            cursor: 'pointer',
+                            border: 'none',
+                            transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '8px',
+                            backgroundColor: 'white',
+                            position: 'absolute',
+                            top: '3px',
+                            left: businessStatus.is_closed_today ? '23px' : '3px',
+                            transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                          }} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
