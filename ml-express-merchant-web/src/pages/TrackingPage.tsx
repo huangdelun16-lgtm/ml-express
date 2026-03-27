@@ -122,7 +122,9 @@ const TrackingPage: React.FC = () => {
                   <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.9rem' }}>地址: {order.receiver_address}</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: '#fbbf24', fontSize: '1.2rem', fontWeight: '900', margin: 0 }}>{order.price} MMK</p>
+                  <p style={{ color: '#fbbf24', fontSize: '1.2rem', fontWeight: '900', margin: 0 }}>
+                    {order.price ? `${order.price.replace('MMK', '').trim()} MMK` : '-'}
+                  </p>
                   <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>{new Date(order.created_at).toLocaleString()}</p>
                 </div>
               </div>
