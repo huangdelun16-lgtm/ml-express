@@ -1837,24 +1837,27 @@ const ProfilePage: React.FC = () => {
       }}>
         {/* 页面标题 */}
         <div style={{
-          textAlign: 'left',
+          textAlign: 'center', // 🚀 移动到页面中间
           marginBottom: '1.5rem',
-          marginTop: '1.5rem', // 🚀 增加顶部外边距，避开侧边栏
+          marginTop: '1.5rem',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
-          transition: 'all 0.6s ease'
+          transition: 'all 0.6s ease',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
         }}>
           <h1 style={{
             color: '#ffffff',
             fontSize: '1.75rem',
-            marginBottom: '0.5rem',
-            fontWeight: '900',
-            letterSpacing: '-1px',
-            textShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            marginBottom: '0.25rem',
+            fontWeight: '950', // 🚀 极重字重，更集中
+            letterSpacing: '-1px', // 🚀 紧凑字间距
+            textShadow: '0 2px 8px rgba(0,0,0,0.2)'
           }}>
             {t.title}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1rem' }}>欢迎回来，这里是您的经营实时看板</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', fontWeight: '600' }}>欢迎回来，这里是您的经营实时看板</p>
         </div>
 
         {/* 用户信息卡片 - 参考客户端app样式 */}
@@ -2502,33 +2505,6 @@ const ProfilePage: React.FC = () => {
                             {merchantCODStats.lastSettledAt ? formatDate(merchantCODStats.lastSettledAt) : t.noSettlement}
                           </span>
                         </div>
-
-                        {/* 🚀 新增：语音播报开启按钮 */}
-                        <button
-                          onClick={() => {
-                            if (!isVoiceEnabled) {
-                              speakNotification('语音提醒功能已开启');
-                              alert(language === 'zh' ? '✅ 语音提醒已开启！当有“待确认”新订单时，系统将自动为您播放播报并刷新列表。' : 'Voice Alert Active! List will auto-refresh on new orders.');
-                            }
-                            setIsVoiceEnabled(!isVoiceEnabled);
-                          }}
-                          style={{
-                            background: isVoiceEnabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                            color: isVoiceEnabled ? '#10b981' : 'white',
-                            border: `1px solid ${isVoiceEnabled ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.2)'}`,
-                            padding: '6px 15px',
-                            borderRadius: '10px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            transition: 'all 0.3s ease'
-                          }}
-                        >
-                          {isVoiceEnabled ? '🔔' : '🔕'} {isVoiceEnabled ? (language === 'zh' ? '语音监控中' : t.voiceActive) : t.enableVoice}
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -2609,35 +2585,66 @@ const ProfilePage: React.FC = () => {
                     >›</button>
                   </div>
 
-                  {/* 🚀 新增：导出对账单按钮 */}
-                  <button
-                    onClick={() => setShowExportModal(true)}
-                    style={{
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '10px 24px',
-                      borderRadius: '18px',
-                      fontWeight: '900',
-                      fontSize: '1.1rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      boxShadow: '0 10px 20px rgba(79, 70, 229, 0.3)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 15px 30px rgba(79, 70, 229, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 10px 20px rgba(79, 70, 229, 0.3)';
-                    }}
-                  >
-                    📊 {language === 'zh' ? '导出对账单' : 'Export Statement'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    {/* 🚀 移动后的语音播报按钮 - 现在在最右侧 */}
+                    <button
+                      onClick={() => {
+                        if (!isVoiceEnabled) {
+                          speakNotification('语音提醒功能已开启');
+                          alert(language === 'zh' ? '✅ 语音提醒已开启！当有“待确认”新订单时，系统将自动为您播放播报并刷新列表。' : 'Voice Alert Active! List will auto-refresh on new orders.');
+                        }
+                        setIsVoiceEnabled(!isVoiceEnabled);
+                      }}
+                      style={{
+                        background: isVoiceEnabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                        color: isVoiceEnabled ? '#10b981' : 'white',
+                        border: `1px solid ${isVoiceEnabled ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.2)'}`,
+                        padding: '10px 20px',
+                        borderRadius: '14px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.3s ease',
+                        boxShadow: isVoiceEnabled ? '0 4px 12px rgba(16, 185, 129, 0.2)' : 'none'
+                      }}
+                    >
+                      {isVoiceEnabled ? '🔔' : '🔕'} {isVoiceEnabled ? (language === 'zh' ? '语音监控中' : t.voiceActive) : t.enableVoice}
+                    </button>
+
+                    {/* 🚀 导出对账单按钮 */}
+                    <button
+                      onClick={() => setShowExportModal(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '10px 24px',
+                        borderRadius: '18px',
+                        fontWeight: '900',
+                        fontSize: '1.1rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        boxShadow: '0 10px 20px rgba(79, 70, 229, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 15px 30px rgba(79, 70, 229, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 10px 20px rgba(79, 70, 229, 0.3)';
+                      }}
+                    >
+                      📊 {language === 'zh' ? '导出对账单' : 'Export Statement'}
+                    </button>
+                  </div>
                 </div>
                 
                 <div style={{
@@ -2773,46 +2780,22 @@ const ProfilePage: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                    {/* 休假模式入口 */}
-                    <button
-                      onClick={() => setShowVacationModal(true)}
-                      style={{
-                        background: 'rgba(59, 130, 246, 0.15)',
-                        color: '#60a5fa',
-                        border: '1px solid rgba(59, 130, 246, 0.3)',
-                        padding: '8px 16px',
-                        borderRadius: '12px',
-                        fontSize: '0.9rem',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'}
-                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
-                    >
-                      📅 {language === 'zh' ? '预设休假' : 'Vacation'}
-                      {businessStatus.vacation_dates.length > 0 && (
-                        <span style={{ background: '#3b82f6', color: 'white', padding: '2px 6px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                          {businessStatus.vacation_dates.length}
-                        </span>
-                      )}
-                    </button>
-
                     {/* 今日营业开关 */}
                     <div style={{ 
                       display: 'flex', 
                       alignItems: 'center',
+                      justifyContent: 'space-between',
                       gap: '12px',
                       background: 'rgba(15, 23, 42, 0.4)',
-                      padding: '8px 16px',
+                      padding: '0 16px',
+                      width: '200px',
+                      height: '39px',
                       borderRadius: '16px',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      whiteSpace: 'nowrap'
                     }}>
-                      <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>{t.closedToday}</span>
+                      <span style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>今日暂停营业</span>
                       <button 
                         type="button"
                         onClick={(e) => {
