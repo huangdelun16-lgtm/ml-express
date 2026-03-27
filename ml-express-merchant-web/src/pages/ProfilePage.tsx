@@ -756,8 +756,8 @@ const ProfilePage: React.FC = () => {
       }
         
         // 检查是否是合伙店铺账户
-        const isPartner = true;
-        setIsPartnerStore(true);
+        const isPartner = await checkIfPartnerStore(user);
+        setIsPartnerStore(isPartner);
         
         // 如果是合伙店铺，加载店铺信息
         if (isPartner && (user.store_code || user.store_id)) {
@@ -1835,7 +1835,7 @@ const ProfilePage: React.FC = () => {
         bottom: 0,
         background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%)',
         pointerEvents: 'none'
-       />
+      }} />
 
       {/* 导航栏 */}
       <NavigationBar
@@ -1843,9 +1843,9 @@ const ProfilePage: React.FC = () => {
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
         onLogout={handleLogout}
-         
-           
-         
+        onShowRegisterModal={(isLoginMode) => {
+          navigate('/', { state: { showModal: true, isLoginMode } });
+        }} 
         
       />
 
@@ -2931,7 +2931,7 @@ const ProfilePage: React.FC = () => {
                           left: businessStatus.is_closed_today ? '27px' : '3px',
                           transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                           boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                         />
+                        }} />
                       </button>
                     </div>
                   </div>
@@ -2960,7 +2960,7 @@ const ProfilePage: React.FC = () => {
                       height: '150px',
                       background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
                       zIndex: 0
-                     />
+                    }} />
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1, flexWrap: 'wrap', gap: '2rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flex: 1, flexWrap: 'wrap' }}>
@@ -4782,7 +4782,7 @@ const ProfilePage: React.FC = () => {
                     >
                       <div style={{ width: '100%', aspectRatio: '1', borderRadius: '20px', background: '#000', marginBottom: '1.25rem', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {product.image_url && !product.image_url.startsWith('file://') ? (
-                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover'  />
+                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           <span style={{ fontSize: '3rem' }}>🖼️</span>
                         )}
@@ -4882,7 +4882,7 @@ const ProfilePage: React.FC = () => {
                 }}
               >
                 {productForm.image_url ? (
-                  <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover'  />
+                  <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <>
                     <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📸</div>
@@ -4895,7 +4895,7 @@ const ProfilePage: React.FC = () => {
                   type="file" 
                   ref={productFileInputRef} 
                   onChange={handleImageUpload} 
-                  style={{ display: 'none'  
+                  style={{ display: 'none' }} 
                   accept="image/*"
                 />
               </div>
@@ -5171,7 +5171,7 @@ const ProfilePage: React.FC = () => {
                   ref={fileInputRef} 
                   onChange={handleFileChange} 
                   accept="image/*" 
-                  style={{ display: 'none'  
+                  style={{ display: 'none' }} 
                 />
               </div>
 
@@ -5938,7 +5938,7 @@ const ProfilePage: React.FC = () => {
                             key={`${review.id}-img-${idx}`} 
                             src={img} 
                             alt={`Review ${idx + 1}`} 
-                            style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid rgba(255,255,255,0.1)'  
+                            style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid rgba(255,255,255,0.1)' }} 
                             onClick={() => window.open(img, '_blank')}
                             onError={(e) => {
                               console.error('图片加载失败:', img);
@@ -6151,7 +6151,7 @@ const ProfilePage: React.FC = () => {
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   {reviewImages.map((img, index) => (
                     <div key={index} style={{ position: 'relative', width: '80px', height: '80px' }}>
-                      <img src={img} alt="Preview" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover'  />
+                      <img src={img} alt="Preview" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />
                       <button 
                         onClick={() => handleRemoveReviewImage(index)}
                         style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: 'white', border: 'none', width: '20px', height: '20px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}
@@ -6191,7 +6191,7 @@ const ProfilePage: React.FC = () => {
                   accept="image/*" 
                   ref={reviewImageInputRef} 
                   onChange={handleReviewImageUpload} 
-                  style={{ display: 'none'  
+                  style={{ display: 'none' }} 
                 />
               </div>
             </div>
