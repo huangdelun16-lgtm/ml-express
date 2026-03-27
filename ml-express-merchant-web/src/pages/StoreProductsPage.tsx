@@ -111,15 +111,15 @@ const StoreProductsPage: React.FC = () => {
               background: 'rgba(255, 255, 255, 0.1)',
               color: 'white', 
               border: '1px solid rgba(255, 255, 255, 0.2)', 
-              padding: '0.6rem 1.2rem', 
-              borderRadius: '12px',
+              padding: '0.4rem 1rem', 
+              borderRadius: '10px',
               fontWeight: '700', 
               cursor: 'pointer', 
               transition: 'all 0.3s ease',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              fontSize: '0.9rem',
+              gap: '6px',
+              fontSize: '0.85rem',
               whiteSpace: 'nowrap'
             }}
             onClick={() => navigate('/')}

@@ -762,12 +762,18 @@ const ProfilePage: React.FC = () => {
         // 如果是合伙店铺，加载店铺信息
         if (isPartner && (user.store_code || user.store_id)) {
           try {
-            const { data: store, error } = await supabase
-              .from('delivery_stores')
-              .select('*')
-              .eq('store_code', user.store_code || '')
-              .or(`id.eq.${user.store_id || ''}`)
-              .maybeSingle();
+            let query = supabase.from('delivery_stores').select('*');
+            
+            // 🚀 优化：根据可用标识符构建查询，避免空的 .or() 导致 400 错误
+            if (user.store_code && user.store_id) {
+              query = query.or(`store_code.eq.${user.store_code},id.eq.${user.store_id}`);
+            } else if (user.store_code) {
+              query = query.eq('store_code', user.store_code);
+            } else if (user.store_id) {
+              query = query.eq('id', user.store_id);
+            }
+            
+            const { data: store, error } = await query.maybeSingle();
             
             if (!error && store) {
               setStoreInfo(store);
