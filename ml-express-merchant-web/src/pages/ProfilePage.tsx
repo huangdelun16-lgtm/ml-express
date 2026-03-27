@@ -1839,6 +1839,7 @@ const ProfilePage: React.FC = () => {
         <div style={{
           textAlign: 'left',
           marginBottom: '3rem',
+          marginTop: '1.5rem', // 🚀 增加顶部外边距，避开侧边栏
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
           transition: 'all 0.6s ease'

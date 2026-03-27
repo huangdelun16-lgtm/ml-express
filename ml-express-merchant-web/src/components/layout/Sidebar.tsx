@@ -61,7 +61,9 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
 const sidebarStyle: React.CSSProperties = {
   width: '260px',
   height: '100vh',
-  background: '#0f172a',
+  background: 'rgba(15, 23, 42, 0.8)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
   borderRight: '1px solid rgba(255,255,255,0.05)',
   display: 'flex',
   flexDirection: 'column',

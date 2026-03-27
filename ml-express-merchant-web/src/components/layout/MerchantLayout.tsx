@@ -30,7 +30,7 @@ const layoutStyle: React.CSSProperties = {
 const mainContentStyle: React.CSSProperties = {
   flex: 1,
   marginLeft: '260px', // 避开固定的侧边栏
-  padding: '2rem',
+  padding: '3.5rem 3rem', // 增加顶部间距，彻底拉开与侧边栏品牌名的距离
   minHeight: '100vh',
   background: 'radial-gradient(circle at top right, rgba(59, 130, 246, 0.05) 0%, transparent 40%)',
 };
