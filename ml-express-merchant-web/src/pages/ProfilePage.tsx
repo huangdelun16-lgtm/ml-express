@@ -32,7 +32,7 @@ const OrderQRCode: React.FC<{ orderId: string }> = ({ orderId }) => {
       QRCode.toDataURL(orderId).then(setQrUrl);
     }
   }, [orderId]);
-  return qrUrl ? <img src={qrUrl} style={{ width: '80px', height: '80px' }} alt="QR" /> : null;
+  return qrUrl ? <img src={qrUrl} style={{ width: '80px', height: '80px'  alt="QR" /> : null;
 };
 
 // 🚀 新增：高级滚动时间选择器组件
@@ -716,17 +716,57 @@ const ProfilePage: React.FC = () => {
       try {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
+        setUserBalance(user.balance || 0); // 🚀 获取余额
         setIsGuest(false);
-        setIsPartnerStore(true); // 🚀 商家端强制为 true
 
-        // 🚀 加载店铺信息
-        if (user.id || user.store_id) {
+      // 🚀 实时从数据库同步最新余额和用户信息
+      if (user.id) {
+        try {
+          const isMerchant = user.user_type === 'merchant' || await checkIfPartnerStore(user);
+          const syncTable = isMerchant ? 'delivery_stores' : 'users';
+          const selectFields = isMerchant 
+            ? 'store_name, phone, email, address' 
+            : 'balance, user_type, name, phone, email, address';
+
+          const { data: latestRaw, error: userError } = await supabase
+            .from(syncTable)
+            .select(selectFields)
+            .eq('id', user.id)
+            .maybeSingle();
+          
+          if (!userError && latestRaw) {
+            console.log('✅ Web端用户信息同步成功:', latestRaw);
+            const rawData = latestRaw as any;
+            const latestUser: any = { ...user, ...rawData };
+            
+            if (isMerchant) {
+              latestUser.name = rawData.store_name;
+              latestUser.user_type = 'merchant';
+              setUserBalance(0);
+            } else {
+              setUserBalance(rawData.balance || 0);
+            }
+
+            setCurrentUser(latestUser);
+            localStorage.setItem('ml-express-customer', JSON.stringify(latestUser));
+          }
+        } catch (error) {
+          console.warn('获取最新用户信息失败');
+        }
+      }
+        
+        // 检查是否是合伙店铺账户
+        const isPartner = await checkIfPartnerStore(user);
+        setIsPartnerStore(true);
+        
+        // 如果是合伙店铺，加载店铺信息
+        if (isPartner && (user.store_code || user.store_id)) {
           try {
-            const storeId = user.store_id || user.id;
             const { data: store, error } = await supabase
               .from('delivery_stores')
               .select('*')
-              .eq('id', storeId)
+              .eq('store_code', user.store_code || '')
+              .or(`id.eq.${user.store_id || ''}`)
               .maybeSingle();
             
             if (!error && store) {
@@ -744,12 +784,15 @@ const ProfilePage: React.FC = () => {
       } catch (error) {
         LoggerService.error('加载用户信息失败:', error);
         setCurrentUser(null);
-        setIsPartnerStore(true);
+        setIsPartnerStore(false);
+        setIsGuest(true);
       }
     } else {
-      navigate('/login');
+      // 如果未登录，重定向到首页
+      setIsGuest(true);
+      navigate('/');
     }
-  }, [navigate]);
+  }, [navigate, checkIfPartnerStore]);
 
   // 加载用户的包裹列表
   const loadUserPackages = useCallback(async () => {
@@ -1792,7 +1835,7 @@ const ProfilePage: React.FC = () => {
         bottom: 0,
         background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%)',
         pointerEvents: 'none'
-      }} />
+       />
 
       {/* 导航栏 */}
       <NavigationBar
@@ -1800,6 +1843,10 @@ const ProfilePage: React.FC = () => {
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
         onLogout={handleLogout}
+         
+           
+         
+        
       />
 
       {/* 主要内容区域 */}
@@ -1946,9 +1993,61 @@ const ProfilePage: React.FC = () => {
                   )}
                 </div>
 
-                {/* 🚀 商家端：只显示商家资料，不显示会员/充值信息 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  {/* 编辑资料按钮 */}
+                {/* 🚀 新增：余额显示和充值按钮 */}
+                {!isPartnerStore && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                      background: 'rgba(251, 191, 36, 0.15)',
+                      padding: '0.6rem 1.5rem',
+                      borderRadius: '14px',
+                      border: '1px solid rgba(251, 191, 36, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.8rem',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}>
+                      <span style={{ fontSize: '1.2rem' }}>💰</span>
+                      <div>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>
+                          {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}
+                        </div>
+                        <div style={{ color: '#fbbf24', fontSize: '1.1rem', fontWeight: '900' }}>
+                          {userBalance.toLocaleString()} <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>MMK</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => setShowRechargeModal(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.8rem 1.8rem',
+                        borderRadius: '14px',
+                        fontSize: '1rem',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(16, 185, 129, 0.5)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)';
+                      }}
+                    >
+                      {language === 'zh' ? '立即充值' : language === 'en' ? 'Recharge' : 'ငွေဖြည့်မည်'}
+                    </button>
+                  </div>
+                )}
+                
+                {/* 🚀 新增：编辑资料按钮 */}
+                {currentUser && (
                   <button
                     onClick={handleOpenEditProfile}
                     style={{
@@ -1960,7 +2059,7 @@ const ProfilePage: React.FC = () => {
                       fontSize: '0.95rem',
                       fontWeight: '700',
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.6rem',
@@ -1970,18 +2069,24 @@ const ProfilePage: React.FC = () => {
                     }}
                     onMouseOver={(e) => {
                       e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.2)';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
                       e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                     }}
                   >
                     <span style={{ fontSize: '1.1rem' }}>📝</span>
                     {language === 'zh' ? '编辑资料' : language === 'en' ? 'Edit Profile' : 'ကိုယ်ရေးအချက်အလက်ပြင်ဆင်ရန်'}
                   </button>
+                )}
 
-                  {/* 安全设置按钮 */}
+                {/* 合伙店铺：修改密码按钮 */}
+                {isPartnerStore && (
                   <button
                     onClick={() => setShowPasswordModal(true)}
                     style={{
@@ -1993,7 +2098,7 @@ const ProfilePage: React.FC = () => {
                       fontSize: '0.95rem',
                       fontWeight: '700',
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.6rem',
@@ -2003,18 +2108,24 @@ const ProfilePage: React.FC = () => {
                     }}
                     onMouseOver={(e) => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.2)';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
                       e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                     }}
                   >
                     <span style={{ fontSize: '1.1rem' }}>🔐</span>
                     {language === 'zh' ? '安全设置' : language === 'en' ? 'Security' : 'လုံခြုံရေး'}
                   </button>
+                )}
 
-                  {/* 管理商品按钮 */}
+                {/* 🚀 新增：我的商品管理按钮 */}
+                {isPartnerStore && (
                   <button
                     onClick={() => setShowProductsModal(true)}
                     style={{
@@ -2026,7 +2137,7 @@ const ProfilePage: React.FC = () => {
                       fontSize: '0.95rem',
                       fontWeight: '700',
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.6rem',
@@ -2036,19 +2147,22 @@ const ProfilePage: React.FC = () => {
                     }}
                     onMouseOver={(e) => {
                       e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.6)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.2)';
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)';
                       e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                     }}
                   >
-                    <span style={{ fontSize: '1.1rem' }}>📦</span>
-                    {language === 'zh' ? '管理商品' : language === 'en' ? 'Products' : 'ပစ္စည်းစီမံရန်'}
+                    <span style={{ fontSize: '1.1rem' }}>🛍️</span>
+                    {t.myProducts}
                   </button>
-                </div>
+                )}
               </div>
-            </div>
               
               {isPartnerStore && storeInfo ? (
                 <div style={{ 
@@ -2175,6 +2289,7 @@ const ProfilePage: React.FC = () => {
               )}
             </div>
           </div>
+
 
           {/* 订单统计卡片 */}
           <div style={{
@@ -2816,7 +2931,7 @@ const ProfilePage: React.FC = () => {
                           left: businessStatus.is_closed_today ? '27px' : '3px',
                           transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                           boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                        }} />
+                         />
                       </button>
                     </div>
                   </div>
@@ -2845,7 +2960,7 @@ const ProfilePage: React.FC = () => {
                       height: '150px',
                       background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
                       zIndex: 0
-                    }} />
+                     />
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1, flexWrap: 'wrap', gap: '2rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flex: 1, flexWrap: 'wrap' }}>
@@ -3569,6 +3684,7 @@ const ProfilePage: React.FC = () => {
             </>
           )}
         </div>
+      </div>
 
       {/* 包裹详情模态框 */}
       {showPackageDetailModal && selectedPackage && (
@@ -4666,7 +4782,7 @@ const ProfilePage: React.FC = () => {
                     >
                       <div style={{ width: '100%', aspectRatio: '1', borderRadius: '20px', background: '#000', marginBottom: '1.25rem', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {product.image_url && !product.image_url.startsWith('file://') ? (
-                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover'  />
                         ) : (
                           <span style={{ fontSize: '3rem' }}>🖼️</span>
                         )}
@@ -4766,7 +4882,7 @@ const ProfilePage: React.FC = () => {
                 }}
               >
                 {productForm.image_url ? (
-                  <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover'  />
                 ) : (
                   <>
                     <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📸</div>
@@ -4779,7 +4895,7 @@ const ProfilePage: React.FC = () => {
                   type="file" 
                   ref={productFileInputRef} 
                   onChange={handleImageUpload} 
-                  style={{ display: 'none' }} 
+                  style={{ display: 'none'  
                   accept="image/*"
                 />
               </div>
@@ -5055,7 +5171,7 @@ const ProfilePage: React.FC = () => {
                   ref={fileInputRef} 
                   onChange={handleFileChange} 
                   accept="image/*" 
-                  style={{ display: 'none' }} 
+                  style={{ display: 'none'  
                 />
               </div>
 
@@ -5822,7 +5938,7 @@ const ProfilePage: React.FC = () => {
                             key={`${review.id}-img-${idx}`} 
                             src={img} 
                             alt={`Review ${idx + 1}`} 
-                            style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid rgba(255,255,255,0.1)' }} 
+                            style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', cursor: 'zoom-in', border: '1px solid rgba(255,255,255,0.1)'  
                             onClick={() => window.open(img, '_blank')}
                             onError={(e) => {
                               console.error('图片加载失败:', img);
@@ -6035,7 +6151,7 @@ const ProfilePage: React.FC = () => {
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   {reviewImages.map((img, index) => (
                     <div key={index} style={{ position: 'relative', width: '80px', height: '80px' }}>
-                      <img src={img} alt="Preview" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />
+                      <img src={img} alt="Preview" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover'  />
                       <button 
                         onClick={() => handleRemoveReviewImage(index)}
                         style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: 'white', border: 'none', width: '20px', height: '20px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}
@@ -6075,7 +6191,7 @@ const ProfilePage: React.FC = () => {
                   accept="image/*" 
                   ref={reviewImageInputRef} 
                   onChange={handleReviewImageUpload} 
-                  style={{ display: 'none' }} 
+                  style={{ display: 'none'  
                 />
               </div>
             </div>
