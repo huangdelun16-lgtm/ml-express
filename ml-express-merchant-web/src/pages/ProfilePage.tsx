@@ -2049,7 +2049,6 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
             </div>
-              </div>
               
               {isPartnerStore && storeInfo ? (
                 <div style={{ 
