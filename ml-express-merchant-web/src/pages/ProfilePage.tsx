@@ -1849,14 +1849,27 @@ const ProfilePage: React.FC = () => {
         }}>
           <h1 style={{
             color: '#ffffff',
-            fontSize: '1.6rem',
-            marginBottom: '0.15rem',
-            fontWeight: '950', // 🚀 极重字重，更集中
-            letterSpacing: '-1px', // 🚀 紧凑字间距
-            textShadow: '0 2px 8px rgba(0,0,0,0.2)'
+            fontSize: '2.2rem', // 🚀 恢复品牌标题规格
+            marginBottom: '0.25rem',
+            fontWeight: '950',
+            letterSpacing: '-1px',
+            textShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            background: 'linear-gradient(135deg, #ffffff 0%, #e6f2ff 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
+            MARKET LINK EXPRESS
+          </h1>
+          <h2 style={{
+            color: 'rgba(255,255,255,0.8)',
+            fontSize: '1.1rem',
+            marginBottom: '0.5rem',
+            fontWeight: '700',
+            letterSpacing: '2px',
+            textTransform: 'uppercase'
           }}>
             {t.title}
-          </h1>
+          </h2>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', fontWeight: '600' }}>
             {language === 'zh' ? '欢迎回来，这里是您的经营实时看板' : 
              language === 'en' ? 'Welcome back, here is your real-time business dashboard' :
@@ -2050,7 +2063,7 @@ const ProfilePage: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => setShowProductsModal(true)}
+                    onClick={() => navigate('/products')}
                     style={{
                       background: 'rgba(16, 185, 129, 0.1)',
                       color: 'white',

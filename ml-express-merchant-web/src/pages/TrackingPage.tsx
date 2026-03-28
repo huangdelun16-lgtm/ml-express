@@ -34,7 +34,7 @@ const TrackingPage: React.FC = () => {
 
   // 🚀 每页显示
   const [currentPage, setCurrentPage] = useState(1);
-  const packagesPerPage = 10;
+  const packagesPerPage = 5; // 🚀 与 ProfilePage 保持一致
 
   // 解析当前状态
   const searchParams = new URLSearchParams(location.search);
@@ -280,80 +280,101 @@ const TrackingPage: React.FC = () => {
 
         {/* 分页控件 */}
         {filteredOrders.length > packagesPerPage && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginTop: '2rem',
-            flexWrap: 'wrap'
-          }}>
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              style={{
-                background: currentPage === 1 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: 'bold',
-                transition: 'all 0.3s ease',
-                opacity: currentPage === 1 ? 0.5 : 1
-              }}
-            >
-              {language === 'zh' ? '上一页' : language === 'en' ? 'Previous' : 'ယခင်စာမျက်နှာ'}
-            </button>
-
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '3rem' }}>
             <div style={{
               display: 'flex',
-              gap: '0.5rem',
+              gap: '1.2rem',
               alignItems: 'center',
-              flexWrap: 'wrap',
-              justifyContent: 'center'
+              padding: '1rem',
+              background: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.05)'
             }}>
-              {Array.from({ length: Math.ceil(filteredOrders.length / packagesPerPage) }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  style={{
-                    background: currentPage === page ? 'rgba(59, 130, 246, 0.7)' : 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    border: `1px solid ${currentPage === page ? 'rgba(59, 130, 246, 0.9)' : 'rgba(255, 255, 255, 0.3)'}`,
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    fontWeight: currentPage === page ? 'bold' : 'normal',
-                    transition: 'all 0.3s ease',
-                    minWidth: '40px'
-                  }}
-                >
-                  {page}
-                </button>
-              ))}
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  opacity: currentPage === 1 ? 0.3 : 1
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>‹</span>
+              </button>
+
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'center'
+              }}>
+                {Array.from({ length: Math.ceil(filteredOrders.length / packagesPerPage) }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    style={{
+                      background: currentPage === page ? '#3b82f6' : 'transparent',
+                      color: 'white',
+                      border: currentPage === page ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: '800',
+                      transition: 'all 0.2s ease',
+                      boxShadow: currentPage === page ? '0 4px 12px rgba(59, 130, 246, 0.4)' : 'none'
+                    }}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredOrders.length / packagesPerPage), prev + 1))}
+                disabled={currentPage === Math.ceil(filteredOrders.length / packagesPerPage)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
+                  cursor: currentPage === Math.ceil(filteredOrders.length / packagesPerPage) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  opacity: currentPage === Math.ceil(filteredOrders.length / packagesPerPage) ? 0.3 : 1
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>›</span>
+              </button>
             </div>
 
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredOrders.length / packagesPerPage), prev + 1))}
-              disabled={currentPage === Math.ceil(filteredOrders.length / packagesPerPage)}
-              style={{
-                background: currentPage === Math.ceil(filteredOrders.length / packagesPerPage) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                cursor: currentPage === Math.ceil(filteredOrders.length / packagesPerPage) ? 'not-allowed' : 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: 'bold',
-                transition: 'all 0.3s ease',
-                opacity: currentPage === Math.ceil(filteredOrders.length / packagesPerPage) ? 0.5 : 1
-              }}
-            >
-              {language === 'zh' ? '下一页' : language === 'en' ? 'Next' : 'နောက်စာမျက်နှာ'}
-            </button>
+            {/* 显示当前页信息 */}
+            <div style={{
+              textAlign: 'center',
+              marginTop: '1.5rem',
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontSize: '0.9rem'
+            }}>
+              {language === 'zh' 
+                ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, filteredOrders.length)} 条，共 ${filteredOrders.length} 条`
+                : language === 'en'
+                ? `Showing ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, filteredOrders.length)} of ${filteredOrders.length}`
+                : ((currentPage - 1) * packagesPerPage + 1) + '-' + Math.min(currentPage * packagesPerPage, filteredOrders.length) + ' ကို ပြသထားသည်၊ စုစုပေါင်း ' + filteredOrders.length
+              }
+            </div>
           </div>
         )}
 

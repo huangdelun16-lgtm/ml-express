@@ -7,6 +7,7 @@
 [build.environment]
   NODE_VERSION = "18"
   NPM_FLAGS = "--legacy-peer-deps"
+  NETLIFY_SKIP_PLUGINS = "true"
 
 # SPA重定向配置 - 解决React Router路由问题
 [[redirects]]

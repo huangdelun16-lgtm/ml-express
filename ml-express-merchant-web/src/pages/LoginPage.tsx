@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import Logo from '../components/Logo';
 import './LoginPage.css';
 
 const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
   const [storeCode, setStoreCode] = useState('');
   const [password, setPassword] = useState('');
@@ -14,28 +15,34 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
 
   const t = {
     zh: {
-      title: '商户管理后台',
-      subtitle: '登录以管理您的店铺',
-      storeCode: '店铺代码',
-      password: '密码',
-      login: '登录',
-      error: '登录失败，请检查您的凭据',
+      title: '商户管理系统',
+      subtitle: '欢迎使用 MARKET LINK EXPRESS 经营指挥中心',
+      storeCode: '店铺代码 (Store ID)',
+      password: '安全密码',
+      login: '立即登录系统',
+      error: '登录失败，请检查店铺代码或密码',
+      storePlaceholder: '请输入 MDY00X 格式代码',
+      passPlaceholder: '请输入您的登录密码'
     },
     en: {
-      title: 'Merchant Backoffice',
-      subtitle: 'Login to manage your store',
-      storeCode: 'Store Code',
-      password: 'Password',
-      login: 'Login',
-      error: 'Login failed, please check your credentials',
+      title: 'Merchant System',
+      subtitle: 'Welcome to MARKET LINK EXPRESS Command Center',
+      storeCode: 'Store ID',
+      password: 'Security Password',
+      login: 'Login to System',
+      error: 'Login failed, please check credentials',
+      storePlaceholder: 'Enter store code (e.g. MDY001)',
+      passPlaceholder: 'Enter your password'
     },
     my: {
-      title: 'ကုန်သည် စီမံခန့်ခွဲမှု',
-      subtitle: 'သင့်ဆိုင်ကို စီမံခန့်ခွဲရန် ဝင်ရောက်ပါ',
+      title: 'ကုန်သည်စနစ်',
+      subtitle: 'MARKET LINK EXPRESS စီမံခန့်ခွဲမှုစင်တာသို့ ကြိုဆိုပါသည်',
       storeCode: 'ဆိုင်ကုဒ်',
       password: 'စကားဝှက်',
-      login: 'ဝင်ရောက်ရန်',
-      error: 'ဝင်ရောက်မှု မအောင်မြင်ပါ',
+      login: 'စနစ်သို့ဝင်ရောက်ရန်',
+      error: 'ဝင်ရောက်မှု မအောင်မြင်ပါ၊ ကုဒ် သို့မဟုတ် စကားဝှက်ကို စစ်ဆေးပါ',
+      storePlaceholder: 'ဆိုင်ကုဒ် ရိုက်ထည့်ပါ',
+      passPlaceholder: 'စကားဝှက် ရိုက်ထည့်ပါ'
     }
   };
 
@@ -50,13 +57,14 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
       const { data: store, error: storeError } = await supabase
         .from('delivery_stores')
         .select('*')
-        .eq('store_code', storeCode.trim())
+        .eq('store_code', storeCode.trim().toUpperCase())
         .maybeSingle();
 
       if (storeError || !store) {
         throw new Error('Store not found');
       }
 
+      // 🚀 支持明文和哈希对比 (后续可完善)
       if (store.password !== password) {
         throw new Error('Invalid password');
       }
@@ -66,6 +74,7 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
         name: store.store_name,
         user_type: 'merchant',
         store_code: store.store_code,
+        store_id: store.id
       };
 
       localStorage.setItem('ml-express-customer', JSON.stringify(merchantsUser));
@@ -82,35 +91,80 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
 
   return (
     <div className="login-page">
+      {/* 🚀 背景装饰 */}
+      <div className="bg-decoration-1"></div>
+      <div className="bg-decoration-2"></div>
+
       <div className="login-card">
         <div className="login-header">
+          <div className="logo-container">
+            <Logo size="medium" />
+          </div>
+          <div className="badge">MERCHANTS</div>
           <h1>{currentT.title}</h1>
           <p>{currentT.subtitle}</p>
         </div>
+
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>{currentT.storeCode}</label>
-            <input 
-              type="text" 
-              value={storeCode} 
-              onChange={(e) => setStoreCode(e.target.value)} 
-              required 
-            />
+            <div className="input-wrapper">
+              <span className="input-icon">🏪</span>
+              <input 
+                type="text" 
+                value={storeCode} 
+                onChange={(e) => setStoreCode(e.target.value)} 
+                placeholder={currentT.storePlaceholder}
+                required 
+              />
+            </div>
           </div>
           <div className="form-group">
             <label>{currentT.password}</label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              required 
-            />
+            <div className="input-wrapper">
+              <span className="input-icon">🔒</span>
+              <input 
+                type="password" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                placeholder={currentT.passPlaceholder}
+                required 
+              />
+            </div>
           </div>
-          {error && <p className="error-message">{error}</p>}
-          <button type="submit" disabled={loading}>
-            {loading ? '...' : currentT.login}
+          
+          {error && <div className="error-message">⚠️ {error}</div>}
+          
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? (
+              <div className="spinner-small"></div>
+            ) : (
+              currentT.login
+            )}
           </button>
         </form>
+
+        {/* 🚀 语言选择 */}
+        <div className="language-selector-login">
+          {[
+            { id: 'zh', label: '中文' },
+            { id: 'en', label: 'English' },
+            { id: 'my', label: 'မြန်မာ' }
+          ].map((lang) => (
+            <button
+              key={lang.id}
+              type="button"
+              onClick={() => setLanguage(lang.id)}
+              className={language === lang.id ? 'active' : ''}
+            >
+              {lang.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="login-footer">
+        © 2026 MARKET LINK EXPRESS. All Rights Reserved.
       </div>
     </div>
   );

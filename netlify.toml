@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  NETLIFY_SKIP_PLUGINS = "true"
 
 # Functions配置
 [functions]
