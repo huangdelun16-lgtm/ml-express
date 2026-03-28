@@ -394,49 +394,122 @@ const TrackingPage: React.FC = () => {
             </div>
 
             <div style={{ display: 'grid', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>{t?.packageId}</label><div style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>{selectedPackage.id}</div></div>
-                <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>{t?.status}</label><div style={{ display: 'inline-block', background: getStatusColor(selectedPackage.status === '待收款' ? '待取件' : selectedPackage.status), color: 'white', padding: '0.5rem 1rem', borderRadius: '24px', fontSize: '0.9rem', fontWeight: 'bold' }}>{selectedPackage.status === '待收款' ? getStatusText(selectedPackage.status) : selectedPackage.status}</div></div>
-              </div>
-
-              {/* 余额支付解析 */}
+              {/* 🚀 统一后的订单详情内容 (参考待接单列表风格) */}
               {(() => {
-                const payMatch = selectedPackage.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
-                if (payMatch && payMatch[1]) {
-                  return (<div><label style={{ color: '#10b981', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>{language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}</label><div style={{ color: '#10b981', fontSize: '1.5rem', fontWeight: '900' }}>{payMatch[1]} MMK</div></div>);
-                }
-                return null;
+                // 解析商品信息
+                const itemsMatch = selectedPackage.description?.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
+                const productItems = itemsMatch ? itemsMatch[1].split(', ') : [];
+                const parsedItems = productItems.map((item: string) => {
+                  const match = item.match(/^(.+?)\s*x(\d+)$/i);
+                  if (!match) return { label: item, qty: 1 };
+                  const name = match[1].trim();
+                  const qty = Number(match[2]) || 1;
+                  const unitPrice = productPriceMap[name];
+                  return { label: name, qty, price: unitPrice ? unitPrice * qty : undefined };
+                });
+
+                return (
+                  <>
+                    {/* 订单 ID 和 二维码区域 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>
+                          {t.packageId}
+                        </div>
+                        <div style={{ color: '#fbbf24', fontSize: '1.6rem', fontWeight: '900' }}>
+                          #{selectedPackage.id}
+                        </div>
+                        <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.9rem', marginTop: '8px' }}>
+                          📅 {selectedPackage.create_time || selectedPackage.created_at || '-'}
+                        </div>
+                        <div style={{ marginTop: '1rem' }}>
+                          <div style={{
+                            display: 'inline-block',
+                            background: getStatusColor(selectedPackage.status === '待收款' ? '待取件' : selectedPackage.status),
+                            color: 'white',
+                            padding: '0.5rem 1.2rem',
+                            borderRadius: '24px',
+                            fontSize: '0.9rem',
+                            fontWeight: '900'
+                          }}>
+                            {selectedPackage.status === '待收款' ? getStatusText(selectedPackage.status) : selectedPackage.status}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ background: 'white', padding: '10px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0,0,0,0.2)' }}>
+                        <OrderQRCode orderId={selectedPackage.id} />
+                      </div>
+                    </div>
+
+                    {/* 信息网格 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
+                      {/* 商家信息 */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ color: '#3b82f6', fontSize: '0.8rem', fontWeight: '900', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>商家信息</div>
+                        <div style={{ color: 'white', fontWeight: '800', fontSize: '1.1rem' }}>{selectedPackage.sender_name}</div>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.95rem', marginTop: '6px' }}>{selectedPackage.sender_phone}</div>
+                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', marginTop: '6px', lineHeight: '1.4' }}>{selectedPackage.sender_address}</div>
+                      </div>
+                      {/* 客户信息 */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: '900', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>客户信息</div>
+                        <div style={{ color: 'white', fontWeight: '800', fontSize: '1.1rem' }}>{selectedPackage.receiver_name}</div>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.95rem', marginTop: '6px' }}>{selectedPackage.receiver_phone}</div>
+                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', marginTop: '6px', lineHeight: '1.4' }}>{selectedPackage.receiver_address}</div>
+                      </div>
+                    </div>
+
+                    {/* 商品清单 */}
+                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: '900', marginBottom: '15px', textTransform: 'uppercase', letterSpacing: '1px' }}>商品清单</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {parsedItems.map((item: any, idx: number) => (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'white', fontSize: '1rem' }}>
+                            <span style={{ fontWeight: '600' }}>• {item.label}</span>
+                            <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>x{item.qty}</span>
+                              {item.price && <span style={{ fontWeight: '800', color: '#10b981' }}>{item.price.toLocaleString()} MMK</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px dashed rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem' }}>支付方式</span>
+                          <span style={{ color: 'white', fontWeight: '700' }}>{getPaymentMethodText(selectedPackage.payment_method)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem' }}>跑腿费用</span>
+                          <span style={{ color: 'white', fontWeight: '700' }}>{selectedPackage.price}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
+                          <span style={{ color: 'white', fontWeight: '900', fontSize: '1.1rem' }}>合计金额</span>
+                          <span style={{ color: '#fbbf24', fontWeight: '950', fontSize: '1.5rem' }}>
+                            {(() => {
+                              const deliveryFee = parseFloat(selectedPackage.price?.replace(/[^0-9.]/g, '') || '0');
+                              const itemPayMatch = selectedPackage.description?.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
+                              const itemCost = itemPayMatch?.[1] ? parseFloat(itemPayMatch[1].replace(/,/g, '')) : 0;
+                              const computedItemTotal = parsedItems.reduce((sum: number, item: any) => sum + (item.price || 0), 0);
+                              const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
+                              return (deliveryFee + finalItemTotal).toLocaleString();
+                            })()} MMK
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 客户备注 */}
+                    {selectedPackage.notes && (
+                      <div style={{ background: 'rgba(251, 191, 36, 0.1)', padding: '1.25rem', borderRadius: '20px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
+                        <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: '900', marginBottom: '6px', textTransform: 'uppercase' }}>💡 客户备注</div>
+                        <div style={{ color: 'white', fontSize: '1rem', lineHeight: '1.5', fontWeight: '500' }}>{selectedPackage.notes}</div>
+                      </div>
+                    )}
+                  </>
+                );
               })()}
-
-              <div style={{ background: 'rgba(255, 255, 255, 0.1)', borderRadius: '12px', padding: '1.5rem', position: 'relative' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 style={{ color: 'white', fontSize: '1.1rem', margin: 0 }}>{t?.sender}</h3>
-                  {(selectedPackage.description?.includes('[下单身份: 商家]') || selectedPackage.description?.includes('[Orderer: MERCHANTS]')) && (<div style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#93c5fd', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800', border: '1px solid rgba(59, 130, 246, 0.3)' }}>{language === 'zh' ? '下单账号：MERCHANTS' : 'Order Account: MERCHANTS'}</div>)}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{t?.name}</label><div style={{ color: 'white' }}>{selectedPackage.sender_name || '-'}</div></div>
-                  <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{t?.phone}</label><div style={{ color: 'white' }}>{selectedPackage.sender_phone || '-'}</div></div>
-                  <div style={{ gridColumn: '1 / -1' }}><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{t?.address}</label><div style={{ color: 'white' }}>{selectedPackage.sender_address || '-'}</div></div>
-                </div>
-              </div>
-
-              <div style={{ background: 'rgba(255, 255, 255, 0.1)', borderRadius: '12px', padding: '1.5rem', position: 'relative' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 style={{ color: 'white', fontSize: '1.1rem', margin: 0 }}>{t?.receiver}</h3>
-                  {(selectedPackage.description?.includes('[下单身份: VIP]') || selectedPackage.description?.includes('[Orderer: VIP]')) && (<div style={{ background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800', border: '1px solid rgba(251, 191, 36, 0.3)' }}>{language === 'zh' ? '下单账号：VIP' : 'Order Account: VIP'}</div>)}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{t?.name}</label><div style={{ color: 'white' }}>{selectedPackage.receiver_name || '-'}</div></div>
-                  <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{t?.phone}</label><div style={{ color: 'white' }}>{selectedPackage.receiver_phone || '-'}</div></div>
-                  <div style={{ gridColumn: '1 / -1' }}><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{t?.address}</label><div style={{ color: 'white' }}>{selectedPackage.receiver_address || '-'}</div></div>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{language === 'zh' ? '包裹类型' : 'Type'}</label><div style={{ color: 'white' }}>{selectedPackage.package_type || '-'}</div></div>
-                <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{language === 'zh' ? '重量' : 'Weight'}</label><div style={{ color: 'white' }}>{selectedPackage.weight || '-'}</div></div>
-                <div><label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'block', marginBottom: '0.25rem' }}>{t?.price}</label><div style={{ color: 'white', fontWeight: 'bold' }}>{selectedPackage.price || '-'}</div></div>
-              </div>
+            </div>
 
               {/* 🚀 商家专属操作按钮 */}
               {isPartnerStore && (
