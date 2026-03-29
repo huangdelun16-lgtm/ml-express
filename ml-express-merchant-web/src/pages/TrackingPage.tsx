@@ -193,6 +193,15 @@ const TrackingPage: React.FC = () => {
     return status;
   };
 
+  const getPaymentMethodText = (paymentMethod?: string) => {
+    if (!paymentMethod) return "-";
+    if (paymentMethod === "cash" || paymentMethod === "现金支付")
+      return language === "zh" ? "现金支付" : "Cash";
+    if (paymentMethod === "balance" || paymentMethod === "余额支付")
+      return language === "zh" ? "余额支付" : "Balance";
+    return paymentMethod;
+  };
+
   const handlePrintReceipt = async (orderData: any) => {
     if (!orderData) return;
     try {
