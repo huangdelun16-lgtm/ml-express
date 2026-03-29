@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Logo from '../Logo';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ currentUser, onLogout }) => {
@@ -85,10 +84,7 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({ current
 
   return (
     <div style={sidebarStyle}>
-      <div style={{ padding: '2rem 1.5rem', flexShrink: 0 }}>
-        <Logo size="small" />
-        <div style={badgeStyle}>MERCHANTS</div>
-      </div>
+      {/* 🚀 已根据要求删除 Sidebar 顶部的 Logo 和名称 */}
 
       <div style={menuContainerStyle}>
         {mainMenuItems.map((item) => {
@@ -228,21 +224,9 @@ const sidebarStyle: React.CSSProperties = {
   scrollbarWidth: 'none', // Firefox 隐藏滚动条
 };
 
-const badgeStyle: React.CSSProperties = {
-  fontSize: '0.65rem',
-  background: '#f59e0b',
-  color: '#000',
-  padding: '2px 8px',
-  borderRadius: '4px',
-  fontWeight: '900',
-  display: 'inline-block',
-  marginTop: '8px',
-  letterSpacing: '1px',
-};
-
 const menuContainerStyle: React.CSSProperties = {
   flex: 1,
-  padding: '1rem 0',
+  padding: '2.5rem 0', // 🚀 增加顶部间距，补偿删除 Logo 后的空白
 };
 
 const menuItemStyle: React.CSSProperties = {
