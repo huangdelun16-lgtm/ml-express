@@ -7,7 +7,6 @@ import * as XLSX from 'xlsx';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import Logo from '../components/Logo';
-import Logo from '../components/Logo';
 import NavigationBar from '../components/home/NavigationBar';
 import { useLanguage } from '../contexts/LanguageContext';
 
