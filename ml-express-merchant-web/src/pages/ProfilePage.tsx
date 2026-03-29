@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import Logo from '../components/Logo';
+import Logo from '../components/Logo';
 import NavigationBar from '../components/home/NavigationBar';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -102,31 +103,8 @@ const TimeWheelPicker: React.FC<{
             style={{ background: 'rgba(255,255,255,0.1)', border: 'none', width: '40px', height: '30px', borderRadius: '8px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >▼</button>
         </div>
-
-        <div style={{ fontSize: '1.8rem', fontWeight: '900', color: '#fbbf24', marginTop: '2px' }}>:</div>
-
-        {/* 分钟滚轮 */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
-          <button 
-            onClick={() => handleMinuteChange(String((parseInt(minute) + 5) % 60))}
-            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', width: '40px', height: '30px', borderRadius: '8px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >▲</button>
-          <div style={{ 
-            fontSize: '2.2rem', 
-            fontWeight: '900', 
-            color: 'white',
-            fontFamily: 'monospace',
-            padding: '5px 10px'
-          }}>
-            {minute.padStart(2, '0')}
-          </div>
-          <button 
-            onClick={() => handleMinuteChange(String((parseInt(minute) - 5 + 60) % 60))}
-            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', width: '40px', height: '30px', borderRadius: '8px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >▼</button>
-        </div>
-      </div>
     </div>
+    </>
   );
 };
 
@@ -1839,7 +1817,7 @@ const ProfilePage: React.FC = () => {
         {/* 页面标题 */}
         <div style={{
           textAlign: 'center', // 🚀 移动到页面中间
-          marginBottom: '1.2rem',
+          marginBottom: '2rem',
           marginTop: '1.5rem',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
@@ -1848,16 +1826,22 @@ const ProfilePage: React.FC = () => {
           flexDirection: 'column',
           alignItems: 'center'
         }}>
-          <div style={{ marginBottom: '1.5rem', transform: 'scale(1.2)' }}>
+          <div style={{ 
+            marginBottom: '1rem', 
+            transform: 'scale(1.3)',
+            filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.4))',
+            transition: 'all 0.5s ease'
+          }}>
             <Logo size="medium" />
           </div>
           <h2 style={{
-            color: 'rgba(255,255,255,0.8)',
-            fontSize: '1.1rem',
+            color: 'rgba(255,255,255,0.9)',
+            fontSize: '1.25rem',
             marginBottom: '0.5rem',
-            fontWeight: '700',
-            letterSpacing: '2px',
-            textTransform: 'uppercase'
+            fontWeight: '800',
+            letterSpacing: '3px',
+            textTransform: 'uppercase',
+            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
           }}>
             {t.title}
           </h2>
@@ -2210,6 +2194,7 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
             </div>
           </div>
 
@@ -2783,6 +2768,7 @@ const ProfilePage: React.FC = () => {
                             minute: '2-digit'
                           })}
                         </div>
+            </div>
                       )}
                     </div>
                   </div>
@@ -3572,15 +3558,12 @@ const ProfilePage: React.FC = () => {
                   ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} 条，共 ${userPackages.length} 条`
                   : language === 'en'
                   ? `Showing ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} of ${userPackages.length}`
-                  : ((currentPage - 1) * packagesPerPage + 1) + '-' + Math.min(currentPage * packagesPerPage, userPackages.length) + ' ကို ပြသထားသည်၊ စုစုပေါင်း ' + userPackages.length
-                }
+                  : ((currentPage - 1) * packagesPerPage + 1) + '-' + Math.min(currentPage * packagesPerPage, userPackages.length) + ' ကို ပြသထားသည်၊ စုစုပေါင်း ' + userPackages.length}
               </div>
             </>
           )}
         </div>
-      </div>
-
-      {/* 包裹详情模态框 */}
+      )}
       {showPackageDetailModal && selectedPackage && (
         <div style={{
           position: 'fixed',
