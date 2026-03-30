@@ -204,12 +204,12 @@ export default function LoginScreen({ navigation }: any) {
               />
             </View>
             <View style={styles.appTitleContainer}>
-              <Text style={styles.appTitleMain}>ML EXPRESS </Text>
-              <Text style={styles.appTitleExpress}>MERCHANTS</Text>
+              <Text style={styles.appTitleMain}>MARKET LINK </Text>
+              <Text style={styles.appTitleExpress}>EXPRESS</Text>
             </View>
             <View style={styles.divider}>
               <View style={styles.line} />
-              <Text style={styles.dividerText}>BUSINESS ADMIN</Text>
+              <Text style={styles.dividerText}>MERCHANTS</Text>
               <View style={styles.line} />
             </View>
           </View>
