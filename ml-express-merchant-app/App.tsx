@@ -19,6 +19,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import NotificationService from './src/services/notificationService';
 import { AppProvider, useApp } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
+import { CartProvider } from './src/contexts/CartContext';
 import { ErrorBoundary } from './src/components/ErrorHandler';
 import NetworkStatus from './src/components/NetworkStatus';
 import { GlobalToast } from './src/components/GlobalToast';
@@ -34,6 +35,12 @@ import OrderDetailScreen from './src/screens/OrderDetailScreen';
 import MerchantProductsScreen from './src/screens/MerchantProductsScreen';
 import NotificationCenterScreen from './src/screens/NotificationCenterScreen';
 import PlaceOrderScreen from './src/screens/PlaceOrderScreen';
+import CartScreen from './src/screens/CartScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
+import AddressBookScreen from './src/screens/AddressBookScreen';
+import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
+import TrackOrderScreen from './src/screens/TrackOrderScreen';
+import CityMallScreen from './src/screens/CityMallScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -90,6 +97,12 @@ function AppContent({ onLayoutRootView }: any) {
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="NotificationCenter" component={NotificationCenterScreen} />
           <Stack.Screen name="PlaceOrder" component={PlaceOrderScreen} />
+          <Stack.Screen name="Cart" component={CartScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="AddressBook" component={AddressBookScreen} />
+          <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+          <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
+          <Stack.Screen name="CityMall" component={CityMallScreen} />
         </Stack.Navigator>
       </NavigationContainer>
 
@@ -159,7 +172,9 @@ export default function App() {
     <ErrorBoundary>
       <AppProvider>
         <LoadingProvider>
-          <AppContent onLayoutRootView={onLayoutRootView} />
+          <CartProvider>
+            <AppContent onLayoutRootView={onLayoutRootView} />
+          </CartProvider>
         </LoadingProvider>
       </AppProvider>
     </ErrorBoundary>
