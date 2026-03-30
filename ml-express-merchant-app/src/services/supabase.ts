@@ -1,24 +1,26 @@
-import { createClient } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
-import LoggerService from './../services/LoggerService';
-import NotificationService from './notificationService';
-import { errorService } from './ErrorService';
-import { retry } from '../utils/retry';
+import { createClient } from "@supabase/supabase-js";
+import { Platform } from "react-native";
+import LoggerService from "./../services/LoggerService";
+import NotificationService from "./notificationService";
+import { errorService } from "./ErrorService";
+import { retry } from "../utils/retry";
 
 // 使用环境变量配置 Supabase
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
 
 // 关键：不要在顶层 throw 错误，这会导致整个 JS Bundle 崩溃，从而出现白屏
 if (!supabaseUrl || !supabaseKey) {
-  LoggerService.error('Supabase 环境变量未配置！请检查 EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  LoggerService.error(
+    "Supabase 环境变量未配置！请检查 EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY",
+  );
 }
 
 // 即使没有环境变量也创建客户端（它会报错但不会导致 Bundle 级崩溃）
 // 或者可以使用一个占位符 URL 以防止 createClient 崩溃
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseKey || 'placeholder-key'
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseKey || "placeholder-key",
 );
 
 // 用户接口（与Web端users表对应）
@@ -29,8 +31,8 @@ export interface User {
   email: string;
   address: string;
   password?: string;
-  user_type: 'customer' | 'courier' | 'admin';
-  status: 'active' | 'inactive' | 'suspended';
+  user_type: "customer" | "courier" | "admin";
+  status: "active" | "inactive" | "suspended";
   registration_date: string;
   last_login: string;
   total_orders: number;
@@ -62,7 +64,7 @@ export interface DeliveryStore {
   created_at?: string;
   updated_at?: string;
   vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
-  cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
+  cod_settlement_day?: "7" | "10" | "15" | "30"; // 🚀 新增：COD 结清日
 }
 
 // 包裹接口
@@ -95,7 +97,7 @@ export interface Package {
   customer_rating?: number;
   customer_comment?: string;
   rating_time?: string;
-  payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
+  payment_method?: "qr" | "cash"; // 支付方式：qr=二维码支付，cash=现金支付
   cod_amount?: number; // 代收款金额
   delivery_store_id?: string; // 🚀 新增：配送店ID
 }
@@ -113,7 +115,7 @@ export interface StoreReview {
   reply_text?: string;
   replied_at?: string;
   is_anonymous: boolean;
-  status: 'pending' | 'published' | 'hidden';
+  status: "pending" | "published" | "hidden";
   created_at?: string;
   updated_at?: string;
 }
@@ -153,7 +155,7 @@ export interface UserNotification {
   user_id: string;
   title: string;
   content: string;
-  type: 'system' | 'order' | 'promotion';
+  type: "system" | "order" | "promotion";
   is_read: boolean;
   related_id?: string;
   created_at: string;
@@ -224,7 +226,6 @@ export interface ProductCategory {
   display_order: number;
 }
 
-
 // 客户服务（使用users表）
 export const customerService = {
   // 注册客户
@@ -238,96 +239,103 @@ export const customerService = {
     try {
       // 1. 检查邮箱是否已存在
       const { data: existingUser, error: checkError } = await supabase
-        .from('users')
-        .select('id, email')
-        .eq('email', customerData.email)
+        .from("users")
+        .select("id, email")
+        .eq("email", customerData.email)
         .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') {
+      if (checkError && checkError.code !== "PGRST116") {
         throw checkError;
       }
 
       if (existingUser) {
-        return { 
-          success: false, 
-          error: { message: '该邮箱已被注册' }
+        return {
+          success: false,
+          error: { message: "该邮箱已被注册" },
         };
       }
 
       // 2. 检查手机号是否已存在
       const { data: existingPhone, error: phoneCheckError } = await supabase
-        .from('users')
-        .select('id, phone')
-        .eq('phone', customerData.phone)
+        .from("users")
+        .select("id, phone")
+        .eq("phone", customerData.phone)
         .maybeSingle();
 
-      if (phoneCheckError && phoneCheckError.code !== 'PGRST116') {
+      if (phoneCheckError && phoneCheckError.code !== "PGRST116") {
         throw phoneCheckError;
       }
 
       if (existingPhone) {
-        return { 
-          success: false, 
-          error: { message: '该手机号已被注册' }
+        return {
+          success: false,
+          error: { message: "该手机号已被注册" },
         };
       }
 
       // 3. 生成用户ID
       const newId = `USR${Date.now().toString().slice(-8)}`;
-      
+
       // 4. 创建用户记录
       const userData = {
         id: newId,
         name: customerData.name,
         phone: customerData.phone,
         email: customerData.email,
-        address: customerData.address || '',
+        address: customerData.address || "",
         password: customerData.password, // 注意：实际项目中应该加密
-        user_type: 'customer',
-        status: 'active',
-        registration_date: new Date().toLocaleDateString('zh-CN'),
-        last_login: '从未登录',
+        user_type: "customer",
+        status: "active",
+        registration_date: new Date().toLocaleDateString("zh-CN"),
+        last_login: "从未登录",
         total_orders: 0,
         total_spent: 0,
         rating: 0,
-        notes: '通过客户端APP注册'
+        notes: "通过客户端APP注册",
       };
 
       const { data, error } = await supabase
-        .from('users')
+        .from("users")
         .insert([userData])
         .select()
         .single();
 
       if (error) {
-        LoggerService.error('注册失败:', error);
+        LoggerService.error("注册失败:", error);
         throw error;
       }
 
       return { success: true, data };
     } catch (error: any) {
-      const appError = errorService.handleError(error, { context: 'customerService.register', silent: true });
-      return { 
-        success: false, 
-        error: appError
+      const appError = errorService.handleError(error, {
+        context: "customerService.register",
+        silent: true,
+      });
+      return {
+        success: false,
+        error: appError,
       };
     }
   },
 
   // 更新用户信息
-  async updateUser(userId: string, updateData: {
-    name?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-  }, userType: string = 'customer') {
+  async updateUser(
+    userId: string,
+    updateData: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+    },
+    userType: string = "customer",
+  ) {
     try {
-      const isMerchant = userType === 'merchant';
-      const table = isMerchant ? 'delivery_stores' : 'users';
-      
+      const isMerchant = userType === "merchant";
+      const table = isMerchant ? "delivery_stores" : "users";
+
       // 🚀 核心改进：显式构建 payload，绝不包含任何多余字段
       const payload: any = {};
-      
+
       if (isMerchant) {
         // 商家表映射
         if (updateData.name) payload.store_name = updateData.name;
@@ -347,7 +355,7 @@ export const customerService = {
       const { data, error } = await supabase
         .from(table)
         .update(payload)
-        .eq('id', userId)
+        .eq("id", userId)
         .select()
         .single();
 
@@ -365,10 +373,10 @@ export const customerService = {
 
       return { success: true, data: resultData };
     } catch (error: any) {
-      LoggerService.error('更新用户信息失败:', error);
-      return { 
-        success: false, 
-        error: { message: error.message || '更新失败，请重试' }
+      LoggerService.error("更新用户信息失败:", error);
+      return {
+        success: false,
+        error: { message: error.message || "更新失败，请重试" },
       };
     }
   },
@@ -378,64 +386,67 @@ export const customerService = {
     try {
       // 1. 查找用户（支持邮箱或手机号登录）
       const { data: userData, error: findError } = await supabase
-        .from('users')
-        .select('*')
+        .from("users")
+        .select("*")
         .or(`email.eq.${email},phone.eq.${email}`)
-        .eq('user_type', 'customer')
+        .eq("user_type", "customer")
         .maybeSingle();
 
-      if (findError && findError.code !== 'PGRST116') {
+      if (findError && findError.code !== "PGRST116") {
         throw findError;
       }
 
       if (!userData) {
-        return { 
-          success: false, 
-          error: { message: '用户不存在' }
+        return {
+          success: false,
+          error: { message: "用户不存在" },
         };
       }
 
       // 2. 检查用户状态
-      if (userData.status !== 'active') {
-        return { 
-          success: false, 
-          error: { message: '账号已被停用，请联系客服' }
+      if (userData.status !== "active") {
+        return {
+          success: false,
+          error: { message: "账号已被停用，请联系客服" },
         };
       }
 
       // 3. 验证密码
       if (userData.password !== password) {
-        return { 
-          success: false, 
-          error: { message: '密码错误' }
+        return {
+          success: false,
+          error: { message: "密码错误" },
         };
       }
 
       // 4. 更新最后登录时间
       const now = new Date();
       await supabase
-        .from('users')
-        .update({ 
-          last_login: now.toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-          })
+        .from("users")
+        .update({
+          last_login: now.toLocaleString("zh-CN", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+          }),
         })
-        .eq('id', userData.id);
+        .eq("id", userData.id);
 
       // 5. 返回用户信息（不包含密码）
       const { password: _, ...userDataWithoutPassword } = userData;
       return { success: true, data: userDataWithoutPassword };
     } catch (error: any) {
-      const appError = errorService.handleError(error, { context: 'customerService.login', silent: true });
-      return { 
-        success: false, 
-        error: appError
+      const appError = errorService.handleError(error, {
+        context: "customerService.login",
+        silent: true,
+      });
+      return {
+        success: false,
+        error: appError,
       };
     }
   },
@@ -444,14 +455,14 @@ export const customerService = {
   async getCustomer(customerId: string) {
     try {
       const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', customerId)
-        .eq('user_type', 'customer')
+        .from("users")
+        .select("*")
+        .eq("id", customerId)
+        .eq("user_type", "customer")
         .single();
 
       if (error) throw error;
-      
+
       // 不返回密码
       if (data) {
         const { password: _, ...userDataWithoutPassword } = data;
@@ -459,7 +470,7 @@ export const customerService = {
       }
       return null;
     } catch (error) {
-      LoggerService.error('获取客户信息失败:', error);
+      LoggerService.error("获取客户信息失败:", error);
       return null;
     }
   },
@@ -468,43 +479,59 @@ export const customerService = {
   async updateCustomer(customerId: string, updates: Partial<User>) {
     try {
       // 移除不应该直接更新的字段
-      const { id, user_type, total_orders, total_spent, rating, created_at, ...allowedUpdates } = updates;
-      
+      const {
+        id,
+        user_type,
+        total_orders,
+        total_spent,
+        rating,
+        created_at,
+        ...allowedUpdates
+      } = updates;
+
       const { error } = await supabase
-        .from('users')
+        .from("users")
         .update(allowedUpdates)
-        .eq('id', customerId)
-        .eq('user_type', 'customer');
+        .eq("id", customerId)
+        .eq("user_type", "customer");
 
       if (error) throw error;
       return true;
     } catch (error) {
-      LoggerService.error('更新客户信息失败:', error);
+      LoggerService.error("更新客户信息失败:", error);
       return false;
     }
   },
 
   // 修改密码
-  async changePassword(userId: string, oldPassword: string, newPassword: string, userType: string = 'customer') {
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+    userType: string = "customer",
+  ) {
     try {
-      const table = userType === 'merchant' ? 'delivery_stores' : 'users';
-      
+      const table = userType === "merchant" ? "delivery_stores" : "users";
+
       // 1. 验证旧密码
       const { data: user, error: findError } = await supabase
         .from(table)
-        .select('password')
-        .eq('id', userId)
+        .select("password")
+        .eq("id", userId)
         .single();
 
       if (findError) {
-        LoggerService.error(`[changePassword] 查找用户失败 (${table}):`, findError);
+        LoggerService.error(
+          `[changePassword] 查找用户失败 (${table}):`,
+          findError,
+        );
         throw findError;
       }
 
       if (user.password !== oldPassword) {
-        return { 
-          success: false, 
-          error: { message: '原密码错误' }
+        return {
+          success: false,
+          error: { message: "原密码错误" },
         };
       }
 
@@ -512,19 +539,22 @@ export const customerService = {
       const { error: updateError } = await supabase
         .from(table)
         .update({ password: newPassword })
-        .eq('id', userId);
+        .eq("id", userId);
 
       if (updateError) {
-        LoggerService.error(`[changePassword] 更新密码失败 (${table}):`, updateError);
+        LoggerService.error(
+          `[changePassword] 更新密码失败 (${table}):`,
+          updateError,
+        );
         throw updateError;
       }
 
       return { success: true };
     } catch (error: any) {
-      LoggerService.error('修改密码异常:', error);
-      return { 
-        success: false, 
-        error: { message: error.message || '修改密码失败' }
+      LoggerService.error("修改密码异常:", error);
+      return {
+        success: false,
+        error: { message: error.message || "修改密码失败" },
       };
     }
   },
@@ -533,36 +563,36 @@ export const customerService = {
   async resetPassword(phone: string, newPassword: string) {
     try {
       const { data: user, error: findError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('phone', phone)
-        .eq('user_type', 'customer')
+        .from("users")
+        .select("id")
+        .eq("phone", phone)
+        .eq("user_type", "customer")
         .maybeSingle();
 
-      if (findError && findError.code !== 'PGRST116') {
+      if (findError && findError.code !== "PGRST116") {
         throw findError;
       }
 
       if (!user) {
-        return { 
-          success: false, 
-          error: { message: '该手机号未注册' }
+        return {
+          success: false,
+          error: { message: "该手机号未注册" },
         };
       }
 
       const { error: updateError } = await supabase
-        .from('users')
+        .from("users")
         .update({ password: newPassword })
-        .eq('id', user.id);
+        .eq("id", user.id);
 
       if (updateError) throw updateError;
 
       return { success: true };
     } catch (error: any) {
-      LoggerService.error('重置密码失败:', error);
-      return { 
-        success: false, 
-        error: { message: error.message || '重置密码失败' }
+      LoggerService.error("重置密码失败:", error);
+      return {
+        success: false,
+        error: { message: error.message || "重置密码失败" },
       };
     }
   },
@@ -572,39 +602,41 @@ export const customerService = {
     try {
       // 1. 检查是否有进行中的订单
       const { data: activeOrders, error: orderError } = await supabase
-        .from('packages')
-        .select('id')
+        .from("packages")
+        .select("id")
         .or(`description.ilike.%[客户ID: ${userId}]%,customer_id.eq.${userId}`)
-        .in('status', ['待取件', '已取件', '配送中']);
+        .in("status", ["待取件", "已取件", "配送中"]);
 
-      if (orderError && orderError.code !== 'PGRST116') {
-        LoggerService.warn('检查订单状态时出错:', orderError);
+      if (orderError && orderError.code !== "PGRST116") {
+        LoggerService.warn("检查订单状态时出错:", orderError);
       }
 
       if (activeOrders && activeOrders.length > 0) {
-        return { 
-          success: false, 
-          error: { message: '您还有正在进行中的订单，请等待订单完成后再注销账号' }
+        return {
+          success: false,
+          error: {
+            message: "您还有正在进行中的订单，请等待订单完成后再注销账号",
+          },
         };
       }
 
       // 2. 删除用户记录
       const { error: deleteError } = await supabase
-        .from('users')
+        .from("users")
         .delete()
-        .eq('id', userId);
+        .eq("id", userId);
 
       if (deleteError) {
-        LoggerService.error('删除用户记录失败:', deleteError);
+        LoggerService.error("删除用户记录失败:", deleteError);
         throw deleteError;
       }
 
       return { success: true };
     } catch (error: any) {
-      LoggerService.error('注销账号失败:', error);
-      return { 
-        success: false, 
-        error: { message: error.message || '注销账号失败，请稍后重试' }
+      LoggerService.error("注销账号失败:", error);
+      return {
+        success: false,
+        error: { message: error.message || "注销账号失败，请稍后重试" },
       };
     }
   },
@@ -615,16 +647,16 @@ export const addressService = {
   async getAddresses(userId: string): Promise<AddressItem[]> {
     try {
       const { data, error } = await supabase
-        .from('address_book')
-        .select('*')
-        .eq('user_id', userId)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
+        .from("address_book")
+        .select("*")
+        .eq("user_id", userId)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data || [];
     } catch (error) {
-      LoggerService.error('获取地址列表失败:', error);
+      LoggerService.error("获取地址列表失败:", error);
       return [];
     }
   },
@@ -634,13 +666,13 @@ export const addressService = {
       // 如果设置为默认，先取消其他默认
       if (address.is_default) {
         await supabase
-          .from('address_book')
+          .from("address_book")
           .update({ is_default: false })
-          .eq('user_id', address.user_id);
+          .eq("user_id", address.user_id);
       }
 
       const { data, error } = await supabase
-        .from('address_book')
+        .from("address_book")
         .insert([address])
         .select()
         .single();
@@ -648,7 +680,7 @@ export const addressService = {
       if (error) throw error;
       return { success: true, data };
     } catch (error: any) {
-      LoggerService.error('添加地址失败:', error);
+      LoggerService.error("添加地址失败:", error);
       return { success: false, error };
     }
   },
@@ -657,22 +689,22 @@ export const addressService = {
     try {
       if (address.is_default && address.user_id) {
         await supabase
-          .from('address_book')
+          .from("address_book")
           .update({ is_default: false })
-          .eq('user_id', address.user_id);
+          .eq("user_id", address.user_id);
       }
 
       const { data, error } = await supabase
-        .from('address_book')
+        .from("address_book")
         .update(address)
-        .eq('id', id)
+        .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
       return { success: true, data };
     } catch (error: any) {
-      LoggerService.error('更新地址失败:', error);
+      LoggerService.error("更新地址失败:", error);
       return { success: false, error };
     }
   },
@@ -680,17 +712,17 @@ export const addressService = {
   async deleteAddress(id: string) {
     try {
       const { error } = await supabase
-        .from('address_book')
+        .from("address_book")
         .delete()
-        .eq('id', id);
+        .eq("id", id);
 
       if (error) throw error;
       return { success: true };
     } catch (error: any) {
-      LoggerService.error('删除地址失败:', error);
+      LoggerService.error("删除地址失败:", error);
       return { success: false, error };
     }
-  }
+  },
 };
 
 // 配送店/合伙商户服务
@@ -698,15 +730,15 @@ export const deliveryStoreService = {
   async getActiveStores() {
     try {
       const { data, error } = await supabase
-        .from('delivery_stores')
-        .select('*')
-        .eq('status', 'active')
-        .order('store_name', { ascending: true });
+        .from("delivery_stores")
+        .select("*")
+        .eq("status", "active")
+        .order("store_name", { ascending: true });
 
       if (error) throw error;
       return data || [];
     } catch (error) {
-      LoggerService.error('获取配送店列表失败:', error);
+      LoggerService.error("获取配送店列表失败:", error);
       return [];
     }
   },
@@ -714,15 +746,15 @@ export const deliveryStoreService = {
   async getStoreById(storeId: string) {
     try {
       const { data, error } = await supabase
-        .from('delivery_stores')
-        .select('*')
-        .eq('id', storeId)
+        .from("delivery_stores")
+        .select("*")
+        .eq("id", storeId)
         .single();
 
       if (error) throw error;
       return data;
     } catch (error) {
-      LoggerService.error('获取店铺详情失败:', error);
+      LoggerService.error("获取店铺详情失败:", error);
       return null;
     }
   },
@@ -730,19 +762,19 @@ export const deliveryStoreService = {
   async updateStoreInfo(storeId: string, updates: any) {
     try {
       const { data, error } = await supabase
-        .from('delivery_stores')
+        .from("delivery_stores")
         .update(updates)
-        .eq('id', storeId)
+        .eq("id", storeId)
         .select()
         .single();
 
       if (error) throw error;
       return { success: true, data };
     } catch (error: any) {
-      LoggerService.error('更新商店信息失败:', error);
+      LoggerService.error("更新商店信息失败:", error);
       return { success: false, error };
     }
-  }
+  },
 };
 
 // 用户通知服务
@@ -750,15 +782,15 @@ export const userNotificationService = {
   async getNotifications(userId: string): Promise<UserNotification[]> {
     try {
       const { data, error } = await supabase
-        .from('user_notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .from("user_notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data || [];
     } catch (error) {
-      LoggerService.error('获取通知列表失败:', error);
+      LoggerService.error("获取通知列表失败:", error);
       return [];
     }
   },
@@ -766,14 +798,14 @@ export const userNotificationService = {
   async markAsRead(notificationId: string) {
     try {
       const { error } = await supabase
-        .from('user_notifications')
+        .from("user_notifications")
         .update({ is_read: true })
-        .eq('id', notificationId);
+        .eq("id", notificationId);
 
       if (error) throw error;
       return true;
     } catch (error) {
-      LoggerService.error('标记已读失败:', error);
+      LoggerService.error("标记已读失败:", error);
       return false;
     }
   },
@@ -781,15 +813,15 @@ export const userNotificationService = {
   async markAllAsRead(userId: string) {
     try {
       const { error } = await supabase
-        .from('user_notifications')
+        .from("user_notifications")
         .update({ is_read: true })
-        .eq('user_id', userId)
-        .eq('is_read', false);
+        .eq("user_id", userId)
+        .eq("is_read", false);
 
       if (error) throw error;
       return true;
     } catch (error) {
-      LoggerService.error('全部标记已读失败:', error);
+      LoggerService.error("全部标记已读失败:", error);
       return false;
     }
   },
@@ -797,18 +829,18 @@ export const userNotificationService = {
   async getUnreadCount(userId: string): Promise<number> {
     try {
       const { count, error } = await supabase
-        .from('user_notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('is_read', false);
+        .from("user_notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_read", false);
 
       if (error) throw error;
       return count || 0;
     } catch (error) {
-      LoggerService.error('获取未读通知数失败:', error);
+      LoggerService.error("获取未读通知数失败:", error);
       return 0;
     }
-  }
+  },
 };
 
 // 包裹服务
@@ -831,36 +863,42 @@ export const packageService = {
   }) {
     try {
       const { data, error } = await supabase
-        .from('packages')
-        .insert([{
-          ...packageData,
-          status: '待取件',
-        }])
+        .from("packages")
+        .insert([
+          {
+            ...packageData,
+            status: "待取件",
+          },
+        ])
         .select()
         .single();
 
       if (error) throw error;
-      
+
       // 更新用户订单统计
       const { data: user } = await supabase
-        .from('users')
-        .select('total_orders, total_spent')
-        .eq('id', packageData.customer_id)
+        .from("users")
+        .select("total_orders, total_spent")
+        .eq("id", packageData.customer_id)
         .single();
 
       if (user) {
         await supabase
-          .from('users')
+          .from("users")
           .update({
             total_orders: (user.total_orders || 0) + 1,
-            total_spent: (user.total_spent || 0) + parseFloat(packageData.price || '0')
+            total_spent:
+              (user.total_spent || 0) + parseFloat(packageData.price || "0"),
           })
-          .eq('id', packageData.customer_id);
+          .eq("id", packageData.customer_id);
       }
 
       return { success: true, data };
     } catch (error) {
-      const appError = errorService.handleError(error, { context: 'packageService.createOrder', silent: true });
+      const appError = errorService.handleError(error, {
+        context: "packageService.createOrder",
+        silent: true,
+      });
       return { success: false, error: appError };
     }
   },
@@ -872,8 +910,11 @@ export const packageService = {
 
       // 提取需要的字段并添加默认值
       // 注意：packages表没有customer_id字段，我们将客户ID添加到description中
-      const customerNote = packageData.customer_id ? `[客户ID: ${packageData.customer_id}]` : '';
-      const fullDescription = `${customerNote} ${packageData.description || ''}`.trim();
+      const customerNote = packageData.customer_id
+        ? `[客户ID: ${packageData.customer_id}]`
+        : "";
+      const fullDescription =
+        `${customerNote} ${packageData.description || ""}`.trim();
 
       const insertData: any = {
         // 添加 customer_id 和 customer_email (需先运行数据库迁移脚本)
@@ -892,17 +933,18 @@ export const packageService = {
         package_type: packageData.package_type,
         weight: packageData.weight,
         description: fullDescription, // 将客户ID包含在描述中 (保留用于兼容旧数据)
-        price: String(packageData.price || '0'), // 确保是字符串
-        delivery_speed: packageData.delivery_speed || '准时达',
+        price: String(packageData.price || "0"), // 确保是字符串
+        delivery_speed: packageData.delivery_speed || "准时达",
         scheduled_delivery_time: packageData.scheduled_delivery_time || null,
         delivery_distance: packageData.delivery_distance || 0,
-        status: packageData.status || '待取件',
+        status: packageData.status || "待取件",
         delivery_store_id: packageData.delivery_store_id || null, // 🚀 新增：保存配送店ID
-        create_time: packageData.create_time || new Date().toLocaleString('zh-CN'),
-        pickup_time: '',
-        delivery_time: '',
-        courier: '待分配',
-        payment_method: packageData.payment_method || 'cash', // 添加支付方式
+        create_time:
+          packageData.create_time || new Date().toLocaleString("zh-CN"),
+        pickup_time: "",
+        delivery_time: "",
+        courier: "待分配",
+        payment_method: packageData.payment_method || "cash", // 添加支付方式
         cod_amount: packageData.cod_amount || 0, // 添加代收款
       };
 
@@ -914,7 +956,7 @@ export const packageService = {
       // LoggerService.debug('准备插入数据库的数据：', insertData);
 
       const { data, error } = await supabase
-        .from('packages')
+        .from("packages")
         .insert([insertData])
         .select()
         .single();
@@ -924,28 +966,33 @@ export const packageService = {
       }
 
       // LoggerService.debug('订单创建成功：', data);
-      
+
       // 更新用户订单统计（如果提供了customer_id）
       if (packageData.customer_id) {
         try {
           const { data: user } = await supabase
-            .from('users')
-            .select('total_orders, total_spent')
-            .eq('id', packageData.customer_id)
+            .from("users")
+            .select("total_orders, total_spent")
+            .eq("id", packageData.customer_id)
             .single();
 
           if (user) {
             await supabase
-              .from('users')
+              .from("users")
               .update({
                 total_orders: (user.total_orders || 0) + 1,
-                total_spent: (user.total_spent || 0) + parseFloat(packageData.price || '0')
+                total_spent:
+                  (user.total_spent || 0) +
+                  parseFloat(packageData.price || "0"),
               })
-              .eq('id', packageData.customer_id);
+              .eq("id", packageData.customer_id);
           }
         } catch (updateError) {
           // 统计更新失败不影响订单创建，仅记录
-          errorService.handleError(updateError, { context: 'createPackage.updateStats', silent: true });
+          errorService.handleError(updateError, {
+            context: "createPackage.updateStats",
+            silent: true,
+          });
         }
       }
 
@@ -954,64 +1001,84 @@ export const packageService = {
         const notificationService = NotificationService.getInstance();
         await notificationService.sendOrderUpdateNotification({
           orderId: data.id,
-          status: '待取件',
+          status: "待取件",
           customerName: packageData.sender_name,
           customerPhone: packageData.sender_phone,
         });
       } catch (notificationError) {
-        errorService.handleError(notificationError, { context: 'createPackage.sendNotification', silent: true });
+        errorService.handleError(notificationError, {
+          context: "createPackage.sendNotification",
+          silent: true,
+        });
       }
 
       return { success: true, data };
     } catch (error: any) {
-      const appError = errorService.handleError(error, { context: 'packageService.createPackage', silent: true });
-      return { 
-        success: false, 
-        error: appError 
+      const appError = errorService.handleError(error, {
+        context: "packageService.createPackage",
+        silent: true,
+      });
+      return {
+        success: false,
+        error: appError,
       };
     }
   },
 
   // 获取客户的所有订单（通过description中的客户ID匹配）
   async getCustomerOrders(customerId: string) {
-    return retry(async () => {
-      try {
-        const { data, error } = await supabase
-          .from('packages')
-          .select('*')
-          .ilike('description', `%[客户ID: ${customerId}]%`)
-          .order('created_at', { ascending: false });
+    return retry(
+      async () => {
+        try {
+          const { data, error } = await supabase
+            .from("packages")
+            .select("*")
+            .ilike("description", `%[客户ID: ${customerId}]%`)
+            .order("created_at", { ascending: false });
 
-        if (error) throw error;
-        return data || [];
-      } catch (error) {
-        throw error; // 抛出错误以触发重试
-      }
-    }, {
-      retries: 2,
-      delay: 1000,
-      shouldRetry: (error) => error.message?.includes('Network request failed') || error.message?.includes('timeout')
-    }).catch(error => {
-      errorService.handleError(error, { context: 'packageService.getCustomerOrders', silent: true });
+          if (error) throw error;
+          return data || [];
+        } catch (error) {
+          throw error; // 抛出错误以触发重试
+        }
+      },
+      {
+        retries: 2,
+        delay: 1000,
+        shouldRetry: (error) =>
+          error.message?.includes("Network request failed") ||
+          error.message?.includes("timeout"),
+      },
+    ).catch((error) => {
+      errorService.handleError(error, {
+        context: "packageService.getCustomerOrders",
+        silent: true,
+      });
       return [];
     });
   },
 
   // 获取客户最近的订单（支持商家和普通客户）
-  async getRecentOrders(userId: string, limit: number = 5, email?: string, phone?: string, userType?: string) {
+  async getRecentOrders(
+    userId: string,
+    limit: number = 5,
+    email?: string,
+    phone?: string,
+    userType?: string,
+  ) {
     try {
       const runQuery = async (includeCustomerId: boolean) => {
         let query = supabase
-          .from('packages')
-          .select('*')
-          .order('created_at', { ascending: false })
+          .from("packages")
+          .select("*")
+          .order("created_at", { ascending: false })
           .limit(limit);
 
-        if (userType === 'merchant') {
+        if (userType === "merchant") {
           // 商家：检查 delivery_store_id 或 customer_email (等于store_code)
           const conditions = [`delivery_store_id.eq.${userId}`];
           if (email) conditions.push(`customer_email.eq.${email}`);
-          query = query.or(conditions.join(','));
+          query = query.or(conditions.join(","));
         } else {
           // 普通客户：使用多种方式匹配订单
           const conditions: string[] = [];
@@ -1019,7 +1086,7 @@ export const packageService = {
           conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
           if (email) conditions.push(`customer_email.eq.${email}`);
           if (phone) conditions.push(`sender_phone.eq.${phone}`);
-          query = query.or(conditions.join(','));
+          query = query.or(conditions.join(","));
         }
 
         const { data, error } = await query;
@@ -1031,71 +1098,83 @@ export const packageService = {
       try {
         return await runQuery(true);
       } catch (error: any) {
-        const message = error?.message || '';
-        if (message.includes('customer_id') && message.includes('does not exist')) {
+        const message = error?.message || "";
+        if (
+          message.includes("customer_id") &&
+          message.includes("does not exist")
+        ) {
           return await runQuery(false);
         }
         throw error;
       }
     } catch (error) {
-      LoggerService.error('获取最近订单失败:', error);
+      LoggerService.error("获取最近订单失败:", error);
       return [];
     }
   },
 
-  // 获取客户订单统计（通过description匹配）
   // 获取订单统计（针对客户ID、邮箱或手机号）
   // 注意：此方法使用与 getAllOrders 完全相同的查询逻辑，确保统计准确
-  async getOrderStats(userId: string, email?: string, phone?: string, userType?: string, storeName?: string) {
+  async getOrderStats(
+    userId: string,
+    email?: string,
+    phone?: string,
+    userType?: string,
+    storeName?: string,
+  ) {
     try {
       const runQuery = async (includeCustomerId: boolean) => {
-        // 使用与 getAllOrders 完全相同的查询逻辑，但只选择 status 字段用于统计
+        // 使用与 getAllOrders 完全相同的查询逻辑，但只选择 status, delivery_speed 字段用于统计
         let query = supabase
-          .from('packages')
-          .select('status')
-          .order('created_at', { ascending: false });
+          .from("packages")
+          .select("status, delivery_speed")
+          .order("created_at", { ascending: false });
 
-        if (userType === 'merchant') {
-          // 商家：检查 delivery_store_id 或 customer_email (等于store_code)
-          // 与 getAllOrders 保持完全一致
+        if (userType === "merchant") {
           const conditions: string[] = [];
           conditions.push(`delivery_store_id.eq.${userId}`);
-          if (email) {
-            conditions.push(`customer_email.eq.${email}`);
-          }
-          if (storeName) {
-            conditions.push(`sender_name.eq.${storeName}`);
-          }
-          if (conditions.length > 0) {
-            query = query.or(conditions.join(','));
-          }
+          if (email) conditions.push(`customer_email.eq.${email}`);
+          if (storeName) conditions.push(`sender_name.eq.${storeName}`);
+          if (conditions.length > 0) query = query.or(conditions.join(","));
         } else {
-          // 普通客户：使用与 getAllOrders 完全相同的查询逻辑
           const conditions: string[] = [];
           if (includeCustomerId) conditions.push(`customer_id.eq.${userId}`);
           conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-          if (email) {
-            conditions.push(`customer_email.eq.${email}`);
-          }
-          if (phone) {
-            conditions.push(`sender_phone.eq.${phone}`);
-          }
-          query = query.or(conditions.join(','));
+          if (email) conditions.push(`customer_email.eq.${email}`);
+          if (phone) conditions.push(`sender_phone.eq.${phone}`);
+          query = query.or(conditions.join(","));
         }
 
         const { data, error } = await query;
 
         if (error) {
-          LoggerService.error('获取订单统计失败:', error);
+          LoggerService.error("获取订单统计失败:", error);
           throw error;
         }
 
         const stats = {
           total: data?.length || 0,
-          pending: data?.filter(p => ['待确认', '待取件', '待收款'].includes(p.status)).length || 0,
-          inTransit: data?.filter(p => ['已取件', '配送中'].includes(p.status)).length || 0,
-          delivered: data?.filter(p => p.status === '已送达').length || 0,
-          cancelled: data?.filter(p => p.status === '已取消').length || 0,
+          pending:
+            data?.filter((p) =>
+              ["待确认", "待取件", "待收款"].includes(p.status),
+            ).length || 0,
+          processing: data?.filter((p) => p.status === "打包中").length || 0,
+          inTransit:
+            data?.filter((p) => ["已取件", "配送中"].includes(p.status))
+              .length || 0,
+          delivered: data?.filter((p) => p.status === "已送达").length || 0,
+          cancelled: data?.filter((p) => p.status === "已取消").length || 0,
+          urgent:
+            data?.filter(
+              (p) =>
+                p.delivery_speed === "急送达" || p.delivery_speed === "Urgent",
+            ).length || 0,
+          standard:
+            data?.filter(
+              (p) =>
+                p.delivery_speed === "普通配送" ||
+                p.delivery_speed === "Standard",
+            ).length || 0,
         };
 
         return stats;
@@ -1104,21 +1183,67 @@ export const packageService = {
       try {
         return await runQuery(true);
       } catch (error: any) {
-        const message = error?.message || '';
-        if (message.includes('customer_id') && message.includes('does not exist')) {
+        const message = error?.message || "";
+        if (
+          message.includes("customer_id") &&
+          message.includes("does not exist")
+        ) {
           return await runQuery(false);
         }
         throw error;
       }
     } catch (error) {
-      LoggerService.error('获取订单统计失败:', error);
+      LoggerService.error("获取订单统计失败:", error);
       return {
         total: 0,
         pending: 0,
         inTransit: 0,
         delivered: 0,
         cancelled: 0,
+        urgent: 0,
+        standard: 0,
       };
+    }
+  },
+
+  // 获取营收统计（今日 vs 昨日）
+  async getRevenueStats(userId: string, storeName?: string) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const runQuery = async (startDate: Date, endDate: Date) => {
+        let query = supabase
+          .from("packages")
+          .select("price")
+          .eq("status", "已送达")
+          .gte("created_at", startDate.toISOString())
+          .lt("created_at", endDate.toISOString());
+
+        const conditions = [`delivery_store_id.eq.${userId}`];
+        if (storeName) conditions.push(`sender_name.eq.${storeName}`);
+        query = query.or(conditions.join(","));
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return (data || []).reduce((sum, p) => {
+          const val = parseFloat(p.price?.replace(/[^0-9.]/g, "") || "0");
+          return sum + val;
+        }, 0);
+      };
+
+      const [todayRevenue, yesterdayRevenue] = await Promise.all([
+        runQuery(today, new Date()),
+        runQuery(yesterday, today),
+      ]);
+
+      return { todayRevenue, yesterdayRevenue };
+    } catch (error) {
+      LoggerService.error("获取营收统计失败:", error);
+      return { todayRevenue: 0, yesterdayRevenue: 0 };
     }
   },
 
@@ -1128,36 +1253,40 @@ export const packageService = {
       // 构建查询函数
       const runQuery = async (fields: string) => {
         let q = supabase
-          .from('packages')
+          .from("packages")
           .select(fields)
-          .eq('status', '已送达')
-          .gt('cod_amount', 0);
+          .eq("status", "已送达")
+          .gt("cod_amount", 0);
 
         const conditions = [`delivery_store_id.eq.${userId}`];
         if (storeName) {
           conditions.push(`sender_name.eq.${storeName}`);
         }
-        
-        q = q.or(conditions.join(','));
-        
+
+        q = q.or(conditions.join(","));
+
         // 如果指定了月份，添加日期过滤
         if (month) {
-          const [year, monthNum] = month.split('-');
+          const [year, monthNum] = month.split("-");
           const startDate = `${year}-${monthNum}-01`;
-          const endDate = new Date(parseInt(year), parseInt(monthNum), 0).toISOString().split('T')[0];
-          q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
+          const endDate = new Date(parseInt(year), parseInt(monthNum), 0)
+            .toISOString()
+            .split("T")[0];
+          q = q.gte("delivery_time", startDate).lte("delivery_time", endDate);
         }
-        
+
         return q;
       };
 
       // 尝试查询所有字段
-      let { data, error } = await runQuery('cod_amount, cod_settled, cod_settled_at, status, delivery_time');
+      let { data, error } = await runQuery(
+        "cod_amount, cod_settled, cod_settled_at, status, delivery_time",
+      );
 
       // 如果报错字段不存在 (42703)，降级查询（不查 cod_settled 相关字段）
-      if (error && error.code === '42703') {
-        LoggerService.warn('cod_settled 字段不存在，使用降级查询');
-        const retryResult = await runQuery('cod_amount, status, delivery_time');
+      if (error && error.code === "42703") {
+        LoggerService.warn("cod_settled 字段不存在，使用降级查询");
+        const retryResult = await runQuery("cod_amount, status, delivery_time");
         data = retryResult.data;
         error = retryResult.error;
       }
@@ -1165,21 +1294,34 @@ export const packageService = {
       if (error) throw error;
 
       const statsData = (data || []) as any[];
-      const totalCOD = statsData.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0) || 0;
-      
+      const totalCOD =
+        statsData.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0) || 0;
+
       // 如果没有 cod_settled 字段，data 中该属性为 undefined，!undefined 为 true，即默认未结清
-      const settledPackages = statsData.filter(pkg => pkg.cod_settled) || [];
-      const settledCOD = settledPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
-      
-      const unclearedPackages = statsData.filter(pkg => !pkg.cod_settled) || [];
-      const unclearedCOD = unclearedPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
+      const settledPackages = statsData.filter((pkg) => pkg.cod_settled) || [];
+      const settledCOD = settledPackages.reduce(
+        (sum, pkg) => sum + (pkg.cod_amount || 0),
+        0,
+      );
+
+      const unclearedPackages =
+        statsData.filter((pkg) => !pkg.cod_settled) || [];
+      const unclearedCOD = unclearedPackages.reduce(
+        (sum, pkg) => sum + (pkg.cod_amount || 0),
+        0,
+      );
       const unclearedCount = unclearedPackages.length;
-      
+
       // 计算最后结清日期
-      const settledWithDatePackages = statsData.filter(pkg => pkg.cod_settled && pkg.cod_settled_at) || [];
+      const settledWithDatePackages =
+        statsData.filter((pkg) => pkg.cod_settled && pkg.cod_settled_at) || [];
       let lastSettledAt = null;
       if (settledWithDatePackages.length > 0) {
-        settledWithDatePackages.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
+        settledWithDatePackages.sort(
+          (a, b) =>
+            new Date(b.cod_settled_at!).getTime() -
+            new Date(a.cod_settled_at!).getTime(),
+        );
         lastSettledAt = settledWithDatePackages[0].cod_settled_at || null;
       }
 
@@ -1188,73 +1330,86 @@ export const packageService = {
         settledCOD: settledCOD || 0,
         unclearedCOD: unclearedCOD || 0,
         unclearedCount: unclearedCount || 0,
-        lastSettledAt: lastSettledAt
+        lastSettledAt: lastSettledAt,
       };
     } catch (error) {
-      LoggerService.error('获取商家统计失败:', error);
+      LoggerService.error("获取商家统计失败:", error);
       return {
         totalCOD: 0,
         settledCOD: 0,
         unclearedCOD: 0,
         unclearedCount: 0,
-        lastSettledAt: null
+        lastSettledAt: null,
       };
     }
   },
 
   // 获取指定月份的有代收款的订单列表
-  async getMerchantCODOrders(userId: string, storeName?: string, month?: string, settled?: boolean, page: number = 1, pageSize: number = 20) {
+  async getMerchantCODOrders(
+    userId: string,
+    storeName?: string,
+    month?: string,
+    settled?: boolean,
+    page: number = 1,
+    pageSize: number = 20,
+  ) {
     try {
       let q = supabase
-        .from('packages')
-        .select('id, cod_amount, delivery_time, cod_settled', { count: 'exact' })
-        .eq('status', '已送达')
-        .gt('cod_amount', 0);
+        .from("packages")
+        .select("id, cod_amount, delivery_time, cod_settled", {
+          count: "exact",
+        })
+        .eq("status", "已送达")
+        .gt("cod_amount", 0);
 
       const conditions = [`delivery_store_id.eq.${userId}`];
       if (storeName) {
         conditions.push(`sender_name.eq.${storeName}`);
       }
-      
-      q = q.or(conditions.join(','));
+
+      q = q.or(conditions.join(","));
 
       // 如果指定了结算状态
       if (settled !== undefined) {
         if (settled) {
-          q = q.eq('cod_settled', true);
+          q = q.eq("cod_settled", true);
         } else {
-          q = q.or('cod_settled.eq.false,cod_settled.is.null');
+          q = q.or("cod_settled.eq.false,cod_settled.is.null");
         }
       }
-      
+
       // 如果指定了月份，添加日期过滤
       if (month) {
-        const [year, monthNum] = month.split('-');
+        const [year, monthNum] = month.split("-");
         const startDate = `${year}-${monthNum}-01`;
-        const endDate = new Date(parseInt(year), parseInt(monthNum), 0).toISOString().split('T')[0];
-        q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
+        const endDate = new Date(parseInt(year), parseInt(monthNum), 0)
+          .toISOString()
+          .split("T")[0];
+        q = q.gte("delivery_time", startDate).lte("delivery_time", endDate);
       }
-      
+
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
-      
+
       const { data, error, count } = await q
-        .order('delivery_time', { ascending: false })
+        .order("delivery_time", { ascending: false })
         .range(from, to);
-      
+
       if (error) throw error;
-      
-      LoggerService.debug(`[getMerchantCODOrders] Fetched ${data?.length} orders, total count: ${count}`);
-      
-      const orders = (data || []).map(pkg => ({
+
+      LoggerService.debug(
+        `[getMerchantCODOrders] Fetched ${data?.length} orders, total count: ${count}`,
+      );
+
+      const orders = (data || []).map((pkg) => ({
         orderId: pkg.id,
         codAmount: pkg.cod_amount || 0,
-        deliveryTime: pkg.delivery_time
+        deliveryTime: pkg.delivery_time,
       }));
-      
+
       return { orders, total: count || 0 };
     } catch (error) {
-      LoggerService.error('获取代收款订单列表失败:', error);
+      LoggerService.error("获取代收款订单列表失败:", error);
       return { orders: [], total: 0 };
     }
   },
@@ -1263,15 +1418,15 @@ export const packageService = {
   async getOrderById(orderId: string) {
     try {
       const { data, error } = await supabase
-        .from('packages')
-        .select('*')
-        .eq('id', orderId)
+        .from("packages")
+        .select("*")
+        .eq("id", orderId)
         .single();
 
       if (error) throw error;
       return data;
     } catch (error) {
-      LoggerService.error('获取订单详情失败:', error);
+      LoggerService.error("获取订单详情失败:", error);
       return null;
     }
   },
@@ -1279,24 +1434,24 @@ export const packageService = {
   // 追踪订单（通过包裹ID）
   async trackOrder(trackingCode: string) {
     try {
-      LoggerService.debug('正在查询订单:', trackingCode);
-      
+      LoggerService.debug("正在查询订单:", trackingCode);
+
       const { data, error } = await supabase
-        .from('packages')
-        .select('*')
-        .eq('id', trackingCode.trim())
+        .from("packages")
+        .select("*")
+        .eq("id", trackingCode.trim())
         .maybeSingle();
 
-      LoggerService.debug('查询结果:', { data, error });
+      LoggerService.debug("查询结果:", { data, error });
 
-      if (error && error.code !== 'PGRST116') {
-        LoggerService.error('Supabase查询错误:', error);
+      if (error && error.code !== "PGRST116") {
+        LoggerService.error("Supabase查询错误:", error);
         throw error;
       }
-      
+
       return data;
     } catch (error) {
-      LoggerService.error('追踪订单失败:', error);
+      LoggerService.error("追踪订单失败:", error);
       return null;
     }
   },
@@ -1306,92 +1461,99 @@ export const packageService = {
     try {
       // 1. 检查订单状态和所有者
       const { data: order, error: checkError } = await supabase
-        .from('packages')
-        .select('status, description')
-        .eq('id', orderId)
+        .from("packages")
+        .select("status, description")
+        .eq("id", orderId)
         .single();
 
       if (checkError) throw checkError;
 
       if (!order) {
-        return { success: false, message: '订单不存在' };
+        return { success: false, message: "订单不存在" };
       }
 
       // 2. 从description中提取客户ID（因为packages表没有customer_id字段）
-      const customerIdFromDescription = order.description?.match(/\[客户ID: ([^\]]+)\]/)?.[1];
-      
+      const customerIdFromDescription =
+        order.description?.match(/\[客户ID: ([^\]]+)\]/)?.[1];
+
       if (customerIdFromDescription !== customerId) {
-        return { success: false, message: '无权操作此订单' };
+        return { success: false, message: "无权操作此订单" };
       }
 
-      if (order.status !== '待取件') {
-        return { success: false, message: '只有待取件状态的订单可以取消' };
+      if (order.status !== "待取件") {
+        return { success: false, message: "只有待取件状态的订单可以取消" };
       }
 
       // 3. 更新状态
       const { error } = await supabase
-        .from('packages')
-        .update({ 
-          status: '已取消',
-          updated_at: new Date().toISOString()
+        .from("packages")
+        .update({
+          status: "已取消",
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', orderId);
+        .eq("id", orderId);
 
       if (error) throw error;
-      return { success: true, message: '订单已取消' };
+      return { success: true, message: "订单已取消" };
     } catch (error) {
-      LoggerService.error('取消订单失败:', error);
-      return { success: false, message: '取消订单失败' };
+      LoggerService.error("取消订单失败:", error);
+      return { success: false, message: "取消订单失败" };
     }
   },
 
   // 评价订单
-  async rateOrder(orderId: string, customerId: string, rating: number, comment?: string) {
+  async rateOrder(
+    orderId: string,
+    customerId: string,
+    rating: number,
+    comment?: string,
+  ) {
     try {
       // 1. 检查订单状态和所有者
       const { data: order, error: checkError } = await supabase
-        .from('packages')
-        .select('status, description, customer_rating')
-        .eq('id', orderId)
+        .from("packages")
+        .select("status, description, customer_rating")
+        .eq("id", orderId)
         .single();
 
       if (checkError) throw checkError;
 
       if (!order) {
-        return { success: false, message: '订单不存在' };
+        return { success: false, message: "订单不存在" };
       }
 
       // 2. 从description中提取客户ID（因为packages表没有customer_id字段）
-      const customerIdFromDescription = order.description?.match(/\[客户ID: ([^\]]+)\]/)?.[1];
-      
+      const customerIdFromDescription =
+        order.description?.match(/\[客户ID: ([^\]]+)\]/)?.[1];
+
       if (customerIdFromDescription !== customerId) {
-        return { success: false, message: '无权操作此订单' };
+        return { success: false, message: "无权操作此订单" };
       }
 
-      if (order.status !== '已送达') {
-        return { success: false, message: '只有已送达的订单可以评价' };
+      if (order.status !== "已送达") {
+        return { success: false, message: "只有已送达的订单可以评价" };
       }
 
       if (order.customer_rating) {
-        return { success: false, message: '该订单已评价过' };
+        return { success: false, message: "该订单已评价过" };
       }
 
       // 3. 添加评价
       const { error } = await supabase
-        .from('packages')
-        .update({ 
+        .from("packages")
+        .update({
           customer_rating: rating,
-          customer_comment: comment || '',
+          customer_comment: comment || "",
           rating_time: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', orderId);
+        .eq("id", orderId);
 
       if (error) throw error;
-      return { success: true, message: '评价成功' };
+      return { success: true, message: "评价成功" };
     } catch (error) {
-      LoggerService.error('评价订单失败:', error);
-      return { success: false, message: '评价订单失败' };
+      LoggerService.error("评价订单失败:", error);
+      return { success: false, message: "评价订单失败" };
     }
   },
 
@@ -1399,38 +1561,41 @@ export const packageService = {
   async getTrackingHistory(orderId: string) {
     try {
       const { data, error } = await supabase
-        .from('tracking_events')
-        .select('*')
-        .eq('package_id', orderId)
-        .order('event_time', { ascending: false });
+        .from("tracking_events")
+        .select("*")
+        .eq("package_id", orderId)
+        .order("event_time", { ascending: false });
 
       if (error) throw error;
       return data || [];
     } catch (error) {
-      LoggerService.error('获取追踪历史失败:', error);
+      LoggerService.error("获取追踪历史失败:", error);
       return [];
     }
   },
 
   // 获取所有订单（带筛选和分页，通过description匹配）
   // 获取所有订单（支持分页和筛选，支持商家）
-  async getAllOrders(userId: string, options?: {
-    status?: string;
-    limit?: number;
-    offset?: number;
-    email?: string;
-    phone?: string;
-    userType?: string;
-    storeName?: string; // 商家店铺名称，用于匹配 sender_name
-  }) {
+  async getAllOrders(
+    userId: string,
+    options?: {
+      status?: string;
+      limit?: number;
+      offset?: number;
+      email?: string;
+      phone?: string;
+      userType?: string;
+      storeName?: string; // 商家店铺名称，用于匹配 sender_name
+    },
+  ) {
     try {
       const runQuery = async (includeCustomerId: boolean) => {
         let query = supabase
-          .from('packages')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false });
+          .from("packages")
+          .select("*", { count: "exact" })
+          .order("created_at", { ascending: false });
 
-        if (options?.userType === 'merchant') {
+        if (options?.userType === "merchant") {
           // 商家订单查询：优先使用 delivery_store_id，如果没有则通过 sender_name 匹配
           const conditions: string[] = [];
           conditions.push(`delivery_store_id.eq.${userId}`);
@@ -1441,7 +1606,7 @@ export const packageService = {
             conditions.push(`customer_email.eq.${options.email}`);
           }
           if (conditions.length > 0) {
-            query = query.or(conditions.join(','));
+            query = query.or(conditions.join(","));
           }
         } else {
           // 普通客户查询：使用多种方式匹配订单
@@ -1456,11 +1621,11 @@ export const packageService = {
           if (options?.phone) {
             conditions.push(`sender_phone.eq.${options.phone}`);
           }
-          query = query.or(conditions.join(','));
+          query = query.or(conditions.join(","));
         }
 
-        if (options?.status && options.status !== 'all') {
-          query = query.eq('status', options.status);
+        if (options?.status && options.status !== "all") {
+          query = query.eq("status", options.status);
         }
 
         if (options?.limit) {
@@ -1468,7 +1633,10 @@ export const packageService = {
         }
 
         if (options?.offset) {
-          query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+          query = query.range(
+            options.offset,
+            options.offset + (options.limit || 10) - 1,
+          );
         }
 
         const { data, error, count } = await query;
@@ -1479,14 +1647,17 @@ export const packageService = {
       try {
         return await runQuery(true);
       } catch (error: any) {
-        const message = error?.message || '';
-        if (message.includes('customer_id') && message.includes('does not exist')) {
+        const message = error?.message || "";
+        if (
+          message.includes("customer_id") &&
+          message.includes("does not exist")
+        ) {
           return await runQuery(false);
         }
         throw error;
       }
     } catch (error) {
-      LoggerService.error('获取订单列表失败:', error);
+      LoggerService.error("获取订单列表失败:", error);
       return { orders: [], total: 0 };
     }
   },
@@ -1498,22 +1669,22 @@ export const bannerService = {
   async getActiveBanners(): Promise<Banner[]> {
     try {
       const { data, error } = await supabase
-        .from('banners')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+        .from("banners")
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true });
 
       if (error) {
-        LoggerService.error('获取广告列表失败:', error);
+        LoggerService.error("获取广告列表失败:", error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      LoggerService.error('获取广告列表异常:', error);
+      LoggerService.error("获取广告列表异常:", error);
       return [];
     }
-  }
+  },
 };
 
 // 系统设置服务
@@ -1521,82 +1692,106 @@ export const systemSettingsService = {
   async getSettings() {
     try {
       const { data, error } = await supabase
-        .from('system_settings')
-        .select('*')
+        .from("system_settings")
+        .select("*")
         .single();
 
       if (error) throw error;
       return data;
     } catch (error) {
-      LoggerService.error('获取系统设置失败:', error);
+      LoggerService.error("获取系统设置失败:", error);
       return null;
     }
   },
 
   // 获取计费规则
   async getPricingSettings(region?: string) {
-    return retry(async () => {
-      try {
-        const { data, error } = await supabase
-          .from('system_settings')
-          .select('settings_key, settings_value')
-          .like('settings_key', 'pricing.%');
+    return retry(
+      async () => {
+        try {
+          const { data, error } = await supabase
+            .from("system_settings")
+            .select("settings_key, settings_value")
+            .like("settings_key", "pricing.%");
 
-        if (error) throw error;
+          if (error) throw error;
 
-        // 默认全局计费
-        const settings: any = {
-          base_fee: 1500,
-          per_km_fee: 250,
-          weight_surcharge: 150,
-          urgent_surcharge: 500,
-          scheduled_surcharge: 200,
-          oversize_surcharge: 300,
-          fragile_surcharge: 300,
-          food_beverage_surcharge: 300,
-          free_km_threshold: 3,
-        };
+          // 默认全局计费
+          const settings: any = {
+            base_fee: 1500,
+            per_km_fee: 250,
+            weight_surcharge: 150,
+            urgent_surcharge: 500,
+            scheduled_surcharge: 200,
+            oversize_surcharge: 300,
+            fragile_surcharge: 300,
+            food_beverage_surcharge: 300,
+            free_km_threshold: 3,
+          };
 
-        // 如果指定了区域，尝试寻找该区域的配置
-        if (region) {
-          const regionPrefix = `pricing.${region.toLowerCase()}.`;
-          const regionSettings = data?.filter(item => item.settings_key.startsWith(regionPrefix));
-          
-          if (regionSettings && regionSettings.length > 0) {
-            regionSettings.forEach((item: any) => {
-              const key = item.settings_key.replace(regionPrefix, '');
-              let value = item.settings_value;
-              if (typeof value === 'string') {
-                try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-              }
-              settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
-            });
-            return settings;
-          }
-        }
+          // 如果指定了区域，尝试寻找该区域的配置
+          if (region) {
+            const regionPrefix = `pricing.${region.toLowerCase()}.`;
+            const regionSettings = data?.filter((item) =>
+              item.settings_key.startsWith(regionPrefix),
+            );
 
-        // 如果没有指定区域或没有特殊配置，使用默认的全局配置（排除掉带区域后缀的）
-        data?.forEach((item: any) => {
-          if (!item.settings_key.match(/\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./)) {
-            const key = item.settings_key.replace('pricing.', '');
-            let value = item.settings_value;
-            if (typeof value === 'string') {
-              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
+            if (regionSettings && regionSettings.length > 0) {
+              regionSettings.forEach((item: any) => {
+                const key = item.settings_key.replace(regionPrefix, "");
+                let value = item.settings_value;
+                if (typeof value === "string") {
+                  try {
+                    value = JSON.parse(value);
+                  } catch {
+                    value = parseFloat(value) || 0;
+                  }
+                }
+                settings[key] =
+                  typeof value === "number" ? value : parseFloat(value) || 0;
+              });
+              return settings;
             }
-            settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
           }
-        });
 
-        return settings;
-      } catch (error) {
-        throw error;
-      }
-    }, {
-      retries: 3,
-      delay: 1000,
-      shouldRetry: (error) => error.message?.includes('Network request failed') || error.message?.includes('timeout')
-    }).catch(error => {
-      errorService.handleError(error, { context: 'systemSettingsService.getPricingSettings', silent: true });
+          // 如果没有指定区域或没有特殊配置，使用默认的全局配置（排除掉带区域后缀的）
+          data?.forEach((item: any) => {
+            if (
+              !item.settings_key.match(
+                /\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./,
+              )
+            ) {
+              const key = item.settings_key.replace("pricing.", "");
+              let value = item.settings_value;
+              if (typeof value === "string") {
+                try {
+                  value = JSON.parse(value);
+                } catch {
+                  value = parseFloat(value) || 0;
+                }
+              }
+              settings[key] =
+                typeof value === "number" ? value : parseFloat(value) || 0;
+            }
+          });
+
+          return settings;
+        } catch (error) {
+          throw error;
+        }
+      },
+      {
+        retries: 3,
+        delay: 1000,
+        shouldRetry: (error) =>
+          error.message?.includes("Network request failed") ||
+          error.message?.includes("timeout"),
+      },
+    ).catch((error) => {
+      errorService.handleError(error, {
+        context: "systemSettingsService.getPricingSettings",
+        silent: true,
+      });
       return {
         base_fee: 1500,
         per_km_fee: 250,
@@ -1618,20 +1813,23 @@ export const rechargeService = {
   async uploadProof(userId: string, imageUri: string): Promise<string | null> {
     try {
       if (!imageUri) {
-        throw new Error('imageUri is empty');
+        throw new Error("imageUri is empty");
       }
 
       const fileName = `recharge_${userId}_${Date.now()}.jpg`;
-      console.log('开始准备上传凭证:', imageUri);
-      
+      console.log("开始准备上传凭证:", imageUri);
+
       // 🚀 确保 URI 格式正确
       let formattedUri = imageUri;
-      if (!imageUri.startsWith('file://') && !imageUri.startsWith('content://')) {
-        formattedUri = Platform.OS === 'ios' ? `file://${imageUri}` : imageUri;
+      if (
+        !imageUri.startsWith("file://") &&
+        !imageUri.startsWith("content://")
+      ) {
+        formattedUri = Platform.OS === "ios" ? `file://${imageUri}` : imageUri;
       }
-      
-      console.log('正在读取图片并转换为字节流...', formattedUri);
-      
+
+      console.log("正在读取图片并转换为字节流...", formattedUri);
+
       // 🚀 使用 fetch 代替 deprecated 的 FileSystem.readAsStringAsync (Expo 54+ 兼容方案)
       const response = await fetch(formattedUri);
       const blob = await response.blob();
@@ -1644,35 +1842,35 @@ export const rechargeService = {
 
       const bytes = new Uint8Array(arrayBuffer);
       if (!bytes || bytes.length === 0) {
-        throw new Error('读取图片内容为空');
+        throw new Error("读取图片内容为空");
       }
 
-      console.log('二进制转换成功，字节数:', bytes.length);
+      console.log("二进制转换成功，字节数:", bytes.length);
 
       // 上传到 storage
-      console.log('正在执行 Supabase Storage 上传:', fileName);
+      console.log("正在执行 Supabase Storage 上传:", fileName);
       const { error: uploadError } = await supabase.storage
-        .from('payment_proofs')
+        .from("payment_proofs")
         .upload(fileName, bytes, {
-          contentType: 'image/jpeg',
-          upsert: true
+          contentType: "image/jpeg",
+          upsert: true,
         });
 
       if (uploadError) {
-        console.error('Supabase Storage 详细错误:', uploadError);
+        console.error("Supabase Storage 详细错误:", uploadError);
         throw uploadError;
       }
 
       // 获取公共 URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('payment_proofs')
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("payment_proofs").getPublicUrl(fileName);
 
-      console.log('获取 URL 成功:', publicUrl);
+      console.log("获取 URL 成功:", publicUrl);
       return publicUrl;
     } catch (error: any) {
-      LoggerService.error('uploadProof 核心异常:', error);
-      console.error('uploadProof 核心异常详情:', error);
+      LoggerService.error("uploadProof 核心异常:", error);
+      console.error("uploadProof 核心异常详情:", error);
       return null;
     }
   },
@@ -1683,27 +1881,29 @@ export const rechargeService = {
     user_name: string;
     amount: number;
     proof_url: string;
-    status: 'pending' | 'completed' | 'rejected';
+    status: "pending" | "completed" | "rejected";
     notes?: string;
   }) {
     try {
       const { data, error } = await supabase
-        .from('recharge_requests')
-        .insert([{
-          ...requestData,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
+        .from("recharge_requests")
+        .insert([
+          {
+            ...requestData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ])
         .select()
         .single();
 
       if (error) throw error;
       return { success: true, data };
     } catch (error: any) {
-      LoggerService.error('创建充值申请失败:', error?.message || '未知错误');
+      LoggerService.error("创建充值申请失败:", error?.message || "未知错误");
       return { success: false, error };
     }
-  }
+  },
 };
 
 // 商家服务 (外卖/零售)
@@ -1712,15 +1912,15 @@ export const merchantService = {
   async getStoreProducts(storeId: string): Promise<Product[]> {
     try {
       const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('store_id', storeId)
-        .order('created_at', { ascending: false });
+        .from("products")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data || [];
     } catch (error) {
-      LoggerService.error('获取商店商品失败:', error);
+      LoggerService.error("获取商店商品失败:", error);
       return [];
     }
   },
@@ -1729,24 +1929,26 @@ export const merchantService = {
   async getStoreCategories(storeId: string): Promise<ProductCategory[]> {
     try {
       const { data, error } = await supabase
-        .from('product_categories')
-        .select('*')
-        .eq('store_id', storeId)
-        .order('display_order', { ascending: true });
+        .from("product_categories")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("display_order", { ascending: true });
 
       if (error) throw error;
       return data || [];
     } catch (error) {
-      LoggerService.error('获取商店分类失败:', error);
+      LoggerService.error("获取商店分类失败:", error);
       return [];
     }
   },
 
   // 添加商品
-  async addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'sales_count'>) {
+  async addProduct(
+    product: Omit<Product, "id" | "created_at" | "updated_at" | "sales_count">,
+  ) {
     try {
       const { data, error } = await supabase
-        .from('products')
+        .from("products")
         .insert([product])
         .select()
         .single();
@@ -1754,7 +1956,7 @@ export const merchantService = {
       if (error) throw error;
       return { success: true, data };
     } catch (error: any) {
-      LoggerService.error('添加商品失败:', error);
+      LoggerService.error("添加商品失败:", error);
       return { success: false, error };
     }
   },
@@ -1763,16 +1965,16 @@ export const merchantService = {
   async updateProduct(productId: string, updates: Partial<Product>) {
     try {
       const { data, error } = await supabase
-        .from('products')
+        .from("products")
         .update(updates)
-        .eq('id', productId)
+        .eq("id", productId)
         .select()
         .single();
 
       if (error) throw error;
       return { success: true, data };
     } catch (error: any) {
-      LoggerService.error('更新商品失败:', error);
+      LoggerService.error("更新商品失败:", error);
       return { success: false, error };
     }
   },
@@ -1781,14 +1983,14 @@ export const merchantService = {
   async deleteProduct(productId: string) {
     try {
       const { error } = await supabase
-        .from('products')
+        .from("products")
         .delete()
-        .eq('id', productId);
+        .eq("id", productId);
 
       if (error) throw error;
       return { success: true };
     } catch (error: any) {
-      LoggerService.error('删除商品失败:', error);
+      LoggerService.error("删除商品失败:", error);
       return { success: false, error };
     }
   },
@@ -1804,23 +2006,29 @@ export const merchantService = {
   },
 
   // 上传商品图片
-  async uploadProductImage(storeId: string, imageUri: string): Promise<string | null> {
+  async uploadProductImage(
+    storeId: string,
+    imageUri: string,
+  ): Promise<string | null> {
     try {
       if (!imageUri) {
-        throw new Error('imageUri is empty');
+        throw new Error("imageUri is empty");
       }
 
       const fileName = `${storeId}/${Date.now()}.jpg`;
-      console.log('开始准备上传商品图片:', imageUri);
-      
+      console.log("开始准备上传商品图片:", imageUri);
+
       // 🚀 确保 URI 格式正确
       let formattedUri = imageUri;
-      if (!imageUri.startsWith('file://') && !imageUri.startsWith('content://')) {
-        formattedUri = Platform.OS === 'ios' ? `file://${imageUri}` : imageUri;
+      if (
+        !imageUri.startsWith("file://") &&
+        !imageUri.startsWith("content://")
+      ) {
+        formattedUri = Platform.OS === "ios" ? `file://${imageUri}` : imageUri;
       }
-      
-      console.log('正在读取商品图片并转换为字节流...', formattedUri);
-      
+
+      console.log("正在读取商品图片并转换为字节流...", formattedUri);
+
       // 🚀 使用 fetch 代替 deprecated 的 FileSystem.readAsStringAsync (Expo 54+ 兼容方案)
       const response = await fetch(formattedUri);
       const blob = await response.blob();
@@ -1833,35 +2041,35 @@ export const merchantService = {
 
       const bytes = new Uint8Array(arrayBuffer);
       if (!bytes || bytes.length === 0) {
-        throw new Error('读取商品图片内容为空');
+        throw new Error("读取商品图片内容为空");
       }
 
-      console.log('二进制转换成功，字节数:', bytes.length);
+      console.log("二进制转换成功，字节数:", bytes.length);
 
       // 上传到 storage
-      console.log('正在执行 Supabase Storage 商品图片上传:', fileName);
+      console.log("正在执行 Supabase Storage 商品图片上传:", fileName);
       const { error: uploadError } = await supabase.storage
-        .from('product_images')
+        .from("product_images")
         .upload(fileName, bytes, {
-          contentType: 'image/jpeg',
-          upsert: true
+          contentType: "image/jpeg",
+          upsert: true,
         });
 
       if (uploadError) {
-        console.error('Supabase Storage 商品图片详细错误:', uploadError);
+        console.error("Supabase Storage 商品图片详细错误:", uploadError);
         throw uploadError;
       }
 
       // 获取公共 URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('product_images')
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("product_images").getPublicUrl(fileName);
 
-      console.log('获取商品图片 URL 成功:', publicUrl);
+      console.log("获取商品图片 URL 成功:", publicUrl);
       return publicUrl;
     } catch (error: any) {
-      LoggerService.error('uploadProductImage 核心异常:', error);
-      console.error('uploadProductImage 核心异常详情:', error);
+      LoggerService.error("uploadProductImage 核心异常:", error);
+      console.error("uploadProductImage 核心异常详情:", error);
       return null;
     }
   },
@@ -1870,8 +2078,9 @@ export const merchantService = {
   async searchProductsByName(query: string): Promise<any[]> {
     try {
       const { data, error } = await supabase
-        .from('products')
-        .select(`
+        .from("products")
+        .select(
+          `
           *,
           delivery_stores (
             id,
@@ -1882,40 +2091,48 @@ export const merchantService = {
             operating_hours,
             is_closed_today
           )
-        `)
-        .ilike('name', `%${query}%`)
-        .eq('is_available', true)
+        `,
+        )
+        .ilike("name", `%${query}%`)
+        .eq("is_available", true)
         .limit(20);
 
       if (error) throw error;
       return data || [];
     } catch (error) {
-      LoggerService.error('搜索商品失败:', error);
+      LoggerService.error("搜索商品失败:", error);
       return [];
     }
-  }
+  },
 };
 
 // 评价服务
 export const reviewService = {
   // 提交评价
-  async createReview(reviewData: Omit<StoreReview, 'id' | 'created_at' | 'updated_at' | 'status'>) {
+  async createReview(
+    reviewData: Omit<
+      StoreReview,
+      "id" | "created_at" | "updated_at" | "status"
+    >,
+  ) {
     try {
       const { data, error } = await supabase
-        .from('store_reviews')
-        .insert([{
-          ...reviewData,
-          status: 'published',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
+        .from("store_reviews")
+        .insert([
+          {
+            ...reviewData,
+            status: "published",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ])
         .select()
         .single();
 
       if (error) throw error;
       return { success: true, data };
     } catch (error: any) {
-      LoggerService.error('提交评价失败:', error?.message || '未知错误');
+      LoggerService.error("提交评价失败:", error?.message || "未知错误");
       return { success: false, error };
     }
   },
@@ -1924,16 +2141,16 @@ export const reviewService = {
   async getStoreReviews(storeId: string) {
     try {
       const { data, error } = await supabase
-        .from('store_reviews')
-        .select('*')
-        .eq('store_id', storeId)
-        .eq('status', 'published')
-        .order('created_at', { ascending: false });
+        .from("store_reviews")
+        .select("*")
+        .eq("store_id", storeId)
+        .eq("status", "published")
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data || [];
     } catch (error: any) {
-      LoggerService.error('获取评价列表失败:', error?.message || '未知错误');
+      LoggerService.error("获取评价列表失败:", error?.message || "未知错误");
       return [];
     }
   },
@@ -1942,31 +2159,39 @@ export const reviewService = {
   async getStoreReviewStats(storeId: string) {
     try {
       const { data, error } = await supabase
-        .from('store_reviews')
-        .select('rating')
-        .eq('store_id', storeId)
-        .eq('status', 'published');
+        .from("store_reviews")
+        .select("rating")
+        .eq("store_id", storeId)
+        .eq("status", "published");
 
       if (error) throw error;
-      
+
       if (!data || data.length === 0) {
-        return { average: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+        return {
+          average: 0,
+          count: 0,
+          distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+        };
       }
 
       const count = data.length;
       const sum = data.reduce((acc, curr) => acc + curr.rating, 0);
       const average = parseFloat((sum / count).toFixed(1));
-      
+
       const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-      data.forEach(r => {
+      data.forEach((r) => {
         const rating = r.rating as keyof typeof distribution;
         distribution[rating] = (distribution[rating] || 0) + 1;
       });
 
       return { average, count, distribution };
     } catch (error: any) {
-      LoggerService.error('获取评价统计失败:', error?.message || '未知错误');
-      return { average: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+      LoggerService.error("获取评价统计失败:", error?.message || "未知错误");
+      return {
+        average: 0,
+        count: 0,
+        distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+      };
     }
   },
 
@@ -1976,23 +2201,27 @@ export const reviewService = {
       if (!storeIds || storeIds.length === 0) return {};
 
       const { data, error } = await supabase
-        .from('store_reviews')
-        .select('store_id, rating')
-        .in('store_id', storeIds)
-        .eq('status', 'published');
+        .from("store_reviews")
+        .select("store_id, rating")
+        .in("store_id", storeIds)
+        .eq("status", "published");
 
       if (error) throw error;
 
       const statsMap: Record<string, any> = {};
-      
+
       // 初始化每个店铺的统计数据
-      storeIds.forEach(id => {
-        statsMap[id] = { average: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+      storeIds.forEach((id) => {
+        statsMap[id] = {
+          average: 0,
+          count: 0,
+          distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+        };
       });
 
       // 填充评分数据
       if (data) {
-        data.forEach(item => {
+        data.forEach((item) => {
           const stats = statsMap[item.store_id];
           if (stats) {
             stats.count += 1;
@@ -2003,10 +2232,12 @@ export const reviewService = {
         });
 
         // 计算平均分
-        Object.keys(statsMap).forEach(id => {
+        Object.keys(statsMap).forEach((id) => {
           const stats = statsMap[id];
           if (stats.count > 0) {
-            stats.average = parseFloat((stats.totalSum / stats.count).toFixed(1));
+            stats.average = parseFloat(
+              (stats.totalSum / stats.count).toFixed(1),
+            );
             delete stats.totalSum; // 清理临时变量
           }
         });
@@ -2014,7 +2245,10 @@ export const reviewService = {
 
       return statsMap;
     } catch (error: any) {
-      LoggerService.error('批量获取评价统计失败:', error?.message || '未知错误');
+      LoggerService.error(
+        "批量获取评价统计失败:",
+        error?.message || "未知错误",
+      );
       return {};
     }
   },
@@ -2023,37 +2257,43 @@ export const reviewService = {
   async replyToReview(reviewId: string, replyText: string) {
     try {
       const { data, error } = await supabase
-        .from('store_reviews')
+        .from("store_reviews")
         .update({
           reply_text: replyText,
           replied_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', reviewId)
+        .eq("id", reviewId)
         .select()
         .single();
 
       if (error) throw error;
       return { success: true, data };
     } catch (error: any) {
-      LoggerService.error('回复评价失败:', error?.message || '未知错误');
+      LoggerService.error("回复评价失败:", error?.message || "未知错误");
       return { success: false, error };
     }
   },
 
   // 上传评价图片 (移动端适配版本)
-  async uploadReviewImage(userId: string, imageUri: string): Promise<string | null> {
+  async uploadReviewImage(
+    userId: string,
+    imageUri: string,
+  ): Promise<string | null> {
     try {
-      if (!imageUri) throw new Error('imageUri is empty');
+      if (!imageUri) throw new Error("imageUri is empty");
 
       const fileName = `review_${userId}_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-      
+
       // 🚀 确保 URI 格式正确
       let formattedUri = imageUri;
-      if (!imageUri.startsWith('file://') && !imageUri.startsWith('content://')) {
-        formattedUri = Platform.OS === 'ios' ? `file://${imageUri}` : imageUri;
+      if (
+        !imageUri.startsWith("file://") &&
+        !imageUri.startsWith("content://")
+      ) {
+        formattedUri = Platform.OS === "ios" ? `file://${imageUri}` : imageUri;
       }
-      
+
       const response = await fetch(formattedUri);
       const blob = await response.blob();
       const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
@@ -2064,26 +2304,26 @@ export const reviewService = {
       });
 
       const bytes = new Uint8Array(arrayBuffer);
-      
+
       const { error: uploadError } = await supabase.storage
-        .from('review_images')
+        .from("review_images")
         .upload(fileName, bytes, {
-          contentType: 'image/jpeg',
-          upsert: true
+          contentType: "image/jpeg",
+          upsert: true,
         });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('review_images')
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("review_images").getPublicUrl(fileName);
 
       return publicUrl;
     } catch (error: any) {
-      LoggerService.error('上传评价图片失败:', error);
+      LoggerService.error("上传评价图片失败:", error);
       return null;
     }
-  }
+  },
 };
 
 // 🚀 新增：使用教学服务
@@ -2091,20 +2331,20 @@ export const tutorialService = {
   async getAllTutorials(): Promise<Tutorial[]> {
     try {
       const { data, error } = await supabase
-        .from('tutorials')
-        .select('*')
-        .order('display_order', { ascending: true });
-      
+        .from("tutorials")
+        .select("*")
+        .order("display_order", { ascending: true });
+
       if (error) {
-        LoggerService.error('获取教学列表失败:', error);
+        LoggerService.error("获取教学列表失败:", error);
         return [];
       }
       return data || [];
     } catch (err) {
-      LoggerService.error('获取教学列表异常:', err);
+      LoggerService.error("获取教学列表异常:", err);
       return [];
     }
-  }
+  },
 };
 
 // 🚀 新增：欢迎页面服务
@@ -2112,23 +2352,23 @@ export const welcomeScreenService = {
   async getActiveWelcomeScreen(): Promise<WelcomeScreen | null> {
     try {
       const { data, error } = await supabase
-        .from('welcome_screens')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+        .from("welcome_screens")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       if (error) {
-        LoggerService.error('获取活跃欢迎页失败:', error);
+        LoggerService.error("获取活跃欢迎页失败:", error);
         return null;
       }
       return data;
     } catch (err) {
-      LoggerService.error('获取活跃欢迎页异常:', err);
+      LoggerService.error("获取活跃欢迎页异常:", err);
       return null;
     }
-  }
+  },
 };
 
 // 配送照片服务
@@ -2137,20 +2377,20 @@ export const deliveryPhotoService = {
   async getPackagePhotos(packageId: string): Promise<any[]> {
     try {
       const { data, error } = await supabase
-        .from('delivery_photos')
-        .select('*')
-        .eq('package_id', packageId)
-        .order('upload_time', { ascending: false });
+        .from("delivery_photos")
+        .select("*")
+        .eq("package_id", packageId)
+        .order("upload_time", { ascending: false });
 
       if (error) {
-        LoggerService.error('获取包裹照片失败:', error);
+        LoggerService.error("获取包裹照片失败:", error);
         return [];
       }
 
       return data || [];
     } catch (err) {
-      LoggerService.error('获取包裹照片异常:', err);
+      LoggerService.error("获取包裹照片异常:", err);
       return [];
     }
-  }
+  },
 };

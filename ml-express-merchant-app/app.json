@@ -2,7 +2,7 @@
   "expo": {
     "name": "ML EXPRESS MERCHANTS",
     "slug": "ml-express-merchants",
-    "version": "1.0.0", 
+    "version": "2.0.0",
     "scheme": "ml-express-merchants",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,17 +19,17 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.merchants",
-      "buildNumber": "57",
+      "buildNumber": "1",
       "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS需要访问您的位置信息以提供准确的配送服务和包裹追踪功能。",
-        "NSCameraUsageDescription": "MARKET LINK EXPRESS需要访问您的相机以扫描二维码和拍摄包裹验证照片。",
-        "NSPhotoLibraryUsageDescription": "MARKET LINK EXPRESS需要访问您的相册以保存二维码和包裹图片。",
-        "NSPhotoLibraryAddUsageDescription": "MARKET LINK EXPRESS需要访问您的相册以保存付款二维码。",
-        "CFBundleDisplayName": "MARKET LINK EXPRESS",
-        "CFBundleName": "MARKET LINK EXPRESS",
-        "CFBundleShortVersionString": "2.3.5",
-        "CFBundleVersion": "57",
+        "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages. / 需要位置信息以提供准确的配送服务。 / တိကျသော ပို့ဆောင်ရေးဝန်ဆောင်မှုအတွက် တည်နေရာလိုအပ်ပါသည်။",
+        "NSCameraUsageDescription": "MARKET LINK EXPRESS needs access to your camera to scan QR codes and take delivery verification photos. / 需要访问相机以扫描二维码和拍照。 / QR ကုဒ်စကင်ဖတ်ရန် ကင်မရာလိုအပ်ပါသည်။",
+        "NSPhotoLibraryUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save QR codes and delivery proof photos. / 需要访问相册以保存图片。 / ဓာတ်ပုံသိမ်းဆည်းရန် ဓာတ်ပုံပြခန်းလိုအပ်ပါသည်။",
+        "NSPhotoLibraryAddUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save payment QR codes. / 需要相册权限以保存付款二维码。 / ငွေပေးချေမှု QR ကုဒ်သိမ်းဆည်းရန် ဓာတ်ပုံပြခန်းလိုအပ်ပါသည်။",
+        "CFBundleDisplayName": "ML MERCHANTS",
+        "CFBundleName": "ML MERCHANTS",
+        "CFBundleShortVersionString": "2.0.0",
+        "CFBundleVersion": "1",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
         "UIRequiredDeviceCapabilities": [
@@ -61,13 +61,15 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.merchants",
-      "versionCode": 57,
+      "versionCode": 1,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "config": {
         "googleMaps": {
@@ -87,11 +89,11 @@
       ]
     ],
     "extra": {
-      "eas": {
-        "projectId": "80b0873d-1d76-429e-8c79-738a817d8a15"
-      },
       "googleMapsApiKey": "AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI",
-      "googlePlacesApiKey": "AIzaSyC952oez7KyjH9A_Ria4Grbgv2qkW7vCYk"
+      "googlePlacesApiKey": "AIzaSyC952oez7KyjH9A_Ria4Grbgv2qkW7vCYk",
+      "eas": {
+        "projectId": "0c1336bd-5ebe-428c-a815-4a91519cdf16"
+      }
     },
     "owner": "amt349"
   }
