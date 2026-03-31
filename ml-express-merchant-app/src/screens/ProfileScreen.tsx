@@ -4416,14 +4416,15 @@ export default function ProfileScreen({ navigation }: any) {
                 <TouchableOpacity
                   style={styles.aboutLink}
                   onPress={() => {
-                    const privacyUrl = "https://mlexpress.com/privacy";
+                    const privacyUrl =
+                      "https://market-link-express.com/privacy-policy";
                     Linking.openURL(privacyUrl).catch(() => {
                       Alert.alert(
                         language === "zh"
                           ? "无法打开链接"
                           : language === "en"
                             ? "Cannot open link"
-                            : "လင့်ခ်ဖွင့်ရန်မအောင်မြင်ပါ",
+                            : "လင့်ข်ဖွင့်ရန်မအောင်မြင်ပါ",
                         language === "zh"
                           ? "请稍后访问: " + privacyUrl
                           : language === "en"
@@ -4443,7 +4444,8 @@ export default function ProfileScreen({ navigation }: any) {
                 <TouchableOpacity
                   style={styles.aboutLink}
                   onPress={() => {
-                    const termsUrl = "https://mlexpress.com/terms";
+                    const termsUrl =
+                      "https://market-link-express.com/terms-of-service";
                     Linking.openURL(termsUrl).catch(() => {
                       Alert.alert(
                         language === "zh"
