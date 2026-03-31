@@ -1,4 +1,4 @@
-package com.mlexpress.client
+package com.mlexpress.merchants
 
 import android.app.Application
 import android.content.res.Configuration
