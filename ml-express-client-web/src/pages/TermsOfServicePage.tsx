@@ -3,47 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
 import { useLanguage } from '../contexts/LanguageContext';
 
-const PrivacyPolicyPage: React.FC = () => {
+const TermsOfServicePage: React.FC = () => {
   const navigate = useNavigate();
   const { language, setLanguage, t: allT } = useLanguage();
-  const t = allT.privacy;
+  const t = allT.terms;
   const [isVisible, setIsVisible] = useState(false);
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
 
-  // 语言切换函数
   const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage);
     localStorage.setItem('ml-express-language', newLanguage);
-  };
-
-  // 点击外部关闭下拉框
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (showLanguageDropdown && !target.closest('[data-language-dropdown]')) {
-        setShowLanguageDropdown(false);
-      }
-    };
-
-    if (showLanguageDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showLanguageDropdown]);
-
-
-  const handleNavigation = (path: string) => {
-    setIsVisible(false);
-    setTimeout(() => {
-      navigate(path);
-    }, 300);
   };
 
   return (
@@ -66,17 +38,6 @@ const PrivacyPolicyPage: React.FC = () => {
         filter: 'blur(40px)',
         zIndex: 1
       }}></div>
-      <div style={{
-        position: 'absolute',
-        bottom: '5%',
-        left: '5%',
-        width: '150px',
-        height: '150px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(30px)',
-        zIndex: 1
-      }}></div>
       
       {/* 导航栏 */}
       <NavigationBar
@@ -87,7 +48,6 @@ const PrivacyPolicyPage: React.FC = () => {
         onShowRegisterModal={(isLoginMode) => {
           navigate('/', { state: { showModal: true, isLoginMode } });
         }} 
-        
       />
 
       {/* 主要内容区域 */}
@@ -132,14 +92,12 @@ const PrivacyPolicyPage: React.FC = () => {
           </p>
         </div>
 
-        {/* 隐私政策内容 */}
+        {/* 条款内容 */}
         <div style={{
-          background: 'var(--card-bg)',
-          backdropFilter: 'var(--card-backdrop)',
-          borderRadius: 'var(--card-radius-lg)',
-          padding: 'var(--card-padding-lg)',
-          border: 'var(--card-border)',
-          boxShadow: 'var(--shadow-card)',
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '24px',
+          padding: window.innerWidth < 768 ? '1.5rem' : '3rem',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
           marginBottom: '2rem'
         }}>
           {Object.values(t.sections).map((section: any, index: number) => (
@@ -188,84 +146,20 @@ const PrivacyPolicyPage: React.FC = () => {
                   ))}
                 </ul>
               )}
-              {section.note && (
-                <div style={{
-                  background: 'rgba(66, 140, 201, 0.1)',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  marginTop: '1rem',
-                  borderLeft: '4px solid #428cc9'
-                }}>
-                  <p style={{
-                    fontSize: '0.95rem',
-                    color: '#2d3748',
-                    lineHeight: '1.6',
-                    margin: 0,
-                    fontWeight: '500'
-                  }}>
-                    {section.note}
-                  </p>
-                </div>
-              )}
             </div>
           ))}
         </div>
 
-        {/* 页脚信息 */}
+        {/* 页脚 */}
         <div style={{
           textAlign: 'center',
-          padding: 'var(--card-padding-lg)',
+          padding: '2rem',
           background: 'rgba(255,255,255,0.1)',
           backdropFilter: 'blur(10px)',
-          borderRadius: 'var(--card-radius-lg)',
-          border: 'var(--card-border)',
-          boxShadow: 'var(--shadow-md)'
+          borderRadius: '24px',
+          border: '1px solid rgba(255,255,255,0.2)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '1rem' }}>
-            <img 
-              src="/logo.png" 
-              alt="Logo" 
-              style={{ 
-                width: '40px', 
-                height: '40px' 
-              }} 
-            />
-            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
-              <span style={{ 
-                color: 'white',
-                fontSize: '1.6rem',
-                fontWeight: '800',
-                textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
-                background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                letterSpacing: '-1px',
-                whiteSpace: 'nowrap'
-              }}>
-                MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
-              </span>
-              <span style={{
-                color: 'white',
-                fontSize: '0.6rem',
-                fontStyle: 'italic',
-                fontWeight: '400',
-                letterSpacing: '1px',
-                opacity: 0.9,
-                marginTop: '-2px',
-                textAlign: 'right',
-                paddingRight: '4px',
-                textShadow: '1px 1px 2px rgba(0,0,0,0.2)'
-              }}>
-                Delivery Services
-              </span>
-            </div>
-          </div>
-          <p style={{ 
-            color: 'rgba(255,255,255,0.8)',
-            fontSize: '0.9rem',
-            margin: '0.5rem 0'
-          }}>
+          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', margin: 0 }}>
             © 2024 MARKET LINK EXPRESS. All rights reserved.
           </p>
         </div>
@@ -274,5 +168,4 @@ const PrivacyPolicyPage: React.FC = () => {
   );
 };
 
-export default PrivacyPolicyPage;
-
+export default TermsOfServicePage;

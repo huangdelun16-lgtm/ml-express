@@ -6,6 +6,7 @@ import ServicesPage from './pages/ServicesPage';
 import TrackingPage from './pages/TrackingPage';
 import ContactPage from './pages/ContactPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 import ProfilePage from './pages/ProfilePage';
 import DeleteAccountPage from './pages/DeleteAccountPage';
 import CityMallPage from './pages/CityMallPage';
@@ -85,6 +86,7 @@ function App() {
                 <Route path="/tracking" element={<TrackingPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms-of-service" element={<TermsOfServicePage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/delete-account" element={<DeleteAccountPage />} />
                 <Route path="/mall" element={<CityMallPage />} />

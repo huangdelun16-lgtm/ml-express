@@ -430,6 +430,60 @@ const translations: any = {
         }
       }
     },
+    terms: {
+      title: '服务条款',
+      subtitle: '欢迎使用 MARKET LINK EXPRESS，请仔细阅读以下服务协议',
+      lastUpdated: '最后更新：2024年12月',
+      sections: {
+        acceptance: {
+          title: '1. 接受条款',
+          content: '通过访问或使用 MARKET LINK EXPRESS 的网站或移动应用程序，即表示您同意受这些服务条款的约束。如果您不同意这些条款，请勿使用我们的服务。'
+        },
+        services: {
+          title: '2. 服务描述',
+          content: '我们提供同城快递、代购及相关物流服务。我们保留随时修改或停止服务的权利，恕不另行通知。'
+        },
+        userAccount: {
+          title: '3. 用户账号',
+          content: '您必须提供真实、准确的信息来创建账号。您有责任保护账号密码的安全，并对账号下的所有活动负责。'
+        },
+        prohibitedItems: {
+          title: '4. 禁运物品',
+          content: '严禁寄送法律禁止的物品，包括但不限于：',
+          items: [
+            '危险品、爆炸物、易燃物',
+            '非法药物或违禁品',
+            '活体动物',
+            '高价值珠宝、现金、有价证券',
+            '法律明令禁止运输的其他物品'
+          ]
+        },
+        payment: {
+          title: '5. 支付与结算',
+          content: '用户应根据系统生成的报价支付费用。目前支持现金支付和余额支付。所有支付一旦完成，非我方原因不予退还。'
+        },
+        liability: {
+          title: '6. 责任限制',
+          content: '对于因不可抗力、用户过错或禁运物品导致的损失，我们不承担赔偿责任。在任何情况下，我们的赔偿责任不超过订单金额的 3 倍。'
+        },
+        privacy: {
+          title: '7. 隐私保护',
+          content: '我们非常重视用户的隐私。关于我们如何收集和使用您的数据，请参阅我们的隐私政策。'
+        },
+        termination: {
+          title: '8. 服务终止',
+          content: '如果您违反本条款，我们有权随时暂停或终止您的账号访问权限。'
+        },
+        contact: {
+          title: '9. 联系我们',
+          content: '如有任何关于服务条款的疑问，请联系：',
+          items: [
+            '电话：(+95) 09788848928',
+            '邮箱：marketlink982@gmail.com'
+          ]
+        }
+      }
+    },
     order: {
       title: '创建订单',
       sender: '寄件人信息',
@@ -952,6 +1006,60 @@ const translations: any = {
         }
       }
     },
+    terms: {
+      title: 'Terms of Service',
+      subtitle: 'Welcome to MARKET LINK EXPRESS. Please read these terms carefully.',
+      lastUpdated: 'Last Updated: December 2024',
+      sections: {
+        acceptance: {
+          title: '1. Acceptance of Terms',
+          content: 'By accessing or using the MARKET LINK EXPRESS website or mobile application, you agree to be bound by these Terms of Service. If you do not agree, please do not use our services.'
+        },
+        services: {
+          title: '2. Description of Services',
+          content: 'We provide city-wide express delivery, personal shopper, and related logistics services. We reserve the right to modify or discontinue services at any time without notice.'
+        },
+        userAccount: {
+          title: '3. User Accounts',
+          content: 'You must provide accurate information to create an account. You are responsible for maintaining the security of your account and for all activities under your account.'
+        },
+        prohibitedItems: {
+          title: '4. Prohibited Items',
+          content: 'The following items are strictly prohibited for delivery:',
+          items: [
+            'Dangerous goods, explosives, flammables',
+            'Illegal drugs or contraband',
+            'Live animals',
+            'High-value jewelry, cash, securities',
+            'Other items prohibited by law'
+          ]
+        },
+        payment: {
+          title: '5. Payment and Settlement',
+          content: 'Users shall pay fees according to the system-generated quotes. We support cash and balance payments. All payments are non-refundable unless caused by our error.'
+        },
+        liability: {
+          title: '6. Limitation of Liability',
+          content: 'We are not liable for losses caused by force majeure, user fault, or prohibited items. In any case, our liability shall not exceed 3 times the order amount.'
+        },
+        privacy: {
+          title: '7. Privacy Protection',
+          content: 'We value your privacy. Please refer to our Privacy Policy for details on how we collect and use your data.'
+        },
+        termination: {
+          title: '8. Termination',
+          content: 'We reserve the right to suspend or terminate your account access if you violate these terms.'
+        },
+        contact: {
+          title: '9. Contact Us',
+          content: 'For any questions regarding these terms, please contact:',
+          items: [
+            'Phone: (+95) 09788848928',
+            'Email: marketlink982@gmail.com'
+          ]
+        }
+      }
+    },
     order: {
       title: 'Create Order',
       sender: 'Sender Information',
@@ -1470,6 +1578,60 @@ const translations: any = {
             'ဖုန်း: (+95) 09788848928',
             'အီးမေးလ်: marketlink982@gmail.com',
             'လိပ်စာ: ChanMyaThaZi Mandalay'
+          ]
+        }
+      }
+    },
+    terms: {
+      title: 'ဝန်ဆောင်မှု စည်းမျဉ်းများ',
+      subtitle: 'MARKET LINK EXPRESS မှ ကြိုဆိုပါသည်။ ဤစည်းမျဉ်းများကို သေချာစွာ ဖတ်ရှုပေးပါ။',
+      lastUpdated: 'နောက်ဆုံးအပ်ဒိတ်: ၂၀၂၄ ဒီဇင်ဘာ',
+      sections: {
+        acceptance: {
+          title: '၁. စည်းမျဉ်းများကို သဘောတူညီခြင်း',
+          content: 'MARKET LINK EXPRESS ၏ ဝဘ်ဆိုဒ် သို့မဟုတ် မိုဘိုင်းအက်ပလီကေးရှင်းကို အသုံးပြုခြင်းအားဖြင့် သင်သည် ဤဝန်ဆောင်မှု စည်းမျဉ်းများကို လိုက်နာရန် သဘောတူညီပြီး ဖြစ်သည်။ အကယ်၍ သင်သည် သဘောမတူပါက ကျွန်ုပ်တို့၏ ဝန်ဆောင်မှုများကို အသုံးမပြုပါနှင့်။'
+        },
+        services: {
+          title: '၂. ဝန်ဆောင်မှု ဖော်ပြချက်',
+          content: 'ကျွန်ုပ်တို့သည် မြို့တွင်းအမြန်ပို့ဆောင်ရေး၊ ဝယ်ယူပေးခြင်းနှင့် ဆက်စပ်ပို့ဆောင်ရေး ဝန်ဆောင်မှုများကို ပေးဆောင်ပါသည်။ ကြိုတင်အကြောင်းကြားခြင်းမရှိဘဲ ဝန်ဆောင်မှုများကို ပြုပြင်ပြောင်းလဲရန် သို့မဟုတ် ရပ်ဆိုင်းရန် အခွင့်အရေးရှိပါသည်။'
+        },
+        userAccount: {
+          title: '၃. အသုံးပြုသူ အကောင့်',
+          content: 'အကောင့်ဖွင့်ရန် မှန်ကန်သော အချက်အလက်များကို ပေးဆောင်ရပါမည်။ သင့်အကောင့်၏ လုံခြုံရေးနှင့် သင့်အကောင့်အောက်ရှိ လှုပ်ရှားမှုအားလုံးအတွက် သင်ကိုယ်တိုင် တာဝန်ရှိပါသည်။'
+        },
+        prohibitedItems: {
+          title: '၄. ပို့ဆောင်ခွင့်မပြုသော ပစ္စည်းများ',
+          content: 'အောက်ပါ ပစ္စည်းများကို ပို့ဆောင်ခြင်းအား တင်းကြပ်စွာ တားမြစ်ထားပါသည် -',
+          items: [
+            'အန္တရာယ်ရှိသော ပစ္စည်းများ၊ ပေါက်ကွဲစေတတ်သော ပစ္စည်းများ၊ မီးလောင်လွယ်သော ပစ္စည်းများ',
+            'တရားမဝင် ဆေးဝါးများ သို့မဟုတ် ပိတ်ပင်ထားသော ပစ္စည်းများ',
+            'အသက်ရှိသော သတ္တဝါများ',
+            'တန်ဖိုးကြီး ကျောက်မျက်ရတနာများ၊ ငွေသား၊ အစုရှယ်ယာများ',
+            'ဥပဒေအရ တားမြစ်ထားသော အခြားပစ္စည်းများ'
+          ]
+        },
+        payment: {
+          title: '၅. ငွေပေးချေမှုနှင့် ရှင်းလင်းမှု',
+          content: 'အသုံးပြုသူများသည် စနစ်မှ ထုတ်ပေးသော ဈေးနှုန်းအတိုင်း ပေးဆောင်ရပါမည်။ ကျွန်ုပ်တို့သည် ငွေသားနှင့် လက်ကျန်ငွေဖြင့် ပေးချေမှုများကို လက်ခံပါသည်။ ကျွန်ုပ်တို့၏ မှားယွင်းမှုကြောင့်မဟုတ်လျှင် ငွေပြန်အမ်းပေးမည် မဟုတ်ပါ။'
+        },
+        liability: {
+          title: '၆. တာဝန်ယူမှု ကန့်သတ်ချက်',
+          content: 'မမျှော်မှန်းနိုင်သော အခြေအနေများ၊ အသုံးပြုသူ၏ အမှား သို့မဟုတ် တားမြစ်ပစ္စည်းများကြောင့် ဖြစ်ပေါ်လာသော ဆုံးရှုံးမှုများအတွက် ကျွန်ုပ်တို့ တာဝန်ယူမည် မဟုတ်ပါ။ မည်သည့်အခြေအနေတွင်မဆို ကျွန်ုပ်တို့၏ တာဝန်ယူမှုသည် အော်ဒါတန်ဖိုး၏ ၃ ဆ ထက် မကျော်လွန်စေရပါ။'
+        },
+        privacy: {
+          title: '၇. ကိုယ်ရေးလုံခြုံမှု ကာကွယ်ခြင်း',
+          content: 'ကျွန်ုပ်တို့သည် သင့်ကိုယ်ရေးလုံခြုံမှုကို တန်ဖိုးထားပါသည်။ အသေးစိတ်သိရှိရန် ကျွန်ုပ်တို့၏ ကိုယ်ရေးလုံခြုံမှု မူဝါဒကို ဖတ်ရှုပါ။'
+        },
+        termination: {
+          title: '၈. ရပ်စဲခြင်း',
+          content: 'သင်သည် ဤစည်းမျဉ်းများကို ချိုးဖောက်ပါက သင့်အကောင့်ကို ရပ်ဆိုင်းရန် သို့မဟုတ် ပိတ်သိမ်းရန် ကျွန်ုပ်တို့တွင် အခွင့်အရေး ရှိပါသည်။'
+        },
+        contact: {
+          title: '၉. ဆက်သွယ်ရန်',
+          content: 'ဤစည်းမျဉ်းများနှင့် ပတ်သက်၍ သိလိုသည်များရှိပါက အောက်ပါအတိုင်း ဆက်သွယ်နိုင်ပါသည် -',
+          items: [
+            'ဖုန်း - (+95) 09788848928',
+            'အီးမေးလ် - marketlink982@gmail.com'
           ]
         }
       }
