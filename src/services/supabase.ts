@@ -79,13 +79,13 @@ export interface Tutorial {
 
 export interface FinanceRecord {
   id: string;
-  record_type: 'income' | 'expense';
+  record_type: "income" | "expense";
   category: string;
-  order_id: string;
-  courier_id: string;
+  order_id?: string; // 🚀 改为可选，因为并非所有记录都关联订单
+  courier_id?: string; // 🚀 改为可选，因为并非所有记录都关联快递员
   amount: number;
   currency: string;
-  status: 'pending' | 'completed' | 'cancelled';
+  status: "pending" | "completed" | "cancelled";
   payment_method: string;
   reference?: string;
   record_date: string;
@@ -821,53 +821,84 @@ export const financeService = {
     }
   },
 
-  async createRecord(recordData: Omit<FinanceRecord, 'created_at' | 'updated_at'>): Promise<FinanceRecord | null> {
+  async createRecord(
+    recordData: Omit<FinanceRecord, "created_at" | "updated_at">,
+  ): Promise<FinanceRecord | null> {
     try {
-      const payload = {
-        ...recordData,
-        amount: Number(recordData.amount)
+      // 🚀 核心优化：清理数据，移除 undefined 和空的 ID 字段，防止数据库约束报错或请求异常
+      const payload: any = {
+        id: recordData.id,
+        record_type: recordData.record_type,
+        category: recordData.category,
+        amount: Number(recordData.amount),
+        currency: recordData.currency || "MMK",
+        status: recordData.status || "completed",
+        payment_method: recordData.payment_method,
+        record_date: recordData.record_date,
+        created_by: recordData.created_by,
       };
 
+      // 仅在有值时添加可选字段
+      if (recordData.order_id && recordData.order_id.trim() !== "") {
+        payload.order_id = recordData.order_id;
+      }
+      if (recordData.courier_id && recordData.courier_id.trim() !== "") {
+        payload.courier_id = recordData.courier_id;
+      }
+      if (recordData.reference && recordData.reference.trim() !== "") {
+        payload.reference = recordData.reference;
+      }
+      if (recordData.notes && recordData.notes.trim() !== "") {
+        payload.notes = recordData.notes;
+      }
+
       const { data, error } = await supabase
-        .from('finances')
+        .from("finances")
         .insert([payload])
         .select()
         .single();
 
       if (error) {
-        console.error('创建财务记录失败:', error);
-        console.error('请求数据:', payload);
+        console.error("创建财务记录失败:", error);
+        console.error("提交负载:", payload);
         return null;
       }
 
       return data;
     } catch (err) {
-      console.error('创建财务记录异常:', err);
-      console.error('请求数据:', recordData);
+      console.error("创建财务记录异常:", err);
       return null;
     }
   },
 
-  async updateRecord(id: string, updateData: Partial<FinanceRecord>): Promise<boolean> {
+  async updateRecord(
+    id: string,
+    updateData: Partial<FinanceRecord>,
+  ): Promise<boolean> {
     try {
-      const payload: Partial<FinanceRecord> = { ...updateData };
+      // 🚀 核心优化：清理数据，移除 undefined 和空的 ID 字段
+      const payload: any = { ...updateData };
       if (payload.amount !== undefined) {
         payload.amount = Number(payload.amount);
       }
 
-      const { error } = await supabase
-        .from('finances')
-        .update(payload)
-        .eq('id', id);
+      // 处理可选字段，如果为空字符串则从负载中移除
+      if (payload.order_id === "") delete payload.order_id;
+      if (payload.courier_id === "") delete payload.courier_id;
+      if (payload.reference === "") delete payload.reference;
+      if (payload.notes === "") delete payload.notes;
+
+      const { error } = await supabase.from("finances").update(payload).eq("id", id);
 
       if (error) {
-        console.error('更新财务记录失败:', error);
+        console.error("更新财务记录失败:", error);
+        console.error("提交负载:", payload);
         return false;
       }
 
       return true;
     } catch (err) {
-      console.error('更新财务记录异常:', err);
+      console.error("更新财务记录异常:", err);
       return false;
     }
   },

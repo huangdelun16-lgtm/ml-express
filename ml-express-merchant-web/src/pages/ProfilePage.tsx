@@ -16,10 +16,13 @@ import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import * as XLSX from "xlsx";
 import QRCode from "qrcode";
+import { GoogleMap, Marker } from "@react-google-maps/api"; // 🚀 新增
 import LoggerService from "../services/LoggerService";
 import Logo from "../components/Logo";
 import NavigationBar from "../components/home/NavigationBar";
+import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
+import { systemSettingsService } from "../services/supabase"; // 🚀 新增
 
 // 注入样式
 if (typeof document !== "undefined") {
@@ -302,6 +305,12 @@ const ProfilePage: React.FC = () => {
   const [isSavingStatus, setIsSavingStatus] = useState(false); // 🚀 新增：保存状态反馈
   const [isGuest, setIsGuest] = useState(false); // 🚀 新增：访客状态
 
+  // 🚀 新增：Google Maps 加载 (用于 OrderModal)
+  const { isLoaded: isMapLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "",
+    libraries: ["places"] as any[],
+  });
+
   // 🚀 新增：导出对账单状态
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportStartDate, setExportStartDate] = useState(() => {
@@ -338,10 +347,70 @@ const ProfilePage: React.FC = () => {
   const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [isUploadingReviewImage, setIsUploadingReviewImage] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [showOrderSuccessModal, setShowOrderSuccessModal] = useState(false); // 🚀 新增
+  const [orderSubmitStatus, setOrderSubmitStatus] = useState<
+    "idle" | "processing" | "success" | "failed"
+  >("idle"); // 🚀 新增
+  const [orderError, setOrderError] = useState(""); // 🚀 新增
+  const [generatedOrderId, setGeneratedOrderId] = useState(""); // 🚀 新增
+  const [qrCodeDataUrlOrder, setQrCodeDataUrlOrder] = useState(""); // 🚀 新增 (区分于寄件码)
+  const [showMapModal, setShowMapModal] = useState(false); // 🚀 新增
+  const [mapSelectionType, setMapSelectionType] = useState<
+    "sender" | "receiver" | null
+  >(null); // 🚀 新增
+  const [mapClickPosition, setMapClickPosition] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null); // 🚀 新增
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(
     new Set(),
   );
   const reviewImageInputRef = useRef<HTMLInputElement>(null);
+
+  // 🚀 新增：立即下单相关状态 (对齐 HomePage)
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [senderName, setSenderName] = useState("");
+  const [senderPhone, setSenderPhone] = useState("");
+  const [senderAddressText, setSenderAddressText] = useState("");
+  const [receiverName, setReceiverName] = useState("");
+  const [receiverPhone, setReceiverPhone] = useState("");
+  const [receiverAddressText, setReceiverAddressText] = useState("");
+  const [description, setDescription] = useState("");
+  const [codAmount, setCodAmount] = useState("");
+  const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState("");
+  const [showTimePickerModal, setShowTimePickerModal] = useState(false);
+  const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState("");
+  const [showWeightInput, setShowWeightInput] = useState(false);
+  const [isCalculated, setIsCalculated] = useState(false);
+  const [calculatedPriceDetail, setCalculatedPriceDetail] = useState(0);
+  const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState(0);
+  const [hasCOD, setHasCOD] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState<"qr" | "cash" | "balance">(
+    "cash",
+  );
+  const [selectedSenderLocation, setSelectedSenderLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [selectedReceiverLocation, setSelectedReceiverLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<
+    Record<string, number>
+  >({});
+  const [cartTotal, setCartTotal] = useState(0);
+  const [pricingSettings, setPricingSettings] = useState({
+    baseFee: 1500,
+    perKmFee: 250,
+    weightSurcharge: 150,
+    urgentSurcharge: 500,
+    oversizeSurcharge: 300,
+    scheduledSurcharge: 200,
+    fragileSurcharge: 300,
+    foodBeverageSurcharge: 300,
+    freeKmThreshold: 3,
+  });
 
   const lastBroadcastCountRef = useRef<number>(0); // 🚀 新增：上次播报的订单数
   const lastVoiceTimeRef = useRef<number>(0); // 🚀 新增：上次播报的时间
@@ -1129,6 +1198,279 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error("回复失败:", error);
+    }
+  };
+
+  // 加载价格配置
+  const loadPricingSettings = useCallback(async (region?: string) => {
+    try {
+      const settings = await systemSettingsService.getPricingSettings(region);
+      setPricingSettings({
+        baseFee: settings.baseFee,
+        perKmFee: settings.perKmFee,
+        weightSurcharge: settings.weightSurcharge,
+        urgentSurcharge: settings.urgentSurcharge,
+        oversizeSurcharge: settings.oversizeSurcharge,
+        scheduledSurcharge: settings.scheduledSurcharge,
+        fragileSurcharge: settings.fragileSurcharge,
+        foodBeverageSurcharge: settings.foodBeverageSurcharge,
+        freeKmThreshold: settings.freeKmThreshold,
+      });
+    } catch (error) {
+      console.error("加载价格设置失败:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPricingSettings();
+  }, [loadPricingSettings]);
+
+  // 🚀 新增：打开立即下单窗口
+  const handleOpenPlaceOrder = () => {
+    if (!currentUser) return;
+
+    // 自动填充商家信息 (寄件人)
+    setSenderName(currentUser.name || "");
+    setSenderPhone(currentUser.phone || currentUser.email || "");
+
+    if (storeInfo) {
+      if (storeInfo.latitude && storeInfo.longitude) {
+        const formattedAddress = `${storeInfo.address}\n📍 坐标: ${storeInfo.latitude.toFixed(6)}, ${storeInfo.longitude.toFixed(6)}`;
+        setSenderAddressText(formattedAddress);
+        setSelectedSenderLocation({
+          lat: storeInfo.latitude,
+          lng: storeInfo.longitude,
+        });
+      } else {
+        setSenderAddressText(storeInfo.address || "");
+      }
+    } else {
+      setSenderAddressText(currentUser.address || "");
+    }
+
+    // 重置其他字段
+    setReceiverName("");
+    setReceiverPhone("");
+    setReceiverAddressText("");
+    setCodAmount("");
+    setDescription("");
+    setSelectedProducts({});
+    setCartTotal(0);
+    setIsCalculated(false);
+    setShowOrderForm(true);
+  };
+
+  // 🚀 新增：处理商品数量变化 (对齐 HomePage)
+  const handleProductQuantityChange = (productId: string, delta: number) => {
+    setSelectedProducts((prev) => {
+      const currentQty = prev[productId] || 0;
+      const newQty = Math.max(0, currentQty + delta);
+      const newMap = { ...prev };
+      if (newQty === 0) {
+        delete newMap[productId];
+      } else {
+        newMap[productId] = newQty;
+      }
+      return newMap;
+    });
+  };
+
+  // 🚀 新增：自动更新描述和代收金额 (对齐 HomePage)
+  useEffect(() => {
+    if (Object.keys(selectedProducts).length > 0) {
+      let totalProductPrice = 0;
+      let productDetails: string[] = [];
+
+      Object.entries(selectedProducts).forEach(([id, qty]) => {
+        const product = merchantProducts.find((p) => p.id === id);
+        if (product) {
+          totalProductPrice += product.price * qty;
+          productDetails.push(`${product.name} x${qty}`);
+        }
+      });
+
+      if (totalProductPrice > 0) {
+        setCartTotal(totalProductPrice);
+        setCodAmount(hasCOD ? totalProductPrice.toString() : "0");
+
+        const selectedProductsText =
+          language === "zh"
+            ? "已选商品"
+            : language === "en"
+              ? "Selected"
+              : "ရွေးချယ်ထားသောပစ္စည်း";
+        const balancePaymentText =
+          language === "zh"
+            ? "余额支付"
+            : language === "en"
+              ? "Balance Payment"
+              : "လက်ကျန်ငွေဖြင့် ပေးချေခြင်း";
+        const productsText = `[${selectedProductsText}: ${productDetails.join(", ")}][${balancePaymentText}: ${totalProductPrice.toLocaleString()} MMK]`;
+
+        const cleanDesc = description
+          .replace(
+            /\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]|\[商品费用（仅余额支付）:.*?\]|\[Item Cost \(Balance Only\):.*?\]|\[ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\):.*?\]/g,
+            "",
+          )
+          .trim();
+        setDescription(`${productsText} ${cleanDesc}`.trim());
+      }
+    } else {
+      setCartTotal(0);
+      setCodAmount("0");
+    }
+  }, [selectedProducts, hasCOD, language]);
+
+  // 🚀 新增：估算价格 (对齐 HomePage)
+  const calculatePriceEstimate = async () => {
+    if (!selectedSenderLocation || !selectedReceiverLocation) {
+      alert(
+        language === "zh"
+          ? "请先在地图上选择寄件和收件位置"
+          : "Please select locations on map",
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // 计算距离 (简化版，实际应调用 Google Distance Matrix)
+      const dist = packageService.calculateDistance(
+        selectedSenderLocation.lat,
+        selectedSenderLocation.lng,
+        selectedReceiverLocation.lat,
+        selectedReceiverLocation.lng,
+      );
+
+      setCalculatedDistanceDetail(dist);
+
+      // 这里根据 pricingSettings 计算价格
+      const base = pricingSettings.baseFee;
+      const kmFee =
+        Math.max(0, dist - pricingSettings.freeKmThreshold) *
+        pricingSettings.perKmFee;
+
+      // 简单估算，不包含所有附加费
+      const total = base + kmFee;
+
+      setCalculatedPriceDetail(total);
+      setIsCalculated(true);
+    } catch (error) {
+      console.error("价格估算失败:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🚀 新增：提交订单 (对齐 HomePage)
+  const handleOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !isCalculated) return;
+
+    try {
+      setOrderSubmitStatus("processing");
+      setShowOrderSuccessModal(true);
+
+      // 构造订单 ID
+      const now = new Date();
+      const myanmarTime = new Date(
+        now.toLocaleString("en-US", { timeZone: "Asia/Yangon" }),
+      );
+      const datePart = myanmarTime.toISOString().slice(2, 10).replace(/-/g, "");
+      const randomPart = Math.floor(1000 + Math.random() * 9000);
+      const orderId = `MDY${datePart}${randomPart}`;
+      setGeneratedOrderId(orderId);
+
+      const orderData = {
+        id: orderId,
+        customer_id: currentUser.id,
+        customer_email: currentUser.email || currentUser.store_code,
+        sender_name: senderName,
+        sender_phone: senderPhone,
+        sender_address: senderAddressText,
+        sender_latitude: selectedSenderLocation?.lat,
+        sender_longitude: selectedSenderLocation?.lng,
+        receiver_name: receiverName,
+        receiver_phone: receiverPhone,
+        receiver_address: receiverAddressText,
+        receiver_latitude: selectedReceiverLocation?.lat,
+        receiver_longitude: selectedReceiverLocation?.lng,
+        package_type: "标准件",
+        weight: "1.0",
+        description: description,
+        price: `${calculatedPriceDetail} MMK`,
+        delivery_distance: calculatedDistanceDetail,
+        status: "待取件",
+        payment_method: paymentMethod,
+        cod_amount: parseFloat(codAmount) || 0,
+        delivery_store_id: currentUser.store_id || currentUser.id,
+      };
+
+      const result = await packageService.createPackage(orderData);
+      if (result.success) {
+        // 生成二维码
+        const qrUrl = await QRCode.toDataURL(orderId, { width: 300 });
+        setQrCodeDataUrlOrder(qrUrl);
+        setOrderSubmitStatus("success");
+        setShowOrderForm(false);
+        loadUserPackages(); // 刷新列表
+      } else {
+        throw new Error(result.error?.message || "Unknown error");
+      }
+    } catch (error: any) {
+      console.error("下单失败:", error);
+      setOrderSubmitStatus("failed");
+      setOrderError(error.message || "下单失败，请重试");
+    }
+  };
+
+  // 🚀 新增：处理地图弹窗打开
+  const handleOpenMapModal = (type: "sender" | "receiver") => {
+    setMapSelectionType(type);
+    setShowMapModal(true);
+  };
+
+  // 🚀 新增：地图点击处理
+  const onMapClick = (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      setMapClickPosition({ lat, lng });
+    }
+  };
+
+  // 🚀 新增：确认地图选择
+  const confirmMapSelection = () => {
+    if (!mapClickPosition) return;
+
+    if (mapSelectionType === "sender") {
+      setSelectedSenderLocation(mapClickPosition);
+      setSenderAddressText(
+        (prev) =>
+          prev.split("\n📍 坐标:")[0] +
+          `\n📍 坐标: ${mapClickPosition.lat.toFixed(6)}, ${mapClickPosition.lng.toFixed(6)}`,
+      );
+    } else {
+      setSelectedReceiverLocation(mapClickPosition);
+      setReceiverAddressText(
+        (prev) =>
+          prev.split("\n📍 坐标:")[0] +
+          `\n📍 坐标: ${mapClickPosition.lat.toFixed(6)}, ${mapClickPosition.lng.toFixed(6)}`,
+      );
+    }
+    setShowMapModal(false);
+    setMapClickPosition(null);
+  };
+
+  // 🚀 新增：下载订单二维码
+  const downloadOrderQRCode = () => {
+    if (qrCodeDataUrlOrder && generatedOrderId) {
+      const link = document.createElement("a");
+      link.download = `订单二维码_${generatedOrderId}.png`;
+      link.href = qrCodeDataUrlOrder;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -2534,6 +2876,48 @@ const ProfilePage: React.FC = () => {
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "1rem" }}
                 >
+                  {/* 🚀 新增：立即下单按钮 */}
+                  {currentUser && isPartnerStore && (
+                    <button
+                      onClick={handleOpenPlaceOrder}
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                        color: "white",
+                        border: "none",
+                        padding: "0.6rem 1.5rem",
+                        borderRadius: "14px",
+                        fontSize: "0.95rem",
+                        fontWeight: "800",
+                        cursor: "pointer",
+                        transition: "all 0.3s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.6rem",
+                        whiteSpace: "nowrap",
+                        backdropFilter: "blur(10px)",
+                        boxShadow: "0 4px 15px rgba(245, 158, 11, 0.4)",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow =
+                          "0 6px 20px rgba(245, 158, 11, 0.5)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow =
+                          "0 4px 15px rgba(245, 158, 11, 0.4)";
+                      }}
+                    >
+                      <span style={{ fontSize: "1.1rem" }}>🚀</span>
+                      {language === "zh"
+                        ? "立即下单"
+                        : language === "en"
+                          ? "Place Order"
+                          : "အော်ဒါတင်မည်"}
+                    </button>
+                  )}
+
                   {/* 编辑资料按钮 */}
                   <button
                     onClick={handleOpenEditProfile}
@@ -10633,6 +11017,334 @@ const ProfilePage: React.FC = () => {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* 🚀 新增：立即下单模态框 */}
+      <OrderModal
+        showOrderForm={showOrderForm}
+        setShowOrderForm={setShowOrderForm}
+        language={language}
+        t={allT}
+        currentUser={currentUser}
+        senderName={senderName}
+        setSenderName={setSenderName}
+        senderPhone={senderPhone}
+        setSenderPhone={setSenderPhone}
+        senderAddressText={senderAddressText}
+        setSenderAddressText={setSenderAddressText}
+        receiverName={receiverName}
+        setReceiverName={setReceiverName}
+        receiverPhone={receiverPhone}
+        setReceiverPhone={setReceiverPhone}
+        receiverAddressText={receiverAddressText}
+        setReceiverAddressText={setReceiverAddressText}
+        codAmount={codAmount}
+        setCodAmount={setCodAmount}
+        selectedDeliverySpeed={selectedDeliverySpeed}
+        setSelectedDeliverySpeed={setSelectedDeliverySpeed}
+        setShowTimePickerModal={setShowTimePickerModal}
+        scheduledDeliveryTime={scheduledDeliveryTime}
+        showWeightInput={showWeightInput}
+        setShowWeightInput={setShowWeightInput}
+        isCalculated={isCalculated}
+        calculatedPriceDetail={calculatedPriceDetail}
+        calculatedDistanceDetail={calculatedDistanceDetail}
+        pricingSettings={pricingSettings}
+        handleOpenMapModal={handleOpenMapModal}
+        calculatePriceEstimate={calculatePriceEstimate}
+        handleOrderSubmit={handleOrderSubmit}
+        setSelectedSenderLocation={setSelectedSenderLocation}
+        setSelectedReceiverLocation={setSelectedReceiverLocation}
+        merchantProducts={merchantProducts}
+        selectedProducts={selectedProducts}
+        handleProductQuantityChange={handleProductQuantityChange}
+        cartTotal={cartTotal}
+        hasCOD={hasCOD}
+        setHasCOD={setHasCOD}
+        description={description}
+        setDescription={setDescription}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        merchantStore={storeInfo}
+      />
+
+      {/* 🚀 新增：地图选择模态框 */}
+      {showMapModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 3000,
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: "2rem",
+              borderRadius: "20px",
+              width: "90%",
+              maxWidth: "800px",
+              height: "80vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "1rem",
+              }}
+            >
+              <h3>
+                {language === "zh"
+                  ? `选择${mapSelectionType === "sender" ? "寄件" : "收件"}位置`
+                  : `Select ${mapSelectionType === "sender" ? "Sender" : "Receiver"} Location`}
+              </h3>
+              <button
+                onClick={() => setShowMapModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.5rem",
+                  cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                position: "relative",
+                borderRadius: "15px",
+                overflow: "hidden",
+              }}
+            >
+              {isMapLoaded ? (
+                <GoogleMap
+                  mapContainerStyle={{ width: "100%", height: "100%" }}
+                  center={mapClickPosition || { lat: 21.95, lng: 96.08 }}
+                  zoom={13}
+                  onClick={onMapClick}
+                >
+                  {mapClickPosition && <Marker position={mapClickPosition} />}
+                </GoogleMap>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100%",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <div
+                    className="spinner"
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      border: "4px solid rgba(0,0,0,0.1)",
+                      borderTop: "4px solid #3b82f6",
+                      borderRadius: "50%",
+                    }}
+                  ></div>
+                </div>
+              )}
+            </div>
+            <div
+              style={{
+                marginTop: "1.5rem",
+                display: "flex",
+                gap: "1rem",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={() => setShowMapModal(false)}
+                style={{
+                  padding: "0.8rem 2rem",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "white",
+                  cursor: "pointer",
+                }}
+              >
+                {language === "zh" ? "取消" : "Cancel"}
+              </button>
+              <button
+                onClick={confirmMapSelection}
+                disabled={!mapClickPosition}
+                style={{
+                  padding: "0.8rem 2rem",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: "#3b82f6",
+                  color: "white",
+                  fontWeight: "bold",
+                  cursor: mapClickPosition ? "pointer" : "not-allowed",
+                  opacity: mapClickPosition ? 1 : 0.5,
+                }}
+              >
+                {language === "zh" ? "确认选择" : "Confirm Selection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 新增：订单成功模态框 */}
+      {showOrderSuccessModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.8)",
+            backdropFilter: "blur(10px)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 99999,
+          }}
+        >
+          <div
+            style={{
+              background: "linear-gradient(135deg, #1a365d 0%, #2c5282 100%)",
+              padding: "2rem",
+              borderRadius: "20px",
+              width: "90%",
+              maxWidth: "500px",
+              maxHeight: "90vh",
+              overflow: "auto",
+              boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.5rem",
+                paddingBottom: "1rem",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  color:
+                    orderSubmitStatus === "success" ? "#A5C7FF" : "#ff6b6b",
+                  fontSize: "1.5rem",
+                  fontWeight: "bold",
+                }}
+              >
+                {orderSubmitStatus === "success"
+                  ? "🎉 订单创建成功！"
+                  : orderSubmitStatus === "failed"
+                    ? "❌ 订单创建失败"
+                    : "⏳ 正在处理..."}
+              </h2>
+              <button
+                onClick={() => setShowOrderSuccessModal(false)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.1)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  color: "white",
+                  padding: "0.5rem",
+                  borderRadius: "50%",
+                  cursor: "pointer",
+                  fontSize: "1.2rem",
+                  width: "40px",
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {orderSubmitStatus === "success" && (
+              <div style={{ textAlign: "center", color: "white" }}>
+                <h3 style={{ color: "#A5C7FF", marginBottom: "1rem" }}>
+                  {language === "zh" ? "订单号" : "Order ID"}:{" "}
+                  {generatedOrderId}
+                </h3>
+                <div
+                  style={{
+                    background: "white",
+                    padding: "1rem",
+                    borderRadius: "15px",
+                    display: "inline-block",
+                    marginBottom: "1.5rem",
+                  }}
+                >
+                  {qrCodeDataUrlOrder && (
+                    <img
+                      src={qrCodeDataUrlOrder}
+                      alt="QR"
+                      style={{ width: "200px", height: "200px" }}
+                    />
+                  )}
+                </div>
+                <p style={{ opacity: 0.8, marginBottom: "2rem" }}>
+                  {language === "zh"
+                    ? "请妥善保管二维码，快递员取件时需扫描"
+                    : "Please keep this QR code, courier will scan it on pickup"}
+                </p>
+                <button
+                  onClick={downloadOrderQRCode}
+                  style={{
+                    width: "100%",
+                    padding: "1rem",
+                    borderRadius: "12px",
+                    background: "#10b981",
+                    color: "white",
+                    border: "none",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  📥 {language === "zh" ? "下载二维码" : "Download QR Code"}
+                </button>
+              </div>
+            )}
+
+            {orderSubmitStatus === "failed" && (
+              <div style={{ color: "white", textAlign: "center" }}>
+                <p style={{ color: "#ff6b6b", fontWeight: "bold" }}>
+                  {orderError}
+                </p>
+                <button
+                  onClick={() => setShowOrderSuccessModal(false)}
+                  style={{
+                    marginTop: "2rem",
+                    padding: "0.8rem 2rem",
+                    borderRadius: "10px",
+                    background: "rgba(255,255,255,0.1)",
+                    color: "white",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                  }}
+                >
+                  {language === "zh" ? "返回重试" : "Retry"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
