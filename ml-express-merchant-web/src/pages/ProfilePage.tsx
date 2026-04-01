@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   packageService,
   supabase,
@@ -1478,6 +1478,26 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const location = useLocation();
+
+  // 🚀 响应侧边栏触发立即下单
+  useEffect(() => {
+    if (location.state && (location.state as any).triggerOrder) {
+      handleOpenPlaceOrder();
+      // 清除 state 防止重复触发
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, handleOpenPlaceOrder]);
+
+  useEffect(() => {
+    const handleTriggerOrder = () => {
+      handleOpenPlaceOrder();
+    };
+    window.addEventListener("trigger-place-order", handleTriggerOrder);
+    return () =>
+      window.removeEventListener("trigger-place-order", handleTriggerOrder);
+  }, [handleOpenPlaceOrder]);
+
   // 1. 加载用户包裹列表
   useEffect(() => {
     loadUserPackages();
@@ -2880,48 +2900,6 @@ const ProfilePage: React.FC = () => {
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "1rem" }}
                 >
-                  {/* 🚀 新增：立即下单按钮 */}
-                  {currentUser && isPartnerStore && (
-                    <button
-                      onClick={handleOpenPlaceOrder}
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                        color: "white",
-                        border: "none",
-                        padding: "0.6rem 1.5rem",
-                        borderRadius: "14px",
-                        fontSize: "0.95rem",
-                        fontWeight: "800",
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.6rem",
-                        whiteSpace: "nowrap",
-                        backdropFilter: "blur(10px)",
-                        boxShadow: "0 4px 15px rgba(245, 158, 11, 0.4)",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow =
-                          "0 6px 20px rgba(245, 158, 11, 0.5)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow =
-                          "0 4px 15px rgba(245, 158, 11, 0.4)";
-                      }}
-                    >
-                      <span style={{ fontSize: "1.1rem" }}>🚀</span>
-                      {language === "zh"
-                        ? "立即下单"
-                        : language === "en"
-                          ? "Place Order"
-                          : "အော်ဒါတင်မည်"}
-                    </button>
-                  )}
-
                   {/* 编辑资料按钮 */}
                   <button
                     onClick={handleOpenEditProfile}
