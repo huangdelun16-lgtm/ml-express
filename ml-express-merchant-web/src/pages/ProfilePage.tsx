@@ -1411,7 +1411,7 @@ const ProfilePage: React.FC = () => {
       };
 
       const result = await packageService.createPackage(orderData);
-      if (result.success) {
+      if (result) {
         // 生成二维码
         const qrUrl = await QRCode.toDataURL(orderId, { width: 300 });
         setQrCodeDataUrlOrder(qrUrl);
@@ -1419,7 +1419,7 @@ const ProfilePage: React.FC = () => {
         setShowOrderForm(false);
         loadUserPackages(); // 刷新列表
       } else {
-        throw new Error(result.error?.message || "Unknown error");
+        throw new Error("Unknown error during package creation");
       }
     } catch (error: any) {
       console.error("下单失败:", error);
