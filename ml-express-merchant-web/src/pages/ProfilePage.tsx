@@ -11,18 +11,18 @@ import {
   reviewService,
   StoreReview,
   userService,
+  systemSettingsService,
 } from "../services/supabase";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import * as XLSX from "xlsx";
 import QRCode from "qrcode";
-import { GoogleMap, Marker } from "@react-google-maps/api"; // 🚀 新增
+import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api"; // 🚀 新增
 import LoggerService from "../services/LoggerService";
 import Logo from "../components/Logo";
 import NavigationBar from "../components/home/NavigationBar";
 import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
-import { systemSettingsService } from "../services/supabase"; // 🚀 新增
 
 // 注入样式
 if (typeof document !== "undefined") {
