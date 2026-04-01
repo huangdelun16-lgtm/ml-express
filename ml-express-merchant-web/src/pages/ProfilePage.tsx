@@ -1282,7 +1282,7 @@ const ProfilePage: React.FC = () => {
       let productDetails: string[] = [];
 
       Object.entries(selectedProducts).forEach(([id, qty]) => {
-        const product = merchantProducts.find((p) => p.id === id);
+        const product = products.find((p) => p.id === id);
         if (product) {
           totalProductPrice += product.price * qty;
           productDetails.push(`${product.name} x${qty}`);
@@ -11056,7 +11056,7 @@ const ProfilePage: React.FC = () => {
         handleOrderSubmit={handleOrderSubmit}
         setSelectedSenderLocation={setSelectedSenderLocation}
         setSelectedReceiverLocation={setSelectedReceiverLocation}
-        merchantProducts={merchantProducts}
+        merchantProducts={products}
         selectedProducts={selectedProducts}
         handleProductQuantityChange={handleProductQuantityChange}
         cartTotal={cartTotal}
