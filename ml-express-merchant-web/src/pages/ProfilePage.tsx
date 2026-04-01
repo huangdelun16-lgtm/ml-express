@@ -1381,7 +1381,7 @@ const ProfilePage: React.FC = () => {
       const orderId = `MDY${datePart}${randomPart}`;
       setGeneratedOrderId(orderId);
 
-      const orderData = {
+      const orderData: any = {
         id: orderId,
         customer_id: currentUser.id,
         customer_email: currentUser.email || currentUser.store_code,
@@ -1404,6 +1404,10 @@ const ProfilePage: React.FC = () => {
         payment_method: paymentMethod,
         cod_amount: parseFloat(codAmount) || 0,
         delivery_store_id: currentUser.store_id || currentUser.id,
+        create_time: now.toLocaleString("zh-CN"),
+        pickup_time: "",
+        delivery_time: "",
+        courier: "待分配",
       };
 
       const result = await packageService.createPackage(orderData);
