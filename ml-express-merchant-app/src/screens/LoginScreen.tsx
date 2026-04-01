@@ -90,28 +90,76 @@ export default function LoginScreen({ navigation }: any) {
     showLoading(currentT.loggingIn);
 
     try {
-      const storeCode = email.trim();
+      // 🚀 核心优化：增加网络状态预检
+      const NetInfo = require("@react-native-community/netinfo").default;
+      const state = await NetInfo.fetch();
+      if (!state.isConnected) {
+        hideLoading();
+        feedbackService.error(
+          language === "zh"
+            ? "网络连接不可用，请检查您的网络设置"
+            : "Network connection unavailable, please check your settings.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      const storeCodeInput = email.trim().toUpperCase(); // 🚀 强制转大写，处理大小写输入问题
       const { data: store, error: storeError } = await supabase
-        .from('delivery_stores')
-        .select('*')
-        .eq('store_code', storeCode)
+        .from("delivery_stores")
+        .select("*")
+        .eq("store_code", storeCodeInput)
         .maybeSingle();
 
       hideLoading();
 
       if (storeError) {
-        LoggerService.error('查询合伙店铺失败:', storeError);
-        feedbackService.error(currentT.queryStoreFailed);
+        LoggerService.error("查询合伙店铺失败:", storeError);
+        feedbackService.error(`${currentT.queryStoreFailed} (${storeError.message})`); // 🚀 增加具体错误信息
         return;
       }
 
       if (!store) {
-        feedbackService.error(currentT.storeNotFound);
+        // 🚀 额外检查：是否误用了其他类型的账号尝试登录商家端
+        const { data: userData } = await supabase
+          .from("users")
+          .select("id, user_type")
+          .or(`email.eq.${storeCodeInput},phone.eq.${storeCodeInput}`)
+          .maybeSingle();
+
+        if (userData) {
+          let errorMsg =
+            language === "zh"
+              ? "检测到非商家账号。请使用商家专属代码登录。"
+              : "Non-merchant account detected. Please use your Merchant Store Code.";
+
+          if (userData.user_type === "admin") {
+            errorMsg =
+              language === "zh"
+                ? "检测到管理员账号。本 App 仅供商家使用，请前往管理后台。"
+                : "Admin account detected. This app is for Merchants only.";
+          }
+
+          feedbackService.error(errorMsg);
+        } else {
+          feedbackService.error(currentT.storeNotFound);
+        }
         return;
       }
 
-      if (store.password !== password) {
+      // 🚀 逻辑修正：密码对比也应进行 trim
+      if (store.password?.trim() !== password.trim()) {
         feedbackService.error(currentT.storePasswordError);
+        return;
+      }
+
+      // 🚀 核心优化：检查商家账号状态
+      if (store.status && store.status !== "active") {
+        feedbackService.error(
+          language === "zh"
+            ? `账号状态异常 (${store.status})，请联系管理员。`
+            : `Account status issue (${store.status}). Please contact admin.`,
+        );
         return;
       }
 
@@ -135,13 +183,18 @@ export default function LoginScreen({ navigation }: any) {
       };
 
       const newSessionId = `SESS_MER_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      
-      await supabase
-        .from('delivery_stores')
-        .update({ current_session_id: newSessionId })
-        .eq('id', store.id);
 
-      await AsyncStorage.setItem('currentUser', JSON.stringify(merchantsUser));
+      // 🚀 核心优化：更新会话 ID 改为非阻塞式，防止由于 RLS 或网络波动导致登录失败
+      try {
+        await supabase
+          .from("delivery_stores")
+          .update({ current_session_id: newSessionId })
+          .eq("id", store.id);
+      } catch (sessErr) {
+        console.warn("更新会话失败，但不影响本次登录:", sessErr);
+      }
+
+      await AsyncStorage.setItem("currentUser", JSON.stringify(merchantsUser));
       await AsyncStorage.setItem('userId', store.id);
       await AsyncStorage.setItem('userEmail', store.email || store.store_code);
       await AsyncStorage.setItem('userName', store.store_name);
@@ -223,7 +276,9 @@ export default function LoginScreen({ navigation }: any) {
                 placeholderTextColor="#94a3b8"
                 value={email}
                 onChangeText={setEmail}
-                autoCapitalize="none"
+                autoCapitalize="characters" // 🚀 自动转大写，匹配 MDY001 格式
+                autoCorrect={false}
+                spellCheck={false}
               />
             </View>
 

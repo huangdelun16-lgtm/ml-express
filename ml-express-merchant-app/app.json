@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.merchants",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages. / 需要位置信息以提供准确的配送服务。 / တိကျသော ပို့ဆောင်ရေးဝန်ဆောင်မှုအတွက် တည်နေရာလိုအပ်ပါသည်။",
@@ -29,7 +29,7 @@
         "CFBundleDisplayName": "ML MERCHANTS",
         "CFBundleName": "ML MERCHANTS",
         "CFBundleShortVersionString": "2.0.0",
-        "CFBundleVersion": "1",
+        "CFBundleVersion": "2",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
         "UIRequiredDeviceCapabilities": [
@@ -61,7 +61,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.merchants",
-      "versionCode": 1,
+      "versionCode": 2,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
