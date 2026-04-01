@@ -10,6 +10,12 @@
   NETLIFY_SKIP_PLUGINS = "true"
 
 [[redirects]]
+  from = "/download"
+  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-merchants.apk"
+  status = 302
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
