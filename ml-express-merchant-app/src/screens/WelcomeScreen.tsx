@@ -193,7 +193,9 @@ export default function WelcomeScreen({ navigation }: any) {
             ]}
           >
             {/* 徽标背景光晕 */}
-            <Animated.View style={[styles.logoGlow, { transform: [{ scale: pulseAnim }] }]} />
+            <Animated.View
+              style={[styles.logoGlow, { transform: [{ scale: pulseAnim }] }]}
+            />
             <View style={styles.logoCircle}>
               {dynamicScreen?.image_url ? (
                 <Image
@@ -203,42 +205,24 @@ export default function WelcomeScreen({ navigation }: any) {
                 />
               ) : (
                 <Image
-                  source={require('../../assets/logo-large.png')}
-                  style={styles.logo}
+                  source={require("../../assets/logo-large.png")}
+                  style={{ width: 220, height: 220 }}
                   resizeMode="contain"
                 />
               )}
             </View>
           </Animated.View>
 
-          <Animated.View 
+          <Animated.View
             style={[
               styles.textContainer,
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
-              }
+              },
             ]}
           >
-            <Text style={styles.welcomeTitle}>
-              {dynamicScreen ? 
-                (language === 'zh' ? dynamicScreen.title_zh : (language === 'en' ? (dynamicScreen.title_en || dynamicScreen.title_zh) : (dynamicScreen.title_my || dynamicScreen.title_zh))) 
-                : currentT.welcomeTitle}
-            </Text>
-            
-            <View style={styles.brandContainer}>
-              <Text style={styles.brandName}>MARKET LINK</Text>
-              <Text style={styles.brandExpress}>EXPRESS</Text>
-            </View>
-
-            <View style={styles.dividerContainer}>
-              <LinearGradient
-                colors={['transparent', 'rgba(255,255,255,0.5)', 'transparent']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.dividerLine}
-              />
-            </View>
+            {/* 🚀 移除冗余的文本标题，因为新 Logo 已包含完整品牌信息 */}
 
             <Text style={styles.description}>
               {dynamicScreen ? 

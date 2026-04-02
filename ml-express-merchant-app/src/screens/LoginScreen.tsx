@@ -249,22 +249,12 @@ export default function LoginScreen({ navigation }: any) {
           <LanguageSelector />
 
           <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-              <Image
-                source={require('../../assets/logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={styles.appTitleContainer}>
-              <Text style={styles.appTitleMain}>MARKET LINK </Text>
-              <Text style={styles.appTitleExpress}>EXPRESS</Text>
-            </View>
-            <View style={styles.divider}>
-              <View style={styles.line} />
-              <Text style={styles.dividerText}>MERCHANTS</Text>
-              <View style={styles.line} />
-            </View>
+            <Image
+              source={require("../../assets/logo.png")}
+              style={{ width: 200, height: 200 }}
+              resizeMode="contain"
+            />
+            {/* 🚀 移除冗余的文本标题，因为新 Logo 已包含完整品牌信息 */}
           </View>
 
           <View style={styles.formContainer}>
