@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { packageService, supabase } from '../services/supabase';
@@ -372,7 +373,9 @@ export default function ProfileScreen({ navigation }: any) {
 
         {/* 版本信息 */}
         <View style={styles.footer}>
-          <Text style={styles.version}>Market Link Staff v1.1.2</Text>
+          <Text style={styles.version}>
+            MARKET LINK STAFF v{Constants.expoConfig?.version ?? '2.2.0'}
+          </Text>
           <Text style={styles.copyright}>© 2025 Market Link Express</Text>
         </View>
       </ScrollView>

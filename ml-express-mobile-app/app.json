@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ML Express Staff",
+    "name": "MARKET LINK STAFF",
     "slug": "MarketLinkStaffApp",
     "version": "2.2.0",
     "scheme": "ml-express-staff",
@@ -18,6 +18,8 @@
       "bundleIdentifier": "com.mlexpress.courier",
       "buildNumber": "10",
       "infoPlist": {
+        "CFBundleDisplayName": "MARKET LINK STAFF",
+        "CFBundleName": "MARKET LINK STAFF",
         "LSApplicationQueriesSchemes": [
           "comgooglemaps",
           "maps"

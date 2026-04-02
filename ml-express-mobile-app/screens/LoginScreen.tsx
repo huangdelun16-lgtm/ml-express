@@ -221,7 +221,7 @@ export default function LoginScreen({ navigation }: any) {
                 />
               </View>
             </View>
-            <Text style={styles.title}>MARKET LINK EXPRESS</Text>
+            <Text style={styles.title}>MARKET LINK STAFF</Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>COURIER PORTAL</Text>
             </View>

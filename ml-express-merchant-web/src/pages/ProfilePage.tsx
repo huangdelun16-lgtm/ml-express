@@ -53,7 +53,7 @@ const OrderQRCode: React.FC<{ orderId: string }> = ({ orderId }) => {
 };
 
 // 🚀 新增：高级滚动时间选择器组件
-const TimeWheelPicker: React.FC<{
+const TimeWheelPicker: React.FC<{ 
   value: string;
   onChange: (val: string) => void;
   label: string;
@@ -62,11 +62,11 @@ const TimeWheelPicker: React.FC<{
   const parts = (value || "09:00").split(":");
   const hour = parts[0] || "09";
   const minute = parts[1] || "00";
-
+  
   const handleHourChange = (newHour: string) => {
     onChange(`${newHour.padStart(2, "0")}:${minute}`);
   };
-
+  
   const handleMinuteChange = (newMinute: string) => {
     onChange(`${hour}:${newMinute.padStart(2, "0")}`);
   };
@@ -81,7 +81,7 @@ const TimeWheelPicker: React.FC<{
         display: "flex",
         flexDirection: "column",
         gap: "1.2rem",
-        flex: 1,
+      flex: 1,
         minWidth: "200px",
       }}
     >
@@ -98,7 +98,7 @@ const TimeWheelPicker: React.FC<{
       >
         <span style={{ fontSize: "1.2rem" }}>{icon}</span> {label}
       </div>
-
+      
       <div
         style={{
           display: "flex",
@@ -121,7 +121,7 @@ const TimeWheelPicker: React.FC<{
             gap: "5px",
           }}
         >
-          <button
+          <button 
             onClick={() => handleHourChange(String((parseInt(hour) + 1) % 24))}
             style={{
               background: "rgba(255,255,255,0.1)",
@@ -149,7 +149,7 @@ const TimeWheelPicker: React.FC<{
           >
             {hour.padStart(2, "0")}
           </div>
-          <button
+          <button 
             onClick={() =>
               handleHourChange(String((parseInt(hour) - 1 + 24) % 24))
             }
@@ -190,7 +190,7 @@ const TimeWheelPicker: React.FC<{
             gap: "5px",
           }}
         >
-          <button
+          <button 
             onClick={() =>
               handleMinuteChange(String((parseInt(minute) + 5) % 60))
             }
@@ -220,7 +220,7 @@ const TimeWheelPicker: React.FC<{
           >
             {minute.padStart(2, "0")}
           </div>
-          <button
+          <button 
             onClick={() =>
               handleMinuteChange(String((parseInt(minute) - 5 + 60) % 60))
             }
@@ -326,7 +326,7 @@ const ProfilePage: React.FC = () => {
   const [exportMethod, setExportMethod] = useState<"download" | "email">(
     "download",
   );
-
+  
   // 🚀 新增：评价管理状态
   const [showReviewsModal, setShowReviewsModal] = useState(false);
   const [storeReviews, setStoreReviews] = useState<StoreReview[]>([]);
@@ -421,7 +421,7 @@ const ProfilePage: React.FC = () => {
     if ("speechSynthesis" in window) {
       // 停止当前的，防止堆叠
       window.speechSynthesis.cancel();
-
+      
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "zh-CN";
       utterance.rate = 1.0;
@@ -526,16 +526,16 @@ const ProfilePage: React.FC = () => {
     const endParts = end.split(":");
     const h = parseInt(endParts[0] || "21");
     const m = parseInt(endParts[1] || "00");
-
+    
     const newH = (h + 1) % 24;
     const newTime = `${String(newH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     const newHours = `${start} - ${newTime}`;
-
+    
     setBusinessStatus((prev) => ({
       ...prev,
       operating_hours: newHours,
     }));
-
+    
     // 🚀 立即保存到数据库
     await handleUpdateStoreStatus({ operating_hours: newHours });
   };
@@ -597,9 +597,9 @@ const ProfilePage: React.FC = () => {
         const result = await deliveryStoreService.updateStoreInfo(
           storeInfo.id,
           {
-            store_name: editProfileForm.name,
-            phone: editProfileForm.phone,
-            email: editProfileForm.email,
+          store_name: editProfileForm.name,
+          phone: editProfileForm.phone,
+          email: editProfileForm.email,
             address: editProfileForm.address,
           },
         );
@@ -648,7 +648,7 @@ const ProfilePage: React.FC = () => {
       setLoadingProducts(true);
       const data = await merchantService.getStoreProducts(currentUser.id);
       setProducts(data);
-
+      
       // 🚀 新增：构建商品价格映射
       const priceMap = data.reduce<Record<string, number>>((acc, product) => {
         acc[product.name] = product.price;
@@ -678,7 +678,7 @@ const ProfilePage: React.FC = () => {
 
   const handleOpenEditProduct = (product: Product) => {
     setEditingProduct(product);
-
+    
     // 计算优惠百分比
     let discountPercent = "";
     if (product.original_price && product.original_price > product.price) {
@@ -728,11 +728,11 @@ const ProfilePage: React.FC = () => {
 
     try {
       setLoadingProducts(true);
-
+      
       const price = parseFloat(productForm.price);
       const discountPercent = parseFloat(productForm.discount_percent);
       let originalPrice = undefined;
-
+      
       if (
         !isNaN(discountPercent) &&
         discountPercent > 0 &&
@@ -795,7 +795,7 @@ const ProfilePage: React.FC = () => {
 
   const toggleProductStatus = async (product: Product) => {
     try {
-      const result = await merchantService.updateProduct(product.id, {
+      const result = await merchantService.updateProduct(product.id, { 
         is_available: !product.is_available,
       });
       if (result.success) {
@@ -876,7 +876,7 @@ const ProfilePage: React.FC = () => {
 
     try {
       setLoading(true);
-
+      
       // 1. 状态恢复为“待取件”
       // 2. 寄件人改为当前中转站（确保骑手去正确地点取货）
       // 3. 清除旧骑手，重新进入分配队列
@@ -922,17 +922,17 @@ const ProfilePage: React.FC = () => {
   // 3. 否则检查用户的邮箱或手机号是否在 delivery_stores 表中
   const checkIfPartnerStore = useCallback(async (user: any) => {
     if (!user) return false;
-
+    
     // 方法1: 检查 user_type
     if (user.user_type === "merchant") {
       return true;
     }
-
+    
     // 方法2: 检查是否有 store_code 或 store_id
     if (user.store_code || user.store_id) {
       return true;
     }
-
+    
     try {
       // 方法3: 构建查询条件，检查用户的邮箱或手机号是否在 delivery_stores 表中
       const conditions: string[] = [];
@@ -942,12 +942,12 @@ const ProfilePage: React.FC = () => {
       if (user.phone) {
         conditions.push(`phone.eq.${user.phone}`);
       }
-
+      
       // 如果没有邮箱和手机号，无法判断
       if (conditions.length === 0) {
         return false;
       }
-
+      
       // 检查用户的邮箱或手机号是否在 delivery_stores 表中
       // 只有admin web中创建的合伙店铺账号才会在delivery_stores表中有记录
       const { data, error } = await supabase
@@ -955,12 +955,12 @@ const ProfilePage: React.FC = () => {
         .select("id")
         .or(conditions.join(","))
         .limit(1);
-
+      
       if (error) {
         LoggerService.error("检查合伙店铺失败:", error);
         return false;
       }
-
+      
       // 如果找到匹配的记录，说明是合伙店铺账号（在admin web中注册的）
       return data && data.length > 0;
     } catch (error) {
@@ -979,51 +979,51 @@ const ProfilePage: React.FC = () => {
         setUserBalance(user.balance || 0); // 🚀 获取余额
         setIsGuest(false);
 
-        // 🚀 实时从数据库同步最新余额和用户信息
-        if (user.id) {
-          try {
+      // 🚀 实时从数据库同步最新余额和用户信息
+      if (user.id) {
+        try {
             const isMerchant =
               user.user_type === "merchant" ||
               (await checkIfPartnerStore(user));
             const syncTable = isMerchant ? "delivery_stores" : "users";
-            const selectFields = isMerchant
+          const selectFields = isMerchant 
               ? "store_name, phone, email, address"
               : "balance, user_type, name, phone, email, address";
 
-            const { data: latestRaw, error: userError } = await supabase
-              .from(syncTable)
-              .select(selectFields)
+          const { data: latestRaw, error: userError } = await supabase
+            .from(syncTable)
+            .select(selectFields)
               .eq("id", user.id)
-              .maybeSingle();
-
-            if (!userError && latestRaw) {
+            .maybeSingle();
+          
+          if (!userError && latestRaw) {
               console.log("✅ Web端用户信息同步成功:", latestRaw);
-              const rawData = latestRaw as any;
-              const latestUser: any = { ...user, ...rawData };
-
-              if (isMerchant) {
-                latestUser.name = rawData.store_name;
+            const rawData = latestRaw as any;
+            const latestUser: any = { ...user, ...rawData };
+            
+            if (isMerchant) {
+              latestUser.name = rawData.store_name;
                 latestUser.user_type = "merchant";
-                setUserBalance(0);
-              } else {
-                setUserBalance(rawData.balance || 0);
-              }
+              setUserBalance(0);
+            } else {
+              setUserBalance(rawData.balance || 0);
+            }
 
-              setCurrentUser(latestUser);
+            setCurrentUser(latestUser);
               localStorage.setItem(
                 "ml-express-customer",
                 JSON.stringify(latestUser),
               );
-            }
-          } catch (error) {
-            console.warn("获取最新用户信息失败");
           }
+        } catch (error) {
+            console.warn("获取最新用户信息失败");
         }
-
+      }
+        
         // 检查是否是合伙店铺账户
         const isPartner = true; // 🚀 商家端强制为 true
         setIsPartnerStore(true);
-
+        
         // 如果是合伙店铺，加载店铺信息
         if (isPartner && (user.store_code || user.store_id)) {
           try {
@@ -1041,7 +1041,7 @@ const ProfilePage: React.FC = () => {
             }
 
             const { data: store, error } = await query.maybeSingle();
-
+            
             if (!error && store) {
               setStoreInfo(store);
               setBusinessStatus({
@@ -1073,12 +1073,12 @@ const ProfilePage: React.FC = () => {
       setLoading(false);
       return;
     }
-
+    
     setLoading(true);
     try {
       // 🚀 核心优化：移除所有账号的注册时间限制，确保 Web 端与 App 端数据完全同步一致
       const queryStartDate = undefined;
-
+      
       const packages = await packageService.getPackagesByUser(
         currentUser.email,
         currentUser.phone,
@@ -1087,7 +1087,7 @@ const ProfilePage: React.FC = () => {
         currentUser.id,
         isPartnerStore ? currentUser.name : undefined,
       );
-
+      
       setUserPackages(packages);
 
       // 🚀 新增：获取已评价的订单ID列表
@@ -1096,7 +1096,7 @@ const ProfilePage: React.FC = () => {
           .from("store_reviews")
           .select("order_id")
           .eq("user_id", currentUser.id);
-
+        
         if (reviews) {
           setReviewedOrderIds(new Set(reviews.map((r) => r.order_id)));
         }
@@ -1153,11 +1153,11 @@ const ProfilePage: React.FC = () => {
   const loadStoreReviews = useCallback(async () => {
     // 🚀 核心优化：确保商家账号使用正确的 store_id 关联评价
     const storeId = storeInfo?.id || currentUser?.store_id || currentUser?.id;
-
+    
     if (!storeId || !isPartnerStore) {
       return;
     }
-
+    
     try {
       setLoadingReviews(true);
       const { data: rawReviews, error: reviewsError } = await supabase
@@ -1530,7 +1530,7 @@ const ProfilePage: React.FC = () => {
     const timer = setInterval(async () => {
       try {
         const storeId = currentUser.store_id || currentUser.id;
-
+        
         // 🚀 修正：仅查询该商家的“待确认”订单（从商城进来的新订单）
         const { count, error } = await supabase
           .from("packages")
@@ -1550,20 +1550,20 @@ const ProfilePage: React.FC = () => {
           // 🚀 播报逻辑
           if (count > 0 && isVoiceEnabled) {
             const now = Date.now();
-
+            
             // 情况1：有新订单进来（数量增加）
             if (count > lastBroadcastCountRef.current) {
               console.log("🚨 检测到新待确认订单!", count);
               speakNotification("你有新的订单 请接单");
               // 🚀 核心：自动刷新包裹列表，让新订单“弹出来”显示在卡片里
               loadUserPackages();
-            }
+            } 
             // 情况2：仍然有待确认订单，且距离上次播报超过 60 秒
             else if (now - lastVoiceTimeRef.current >= 60000) {
               console.log("📢 60秒周期性播报提醒...");
               speakNotification("你有新的订单 请接单");
             }
-          }
+          } 
           // 🚀 核心逻辑：假如没有了 “待确认” 状态的订单，且之前是开启状态，则语音播报功能自动关闭
           else if (count === 0 && isVoiceEnabled) {
             console.log("✅ 所有订单已处理，自动关闭语音提醒");
@@ -1574,7 +1574,7 @@ const ProfilePage: React.FC = () => {
                 : "All orders accepted, voice alert disabled",
             );
           }
-
+          
           lastBroadcastCountRef.current = count;
         }
       } catch (err) {
@@ -1594,11 +1594,11 @@ const ProfilePage: React.FC = () => {
   // 查看代收款订单
   const handleViewCODOrders = async (settled?: boolean) => {
     if (!currentUser || !isPartnerStore) return;
-
+    
     try {
       const storeName = currentUser.name || storeInfo?.store_name;
       const userId = currentUser.id || storeInfo?.id;
-
+      
       if (userId) {
         // 设置模态框标题
         if (settled === true) {
@@ -1746,7 +1746,7 @@ const ProfilePage: React.FC = () => {
 
       // 更新本地存储的店铺信息
       setStoreInfo({ ...storeInfo, password: passwordForm.newPassword });
-
+      
       // 清空表单并关闭模态框
       setPasswordForm({
         currentPassword: "",
@@ -1754,7 +1754,7 @@ const ProfilePage: React.FC = () => {
         confirmPassword: "",
       });
       setShowPasswordModal(false);
-
+      
       alert(
         language === "zh"
           ? "密码修改成功！"
@@ -1777,10 +1777,10 @@ const ProfilePage: React.FC = () => {
   // 🚀 新增：导出对账单逻辑
   const handleExportStatement = async () => {
     if (!currentUser?.id || !isPartnerStore) return;
-
+    
     try {
       setIsExporting(true);
-
+      
       console.log("📡 开始查询订单数据...", {
         store_id: currentUser.store_id || currentUser.id,
         start: exportStartDate,
@@ -1815,7 +1815,7 @@ const ProfilePage: React.FC = () => {
 
       // 2. 准备导出数据
       const fileName = `Statement_${storeInfo?.store_name || "Merchant"}_${exportStartDate}_to_${exportEndDate}`;
-
+      
       if (exportFormat === "excel") {
         // 生成 Excel
         console.log("📄 正在生成 Excel...");
@@ -1834,7 +1834,7 @@ const ProfilePage: React.FC = () => {
         const ws = XLSX.utils.json_to_sheet(worksheetData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Orders");
-
+        
         if (exportMethod === "download") {
           console.log("⬇️ 正在下载 Excel...");
           XLSX.writeFile(wb, `${fileName}.xlsx`);
@@ -1852,7 +1852,7 @@ const ProfilePage: React.FC = () => {
         console.log("📄 正在尝试生成 PDF...");
         try {
           const doc = new jsPDF();
-
+          
           // 添加标题
           doc.setFontSize(18);
           // 🚀 核心修复：jsPDF 默认不支持中文/缅文。如果 store_name 包含这些字符，doc.text 可能会报错。
@@ -1861,10 +1861,10 @@ const ProfilePage: React.FC = () => {
             storeInfo?.store_name || "Merchant"
           ).replace(/[^\x00-\x7F]/g, "*");
           doc.text(`Statement: ${displayStoreName}`, 14, 20);
-
+          
           doc.setFontSize(12);
           doc.text(`Period: ${exportStartDate} to ${exportEndDate}`, 14, 30);
-
+          
           // 准备表格数据 - 全部转为 ASCII 兼容字符
           const tableColumn = [
             "ID",
@@ -1876,7 +1876,7 @@ const ProfilePage: React.FC = () => {
             "Settled",
           ];
           const tableRows = orders.map((pkg) => [
-            pkg.id.slice(-8),
+            pkg.id.slice(-8), 
             new Date(pkg.created_at).toLocaleDateString(),
             (pkg.receiver_name || "").replace(/[^\x00-\x7F]/g, "*"),
             (pkg.status || "").replace(/[^\x00-\x7F]/g, "*"),
@@ -1976,10 +1976,10 @@ const ProfilePage: React.FC = () => {
       const uploadPromises = Array.from(files).map((file) =>
         reviewService.uploadReviewImage(currentUser.id, file),
       );
-
+      
       const urls = await Promise.all(uploadPromises);
       const validUrls = urls.filter((url): url is string => url !== null);
-
+      
       setReviewImages((prev) => [...prev, ...validUrls].slice(0, 6)); // 最多6张
     } catch (error) {
       LoggerService.error("上传评价图片失败:", error);
@@ -2023,7 +2023,7 @@ const ProfilePage: React.FC = () => {
             ? "评价提交成功！感谢您的反馈。"
             : "Review submitted! Thank you.",
         );
-
+        
         // 🚀 更新已评价ID列表，让按钮立即消失
         setReviewedOrderIds((prev) => {
           const newSet = new Set(prev);
@@ -2053,13 +2053,13 @@ const ProfilePage: React.FC = () => {
   // 🚀 新增：自动打印小票功能
   const handlePrintReceipt = async (orderData: any) => {
     if (!orderData) return;
-
+    
     try {
       const qrDataUrl = await QRCode.toDataURL(orderData.id, {
         margin: 1,
         width: 180,
       });
-
+      
       // 解析商品信息
       const itemsMatch = orderData.description?.match(
         /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/,
@@ -2172,13 +2172,13 @@ const ProfilePage: React.FC = () => {
       iframe.style.height = "0";
       iframe.style.border = "none";
       document.body.appendChild(iframe);
-
+      
       const doc = iframe.contentWindow?.document || iframe.contentDocument;
       if (doc) {
         doc.open();
         doc.write(html);
         doc.close();
-
+        
         // 等待图片加载完成再打印
         setTimeout(() => {
           iframe.contentWindow?.focus();
@@ -2197,10 +2197,10 @@ const ProfilePage: React.FC = () => {
   const handleAcceptOrder = async (targetPkg?: any) => {
     const pkgToAccept = targetPkg || selectedPackage;
     if (!pkgToAccept?.id) return;
-
+    
     try {
       setLoading(true);
-
+      
       // 检查当前状态是否是待确认
       if (pkgToAccept.status !== "待确认") {
         alert(
@@ -2216,11 +2216,11 @@ const ProfilePage: React.FC = () => {
         pkgToAccept.id,
         "打包中",
       );
-
+      
       if (success) {
         // 🚀 核心优化：接单成功后自动打印小票
         handlePrintReceipt(pkgToAccept);
-
+        
         alert(
           language === "zh"
             ? "接单成功！小票已自动打印，请开始打包商品。"
@@ -2250,25 +2250,25 @@ const ProfilePage: React.FC = () => {
   // 🚀 新增：商家取消订单功能（商品卖完时）
   const handleCancelOrder = async (pkg: any) => {
     if (!pkg?.id) return;
-
+    
     const confirmMsg =
       language === "zh"
         ? "确定要取消此订单吗？（此操作不可逆，通常用于商品已售罄的情况）"
         : language === "en"
           ? "Are you sure you want to cancel this order? (This action is irreversible, typically used when items are sold out)"
           : "ဤအော်ဒါကို ပယ်ဖျက်ရန် သေချာပါသလား? (ပစ္စည်းပြတ်လပ်သွားသောအခါတွင် အသုံးပြုရန်)";
-
+      
     if (!window.confirm(confirmMsg)) return;
 
     try {
       setLoading(true);
-
+      
       // 更新状态为“已取消”
       const success = await packageService.updatePackageStatus(
         pkg.id,
         "已取消",
       );
-
+      
       if (success) {
         alert(
           language === "zh"
@@ -2319,7 +2319,7 @@ const ProfilePage: React.FC = () => {
 
     try {
       setLoading(true);
-
+      
       // 确定新的状态：如果已支付（如 VIP 余额支付）则进入待取件，否则进入待收款
       // 实际上对于商家，统称为“待取件”或“待收款”，我们这里统一逻辑
       const isPaid =
@@ -2331,7 +2331,7 @@ const ProfilePage: React.FC = () => {
         packingOrderData.id,
         nextStatus,
       );
-
+      
       if (success) {
         alert(
           language === "zh"
@@ -2625,7 +2625,7 @@ const ProfilePage: React.FC = () => {
 
     try {
       setLoading(true);
-
+      
       // 1. 上传图片
       const proofUrl = await rechargeService.uploadProof(
         currentUser.id,
@@ -2683,7 +2683,7 @@ const ProfilePage: React.FC = () => {
       <div
         style={{
           position: "relative",
-          zIndex: 5,
+        zIndex: 5,
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? "translateY(0)" : "translateY(20px)",
           transition: "all 0.6s ease",
@@ -2695,7 +2695,7 @@ const ProfilePage: React.FC = () => {
             textAlign: "center", // 🚀 移动到页面中间
             marginBottom: "2rem",
             marginTop: "1.5rem",
-            opacity: isVisible ? 1 : 0,
+          opacity: isVisible ? 1 : 0,
             transform: isVisible ? "translateY(0)" : "translateY(-20px)",
             transition: "all 0.6s ease",
             display: "flex",
@@ -2751,7 +2751,7 @@ const ProfilePage: React.FC = () => {
             marginBottom: "2rem",
             border: "1px solid rgba(255, 255, 255, 0.2)",
             boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-            opacity: isVisible ? 1 : 0,
+          opacity: isVisible ? 1 : 0,
             transform: isVisible ? "translateY(0)" : "translateY(20px)",
             transition: "all 0.6s ease 0.2s",
           }}
@@ -2768,7 +2768,7 @@ const ProfilePage: React.FC = () => {
             }}
           >
             {/* 头像 */}
-
+            
             {/* 用户基本信息 */}
             <div style={{ flex: 1 }}>
               <div
@@ -2823,7 +2823,7 @@ const ProfilePage: React.FC = () => {
                   </div>
                   <div
                     style={{
-                      background: isPartnerStore
+                    background: isPartnerStore 
                         ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
                         : userBalance > 0 || currentUser.user_type === "vip"
                           ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
@@ -2832,7 +2832,7 @@ const ProfilePage: React.FC = () => {
                             : currentUser.user_type === "courier"
                               ? "linear-gradient(135deg, #a855f7 0%, #9333ea 100%)"
                               : "linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%)",
-                      boxShadow: isPartnerStore
+                    boxShadow: isPartnerStore 
                         ? "0 4px 15px rgba(14, 165, 233, 0.4)"
                         : userBalance > 0 || currentUser.user_type === "vip"
                           ? "0 4px 15px rgba(251, 191, 36, 0.4)"
@@ -3017,7 +3017,7 @@ const ProfilePage: React.FC = () => {
                   </button>
                 </div>
               </div>
-
+              
               {isPartnerStore && storeInfo ? (
                 <div
                   style={{
@@ -3067,7 +3067,7 @@ const ProfilePage: React.FC = () => {
                         }}
                       >
                         🆔
-                      </div>
+                    </div>
                       <span
                         style={{
                           fontSize: "0.85rem",
@@ -3124,7 +3124,7 @@ const ProfilePage: React.FC = () => {
                         }}
                       >
                         🏪
-                      </div>
+                    </div>
                       <span
                         style={{
                           fontSize: "0.85rem",
@@ -3147,7 +3147,7 @@ const ProfilePage: React.FC = () => {
                       {getStoreTypeLabel(storeInfo.store_type)}
                     </span>
                   </div>
-
+                  
                   <div
                     style={{
                       display: "flex",
@@ -3179,7 +3179,7 @@ const ProfilePage: React.FC = () => {
                         }}
                       >
                         📞
-                      </div>
+                    </div>
                       <span
                         style={{
                           fontSize: "0.85rem",
@@ -3238,7 +3238,7 @@ const ProfilePage: React.FC = () => {
                         }}
                       >
                         📍
-                      </div>
+                    </div>
                       <span
                         style={{
                           fontSize: "0.85rem",
@@ -3294,7 +3294,7 @@ const ProfilePage: React.FC = () => {
                         }}
                       >
                         🗓️
-                      </div>
+                    </div>
                       <span
                         style={{
                           fontSize: "0.85rem",
@@ -3365,28 +3365,28 @@ const ProfilePage: React.FC = () => {
                 </div>
               )}
             </div>
+            </div>
           </div>
-        </div>
 
-        {/* 订单统计卡片 */}
+          {/* 订单统计卡片 */}
         <div
           style={{
             display: "grid",
             gridTemplateColumns:
               window.innerWidth < 768
                 ? "repeat(2, 1fr)"
-                : `repeat(${
-                    4 +
+              : `repeat(${
+                  4 + 
                     (isPartnerStore && orderStats.pendingConfirmation > 0
                       ? 1
                       : 0) +
-                    (isPartnerStore ? 2 : 0)
-                  }, 1fr)`,
+                  (isPartnerStore ? 2 : 0)
+                }, 1fr)`,
             gap: "1.5rem",
             marginBottom: "3rem",
           }}
         >
-          {/* 全部订单 */}
+            {/* 全部订单 */}
           <div
             style={{
               background:
@@ -3421,8 +3421,8 @@ const ProfilePage: React.FC = () => {
                 letterSpacing: "-1px",
               }}
             >
-              {orderStats.total}
-            </div>
+                {orderStats.total}
+              </div>
             <div
               style={{
                 color: "rgba(255,255,255,0.6)",
@@ -3432,12 +3432,12 @@ const ProfilePage: React.FC = () => {
                 letterSpacing: "1px",
               }}
             >
-              {t.totalOrders}
+                {t.totalOrders}
+              </div>
             </div>
-          </div>
 
-          {/* 待接单 (仅当是合伙店铺且有待接单订单时显示) */}
-          {isPartnerStore && orderStats.pendingConfirmation > 0 && (
+            {/* 待接单 (仅当是合伙店铺且有待接单订单时显示) */}
+            {isPartnerStore && orderStats.pendingConfirmation > 0 && (
             <div
               style={{
                 background:
@@ -3490,8 +3490,8 @@ const ProfilePage: React.FC = () => {
                   letterSpacing: "-1px",
                 }}
               >
-                {orderStats.pendingConfirmation}
-              </div>
+                  {orderStats.pendingConfirmation}
+                </div>
               <div
                 style={{
                   color: "white",
@@ -3501,13 +3501,13 @@ const ProfilePage: React.FC = () => {
                   letterSpacing: "1px",
                 }}
               >
-                {t.pendingAccept}
+                  {t.pendingAccept}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* 打包中 (仅限合伙店铺显示) */}
-          {isPartnerStore && (
+            {/* 打包中 (仅限合伙店铺显示) */}
+            {isPartnerStore && (
             <div
               style={{
                 background:
@@ -3543,8 +3543,8 @@ const ProfilePage: React.FC = () => {
                   letterSpacing: "-1px",
                 }}
               >
-                {orderStats.packing}
-              </div>
+                  {orderStats.packing}
+                </div>
               <div
                 style={{
                   color: "white",
@@ -3559,11 +3559,11 @@ const ProfilePage: React.FC = () => {
                   : language === "en"
                     ? "Packing"
                     : "ထုပ်ပိုးနေသည်"}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* 待取件 */}
+            {/* 待取件 */}
           <div
             style={{
               background:
@@ -3598,8 +3598,8 @@ const ProfilePage: React.FC = () => {
                 letterSpacing: "-1px",
               }}
             >
-              {orderStats.pendingPickup}
-            </div>
+                {orderStats.pendingPickup}
+              </div>
             <div
               style={{
                 color: "rgba(255,255,255,0.6)",
@@ -3609,11 +3609,11 @@ const ProfilePage: React.FC = () => {
                 letterSpacing: "1px",
               }}
             >
-              {t.pendingPickup}
+                {t.pendingPickup}
+              </div>
             </div>
-          </div>
 
-          {/* 配送中 */}
+            {/* 配送中 */}
           <div
             style={{
               background:
@@ -3648,8 +3648,8 @@ const ProfilePage: React.FC = () => {
                 letterSpacing: "-1px",
               }}
             >
-              {orderStats.inTransit}
-            </div>
+                {orderStats.inTransit}
+              </div>
             <div
               style={{
                 color: "rgba(255,255,255,0.6)",
@@ -3659,11 +3659,11 @@ const ProfilePage: React.FC = () => {
                 letterSpacing: "1px",
               }}
             >
-              {t.inTransit}
+                {t.inTransit}
+              </div>
             </div>
-          </div>
 
-          {/* 已完成 */}
+            {/* 已完成 */}
           <div
             style={{
               background:
@@ -3698,8 +3698,8 @@ const ProfilePage: React.FC = () => {
                 letterSpacing: "-1px",
               }}
             >
-              {orderStats.completed}
-            </div>
+                {orderStats.completed}
+              </div>
             <div
               style={{
                 color: "rgba(255,255,255,0.6)",
@@ -3709,12 +3709,12 @@ const ProfilePage: React.FC = () => {
                 letterSpacing: "1px",
               }}
             >
-              {t.completed}
+                {t.completed}
+              </div>
             </div>
-          </div>
 
-          {/* 🚀 新增：店铺评价 (仅限合伙店铺显示) */}
-          {isPartnerStore && (
+            {/* 🚀 新增：店铺评价 (仅限合伙店铺显示) */}
+            {isPartnerStore && (
             <div
               style={{
                 background:
@@ -3737,10 +3737,10 @@ const ProfilePage: React.FC = () => {
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.1)";
               }}
-            >
+              >
               <div style={{ fontSize: "2.2rem", marginBottom: "0.75rem" }}>
                 ⭐
-              </div>
+                </div>
               <div
                 style={{
                   color: "#fbbf24",
@@ -3766,13 +3766,13 @@ const ProfilePage: React.FC = () => {
                   : language === "en"
                     ? `${reviewStats.count} Reviews`
                     : `${reviewStats.count} ခု မှတ်ချက်`}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* 代收款统计卡片 - 仅合伙店铺显示 */}
-        {isPartnerStore && storeInfo && (
+          {/* 代收款统计卡片 - 仅合伙店铺显示 */}
+          {isPartnerStore && storeInfo && (
           <div
             style={{
               display: "flex",
@@ -3781,7 +3781,7 @@ const ProfilePage: React.FC = () => {
               marginBottom: "3rem",
             }}
           >
-            {/* 代收款统计 */}
+              {/* 代收款统计 */}
             <div
               id="cod-stats-section"
               style={{
@@ -3847,9 +3847,9 @@ const ProfilePage: React.FC = () => {
                         letterSpacing: "-0.5px",
                       }}
                     >
-                      {t.codStats}
-                    </h3>
-                    {/* 🚀 修正：上次结算日期 - 非卡片样式 */}
+                        {t.codStats}
+                      </h3>
+                      {/* 🚀 修正：上次结算日期 - 非卡片样式 */}
                     <div
                       style={{
                         fontSize: "1rem",
@@ -3861,7 +3861,7 @@ const ProfilePage: React.FC = () => {
                       }}
                     >
                       <div
-                        style={{
+                          style={{
                           display: "flex",
                           alignItems: "center",
                           gap: "8px",
@@ -3874,9 +3874,9 @@ const ProfilePage: React.FC = () => {
                             : t.noSettlement}
                         </span>
                       </div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 <div
                   style={{
@@ -3890,9 +3890,9 @@ const ProfilePage: React.FC = () => {
                     boxShadow: "inset 0 4px 12px rgba(0,0,0,0.3)",
                   }}
                 >
-                  <button
-                    onClick={handlePrevMonth}
-                    style={{
+                    <button 
+                      onClick={handlePrevMonth}
+                      style={{
                       background: "rgba(255, 255, 255, 0.15)",
                       border: "none",
                       borderRadius: "14px",
@@ -3918,10 +3918,10 @@ const ProfilePage: React.FC = () => {
                   >
                     ‹
                   </button>
-
-                  <div
-                    onClick={() => dateInputRef.current?.showPicker()}
-                    style={{
+                    
+                    <div 
+                      onClick={() => dateInputRef.current?.showPicker()}
+                      style={{ 
                       color: "white",
                       fontSize: "1.25rem",
                       fontWeight: "900",
@@ -3930,26 +3930,26 @@ const ProfilePage: React.FC = () => {
                       textAlign: "center",
                       fontFamily: "monospace",
                       letterSpacing: "1px",
-                    }}
-                  >
-                    {selectedMonth}
-                    <input
-                      ref={dateInputRef}
-                      type="month"
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      }}
+                    >
+                      {selectedMonth}
+                      <input
+                        ref={dateInputRef}
+                        type="month"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
                       style={{
                         position: "absolute",
                         opacity: 0,
                         pointerEvents: "none",
                         width: 0,
                       }}
-                    />
-                  </div>
+                      />
+                    </div>
 
-                  <button
-                    onClick={handleNextMonth}
-                    style={{
+                    <button 
+                      onClick={handleNextMonth}
+                      style={{
                       background: "rgba(255, 255, 255, 0.15)",
                       border: "none",
                       borderRadius: "14px",
@@ -3975,7 +3975,7 @@ const ProfilePage: React.FC = () => {
                   >
                     ›
                   </button>
-                </div>
+                  </div>
 
                 <div
                   style={{ display: "flex", gap: "12px", alignItems: "center" }}
@@ -4055,8 +4055,8 @@ const ProfilePage: React.FC = () => {
                     📊 {language === "zh" ? "导出对账单" : "Export Statement"}
                   </button>
                 </div>
-              </div>
-
+                </div>
+                
               <div
                 style={{
                   display: "grid",
@@ -4065,7 +4065,7 @@ const ProfilePage: React.FC = () => {
                   gap: "2.5rem",
                 }}
               >
-                {/* 本月已结清 */}
+                  {/* 本月已结清 */}
                 <div
                   style={{
                     background: "rgba(0, 0, 0, 0.3)",
@@ -4096,7 +4096,7 @@ const ProfilePage: React.FC = () => {
                     >
                       {t.totalCOD}
                     </span>
-                  </div>
+                    </div>
                   <div
                     style={{
                       fontSize: "2.8rem",
@@ -4107,10 +4107,10 @@ const ProfilePage: React.FC = () => {
                   >
                     {merchantCODStats.settledCOD.toLocaleString()}{" "}
                     <span style={{ fontSize: "1rem", opacity: 0.6 }}>MMK</span>
-                  </div>
-                  <button
-                    onClick={() => handleViewCODOrders(true)}
-                    style={{
+                    </div>
+                    <button 
+                      onClick={() => handleViewCODOrders(true)}
+                      style={{ 
                       padding: "10px 20px",
                       borderRadius: "14px",
                       background: "#3b82f6",
@@ -4146,9 +4146,9 @@ const ProfilePage: React.FC = () => {
                   >
                     📈
                   </div>
-                </div>
+                  </div>
 
-                {/* 待结清金额 */}
+                  {/* 待结清金额 */}
                 <div
                   style={{
                     background: "rgba(0, 0, 0, 0.3)",
@@ -4191,9 +4191,9 @@ const ProfilePage: React.FC = () => {
                         borderRadius: "12px",
                       }}
                     >
-                      {merchantCODStats.unclearedCount} 笔待结算
+                        {merchantCODStats.unclearedCount} 笔待结算
+                      </div>
                     </div>
-                  </div>
                   <div
                     style={{
                       fontSize: "2.8rem",
@@ -4204,10 +4204,10 @@ const ProfilePage: React.FC = () => {
                   >
                     {merchantCODStats.unclearedCOD.toLocaleString()}{" "}
                     <span style={{ fontSize: "1rem", opacity: 0.6 }}>MMK</span>
-                  </div>
-                  <button
-                    onClick={() => handleViewCODOrders(false)}
-                    style={{
+                    </div>
+                    <button 
+                      onClick={() => handleViewCODOrders(false)}
+                      style={{ 
                       padding: "10px 20px",
                       borderRadius: "14px",
                       background: "#f59e0b",
@@ -4244,10 +4244,10 @@ const ProfilePage: React.FC = () => {
                     ⏳
                   </div>
                 </div>
+                </div>
               </div>
-            </div>
 
-            {/* 营业状态管理 */}
+              {/* 营业状态管理 */}
             <div
               style={{
                 background: "rgba(255, 255, 255, 0.15)",
@@ -4307,7 +4307,7 @@ const ProfilePage: React.FC = () => {
                     >
                       {t.businessManagement}
                     </h3>
-                    {storeInfo?.updated_at && (
+                      {storeInfo?.updated_at && (
                       <div
                         style={{
                           color: "rgba(255,255,255,0.4)",
@@ -4326,17 +4326,17 @@ const ProfilePage: React.FC = () => {
                             minute: "2-digit",
                           },
                         )}
-                      </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
                 <div
                   style={{ display: "flex", gap: "15px", alignItems: "center" }}
                 >
                   {/* 今日营业开关 */}
                   <div
-                    style={{
+                      style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
@@ -4364,7 +4364,7 @@ const ProfilePage: React.FC = () => {
                       }}
                     >
                       {t.closedToday}
-                    </span>
+                        </span>
                     <div
                       style={{
                         display: "flex",
@@ -4372,7 +4372,7 @@ const ProfilePage: React.FC = () => {
                         height: "100%",
                       }}
                     >
-                      <button
+                      <button 
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
@@ -4417,9 +4417,9 @@ const ProfilePage: React.FC = () => {
                         />
                       </button>
                     </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
               <div
                 style={{
@@ -4428,7 +4428,7 @@ const ProfilePage: React.FC = () => {
                   gap: "2rem",
                 }}
               >
-                {/* 营业时间设置 */}
+                  {/* 营业时间设置 */}
                 <div
                   id="business-hours-section"
                   style={{
@@ -4444,7 +4444,7 @@ const ProfilePage: React.FC = () => {
                     overflow: "hidden",
                   }}
                 >
-                  {/* 背景发光效果 */}
+                    {/* 背景发光效果 */}
                   <div
                     style={{
                       position: "absolute",
@@ -4500,9 +4500,9 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           <span style={{ fontSize: "1.4rem" }}>⏰</span>
+                          </div>
+                          {t.operatingHours}
                         </div>
-                        {t.operatingHours}
-                      </div>
 
                       <div
                         style={{
@@ -4511,15 +4511,15 @@ const ProfilePage: React.FC = () => {
                           alignItems: "center",
                         }}
                       >
-                        <TimeWheelPicker
-                          label="OPEN TIME"
-                          icon="🌅"
+                          <TimeWheelPicker 
+                            label="OPEN TIME"
+                            icon="🌅"
                           value={
                             (
                               businessStatus.operating_hours || "09:00 - 21:00"
                             ).split(" - ")[0] || "09:00"
                           }
-                          onChange={(val) => {
+                            onChange={(val) => {
                             const parts = (
                               businessStatus.operating_hours || "09:00 - 21:00"
                             ).split(" - ");
@@ -4541,15 +4541,15 @@ const ProfilePage: React.FC = () => {
                           →
                         </div>
 
-                        <TimeWheelPicker
-                          label="CLOSED TIME"
-                          icon="🌙"
+                          <TimeWheelPicker 
+                            label="CLOSED TIME"
+                            icon="🌙"
                           value={
                             (
                               businessStatus.operating_hours || "09:00 - 21:00"
                             ).split(" - ")[1] || "21:00"
                           }
-                          onChange={(val) => {
+                            onChange={(val) => {
                             const parts = (
                               businessStatus.operating_hours || "09:00 - 21:00"
                             ).split(" - ");
@@ -4558,11 +4558,11 @@ const ProfilePage: React.FC = () => {
                               ...prev,
                               operating_hours: `${start} - ${val}`,
                             }));
-                          }}
-                        />
+                            }}
+                          />
 
-                        {/* 营业时长预览 */}
-                        {(() => {
+                          {/* 营业时长预览 */}
+                          {(() => {
                           const hours =
                             businessStatus.operating_hours || "09:00 - 21:00";
                           const parts = hours.split(" - ");
@@ -4575,17 +4575,17 @@ const ProfilePage: React.FC = () => {
                           if (startParts.length < 2 || endParts.length < 2)
                             return null;
 
-                          const [sH, sM] = startParts.map(Number);
-                          const [eH, eM] = endParts.map(Number);
-
+                            const [sH, sM] = startParts.map(Number);
+                            const [eH, eM] = endParts.map(Number);
+                            
                           if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM))
                             return null;
 
                           let duration = eH * 60 + eM - (sH * 60 + sM);
-                          if (duration < 0) duration += 24 * 60; // 跨天
-                          const h = Math.floor(duration / 60);
-                          const m = duration % 60;
-                          return (
+                            if (duration < 0) duration += 24 * 60; // 跨天
+                            const h = Math.floor(duration / 60);
+                            const m = duration % 60;
+                            return (
                             <div
                               style={{
                                 background: "rgba(16, 185, 129, 0.15)",
@@ -4601,11 +4601,11 @@ const ProfilePage: React.FC = () => {
                               {language === "zh"
                                 ? `时长: ${h}h${m > 0 ? `${m}m` : ""}`
                                 : `Dur: ${h}h ${m > 0 ? `${m}m` : ""}`}
-                            </div>
-                          );
-                        })()}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
-                    </div>
 
                     {/* 🚀 操作按钮组 - 移动到右侧 */}
                     <div
@@ -4766,15 +4766,15 @@ const ProfilePage: React.FC = () => {
                         )}
                       </button>
                     </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* 详细信息网格 - 仅非合伙店铺显示 */}
-        {!isPartnerStore && (
+          {/* 详细信息网格 - 仅非合伙店铺显示 */}
+          {!isPartnerStore && (
           <div
             style={{
               display: "flex",
@@ -4821,7 +4821,7 @@ const ProfilePage: React.FC = () => {
                 >
                   🗓️
                 </div>
-                <div>
+                  <div>
                   <label
                     style={{
                       color: "rgba(255,255,255,0.5)",
@@ -4833,8 +4833,8 @@ const ProfilePage: React.FC = () => {
                       letterSpacing: "1px",
                     }}
                   >
-                    {t.accountDate}
-                  </label>
+                      {t.accountDate}
+                    </label>
                   <div
                     style={{
                       color: "white",
@@ -4842,7 +4842,7 @@ const ProfilePage: React.FC = () => {
                       fontWeight: "700",
                     }}
                   >
-                    {currentUser.created_at
+                      {currentUser.created_at 
                       ? new Date(currentUser.created_at).toLocaleDateString(
                           language === "zh"
                             ? "zh-CN"
@@ -4856,9 +4856,9 @@ const ProfilePage: React.FC = () => {
                           },
                         )
                       : "-"}
+                    </div>
                   </div>
                 </div>
-              </div>
               <div
                 style={{
                   display: "flex",
@@ -4884,7 +4884,7 @@ const ProfilePage: React.FC = () => {
                 >
                   📍
                 </div>
-                <div>
+                  <div>
                   <label
                     style={{
                       color: "rgba(255,255,255,0.5)",
@@ -4896,8 +4896,8 @@ const ProfilePage: React.FC = () => {
                       letterSpacing: "1px",
                     }}
                   >
-                    {t.address}
-                  </label>
+                      {t.address}
+                    </label>
                   <div
                     style={{
                       color: "white",
@@ -4906,15 +4906,15 @@ const ProfilePage: React.FC = () => {
                     }}
                   >
                     {currentUser.address || "-"}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* 包裹列表 */}
+        {/* 包裹列表 */}
       <div
         style={{
           background: "rgba(255, 255, 255, 0.15)",
@@ -4938,10 +4938,10 @@ const ProfilePage: React.FC = () => {
             paddingBottom: "0.5rem",
           }}
         >
-          {t.packages}
-        </h2>
+            {t.packages}
+          </h2>
 
-        {loading ? (
+          {loading ? (
           <div style={{ textAlign: "center", padding: "3rem", color: "white" }}>
             <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>⏳</div>
             <div>
@@ -4951,47 +4951,47 @@ const ProfilePage: React.FC = () => {
                   ? "Loading..."
                   : "ဖွင့်နေသည်..."}
             </div>
-          </div>
-        ) : userPackages.length === 0 ? (
+            </div>
+          ) : userPackages.length === 0 ? (
           <div style={{ textAlign: "center", padding: "3rem", color: "white" }}>
             <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📦</div>
             <div style={{ fontSize: "1.2rem" }}>{t.noPackages}</div>
-          </div>
-        ) : (
-          <>
+            </div>
+          ) : (
+            <>
             <div
               style={{
                 display: "grid",
                 gap: "1rem",
               }}
             >
-              {userPackages
+                {userPackages
                 .slice(
                   (currentPage - 1) * packagesPerPage,
                   currentPage * packagesPerPage,
                 )
-                .map((pkg: any) => (
-                  <div
-                    key={pkg.id}
-                    style={{
+                  .map((pkg: any) => (
+                <div
+                  key={pkg.id}
+                  style={{
                       background: "rgba(255, 255, 255, 0.1)",
                       borderRadius: "12px",
                       padding: "1.5rem",
                       border: "1px solid rgba(255, 255, 255, 0.2)",
                       transition: "all 0.3s ease",
-                    }}
-                    onMouseOver={(e) => {
+                  }}
+                  onMouseOver={(e) => {
                       e.currentTarget.style.background =
                         "rgba(255, 255, 255, 0.15)";
                       e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
+                  }}
+                  onMouseOut={(e) => {
                       e.currentTarget.style.background =
                         "rgba(255, 255, 255, 0.1)";
                       e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    {/* 顶部：订单号、创建时间、价格、包裹类型 - 一行显示 */}
+                  }}
+                >
+                  {/* 顶部：订单号、创建时间、价格、包裹类型 - 一行显示 */}
                     <div
                       style={{
                         display: "flex",
@@ -5003,7 +5003,7 @@ const ProfilePage: React.FC = () => {
                         borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
                       }}
                     >
-                      {/* 订单号 */}
+                    {/* 订单号 */}
                       <div
                         style={{
                           display: "flex",
@@ -5018,8 +5018,8 @@ const ProfilePage: React.FC = () => {
                             fontSize: "0.85rem",
                           }}
                         >
-                          {t.packageId}:
-                        </span>
+                        {t.packageId}:
+                      </span>
                         <span
                           style={{
                             color: "white",
@@ -5027,11 +5027,11 @@ const ProfilePage: React.FC = () => {
                             fontWeight: "bold",
                           }}
                         >
-                          {pkg.id}
-                        </span>
-                      </div>
+                        {pkg.id}
+                      </span>
+                    </div>
 
-                      {/* 分隔符 */}
+                    {/* 分隔符 */}
                       <span
                         style={{
                           color: "rgba(255,255,255,0.3)",
@@ -5041,7 +5041,7 @@ const ProfilePage: React.FC = () => {
                         |
                       </span>
 
-                      {/* 创建时间 */}
+                    {/* 创建时间 */}
                       <div
                         style={{
                           display: "flex",
@@ -5056,14 +5056,14 @@ const ProfilePage: React.FC = () => {
                             fontSize: "0.85rem",
                           }}
                         >
-                          {t.createTime}:
-                        </span>
+                        {t.createTime}:
+                      </span>
                         <span style={{ color: "white", fontSize: "0.95rem" }}>
                           {pkg.create_time || pkg.created_at || "-"}
-                        </span>
-                      </div>
+                      </span>
+                    </div>
 
-                      {/* 分隔符 */}
+                    {/* 分隔符 */}
                       <span
                         style={{
                           color: "rgba(255,255,255,0.3)",
@@ -5073,7 +5073,7 @@ const ProfilePage: React.FC = () => {
                         |
                       </span>
 
-                      {/* 价格 */}
+                    {/* 价格 */}
                       <div
                         style={{
                           display: "flex",
@@ -5088,8 +5088,8 @@ const ProfilePage: React.FC = () => {
                             fontSize: "0.85rem",
                           }}
                         >
-                          {t.price}:
-                        </span>
+                        {t.price}:
+                      </span>
                         <span
                           style={{
                             color: "white",
@@ -5100,10 +5100,10 @@ const ProfilePage: React.FC = () => {
                           {pkg.price
                             ? `${pkg.price.replace("MMK", "").trim()} MMK`
                             : "-"}
-                        </span>
-                      </div>
+                      </span>
+                    </div>
 
-                      {/* 分隔符 */}
+                    {/* 分隔符 */}
                       <span
                         style={{
                           color: "rgba(255,255,255,0.3)",
@@ -5113,7 +5113,7 @@ const ProfilePage: React.FC = () => {
                         |
                       </span>
 
-                      {/* 包裹类型 */}
+                    {/* 包裹类型 */}
                       <div
                         style={{
                           display: "flex",
@@ -5134,14 +5134,14 @@ const ProfilePage: React.FC = () => {
                               ? "Package Type"
                               : "ပက်ကေ့ဂျ်အမျိုးအစား"}
                           :
-                        </span>
+                      </span>
                         <span style={{ color: "white", fontSize: "0.95rem" }}>
                           {pkg.package_type || "-"}
-                        </span>
-                      </div>
+                      </span>
                     </div>
+                  </div>
 
-                    {/* 状态和支付方式按钮 */}
+                  {/* 状态和支付方式按钮 */}
                     <div
                       style={{
                         display: "flex",
@@ -5151,7 +5151,7 @@ const ProfilePage: React.FC = () => {
                         marginBottom: "1rem",
                       }}
                     >
-                      {/* 状态按钮 */}
+                    {/* 状态按钮 */}
                       <div
                         style={{
                           background: getStatusColor(
@@ -5168,17 +5168,17 @@ const ProfilePage: React.FC = () => {
                         {pkg.status === "待收款"
                           ? getStatusText(pkg.status)
                           : pkg.status}
-                      </div>
-
-                      {/* 支付方式按钮 */}
-                      {pkg.payment_method && (
+                    </div>
+                    
+                    {/* 支付方式按钮 */}
+                    {pkg.payment_method && (
                         <div
                           style={{
                             background: getPaymentMethodColor(
                               pkg.payment_method,
                             ),
                             color: "white",
-                            border: `1px solid ${getPaymentMethodBorderColor(pkg.payment_method)}`,
+                        border: `1px solid ${getPaymentMethodBorderColor(pkg.payment_method)}`,
                             padding: "0.4rem 0.9rem",
                             borderRadius: "24px",
                             fontSize: "0.85rem",
@@ -5186,18 +5186,18 @@ const ProfilePage: React.FC = () => {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {getPaymentMethodText(pkg.payment_method)}
-                        </div>
-                      )}
+                        {getPaymentMethodText(pkg.payment_method)}
+                      </div>
+                    )}
 
-                      {/* 🚀 新增：商品费用 - 仅限 VIP/普通账号显示 */}
+                    {/* 🚀 新增：商品费用 - 仅限 VIP/普通账号显示 */}
                       {!isPartnerStore &&
                         (() => {
                           const itemMatch = pkg.description?.match(
                             /\[(?:商品费用（仅余额支付）|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)): (.*?) MMK\]/,
                           );
-                          if (itemMatch && itemMatch[1]) {
-                            return (
+                      if (itemMatch && itemMatch[1]) {
+                        return (
                               <div
                                 style={{
                                   background: "rgba(251, 191, 36, 0.2)",
@@ -5223,14 +5223,14 @@ const ProfilePage: React.FC = () => {
                                     ? "Balance"
                                     : "လက်ကျန်ငွေ"}
                                 )
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
 
-                      {/* 🚀 修正：代收款 - 仅限商家账号显示 */}
-                      {isPartnerStore && pkg.cod_amount > 0 ? (
+                    {/* 🚀 修正：代收款 - 仅限商家账号显示 */}
+                    {isPartnerStore && pkg.cod_amount > 0 ? (
                         <div
                           style={{
                             background: "rgba(239, 68, 68, 0.2)",
@@ -5243,10 +5243,10 @@ const ProfilePage: React.FC = () => {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          💰 {t.cod}: {pkg.cod_amount.toLocaleString()} MMK
-                        </div>
-                      ) : null}
-                    </div>
+                        💰 {t.cod}: {pkg.cod_amount.toLocaleString()} MMK
+                      </div>
+                    ) : null}
+                  </div>
 
                     <div
                       style={{
@@ -5256,12 +5256,12 @@ const ProfilePage: React.FC = () => {
                         marginTop: "1rem",
                       }}
                     >
-                      <button
-                        onClick={() => {
-                          setSelectedPackage(pkg);
-                          setShowPackageDetailModal(true);
-                        }}
-                        style={{
+                    <button
+                      onClick={() => {
+                        setSelectedPackage(pkg);
+                        setShowPackageDetailModal(true);
+                      }}
+                      style={{
                           background: "rgba(59, 130, 246, 0.25)",
                           color: "white",
                           border: "1px solid rgba(59, 130, 246, 0.4)",
@@ -5271,30 +5271,30 @@ const ProfilePage: React.FC = () => {
                           fontSize: "0.9rem",
                           fontWeight: "bold",
                           transition: "all 0.3s ease",
-                          flex: 1,
+                        flex: 1,
                           maxWidth: "150px",
-                        }}
-                        onMouseOver={(e) => {
+                      }}
+                      onMouseOver={(e) => {
                           e.currentTarget.style.background =
                             "rgba(59, 130, 246, 0.4)";
                           e.currentTarget.style.transform = "translateY(-2px)";
-                        }}
-                        onMouseOut={(e) => {
+                      }}
+                      onMouseOut={(e) => {
                           e.currentTarget.style.background =
                             "rgba(59, 130, 246, 0.25)";
                           e.currentTarget.style.transform = "translateY(0)";
-                        }}
-                      >
-                        {t.viewDetails}
-                      </button>
+                      }}
+                    >
+                      {t.viewDetails}
+                    </button>
 
-                      {/* 🚀 新增：评价订单按钮 - 仅限已完成/已送达订单 且 未评价过 */}
+                    {/* 🚀 新增：评价订单按钮 - 仅限已完成/已送达订单 且 未评价过 */}
                       {!isPartnerStore &&
                         (pkg.status === "已送达" || pkg.status === "已完成") &&
                         !reviewedOrderIds.has(pkg.id) && (
-                          <button
-                            onClick={() => handleOpenReviewModal(pkg)}
-                            style={{
+                      <button
+                        onClick={() => handleOpenReviewModal(pkg)}
+                        style={{
                               background:
                                 "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
                               color: "white",
@@ -5305,17 +5305,17 @@ const ProfilePage: React.FC = () => {
                               fontSize: "0.9rem",
                               fontWeight: "bold",
                               transition: "all 0.3s ease",
-                              flex: 1,
+                          flex: 1,
                               maxWidth: "150px",
                               boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
-                            }}
-                            onMouseOver={(e) => {
+                        }}
+                        onMouseOver={(e) => {
                               e.currentTarget.style.transform =
                                 "translateY(-2px)";
                               e.currentTarget.style.boxShadow =
                                 "0 6px 15px rgba(245, 158, 11, 0.4)";
-                            }}
-                            onMouseOut={(e) => {
+                        }}
+                        onMouseOut={(e) => {
                               e.currentTarget.style.transform = "translateY(0)";
                               e.currentTarget.style.boxShadow =
                                 "0 4px 12px rgba(245, 158, 11, 0.3)";
@@ -5327,14 +5327,14 @@ const ProfilePage: React.FC = () => {
                               : language === "en"
                                 ? "Rate Order"
                                 : "မှတ်ချက်ပေးရန်"}
-                          </button>
-                        )}
+                      </button>
+                    )}
 
-                      {/* 🚀 新增：打包中状态显示“开始打包”按钮 */}
+                    {/* 🚀 新增：打包中状态显示“开始打包”按钮 */}
                       {isPartnerStore && pkg.status === "打包中" && (
-                        <button
-                          onClick={() => handleStartPacking(pkg)}
-                          style={{
+                      <button
+                        onClick={() => handleStartPacking(pkg)}
+                        style={{
                             background:
                               "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                             color: "white",
@@ -5345,17 +5345,17 @@ const ProfilePage: React.FC = () => {
                             fontSize: "0.9rem",
                             fontWeight: "900",
                             transition: "all 0.3s ease",
-                            flex: 1,
+                          flex: 1,
                             maxWidth: "150px",
                             boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-                          }}
-                          onMouseOver={(e) => {
+                        }}
+                        onMouseOver={(e) => {
                             e.currentTarget.style.transform =
                               "translateY(-2px)";
                             e.currentTarget.style.boxShadow =
                               "0 6px 15px rgba(16, 185, 129, 0.4)";
-                          }}
-                          onMouseOut={(e) => {
+                        }}
+                        onMouseOut={(e) => {
                             e.currentTarget.style.transform = "translateY(0)";
                             e.currentTarget.style.boxShadow =
                               "0 4px 12px rgba(16, 185, 129, 0.3)";
@@ -5367,17 +5367,17 @@ const ProfilePage: React.FC = () => {
                             : language === "en"
                               ? "Start Packing"
                               : "ထုပ်ပိုးရန်စတင်ပါ"}
-                        </button>
-                      )}
+                      </button>
+                    )}
 
-                      {/* 🚀 新增：中转站重新发货按钮 */}
+                    {/* 🚀 新增：中转站重新发货按钮 */}
                       {isPartnerStore &&
                         storeInfo?.store_type === "transit_station" &&
                         pkg.status === "已送达" &&
                         pkg.description?.includes("[异常转送中转站]") && (
-                          <button
-                            onClick={() => handleReshipOrder(pkg)}
-                            style={{
+                      <button
+                        onClick={() => handleReshipOrder(pkg)}
+                        style={{
                               background:
                                 "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
                               color: "white",
@@ -5388,17 +5388,17 @@ const ProfilePage: React.FC = () => {
                               fontSize: "0.9rem",
                               fontWeight: "900",
                               transition: "all 0.3s ease",
-                              flex: 1,
+                          flex: 1,
                               maxWidth: "150px",
                               boxShadow: "0 4px 12px rgba(217, 119, 6, 0.3)",
-                            }}
-                            onMouseOver={(e) => {
+                        }}
+                        onMouseOver={(e) => {
                               e.currentTarget.style.transform =
                                 "translateY(-2px)";
                               e.currentTarget.style.boxShadow =
                                 "0 6px 15px rgba(217, 119, 6, 0.4)";
-                            }}
-                            onMouseOut={(e) => {
+                        }}
+                        onMouseOut={(e) => {
                               e.currentTarget.style.transform = "translateY(0)";
                               e.currentTarget.style.boxShadow =
                                 "0 4px 12px rgba(217, 119, 6, 0.3)";
@@ -5410,15 +5410,15 @@ const ProfilePage: React.FC = () => {
                               : language === "en"
                                 ? "Re-ship"
                                 : "ပြန်လည်ပို့ဆောင်ပါ"}
-                          </button>
-                        )}
-                    </div>
+                      </button>
+                    )}
                   </div>
-                ))}
-            </div>
+                </div>
+              ))}
+              </div>
 
             {/* 分页控件 - 指挥中心风格 */}
-            {userPackages.length > packagesPerPage && (
+              {userPackages.length > packagesPerPage && (
               <div
                 style={{
                   display: "flex",
@@ -5433,12 +5433,12 @@ const ProfilePage: React.FC = () => {
                   alignSelf: "center",
                 }}
               >
-                <button
+                  <button
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(1, prev - 1))
                   }
-                  disabled={currentPage === 1}
-                  style={{
+                    disabled={currentPage === 1}
+                    style={{
                     background: "rgba(255, 255, 255, 0.05)",
                     color: "white",
                     border: "1px solid rgba(255, 255, 255, 0.1)",
@@ -5454,7 +5454,7 @@ const ProfilePage: React.FC = () => {
                   }}
                 >
                   <span style={{ fontSize: "1.2rem" }}>‹</span>
-                </button>
+                  </button>
 
                 <div
                   style={{
@@ -5469,10 +5469,10 @@ const ProfilePage: React.FC = () => {
                     },
                     (_, i) => i + 1,
                   ).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      style={{
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        style={{
                         background:
                           currentPage === page ? "#3b82f6" : "transparent",
                         color: "white",
@@ -5491,14 +5491,14 @@ const ProfilePage: React.FC = () => {
                           currentPage === page
                             ? "0 4px 12px rgba(59, 130, 246, 0.4)"
                             : "none",
-                      }}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
+                        }}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
 
-                <button
+                  <button
                   onClick={() =>
                     setCurrentPage((prev) =>
                       Math.min(
@@ -5535,11 +5535,11 @@ const ProfilePage: React.FC = () => {
                   }}
                 >
                   <span style={{ fontSize: "1.2rem" }}>›</span>
-                </button>
-              </div>
-            )}
+                  </button>
+                </div>
+              )}
 
-            {/* 显示当前页信息 */}
+              {/* 显示当前页信息 */}
             <div
               style={{
                 textAlign: "center",
@@ -5549,7 +5549,7 @@ const ProfilePage: React.FC = () => {
               }}
             >
               {language === "zh"
-                ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} 条，共 ${userPackages.length} 条`
+                  ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} 条，共 ${userPackages.length} 条`
                 : language === "en"
                   ? `Showing ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} of ${userPackages.length}`
                   : (currentPage - 1) * packagesPerPage +
@@ -5561,27 +5561,27 @@ const ProfilePage: React.FC = () => {
                     ) +
                     " ကို ပြသထားသည်၊ စုစုပေါင်း " +
                     userPackages.length}
-            </div>
-          </>
-        )}
-      </div>
+              </div>
+            </>
+          )}
+        </div>
       {showPackageDetailModal && selectedPackage && (
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(0, 0, 0, 0.7)",
             backdropFilter: "blur(5px)",
-            zIndex: 1000,
+          zIndex: 1000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             padding: "2rem",
-          }}
-          onClick={() => setShowPackageDetailModal(false)}
+        }}
+        onClick={() => setShowPackageDetailModal(false)}
         >
           <div
             style={{
@@ -5595,8 +5595,8 @@ const ProfilePage: React.FC = () => {
               width: "100%",
               maxHeight: "90vh",
               overflowY: "auto",
-            }}
-            onClick={(e) => e.stopPropagation()}
+          }}
+          onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -5657,7 +5657,7 @@ const ProfilePage: React.FC = () => {
                   };
                 });
 
-                return (
+                  return (
                   <>
                     {/* 订单 ID 和 二维码区域 */}
                     <div
@@ -5671,7 +5671,7 @@ const ProfilePage: React.FC = () => {
                         border: "1px solid rgba(255,255,255,0.1)",
                       }}
                     >
-                      <div>
+                    <div>
                         <div
                           style={{
                             color: "rgba(255, 255, 255, 0.5)",
@@ -5681,7 +5681,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           {t.packageId}
-                        </div>
+                      </div>
                         <div
                           style={{
                             color: "#fbbf24",
@@ -5690,7 +5690,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           #{selectedPackage.id}
-                        </div>
+                    </div>
                         <div
                           style={{
                             color: "rgba(255, 255, 255, 0.7)",
@@ -5702,7 +5702,7 @@ const ProfilePage: React.FC = () => {
                           {selectedPackage.create_time ||
                             selectedPackage.created_at ||
                             "-"}
-                        </div>
+                    </div>
                         <div style={{ marginTop: "1rem" }}>
                           <div
                             style={{
@@ -5722,9 +5722,9 @@ const ProfilePage: React.FC = () => {
                             {selectedPackage.status === "待收款"
                               ? getStatusText(selectedPackage.status)
                               : selectedPackage.status}
-                          </div>
-                        </div>
-                      </div>
+                </div>
+                    </div>
+                  </div>
                       <div
                         style={{
                           background: "white",
@@ -5734,8 +5734,8 @@ const ProfilePage: React.FC = () => {
                         }}
                       >
                         <OrderQRCode orderId={selectedPackage.id} />
-                      </div>
                     </div>
+                  </div>
 
                     {/* 信息网格 */}
                     <div
@@ -5766,7 +5766,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           商家信息
-                        </div>
+                    </div>
                         <div
                           style={{
                             color: "white",
@@ -5775,7 +5775,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           {selectedPackage.sender_name}
-                        </div>
+                  </div>
                         <div
                           style={{
                             color: "rgba(255,255,255,0.6)",
@@ -5784,7 +5784,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           {selectedPackage.sender_phone}
-                        </div>
+                </div>
                         <div
                           style={{
                             color: "rgba(255,255,255,0.5)",
@@ -5794,8 +5794,8 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           {selectedPackage.sender_address}
-                        </div>
-                      </div>
+              </div>
+                    </div>
                       {/* 客户信息 */}
                       <div
                         style={{
@@ -5816,7 +5816,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           客户信息
-                        </div>
+                </div>
                         <div
                           style={{
                             color: "white",
@@ -5825,7 +5825,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           {selectedPackage.receiver_name}
-                        </div>
+                    </div>
                         <div
                           style={{
                             color: "rgba(255,255,255,0.6)",
@@ -5834,7 +5834,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           {selectedPackage.receiver_phone}
-                        </div>
+                  </div>
                         <div
                           style={{
                             color: "rgba(255,255,255,0.5)",
@@ -5844,8 +5844,8 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           {selectedPackage.receiver_address}
-                        </div>
-                      </div>
+                    </div>
+                  </div>
                     </div>
 
                     {/* 商品清单 */}
@@ -5868,7 +5868,7 @@ const ProfilePage: React.FC = () => {
                         }}
                       >
                         商品清单
-                      </div>
+                  </div>
                       <div
                         style={{
                           display: "flex",
@@ -5914,10 +5914,10 @@ const ProfilePage: React.FC = () => {
                                   {item.price.toLocaleString()} MMK
                                 </span>
                               )}
-                            </div>
+                </div>
                           </div>
                         ))}
-                      </div>
+              </div>
 
                       <div
                         style={{
@@ -5949,7 +5949,7 @@ const ProfilePage: React.FC = () => {
                               selectedPackage.payment_method,
                             )}
                           </span>
-                        </div>
+                  </div>
                         <div
                           style={{
                             display: "flex",
@@ -5968,7 +5968,7 @@ const ProfilePage: React.FC = () => {
                           <span style={{ color: "white", fontWeight: "700" }}>
                             {selectedPackage.price}
                           </span>
-                        </div>
+                </div>
                         <div
                           style={{
                             display: "flex",
@@ -6020,9 +6020,9 @@ const ProfilePage: React.FC = () => {
                             })()}{" "}
                             MMK
                           </span>
-                        </div>
-                      </div>
-                    </div>
+                  </div>
+                  </div>
+                </div>
 
                     {/* 客户备注 */}
                     {selectedPackage.notes && (
@@ -6044,7 +6044,7 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           💡 客户备注
-                        </div>
+                      </div>
                         <div
                           style={{
                             color: "white",
@@ -6054,22 +6054,22 @@ const ProfilePage: React.FC = () => {
                           }}
                         >
                           {selectedPackage.notes}
-                        </div>
+                    </div>
                       </div>
-                    )}
+                )}
                   </>
                 );
               })()}
-            </div>
+              </div>
 
-            {/* 🚀 新增：商家接单/开始打包功能按钮 */}
-            {isPartnerStore && (
-              <>
+              {/* 🚀 新增：商家接单/开始打包功能按钮 */}
+              {isPartnerStore && (
+                <>
                 {selectedPackage.status === "待确认" && (
-                  <button
-                    onClick={handleAcceptOrder}
-                    disabled={loading}
-                    style={{
+                    <button
+                      onClick={handleAcceptOrder}
+                      disabled={loading}
+                      style={{
                       background:
                         "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                       color: "white",
@@ -6087,9 +6087,9 @@ const ProfilePage: React.FC = () => {
                       justifyContent: "center",
                       gap: "10px",
                       marginBottom: "0.5rem",
-                    }}
-                  >
-                    {loading ? (
+                      }}
+                    >
+                      {loading ? (
                       <div
                         className="spinner"
                         style={{
@@ -6110,15 +6110,15 @@ const ProfilePage: React.FC = () => {
                             ? "Accept Order"
                             : "အော်ဒါလက်ခံရန်"}
                       </>
-                    )}
-                  </button>
-                )}
+                      )}
+                    </button>
+                  )}
 
                 {selectedPackage.status === "打包中" && (
-                  <button
-                    onClick={() => handleStartPacking(selectedPackage)}
-                    disabled={loading}
-                    style={{
+                    <button
+                      onClick={() => handleStartPacking(selectedPackage)}
+                      disabled={loading}
+                      style={{
                       background:
                         "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                       color: "white",
@@ -6146,15 +6146,15 @@ const ProfilePage: React.FC = () => {
                           ? "Start Packing"
                           : "ထုပ်ပိုးရန်စတင်ပါ"}
                     </>
-                  </button>
-                )}
-              </>
-            )}
+                    </button>
+                  )}
+                </>
+              )}
 
-            {/* 关闭按钮 */}
-            <button
-              onClick={() => setShowPackageDetailModal(false)}
-              style={{
+              {/* 关闭按钮 */}
+              <button
+                onClick={() => setShowPackageDetailModal(false)}
+                style={{
                 background: "rgba(59, 130, 246, 0.5)",
                 color: "white",
                 border: "1px solid rgba(59, 130, 246, 0.7)",
@@ -6165,16 +6165,16 @@ const ProfilePage: React.FC = () => {
                 fontWeight: "bold",
                 transition: "all 0.3s ease",
                 width: "100%",
-              }}
-              onMouseOver={(e) => {
+                }}
+                onMouseOver={(e) => {
                 e.currentTarget.style.background = "rgba(59, 130, 246, 0.7)";
-              }}
-              onMouseOut={(e) => {
+                }}
+                onMouseOut={(e) => {
                 e.currentTarget.style.background = "rgba(59, 130, 246, 0.5)";
-              }}
-            >
-              {t.close}
-            </button>
+                }}
+              >
+                {t.close}
+              </button>
           </div>
         </div>
       )}
@@ -6184,19 +6184,19 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(0, 0, 0, 0.8)",
             backdropFilter: "blur(5px)",
-            zIndex: 1001,
+          zIndex: 1001,
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
             padding: "2rem",
-          }}
-          onClick={closePickupCodeModal}
+        }}
+        onClick={closePickupCodeModal}
         >
           <div
             style={{
@@ -6211,8 +6211,8 @@ const ProfilePage: React.FC = () => {
               textAlign: "center",
               display: "flex",
               flexDirection: "column",
-            }}
-            onClick={(e) => e.stopPropagation()}
+          }}
+          onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -6309,7 +6309,7 @@ const ProfilePage: React.FC = () => {
                   {selectedPackage.receiver_name || "-"}
                 </p>
               </div>
-
+              
               <div
                 style={{
                   background: "white",
@@ -6336,7 +6336,7 @@ const ProfilePage: React.FC = () => {
                 >
                   {selectedPackage.id}
                 </div>
-
+                
                 {qrCodeDataUrl ? (
                   <div
                     style={{
@@ -6346,8 +6346,8 @@ const ProfilePage: React.FC = () => {
                       gap: "10px",
                     }}
                   >
-                    <img
-                      src={qrCodeDataUrl}
+                    <img 
+                      src={qrCodeDataUrl} 
                       alt={t.pickupCode}
                       style={{
                         width: "220px",
@@ -6360,7 +6360,7 @@ const ProfilePage: React.FC = () => {
                       style={{
                         color: "#666",
                         fontSize: "0.8rem",
-                        margin: 0,
+                      margin: 0,
                         textAlign: "center",
                       }}
                     >
@@ -6408,7 +6408,7 @@ const ProfilePage: React.FC = () => {
                   </div>
                 )}
               </div>
-
+              
               <div
                 style={{
                   background: "rgba(255, 255, 255, 0.05)",
@@ -6436,7 +6436,7 @@ const ProfilePage: React.FC = () => {
                     color: "rgba(255,255,255,0.9)",
                     fontSize: "0.85rem",
                     textAlign: "left",
-                    margin: 0,
+                  margin: 0,
                     paddingLeft: "20px",
                     lineHeight: "1.6",
                   }}
@@ -6522,9 +6522,9 @@ const ProfilePage: React.FC = () => {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 30000,
+          zIndex: 30000,
             padding: "1rem",
-          }}
+        }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowPasswordModal(false);
@@ -6864,15 +6864,15 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(15, 23, 42, 0.85)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 30000,
+          zIndex: 30000,
             backdropFilter: "blur(10px)",
             padding: "20px",
           }}
@@ -6920,7 +6920,7 @@ const ProfilePage: React.FC = () => {
                 <h2
                   style={{
                     color: "white",
-                    margin: 0,
+                  margin: 0,
                     fontSize: "1.5rem",
                     fontWeight: "900",
                   }}
@@ -6947,7 +6947,7 @@ const ProfilePage: React.FC = () => {
                 ✕
               </button>
             </div>
-
+            
             <div style={{ flex: 1, overflowY: "auto", paddingRight: "0.5rem" }}>
               {codOrders.length > 0 ? (
                 codOrders.map((order: any, index: number) => (
@@ -7065,16 +7065,16 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.85)",
             backdropFilter: "blur(15px)",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 20000,
+          zIndex: 20000,
             padding: "20px",
           }}
         >
@@ -7125,7 +7125,7 @@ const ProfilePage: React.FC = () => {
                   }}
                 >
                   🏪
-                </div>
+              </div>
                 <h3
                   style={{
                     color: "white",
@@ -7138,7 +7138,7 @@ const ProfilePage: React.FC = () => {
                 </h3>
               </div>
               <div style={{ display: "flex", gap: "1rem" }}>
-                <button
+                <button 
                   onClick={handleOpenAddProduct}
                   style={{
                     padding: "12px 28px",
@@ -7161,7 +7161,7 @@ const ProfilePage: React.FC = () => {
                 >
                   + {t.addProduct}
                 </button>
-                <button
+                <button 
                   onClick={() => setShowProductsModal(false)}
                   style={{
                     position: "relative",
@@ -7224,7 +7224,7 @@ const ProfilePage: React.FC = () => {
                   }}
                 >
                   {products.map((product: any) => (
-                    <div
+                    <div 
                       key={product.id}
                       onClick={() => handleOpenEditProduct(product)}
                       style={{
@@ -7317,9 +7317,9 @@ const ProfilePage: React.FC = () => {
                                 fontWeight: "600",
                               }}
                             >
-                              {product.original_price.toLocaleString()}
-                            </div>
-                          )}
+                            {product.original_price.toLocaleString()}
+                          </div>
+                        )}
                       </div>
                       {product.original_price &&
                         product.original_price > product.price && (
@@ -7344,8 +7344,8 @@ const ProfilePage: React.FC = () => {
                                 100,
                             )}
                             % OFF
-                          </div>
-                        )}
+                        </div>
+                      )}
                       <div
                         style={{
                           display: "flex",
@@ -7395,16 +7395,16 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.8)",
             backdropFilter: "blur(10px)",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 30000,
+          zIndex: 30000,
             padding: "20px",
           }}
         >
@@ -7422,7 +7422,7 @@ const ProfilePage: React.FC = () => {
               position: "relative",
             }}
           >
-            <button
+            <button 
               onClick={() => setShowAddEditProductModal(false)}
               style={{
                 position: "absolute",
@@ -7463,7 +7463,7 @@ const ProfilePage: React.FC = () => {
               }}
             >
               {/* 图片上传区域 */}
-              <div
+              <div 
                 onClick={() => productFileInputRef.current?.click()}
                 style={{
                   width: "100%",
@@ -7507,10 +7507,10 @@ const ProfilePage: React.FC = () => {
                     </div>
                   </>
                 )}
-                <input
-                  type="file"
-                  ref={productFileInputRef}
-                  onChange={handleImageUpload}
+                <input 
+                  type="file" 
+                  ref={productFileInputRef} 
+                  onChange={handleImageUpload} 
                   style={{ display: "none" }}
                   accept="image/*"
                 />
@@ -7528,7 +7528,7 @@ const ProfilePage: React.FC = () => {
                 >
                   {t.productName} *
                 </label>
-                <input
+                <input 
                   type="text"
                   value={productForm.name}
                   onChange={(e) =>
@@ -7561,7 +7561,7 @@ const ProfilePage: React.FC = () => {
                     ? "商品描述 (详细介绍商品细节)"
                     : "Description"}
                 </label>
-                <textarea
+                <textarea 
                   value={productForm.description}
                   onChange={(e) =>
                     setProductForm({
@@ -7601,7 +7601,7 @@ const ProfilePage: React.FC = () => {
                 >
                   {t.productPrice} (MMK) *
                 </label>
-                <input
+                <input 
                   type="number"
                   value={productForm.price}
                   onChange={(e) =>
@@ -7632,7 +7632,7 @@ const ProfilePage: React.FC = () => {
                 >
                   {t.productDiscount} (%)
                 </label>
-                <input
+                <input 
                   type="number"
                   value={productForm.discount_percent}
                   onChange={(e) =>
@@ -7666,7 +7666,7 @@ const ProfilePage: React.FC = () => {
                 >
                   {t.productStock} (-1={t.stockInfinite})
                 </label>
-                <input
+                <input 
                   type="number"
                   value={productForm.stock}
                   onChange={(e) =>
@@ -7699,7 +7699,7 @@ const ProfilePage: React.FC = () => {
                 >
                   {t.isAvailable}
                 </span>
-                <input
+                <input 
                   type="checkbox"
                   checked={productForm.is_available}
                   onChange={(e) =>
@@ -7714,7 +7714,7 @@ const ProfilePage: React.FC = () => {
 
               <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
                 {editingProduct && (
-                  <button
+                  <button 
                     onClick={() => handleDeleteProduct(editingProduct.id)}
                     style={{
                       flex: 1,
@@ -7730,7 +7730,7 @@ const ProfilePage: React.FC = () => {
                     🗑️ {t.delete}
                   </button>
                 )}
-                <button
+                <button 
                   onClick={handleSaveProduct}
                   style={{
                     flex: 2,
@@ -7758,16 +7758,16 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.85)", // 🚀 加深背景
             backdropFilter: "blur(15px)",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 99999, // 🚀 极高 Z-Index，确保在所有元素（包括 Header）上方
+          zIndex: 99999, // 🚀 极高 Z-Index，确保在所有元素（包括 Header）上方
             padding: "20px",
           }}
         >
@@ -7784,7 +7784,7 @@ const ProfilePage: React.FC = () => {
               animation: "fadeInUp 0.4s ease-out",
             }}
           >
-            <button
+            <button 
               onClick={() => setShowRechargeModal(false)}
               style={{
                 position: "absolute",
@@ -7855,10 +7855,10 @@ const ProfilePage: React.FC = () => {
               >
                 {[10000, 50000, 100000, 300000, 500000, 1000000].map(
                   (amount: number) => (
-                    <button
-                      key={amount}
-                      onClick={() => setRechargeAmount(amount.toString())}
-                      style={{
+                  <button
+                    key={amount}
+                    onClick={() => setRechargeAmount(amount.toString())}
+                    style={{
                         padding: "1.2rem",
                         borderRadius: "18px",
                         background:
@@ -7887,23 +7887,23 @@ const ProfilePage: React.FC = () => {
                           rechargeAmount === amount.toString()
                             ? "0 10px 20px rgba(59, 130, 246, 0.3)"
                             : "none",
-                      }}
-                    >
-                      <span>{amount.toLocaleString()}</span>
+                    }}
+                  >
+                    <span>{amount.toLocaleString()}</span>
                       <span style={{ fontSize: "0.7rem", opacity: 0.6 }}>
                         MMK
                       </span>
-                    </button>
+                  </button>
                   ),
                 )}
               </div>
 
-              <button
+              <button 
                 onClick={handleOpenPaymentQR}
                 disabled={
                   loading || !rechargeAmount || parseFloat(rechargeAmount) <= 0
                 }
-                style={{
+                style={{ 
                   marginTop: "1rem",
                   padding: "18px",
                   borderRadius: "18px",
@@ -7946,16 +7946,16 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.85)",
             backdropFilter: "blur(15px)",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 100000, // 🚀 确保在最高层
+          zIndex: 100000, // 🚀 确保在最高层
             padding: "20px",
           }}
         >
@@ -7972,7 +7972,7 @@ const ProfilePage: React.FC = () => {
               animation: "fadeInUp 0.4s ease-out",
             }}
           >
-            <button
+            <button 
               onClick={() => setShowPaymentQRModal(false)}
               style={{
                 position: "absolute",
@@ -8030,16 +8030,16 @@ const ProfilePage: React.FC = () => {
                   boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
                 }}
               >
-                <img
-                  src={`/kbz_qr_${selectedRechargeAmount}.png`}
-                  alt="KBZPay QR"
+                <img 
+                  src={`/kbz_qr_${selectedRechargeAmount}.png`} 
+                  alt="KBZPay QR" 
                   style={{
                     width: "220px",
                     height: "220px",
                     objectFit: "contain",
                   }}
                 />
-                <button
+                <button 
                   onClick={handleSaveQRCode}
                   style={{
                     position: "absolute",
@@ -8074,9 +8074,9 @@ const ProfilePage: React.FC = () => {
                 >
                   上传支付凭证截图：
                 </p>
-                <div
+                <div 
                   onClick={() => fileInputRef.current?.click()}
-                  style={{
+                  style={{ 
                     width: "100%",
                     height: "140px",
                     border: "2px dashed rgba(255,255,255,0.2)",
@@ -8115,19 +8115,19 @@ const ProfilePage: React.FC = () => {
                     </>
                   )}
                 </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="image/*"
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  accept="image/*" 
                   style={{ display: "none" }}
                 />
               </div>
 
-              <button
+              <button 
                 onClick={handleConfirmRecharge}
                 disabled={loading || !rechargeProof}
-                style={{
+                style={{ 
                   width: "100%",
                   padding: "18px",
                   borderRadius: "18px",
@@ -8183,18 +8183,18 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(15, 23, 42, 0.8)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 30000,
+          zIndex: 30000,
             backdropFilter: "blur(10px)",
-          }}
-          onClick={() => setShowPackingListModal(false)}
+        }}
+        onClick={() => setShowPackingListModal(false)}
         >
           <div
             style={{
@@ -8209,8 +8209,8 @@ const ProfilePage: React.FC = () => {
               border: "1px solid rgba(255, 255, 255, 0.1)",
               display: "flex",
               flexDirection: "column",
-            }}
-            onClick={(e) => e.stopPropagation()}
+          }}
+          onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -8243,7 +8243,7 @@ const ProfilePage: React.FC = () => {
                 <h2
                   style={{
                     color: "white",
-                    margin: 0,
+                  margin: 0,
                     fontSize: "1.75rem",
                     fontWeight: "800",
                   }}
@@ -8274,16 +8274,16 @@ const ProfilePage: React.FC = () => {
                 ✕
               </button>
             </div>
-
+            
             <div style={{ overflowY: "auto", flex: 1, paddingRight: "0.5rem" }}>
               {userPackages.filter((pkg) => pkg.status === "打包中").length >
               0 ? (
                 userPackages
                   .filter((pkg) => pkg.status === "打包中")
                   .map((pkg: any) => (
-                    <div
-                      key={pkg.id}
-                      style={{
+                  <div
+                    key={pkg.id}
+                    style={{
                         padding: "1.5rem",
                         marginBottom: "1rem",
                         background: "rgba(255, 255, 255, 0.05)",
@@ -8294,9 +8294,9 @@ const ProfilePage: React.FC = () => {
                         alignItems: "center",
                         gap: "1rem",
                         transition: "all 0.3s ease",
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
                         <div
                           style={{
                             color: "rgba(255, 255, 255, 0.5)",
@@ -8305,8 +8305,8 @@ const ProfilePage: React.FC = () => {
                             fontWeight: "bold",
                           }}
                         >
-                          {t.packageId}
-                        </div>
+                        {t.packageId}
+                      </div>
                         <div
                           style={{
                             color: "white",
@@ -8315,8 +8315,8 @@ const ProfilePage: React.FC = () => {
                             marginBottom: "8px",
                           }}
                         >
-                          {pkg.id}
-                        </div>
+                        {pkg.id}
+                      </div>
                         <div style={{ display: "flex", gap: "15px" }}>
                           <div
                             style={{
@@ -8325,8 +8325,8 @@ const ProfilePage: React.FC = () => {
                             }}
                           >
                             📅 {pkg.create_time || pkg.created_at || "-"}
-                          </div>
-                          {pkg.cod_amount > 0 && (
+                        </div>
+                        {pkg.cod_amount > 0 && (
                             <div
                               style={{
                                 color: "#fca5a5",
@@ -8334,17 +8334,17 @@ const ProfilePage: React.FC = () => {
                                 fontWeight: "bold",
                               }}
                             >
-                              💰 {pkg.cod_amount.toLocaleString()} MMK
-                            </div>
-                          )}
-                        </div>
+                            💰 {pkg.cod_amount.toLocaleString()} MMK
+                          </div>
+                        )}
                       </div>
-                      <button
-                        onClick={() => {
-                          setShowPackingListModal(false);
-                          handleStartPacking(pkg);
-                        }}
-                        style={{
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowPackingListModal(false);
+                        handleStartPacking(pkg);
+                      }}
+                      style={{
                           padding: "12px 24px",
                           background:
                             "linear-gradient(135deg, #10b981 0%, #059669 100%)",
@@ -8371,9 +8371,9 @@ const ProfilePage: React.FC = () => {
                           : language === "en"
                             ? "Start Packing"
                             : "ထုပ်ပိုးရန်စတင်ပါ"}
-                      </button>
-                    </div>
-                  ))
+                    </button>
+                  </div>
+                ))
               ) : (
                 <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
                   <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>
@@ -8438,18 +8438,18 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(15, 23, 42, 0.8)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 30000,
+          zIndex: 30000,
             backdropFilter: "blur(10px)",
-          }}
-          onClick={() => setShowPendingAcceptListModal(false)}
+        }}
+        onClick={() => setShowPendingAcceptListModal(false)}
         >
           <div
             style={{
@@ -8464,8 +8464,8 @@ const ProfilePage: React.FC = () => {
               border: "1px solid rgba(255, 255, 255, 0.1)",
               display: "flex",
               flexDirection: "column",
-            }}
-            onClick={(e) => e.stopPropagation()}
+          }}
+          onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -8498,7 +8498,7 @@ const ProfilePage: React.FC = () => {
                 <h2
                   style={{
                     color: "white",
-                    margin: 0,
+                  margin: 0,
                     fontSize: "1.75rem",
                     fontWeight: "800",
                   }}
@@ -8529,33 +8529,33 @@ const ProfilePage: React.FC = () => {
                 ✕
               </button>
             </div>
-
+            
             <div style={{ overflowY: "auto", flex: 1, paddingRight: "0.5rem" }}>
               {userPackages.filter((pkg) => pkg.status === "待确认").length >
               0 ? (
                 userPackages
                   .filter((pkg) => pkg.status === "待确认")
                   .map((pkg: any) => {
-                    // 解析商品信息
+                  // 解析商品信息
                     const itemsMatch = pkg.description?.match(
                       /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/,
                     );
                     const productItems = itemsMatch
                       ? itemsMatch[1].split(", ")
                       : [];
-                    const parsedItems = productItems.map((item: string) => {
-                      const match = item.match(/^(.+?)\s*x(\d+)$/i);
-                      if (!match) return { label: item, qty: 1 };
+                  const parsedItems = productItems.map((item: string) => {
+                    const match = item.match(/^(.+?)\s*x(\d+)$/i);
+                    if (!match) return { label: item, qty: 1 };
                       return {
                         label: match[1].trim(),
                         qty: Number(match[2]) || 1,
                       };
-                    });
+                  });
 
-                    return (
-                      <div
-                        key={pkg.id}
-                        style={{
+                  return (
+                    <div
+                      key={pkg.id}
+                      style={{
                           padding: "1.5rem",
                           marginBottom: "2rem",
                           background: "rgba(255, 255, 255, 0.05)",
@@ -8565,9 +8565,9 @@ const ProfilePage: React.FC = () => {
                           flexDirection: "column",
                           gap: "1.5rem",
                           transition: "all 0.3s ease",
-                        }}
-                      >
-                        {/* 订单 ID 和 二维码区域 */}
+                      }}
+                    >
+                      {/* 订单 ID 和 二维码区域 */}
                         <div
                           style={{
                             display: "flex",
@@ -8575,7 +8575,7 @@ const ProfilePage: React.FC = () => {
                             alignItems: "flex-start",
                           }}
                         >
-                          <div>
+                        <div>
                             <div
                               style={{
                                 color: "rgba(255, 255, 255, 0.5)",
@@ -8584,8 +8584,8 @@ const ProfilePage: React.FC = () => {
                                 fontWeight: "bold",
                               }}
                             >
-                              {t.packageId}
-                            </div>
+                            {t.packageId}
+                          </div>
                             <div
                               style={{
                                 color: "#fbbf24",
@@ -8593,8 +8593,8 @@ const ProfilePage: React.FC = () => {
                                 fontWeight: "900",
                               }}
                             >
-                              #{pkg.id}
-                            </div>
+                            #{pkg.id}
+                          </div>
                             <div
                               style={{
                                 color: "rgba(255, 255, 255, 0.7)",
@@ -8603,8 +8603,8 @@ const ProfilePage: React.FC = () => {
                               }}
                             >
                               📅 {pkg.create_time || pkg.created_at || "-"}
-                            </div>
                           </div>
+                        </div>
                           <div
                             style={{
                               background: "white",
@@ -8612,11 +8612,11 @@ const ProfilePage: React.FC = () => {
                               borderRadius: "16px",
                             }}
                           >
-                            <OrderQRCode orderId={pkg.id} />
-                          </div>
+                          <OrderQRCode orderId={pkg.id} />
                         </div>
+                      </div>
 
-                        {/* 信息网格 */}
+                      {/* 信息网格 */}
                         <div
                           style={{
                             display: "grid",
@@ -8624,7 +8624,7 @@ const ProfilePage: React.FC = () => {
                             gap: "1.5rem",
                           }}
                         >
-                          {/* 商家信息 */}
+                        {/* 商家信息 */}
                           <div
                             style={{
                               background: "rgba(255,255,255,0.03)",
@@ -8671,8 +8671,8 @@ const ProfilePage: React.FC = () => {
                             >
                               {pkg.sender_address}
                             </div>
-                          </div>
-                          {/* 客户信息 */}
+                        </div>
+                        {/* 客户信息 */}
                           <div
                             style={{
                               background: "rgba(255,255,255,0.03)",
@@ -8719,10 +8719,10 @@ const ProfilePage: React.FC = () => {
                             >
                               {pkg.receiver_address}
                             </div>
-                          </div>
                         </div>
+                      </div>
 
-                        {/* 商品清单 */}
+                      {/* 商品清单 */}
                         <div
                           style={{
                             background: "rgba(255,255,255,0.03)",
@@ -8749,7 +8749,7 @@ const ProfilePage: React.FC = () => {
                               gap: "8px",
                             }}
                           >
-                            {parsedItems.map((item: any, idx: number) => (
+                          {parsedItems.map((item: any, idx: number) => (
                               <div
                                 key={idx}
                                 style={{
@@ -8759,13 +8759,13 @@ const ProfilePage: React.FC = () => {
                                   fontSize: "0.95rem",
                                 }}
                               >
-                                <span>• {item.label}</span>
+                              <span>• {item.label}</span>
                                 <span style={{ fontWeight: "900" }}>
                                   x{item.qty}
                                 </span>
-                              </div>
-                            ))}
-                          </div>
+                            </div>
+                          ))}
+                        </div>
                           <div
                             style={{
                               marginTop: "12px",
@@ -8797,11 +8797,11 @@ const ProfilePage: React.FC = () => {
                                 ? `${pkg.price.replace("MMK", "").trim()} MMK`
                                 : "-"}
                             </span>
-                          </div>
                         </div>
+                      </div>
 
-                        {/* 客户备注 */}
-                        {pkg.notes && (
+                      {/* 客户备注 */}
+                      {pkg.notes && (
                           <div
                             style={{
                               background: "rgba(251, 191, 36, 0.1)",
@@ -8825,15 +8825,15 @@ const ProfilePage: React.FC = () => {
                             >
                               {pkg.notes}
                             </div>
-                          </div>
-                        )}
+                        </div>
+                      )}
 
-                        {/* 操作按钮 */}
+                      {/* 操作按钮 */}
                         <div style={{ display: "flex", gap: "1rem" }}>
-                          <button
-                            onClick={() => handleCancelOrder(pkg)}
-                            style={{
-                              flex: 1,
+                        <button
+                          onClick={() => handleCancelOrder(pkg)}
+                          style={{
+                            flex: 1,
                               padding: "1rem",
                               background: "rgba(239, 68, 68, 0.15)",
                               color: "#fca5a5",
@@ -8842,14 +8842,14 @@ const ProfilePage: React.FC = () => {
                               fontWeight: "800",
                               cursor: "pointer",
                               transition: "all 0.3s ease",
-                            }}
-                          >
-                            ✕ 拒绝接单
-                          </button>
-                          <button
-                            onClick={() => handleAcceptOrder(pkg)}
-                            style={{
-                              flex: 2,
+                          }}
+                        >
+                          ✕ 拒绝接单
+                        </button>
+                        <button
+                          onClick={() => handleAcceptOrder(pkg)}
+                          style={{
+                            flex: 2,
                               padding: "1rem",
                               background:
                                 "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
@@ -8861,14 +8861,14 @@ const ProfilePage: React.FC = () => {
                               cursor: "pointer",
                               boxShadow: "0 8px 20px rgba(245, 158, 11, 0.3)",
                               transition: "all 0.3s ease",
-                            }}
-                          >
-                            🤝 立即接单 (自动打单)
-                          </button>
-                        </div>
+                          }}
+                        >
+                          🤝 立即接单 (自动打单)
+                        </button>
                       </div>
-                    );
-                  })
+                    </div>
+                  );
+                })
               ) : (
                 <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
                   <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>
@@ -8933,19 +8933,19 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(0, 0, 0, 0.85)",
             backdropFilter: "blur(10px)",
-            zIndex: 30000,
+          zIndex: 30000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             padding: "1rem",
-          }}
-          onClick={() => !loading && setShowPackingModal(false)}
+        }}
+        onClick={() => !loading && setShowPackingModal(false)}
         >
           <div
             style={{
@@ -8959,8 +8959,8 @@ const ProfilePage: React.FC = () => {
               flexDirection: "column",
               boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
               position: "relative",
-            }}
-            onClick={(e) => e.stopPropagation()}
+          }}
+          onClick={(e) => e.stopPropagation()}
           >
             {/* 打包窗口页眉 */}
             <div
@@ -8997,7 +8997,7 @@ const ProfilePage: React.FC = () => {
                 {t.packageId}: {packingOrderData.id}
               </p>
               {!loading && (
-                <button
+                <button 
                   onClick={() => setShowPackingModal(false)}
                   style={{
                     position: "absolute",
@@ -9040,7 +9040,7 @@ const ProfilePage: React.FC = () => {
                       ? "Checklist"
                       : "ပစ္စည်းစာရင်းစစ်ဆေးရန်"}
                 </h3>
-
+                
                 <div
                   style={{
                     display: "flex",
@@ -9057,7 +9057,7 @@ const ProfilePage: React.FC = () => {
                     const productItems = productsMatch
                       ? productsMatch[1].split(", ")
                       : [];
-
+                    
                     if (productItems.length === 0) {
                       return (
                         <div
@@ -9084,8 +9084,8 @@ const ProfilePage: React.FC = () => {
                               cursor: "pointer",
                             }}
                           >
-                            <input
-                              type="checkbox"
+                            <input 
+                              type="checkbox" 
                               checked={checkedItems["default"]}
                               onChange={() => toggleItem("default")}
                               style={{
@@ -9111,7 +9111,7 @@ const ProfilePage: React.FC = () => {
                     }
 
                     return productItems.map((item: string, index: number) => (
-                      <div
+                      <div 
                         key={index}
                         onClick={() => toggleItem(`item-${index}`)}
                         style={{
@@ -9199,8 +9199,8 @@ const ProfilePage: React.FC = () => {
                     >
                       {packingOrderData.description}
                     </p>
-                  </div>
-                )}
+                </div>
+              )}
             </div>
 
             {/* 底部操作栏 */}
@@ -9303,18 +9303,18 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(15, 23, 42, 0.8)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 30000,
+          zIndex: 30000,
             backdropFilter: "blur(10px)",
-          }}
-          onClick={() => setShowReviewsModal(false)}
+        }}
+        onClick={() => setShowReviewsModal(false)}
         >
           <div
             style={{
@@ -9329,8 +9329,8 @@ const ProfilePage: React.FC = () => {
               border: "1px solid rgba(255, 255, 255, 0.1)",
               display: "flex",
               flexDirection: "column",
-            }}
-            onClick={(e) => e.stopPropagation()}
+          }}
+          onClick={(e) => e.stopPropagation()}
           >
             {/* 页眉 */}
             <div
@@ -9425,7 +9425,7 @@ const ProfilePage: React.FC = () => {
                 ✕
               </button>
             </div>
-
+            
             <div style={{ overflowY: "auto", flex: 1, paddingRight: "0.5rem" }}>
               {loadingReviews ? (
                 <div style={{ textAlign: "center", padding: "5rem" }}>
@@ -9547,11 +9547,11 @@ const ProfilePage: React.FC = () => {
                             marginBottom: "1.25rem",
                           }}
                         >
-                          {review.images.map((img, idx) => (
-                            <img
-                              key={`${review.id}-img-${idx}`}
-                              src={img}
-                              alt={`Review ${idx + 1}`}
+                        {review.images.map((img, idx) => (
+                          <img 
+                            key={`${review.id}-img-${idx}`} 
+                            src={img} 
+                            alt={`Review ${idx + 1}`} 
                               style={{
                                 width: "80px",
                                 height: "80px",
@@ -9561,14 +9561,14 @@ const ProfilePage: React.FC = () => {
                                 border: "1px solid rgba(255,255,255,0.1)",
                               }}
                               onClick={() => window.open(img, "_blank")}
-                              onError={(e) => {
+                            onError={(e) => {
                                 console.error("图片加载失败:", img);
                                 e.currentTarget.style.display = "none"; // 隐藏加载失败的图片
-                              }}
-                            />
-                          ))}
-                        </div>
-                      )}
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
 
                     {/* 商家回复部分 */}
                     {review.reply_text ? (
@@ -9766,19 +9766,19 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(0, 0, 0, 0.85)",
             backdropFilter: "blur(10px)",
-            zIndex: 30000,
+          zIndex: 30000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             padding: "1rem",
-          }}
-          onClick={() => !isSubmittingReview && setShowReviewSubmitModal(false)}
+        }}
+        onClick={() => !isSubmittingReview && setShowReviewSubmitModal(false)}
         >
           <div
             style={{
@@ -9792,8 +9792,8 @@ const ProfilePage: React.FC = () => {
               flexDirection: "column",
               boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
               position: "relative",
-            }}
-            onClick={(e) => e.stopPropagation()}
+          }}
+          onClick={(e) => e.stopPropagation()}
           >
             {/* 页眉 */}
             <div
@@ -9825,7 +9825,7 @@ const ProfilePage: React.FC = () => {
                 {t.packageId}: {reviewOrder.id}
               </p>
               {!isSubmittingReview && (
-                <button
+                <button 
                   onClick={() => setShowReviewSubmitModal(false)}
                   style={{
                     position: "absolute",
@@ -9866,10 +9866,10 @@ const ProfilePage: React.FC = () => {
                   }}
                 >
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <span
+                    <span 
                       key={star}
                       onClick={() => setReviewRating(star)}
-                      style={{
+                      style={{ 
                         fontSize: "1.75rem",
                         cursor: "pointer",
                         color: star <= reviewRating ? "#fbbf24" : "#e2e8f0",
@@ -9933,7 +9933,7 @@ const ProfilePage: React.FC = () => {
                       ? "写下您的真实评价，帮助我们做得更好..."
                       : "Share your experience..."
                   }
-                  style={{
+                  style={{ 
                     width: "100%",
                     minHeight: "120px",
                     background: "#f8fafc",
@@ -9983,7 +9983,7 @@ const ProfilePage: React.FC = () => {
                           objectFit: "cover",
                         }}
                       />
-                      <button
+                      <button 
                         onClick={() => handleRemoveReviewImage(index)}
                         style={{
                           position: "absolute",
@@ -10007,12 +10007,12 @@ const ProfilePage: React.FC = () => {
                     </div>
                   ))}
                   {reviewImages.length < 6 && (
-                    <div
+                    <div 
                       onClick={() =>
                         !isUploadingReviewImage &&
                         reviewImageInputRef.current?.click()
                       }
-                      style={{
+                      style={{ 
                         width: "80px",
                         height: "80px",
                         border: "2px dashed #cbd5e1",
@@ -10053,12 +10053,12 @@ const ProfilePage: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  ref={reviewImageInputRef}
-                  onChange={handleReviewImageUpload}
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*" 
+                  ref={reviewImageInputRef} 
+                  onChange={handleReviewImageUpload} 
                   style={{ display: "none" }}
                 />
               </div>
@@ -10188,8 +10188,8 @@ const ProfilePage: React.FC = () => {
                 添加休假日期，系统将在这些日期自动设为歇业状态。
               </p>
               <div style={{ display: "flex", gap: "10px" }}>
-                <input
-                  type="date"
+                <input 
+                  type="date" 
                   value={tempVacationDate}
                   onChange={(e) => setTempVacationDate(e.target.value)}
                   style={{
@@ -10202,7 +10202,7 @@ const ProfilePage: React.FC = () => {
                     outline: "none",
                   }}
                 />
-                <button
+                <button 
                   onClick={handleAddVacationDate}
                   style={{
                     background: "#3b82f6",
@@ -10373,8 +10373,8 @@ const ProfilePage: React.FC = () => {
                   {language === "zh" ? "编辑个人资料" : "Edit Profile"}
                 </h3>
               </div>
-              <button
-                onClick={() => setShowEditProfileModal(false)}
+              <button 
+                onClick={() => setShowEditProfileModal(false)} 
                 style={{
                   background: "rgba(255,255,255,0.1)",
                   border: "none",
@@ -10432,8 +10432,8 @@ const ProfilePage: React.FC = () => {
                   >
                     👤
                   </span>
-                  <input
-                    type="text"
+                  <input 
+                    type="text" 
                     value={editProfileForm.name}
                     onChange={(e) =>
                       setEditProfileForm({
@@ -10484,8 +10484,8 @@ const ProfilePage: React.FC = () => {
                   >
                     📞
                   </span>
-                  <input
-                    type="text"
+                  <input 
+                    type="text" 
                     value={editProfileForm.phone}
                     onChange={(e) =>
                       setEditProfileForm({
@@ -10536,8 +10536,8 @@ const ProfilePage: React.FC = () => {
                   >
                     📧
                   </span>
-                  <input
-                    type="email"
+                  <input 
+                    type="email" 
                     value={editProfileForm.email}
                     onChange={(e) =>
                       setEditProfileForm({
@@ -10588,7 +10588,7 @@ const ProfilePage: React.FC = () => {
                   >
                     📍
                   </span>
-                  <textarea
+                  <textarea 
                     value={editProfileForm.address}
                     onChange={(e) =>
                       setEditProfileForm({
@@ -10699,19 +10699,19 @@ const ProfilePage: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
             background: "rgba(0, 0, 0, 0.85)",
             backdropFilter: "blur(10px)",
-            zIndex: 30000,
+          zIndex: 30000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             padding: "1rem",
-          }}
-          onClick={() => !isExporting && setShowExportModal(false)}
+        }}
+        onClick={() => !isExporting && setShowExportModal(false)}
         >
           <div
             style={{
@@ -10723,8 +10723,8 @@ const ProfilePage: React.FC = () => {
               boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
               border: "1px solid rgba(255,255,255,0.1)",
               position: "relative",
-            }}
-            onClick={(e) => e.stopPropagation()}
+          }}
+          onClick={(e) => e.stopPropagation()}
           >
             {/* 页眉 */}
             <div
@@ -10780,8 +10780,8 @@ const ProfilePage: React.FC = () => {
                   >
                     {language === "zh" ? "开始日期" : "Start Date"}
                   </label>
-                  <input
-                    type="date"
+                  <input 
+                    type="date" 
                     value={exportStartDate}
                     onChange={(e) => setExportStartDate(e.target.value)}
                     style={{
@@ -10807,8 +10807,8 @@ const ProfilePage: React.FC = () => {
                   >
                     {language === "zh" ? "结束日期" : "End Date"}
                   </label>
-                  <input
-                    type="date"
+                  <input 
+                    type="date" 
                     value={exportEndDate}
                     onChange={(e) => setExportEndDate(e.target.value)}
                     style={{
@@ -10838,7 +10838,7 @@ const ProfilePage: React.FC = () => {
                   {language === "zh" ? "文件格式" : "File Format"}
                 </label>
                 <div style={{ display: "flex", gap: "1rem" }}>
-                  <button
+                  <button 
                     onClick={() => setExportFormat("pdf")}
                     style={{
                       flex: 1,
@@ -10857,7 +10857,7 @@ const ProfilePage: React.FC = () => {
                   >
                     PDF
                   </button>
-                  <button
+                  <button 
                     onClick={() => setExportFormat("excel")}
                     style={{
                       flex: 1,
@@ -10893,7 +10893,7 @@ const ProfilePage: React.FC = () => {
                   {language === "zh" ? "导出方式" : "Export Method"}
                 </label>
                 <div style={{ display: "flex", gap: "1rem" }}>
-                  <button
+                  <button 
                     onClick={() => setExportMethod("download")}
                     style={{
                       flex: 1,
@@ -10912,7 +10912,7 @@ const ProfilePage: React.FC = () => {
                   >
                     ⬇️ {language === "zh" ? "直接下载" : "Download"}
                   </button>
-                  <button
+                  <button 
                     onClick={() => setExportMethod("email")}
                     style={{
                       flex: 1,
@@ -11103,7 +11103,7 @@ const ProfilePage: React.FC = () => {
               >
                 ✕
               </button>
-            </div>
+    </div>
             <div
               style={{
                 flex: 1,

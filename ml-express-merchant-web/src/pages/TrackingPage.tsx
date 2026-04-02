@@ -33,7 +33,7 @@ const TrackingPage: React.FC = () => {
   const location = useLocation();
   const { language, setLanguage, t: allT } = useLanguage();
   const t = allT.profile;
-
+  
   const { isLoaded: isMapLoaded } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: GOOGLE_MAPS_LIBRARIES,
@@ -92,10 +92,10 @@ const TrackingPage: React.FC = () => {
       setLoading(true);
       try {
         const storeId = user.store_id || user.id;
-        const packages = await packageService.getPackagesByUser(
+      const packages = await packageService.getPackagesByUser(
           user.email,
           user.phone,
-          undefined,
+        undefined,
           storeId,
           user.id,
           user.name,
@@ -106,11 +106,11 @@ const TrackingPage: React.FC = () => {
           setIsPartnerStore(true);
           await loadStoreData(storeId);
         }
-      } catch (error) {
+    } catch (error) {
         LoggerService.error("Failed to load orders:", error);
-      } finally {
+    } finally {
         setLoading(false);
-      }
+    }
     },
     [loadStoreData],
   );
@@ -417,8 +417,8 @@ const TrackingPage: React.FC = () => {
       if (success) {
         setShowPackingModal(false);
         if (currentUser) loadActiveOrders(currentUser);
-      }
-    } catch (error) {
+            }
+          } catch (error) {
       LoggerService.error("打包失败:", error);
     } finally {
       setLoading(false);
@@ -469,7 +469,7 @@ const TrackingPage: React.FC = () => {
                 }}
               >
                 {t?.packages || "订单列表"}
-              </h1>
+          </h1>
               <p
                 style={{
                   color: "rgba(255,255,255,0.5)",
@@ -480,14 +480,14 @@ const TrackingPage: React.FC = () => {
               >
                 {statusFilter === "all" ? "处理中的订单" : statusFilter}{" "}
                 {filteredOrders.length} 笔
-              </p>
-            </div>
+          </p>
+        </div>
           </div>
           <div style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.85rem" }}>
             {statusFilter.toUpperCase()}
           </div>
-        </div>
-
+            </div>
+            
         {loading && activeOrders.length === 0 ? (
           <div style={{ textAlign: "center", padding: "10rem 0" }}>
             <div
@@ -502,8 +502,8 @@ const TrackingPage: React.FC = () => {
                 margin: "0 auto",
               }}
             ></div>
-          </div>
-        ) : (
+                </div>
+              ) : (
           <div style={{ display: "grid", gap: "1.5rem" }}>
             {filteredOrders
               .slice(
@@ -511,8 +511,8 @@ const TrackingPage: React.FC = () => {
                 currentPage * packagesPerPage,
               )
               .map((order) => (
-                <div
-                  key={order.id}
+                    <div
+                      key={order.id}
                   onClick={() => handleOrderClick(order)}
                   style={{
                     background: "rgba(255,255,255,0.05)",
@@ -552,7 +552,7 @@ const TrackingPage: React.FC = () => {
                         }}
                       >
                         #{order.id}
-                      </span>
+                        </span>
                       <span
                         style={{
                           background: getStatusColor(
@@ -569,7 +569,7 @@ const TrackingPage: React.FC = () => {
                           ? getStatusText(order.status)
                           : order.status}
                       </span>
-                    </div>
+                        </div>
                     <p
                       style={{
                         color: "rgba(255,255,255,0.6)",
@@ -588,7 +588,7 @@ const TrackingPage: React.FC = () => {
                     >
                       地址: {order.receiver_address}
                     </p>
-                  </div>
+                      </div>
                   <div style={{ textAlign: "right" }}>
                     <p
                       style={{
@@ -610,8 +610,8 @@ const TrackingPage: React.FC = () => {
                     >
                       {new Date(order.created_at).toLocaleString()}
                     </p>
-                  </div>
-                </div>
+                      </div>
+                      </div>
               ))}
           </div>
         )}
@@ -619,7 +619,7 @@ const TrackingPage: React.FC = () => {
         {/* 分页 */}
         {filteredOrders.length > packagesPerPage && (
           <div
-            style={{
+                style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -666,10 +666,10 @@ const TrackingPage: React.FC = () => {
                   },
                   (_, i) => i + 1,
                 ).map((page) => (
-                  <button
+              <button
                     key={page}
                     onClick={() => setCurrentPage(page)}
-                    style={{
+                style={{
                       background:
                         currentPage === page ? "#3b82f6" : "transparent",
                       color: "white",
@@ -744,7 +744,7 @@ const TrackingPage: React.FC = () => {
               {language === "zh"
                 ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, filteredOrders.length)} 条，共 ${filteredOrders.length} 条`
                 : `Showing ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, filteredOrders.length)} of ${filteredOrders.length}`}
-            </div>
+          </div>
           </div>
         )}
 
@@ -761,10 +761,10 @@ const TrackingPage: React.FC = () => {
             <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>✨</div>
             <h3 style={{ color: "rgba(255,255,255,0.5)" }}>
               当前暂无该状态下的订单
-            </h3>
-          </div>
+                  </h3>
+                    </div>
         )}
-      </div>
+                    </div>
 
       <style>{` @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .spinner { animation: spin 1s linear infinite; } `}</style>
 
@@ -830,7 +830,7 @@ const TrackingPage: React.FC = () => {
               >
                 {t?.close || "关闭"}
               </button>
-            </div>
+                    </div>
 
             <div style={{ display: "grid", gap: "1.5rem" }}>
               {/* 🚀 统一后的订单详情内容 (参考待接单列表风格) */}
@@ -879,7 +879,7 @@ const TrackingPage: React.FC = () => {
                           }}
                         >
                           {t.packageId}
-                        </div>
+                            </div>
                         <div
                           style={{
                             color: "#fbbf24",
@@ -888,7 +888,7 @@ const TrackingPage: React.FC = () => {
                           }}
                         >
                           #{selectedPackage.id}
-                        </div>
+                          </div>
                         <div
                           style={{
                             color: "rgba(255, 255, 255, 0.7)",
@@ -900,7 +900,7 @@ const TrackingPage: React.FC = () => {
                           {selectedPackage.create_time ||
                             selectedPackage.created_at ||
                             "-"}
-                        </div>
+                      </div>
                         <div style={{ marginTop: "1rem" }}>
                           <div
                             style={{
@@ -920,7 +920,7 @@ const TrackingPage: React.FC = () => {
                             {selectedPackage.status === "待收款"
                               ? getStatusText(selectedPackage.status)
                               : selectedPackage.status}
-                          </div>
+                  </div>
                         </div>
                       </div>
                       <div
@@ -932,9 +932,9 @@ const TrackingPage: React.FC = () => {
                         }}
                       >
                         <OrderQRCode orderId={selectedPackage.id} />
-                      </div>
-                    </div>
-
+                </div>
+              </div>
+              
                     {/* 信息网格 */}
                     <div
                       style={{
@@ -964,7 +964,7 @@ const TrackingPage: React.FC = () => {
                           }}
                         >
                           商家信息
-                        </div>
+                            </div>
                         <div
                           style={{
                             color: "white",
@@ -1066,7 +1066,7 @@ const TrackingPage: React.FC = () => {
                         }}
                       >
                         商品清单
-                      </div>
+                            </div>
                       <div
                         style={{
                           display: "flex",
@@ -1112,8 +1112,8 @@ const TrackingPage: React.FC = () => {
                                   {item.price.toLocaleString()} MMK
                                 </span>
                               )}
-                            </div>
-                          </div>
+                    </div>
+                    </div>
                         ))}
                       </div>
 
@@ -1242,7 +1242,7 @@ const TrackingPage: React.FC = () => {
                           }}
                         >
                           💡 客户备注
-                        </div>
+                    </div>
                         <div
                           style={{
                             color: "white",
@@ -1252,13 +1252,13 @@ const TrackingPage: React.FC = () => {
                           }}
                         >
                           {selectedPackage.notes}
-                        </div>
+                    </div>
                       </div>
                     )}
                   </>
                 );
               })()}
-            </div>
+                  </div>
 
             {/* 🚀 商家专属操作按钮 */}
             {isPartnerStore && (
@@ -1328,8 +1328,8 @@ const TrackingPage: React.FC = () => {
                     >
                       {language === "zh" ? "拒绝接单" : "Reject Order"}
                     </button>
-                  </>
-                )}
+                    </>
+                  )}
                 {selectedPackage.status === "打包中" && (
                   <button
                     onClick={() => handleStartPacking(selectedPackage)}
@@ -1363,8 +1363,8 @@ const TrackingPage: React.FC = () => {
                           : "ထုပ်ပိုးရန်စတင်ပါ"}
                     </>
                   </button>
-                )}
-              </div>
+                  )}
+                </div>
             )}
 
             <button
@@ -1384,9 +1384,9 @@ const TrackingPage: React.FC = () => {
             >
               {t?.close || "关闭"}
             </button>
-          </div>
-        </div>
-      )}
+              </div>
+            </div>
+          )}
 
       {/* 🚀 打包模态框 (与 ProfilePage 同步) */}
       {showPackingModal && packingOrderData && (
@@ -1450,7 +1450,7 @@ const TrackingPage: React.FC = () => {
               >
                 {t?.packageId}: {packingOrderData.id}
               </p>
-            </div>
+        </div>
             <div style={{ flex: 1, overflowY: "auto", padding: "2rem" }}>
               <h3
                 style={{
@@ -1517,7 +1517,7 @@ const TrackingPage: React.FC = () => {
                             {language === "zh" ? "确认商品已备齐" : "Confirm"}
                           </span>
                         </label>
-                      </div>
+      </div>
                     );
                   }
                   return productItems.map((item: string, index: number) => (
@@ -1620,7 +1620,7 @@ const TrackingPage: React.FC = () => {
                     ? "确认打包完成"
                     : "Packing Done"}
               </button>
-            </div>
+    </div>
           </div>
         </div>
       )}
