@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ML EXPRESS MERCHANTS",
+    "name": "MARKET LINK MERCHANT",
     "slug": "ml-express-merchants",
     "version": "2.0.0",
     "scheme": "ml-express-merchants",
@@ -26,8 +26,8 @@
         "NSCameraUsageDescription": "MARKET LINK EXPRESS needs access to your camera to scan QR codes and take delivery verification photos. / 需要访问相机以扫描二维码和拍照。 / QR ကုဒ်စကင်ဖတ်ရန် ကင်မရာလိုအပ်ပါသည်။",
         "NSPhotoLibraryUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save QR codes and delivery proof photos. / 需要访问相册以保存图片。 / ဓာတ်ပုံသိမ်းဆည်းရန် ဓာတ်ပုံပြခန်းလိုအပ်ပါသည်။",
         "NSPhotoLibraryAddUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save payment QR codes. / 需要相册权限以保存付款二维码。 / ငွေပေးချေမှု QR ကုဒ်သိမ်းဆည်းရန် ဓာတ်ပုံပြခန်းလိုအပ်ပါသည်။",
-        "CFBundleDisplayName": "ML MERCHANTS",
-        "CFBundleName": "ML MERCHANTS",
+        "CFBundleDisplayName": "MARKET LINK MERCHANT",
+        "CFBundleName": "MARKET LINK MERCHANT",
         "CFBundleShortVersionString": "2.0.0",
         "CFBundleVersion": "2",
         "LSRequiresIPhoneOS": true,
