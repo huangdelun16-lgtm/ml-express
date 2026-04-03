@@ -1,18 +1,24 @@
 import { createClient } from "@supabase/supabase-js";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import LoggerService from "./../services/LoggerService";
 import NotificationService from "./notificationService";
 import { errorService } from "./ErrorService";
 import { retry } from "../utils/retry";
 
-// 使用环境变量配置 Supabase
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
+type SupabaseExtra = { supabaseUrl?: string; supabaseAnonKey?: string };
+const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra) as SupabaseExtra | undefined;
+
+// 优先级：EAS Build / 本机 expo start 注入的 EXPO_PUBLIC_* → app.json extra（可选回退，勿在 Git 中提交密钥）
+const supabaseUrl =
+  process.env.EXPO_PUBLIC_SUPABASE_URL || extra?.supabaseUrl || "";
+const supabaseKey =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || extra?.supabaseAnonKey || "";
 
 // 关键：不要在顶层 throw 错误，这会导致整个 JS Bundle 崩溃，从而出现白屏
 if (!supabaseUrl || !supabaseKey) {
   LoggerService.error(
-    "Supabase 环境变量未配置！请检查 EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_ANON_KEY",
+    "Supabase 未配置：请在 EAS 环境变量或本机 .env 中设置 EXPO_PUBLIC_SUPABASE_URL 与 EXPO_PUBLIC_SUPABASE_ANON_KEY。详见项目内 docs/EAS_ENVIRONMENT_SETUP.txt",
   );
 }
 

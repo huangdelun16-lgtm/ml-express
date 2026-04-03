@@ -159,6 +159,17 @@ const ContactPage: React.FC = () => {
                 downloadUrl: 'https://market-link-express.com/download-rider'
               },
               {
+                icon: '🏪',
+                title: language === 'zh' ? '下载商家端 App' : language === 'en' ? 'Download Merchant App' : 'Merchant App ဒေါင်းလုဒ်လုပ်ရန်',
+                value: language === 'zh' ? '店铺经营、订单与商品管理' : language === 'en' ? 'Store operations, orders & inventory' : 'ဆိုင်လုပ်ငန်း၊ အော်ဒါနှင့် ကုန်ပစ္စည်းစီမံခန့်ခွဲမှု',
+                color: '#9f7aea',
+                bgGradient: 'linear-gradient(135deg, #805ad5 0%, #b794f4 100%)',
+                iconBg: 'linear-gradient(135deg, #805ad5 0%, #b794f4 100%)',
+                isDownload: true,
+                downloadUrl: 'https://mlexpress-merchant.netlify.app/download',
+                downloadButtonText: language === 'zh' ? '立即下载' : language === 'en' ? 'Download Now' : 'ယခုဒေါင်းလုဒ်လုပ်မည်'
+              },
+              {
                 icon: '📞',
                 title: t.contact.phone,
                 value: (
@@ -327,7 +338,7 @@ const ContactPage: React.FC = () => {
                       onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
                       onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
                     >
-                      {language === 'zh' ? '立即下载 APK' : language === 'en' ? 'Download APK' : 'APK ဒေါင်းလုဒ်လုပ်မည်'}
+                      {contact.downloadButtonText ?? (language === 'zh' ? '立即下载 APK' : language === 'en' ? 'Download APK' : 'APK ဒေါင်းလုဒ်လုပ်မည်')}
                     </button>
                     <p style={{ fontSize: '0.9rem', color: '#4a5568', fontWeight: '600', opacity: 0.8, lineHeight: '1.4' }}>
                       {contact.value}

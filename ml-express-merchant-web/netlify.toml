@@ -9,9 +9,11 @@
   # 🚀 尝试强制跳过可能导致问题的插件安装
   NETLIFY_SKIP_PLUGINS = "true"
 
+# 勿用 releases/latest：若最新 Release 未附带 ml-express-merchants.apk 会 404。
+# 发布新版商家 APK 后请上传到 GitHub 并改为对应 tag，或恢复为 latest（且保证附件存在）。
 [[redirects]]
   from = "/download"
-  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-merchants.apk"
+  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/download/v.2.1.1-merchants/ml-express-merchants.apk"
   status = 302
   force = true
 

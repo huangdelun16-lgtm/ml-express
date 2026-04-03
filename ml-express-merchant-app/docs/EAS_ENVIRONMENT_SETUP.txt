@@ -1,0 +1,66 @@
+商家端 EAS 环境变量（安全说明）
+================================
+
+为何不用 eas.json 直接写密钥？
+  eas.json 会进 Git。敏感值应放在 Expo 云端：Dashboard 或使用 CLI 写入「环境变量」，
+  构建时再注入到 process.env，最终打进 JS 包（EXPO_PUBLIC_* 仍会在客户端可见，这是
+  Supabase anon 的设计；但密钥不留在仓库里，便于轮换与权限管理）。
+
+eas.json 与本项目
+  各 build profile 已设置 "environment": "development" | "preview" | "production"。
+  对应 Expo 项目中的三套环境变量；构建时 EAS 会把该环境下的变量注入进工程。
+
+--------------------------------------------
+一、在网页里配置（推荐）
+--------------------------------------------
+1. 打开 https://expo.dev → 选中项目 ml-express-merchants（或与 eas projectId 对应的项目）
+2. Project settings → Environment variables（或 Secrets，视 Expo 版本界面而定）
+3. 为 development / preview / production 分别添加同名变量（至少 production 与 preview 要配齐发版用）：
+
+   变量名                            说明
+   --------------------------------  ----------------------------------
+   EXPO_PUBLIC_SUPABASE_URL          Supabase 项目 URL（明文即可）
+   EXPO_PUBLIC_SUPABASE_ANON_KEY     Supabase anon public key（建议设为 Sensitive）
+
+可选（若希望与 app.json 解耦、进一步减少仓库里的地图 Key，可逐步迁移）：
+   EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+   EXPO_PUBLIC_GOOGLE_PLACES_API_KEY
+
+4. 保存后重新执行 eas build（对应 profile 会使用对应 environment）。
+
+--------------------------------------------
+二、用 CLI 配置（示例，需 eas-cli 已登录）
+--------------------------------------------
+在项目目录 ml-express-merchant-app 下执行（将占位符换成真实值）：
+
+  # production（商店包、apk profile、production profile）
+  eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_URL --value https://xxxxx.supabase.co --type string --visibility plaintext --non-interactive
+
+  eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value 'eyJ...' --type string --visibility sensitive --non-interactive
+
+  # preview（内部测试 APK 等）
+  eas env:create --environment preview --name EXPO_PUBLIC_SUPABASE_URL --value https://xxxxx.supabase.co --type string --visibility plaintext --non-interactive
+
+  eas env:create --environment preview --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value 'eyJ...' --type string --visibility sensitive --non-interactive
+
+  # development（开发版 / dev client，按需）
+  eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_URL --value https://xxxxx.supabase.co --type string --visibility plaintext --non-interactive
+
+  eas env:create --environment development --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value 'eyJ...' --type string --visibility sensitive --non-interactive
+
+若你的 eas-cli 版本子命令不同，请以 https://docs.expo.dev/build-reference/variables/ 为准。
+
+查看已配置变量：
+  eas env:list --environment production
+
+--------------------------------------------
+三、本地开发
+--------------------------------------------
+复制 .env.example 为 .env，填写 EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY。
+勿将 .env 提交到 Git。
+
+--------------------------------------------
+四、app.json extra 回退（不推荐用于生产）
+--------------------------------------------
+supabase.ts 仍支持从 app.json 的 extra.supabaseUrl / extra.supabaseAnonKey 读取，
+仅用于临时排障。正式安全做法：extra 中不写密钥，一律依赖 EAS 环境变量 + 本地 .env。

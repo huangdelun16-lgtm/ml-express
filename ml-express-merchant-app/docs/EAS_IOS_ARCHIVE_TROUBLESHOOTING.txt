@@ -1,0 +1,63 @@
+EAS iOS 构建在「Run fastlane / Archive failed」时如何排查
+============================================================
+
+你的截图只显示 Archive failed，真正原因在同一步骤**展开后的日志**里，请按下面做。
+
+--------------------------------------------
+一、先拿到完整错误行（最重要）
+--------------------------------------------
+1. 打开该次构建页面（Expo → Builds → 点开失败的那条）。
+2. 找到 **Run fastlane**（或 **Run gradle** 以外的 iOS 步骤）。
+3. 点步骤展开，在日志里用搜索（Ctrl/Cmd+F）搜：
+   - error:
+   - ERROR
+   - signing
+   - No profiles for
+   - Provisioning profile
+   - Certificate
+   - CodeSign
+4. 把**第一条明确的报错段落**复制下来（通常在上面这些关键词附近）。
+
+把该段发给开发者或对照下面「常见原因」。
+
+--------------------------------------------
+二、常见原因（本地能编过、EAS 仍失败时）
+--------------------------------------------
+1) 签名 / 描述文件（最常见）
+   - Distribution 证书过期、或 App ID / Capability 与 entitlements 不一致。
+   - 处理：在项目目录执行
+       eas credentials
+     检查 iOS Distribution、Provisioning Profile 是否与 bundle id
+     com.mlexpress.merchants 一致。
+   - 可在 Expo 网页 Project → Credentials 中重新生成/上传。
+
+2) Metro 打包脚本失败（次常见）
+   - 日志里会出现 "Bundle React Native code and images" 失败。
+   - 常见：生产环境变量未注入导致 import 报错、或 Node 内存不足。
+   - 处理：确认 production 环境已配置 EXPO_PUBLIC_SUPABASE_* 等（见 docs/EAS_ENVIRONMENT_SETUP.txt）；
+     可尝试 eas build 时加 --clear-cache。
+
+3) Xcode / 镜像与依赖不一致
+   - 已提交 Podfile.lock：云端与本地 CocoaPods 解析一致，减少随机失败。
+   - 若错误与某 Pod 或 Swift 版本相关，可在 eas.json 的 ios 里指定 image（见 Expo 文档 “Build server infrastructure”）。
+
+4) App Store Connect 版本冲突（多在 export/upload 阶段）
+   - 若日志提示已存在相同 build number，在 app.json 提高 ios.buildNumber（CFBundleVersion）后重打。
+
+--------------------------------------------
+三、本地自检（你本机是 Mac + Xcode 时）
+--------------------------------------------
+无签名试归档（只看编译是否通过）：
+  cd ios
+  xcodebuild -workspace MARKETLINKEXPRESS.xcworkspace \\
+    -scheme MARKETLINKEXPRESS -configuration Release -sdk iphoneos \\
+    -destination 'generic/platform=iOS' archive \\
+    -archivePath /tmp/MLMerchant.xcarchive CODE_SIGNING_ALLOWED=NO
+
+若本地 **ARCHIVE SUCCEEDED** 而 EAS 仍失败，多半指向**签名/fastlane 导出**，而不是业务代码。
+
+--------------------------------------------
+四、建议流程
+--------------------------------------------
+1. 修复凭据或环境变量后：eas build --platform ios --profile production --clear-cache
+2. 每次改 native 依赖后：ios 目录执行 pod install，并把 Podfile.lock 提交进 Git，再打 EAS。

@@ -323,7 +323,6 @@ const HomePage: React.FC = () => {
   // 用户认证相关状态
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false); // true=登录模式, false=注册模式
-  const [loginType, setLoginType] = useState<'normal' | 'merchant'>('normal'); // 登录类型：普通登录或商家登录
   const [registerMethod, setRegisterMethod] = useState<'phone' | 'email'>('phone'); // 注册方式：手机号或邮箱
   const [registerForm, setRegisterForm] = useState({
     name: '',
@@ -658,73 +657,7 @@ const HomePage: React.FC = () => {
       }
       
       if (isLoginMode) {
-        // ===== 登录模式 =====
-        
-        // 合伙登录
-        if (loginType === 'merchant') {
-          // 验证店铺代码和密码
-        if (!registerForm.email) {
-            alert(language === 'zh' ? '请输入店铺代码' : language === 'en' ? 'Please enter store code' : 'ဆိုင်ကုဒ် ထည့်ပါ');
-            return;
-          }
-
-          if (!registerForm.password) {
-            alert(language === 'zh' ? '请输入密码' : language === 'en' ? 'Please enter password' : 'စကားဝှက်ထည့်ပါ');
-            return;
-          }
-
-          // 查询合伙店铺
-          const storeCode = registerForm.email.trim();
-          const { data: store, error: storeError } = await supabase
-            .from('delivery_stores')
-            .select('*')
-            .eq('store_code', storeCode)
-            .maybeSingle();
-
-          if (storeError) {
-            console.error('查询合伙店铺失败:', storeError);
-            alert(language === 'zh' ? '查询店铺失败，请稍后重试' : language === 'en' ? 'Failed to query store, please try again later' : 'ဆိုင်ကို ရှာဖွေရန် မအောင်မြင်ပါ');
-            return;
-          }
-
-          if (!store) {
-            alert(language === 'zh' ? '店铺代码不存在' : language === 'en' ? 'Store code does not exist' : 'ဆိုင်ကုဒ် မရှိပါ');
-            return;
-          }
-
-          // 验证密码
-          if (store.password !== registerForm.password) {
-            alert(language === 'zh' ? '密码错误' : language === 'en' ? 'Incorrect password' : 'စကားဝှက်မှားနေပါသည်');
-            return;
-          }
-
-          // 登录成功，创建用户对象（用于兼容现有系统）
-          const merchantUser = {
-            id: store.id,
-            name: store.store_name,
-            email: store.email || store.store_code,
-            phone: store.phone,
-            user_type: 'merchant',
-            address: store.address,
-            store_code: store.store_code,
-            store_id: store.id
-          };
-
-          setCurrentUser(merchantUser);
-          localStorage.setItem('ml-express-customer', JSON.stringify(merchantUser));
-          setShowRegisterModal(false);
-          alert(language === 'zh' ? `登录成功！欢迎回来，${store.store_name}` : 
-                language === 'en' ? `Login successful! Welcome back, ${store.store_name}` : 
-                'ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ' + store.store_name);
-          
-          // 清空表单
-          setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
-          setCodeSent(false);
-          setCountdown(0);
-          setLoginType('normal'); // 重置登录类型
-          return;
-        }
-        
+        // ===== 登录模式（会员）—— 商家请使用独立商家端 =====
         // 普通登录：验证邮箱或手机号和密码
         if (!registerForm.email && !registerForm.phone) {
           alert(language === 'zh' ? '请输入邮箱或手机号' : language === 'en' ? 'Please enter email or phone number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ');
@@ -4051,7 +3984,7 @@ const HomePage: React.FC = () => {
             if (e.target === e.currentTarget) {
               setShowRegisterModal(false);
               setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
-              setCodeSent(false); setCountdown(0); setLoginType('normal');
+              setCodeSent(false); setCountdown(0);
             }
           }}
         >
@@ -4062,7 +3995,7 @@ const HomePage: React.FC = () => {
             position: 'relative', animation: 'scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1)'
           }}>
             <button
-              onClick={() => { setShowRegisterModal(false); setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' }); setCodeSent(false); setCountdown(0); setLoginType('normal'); }}
+              onClick={() => { setShowRegisterModal(false); setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' }); setCodeSent(false); setCountdown(0); }}
               style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', zIndex: 10 }}
             >✕</button>
 
@@ -4073,26 +4006,19 @@ const HomePage: React.FC = () => {
               </h2>
             </div>
 
+            {!isLoginMode && (
             <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '16px', marginBottom: '2rem' }}>
-              {!isLoginMode ? (
-                <>
                   <button type='button' onClick={() => setRegisterMethod('phone')} style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer', background: registerMethod === 'phone' ? 'white' : 'transparent', color: registerMethod === 'phone' ? '#2563eb' : '#64748b' }}>📱 {language === 'zh' ? '手机号' : 'Phone'}</button>
                   <button type='button' onClick={() => setRegisterMethod('email')} style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer', background: registerMethod === 'email' ? 'white' : 'transparent', color: registerMethod === 'email' ? '#2563eb' : '#64748b' }}>📧 {language === 'zh' ? '邮箱' : 'Email'}</button>
-                </>
-              ) : (
-                <>
-                  <button type='button' onClick={() => setLoginType('normal')} style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer', background: loginType === 'normal' ? 'white' : 'transparent', color: loginType === 'normal' ? '#2563eb' : '#64748b' }}>👤 {language === 'zh' ? '会员' : 'Member'}</button>
-                  <button type='button' onClick={() => setLoginType('merchant')} style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer', background: loginType === 'merchant' ? 'white' : 'transparent', color: loginType === 'merchant' ? '#2563eb' : '#64748b' }}>🏪 {language === 'zh' ? '商家' : 'Merchant'}</button>
-                </>
-              )}
             </div>
+            )}
 
             <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {isLoginMode ? (
                 <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{loginType === 'merchant' ? (language === 'zh' ? '店铺代码' : 'Store Code') : (language === 'zh' ? '邮箱或手机号' : 'Email/Phone')}</label>
-                    <input type='text' value={registerForm.email || registerForm.phone} onChange={(e) => { const v = e.target.value; if (loginType === 'merchant') setRegisterForm({...registerForm, email: v, phone: ''}); else if (v.includes('@')) setRegisterForm({...registerForm, email: v, phone: ''}); else setRegisterForm({...registerForm, phone: v, email: ''}); }} required style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} />
+                    <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '邮箱或手机号' : 'Email/Phone'}</label>
+                    <input type='text' value={registerForm.email || registerForm.phone} onChange={(e) => { const v = e.target.value; if (v.includes('@')) setRegisterForm({...registerForm, email: v, phone: ''}); else setRegisterForm({...registerForm, phone: v, email: ''}); }} required style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '密码' : 'Password'}</label>
@@ -4173,7 +4099,7 @@ const HomePage: React.FC = () => {
                 </>
               )}
               <button type='submit' style={{ width: '100%', background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', color: 'white', border: 'none', padding: '1.125rem', borderRadius: '18px', cursor: 'pointer', fontWeight: '800', fontSize: '1.1rem', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.3)', marginTop: '1rem' }}>{isLoginMode ? (language === 'zh' ? '立即登录' : 'Sign In') : (language === 'zh' ? '创建账户' : 'Create Account')}</button>
-              <div style={{ textAlign: 'center', marginTop: '0.5rem' }}><span onClick={() => { setIsLoginMode(!isLoginMode); setLoginType('normal'); }} style={{ color: '#64748b', fontSize: '0.95rem', cursor: 'pointer', fontWeight: '600' }}>{isLoginMode ? (language === 'zh' ? '还没有账号？点此注册' : 'No account? Sign Up') : (language === 'zh' ? '已有账号？点此登录' : 'Have account? Login')}</span></div>
+              <div style={{ textAlign: 'center', marginTop: '0.5rem' }}><span onClick={() => { setIsLoginMode(!isLoginMode); }} style={{ color: '#64748b', fontSize: '0.95rem', cursor: 'pointer', fontWeight: '600' }}>{isLoginMode ? (language === 'zh' ? '还没有账号？点此注册' : 'No account? Sign Up') : (language === 'zh' ? '已有账号？点此登录' : 'Have account? Login')}</span></div>
             </form>
           </div>
         </div>

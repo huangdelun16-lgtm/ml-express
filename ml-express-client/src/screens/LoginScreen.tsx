@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import LoggerService from './../services/LoggerService';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Image, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,7 +13,6 @@ import { feedbackService } from '../services/FeedbackService';
 export default function LoginScreen({ navigation }: any) {
   const { language, refreshSession } = useApp();
   const { showLoading, hideLoading } = useLoading();
-  const [loginType, setLoginType] = useState<'customer' | 'merchant'>('customer');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,16 +23,12 @@ export default function LoginScreen({ navigation }: any) {
       welcome: '欢迎回来',
       title: '登录',
       subtitle: '登录您的账户继续使用服务',
-      customerLogin: '会员',
-      merchantsLogin: '商家',
       email: '邮箱/手机号',
-      storeCode: '店铺代码',
       password: '密码',
       loginButton: '登录',
       noAccount: '还没有账号？',
       register: '立即注册',
       emailPlaceholder: '请输入注册时的邮箱或手机号',
-      storeCodePlaceholder: '请输入店铺代码',
       passwordPlaceholder: '请输入密码',
       loginSuccess: '登录成功',
       loginFailed: '登录失败',
@@ -43,25 +38,17 @@ export default function LoginScreen({ navigation }: any) {
       languageChinese: '中文',
       languageEnglish: 'English',
       languageBurmese: 'မြန်မာ',
-      storeNotFound: '店铺代码不存在',
-      storePasswordError: '密码错误',
-      queryStoreFailed: '查询店铺失败，请稍后重试',
-      welcomeMERCHANTS: '欢迎回来，',
     },
     en: {
       welcome: 'Welcome Back',
       title: 'Login',
       subtitle: 'Sign in to your account to continue',
-      customerLogin: 'Member',
-      merchantsLogin: 'MERCHANTS',
       email: 'Email/Phone',
-      storeCode: 'Store Code',
       password: 'Password',
       loginButton: 'Login',
       noAccount: "Don't have an account?",
       register: 'Register Now',
       emailPlaceholder: 'Enter registered email or phone',
-      storeCodePlaceholder: 'Enter store code',
       passwordPlaceholder: 'Enter password',
       loginSuccess: 'Login successful',
       loginFailed: 'Login failed',
@@ -71,25 +58,17 @@ export default function LoginScreen({ navigation }: any) {
       languageChinese: '中文',
       languageEnglish: 'English',
       languageBurmese: 'မြန်မာ',
-      storeNotFound: 'Store code not found',
-      storePasswordError: 'Incorrect password',
-      queryStoreFailed: 'Failed to query store',
-      welcomeMERCHANTS: 'Welcome back, ',
     },
     my: {
       welcome: 'ပြန်လည်ကြိုဆိုပါတယ်',
       title: 'ဝင်ရောက်ရန်',
       subtitle: 'သင့်အကောင့်သို့ဝင်ရောက်ပါ',
-      customerLogin: 'အဖွဲ့ဝင်',
-      merchantsLogin: 'ကုန်သည်',
       email: 'အီးမေးလ်/ဖုန်း',
-      storeCode: 'ဆိုင်ကုဒ်',
       password: 'စကားဝှက်',
       loginButton: 'ဝင်ရောက်',
       noAccount: 'အကောင့်မရှိသေးဘူးလား?',
       register: 'စာရင်းသွင်း',
       emailPlaceholder: 'မှတ်ပုံတင်ထားသော အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ',
-      storeCodePlaceholder: 'ဆိုင်ကုဒ်ထည့်ပါ',
       passwordPlaceholder: 'စကားဝှက်ထည့်ပါ',
       loginSuccess: 'အောင်မြင်စွာဝင်ရောက်ပြီး',
       loginFailed: 'ဝင်ရောက်မှုမအောင်မြင်',
@@ -99,10 +78,6 @@ export default function LoginScreen({ navigation }: any) {
       languageChinese: '中文',
       languageEnglish: 'English',
       languageBurmese: 'မြန်မာ',
-      storeNotFound: 'ဆိုင်ကုဒ် မရှိပါ',
-      storePasswordError: 'စကားဝှက်မှားနေပါသည်',
-      queryStoreFailed: 'ဆိုင်ကို ရှာဖွေရန် မအောင်မြင်ပါ',
-      welcomeMERCHANTS: 'ပြန်လည်ကြိုဆိုပါတယ် ',
     },
   };
 
@@ -118,139 +93,41 @@ export default function LoginScreen({ navigation }: any) {
     showLoading(currentT.loggingIn);
 
     try {
-      if (loginType === 'customer') {
-        // ===== 客户登录 =====
-        const result = await customerService.login(email.trim(), password);
-        
-        hideLoading();
+      const result = await customerService.login(email.trim(), password);
 
-        if (result.success && result.data) {
-          // 🚀 核心逻辑：生成唯一的会话 ID
-          const newSessionId = `SESS_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-          
-          // 更新数据库中的会话 ID
-          await supabase
-            .from('users')
-            .update({ current_session_id: newSessionId })
-            .eq('id', result.data.id);
+      hideLoading();
 
-          // 保存用户信息到本地（保存完整用户对象）
-          await AsyncStorage.setItem('currentUser', JSON.stringify(result.data));
-          await AsyncStorage.setItem('userId', result.data.id);
-          await AsyncStorage.setItem('userEmail', result.data.email);
-          await AsyncStorage.setItem('userName', result.data.name);
-          await AsyncStorage.setItem('userPhone', result.data.phone);
-          // 确保 user_type 正确
-          await AsyncStorage.setItem('userType', 'customer');
-          await AsyncStorage.setItem('currentSessionId', newSessionId);
-          
-          // 🚀 核心优化：刷新全局会话上下文，确保本设备被识别为“最新登录”
-          await refreshSession();
-          
-          // 🚀 新增：注册并保存推送令牌
-          try {
-            const NotificationService = require('../services/notificationService').default;
-            const ns = NotificationService.getInstance();
-            const token = await ns.getExpoPushToken();
-            if (token) {
-              await ns.savePushTokenToSupabase(result.data.id, token);
-            }
-          } catch (nsError) {
-            console.warn('推送注册失败，但不影响登录:', nsError);
-          }
-          
-          feedbackService.success(currentT.loginSuccess);
-          navigation.replace('Main');
-        } else {
-          const errorMessage = result.error?.message || currentT.loginFailed;
-          feedbackService.error(errorMessage);
-        }
-      } else {
-        // ===== 合伙登录 =====
-        const storeCode = email.trim();
-        const { data: store, error: storeError } = await supabase
-          .from('delivery_stores')
-          .select('*')
-          .eq('store_code', storeCode)
-          .maybeSingle();
+      if (result.success && result.data) {
+        const newSessionId = `SESS_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-        hideLoading();
+        await supabase.from('users').update({ current_session_id: newSessionId }).eq('id', result.data.id);
 
-        if (storeError) {
-          LoggerService.error('查询合伙店铺失败:', storeError);
-          feedbackService.error(currentT.queryStoreFailed);
-          return;
-        }
-
-        if (!store) {
-          feedbackService.error(currentT.storeNotFound);
-          return;
-        }
-
-        if (store.password !== password) {
-          feedbackService.error(currentT.storePasswordError);
-          return;
-        }
-
-        // 构造商家用户对象（兼容 User 接口）
-        const merchantsUser = {
-          id: store.id,
-          name: store.store_name,
-          email: store.email || store.store_code,
-          phone: store.phone || '',
-          address: store.address || '',
-          user_type: 'merchant', // 标记为商家
-          status: 'active',
-          registration_date: store.created_at,
-          last_login: new Date().toISOString(),
-          total_orders: 0,
-          total_spent: 0,
-          rating: 5,
-          notes: '',
-          store_code: store.store_code, // 额外字段
-          store_id: store.id // 额外字段
-        };
-
-        // 保存商家信息
-        const newSessionId = `SESS_MER_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-        
-        // 更新数据库中的会话 ID
-        await supabase
-          .from('delivery_stores')
-          .update({ current_session_id: newSessionId })
-          .eq('id', store.id);
-
-        await AsyncStorage.setItem('currentUser', JSON.stringify(merchantsUser));
-        await AsyncStorage.setItem('userId', store.id);
-        await AsyncStorage.setItem('userEmail', store.email || store.store_code);
-        await AsyncStorage.setItem('userName', store.store_name);
-        await AsyncStorage.setItem('userPhone', store.phone || '');
-        await AsyncStorage.setItem('userType', 'merchant');
-        await AsyncStorage.setItem('currentStoreCode', store.store_code);
+        await AsyncStorage.setItem('currentUser', JSON.stringify(result.data));
+        await AsyncStorage.setItem('userId', result.data.id);
+        await AsyncStorage.setItem('userEmail', result.data.email);
+        await AsyncStorage.setItem('userName', result.data.name);
+        await AsyncStorage.setItem('userPhone', result.data.phone);
+        await AsyncStorage.setItem('userType', 'customer');
         await AsyncStorage.setItem('currentSessionId', newSessionId);
 
-        // 🚀 核心优化：刷新全局会话上下文，确保本设备被识别为“最新登录”
         await refreshSession();
 
-        // 🚀 新增：注册并保存推送令牌（商家使用 delivery_stores 表，但目前我们的推送通知统一查 users 表）
-        // 如果商家也需要推送，建议将推送令牌也保存到 delivery_stores 表
         try {
           const NotificationService = require('../services/notificationService').default;
           const ns = NotificationService.getInstance();
           const token = await ns.getExpoPushToken();
           if (token) {
-            // 目前先尝试更新 delivery_stores 表（假设也有该字段）
-            await supabase
-              .from('delivery_stores')
-              .update({ push_token: token })
-              .eq('id', store.id);
+            await ns.savePushTokenToSupabase(result.data.id, token);
           }
         } catch (nsError) {
           console.warn('推送注册失败，但不影响登录:', nsError);
         }
 
-        feedbackService.success(`${currentT.welcomeMERCHANTS}${store.store_name}`);
+        feedbackService.success(currentT.loginSuccess);
         navigation.replace('Main');
+      } else {
+        const errorMessage = result.error?.message || currentT.loginFailed;
+        feedbackService.error(errorMessage);
       }
     } catch (error: any) {
       hideLoading();
@@ -277,10 +154,8 @@ export default function LoginScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Language Selector */}
           <LanguageSelector />
 
-          {/* Logo Area */}
           <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
               <Image
@@ -300,48 +175,17 @@ export default function LoginScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Form Container */}
           <View style={styles.formContainer}>
-            {/* Login Type Tabs */}
-            <View style={styles.tabContainer}>
-              <TouchableOpacity
-                style={[styles.tabButton, loginType === 'customer' && styles.activeTabButton]}
-                onPress={() => {
-                  setLoginType('customer');
-                  setEmail('');
-                  setPassword('');
-                }}
-              >
-                <Text style={[styles.tabText, loginType === 'customer' && styles.activeTabText]}>
-                  {currentT.customerLogin}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tabButton, loginType === 'merchant' && styles.activeTabButton]}
-                onPress={() => {
-                  setLoginType('merchant');
-                  setEmail('');
-                  setPassword('');
-                }}
-              >
-                <Text style={[styles.tabText, loginType === 'merchant' && styles.activeTabText]}>
-                  {currentT.merchantsLogin}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                {loginType === 'customer' ? currentT.email : currentT.storeCode}
-              </Text>
+              <Text style={styles.label}>{currentT.email}</Text>
               <TextInput
                 style={styles.input}
-                placeholder={loginType === 'customer' ? currentT.emailPlaceholder : currentT.storeCodePlaceholder}
+                placeholder={currentT.emailPlaceholder}
                 placeholderTextColor="#A0AEC0"
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
-                keyboardType={loginType === 'customer' ? 'email-address' : 'default'}
+                keyboardType="email-address"
               />
             </View>
 
@@ -381,16 +225,14 @@ export default function LoginScreen({ navigation }: any) {
               )}
             </TouchableOpacity>
 
-            {loginType === 'customer' && (
-              <TouchableOpacity
-                style={styles.registerLink}
-                onPress={() => navigation.navigate('Register')}
-              >
-                <Text style={styles.registerText}>
-                  {currentT.noAccount} <Text style={styles.registerHighlight}>{currentT.register}</Text>
-                </Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={styles.registerLink}
+              onPress={() => navigation.navigate('Register')}
+            >
+              <Text style={styles.registerText}>
+                {currentT.noAccount} <Text style={styles.registerHighlight}>{currentT.register}</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </LinearGradient>
@@ -495,36 +337,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F7FAFC',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 25,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  activeTabButton: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#718096',
-  },
-  activeTabText: {
-    color: '#2B6CB0',
-    fontWeight: 'bold',
   },
   inputGroup: {
     marginBottom: 20,

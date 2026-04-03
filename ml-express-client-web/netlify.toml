@@ -1,5 +1,6 @@
+# 在 Netlify 站点设置中将「Base directory」设为 ml-express-client-web（本文件所在目录）。
+# 若从仓库根目录用单站点构建，请在 UI 中同样指定 Base directory，勿在下方重复写 base 子路径。
 [build]
-  base = "ml-express-client-web"
   command = "npm install --legacy-peer-deps && npm run build"
   publish = "build"
   functions = "netlify/functions"
@@ -13,18 +14,6 @@
 [[redirects]]
   from = "/download"
   to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express.apk"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/download-rider"
-  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-rider.apk"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/download-rider"
-  to = "https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-rider.apk"
   status = 302
   force = true
 
