@@ -55,6 +55,14 @@ const HomeBanner = () => {
 
   const TOTAL_BANNERS = banners.length > 0 ? banners.length : 2;
 
+  if (loading) {
+    return (
+      <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+        Loading…
+      </div>
+    );
+  }
+
   return (
     <div style={{
       position: 'relative',

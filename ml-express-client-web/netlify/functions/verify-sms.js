@@ -11,6 +11,13 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 // 引入 CORS 工具函数
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 
+/** 生产环境禁止万能测试码 123456；预览/分支部署可用；ALLOW_DEV_SMS_CODE=true 时强制允许（慎用） */
+function allowStaticDevSmsCode() {
+  if (process.env.ALLOW_DEV_SMS_CODE === 'true') return true;
+  if (process.env.CONTEXT === 'production') return false;
+  return true;
+}
+
 exports.handler = async (event, context) => {
   const preflightResponse = handleCorsPreflight(event, {
     allowedMethods: ['POST', 'OPTIONS'],
@@ -41,8 +48,7 @@ exports.handler = async (event, context) => {
 
     console.log(`🔍 验证请求: identifier=${identifier}, code=${code}`);
 
-    // 测试模式
-    if (code === '123456') {
+    if (code === '123456' && allowStaticDevSmsCode()) {
       return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: '验证成功' }) };
     }
 

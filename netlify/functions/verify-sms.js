@@ -1,117 +1,79 @@
-// Netlify Function: 验证短信验证码
-// 路径: /.netlify/functions/verify-sms
+// Netlify Function: 验证短信验证码 (与 ml-express-client-web/netlify/functions 对齐)
 
-// 注意：这是简化版本，生产环境应使用 Supabase 或其他数据库存储验证码
-// Netlify Functions 是无状态的，无法在多次调用之间共享内存
+const { createClient } = require('@supabase/supabase-js');
 
-// 引入 CORS 工具函数
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 
+/** 生产环境禁止万能测试码；预览/分支或本地可放行；显式 ALLOW_DEV_SMS_CODE=true 时生产也可放行（慎用） */
+function allowStaticDevSmsCode() {
+  if (process.env.ALLOW_DEV_SMS_CODE === 'true') return true;
+  if (process.env.CONTEXT === 'production') return false;
+  return true;
+}
+
 exports.handler = async (event, context) => {
-  // 处理 CORS 预检请求
   const preflightResponse = handleCorsPreflight(event, {
     allowedMethods: ['POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type']
   });
-  if (preflightResponse) {
-    return preflightResponse;
-  }
+  if (preflightResponse) return preflightResponse;
 
-  // 获取 CORS 响应头
   const headers = getCorsHeaders(event, {
     allowedMethods: ['POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type']
   });
 
-  // 只允许 POST 请求
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ 
-        success: false,
-        error: 'Method Not Allowed' 
-      })
-    };
+    return { statusCode: 405, headers, body: JSON.stringify({ success: false, error: 'Method Not Allowed' }) };
   }
 
   try {
-    // 解析请求体
-    const { phoneNumber, code, language = 'zh' } = JSON.parse(event.body || '{}');
+    const { phoneNumber, phone, code, language = 'zh' } = JSON.parse(event.body || '{}');
+    let rawPhone = phoneNumber || phone || '';
 
-    console.log(`🔍 验证请求: 手机号=${phoneNumber}, 验证码=${code}`);
-
-    // 验证参数
-    if (!phoneNumber || !code) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: language === 'zh' ? '缺少必要参数' : 
-                 language === 'en' ? 'Missing required parameters' : 
-                 'လိုအပ်သော အချက်အလက်များ ပျောက်ဆုံးနေပါသည်'
-        })
-      };
+    if (!rawPhone || !code) {
+      return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: '缺少手机号或验证码' }) };
     }
 
-    // TODO: 从 Supabase 查询验证码
-    // const { data, error } = await supabase
-    //   .from('verification_codes')
-    //   .select('*')
-    //   .eq('phone_number', phoneNumber)
-    //   .eq('code', code)
-    //   .gt('expires_at', new Date().toISOString())
-    //   .single();
-    // 
-    // if (error || !data) {
-    //   return {
-    //     statusCode: 400,
-    //     headers,
-    //     body: JSON.stringify({
-    //       success: false,
-    //       error: '验证码错误或已过期'
-    //     })
-    //   };
-    // }
+    rawPhone = rawPhone.replace(/\D/g, '');
+    const identifier = 'PHONE_' + rawPhone;
 
-    // 开发模式：固定验证码 123456
-    if (code === '123456') {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          message: language === 'zh' ? '验证成功' : 
-                   language === 'en' ? 'Verification successful' : 
-                   'အတည်ပြုခြင်း အောင်မြင်ပါသည်'
-        })
-      };
+    console.log(`🔍 验证请求: identifier=${identifier}, code=${code}`);
+
+    if (code === '123456' && allowStaticDevSmsCode()) {
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: '验证成功' }) };
     }
 
-    // 验证码错误
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({
-        success: false,
-        error: language === 'zh' ? '验证码错误或已过期' : 
-               language === 'en' ? 'Verification code is incorrect or expired' : 
-               'အတည်ပြုကုဒ် မှားယွင်းနေသည် သို့မဟုတ် သက်တမ်းကုန်ပါပြီ'
-      })
-    };
+    if (!supabase) {
+      return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '数据库未连接' }) };
+    }
+
+    const { data, error } = await supabase
+      .from('verification_codes')
+      .select('*')
+      .eq('email', identifier)
+      .eq('code', code)
+      .eq('used', false)
+      .single();
+
+    if (error || !data) {
+      return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '验证码错误或已失效' }) };
+    }
+
+    if (new Date() > new Date(data.expires_at)) {
+      return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '验证码已过期' }) };
+    }
+
+    await supabase.from('verification_codes').update({ used: true }).eq('id', data.id);
+
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: '验证成功' }) };
 
   } catch (error) {
-    console.error('❌ 验证失败:', error);
-
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        success: false,
-        error: '服务器错误，请稍后重试'
-      })
-    };
+    console.error('❌ Verify SMS Error:', error);
+    return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '系统异常，请重试' }) };
   }
 };
-

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { packageService, supabase, userService, testConnection, systemSettingsService, pendingOrderService, merchantService, tutorialService, Tutorial } from '../services/supabase';
+import { packageService, supabase, userService, testConnection, systemSettingsService, merchantService, tutorialService, Tutorial } from '../services/supabase';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
-import TrackingSection from '../components/home/TrackingSection';
 import NavigationBar from '../components/home/NavigationBar';
 import Logo from '../components/Logo';
 import OrderModal from '../components/home/OrderModal';
+import LoginRegisterModal from '../components/home/LoginRegisterModal';
 import { MYANMAR_CITIES, CityKey, DEFAULT_CITY_KEY, DEFAULT_CITY_CENTER } from '../constants/cities';
+import { deriveInitialOrderStatus } from '../utils/orderSubmitHelpers';
 // import { getNearestCityKey } from '../utils/locationUtils';
 
 // Google Maps API 配置
@@ -198,7 +199,7 @@ const HomePage: React.FC = () => {
       // 清除 state，防止刷新时再次弹出
       window.history.replaceState({}, document.title);
     }
-  }, [location.state, supabase, currentUser]);
+  }, [location.state, currentUser]);
   
   // 🚀 新增：自动更新物品描述和代收金额 (对齐 App 逻辑)
   useEffect(() => {
@@ -233,6 +234,8 @@ const HomePage: React.FC = () => {
       setCartTotal(0);
       setCodAmount('0');
     }
+    // merchantProducts/description 用于拼接描述，纳入依赖会导致与 setDescription 循环；仅随购物车与语言变
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProducts, hasCOD, currentUser, language]);
 
   // Google Maps API 加载
@@ -279,8 +282,6 @@ const HomePage: React.FC = () => {
   const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState<string>('');
   const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState<string>('');
   const [showWeightInput, setShowWeightInput] = useState<boolean>(false);
-  const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
-  const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
   const [isCalculated, setIsCalculated] = useState(false);
   const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
@@ -409,7 +410,7 @@ const HomePage: React.FC = () => {
         setSenderAddressText(currentUser.address || '');
       }
     }
-  }, [showOrderForm, currentUser]);
+  }, [showOrderForm, currentUser, isFromCart]);
 
   // 验证码倒计时
   useEffect(() => {
@@ -1684,15 +1685,12 @@ const HomePage: React.FC = () => {
         }
       }
       
-      setDeliveryDistance(finalDistance);
-
       const finalPrice = isCalculated ? calculatedPriceDetail : calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
         orderInfo.deliverySpeed,
         finalDistance
       );
-      setCalculatedPrice(finalPrice);
 
       // 3. 生成最终订单 ID
       const packageId = generateMyanmarPackageId(orderInfo.senderAddress);
@@ -1755,13 +1753,11 @@ const HomePage: React.FC = () => {
 
       const finalDescription = `${ordererTypeTag} ${orderInfo.description || description || ''}`.trim();
       
-      // 决定状态
-      let orderStatus = '待取件';
-      if (isFromCart && currentUser?.user_type !== 'merchant') {
-        orderStatus = '待确认';
-      } else if (paymentMethod === 'cash') {
-        orderStatus = '待收款';
-      }
+      const orderStatus = deriveInitialOrderStatus({
+        isFromCart,
+        userType: currentUser?.user_type,
+        paymentMethod
+      });
 
       // 6. 构建并保存包裹记录
       const packageData: any = {
@@ -2962,7 +2958,9 @@ const HomePage: React.FC = () => {
                   }}>
                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
                     <h3 style={{ margin: '0 0 0.5rem 0' }}>地图加载失败</h3>
-                    <p style={{ margin: '0', opacity: 0.8 }}>请检查网络连接</p>
+                    <p style={{ margin: '0', opacity: 0.8, textAlign: 'center', padding: '0 1rem', fontSize: '0.9rem' }}>
+                      请检查是否已在 Google Cloud 启用「Maps JavaScript API」、绑定结算账号，并在 API 密钥中允许本网站域名。
+                    </p>
                   </div>
                 ) : !isMapLoaded ? (
                   <div style={{
@@ -3251,27 +3249,29 @@ const HomePage: React.FC = () => {
                       alert(`📍 已获取位置坐标：\n纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n\n请手动输入详细地址`);
                     }
                     
-                  } catch (error: any) {
-                    console.error('定位失败:', error);
-                    
+                  } catch (error: unknown) {
+                    // GeolocationPositionError 仅提供 code 数字：1=拒绝 2=不可用 3=超时（无 PERMISSION_DENIED 等实例属性）
+                    const geo = error as GeolocationPositionError;
                     let errorMessage = '无法获取您的位置';
-                    
-                    if (error.code) {
-                      switch (error.code) {
-                        case error.PERMISSION_DENIED:
-                          errorMessage = '❌ 位置权限被拒绝\n\n请在浏览器设置中允许位置访问，然后刷新页面重试';
+                    if (geo && typeof geo.code === 'number') {
+                      switch (geo.code) {
+                        case 1:
+                          errorMessage =
+                            '❌ 位置权限被拒绝\n\n请在 Safari「设置 › 网站 › 位置」或地址栏旁允许位置访问，然后重试';
                           break;
-                        case error.POSITION_UNAVAILABLE:
-                          errorMessage = '❌ 位置信息不可用\n\n请检查设备的GPS设置';
+                        case 2:
+                          errorMessage = '❌ 位置信息不可用\n\n请检查设备的定位/GPS 设置';
                           break;
-                        case error.TIMEOUT:
-                          errorMessage = '❌ 定位超时\n\n请确保设备已开启位置服务';
+                        case 3:
+                          errorMessage = '❌ 定位超时\n\n请确保已开启位置服务，或稍后在信号较好处重试';
                           break;
                         default:
-                          errorMessage = `❌ 定位失败: ${error.message}`;
+                          errorMessage = `❌ 定位失败: ${geo.message || '未知错误'}`;
                       }
                     }
-                    
+                    if (process.env.NODE_ENV === 'development') {
+                      console.warn('定位未成功:', geo);
+                    }
                     alert(errorMessage);
                   } finally {
                     // 恢复按钮状态
@@ -3970,139 +3970,22 @@ const HomePage: React.FC = () => {
         </div>
       )}
 
-      {/* 用户注册/登录模态窗口 */}
       {showRegisterModal && (
-        <div 
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.75) 100%)',
-            backdropFilter: 'blur(16px) saturate(180%)', WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-            display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999999,
-            animation: 'fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)', padding: '1rem'
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowRegisterModal(false);
-              setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' });
-              setCodeSent(false); setCountdown(0);
-            }
-          }}
-        >
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.98)', padding: window.innerWidth < 768 ? '2rem 1.5rem' : '3.5rem 2.75rem',
-            borderRadius: '32px', width: window.innerWidth < 768 ? '100%' : '520px', maxWidth: '95vw', maxHeight: '92vh',
-            overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', border: '1px solid rgba(255, 255, 255, 0.3)',
-            position: 'relative', animation: 'scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1)'
-          }}>
-            <button
-              onClick={() => { setShowRegisterModal(false); setRegisterForm({ name: '', phone: '', email: '', address: '', password: '', confirmPassword: '', verificationCode: '' }); setCodeSent(false); setCountdown(0); }}
-              style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', zIndex: 10 }}
-            >✕</button>
-
-            <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-              <img src='/logo.png' alt='Logo' style={{ width: '80px', height: '80px', marginBottom: '1.25rem', objectFit: 'contain' }} />
-              <h2 style={{ color: '#0f172a', margin: 0, fontSize: '1.75rem', fontWeight: '850' }}>
-                {isLoginMode ? (language === 'zh' ? '欢迎回来' : 'Welcome Back') : (language === 'zh' ? '创建账户' : 'Create Account')}
-              </h2>
-            </div>
-
-            {!isLoginMode && (
-            <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '16px', marginBottom: '2rem' }}>
-                  <button type='button' onClick={() => setRegisterMethod('phone')} style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer', background: registerMethod === 'phone' ? 'white' : 'transparent', color: registerMethod === 'phone' ? '#2563eb' : '#64748b' }}>📱 {language === 'zh' ? '手机号' : 'Phone'}</button>
-                  <button type='button' onClick={() => setRegisterMethod('email')} style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer', background: registerMethod === 'email' ? 'white' : 'transparent', color: registerMethod === 'email' ? '#2563eb' : '#64748b' }}>📧 {language === 'zh' ? '邮箱' : 'Email'}</button>
-            </div>
-            )}
-
-            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {isLoginMode ? (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '邮箱或手机号' : 'Email/Phone'}</label>
-                    <input type='text' value={registerForm.email || registerForm.phone} onChange={(e) => { const v = e.target.value; if (v.includes('@')) setRegisterForm({...registerForm, email: v, phone: ''}); else setRegisterForm({...registerForm, phone: v, email: ''}); }} required style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '密码' : 'Password'}</label>
-                    <input type='password' value={registerForm.password} onChange={(e) => setRegisterForm({...registerForm, password: e.target.value})} required style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '姓名' : 'Name'}</label>
-                    <input type='text' value={registerForm.name} onChange={(e) => setRegisterForm({...registerForm, name: e.target.value})} required placeholder={language === 'zh' ? '请输入您的姓名' : 'Your Full Name'} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '密码' : 'Password'}</label>
-                      <input type='password' value={registerForm.password} onChange={(e) => setRegisterForm({...registerForm, password: e.target.value})} required minLength={6} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', width: '100%' }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '确认密码' : 'Confirm'}</label>
-                      <input type='password' value={registerForm.confirmPassword} onChange={(e) => setRegisterForm({...registerForm, confirmPassword: e.target.value})} required minLength={6} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', width: '100%' }} />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{registerMethod === 'phone' ? (language === 'zh' ? '电话号码' : 'Phone') : (language === 'zh' ? '邮箱' : 'Email')}</label>
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                      {registerMethod === 'phone' && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '0 1rem',
-                          background: '#f8fafc',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '16px',
-                          color: '#475569',
-                          fontWeight: '800',
-                          fontSize: '1rem'
-                        }}>
-                          +95
-                        </div>
-                      )}
-                      <input 
-                        type={registerMethod === 'phone' ? 'tel' : 'email'} 
-                        value={registerMethod === 'phone' ? registerForm.phone : registerForm.email} 
-                        onChange={(e) => {
-                          let val = e.target.value;
-                          if (registerMethod === 'phone') {
-                            // 自动删除开头的 0
-                            if (val.startsWith('0')) {
-                              val = val.substring(1);
-                            }
-                            setRegisterForm({...registerForm, phone: val});
-                          } else {
-                            setRegisterForm({...registerForm, email: val});
-                          }
-                        }} 
-                        required 
-                        placeholder={registerMethod === 'phone' ? '9xxxxxxxx' : 'example@gmail.com'} 
-                        style={{ flex: 1, padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none' }} 
-                      />
-                      <button type='button' onClick={handleSendVerificationCode} disabled={countdown > 0} style={{ padding: '0 1.25rem', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '16px', fontWeight: '800', cursor: 'pointer' }}>{countdown > 0 ? countdown + 's' : (language === 'zh' ? '获取验证码' : 'Get Code')}</button>
-                    </div>
-                    {registerMethod === 'phone' && (
-                      <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.4rem', fontWeight: '600', fontStyle: 'italic' }}>
-                        {language === 'zh' ? '备注***目前只有 MYTEL Sim卡 能收到验证码***' : 
-                         language === 'en' ? 'Note: Currently only MYTEL Sim cards can receive codes' : 
-                         'မှတ်ချက် - လက်ရှိတွင် MYTEL Sim ကတ်များသာ ကုဒ်လက်ခံရရှိနိုင်ပါသည်'}
-                      </p>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '验证码' : 'Code'}</label>
-                    <input type='text' value={registerForm.verificationCode} onChange={(e) => setRegisterForm({...registerForm, verificationCode: e.target.value})} placeholder='000000' maxLength={6} required style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', textAlign: 'center', letterSpacing: '0.5rem', fontWeight: '900', fontSize: '1.25rem' }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ color: '#475569', fontSize: '0.875rem', fontWeight: '700' }}>{language === 'zh' ? '详细地址' : 'Address'}</label>
-                    <textarea value={registerForm.address} onChange={(e) => setRegisterForm({...registerForm, address: e.target.value})} placeholder={language === 'zh' ? '收货或寄件地址' : 'Full Address'} rows={2} style={{ padding: '1rem', border: '2px solid #e2e8f0', borderRadius: '16px', outline: 'none', resize: 'none' }} />
-                  </div>
-                </>
-              )}
-              <button type='submit' style={{ width: '100%', background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', color: 'white', border: 'none', padding: '1.125rem', borderRadius: '18px', cursor: 'pointer', fontWeight: '800', fontSize: '1.1rem', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.3)', marginTop: '1rem' }}>{isLoginMode ? (language === 'zh' ? '立即登录' : 'Sign In') : (language === 'zh' ? '创建账户' : 'Create Account')}</button>
-              <div style={{ textAlign: 'center', marginTop: '0.5rem' }}><span onClick={() => { setIsLoginMode(!isLoginMode); }} style={{ color: '#64748b', fontSize: '0.95rem', cursor: 'pointer', fontWeight: '600' }}>{isLoginMode ? (language === 'zh' ? '还没有账号？点此注册' : 'No account? Sign Up') : (language === 'zh' ? '已有账号？点此登录' : 'Have account? Login')}</span></div>
-            </form>
-          </div>
-        </div>
+        <LoginRegisterModal
+          language={language}
+          isLoginMode={isLoginMode}
+          setIsLoginMode={setIsLoginMode}
+          registerMethod={registerMethod}
+          setRegisterMethod={setRegisterMethod}
+          registerForm={registerForm}
+          setRegisterForm={setRegisterForm}
+          setCodeSent={setCodeSent}
+          countdown={countdown}
+          setCountdown={setCountdown}
+          onClose={() => setShowRegisterModal(false)}
+          onSubmit={handleRegister}
+          onSendVerificationCode={handleSendVerificationCode}
+        />
       )}
     </div>
   );

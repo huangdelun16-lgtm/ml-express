@@ -93,6 +93,20 @@ MARKET LINK EXPRESS 是一个基于 **React/React Native + Supabase + Netlify** 
     *   **Terms**: `https://market-link-express.com/terms-of-service`
     *   **测试账号**: 必须在 Google/Apple 审核说明中提供有效的商家测试账号。
 
+5.  **Netlify Functions 目录（勿混淆）**:
+    *   **客户端 Web** 站点：使用 [`ml-express-client-web/netlify/functions`](ml-express-client-web/netlify/functions/)（构建时随该子项目发布）。
+    *   **商家端 Web** 站点：使用 [`ml-express-merchant-web/netlify/functions`](ml-express-merchant-web/netlify/functions/)。
+    *   **后台管理**（根目录 CRA）：使用仓库根目录 [`netlify/functions`](netlify/functions/)，其中 `send-sms` / `verify-sms` 已与客户端 Web 逻辑对齐；短信验证码存 `verification_codes`（手机号键为 `PHONE_` + 数字）。
+    *   **verify-sms**：万能测试码 `123456` 在 **Netlify `CONTEXT=production`** 下默认**禁用**；预览/分支部署仍可用。若必须在生产临时启用，仅可设环境变量 `ALLOW_DEV_SMS_CODE=true`（慎用）。
+
+6.  **可观测性（可选）**:
+    *   客户端 Web 支持 `REACT_APP_SENTRY_DSN`：配置后在运行时动态加载 Sentry；未配置不增加首包体积。
+    *   `LoggerService` 在生产环境且存在 DSN 时，会将 WARN/ERROR 摘要上报至 Sentry。
+
+7.  **GitHub Release 与下载链接**:
+    *   使用 `releases/latest/download/<文件名>.apk` 时，**最新 Release 必须附带该文件名**，否则 GitHub 404。
+    *   各端 APK 命名与 [`ml-express-merchant-web/netlify.toml`](ml-express-merchant-web/netlify.toml) 等 `/download` 重定向保持一致；发版后核对 Netlify 与 GitHub。
+
 ---
 *记录人：Cursor AI*
 *存档日期：2026年3月31日*

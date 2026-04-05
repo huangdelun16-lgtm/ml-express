@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { PACKAGE_STATUS } from '../constants/packageStatus';
 import LoggerService from './LoggerService';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
@@ -461,7 +462,7 @@ export const packageService = {
         let q = supabase
           .from('packages')
           .select(fields)
-          .eq('status', '已送达')
+          .eq('status', PACKAGE_STATUS.DELIVERED)
           .gt('cod_amount', 0);
 
         const conditions = [`delivery_store_id.eq.${userId}`];
@@ -547,7 +548,7 @@ export const packageService = {
       let q = supabase
         .from('packages')
         .select('id, cod_amount, delivery_time, cod_settled', { count: 'exact' })
-        .eq('status', '已送达')
+        .eq('status', PACKAGE_STATUS.DELIVERED)
         .gt('cod_amount', 0);
 
       const conditions = [`delivery_store_id.eq.${userId}`];
@@ -629,7 +630,7 @@ export const packageService = {
         .from('packages')
         .select('*')
         .eq('delivery_store_id', storeId)
-        .eq('status', '已送达')
+        .eq('status', PACKAGE_STATUS.DELIVERED)
         .order('delivery_time', { ascending: false });
 
       if (error) throw error;
@@ -1123,7 +1124,7 @@ export const merchantService = {
       const fileExt = file.name.split('.').pop();
       const fileName = `${storeId}/${Date.now()}.${fileExt}`;
       
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('product_images')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -1230,7 +1231,7 @@ export const rechargeService = {
       const fileExt = file.name.split('.').pop();
       const fileName = `recharge_${userId}_${Date.now()}.${fileExt}`;
       
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('payment_proofs')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -1375,7 +1376,7 @@ export const reviewService = {
       const fileExt = file.name.split('.').pop();
       const fileName = `review_${userId}_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
       
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('review_images')
         .upload(fileName, file, {
           cacheControl: '3600',

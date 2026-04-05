@@ -1,20 +1,39 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import LoggerService from './services/LoggerService';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
-import ServicesPage from './pages/ServicesPage';
-import TrackingPage from './pages/TrackingPage';
-import ContactPage from './pages/ContactPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import TermsOfServicePage from './pages/TermsOfServicePage';
-import ProfilePage from './pages/ProfilePage';
-import DeleteAccountPage from './pages/DeleteAccountPage';
-import CityMallPage from './pages/CityMallPage';
-import StoreProductsPage from './pages/StoreProductsPage';
-import CartPage from './pages/CartPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { CartProvider } from './contexts/CartContext';
 import './App.css';
+
+const ServicesPage = lazy(() => import('./pages/ServicesPage'));
+const TrackingPage = lazy(() => import('./pages/TrackingPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const DeleteAccountPage = lazy(() => import('./pages/DeleteAccountPage'));
+const CityMallPage = lazy(() => import('./pages/CityMallPage'));
+const StoreProductsPage = lazy(() => import('./pages/StoreProductsPage'));
+const CartPage = lazy(() => import('./pages/CartPage'));
+
+function RouteFallback() {
+  return (
+    <div
+      style={{
+        minHeight: '40vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#64748b',
+        fontSize: '1rem',
+        fontWeight: 600
+      }}
+    >
+      Loading…
+    </div>
+  );
+}
 
 // 错误边界组件
 class ErrorBoundary extends React.Component<
@@ -79,20 +98,25 @@ function App() {
         <CartProvider>
           <Router>
             <div className="App" style={{ minHeight: '100vh' }}>
-              <Routes>
-                {/* 客户端路由 - 不包含任何后台管理功能 */}
-                <Route path="/" element={<HomePage />} />
-                <Route path="/services" element={<ServicesPage />} />
-                <Route path="/tracking" element={<TrackingPage />} />
-                <Route path="/contact" element={<ContactPage />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                <Route path="/terms-of-service" element={<TermsOfServicePage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/delete-account" element={<DeleteAccountPage />} />
-                <Route path="/mall" element={<CityMallPage />} />
-                <Route path="/mall/:storeId" element={<StoreProductsPage />} />
-                <Route path="/cart" element={<CartPage />} />
-              </Routes>
+              <Suspense fallback={<RouteFallback />}>
+                <Routes>
+                  {/* 首页保持同步加载，避免 LCP 变差；其余路由懒加载 */}
+                  <Route path="/" element={<HomePage />} />
+                  {/* 商家端曾误部署到本域名时常见 /login；认证回调或书签也可能指向此处 */}
+                  <Route path="/login" element={<Navigate to="/" replace />} />
+                  <Route path="/services" element={<ServicesPage />} />
+                  <Route path="/tracking" element={<TrackingPage />} />
+                  <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                  <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/delete-account" element={<DeleteAccountPage />} />
+                  <Route path="/mall" element={<CityMallPage />} />
+                  <Route path="/mall/:storeId" element={<StoreProductsPage />} />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
             </div>
           </Router>
         </CartProvider>

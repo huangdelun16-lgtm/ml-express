@@ -172,12 +172,11 @@ const ProfilePage: React.FC = () => {
     settledCOD: 0,
     lastSettledAt: null as string | null,
   }); // 合伙店铺代收款统计
-  const [lastOrderCheckTime, setLastOrderCheckTime] = useState<number>(Date.now()); // 🚀 新增：上次订单检测时间
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // 🚀 新增：是否开启语音提醒
-  const [pendingMerchantOrdersCount, setPendingMerchantOrdersCount] = useState(0); // 🚀 新增：待处理订单数
+  const [, setPendingMerchantOrdersCount] = useState(0); // 🚀 新增：待处理订单数
   const [productPriceMap, setProductPriceMap] = useState<Record<string, number>>({}); // 🚀 新增：商品价格映射
   const [isSavingStatus, setIsSavingStatus] = useState(false); // 🚀 新增：保存状态反馈
-  const [isGuest, setIsGuest] = useState(false); // 🚀 新增：访客状态
+  const [, setIsGuest] = useState(false); // 🚀 新增：访客状态
 
   // 🚀 新增：导出对账单状态
   const [showExportModal, setShowExportModal] = useState(false);
@@ -214,8 +213,6 @@ const ProfilePage: React.FC = () => {
 
   const lastBroadcastCountRef = useRef<number>(0); // 🚀 新增：上次播报的订单数
   const lastVoiceTimeRef = useRef<number>(0); // 🚀 新增：上次播报的时间
-  const voiceActivationRef = useRef<HTMLAudioElement | null>(null); // 🚀 新增：用于激活音频上下文的引用
-
   // 🚀 新增：语音播报函数
   const speakNotification = (text: string) => {
     if ('speechSynthesis' in window) {
@@ -279,18 +276,6 @@ const ProfilePage: React.FC = () => {
     address: ''
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-
-  // 🚀 24小时时间解析助手
-  const parseTimeParts = (timeStr: string, defaultTime: string) => {
-    try {
-      if (!timeStr) return defaultTime.split(':');
-      const parts = timeStr.trim().split(':');
-      if (parts.length < 2) return defaultTime.split(':');
-      return [parts[0].padStart(2, '0'), parts[1].padStart(2, '0')];
-    } catch (e) {
-      return defaultTime.split(':');
-    }
-  };
 
   const handlePrevMonth = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -985,7 +970,7 @@ const ProfilePage: React.FC = () => {
     }, 15000);
 
     return () => clearInterval(timer);
-  }, [isPartnerStore, currentUser?.id, isVoiceEnabled, language, loadUserPackages]);
+  }, [isPartnerStore, currentUser?.id, currentUser?.store_id, isVoiceEnabled, language, loadUserPackages]);
 
   // 查看代收款订单
   const handleViewCODOrders = async (settled?: boolean) => {
@@ -1186,7 +1171,7 @@ const ProfilePage: React.FC = () => {
           doc.setFontSize(18);
           // 🚀 核心修复：jsPDF 默认不支持中文/缅文。如果 store_name 包含这些字符，doc.text 可能会报错。
           // 我们尝试使用拼音或占位符，并强烈建议用户使用 Excel 格式。
-          const displayStoreName = (storeInfo?.store_name || 'Merchant').replace(/[^\x00-\x7F]/g, '*');
+          const displayStoreName = (storeInfo?.store_name || 'Merchant').replace(/[^\u0020-\u007E]/g, '*');
           doc.text(`Statement: ${displayStoreName}`, 14, 20);
           
           doc.setFontSize(12);
@@ -1197,8 +1182,8 @@ const ProfilePage: React.FC = () => {
           const tableRows = orders.map(pkg => [
             pkg.id.slice(-8), 
             new Date(pkg.created_at).toLocaleDateString(),
-            (pkg.receiver_name || '').replace(/[^\x00-\x7F]/g, '*'),
-            (pkg.status || '').replace(/[^\x00-\x7F]/g, '*'),
+            (pkg.receiver_name || '').replace(/[^\u0020-\u007E]/g, '*'),
+            (pkg.status || '').replace(/[^\u0020-\u007E]/g, '*'),
             pkg.price,
             pkg.cod_amount || 0,
             pkg.cod_settled ? "Yes" : "No"
@@ -1722,6 +1707,7 @@ const ProfilePage: React.FC = () => {
 
   // 显示寄件码
   const showPickupCode = async (pkg: any) => {
+    setSelectedPackage(pkg);
     await generateQRCode(pkg.id);
     setShowPickupCodeModal(true);
   };
@@ -3461,6 +3447,27 @@ const ProfilePage: React.FC = () => {
                       {t.viewDetails}
                     </button>
 
+                    {!isPartnerStore && (
+                      <button
+                        type="button"
+                        onClick={() => void showPickupCode(pkg)}
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.25)',
+                          color: 'white',
+                          border: '1px solid rgba(16, 185, 129, 0.45)',
+                          padding: '0.5rem 1.5rem',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: 'bold',
+                          flex: 1,
+                          maxWidth: '150px'
+                        }}
+                      >
+                        📱 {t.pickupCode}
+                      </button>
+                    )}
+
                     {/* 🚀 新增：评价订单按钮 - 仅限已完成/已送达订单 且 未评价过 */}
                     {!isPartnerStore && (pkg.status === '已送达' || pkg.status === '已完成') && !reviewedOrderIds.has(pkg.id) && (
                       <button
@@ -4805,16 +4812,22 @@ const ProfilePage: React.FC = () => {
                         <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>
                           {t.productStock}: {product.stock === -1 ? t.stockInfinite : product.stock}
                         </div>
-                        <div style={{ 
+                        <button
+                          type="button"
+                          onClick={() => void toggleProductStatus(product)}
+                          style={{ 
                           padding: '4px 12px', 
                           borderRadius: '10px', 
                           fontSize: '0.75rem', 
                           fontWeight: '800',
+                          border: 'none',
+                          cursor: 'pointer',
                           backgroundColor: product.is_available ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                           color: product.is_available ? '#10b981' : '#ef4444'
-                        }}>
+                        }}
+                        >
                           {product.is_available ? t.onSale : t.offShelf}
-                        </div>
+                        </button>
                       </div>
                     </div>
                   ))}

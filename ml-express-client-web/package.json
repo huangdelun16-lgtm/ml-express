@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@react-google-maps/api": "^2.20.7",
+    "@sentry/react": "^8.55.1",
     "@supabase/supabase-js": "^2.81.1",
     "@types/node": "^16.18.0",
     "@types/react": "^18.3.26",
@@ -25,7 +26,8 @@
     "start": "react-scripts start",
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy:netlify": "netlify deploy --prod --site 52f5f573-ca0a-4769-a8c7-e5f675764056"
   },
   "eslintConfig": {
     "extends": [

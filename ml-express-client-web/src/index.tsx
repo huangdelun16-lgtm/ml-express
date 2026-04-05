@@ -5,6 +5,8 @@ import './styles/global.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+void import('./sentryInit').then((m) => m.initSentry());
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );

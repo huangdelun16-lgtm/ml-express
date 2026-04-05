@@ -98,27 +98,19 @@ function sanitizeData(data: any): any {
  * 发送日志到外部服务（生产环境）
  */
 function sendToLogService(level: LogLevel, message: string, data?: any) {
-  // 生产环境：可以发送到 Sentry、LogRocket 等服务
-  // 示例：Sentry
-  // if (window.Sentry && level >= LogLevel.ERROR) {
-  //   window.Sentry.captureMessage(message, {
-  //     level: level === LogLevel.ERROR ? 'error' : 'info',
-  //     extra: sanitizeData(data),
-  //   });
-  // }
-  
-  // 示例：自定义日志服务
-  // fetch('/api/logs', {
-  //   method: 'POST',
-  //   body: JSON.stringify({
-  //     level,
-  //     message,
-  //     data: sanitizeData(data),
-  //     timestamp: new Date().toISOString(),
-  //   }),
-  // }).catch(() => {
-  //   // 静默失败，不影响应用运行
-  // });
+  if (!process.env.REACT_APP_SENTRY_DSN) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Sentry = require('@sentry/react');
+    const extra = sanitizeData(data);
+    if (level >= LogLevel.ERROR) {
+      Sentry.captureMessage(message, { level: 'error', extra: { payload: extra } });
+    } else if (level === LogLevel.WARN) {
+      Sentry.captureMessage(message, { level: 'warning', extra: { payload: extra } });
+    }
+  } catch {
+    /* Sentry 未安装或初始化失败时忽略 */
+  }
 }
 
 /**

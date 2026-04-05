@@ -38,14 +38,6 @@ const PrivacyPolicyPage: React.FC = () => {
     };
   }, [showLanguageDropdown]);
 
-
-  const handleNavigation = (path: string) => {
-    setIsVisible(false);
-    setTimeout(() => {
-      navigate(path);
-    }, 300);
-  };
-
   return (
     <div style={{
       minHeight: '100vh',

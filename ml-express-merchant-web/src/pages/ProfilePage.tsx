@@ -23,6 +23,7 @@ import Logo from "../components/Logo";
 import NavigationBar from "../components/home/NavigationBar";
 import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
+import OrderQRCode from "../components/profile/OrderQRCode";
 
 // 注入样式
 if (typeof document !== "undefined") {
@@ -38,19 +39,6 @@ if (typeof document !== "undefined") {
   `;
   document.head.appendChild(style);
 }
-
-// 🚀 新增：订单二维码子组件 (解决 Rule of Hooks 问题)
-const OrderQRCode: React.FC<{ orderId: string }> = ({ orderId }) => {
-  const [qrUrl, setQrUrl] = useState("");
-  useEffect(() => {
-    if (orderId) {
-      QRCode.toDataURL(orderId).then(setQrUrl);
-    }
-  }, [orderId]);
-  return qrUrl ? (
-    <img src={qrUrl} style={{ width: "80px", height: "80px" }} alt="QR" />
-  ) : null;
-};
 
 // 🚀 新增：高级滚动时间选择器组件
 const TimeWheelPicker: React.FC<{ 
@@ -306,8 +294,9 @@ const ProfilePage: React.FC = () => {
   const [isGuest, setIsGuest] = useState(false); // 🚀 新增：访客状态
 
   // 🚀 新增：Google Maps 加载 (用于 OrderModal)
-  const { isLoaded: isMapLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "",
+  const googleMapsApiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
+  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
+    googleMapsApiKey,
     libraries: ["places"] as any[],
   });
 
@@ -362,6 +351,8 @@ const ProfilePage: React.FC = () => {
     lat: number;
     lng: number;
   } | null>(null); // 🚀 新增
+  /** 地图弹窗内逆地理编码得到的地址预览（与客户端「立即下单」地图一致） */
+  const [mapModalPreviewAddress, setMapModalPreviewAddress] = useState("");
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(
     new Set(),
   );
@@ -1431,39 +1422,181 @@ const ProfilePage: React.FC = () => {
   // 🚀 新增：处理地图弹窗打开
   const handleOpenMapModal = (type: "sender" | "receiver") => {
     setMapSelectionType(type);
+    setMapClickPosition(null);
+    setMapModalPreviewAddress("");
     setShowMapModal(true);
   };
 
-  // 🚀 新增：地图点击处理
+  // 🚀 地图点击：落点 + 逆地理编码（对齐客户端）
   const onMapClick = (e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-      const lat = e.latLng.lat();
-      const lng = e.latLng.lng();
-      setMapClickPosition({ lat, lng });
+    if (!e.latLng) return;
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    setMapClickPosition({ lat, lng });
+    if (!window.google?.maps?.Geocoder) {
+      setMapModalPreviewAddress(
+        language === "zh"
+          ? `纬度: ${lat.toFixed(6)}, 经度: ${lng.toFixed(6)}`
+          : `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
+      );
+      return;
+    }
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      if (status === "OK" && results?.[0]) {
+        setMapModalPreviewAddress(results[0].formatted_address);
+      } else {
+        setMapModalPreviewAddress(
+          language === "zh"
+            ? `纬度: ${lat.toFixed(6)}, 经度: ${lng.toFixed(6)}`
+            : `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
+        );
+      }
+    });
+  };
+
+  // 🚀 获取当前位置（对齐客户端 HomePage 地图）
+  const handleMapModalLocateCurrent = async (
+    e: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    if (!navigator.geolocation) {
+      alert(
+        language === "zh"
+          ? "您的浏览器不支持地理定位功能"
+          : language === "en"
+            ? "Geolocation is not supported"
+            : "ဤဘရောက်ဆာတွင် တည်နေရာမရရှိပါ",
+      );
+      return;
+    }
+    if (!window.google?.maps?.Geocoder) {
+      alert(
+        language === "zh"
+          ? "地图尚未加载完成，请稍后再试"
+          : "Map is still loading, please try again",
+      );
+      return;
+    }
+    const button = e.currentTarget;
+    const originalContent = button.innerHTML;
+    button.innerHTML = "🔄";
+    button.style.opacity = "0.7";
+    button.disabled = true;
+    try {
+      const position = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 300000,
+          });
+        },
+      );
+      const { latitude, longitude } = position.coords;
+      setMapClickPosition({ lat: latitude, lng: longitude });
+      try {
+        const geocoder = new window.google.maps.Geocoder();
+        const result = await new Promise<google.maps.GeocoderResult[]>(
+          (resolve, reject) => {
+            geocoder.geocode(
+              { location: { lat: latitude, lng: longitude } },
+              (results, status) => {
+                if (status === "OK" && results) {
+                  resolve(results);
+                } else {
+                  reject(new Error(`Geocoding failed: ${status}`));
+                }
+              },
+            );
+          },
+        );
+        if (result?.[0]) {
+          const address = result[0].formatted_address;
+          setMapModalPreviewAddress(address);
+          alert(
+            language === "zh"
+              ? `✅ 定位成功！\n\n地址：${address}\n\n坐标：${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+              : language === "en"
+                ? `✅ Located\n\n${address}\n\n${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+                : `✅ ${address}\n${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          );
+        } else {
+          throw new Error("no result");
+        }
+      } catch {
+        setMapModalPreviewAddress(
+          language === "zh"
+            ? `纬度: ${latitude.toFixed(6)}, 经度: ${longitude.toFixed(6)}`
+            : `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`,
+        );
+        alert(
+          language === "zh"
+            ? `📍 已获取坐标：\n纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n\n请手动输入详细地址`
+            : `📍 Coordinates:\n${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n\nEnter address manually if needed`,
+        );
+      }
+    } catch (error: unknown) {
+      const geo = error as GeolocationPositionError;
+      let errorMessage =
+        language === "zh" ? "无法获取您的位置" : "Could not get your location";
+      if (geo && typeof geo.code === "number") {
+        switch (geo.code) {
+          case 1:
+            errorMessage =
+              language === "zh"
+                ? "❌ 位置权限被拒绝\n\n请在浏览器设置中允许本站使用位置"
+                : "❌ Location permission denied";
+            break;
+          case 2:
+            errorMessage =
+              language === "zh"
+                ? "❌ 位置信息不可用\n\n请检查设备定位设置"
+                : "❌ Position unavailable";
+            break;
+          case 3:
+            errorMessage =
+              language === "zh"
+                ? "❌ 定位超时\n\n请稍后在信号较好处重试"
+                : "❌ Location request timed out";
+            break;
+          default:
+            errorMessage = geo.message || errorMessage;
+        }
+      }
+      alert(errorMessage);
+    } finally {
+      button.innerHTML = originalContent;
+      button.style.opacity = "1";
+      button.disabled = false;
     }
   };
 
   // 🚀 新增：确认地图选择
   const confirmMapSelection = () => {
     if (!mapClickPosition) return;
+    const coordLine = `📍 坐标: ${mapClickPosition.lat.toFixed(6)}, ${mapClickPosition.lng.toFixed(6)}`;
+    const addrBlock = mapModalPreviewAddress.trim();
 
     if (mapSelectionType === "sender") {
       setSelectedSenderLocation(mapClickPosition);
-      setSenderAddressText(
-        (prev) =>
-          prev.split("\n📍 坐标:")[0] +
-          `\n📍 坐标: ${mapClickPosition.lat.toFixed(6)}, ${mapClickPosition.lng.toFixed(6)}`,
-      );
+      setSenderAddressText((prev) => {
+        const base = prev.split("\n📍 坐标:")[0].trim();
+        return addrBlock
+          ? `${base}\n${addrBlock}\n${coordLine}`
+          : `${base}\n${coordLine}`;
+      });
     } else {
       setSelectedReceiverLocation(mapClickPosition);
-      setReceiverAddressText(
-        (prev) =>
-          prev.split("\n📍 坐标:")[0] +
-          `\n📍 坐标: ${mapClickPosition.lat.toFixed(6)}, ${mapClickPosition.lng.toFixed(6)}`,
-      );
+      setReceiverAddressText((prev) => {
+        const base = prev.split("\n📍 坐标:")[0].trim();
+        return addrBlock
+          ? `${base}\n${addrBlock}\n${coordLine}`
+          : `${base}\n${coordLine}`;
+      });
     }
     setShowMapModal(false);
     setMapClickPosition(null);
+    setMapModalPreviewAddress("");
   };
 
   // 🚀 新增：下载订单二维码
@@ -11093,7 +11226,12 @@ const ProfilePage: React.FC = () => {
                   : `Select ${mapSelectionType === "sender" ? "Sender" : "Receiver"} Location`}
               </h3>
               <button
-                onClick={() => setShowMapModal(false)}
+                type="button"
+                onClick={() => {
+                  setShowMapModal(false);
+                  setMapClickPosition(null);
+                  setMapModalPreviewAddress("");
+                }}
                 style={{
                   background: "none",
                   border: "none",
@@ -11107,20 +11245,149 @@ const ProfilePage: React.FC = () => {
             <div
               style={{
                 flex: 1,
-                position: "relative",
-                borderRadius: "15px",
-                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: 0,
+                gap: "0.75rem",
               }}
             >
-              {isMapLoaded ? (
-                <GoogleMap
-                  mapContainerStyle={{ width: "100%", height: "100%" }}
-                  center={mapClickPosition || { lat: 21.95, lng: 96.08 }}
-                  zoom={13}
-                  onClick={onMapClick}
+              {!googleMapsApiKey || mapLoadError ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100%",
+                    minHeight: "240px",
+                    background: "linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)",
+                    color: "#334155",
+                    padding: "1.25rem",
+                    textAlign: "center",
+                    fontSize: "0.9rem",
+                    lineHeight: 1.5,
+                  }}
                 >
-                  {mapClickPosition && <Marker position={mapClickPosition} />}
-                </GoogleMap>
+                  <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>🗺️</div>
+                  <strong style={{ marginBottom: "0.5rem" }}>
+                    {language === "zh" ? "地图无法加载" : "Map failed to load"}
+                  </strong>
+                  <span>
+                    {language === "zh"
+                      ? "请在 Google Cloud 控制台为当前项目启用「Maps JavaScript API」、绑定结算账号，并将 API 密钥的 HTTP 来源限制为："
+                      : "Enable Maps JavaScript API and billing in Google Cloud, and add these referrers to your API key:"}
+                  </span>
+                  <code
+                    style={{
+                      display: "block",
+                      marginTop: "0.75rem",
+                      fontSize: "0.75rem",
+                      wordBreak: "break-all",
+                      background: "rgba(255,255,255,0.8)",
+                      padding: "0.5rem",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    https://mlexpress-merchants.com/*
+                    <br />
+                    https://*.netlify.app/*
+                  </code>
+                  {mapLoadError && (
+                    <span style={{ marginTop: "0.75rem", opacity: 0.85, fontSize: "0.8rem" }}>
+                      (ApiProjectMapError 通常表示未启用 Maps JavaScript API 或密钥未授权本域名)
+                    </span>
+                  )}
+                </div>
+              ) : isMapLoaded ? (
+                <>
+                  <div
+                    style={{
+                      flex: 1,
+                      position: "relative",
+                      minHeight: "280px",
+                      borderRadius: "15px",
+                      overflow: "hidden",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <GoogleMap
+                      mapContainerStyle={{ width: "100%", height: "100%" }}
+                      center={mapClickPosition || { lat: 21.95, lng: 96.08 }}
+                      zoom={mapClickPosition ? 15 : 13}
+                      onClick={onMapClick}
+                    >
+                      {mapClickPosition && window.google?.maps && (
+                        <Marker
+                          position={mapClickPosition}
+                          icon={{
+                            url:
+                              "data:image/svg+xml;charset=UTF-8," +
+                              encodeURIComponent(
+                                `<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="12" fill="#ef4444" stroke="white" stroke-width="3"/><circle cx="20" cy="20" r="5" fill="white"/><circle cx="20" cy="20" r="2" fill="#ef4444"/></svg>`,
+                              ),
+                            scaledSize: new window.google.maps.Size(40, 40),
+                            anchor: new window.google.maps.Point(20, 20),
+                          }}
+                          animation={window.google.maps.Animation?.DROP}
+                          zIndex={1000}
+                        />
+                      )}
+                    </GoogleMap>
+                    <button
+                      type="button"
+                      onClick={handleMapModalLocateCurrent}
+                      title={allT.order.getMyLocation}
+                      style={{
+                        position: "absolute",
+                        top: "70px",
+                        right: "10px",
+                        background:
+                          "linear-gradient(135deg, #38a169 0%, #48bb78 100%)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "50px",
+                        height: "50px",
+                        cursor: "pointer",
+                        fontSize: "20px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 4px 15px rgba(56, 161, 105, 0.3)",
+                        zIndex: 10,
+                      }}
+                    >
+                      📍
+                    </button>
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "#64748b",
+                        marginBottom: "0.35rem",
+                      }}
+                    >
+                      {allT.order.mapTip}
+                    </div>
+                    <input
+                      id="merchant-map-address-input"
+                      readOnly
+                      value={mapModalPreviewAddress}
+                      placeholder={allT.order.mapPlaceholder}
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem 1rem",
+                        border: "2px solid #e2e8f0",
+                        borderRadius: "10px",
+                        fontSize: "0.95rem",
+                        boxSizing: "border-box",
+                        background: "#f8fafc",
+                        color: "#0f172a",
+                      }}
+                    />
+                  </div>
+                </>
               ) : (
                 <div
                   style={{
@@ -11128,6 +11395,7 @@ const ProfilePage: React.FC = () => {
                     justifyContent: "center",
                     alignItems: "center",
                     height: "100%",
+                    minHeight: "240px",
                     background: "#f8fafc",
                   }}
                 >
@@ -11153,7 +11421,12 @@ const ProfilePage: React.FC = () => {
               }}
             >
               <button
-                onClick={() => setShowMapModal(false)}
+                type="button"
+                onClick={() => {
+                  setShowMapModal(false);
+                  setMapClickPosition(null);
+                  setMapModalPreviewAddress("");
+                }}
                 style={{
                   padding: "0.8rem 2rem",
                   borderRadius: "10px",
@@ -11165,6 +11438,7 @@ const ProfilePage: React.FC = () => {
                 {language === "zh" ? "取消" : "Cancel"}
               </button>
               <button
+                type="button"
                 onClick={confirmMapSelection}
                 disabled={!mapClickPosition}
                 style={{

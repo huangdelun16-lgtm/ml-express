@@ -1,181 +1,111 @@
-// Netlify Function: 发送短信验证码
-// 路径: /.netlify/functions/send-sms
+// Netlify Function: 发送短信验证码 (与 ml-express-client-web/netlify/functions 对齐)
+// 后台站点部署时使用本仓库根目录 netlify/functions
 
 const twilio = require('twilio');
+const { createClient } = require('@supabase/supabase-js');
 
-// 验证码存储（简单实现，生产环境应使用数据库或 Redis）
-// 注意：Netlify Functions 是无状态的，每次调用都会重置
-// 建议使用 Supabase 或其他数据库存储验证码
-const verificationCodes = new Map();
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-// 生成6位随机验证码
 function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// 引入 CORS 工具函数
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 
 exports.handler = async (event, context) => {
-  // 处理 CORS 预检请求
-  const preflightResponse = handleCorsPreflight(event, {
-    allowedMethods: ['POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type']
-  });
-  if (preflightResponse) {
-    return preflightResponse;
-  }
+  const preflightResponse = handleCorsPreflight(event, { allowedMethods: ['POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] });
+  if (preflightResponse) return preflightResponse;
 
-  // 获取 CORS 响应头
-  const headers = getCorsHeaders(event, {
-    allowedMethods: ['POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type']
-  });
+  const headers = getCorsHeaders(event, { allowedMethods: ['POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] });
 
-  // 只允许 POST 请求
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ 
-        success: false,
-        error: 'Method Not Allowed' 
-      })
-    };
+    return { statusCode: 405, headers, body: JSON.stringify({ success: false, error: 'Method Not Allowed' }) };
   }
 
   try {
-    // 解析请求体
-    const { phoneNumber, language = 'zh' } = JSON.parse(event.body || '{}');
+    const body = JSON.parse(event.body || '{}');
+    let rawPhone = body.phoneNumber || body.phone || '';
+    const language = body.language || 'zh';
 
-    // 验证手机号格式
-    const phoneRegex = /^09\d{7,9}$/;
-    if (!phoneNumber || !phoneRegex.test(phoneNumber)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: language === 'zh' ? '无效的手机号格式' : 
-                 language === 'en' ? 'Invalid phone number format' : 
-                 'ဖုန်းနံပါတ် မမှန်ကန်ပါ'
-        })
-      };
+    rawPhone = rawPhone.replace(/\D/g, '');
+    if (!rawPhone) return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '请输入手机号' }) };
+
+    if (supabase) {
+      const identifier = 'PHONE_' + rawPhone;
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+
+      const { count: recentCount } = await supabase.from('verification_codes').select('*', { count: 'exact', head: true }).eq('email', identifier).gt('created_at', oneMinuteAgo);
+      if (recentCount > 0) return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '请求太频繁，请 1 分钟后再试' }) };
+
+      const { count: hourCount } = await supabase.from('verification_codes').select('*', { count: 'exact', head: true }).eq('email', identifier).gt('created_at', oneHourAgo);
+      if (hourCount >= 3) return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '该号码发送验证码过于频繁，请 1 小时后再试' }) };
     }
 
-    // 检查 Twilio 配置
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
 
-    if (!accountSid || !authToken || !twilioPhone) {
-      console.log('⚠️ Twilio 未配置，使用开发模式');
-      
-      // 开发模式：返回固定验证码
-      const devCode = '123456';
-      
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          message: '验证码已发送（开发模式）',
-          code: devCode, // 仅开发模式返回
-          isDevelopmentMode: true
-        })
-      };
+    if (!accountSid || !authToken || (!twilioPhone && !messagingServiceSid)) {
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: '测试模式: 123456', isDevelopmentMode: true }) };
     }
 
-    // 初始化 Twilio 客户端
-    const client = twilio(accountSid, authToken);
+    const client = twilio(accountSid.trim(), authToken.trim());
 
-    // 生成验证码
+    const toPhone = (rawPhone.startsWith('95') ? '+' : '+95') + rawPhone.replace(/^0+/, '');
+
+    console.log(`🔍 正在执行 Lookup 检测: ${toPhone}`);
+    try {
+      const lookup = await client.lookups.v2.phoneNumbers(toPhone).fetch({ fields: 'line_type_intelligence' });
+
+      if (!lookup.valid) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '无效的电话号码，请检查后重试' }) };
+      }
+
+      const lineType = lookup.lineTypeIntelligence ? lookup.lineTypeIntelligence.type : 'unknown';
+      console.log(`📱 号码类型: ${lineType}`);
+
+      if (lineType === 'landline' || lineType === 'fixedLine') {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '该号码是固定电话，无法接收短信，请使用手机号' }) };
+      }
+
+      if (lineType === 'voip') {
+        console.warn('⚠️ 拦截到虚拟号 (VOIP) 请求');
+      }
+    } catch (lookupErr) {
+      console.error('⚠️ Lookup 检测失败 (可能是权限或余额问题):', lookupErr.message);
+    }
+
     const code = generateVerificationCode();
-
-    // 构建短信内容（多语言）
-    let messageText = '';
-    if (language === 'zh') {
-      messageText = `【缅甸同城快递】您的验证码是：${code}，5分钟内有效。请勿泄露给他人。`;
-    } else if (language === 'en') {
-      messageText = `[Myanmar Express] Your verification code is: ${code}. Valid for 5 minutes. Do not share with others.`;
-    } else {
-      messageText = '[Myanmar Express] သင့်အတည်ပြုကုဒ်မှာ: ' + code + ' ဖြစ်ပါသည်။ ၅ မိနစ်အတွင်း အသုံးပြုပါ။';
+    if (supabase) {
+      const identifier = 'PHONE_' + rawPhone;
+      await supabase.from('verification_codes').delete().eq('email', identifier).lt('expires_at', new Date().toISOString());
+      await supabase.from('verification_codes').insert({
+        email: identifier,
+        code: code,
+        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        used: false
+      });
     }
 
-    // 发送短信（缅甸手机号需要加国际区号 +95）
-    // 09xxxxxxxx -> +959xxxxxxxx
-    const internationalPhone = '+95' + phoneNumber.substring(1);
-    
-    console.log(`📱 正在发送验证码到: ${internationalPhone} (原始号码: ${phoneNumber})`);
-    
+    const messageBody = language === 'zh'
+      ? `【ML Express】您的验证码是：${code}，5分钟内有效。`
+      : `[ML Express] Your verification code is: ${code}. Valid for 5 mins.`;
+
     const message = await client.messages.create({
-      body: messageText,
-      from: twilioPhone,
-      to: internationalPhone
+      body: messageBody,
+      to: toPhone,
+      ...(messagingServiceSid ? { messagingServiceSid: messagingServiceSid.trim() } : { from: twilioPhone.trim() })
     });
 
-    console.log(`✅ 短信发送成功，SID: ${message.sid}`);
-
-    // 存储验证码到 Supabase（推荐）
-    // TODO: 实现 Supabase 存储逻辑
-    // await supabase.from('verification_codes').insert({
-    //   phone_number: phoneNumber,
-    //   code: code,
-    //   expires_at: new Date(Date.now() + 5 * 60 * 1000)
-    // });
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        message: language === 'zh' ? '验证码已发送，请查收短信' : 
-                 language === 'en' ? 'Verification code sent, please check your SMS' : 
-                 'အတည်ပြုကုဒ်ပို့ပြီးပါပြီ၊ SMS စစ်ဆေးပါ',
-        messageSid: message.sid,
-        // 生产环境不应返回验证码，这里仅用于测试
-        // code: code
-      })
-    };
+    console.log(`✅ Lookup 通过并发送成功, SID: ${message.sid}`);
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true }) };
 
   } catch (error) {
-    console.error('❌ 发送短信失败:', error);
-
-    // 错误处理
-    let errorMessage = '';
-    let statusCode = 500;
-
-    if (error.code === 21211) {
-      errorMessage = language === 'zh' ? '无效的手机号' : 
-                     language === 'en' ? 'Invalid phone number' : 
-                     'ဖုန်းနံပါတ် မမှန်ကန်ပါ';
-      statusCode = 400;
-    } else if (error.code === 21608) {
-      errorMessage = language === 'zh' ? '该号码无法接收短信' : 
-                     language === 'en' ? 'This number cannot receive SMS' : 
-                     'ဤနံပါတ်သည် SMS လက်ရှိမရနိုင်ပါ';
-      statusCode = 400;
-    } else if (error.code === 20003) {
-      errorMessage = language === 'zh' ? 'Twilio 认证失败，请检查配置' : 
-                     language === 'en' ? 'Twilio authentication failed' : 
-                     'Twilio အထောက်အထား မအောင်မြင်ပါ';
-      statusCode = 500;
-    } else {
-      errorMessage = language === 'zh' ? '发送失败，请稍后重试' : 
-                     language === 'en' ? 'Failed to send, please try again later' : 
-                     'ပို့ဆောင်မှု မအောင်မြင်ပါ';
-    }
-
-    return {
-      statusCode: statusCode,
-      headers,
-      body: JSON.stringify({
-        success: false,
-        error: errorMessage,
-        errorCode: error.code,
-        errorDetails: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
-    };
+    console.error('❌ SMS Function Error:', error);
+    return { statusCode: 200, headers, body: JSON.stringify({ success: false, error: '发送失败: ' + error.message }) };
   }
 };
-

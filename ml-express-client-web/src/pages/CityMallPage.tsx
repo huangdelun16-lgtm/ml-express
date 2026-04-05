@@ -14,7 +14,8 @@ const CityMallPage: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [selectedRegion, setSelectedRegion] = useState<string>('MDY');
   const [selectedCategory, setSelectedCategory] = useState<string>('全部'); // 🚀 新增
-  const [searchMode, setSearchMode] = useState<'stores' | 'products'>('stores'); // 🚀 新增
+  // 预留商品搜索模式；UI 切换接入前仅使用 stores
+  const [searchMode] = useState<'stores' | 'products'>('stores');
   const [foundProducts, setFoundProducts] = useState<any[]>([]); // 🚀 新增
   const [searchingProducts, setSearchingProducts] = useState(false); // 🚀 新增
   const [banners, setBanners] = useState<Banner[]>([]); // 🚀 新增

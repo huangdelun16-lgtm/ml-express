@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { merchantService, deliveryStoreService, Product, DeliveryStore } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -21,6 +21,32 @@ const StoreProductsPage: React.FC = () => {
   
   const productRefs = useRef<Record<string, HTMLDivElement | null>>({}); // 🚀 新增用于滚动定位
 
+  const loadStoreData = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const [storeData, productsData] = await Promise.all([
+        deliveryStoreService.getStoreById(storeId),
+        merchantService.getStoreProducts(storeId)
+      ]);
+      setStore(storeData);
+      setProducts(productsData);
+
+      const params = new URLSearchParams(location.search);
+      const highlightId = params.get('highlight');
+      if (highlightId) {
+        setItemQuantities(prev => ({ ...prev, [highlightId]: 1 }));
+        setTimeout(() => {
+          productRefs.current[highlightId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+      }
+    } catch (error) {
+      LoggerService.error('Failed to load store data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [storeId, location.search]);
+
   useEffect(() => {
     const savedUser = localStorage.getItem('ml-express-customer');
     if (savedUser) {
@@ -33,40 +59,12 @@ const StoreProductsPage: React.FC = () => {
     if (storeId) {
       loadStoreData();
     }
-  }, [storeId]);
+  }, [storeId, loadStoreData]);
 
   const handleLogout = () => {
     localStorage.removeItem('ml-express-customer');
     setCurrentUser(null);
     navigate('/');
-  };
-
-  const loadStoreData = async () => {
-    setLoading(true);
-    try {
-      const [storeData, productsData] = await Promise.all([
-        deliveryStoreService.getStoreById(storeId!),
-        merchantService.getStoreProducts(storeId!)
-      ]);
-      setStore(storeData);
-      setProducts(productsData);
-
-      // 🚀 处理高亮或自动加车逻辑
-      const params = new URLSearchParams(location.search);
-      const highlightId = params.get('highlight');
-      if (highlightId) {
-        // 自动增加该商品数量
-        setItemQuantities(prev => ({ ...prev, [highlightId]: 1 }));
-        // 延迟一点点等待列表渲染后滚动
-        setTimeout(() => {
-          productRefs.current[highlightId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 500);
-      }
-    } catch (error) {
-      LoggerService.error('Failed to load store data:', error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const updateQuantity = (id: string, delta: number) => {
@@ -435,6 +433,24 @@ const StoreProductsPage: React.FC = () => {
                               style={{ width: '32px', height: '32px', borderRadius: '10px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontSize: '1.2rem', fontWeight: 'bold', color: '#1e40af' }}
                             >+</button>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(product)}
+                            style={{
+                              marginTop: '0.6rem',
+                              width: '100%',
+                              padding: '0.55rem',
+                              borderRadius: '12px',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                              color: 'white',
+                              fontWeight: 800,
+                              fontSize: '0.85rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {t.store.addToCart}
+                          </button>
                         </div>
                       </div>
                     </div>

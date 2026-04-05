@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService, supabase } from '../services/supabase';
 import NavigationBar from '../components/home/NavigationBar';
 import { useLanguage } from '../contexts/LanguageContext';
+import {
+  ACTIVE_PACKAGE_STATUSES,
+  PACKAGE_STATUS,
+  TERMINAL_EXCLUDED_STATUSES,
+  TRACKING_LIVE_MAP_STATUSES
+} from '../constants/packageStatus';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
@@ -50,24 +56,10 @@ const TrackingPage: React.FC = () => {
   const [activeOrders, setActiveOrders] = useState<any[]>([]); // 🚀 新增：进行中的订单列表
   const [loadingActiveOrders, setLoadingActiveOrders] = useState(false); // 🚀 新增：加载状态
 
-  useEffect(() => {
-    setIsVisible(true);
-    loadUserFromStorage();
-  }, []);
-
-  // 🚀 新增：当用户信息加载后，拉取进行中的订单
-  useEffect(() => {
-    if (currentUser) {
-      loadActiveOrders();
-    }
-  }, [currentUser]);
-
-  // 🚀 新增：加载进行中的订单列表
-  const loadActiveOrders = async () => {
+  const loadActiveOrders = useCallback(async () => {
     if (!currentUser) return;
     setLoadingActiveOrders(true);
     try {
-      // 这里的逻辑参考 ProfilePage 的拉取逻辑，确保数据一致
       const packages = await packageService.getPackagesByUser(
         currentUser.email,
         currentUser.phone,
@@ -76,9 +68,8 @@ const TrackingPage: React.FC = () => {
         currentUser.id,
         currentUser.user_type === 'merchant' ? currentUser.name : undefined
       );
-      
-      // 过滤出进行中的订单（非已送达、非已取消，且排除“顺路递”）
-      const excludedStatuses = ['已送达', '已取消', 'Delivered', 'Cancelled'];
+
+      const excludedStatuses = [...TERMINAL_EXCLUDED_STATUSES];
       const active = packages.filter(pkg => {
         const isExcludedStatus = excludedStatuses.includes(pkg.status);
         const isWaySide = pkg.package_type === '顺路递' || pkg.package_type === 'Eco Way' || pkg.package_type === 'တန်တန်လေးပို့';
@@ -90,7 +81,18 @@ const TrackingPage: React.FC = () => {
     } finally {
       setLoadingActiveOrders(false);
     }
-  };
+  }, [currentUser]);
+
+  useEffect(() => {
+    setIsVisible(true);
+    loadUserFromStorage();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadActiveOrders();
+    }
+  }, [currentUser, loadActiveOrders]);
 
   // 从本地存储加载用户信息
   const loadUserFromStorage = () => {
@@ -137,7 +139,7 @@ const TrackingPage: React.FC = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    const activeStatuses = ['待确认', '待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'];
+    const activeStatuses = [...ACTIVE_PACKAGE_STATUSES];
     if (trackingResult && activeStatuses.includes(trackingResult.status) && trackingResult.courier && trackingResult.courier !== '待分配') {
       console.log('📡 启动 Web 实时追踪:', trackingResult.courier);
       
@@ -241,7 +243,7 @@ const TrackingPage: React.FC = () => {
       if (channel) supabase.removeChannel(channel);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [trackingResult]);
+  }, [trackingResult, language]);
 
   // 语言切换函数
   const handleLanguageChange = (newLanguage: string) => {
@@ -265,13 +267,6 @@ const TrackingPage: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showLanguageDropdown]);
-
-  const onRefresh = () => {
-    loadActiveOrders();
-    if (trackingNumber) {
-      handleTrackingInternal(trackingNumber);
-    }
-  };
 
   const handleTracking = async () => {
     handleTrackingInternal(trackingNumber);
@@ -338,19 +333,19 @@ const TrackingPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '待取件':
+      case PACKAGE_STATUS.PENDING_PICKUP:
       case 'Pending Pickup':
         return '#f39c12';
-      case '已取件':
+      case PACKAGE_STATUS.PICKED_UP:
       case 'Picked Up':
         return '#3498db';
-      case '配送中':
+      case PACKAGE_STATUS.IN_TRANSIT:
       case 'In Delivery':
         return '#9b59b6';
-      case '已送达':
+      case PACKAGE_STATUS.DELIVERED:
       case 'Delivered':
         return '#27ae60';
-      case '已取消':
+      case PACKAGE_STATUS.CANCELLED:
       case 'Cancelled':
         return '#95a5a6';
       default:
@@ -852,7 +847,7 @@ const TrackingPage: React.FC = () => {
                   </div>
 
                   {/* 骑手位置信息或隐私提示 */}
-                  {['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(trackingResult.status) && (
+                  {TRACKING_LIVE_MAP_STATUSES.includes(trackingResult.status) && (
                     <>
                       {courierLocation ? (
                         <div style={{ 
