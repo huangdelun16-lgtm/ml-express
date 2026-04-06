@@ -220,6 +220,7 @@ export interface Product {
   stock: number;
   is_available: boolean;
   sales_count: number;
+  listing_status?: "pending" | "approved" | "rejected" | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -1953,9 +1954,10 @@ export const merchantService = {
     product: Omit<Product, "id" | "created_at" | "updated_at" | "sales_count">,
   ) {
     try {
+      const { listing_status: _ignored, sales_count: _sc, is_available: _ia, ...rest } = product as Product;
       const { data, error } = await supabase
         .from("products")
-        .insert([product])
+        .insert([{ ...rest, sales_count: 0, listing_status: "pending" as const, is_available: false }])
         .select()
         .single();
 

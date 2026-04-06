@@ -28,6 +28,7 @@ const AdminDashboard: React.FC = () => {
   const lastVoiceBroadcastRef = useRef<number>(0);
   const [pendingRechargeCount, setPendingRechargeCount] = useState(0);
   const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0);
+  const [pendingProductReviewCount, setPendingProductReviewCount] = useState(0);
   const prevPendingAssignmentCountRef = useRef<number>(0); // 🚀 新增：记录上次待分配数量
 
   // 🚀 新增：语音播报函数
@@ -99,6 +100,17 @@ const AdminDashboard: React.FC = () => {
             }
           }
           prevPendingAssignmentCountRef.current = currentAssignCount;
+        }
+
+        // 3. 待审核商品（商家提交、需后台通过后才能上架）
+        const { count: pendingProducts, error: productReviewErr } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('listing_status', 'pending');
+        if (!productReviewErr && typeof pendingProducts === 'number') {
+          setPendingProductReviewCount(pendingProducts);
+        } else {
+          setPendingProductReviewCount(0);
         }
       } catch (err) {
         console.error('📊 Dashboard 轮询失败:', err);
@@ -547,7 +559,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       </div>
       
       {/* 🚀 新增：核心指标警报栏 */}
-      {(pendingRechargeCount > 0 || pendingAssignmentCount > 0) && (
+      {(pendingRechargeCount > 0 || pendingAssignmentCount > 0 || pendingProductReviewCount > 0) && (
         <div style={{
           display: 'flex',
           gap: '15px',
@@ -624,6 +636,42 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
               </div>
               <div style={{ background: '#3498db', color: 'white', padding: '5px 15px', borderRadius: '15px', fontWeight: '900', fontSize: '1.4rem' }}>
                 {pendingAssignmentCount}
+              </div>
+            </div>
+          )}
+
+          {pendingProductReviewCount > 0 && (
+            <div
+              onClick={() => navigate('/admin/delivery-stores')}
+              style={{
+                flex: 1,
+                minWidth: '280px',
+                background: 'rgba(245, 158, 11, 0.15)',
+                backdropFilter: 'blur(15px)',
+                borderRadius: '20px',
+                padding: '15px 25px',
+                border: '2px solid #f59e0b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                animation: 'pulse-alert 2s infinite',
+                boxShadow: '0 8px 25px rgba(245, 158, 11, 0.35)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <span style={{ fontSize: '2rem' }}>🛍️</span>
+                <div>
+                  <div style={{ color: '#fbbf24', fontWeight: '900', fontSize: '1.1rem' }}>
+                    {language === 'zh' ? '待审核商品' : language === 'en' ? 'Products to review' : 'စစ်ဆေးရန် ကုန်ပစ္စည်းများ'}
+                  </div>
+                  <div style={{ color: 'white', fontSize: '0.85rem', opacity: 0.85 }}>
+                    {language === 'zh' ? '商家提交了新品，请在合伙店铺中处理' : language === 'en' ? 'Open Merchants → store product list' : 'ကုန်သည်မှ ကုန်ပစ္စည်းအသစ်'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ background: '#f59e0b', color: 'white', padding: '5px 15px', borderRadius: '15px', fontWeight: '900', fontSize: '1.4rem' }}>
+                {pendingProductReviewCount}
               </div>
             </div>
           )}
@@ -719,6 +767,60 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
               }} />
               {card.icon}
             </div>
+            {card.id === 'merchant_stores' && pendingProductReviewCount > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  right: '14px',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  boxShadow: '0 6px 16px rgba(245, 158, 11, 0.45)',
+                  zIndex: 10,
+                  letterSpacing: '0.02em',
+                  maxWidth: 'calc(100% - 28px)',
+                  textAlign: 'center',
+                  lineHeight: 1.35
+                }}
+              >
+                {language === 'zh'
+                  ? `待审核 ${pendingProductReviewCount} 件商品`
+                  : language === 'en'
+                    ? `${pendingProductReviewCount} pending`
+                    : `စစ်ဆေး ${pendingProductReviewCount}`}
+              </div>
+            )}
+            {card.id === 'recharges' && pendingRechargeCount > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  right: '14px',
+                  background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                  color: 'white',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  boxShadow: '0 6px 16px rgba(231, 76, 60, 0.45)',
+                  zIndex: 10,
+                  letterSpacing: '0.02em',
+                  maxWidth: 'calc(100% - 28px)',
+                  textAlign: 'center',
+                  lineHeight: 1.35
+                }}
+              >
+                {language === 'zh'
+                  ? `待审核 ${pendingRechargeCount} 笔充值`
+                  : language === 'en'
+                    ? `${pendingRechargeCount} pending`
+                    : `ငွေဖြည့် ${pendingRechargeCount}`}
+              </div>
+            )}
             <h3 style={{ 
               fontSize: '1.6rem', 
               marginBottom: '12px',

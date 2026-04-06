@@ -6,13 +6,12 @@ import { packageService, Package, supabase, CourierLocation, notificationService
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Courier, CourierWithLocation, Coordinates } from '../types';
+import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
 
-// Google Maps 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
   console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
-const GOOGLE_MAPS_LIBRARIES: any = ['places', 'visualization'];
 
 // 配送商店接口已在types/index.ts中定义
 

@@ -36,6 +36,14 @@ if (typeof document !== "undefined") {
     .spinner {
       animation: spin 1s linear infinite;
     }
+    .merchant-stat-grid > * {
+      min-width: 0;
+    }
+    .merchant-stat-grid .stat-label {
+      line-height: 1.3;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -353,6 +361,28 @@ const ProfilePage: React.FC = () => {
   } | null>(null); // 🚀 新增
   /** 地图弹窗内逆地理编码得到的地址预览（与客户端「立即下单」地图一致） */
   const [mapModalPreviewAddress, setMapModalPreviewAddress] = useState("");
+  /** Places 自动完成（店名/地址搜索） */
+  const merchantMapRef = useRef<google.maps.Map | null>(null);
+  const merchantAutocompleteServiceRef =
+    useRef<google.maps.places.AutocompleteService | null>(null);
+  const merchantPlacesServiceRef =
+    useRef<google.maps.places.PlacesService | null>(null);
+  const merchantMapSearchDebounceRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const lastMerchantMapSearchQueryRef = useRef("");
+  const [merchantMapSuggestions, setMerchantMapSuggestions] = useState<
+    Array<{
+      place_id: string;
+      main_text: string;
+      secondary_text: string;
+      description: string;
+    }>
+  >([]);
+  const [showMerchantMapSuggestions, setShowMerchantMapSuggestions] =
+    useState(false);
+  const [isLoadingMerchantMapSuggestions, setIsLoadingMerchantMapSuggestions] =
+    useState(false);
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(
     new Set(),
   );
@@ -732,7 +762,7 @@ const ProfilePage: React.FC = () => {
         originalPrice = Math.round(price / (1 - discountPercent / 100));
       }
 
-      const productData = {
+      let productData: Record<string, unknown> = {
         store_id: currentUser.id,
         name: productForm.name,
         price: price,
@@ -745,17 +775,27 @@ const ProfilePage: React.FC = () => {
 
       let result;
       if (editingProduct) {
+        if (editingProduct.listing_status === "rejected") {
+          productData = { ...productData, listing_status: "pending" };
+        }
         result = await merchantService.updateProduct(
           editingProduct.id,
-          productData,
+          productData as Parameters<typeof merchantService.updateProduct>[1],
         );
       } else {
-        result = await merchantService.addProduct(productData);
+        result = await merchantService.addProduct(productData as Parameters<typeof merchantService.addProduct>[0]);
       }
 
       if (result.success) {
         setShowAddEditProductModal(false);
         await loadProducts();
+        if (!editingProduct) {
+          alert(
+            language === "zh"
+              ? "商品已提交，待后台审核通过后将展示给顾客。"
+              : "Submitted. Visible to customers after admin approval.",
+          );
+        }
       } else {
         alert("保存失败，请重试");
       }
@@ -1424,6 +1464,9 @@ const ProfilePage: React.FC = () => {
     setMapSelectionType(type);
     setMapClickPosition(null);
     setMapModalPreviewAddress("");
+    setMerchantMapSuggestions([]);
+    setShowMerchantMapSuggestions(false);
+    lastMerchantMapSearchQueryRef.current = "";
     setShowMapModal(true);
   };
 
@@ -1454,6 +1497,130 @@ const ProfilePage: React.FC = () => {
       }
     });
   };
+
+  const MERCHANT_MAP_DEFAULT_CENTER = { lat: 21.95, lng: 96.08 };
+
+  const performMerchantMapAutocomplete = (input: string) => {
+    const svc = merchantAutocompleteServiceRef.current;
+    if (!input.trim() || !svc || input.trim().length < 2) {
+      setMerchantMapSuggestions([]);
+      setShowMerchantMapSuggestions(false);
+      setIsLoadingMerchantMapSuggestions(false);
+      return;
+    }
+    if (lastMerchantMapSearchQueryRef.current === input.trim()) {
+      return;
+    }
+    setIsLoadingMerchantMapSuggestions(true);
+    lastMerchantMapSearchQueryRef.current = input.trim();
+    const center = mapClickPosition || MERCHANT_MAP_DEFAULT_CENTER;
+    svc.getPlacePredictions(
+      {
+        input: input.trim(),
+        location: new window.google.maps.LatLng(center.lat, center.lng),
+        radius: 50000,
+        componentRestrictions: { country: "mm" },
+        language:
+          language === "zh" ? "zh-CN" : language === "my" ? "my" : "en",
+      },
+      (predictions, status) => {
+        if (lastMerchantMapSearchQueryRef.current !== input.trim()) {
+          return;
+        }
+        setIsLoadingMerchantMapSuggestions(false);
+        if (
+          status === window.google.maps.places.PlacesServiceStatus.OK &&
+          predictions &&
+          predictions.length > 0
+        ) {
+          const suggestions = predictions
+            .slice(0, 10)
+            .map((prediction: google.maps.places.AutocompletePrediction) => ({
+              place_id: prediction.place_id,
+              main_text:
+                prediction.structured_formatting?.main_text ||
+                prediction.description,
+              secondary_text:
+                prediction.structured_formatting?.secondary_text || "",
+              description: prediction.description,
+            }));
+          setMerchantMapSuggestions(suggestions);
+          setShowMerchantMapSuggestions(true);
+        } else {
+          setMerchantMapSuggestions([]);
+          setShowMerchantMapSuggestions(false);
+        }
+      },
+    );
+  };
+
+  const handleMerchantMapAddressInputChange = (raw: string) => {
+    setMapModalPreviewAddress(raw);
+    if (merchantMapSearchDebounceRef.current) {
+      clearTimeout(merchantMapSearchDebounceRef.current);
+    }
+    if (!raw.trim()) {
+      setMerchantMapSuggestions([]);
+      setShowMerchantMapSuggestions(false);
+      setIsLoadingMerchantMapSuggestions(false);
+      lastMerchantMapSearchQueryRef.current = "";
+      return;
+    }
+    if (raw.trim().length < 2) {
+      setMerchantMapSuggestions([]);
+      setShowMerchantMapSuggestions(false);
+      setIsLoadingMerchantMapSuggestions(false);
+      return;
+    }
+    merchantMapSearchDebounceRef.current = setTimeout(() => {
+      performMerchantMapAutocomplete(raw);
+    }, 300);
+  };
+
+  const handleMerchantMapSelectSuggestion = (suggestion: {
+    place_id: string;
+    description: string;
+  }) => {
+    const places = merchantPlacesServiceRef.current;
+    if (!places) return;
+    setShowMerchantMapSuggestions(false);
+    setIsLoadingMerchantMapSuggestions(true);
+    lastMerchantMapSearchQueryRef.current = "";
+    setMapModalPreviewAddress(suggestion.description);
+    places.getDetails(
+      {
+        placeId: suggestion.place_id,
+        fields: ["geometry", "formatted_address", "name"],
+      },
+      (place, status) => {
+        setIsLoadingMerchantMapSuggestions(false);
+        if (
+          status === window.google.maps.places.PlacesServiceStatus.OK &&
+          place?.geometry?.location
+        ) {
+          const loc = place.geometry.location;
+          const coords = { lat: loc.lat(), lng: loc.lng() };
+          setMapClickPosition(coords);
+          const addr =
+            place.formatted_address || place.name || suggestion.description;
+          setMapModalPreviewAddress(addr);
+          if (merchantMapRef.current) {
+            merchantMapRef.current.panTo(coords);
+            merchantMapRef.current.setZoom(16);
+          }
+        }
+      },
+    );
+    setMerchantMapSuggestions([]);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (merchantMapSearchDebounceRef.current) {
+        clearTimeout(merchantMapSearchDebounceRef.current);
+      }
+    };
+  }, []);
 
   // 🚀 获取当前位置（对齐客户端 HomePage 地图）
   const handleMapModalLocateCurrent = async (
@@ -1597,6 +1764,8 @@ const ProfilePage: React.FC = () => {
     setShowMapModal(false);
     setMapClickPosition(null);
     setMapModalPreviewAddress("");
+    setMerchantMapSuggestions([]);
+    setShowMerchantMapSuggestions(false);
   };
 
   // 🚀 新增：下载订单二维码
@@ -3501,22 +3670,17 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {/* 订单统计卡片 */}
+          {/* 订单统计卡片：auto-fill + minmax 避免英文/缅文下一行挤爆；窄屏自动换两行或多行 */}
         <div
+          className="merchant-stat-grid"
           style={{
             display: "grid",
             gridTemplateColumns:
-              window.innerWidth < 768
-                ? "repeat(2, 1fr)"
-              : `repeat(${
-                  4 + 
-                    (isPartnerStore && orderStats.pendingConfirmation > 0
-                      ? 1
-                      : 0) +
-                  (isPartnerStore ? 2 : 0)
-                }, 1fr)`,
+              "repeat(auto-fill, minmax(min(100%, 152px), 1fr))",
             gap: "1.5rem",
             marginBottom: "3rem",
+            width: "100%",
+            minWidth: 0,
           }}
         >
             {/* 全部订单 */}
@@ -3557,6 +3721,7 @@ const ProfilePage: React.FC = () => {
                 {orderStats.total}
               </div>
             <div
+              className="stat-label"
               style={{
                 color: "rgba(255,255,255,0.6)",
                 fontSize: "0.9rem",
@@ -3566,7 +3731,7 @@ const ProfilePage: React.FC = () => {
               }}
             >
                 {t.totalOrders}
-              </div>
+            </div>
             </div>
 
             {/* 待接单 (仅当是合伙店铺且有待接单订单时显示) */}
@@ -3626,6 +3791,7 @@ const ProfilePage: React.FC = () => {
                   {orderStats.pendingConfirmation}
                 </div>
               <div
+                className="stat-label"
                 style={{
                   color: "white",
                   fontSize: "0.9rem",
@@ -3679,6 +3845,7 @@ const ProfilePage: React.FC = () => {
                   {orderStats.packing}
                 </div>
               <div
+                className="stat-label"
                 style={{
                   color: "white",
                   fontSize: "0.9rem",
@@ -3734,6 +3901,7 @@ const ProfilePage: React.FC = () => {
                 {orderStats.pendingPickup}
               </div>
             <div
+              className="stat-label"
               style={{
                 color: "rgba(255,255,255,0.6)",
                 fontSize: "0.9rem",
@@ -3784,6 +3952,7 @@ const ProfilePage: React.FC = () => {
                 {orderStats.inTransit}
               </div>
             <div
+              className="stat-label"
               style={{
                 color: "rgba(255,255,255,0.6)",
                 fontSize: "0.9rem",
@@ -3834,6 +4003,7 @@ const ProfilePage: React.FC = () => {
                 {orderStats.completed}
               </div>
             <div
+              className="stat-label"
               style={{
                 color: "rgba(255,255,255,0.6)",
                 fontSize: "0.9rem",
@@ -3886,6 +4056,7 @@ const ProfilePage: React.FC = () => {
                 {reviewStats.average || "0.0"}
               </div>
               <div
+                className="stat-label"
                 style={{
                   color: "white",
                   fontSize: "0.9rem",
@@ -7514,6 +7685,28 @@ const ProfilePage: React.FC = () => {
                           {product.is_available ? t.onSale : t.offShelf}
                         </div>
                       </div>
+                      {(product.listing_status === "pending" ||
+                        product.listing_status === "rejected") && (
+                        <div
+                          style={{
+                            marginTop: "0.5rem",
+                            fontSize: "0.75rem",
+                            fontWeight: 800,
+                            color:
+                              product.listing_status === "pending"
+                                ? "#fbbf24"
+                                : "#f87171",
+                          }}
+                        >
+                          {product.listing_status === "pending"
+                            ? language === "zh"
+                              ? "待后台审核"
+                              : "Pending approval"
+                            : language === "zh"
+                              ? "审核未通过"
+                              : "Rejected"}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -11199,28 +11392,43 @@ const ProfilePage: React.FC = () => {
             justifyContent: "center",
             zIndex: 3000,
             backdropFilter: "blur(10px)",
+            padding:
+              "max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))",
+            overflowY: "auto",
+            boxSizing: "border-box",
           }}
         >
           <div
             style={{
               background: "white",
-              padding: "2rem",
+              padding: "1.25rem 1.5rem 1rem",
               borderRadius: "20px",
-              width: "90%",
-              maxWidth: "800px",
-              height: "80vh",
+              width: "min(92vw, 800px)",
+              maxHeight: "min(92vh, 880px)",
+              height: "min(92vh, 880px)",
               display: "flex",
               flexDirection: "column",
+              overflow: "hidden",
+              boxSizing: "border-box",
             }}
           >
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                marginBottom: "1rem",
+                alignItems: "flex-start",
+                gap: "0.75rem",
+                flexShrink: 0,
+                marginBottom: "0.75rem",
               }}
             >
-              <h3>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "clamp(1rem, 2.8vw, 1.25rem)",
+                  lineHeight: 1.35,
+                }}
+              >
                 {language === "zh"
                   ? `选择${mapSelectionType === "sender" ? "寄件" : "收件"}位置`
                   : `Select ${mapSelectionType === "sender" ? "Sender" : "Receiver"} Location`}
@@ -11231,6 +11439,8 @@ const ProfilePage: React.FC = () => {
                   setShowMapModal(false);
                   setMapClickPosition(null);
                   setMapModalPreviewAddress("");
+                  setMerchantMapSuggestions([]);
+                  setShowMerchantMapSuggestions(false);
                 }}
                 style={{
                   background: "none",
@@ -11245,10 +11455,14 @@ const ProfilePage: React.FC = () => {
             <div
               style={{
                 flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                overflowX: "hidden",
+                WebkitOverflowScrolling: "touch",
                 display: "flex",
                 flexDirection: "column",
-                minHeight: 0,
                 gap: "0.75rem",
+                paddingBottom: "0.5rem",
               }}
             >
               {!googleMapsApiKey || mapLoadError ? (
@@ -11302,9 +11516,10 @@ const ProfilePage: React.FC = () => {
                 <>
                   <div
                     style={{
-                      flex: 1,
                       position: "relative",
-                      minHeight: "280px",
+                      width: "100%",
+                      height: "clamp(220px, 38vh, 360px)",
+                      flexShrink: 0,
                       borderRadius: "15px",
                       overflow: "hidden",
                       border: "1px solid #e2e8f0",
@@ -11312,9 +11527,20 @@ const ProfilePage: React.FC = () => {
                   >
                     <GoogleMap
                       mapContainerStyle={{ width: "100%", height: "100%" }}
-                      center={mapClickPosition || { lat: 21.95, lng: 96.08 }}
+                      center={
+                        mapClickPosition || { lat: 21.95, lng: 96.08 }
+                      }
                       zoom={mapClickPosition ? 15 : 13}
                       onClick={onMapClick}
+                      onLoad={(map) => {
+                        merchantMapRef.current = map;
+                        if (window.google?.maps?.places) {
+                          merchantAutocompleteServiceRef.current =
+                            new window.google.maps.places.AutocompleteService();
+                          merchantPlacesServiceRef.current =
+                            new window.google.maps.places.PlacesService(map);
+                        }
+                      }}
                     >
                       {mapClickPosition && window.google?.maps && (
                         <Marker
@@ -11370,22 +11596,127 @@ const ProfilePage: React.FC = () => {
                     >
                       {allT.order.mapTip}
                     </div>
-                    <input
-                      id="merchant-map-address-input"
-                      readOnly
-                      value={mapModalPreviewAddress}
-                      placeholder={allT.order.mapPlaceholder}
+                    <div
                       style={{
-                        width: "100%",
-                        padding: "0.75rem 1rem",
-                        border: "2px solid #e2e8f0",
-                        borderRadius: "10px",
-                        fontSize: "0.95rem",
-                        boxSizing: "border-box",
-                        background: "#f8fafc",
-                        color: "#0f172a",
+                        fontSize: "0.8rem",
+                        color: "#94a3b8",
+                        marginBottom: "0.5rem",
                       }}
-                    />
+                    >
+                      {language === "zh"
+                        ? "在搜索框输入店名、地标或地址，从列表中选择；也可点击地图选点。"
+                        : language === "en"
+                          ? "Search by store name, landmark, or address; or tap the map."
+                          : "ဆိုင်အမည်၊ လမ်းညွှန်ချက်ဖြင့် ရှာပြီး ရွေးချယ်ပါ။ မြေပုံကိုနှိပ်ခြင်းလည်း လုပ်နိုင်သည်။"}
+                    </div>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        id="merchant-map-address-input"
+                        type="text"
+                        value={mapModalPreviewAddress}
+                        placeholder={allT.order.mapPlaceholder}
+                        onChange={(e) =>
+                          handleMerchantMapAddressInputChange(e.target.value)
+                        }
+                        onFocus={(e) => {
+                          if (e.currentTarget.value.trim().length >= 2) {
+                            performMerchantMapAutocomplete(
+                              e.currentTarget.value,
+                            );
+                          }
+                        }}
+                        onBlur={() => {
+                          setTimeout(
+                            () => setShowMerchantMapSuggestions(false),
+                            200,
+                          );
+                        }}
+                        autoComplete="off"
+                        style={{
+                          width: "100%",
+                          padding: "0.75rem 1rem",
+                          border: "2px solid #e2e8f0",
+                          borderRadius: "10px",
+                          fontSize: "0.95rem",
+                          boxSizing: "border-box",
+                          background: "#fff",
+                          color: "#0f172a",
+                        }}
+                      />
+                      {isLoadingMerchantMapSuggestions && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            right: "12px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            fontSize: "0.75rem",
+                            color: "#64748b",
+                          }}
+                        >
+                          🔍
+                        </div>
+                      )}
+                      {showMerchantMapSuggestions &&
+                        merchantMapSuggestions.length > 0 && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: "100%",
+                              left: 0,
+                              right: 0,
+                              marginTop: "4px",
+                              background: "#fff",
+                              borderRadius: "10px",
+                              border: "1px solid #e2e8f0",
+                              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                              maxHeight: "280px",
+                              overflowY: "auto",
+                              zIndex: 20,
+                            }}
+                          >
+                            {merchantMapSuggestions.map((s, index) => (
+                              <button
+                                key={`${s.place_id}-${index}`}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() =>
+                                  handleMerchantMapSelectSuggestion(s)
+                                }
+                                style={{
+                                  width: "100%",
+                                  textAlign: "left",
+                                  padding: "0.75rem 1rem",
+                                  border: "none",
+                                  borderBottom:
+                                    index < merchantMapSuggestions.length - 1
+                                      ? "1px solid #f1f5f9"
+                                      : "none",
+                                  background: "transparent",
+                                  cursor: "pointer",
+                                  fontSize: "0.9rem",
+                                  color: "#0f172a",
+                                }}
+                              >
+                                <div style={{ fontWeight: 600 }}>
+                                  {s.main_text}
+                                </div>
+                                {s.secondary_text ? (
+                                  <div
+                                    style={{
+                                      fontSize: "0.8rem",
+                                      color: "#64748b",
+                                      marginTop: "2px",
+                                    }}
+                                  >
+                                    {s.secondary_text}
+                                  </div>
+                                ) : null}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                    </div>
                   </div>
                 </>
               ) : (
@@ -11414,10 +11745,17 @@ const ProfilePage: React.FC = () => {
             </div>
             <div
               style={{
-                marginTop: "1.5rem",
+                flexShrink: 0,
+                marginTop: "auto",
+                paddingTop: "1rem",
+                paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))",
+                borderTop: "1px solid #e2e8f0",
                 display: "flex",
-                gap: "1rem",
+                flexWrap: "wrap",
+                gap: "0.75rem",
                 justifyContent: "flex-end",
+                alignItems: "center",
+                background: "#fff",
               }}
             >
               <button
@@ -11426,13 +11764,16 @@ const ProfilePage: React.FC = () => {
                   setShowMapModal(false);
                   setMapClickPosition(null);
                   setMapModalPreviewAddress("");
+                  setMerchantMapSuggestions([]);
+                  setShowMerchantMapSuggestions(false);
                 }}
                 style={{
-                  padding: "0.8rem 2rem",
+                  padding: "0.75rem 1.5rem",
                   borderRadius: "10px",
                   border: "1px solid #e2e8f0",
                   background: "white",
                   cursor: "pointer",
+                  fontWeight: 600,
                 }}
               >
                 {language === "zh" ? "取消" : "Cancel"}
@@ -11442,7 +11783,7 @@ const ProfilePage: React.FC = () => {
                 onClick={confirmMapSelection}
                 disabled={!mapClickPosition}
                 style={{
-                  padding: "0.8rem 2rem",
+                  padding: "0.75rem 1.5rem",
                   borderRadius: "10px",
                   border: "none",
                   background: "#3b82f6",

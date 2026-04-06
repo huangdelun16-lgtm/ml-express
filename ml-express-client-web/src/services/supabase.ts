@@ -8,11 +8,14 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 // 验证 API key 是否有效
 if (!supabaseUrl || !supabaseKey) {
-  LoggerService.error('❌ 错误：Supabase 环境变量未配置！');
-  LoggerService.error('请在 Netlify Dashboard → Site settings → Environment variables 中配置：');
-  LoggerService.error('  - REACT_APP_SUPABASE_URL');
-  LoggerService.error('  - REACT_APP_SUPABASE_ANON_KEY');
-  throw new Error('REACT_APP_SUPABASE_URL 和 REACT_APP_SUPABASE_ANON_KEY 环境变量必须配置！');
+    LoggerService.error('❌ 错误：Supabase 环境变量未配置！');
+    LoggerService.error('本地开发：在本项目目录执行 cp .env.example .env.local，填写 URL 与 ANON_KEY 后重新 npm start');
+    LoggerService.error('线上部署：在 Netlify → Site settings → Environment variables 中配置：');
+    LoggerService.error('  - REACT_APP_SUPABASE_URL');
+    LoggerService.error('  - REACT_APP_SUPABASE_ANON_KEY');
+    throw new Error(
+      '请配置 REACT_APP_SUPABASE_URL 与 REACT_APP_SUPABASE_ANON_KEY（本地用 .env.local，见 .env.example）',
+    );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
@@ -109,6 +112,7 @@ export interface Product {
   stock: number;
   is_available: boolean;
   sales_count: number;
+  listing_status?: 'pending' | 'approved' | 'rejected' | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -991,7 +995,7 @@ export const deliveryStoreService = {
 
 // 商家服务
 export const merchantService = {
-  // 获取商店的所有商品
+  // 获取商店全部商品（商家后台：含待审核）
   async getStoreProducts(storeId: string): Promise<Product[]> {
     try {
       const { data, error } = await supabase
@@ -1004,6 +1008,30 @@ export const merchantService = {
       return data || [];
     } catch (error) {
       LoggerService.error('获取商店商品失败:', error);
+      return [];
+    }
+  },
+
+  /** 客户侧可见：已审核通过且在售（待审/已拒绝一律不可见） */
+  async getPublicStoreProducts(storeId: string): Promise<Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      const rows = data || [];
+      return rows.filter((p) => {
+        if (!p.is_available) return false;
+        const ls = (p.listing_status ?? '').toString().trim();
+        if (ls === 'pending' || ls === 'rejected') return false;
+        if (ls === 'approved') return true;
+        return ls === '';
+      });
+    } catch (error) {
+      LoggerService.error('获取公开商店商品失败:', error);
       return [];
     }
   },
@@ -1025,12 +1053,13 @@ export const merchantService = {
     }
   },
 
-  // 添加商品
+  // 添加商品（需 Admin 审核后对客户展示）
   async addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'sales_count'>) {
     try {
+      const { listing_status: _ignored, sales_count: _sc, is_available: _ia, ...rest } = product as Product;
       const { data, error } = await supabase
         .from('products')
-        .insert([product])
+        .insert([{ ...rest, sales_count: 0, listing_status: 'pending' as const, is_available: false }])
         .select()
         .single();
 
@@ -1108,10 +1137,15 @@ export const merchantService = {
         `)
         .ilike('name', `%${query}%`)
         .eq('is_available', true)
-        .limit(20);
+        .limit(40);
 
       if (error) throw error;
-      return data || [];
+      const rows = data || [];
+      return rows.filter((p: Product) => {
+        const ls = (p.listing_status ?? '').toString().trim();
+        if (ls === 'pending' || ls === 'rejected') return false;
+        return ls === 'approved' || ls === '';
+      }).slice(0, 20);
     } catch (error: any) {
       LoggerService.error('搜索商品失败:', error?.message || '未知错误');
       return [];

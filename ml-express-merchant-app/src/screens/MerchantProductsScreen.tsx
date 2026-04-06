@@ -330,7 +330,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         }
       }
 
-      const productData = {
+      let productData: Record<string, unknown> = {
         store_id: storeId,
         name: productForm.name,
         description: productForm.description,
@@ -345,9 +345,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
       let result;
       if (editingProduct) {
-        result = await merchantService.updateProduct(editingProduct.id, productData);
+        if (editingProduct.listing_status === "rejected") {
+          productData = { ...productData, listing_status: "pending" };
+        }
+        result = await merchantService.updateProduct(editingProduct.id, productData as any);
       } else {
-        result = await merchantService.addProduct(productData);
+        result = await merchantService.addProduct(productData as any);
       }
 
       if (result.success) {

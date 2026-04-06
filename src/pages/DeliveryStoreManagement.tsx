@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
 import { supabase, deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import QRCode from 'qrcode';
+import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
@@ -35,7 +36,6 @@ const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
   console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
-const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 // 添加CSS动画样式
 const spinAnimation = `
@@ -125,6 +125,14 @@ class ErrorBoundary extends React.Component<
   }
 }
 
+/** 仅当明确为 approved 时视为已上架；null/undefined/空串 等均视为待审核（避免未跑迁移时误判为「已上架」） */
+function normalizeProductListingStatus(product: { listing_status?: string | null }): 'pending' | 'approved' | 'rejected' {
+  const s = typeof product.listing_status === 'string' ? product.listing_status.trim() : '';
+  if (s === 'approved') return 'approved';
+  if (s === 'rejected') return 'rejected';
+  return 'pending';
+}
+
 const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
@@ -179,8 +187,14 @@ const DeliveryStoreManagement: React.FC = () => {
   // 🚀 新增：店铺商品查看状态
   const [showProductsModal, setShowProductsModal] = useState(false);
   const [viewingStoreName, setViewingStoreName] = useState('');
+  const [viewingStoreId, setViewingStoreId] = useState<string | null>(null);
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productListingActionId, setProductListingActionId] = useState<string | null>(null);
+  /** 商品列表弹窗：全部 / 待审核 / 已完成(已通过) / 已取消(已拒绝) */
+  const [productListFilter, setProductListFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  /** 全局待审核商品数（listing_status=pending），用于列表区与仪表板一致提示 */
+  const [pendingProductReviewCount, setPendingProductReviewCount] = useState(0);
 
   // Google Places API 相关状态
   const [placeSearchInput, setPlaceSearchInput] = useState('');
@@ -622,7 +636,9 @@ const DeliveryStoreManagement: React.FC = () => {
   const viewStoreProducts = async (store: DeliveryStore) => {
     try {
       setLoadingProducts(true);
+      setProductListFilter('all');
       setViewingStoreName(store.store_name);
+      setViewingStoreId(store.id ?? null);
       setShowProductsModal(true);
       
       const { data, error } = await supabase
@@ -640,6 +656,75 @@ const DeliveryStoreManagement: React.FC = () => {
       setLoadingProducts(false);
     }
   };
+
+  const loadPendingProductReviewCount = useCallback(async () => {
+    try {
+      const { count, error } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('listing_status', 'pending');
+      if (error) {
+        setPendingProductReviewCount(0);
+        return;
+      }
+      setPendingProductReviewCount(typeof count === 'number' ? count : 0);
+    } catch {
+      setPendingProductReviewCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPendingProductReviewCount();
+    const t = setInterval(loadPendingProductReviewCount, 30000);
+    return () => clearInterval(t);
+  }, [loadPendingProductReviewCount]);
+
+  const updateProductListingStatus = async (productId: string, listing_status: 'approved' | 'rejected') => {
+    if (!viewingStoreId) return;
+    setProductListingActionId(productId);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          listing_status,
+          is_available: listing_status === 'approved',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', productId);
+      if (error) throw error;
+      const { data, error: reloadError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', viewingStoreId)
+        .order('created_at', { ascending: false });
+      if (reloadError) throw reloadError;
+      setStoreProducts(data || []);
+      await loadPendingProductReviewCount();
+    } catch (e) {
+      console.error('更新商品审核状态失败:', e);
+      alert('更新失败，请重试（请确认已在数据库执行 listing_status 迁移）');
+    } finally {
+      setProductListingActionId(null);
+    }
+  };
+
+  const productListCounts = useMemo(() => {
+    let pending = 0;
+    let approved = 0;
+    let rejected = 0;
+    storeProducts.forEach((p) => {
+      const ls = normalizeProductListingStatus(p);
+      if (ls === 'pending') pending += 1;
+      else if (ls === 'approved') approved += 1;
+      else rejected += 1;
+    });
+    return { all: storeProducts.length, pending, approved, rejected };
+  }, [storeProducts]);
+
+  const filteredStoreProducts = useMemo(() => {
+    if (productListFilter === 'all') return storeProducts;
+    return storeProducts.filter((p) => normalizeProductListingStatus(p) === productListFilter);
+  }, [storeProducts, productListFilter]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -1418,11 +1503,38 @@ const DeliveryStoreManagement: React.FC = () => {
             color: 'white'
           }}
         >
-          <h2 style={{ marginBottom: '20px' }}>
-            合伙店铺列表 
-            <span style={{ fontSize: '0.9rem', fontWeight: 'normal', opacity: 0.8, marginLeft: '8px' }}>
-              ({myanmarCities[selectedCity].name}: {stores.length} 个)
+          <h2 style={{
+            marginBottom: '20px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: '10px',
+            justifyContent: 'space-between',
+            rowGap: '12px'
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              合伙店铺列表
+              <span style={{ fontSize: '0.9rem', fontWeight: 'normal', opacity: 0.8 }}>
+                ({myanmarCities[selectedCity].name}: {stores.length} 个)
+              </span>
             </span>
+            {pendingProductReviewCount > 0 && (
+              <span
+                style={{
+                  background: 'rgba(245, 158, 11, 0.22)',
+                  border: '1px solid rgba(251, 191, 36, 0.55)',
+                  color: '#fbbf24',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  padding: '6px 14px',
+                  borderRadius: '999px',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)'
+                }}
+              >
+                🛍️ 待审核商品 {pendingProductReviewCount}
+              </span>
+            )}
           </h2>
           {loading ? (
             <p>加载中...</p>
@@ -3960,10 +4072,12 @@ const DeliveryStoreManagement: React.FC = () => {
             }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: '1.5rem' }}>🛍️ {viewingStoreName} - 商品列表</h2>
-                <p style={{ margin: '4px 0 0 0', opacity: 0.8, fontSize: '0.9rem' }}>共 {storeProducts.length} 件在售商品</p>
+                <p style={{ margin: '4px 0 0 0', opacity: 0.8, fontSize: '0.9rem' }}>
+                  共 {productListCounts.all} 件 · 待审 {productListCounts.pending} · 已完成 {productListCounts.approved} · 已取消 {productListCounts.rejected}
+                </p>
               </div>
               <button 
-                onClick={() => setShowProductsModal(false)}
+                onClick={() => { setShowProductsModal(false); setViewingStoreId(null); }}
                 style={{
                   background: 'rgba(255, 255, 255, 0.2)',
                   border: 'none',
@@ -4000,12 +4114,54 @@ const DeliveryStoreManagement: React.FC = () => {
                   <p style={{ fontSize: '1.2rem' }}>该店铺暂未添加任何商品</p>
                 </div>
               ) : (
+                <>
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                  marginBottom: '20px'
+                }}>
+                  {([
+                    { key: 'all' as const, label: '全部' },
+                    { key: 'pending' as const, label: '待审核' },
+                    { key: 'approved' as const, label: '已完成' },
+                    { key: 'rejected' as const, label: '已取消' },
+                  ]).map(({ key, label }) => {
+                    const count = key === 'all' ? productListCounts.all : productListCounts[key];
+                    const active = productListFilter === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setProductListFilter(key)}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          border: active ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.15)',
+                          background: active ? 'rgba(37, 99, 235, 0.4)' : 'rgba(255,255,255,0.06)',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {label} <span style={{ opacity: 0.75 }}>({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {filteredStoreProducts.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '48px', color: 'rgba(255,255,255,0.45)' }}>
+                    <p style={{ fontSize: '1.1rem', margin: 0 }}>该状态下暂无商品</p>
+                    <p style={{ fontSize: '0.85rem', marginTop: '8px', opacity: 0.7 }}>请切换上方状态或等待商家提交</p>
+                  </div>
+                ) : (
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
                   gap: '20px'
                 }}>
-                  {storeProducts.map((product) => (
+                  {filteredStoreProducts.map((product) => (
                     <div key={product.id} style={{
                       background: 'rgba(255, 255, 255, 0.05)',
                       borderRadius: '16px',
@@ -4031,7 +4187,7 @@ const DeliveryStoreManagement: React.FC = () => {
                         )}
                       </div>
                       <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'white' }}>{product.name}</h3>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                         <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.2rem' }}>{product.price.toLocaleString()} MMK</span>
                         <span style={{ 
                           fontSize: '0.8rem', 
@@ -4043,12 +4199,78 @@ const DeliveryStoreManagement: React.FC = () => {
                           {product.is_available ? '在售' : '下架'}
                         </span>
                       </div>
+                      <div style={{ marginTop: '8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          background:
+                            normalizeProductListingStatus(product) === 'pending'
+                              ? 'rgba(245, 158, 11, 0.25)'
+                              : normalizeProductListingStatus(product) === 'rejected'
+                                ? 'rgba(239, 68, 68, 0.25)'
+                                : 'rgba(16, 185, 129, 0.2)',
+                          color:
+                            normalizeProductListingStatus(product) === 'pending'
+                              ? '#fbbf24'
+                              : normalizeProductListingStatus(product) === 'rejected'
+                                ? '#f87171'
+                                : '#34d399',
+                        }}>
+                          {normalizeProductListingStatus(product) === 'pending'
+                            ? '待审核'
+                            : normalizeProductListingStatus(product) === 'rejected'
+                              ? '已取消'
+                              : '已完成'}
+                        </span>
+                      </div>
+                      {normalizeProductListingStatus(product) !== 'approved' && (
+                        <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            disabled={productListingActionId === product.id}
+                            onClick={(e) => { e.stopPropagation(); updateProductListingStatus(product.id, 'approved'); }}
+                            style={{
+                              flex: 1,
+                              padding: '8px 10px',
+                              borderRadius: '10px',
+                              border: 'none',
+                              cursor: productListingActionId === product.id ? 'wait' : 'pointer',
+                              background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                              color: 'white',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            {productListingActionId === product.id ? '…' : '通过上架'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={productListingActionId === product.id}
+                            onClick={(e) => { e.stopPropagation(); updateProductListingStatus(product.id, 'rejected'); }}
+                            style={{
+                              flex: 1,
+                              padding: '8px 10px',
+                              borderRadius: '10px',
+                              border: '1px solid rgba(248, 113, 113, 0.5)',
+                              cursor: productListingActionId === product.id ? 'wait' : 'pointer',
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#fca5a5',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            拒绝
+                          </button>
+                        </div>
+                      )}
                       <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>
                         库存: {product.stock === -1 ? '无限' : product.stock}
                       </div>
                     </div>
                   ))}
                 </div>
+                )}
+                </>
               )}
             </div>
           </div>

@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService, trackingService } from '../services/supabase';
+import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
   console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
-const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 const TrackingPage: React.FC = () => {
   const navigate = useNavigate();

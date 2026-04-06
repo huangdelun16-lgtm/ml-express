@@ -65,6 +65,14 @@ const getDateKey = (value?: string): string => {
   return `${year}-${month}-${day}`;
 };
 
+const getLocalDateYYYYMMDD = (): string => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 type TabKey =
   | "overview"
   | "records"
@@ -212,6 +220,7 @@ const FinanceManagement: React.FC = () => {
   const [cashSettlementStatus, setCashSettlementStatus] = useState<
     "unsettled" | "settled" | "all"
   >("unsettled");
+  const [cashReminderTick, setCashReminderTick] = useState(() => Date.now());
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [packages, setPackages] = useState<Package[]>([]); // 添加包裹数据状态
   const [loading, setLoading] = useState<boolean>(true);
@@ -367,6 +376,43 @@ const FinanceManagement: React.FC = () => {
   useEffect(() => {
     setPackageRecordsPage(1);
   }, [packagePaymentFilter]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setCashReminderTick(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const cashUnsettledForCollectionDate = useMemo(() => {
+    return packages.filter((pkg) => {
+      if (pkg.payment_method !== "cash") return false;
+      if (pkg.status !== "已送达" && pkg.status !== "已完成") return false;
+      if (pkg.rider_settled) return false;
+      const dateKey = getDateKey(
+        pkg.delivery_time ||
+          pkg.updated_at ||
+          pkg.created_at ||
+          pkg.create_time,
+      );
+      if (!dateKey || dateKey !== cashCollectionDate) return false;
+      if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix))
+        return false;
+      return true;
+    });
+  }, [packages, cashCollectionDate, isRegionalUser, currentRegionPrefix]);
+
+  const showCashSettlementReminder = useMemo(() => {
+    if (activeTab !== "cash_collection") return false;
+    if (getLocalDateYYYYMMDD() !== cashCollectionDate) return false;
+    const d = new Date(cashReminderTick);
+    const mins = d.getHours() * 60 + d.getMinutes();
+    const inWindow = mins >= 17 * 60 && mins < 18 * 60;
+    return inWindow && cashUnsettledForCollectionDate.length > 0;
+  }, [
+    activeTab,
+    cashCollectionDate,
+    cashReminderTick,
+    cashUnsettledForCollectionDate.length,
+  ]);
 
   const packagePagination = useMemo(() => {
     const totalPages = Math.max(
@@ -7920,9 +7966,26 @@ const FinanceManagement: React.FC = () => {
                     style={{
                       color: "rgba(255,255,255,0.7)",
                       fontSize: "0.9rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
                     }}
                   >
                     {t.statusFilter}:
+                    {showCashSettlementReminder && (
+                      <span
+                        title={t.cashSettlementReminder}
+                        style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          background: "#ffc107",
+                          boxShadow: "0 0 0 2px rgba(255, 193, 7, 0.35)",
+                          flexShrink: 0,
+                        }}
+                        aria-hidden
+                      />
+                    )}
                   </span>
                   <select
                     value={cashSettlementStatus}
@@ -7951,6 +8014,27 @@ const FinanceManagement: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {showCashSettlementReminder && (
+                <div
+                  role="status"
+                  style={{
+                    marginBottom: "16px",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    background: "rgba(255, 193, 7, 0.18)",
+                    border: "1px solid rgba(255, 193, 7, 0.45)",
+                    color: "rgba(255, 255, 255, 0.96)",
+                    fontSize: "0.95rem",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <span style={{ marginRight: "8px" }} aria-hidden>
+                    🔔
+                  </span>
+                  {t.cashSettlementReminder}
+                </div>
+              )}
 
               {/* 统计卡片 */}
               {(() => {

@@ -505,7 +505,7 @@ const ProfilePage: React.FC = () => {
         originalPrice = Math.round(price / (1 - discountPercent / 100));
       }
 
-      const productData = {
+      let productData: Record<string, unknown> = {
         store_id: currentUser.id,
         name: productForm.name,
         price: price,
@@ -518,14 +518,20 @@ const ProfilePage: React.FC = () => {
 
       let result;
       if (editingProduct) {
-        result = await merchantService.updateProduct(editingProduct.id, productData);
+        if (editingProduct.listing_status === 'rejected') {
+          productData = { ...productData, listing_status: 'pending' };
+        }
+        result = await merchantService.updateProduct(editingProduct.id, productData as Partial<Product>);
       } else {
-        result = await merchantService.addProduct(productData);
+        result = await merchantService.addProduct(productData as Omit<Product, 'id' | 'created_at' | 'updated_at' | 'sales_count'>);
       }
 
       if (result.success) {
         setShowAddEditProductModal(false);
         await loadProducts();
+        if (!editingProduct) {
+          alert(language === 'zh' ? '商品已提交，待后台审核通过后将展示给顾客。' : 'Submitted. Visible to customers after admin approval.');
+        }
       } else {
         alert('保存失败，请重试');
       }

@@ -27,7 +27,7 @@ const StoreProductsPage: React.FC = () => {
     try {
       const [storeData, productsData] = await Promise.all([
         deliveryStoreService.getStoreById(storeId),
-        merchantService.getStoreProducts(storeId)
+        merchantService.getPublicStoreProducts(storeId)
       ]);
       setStore(storeData);
       setProducts(productsData);

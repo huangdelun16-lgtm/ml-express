@@ -137,7 +137,7 @@ const StoreProductsPage: React.FC = () => {
         originalPrice = Math.round(price / (1 - discountPercent / 100));
       }
 
-      const productData = {
+      let productData: Record<string, unknown> = {
         store_id: storeId,
         name: productForm.name,
         price: price,
@@ -150,14 +150,20 @@ const StoreProductsPage: React.FC = () => {
 
       let result;
       if (editingProduct) {
-        result = await merchantService.updateProduct(editingProduct.id, productData);
+        if (editingProduct.listing_status === 'rejected') {
+          productData = { ...productData, listing_status: 'pending' };
+        }
+        result = await merchantService.updateProduct(editingProduct.id, productData as Partial<Product>);
       } else {
-        result = await merchantService.addProduct(productData);
+        result = await merchantService.addProduct(productData as Omit<Product, 'id' | 'created_at' | 'updated_at' | 'sales_count'>);
       }
 
       if (result.success) {
         setShowAddEditProductModal(false);
         await loadStoreData(storeId);
+        if (!editingProduct) {
+          alert(language === 'zh' ? '商品已提交，待后台审核通过后将展示给顾客。' : 'Submitted. Visible to customers after admin approval.');
+        }
       } else {
         alert(language === 'zh' ? '保存失败，请重试' : 'Save failed');
       }
@@ -383,6 +389,19 @@ const StoreProductsPage: React.FC = () => {
                     <span style={{ color: '#10b981', fontWeight: '700', fontSize: '0.9rem', display: 'block' }}>{product.sales_count || 0}</span>
                   </div>
                 </div>
+
+                {(product.listing_status === 'pending' || product.listing_status === 'rejected') && (
+                  <div style={{
+                    marginBottom: '0.75rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    color: product.listing_status === 'pending' ? '#fbbf24' : '#f87171',
+                  }}>
+                    {product.listing_status === 'pending'
+                      ? (language === 'zh' ? '待后台审核' : 'Pending approval')
+                      : (language === 'zh' ? '审核未通过' : 'Rejected')}
+                  </div>
+                )}
 
                 <button 
                   onClick={() => handleOpenEditProduct(product)}

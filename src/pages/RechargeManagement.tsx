@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, rechargeService, RechargeRequest, auditLogService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -33,11 +33,7 @@ const RechargeManagement: React.FC = () => {
   const currentAdmin = sessionStorage.getItem('currentUserName') || '系统管理员';
   const currentAdminId = sessionStorage.getItem('currentUser') || 'admin';
 
-  useEffect(() => {
-    loadRequests();
-  }, []);
-
-  const loadRequests = async () => {
+  const loadRequests = useCallback(async () => {
     setLoading(true);
     try {
       const data = await rechargeService.getAllRequests();
@@ -47,7 +43,13 @@ const RechargeManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadRequests();
+    const timer = setInterval(loadRequests, 30000);
+    return () => clearInterval(timer);
+  }, [loadRequests]);
 
   const handleApprove = async (request: RechargeRequest) => {
     if (!window.confirm(`确定要通过该充值申请吗？\n用户: ${request.user_name}\n金额: ${request.amount.toLocaleString()} MMK`)) return;
@@ -119,6 +121,14 @@ const RechargeManagement: React.FC = () => {
     });
   }, [requests, filterStatus, selectedDate]);
 
+  /** 各状态数量（与筛选标签一致，便于一眼看到待处理量） */
+  const statusCounts = useMemo(() => ({
+    all: requests.length,
+    pending: requests.filter(r => r.status === 'pending').length,
+    completed: requests.filter(r => r.status === 'completed').length,
+    rejected: requests.filter(r => r.status === 'rejected').length
+  }), [requests]);
+
   // 🚀 新增：充值统计汇总
   const summary = useMemo(() => {
     const totalCompletedAmount = requests
@@ -144,12 +154,25 @@ const RechargeManagement: React.FC = () => {
   }, [requests]);
 
   const getStatusStyle = (status: string) => {
+    const zh = language === 'zh';
     switch (status) {
-      case 'pending': return { background: '#fef3c7', color: '#92400e', label: '待审核' };
-      case 'completed': return { background: '#dcfce7', color: '#166534', label: '已完成' };
-      case 'rejected': return { background: '#fee2e2', color: '#991b1b', label: '已拒绝' };
-      default: return { background: '#f3f4f6', color: '#374151', label: status };
+      case 'pending':
+        return { background: '#fef3c7', color: '#92400e', label: zh ? '待审核' : 'Pending' };
+      case 'completed':
+        return { background: '#dcfce7', color: '#166534', label: zh ? '已完成' : 'Completed' };
+      case 'rejected':
+        return { background: '#fee2e2', color: '#991b1b', label: zh ? '已取消' : 'Cancelled' };
+      default:
+        return { background: '#f3f4f6', color: '#374151', label: status };
     }
+  };
+
+  const filterTabLabel = (s: string) => {
+    if (s === 'all') return language === 'zh' ? '全部' : 'All';
+    if (s === 'pending') return language === 'zh' ? '待审核' : 'Pending';
+    if (s === 'completed') return language === 'zh' ? '已完成' : 'Completed';
+    if (s === 'rejected') return language === 'zh' ? '已取消' : 'Cancelled';
+    return s;
   };
 
   return (
@@ -161,13 +184,38 @@ const RechargeManagement: React.FC = () => {
       fontFamily: "'Inter', -apple-system, sans-serif"
     }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? '1.8rem' : '2.5rem', fontWeight: 800, letterSpacing: '-1px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <span style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '10px', borderRadius: '15px' }}>💳</span>
-              {language === 'zh' ? '充值中心' : 'Recharge Center'}
-            </h1>
-            <p style={{ margin: '8px 0 0 65px', opacity: 0.6, fontSize: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '40px', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <h1 style={{ margin: 0, fontSize: isMobile ? '1.8rem' : '2.5rem', fontWeight: 800, letterSpacing: '-1px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <span style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '10px', borderRadius: '15px' }}>💳</span>
+                {language === 'zh' ? '充值管理' : 'Recharge Center'}
+              </h1>
+              {statusCounts.pending > 0 && (
+                <span
+                  style={{
+                    background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                    color: 'white',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    padding: '8px 14px',
+                    borderRadius: '999px',
+                    boxShadow: '0 6px 18px rgba(231, 76, 60, 0.35)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {language === 'zh'
+                    ? `待审核 ${statusCounts.pending} 笔`
+                    : `${statusCounts.pending} pending`}
+                </span>
+              )}
+            </div>
+            <p style={{ margin: '10px 0 0 0', opacity: 0.65, fontSize: '0.95rem' }}>
+              {language === 'zh'
+                ? `共 ${statusCounts.all} 条 · 待审 ${statusCounts.pending} · 已完成 ${statusCounts.completed} · 已取消 ${statusCounts.rejected}`
+                : `Total ${statusCounts.all} · Pending ${statusCounts.pending} · Done ${statusCounts.completed} · Cancelled ${statusCounts.rejected}`}
+            </p>
+            <p style={{ margin: '6px 0 0 0', opacity: 0.5, fontSize: '0.9rem' }}>
               {language === 'zh' ? '审核客户充值申请并管理账户余额' : 'Audit recharge requests and manage balances'}
             </p>
           </div>
@@ -248,26 +296,31 @@ const RechargeManagement: React.FC = () => {
             flexWrap: 'wrap',
             gap: '15px'
           }}>
-            <div style={{ display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '5px', borderRadius: '16px' }}>
-              {['all', 'pending', 'completed', 'rejected'].map(s => (
-                <button
-                  key={s}
-                  onClick={() => setFilterStatus(s)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    background: filterStatus === s ? '#3b82f6' : 'transparent',
-                    color: filterStatus === s ? 'white' : 'rgba(255,255,255,0.5)',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {s === 'all' ? '全部' : getStatusStyle(s).label}
-                </button>
-              ))}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {(['all', 'pending', 'completed', 'rejected'] as const).map((s) => {
+                const count = statusCounts[s];
+                const active = filterStatus === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setFilterStatus(s)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '10px',
+                      border: active ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.15)',
+                      background: active ? 'rgba(37, 99, 235, 0.4)' : 'rgba(255,255,255,0.06)',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {filterTabLabel(s)} <span style={{ opacity: 0.8 }}>({count})</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -357,7 +410,11 @@ const RechargeManagement: React.FC = () => {
           ) : filteredRequests.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '100px', background: 'rgba(255,255,255,0.02)', borderRadius: '30px', border: '2px dashed rgba(255,255,255,0.05)' }}>
               <div style={{ fontSize: '3rem', marginBottom: '15px', opacity: 0.2 }}>📭</div>
-              <p style={{ opacity: 0.4 }}>{language === 'zh' ? '暂无申请记录' : 'No records found'}</p>
+              <p style={{ opacity: 0.5, fontSize: '1.05rem' }}>
+                {requests.length === 0
+                  ? (language === 'zh' ? '暂无申请记录' : 'No records found')
+                  : (language === 'zh' ? '该状态下暂无记录，请切换上方筛选或调整日期' : 'No records in this filter')}
+              </p>
             </div>
           ) : (
             filteredRequests.map(req => {

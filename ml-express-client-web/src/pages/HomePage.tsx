@@ -381,8 +381,8 @@ const HomePage: React.FC = () => {
         try {
           const storeId = currentUser.store_id || currentUser.id;
           console.log('正在加载商家商品，storeId:', storeId);
-          const products = await merchantService.getStoreProducts(storeId);
-          // 仅显示上架的商品
+          const products = await merchantService.getPublicStoreProducts(storeId);
+          // 仅显示上架的商品（已通过审核且在售）
           setMerchantProducts(products.filter(p => p.is_available));
           console.log(`✅ 已加载商家商品: ${products.length} 个`);
         } catch (error) {
