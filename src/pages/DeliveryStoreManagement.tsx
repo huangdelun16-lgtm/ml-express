@@ -340,14 +340,19 @@ const DeliveryStoreManagement: React.FC = () => {
     return minDistance <= 50 ? closestCity : null;
   };
 
-  // 根据选择的城市过滤合伙店铺
-  const filteredStores = allStores.filter(store => {
-    const storeCity = getStoreCity(store);
-    return storeCity === selectedCity;
-  });
-
-  // 使用过滤后的合伙店铺列表
-  const stores = filteredStores;
+  /** 当前城市店铺列表；有待审核商品的店排在前面，便于处理 */
+  const stores = useMemo(() => {
+    const filtered = allStores.filter(store => {
+      const storeCity = getStoreCity(store);
+      return storeCity === selectedCity;
+    });
+    return filtered.slice().sort((a, b) => {
+      const pa = a.id ? (pendingReviewByStoreId[a.id] ?? 0) : 0;
+      const pb = b.id ? (pendingReviewByStoreId[b.id] ?? 0) : 0;
+      if (pb !== pa) return pb - pa;
+      return (a.store_name || '').localeCompare(b.store_name || '', 'zh-Hans');
+    });
+  }, [allStores, selectedCity, pendingReviewByStoreId]);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
@@ -635,10 +640,13 @@ const DeliveryStoreManagement: React.FC = () => {
   };
 
   // 🚀 新增：加载店铺商品逻辑
-  const viewStoreProducts = async (store: DeliveryStore) => {
+  const viewStoreProducts = async (
+    store: DeliveryStore,
+    initialFilter: 'all' | 'pending' | 'approved' | 'rejected' = 'all'
+  ) => {
     try {
       setLoadingProducts(true);
-      setProductListFilter('all');
+      setProductListFilter(initialFilter);
       setViewingStoreName(store.store_name);
       setViewingStoreId(store.id ?? null);
       setShowProductsModal(true);
@@ -684,18 +692,19 @@ const DeliveryStoreManagement: React.FC = () => {
     }
   }, []);
 
-  /** 待审核商品按店铺名称排序展示（名称以当前已加载的合伙店铺列表为准） */
-  const pendingReviewBreakdownLines = useMemo(() => {
-    return Object.entries(pendingReviewByStoreId)
+  /** 悬停在顶部「待审核」徽章上时显示各店件数（不占用列表区域） */
+  const pendingReviewTitleHint = useMemo(() => {
+    if (pendingProductReviewCount <= 0) return '';
+    const lines = Object.entries(pendingReviewByStoreId)
       .map(([id, count]) => ({
-        id,
         count,
-        name:
+        label:
           allStores.find((s) => s.id === id)?.store_name ??
-          `店铺 ${id.length > 8 ? `${id.slice(0, 6)}…` : id}`,
+          (id.length > 8 ? `${id.slice(0, 6)}…` : id),
       }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-Hans'));
-  }, [pendingReviewByStoreId, allStores]);
+      .sort((x, y) => y.count - x.count || x.label.localeCompare(y.label, 'zh-Hans'));
+    return lines.map(({ label, count }) => `${label}：${count} 件`).join('\n');
+  }, [pendingReviewByStoreId, allStores, pendingProductReviewCount]);
 
   useEffect(() => {
     loadPendingProductReviewSummary();
@@ -1544,6 +1553,7 @@ const DeliveryStoreManagement: React.FC = () => {
             </span>
             {pendingProductReviewCount > 0 && (
               <span
+                title={pendingReviewTitleHint || undefined}
                 style={{
                   background: 'rgba(245, 158, 11, 0.22)',
                   border: '1px solid rgba(251, 191, 36, 0.55)',
@@ -1553,38 +1563,15 @@ const DeliveryStoreManagement: React.FC = () => {
                   padding: '6px 14px',
                   borderRadius: '999px',
                   whiteSpace: 'nowrap',
-                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)'
+                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)',
+                  cursor: 'help'
                 }}
               >
-                🛍️ 待审核共 {pendingProductReviewCount} 件
+                待审核 {pendingProductReviewCount} 件
+                <span style={{ fontWeight: 500, opacity: 0.85, marginLeft: '6px', fontSize: '0.75rem' }}>（悬停看各店）</span>
               </span>
             )}
           </h2>
-          {pendingProductReviewCount > 0 && pendingReviewBreakdownLines.length > 0 && (
-            <div
-              style={{
-                marginBottom: '16px',
-                padding: '12px 14px',
-                background: 'rgba(245, 158, 11, 0.12)',
-                border: '1px solid rgba(251, 191, 36, 0.35)',
-                borderRadius: '12px',
-                fontSize: '0.84rem',
-                lineHeight: 1.55,
-                color: 'rgba(255,255,255,0.95)'
-              }}
-            >
-              <div style={{ fontWeight: 800, color: '#fbbf24', marginBottom: '8px' }}>
-                待审核分布（按店铺，含全部区域）
-              </div>
-              <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'disc' }}>
-                {pendingReviewBreakdownLines.map(({ id, name, count }) => (
-                  <li key={id} style={{ marginBottom: '4px' }}>
-                    <strong>{name}</strong>：{count} 件新商品待审核
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
           {loading ? (
             <p>加载中...</p>
           ) : stores.length === 0 ? (
@@ -1595,7 +1582,11 @@ const DeliveryStoreManagement: React.FC = () => {
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {stores.map((store) => (
+              {stores.map((store) => {
+                const pendingN = store.id ? (pendingReviewByStoreId[store.id] ?? 0) : 0;
+                const baseShadow = selectedStore?.id === store.id ? '0 10px 25px rgba(0,0,0,0.2)' : '0 4px 15px rgba(0,0,0,0.1)';
+                const pendingInset = pendingN > 0 ? ', inset 5px 0 0 0 rgba(245, 158, 11, 0.92)' : '';
+                return (
                 <div
                   key={store.id}
                   data-store-id={store.id}
@@ -1608,7 +1599,7 @@ const DeliveryStoreManagement: React.FC = () => {
                     cursor: 'pointer',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     backdropFilter: 'blur(10px)',
-                    boxShadow: selectedStore?.id === store.id ? '0 10px 25px rgba(0,0,0,0.2)' : '0 4px 15px rgba(0,0,0,0.1)'
+                    boxShadow: `${baseShadow}${pendingInset}`
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-5px)';
@@ -1624,7 +1615,7 @@ const DeliveryStoreManagement: React.FC = () => {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{store.store_name}</h3>
                       {store.region && (
                         <span style={{ 
@@ -1638,6 +1629,29 @@ const DeliveryStoreManagement: React.FC = () => {
                         }}>
                           {REGIONS.find(r => r.id === store.region)?.prefix || store.region}
                         </span>
+                      )}
+                      {pendingN > 0 && (
+                        <button
+                          type="button"
+                          title="直接打开该店商品并切换到「待审核」"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            viewStoreProducts(store, 'pending');
+                          }}
+                          style={{
+                            background: 'rgba(245, 158, 11, 0.25)',
+                            color: '#fbbf24',
+                            border: '1px solid rgba(251, 191, 36, 0.55)',
+                            padding: '3px 10px',
+                            borderRadius: '999px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            lineHeight: 1.2
+                          }}
+                        >
+                          待审 {pendingN}
+                        </button>
                       )}
                     </div>
                     <span
@@ -1659,32 +1673,6 @@ const DeliveryStoreManagement: React.FC = () => {
                     </span>
                   </div>
                   <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>{store.address}</p>
-                  {store.id && (pendingReviewByStoreId[store.id] ?? 0) > 0 && (
-                    <div
-                      role="status"
-                      style={{
-                        marginTop: '10px',
-                        marginBottom: '6px',
-                        padding: '10px 12px',
-                        background: 'rgba(245, 158, 11, 0.2)',
-                        border: '1px solid rgba(251, 191, 36, 0.5)',
-                        borderRadius: '12px',
-                        color: '#fef3c7',
-                        fontSize: '0.82rem',
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '8px',
-                        lineHeight: 1.45
-                      }}
-                    >
-                      <span aria-hidden style={{ flexShrink: 0 }}>{String.fromCodePoint(0x1f514)}</span>
-                      <span>
-                        本店（{store.store_name}）有 <strong style={{ color: '#fff' }}>{pendingReviewByStoreId[store.id]}</strong>{' '}
-                        件新商品待审核，请点击「进入店铺」，在商品列表中切换到「待审核」进行通过或拒绝。
-                      </span>
-                    </div>
-                  )}
                   <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem', opacity: 0.7 }}>
                     <span>📞 {store.phone}</span>
                     <span>👤 {store.manager_name}</span>
@@ -1915,7 +1903,8 @@ const DeliveryStoreManagement: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
