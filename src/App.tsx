@@ -1,9 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import HomePage from './pages/HomePage';
-import ServicesPage from './pages/ServicesPage';
-import TrackingPage from './pages/TrackingPage';
-import ContactPage from './pages/ContactPage';
 import AdminLogin from './pages/AdminLogin';
 import DeliveryAlerts from './pages/DeliveryAlerts';
 import AdminDashboard from './pages/AdminDashboard';

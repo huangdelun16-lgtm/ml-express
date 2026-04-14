@@ -195,6 +195,8 @@ const DeliveryStoreManagement: React.FC = () => {
   const [productListFilter, setProductListFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   /** 全局待审核商品数（listing_status=pending），用于列表区与仪表板一致提示 */
   const [pendingProductReviewCount, setPendingProductReviewCount] = useState(0);
+  /** 各合伙店铺待审核商品数量（store_id → 件数），用于列表按店展示与卡片提示 */
+  const [pendingReviewByStoreId, setPendingReviewByStoreId] = useState<Record<string, number>>({});
 
   // Google Places API 相关状态
   const [placeSearchInput, setPlaceSearchInput] = useState('');
@@ -657,27 +659,49 @@ const DeliveryStoreManagement: React.FC = () => {
     }
   };
 
-  const loadPendingProductReviewCount = useCallback(async () => {
+  const loadPendingProductReviewSummary = useCallback(async () => {
     try {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from('products')
-        .select('*', { count: 'exact', head: true })
+        .select('store_id')
         .eq('listing_status', 'pending');
       if (error) {
         setPendingProductReviewCount(0);
+        setPendingReviewByStoreId({});
         return;
       }
-      setPendingProductReviewCount(typeof count === 'number' ? count : 0);
+      const byId: Record<string, number> = {};
+      for (const row of data || []) {
+        const sid = row.store_id as string | undefined;
+        if (!sid) continue;
+        byId[sid] = (byId[sid] || 0) + 1;
+      }
+      setPendingReviewByStoreId(byId);
+      setPendingProductReviewCount(Object.values(byId).reduce((a, b) => a + b, 0));
     } catch {
       setPendingProductReviewCount(0);
+      setPendingReviewByStoreId({});
     }
   }, []);
 
+  /** 待审核商品按店铺名称排序展示（名称以当前已加载的合伙店铺列表为准） */
+  const pendingReviewBreakdownLines = useMemo(() => {
+    return Object.entries(pendingReviewByStoreId)
+      .map(([id, count]) => ({
+        id,
+        count,
+        name:
+          allStores.find((s) => s.id === id)?.store_name ??
+          `店铺 ${id.length > 8 ? `${id.slice(0, 6)}…` : id}`,
+      }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-Hans'));
+  }, [pendingReviewByStoreId, allStores]);
+
   useEffect(() => {
-    loadPendingProductReviewCount();
-    const t = setInterval(loadPendingProductReviewCount, 30000);
+    loadPendingProductReviewSummary();
+    const t = setInterval(loadPendingProductReviewSummary, 30000);
     return () => clearInterval(t);
-  }, [loadPendingProductReviewCount]);
+  }, [loadPendingProductReviewSummary]);
 
   const updateProductListingStatus = async (productId: string, listing_status: 'approved' | 'rejected') => {
     if (!viewingStoreId) return;
@@ -699,7 +723,7 @@ const DeliveryStoreManagement: React.FC = () => {
         .order('created_at', { ascending: false });
       if (reloadError) throw reloadError;
       setStoreProducts(data || []);
-      await loadPendingProductReviewCount();
+      await loadPendingProductReviewSummary();
     } catch (e) {
       console.error('更新商品审核状态失败:', e);
       alert('更新失败，请重试（请确认已在数据库执行 listing_status 迁移）');
@@ -1532,10 +1556,35 @@ const DeliveryStoreManagement: React.FC = () => {
                   boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)'
                 }}
               >
-                🛍️ 待审核商品 {pendingProductReviewCount}
+                🛍️ 待审核共 {pendingProductReviewCount} 件
               </span>
             )}
           </h2>
+          {pendingProductReviewCount > 0 && pendingReviewBreakdownLines.length > 0 && (
+            <div
+              style={{
+                marginBottom: '16px',
+                padding: '12px 14px',
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(251, 191, 36, 0.35)',
+                borderRadius: '12px',
+                fontSize: '0.84rem',
+                lineHeight: 1.55,
+                color: 'rgba(255,255,255,0.95)'
+              }}
+            >
+              <div style={{ fontWeight: 800, color: '#fbbf24', marginBottom: '8px' }}>
+                待审核分布（按店铺，含全部区域）
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'disc' }}>
+                {pendingReviewBreakdownLines.map(({ id, name, count }) => (
+                  <li key={id} style={{ marginBottom: '4px' }}>
+                    <strong>{name}</strong>：{count} 件新商品待审核
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {loading ? (
             <p>加载中...</p>
           ) : stores.length === 0 ? (
@@ -1610,6 +1659,32 @@ const DeliveryStoreManagement: React.FC = () => {
                     </span>
                   </div>
                   <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>{store.address}</p>
+                  {store.id && (pendingReviewByStoreId[store.id] ?? 0) > 0 && (
+                    <div
+                      role="status"
+                      style={{
+                        marginTop: '10px',
+                        marginBottom: '6px',
+                        padding: '10px 12px',
+                        background: 'rgba(245, 158, 11, 0.2)',
+                        border: '1px solid rgba(251, 191, 36, 0.5)',
+                        borderRadius: '12px',
+                        color: '#fef3c7',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '8px',
+                        lineHeight: 1.45
+                      }}
+                    >
+                      <span aria-hidden style={{ flexShrink: 0 }}>{String.fromCodePoint(0x1f514)}</span>
+                      <span>
+                        本店（{store.store_name}）有 <strong style={{ color: '#fff' }}>{pendingReviewByStoreId[store.id]}</strong>{' '}
+                        件新商品待审核，请点击「进入店铺」，在商品列表中切换到「待审核」进行通过或拒绝。
+                      </span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem', opacity: 0.7 }}>
                     <span>📞 {store.phone}</span>
                     <span>👤 {store.manager_name}</span>

@@ -1,14 +1,27 @@
+# =============================================================================
+# Admin 后台 Web（仓库根目录的 React 应用）
+# -----------------------------------------------------------------------------
+# Netlify 控制台：新建/已有站点 → Build settings
+#   Base directory : 留空（使用仓库根目录，勿选子文件夹）
+#   Build command  : npm install --legacy-peer-deps && CI=false npm run build
+#   Publish dir    : build
+#   Functions dir  : netlify/functions（见下方 [build] functions）
+# 环境变量（Site settings → Environment variables）示例：
+#   REACT_APP_SUPABASE_URL、REACT_APP_SUPABASE_ANON_KEY
+#   REACT_APP_GOOGLE_MAPS_API_KEY
+#   以及 netlify/functions 内 send-sms / send-email-code 等所需密钥
+# CLI 部署（在仓库根目录、且已 netlify link 到本 Admin 站点）：npm run deploy:netlify
+# 若 netlify 命令总跳到子项目：先 netlify unlink，再在仓库根目录 netlify link 选 Admin 站点
+# =============================================================================
+
 [build]
   command = "npm install --legacy-peer-deps && CI=false npm run build"
   publish = "build"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
   NETLIFY_SKIP_PLUGINS = "true"
-
-# Functions配置
-[functions]
-  directory = "netlify/functions"
 
 # SPA重定向配置 - 解决React Router路由问题
 [[redirects]]
