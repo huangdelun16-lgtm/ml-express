@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK MERCHANT",
     "slug": "ml-express-merchants",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "scheme": "ml-express-merchants",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.merchants",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages. / 需要位置信息以提供准确的配送服务。 / တိကျသော ပို့ဆောင်ရေးဝန်ဆောင်မှုအတွက် တည်နေရာလိုအပ်ပါသည်။",
@@ -28,8 +28,8 @@
         "NSPhotoLibraryAddUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save payment QR codes. / 需要相册权限以保存付款二维码。 / ငွေပေးချေမှု QR ကုဒ်သိမ်းဆည်းရန် ဓာတ်ပုံပြခန်းလိုအပ်ပါသည်။",
         "CFBundleDisplayName": "MARKET LINK MERCHANT",
         "CFBundleName": "MARKET LINK MERCHANT",
-        "CFBundleShortVersionString": "2.1.1",
-        "CFBundleVersion": "4",
+        "CFBundleShortVersionString": "2.2.0",
+        "CFBundleVersion": "5",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
         "UIRequiredDeviceCapabilities": [
@@ -61,7 +61,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.merchants",
-      "versionCode": 4,
+      "versionCode": 5,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
