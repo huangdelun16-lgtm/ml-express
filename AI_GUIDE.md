@@ -76,7 +76,9 @@
 | `npm run web` | `expo start --web` |
 | `npm run build:web` | `npx expo export --platform web` |
 
-版本参考（以仓库内 `package.json` 为准）：客户端 App `2.3.6`，商家 App `2.1.1`，Expo SDK `~54`，React `19.1.x`，RN `0.81.x`。
+**版本号**：客户端 / 商家 App 在仓库里**带有已提交的 `android/`、`ios/`**（Bare 工作流），**商店构建以原生工程里的版本为准**；不要只看 `package.json`。发版时必须按 **§9** 同步修改所有列出的文件，否则 EAS 上仍会显示旧版本（例如只改 `app.json` 仍打出 `2.3.6 (58)`）。
+
+当前仓库内参考：客户端 App `package.json` 与原生多为 `2.4.0` / `59`，商家 App 多为 `2.1.1` / `4`；Expo SDK `~54`，React `19.1.x`，RN `0.81.x`。
 
 ### 3.5 骑手端（`ml-express-mobile-app`）
 
@@ -190,7 +192,7 @@
 1. **大文件 JSX**：修改 `ProfilePage.tsx` 等巨型组件后，建议格式化并检查标签闭合，避免构建失败。
 2. **ESLint**：CRA 在开发时可能将部分规则打成 **warning**；若需临时跳过插件可用 `DISABLE_ESLINT_PLUGIN=true`（仅作权宜，长期应修警告）。
 3. **Netlify 插件**：`NETLIFY_SKIP_PLUGINS=true` 用于规避部分托管环境插件问题（以各 `netlify.toml` 为准）。
-4. **移动端**：发版前核对 `app.json` / `app.config` 与原生目录版本号；骑手端另有 `run-android.sh` 辅助流程。
+4. **移动端**：发版前按 **§9** 核对版本号（客户端 / 商家须改原生文件；骑手端见该节说明）。
 5. **上架与合规**：隐私政策与客户站点路径一致（如 `https://market-link-express.com/privacy-policy`）；向商店提供可登录的测试账号说明。
 6. **可观测性（客户端 Web）**：可选 `REACT_APP_SENTRY_DSN`；`LoggerService` 在生产且存在 DSN 时可上报 WARN/ERROR 摘要。
 7. **Git安全**：远程 URL **不要**嵌入个人访问令牌；使用 SSH、`gh` 或系统凭据管理。
@@ -198,4 +200,54 @@
 
 ---
 
-*文档维护：随仓库结构变更请同步更新「构建命令」「Netlify 对照」「Functions 列表」三节。*
+## 9. Expo 应用商店版本号（EAS）：必须改哪些文件
+
+### 9.1 为什么「只改了 app.json」在 EAS 上还是旧版本？
+
+`ml-express-client` 与 `ml-express-merchant-app` 采用 **已提交到 Git 的 `ios/`、`android/` 原生目录**（`expo run:ios` / `expo run:android` 即用此工程）。**EAS Build 打 iOS / Android 商店包时，Xcode 与 Gradle 读取的是这些原生文件里的版本字段**，不会自动以 `app.json` 为唯一来源。若只更新 `app.json`（或只改 `package.json`）而未改 `build.gradle` / `project.pbxproj` / `Info.plist`，云端构建产物上的 **Marketing 版本号** 与 **Build 号 / versionCode** 会保持原样。
+
+`eas.json` 中的 `"appVersionSource": "local"` 表示从本地配置读取应用版本策略，**在 Bare 工程下仍须与原生文件内容一致**，否则会出现「Git 有新提交，但 Expo 列表里仍是 2.3.6 (58)」的情况。
+
+### 9.2 客户端 App（`ml-express-client`）发版检查清单
+
+以下 **同一轮发版须全部改到同一组数字**（示例：版本名 `2.4.0`，iOS Build / Android versionCode `59`）：
+
+| 顺序 | 文件 | 字段 | 说明 |
+|------|------|------|------|
+| 1 | `ml-express-client/app.json` | `expo.version` | 用户可见版本名（如 `2.4.0`） |
+| 2 | 同上 | `expo.ios.buildNumber` | iOS 构建号（整数字符串，如 `"59"`） |
+| 3 | 同上 | `expo.android.versionCode` | Android `versionCode`（整数，如 `59`） |
+| 4 | 同上 | `expo.ios.infoPlist.CFBundleShortVersionString`、`CFBundleVersion` | 与上保持一致，避免本地 Info 与云端不一致 |
+| 5 | `ml-express-client/ios/MARKETLINKEXPRESS/Info.plist` | `CFBundleShortVersionString`、`CFBundleVersion` | **硬编码**字面量，须手动与 2.4.0 / 59 对齐 |
+| 6 | `ml-express-client/ios/MARKETLINKEXPRESS.xcodeproj/project.pbxproj` | `MARKETING_VERSION`、`CURRENT_PROJECT_VERSION` | **Debug / Release 两段**都要改（文件中各出现两次） |
+| 7 | `ml-express-client/android/app/build.gradle` | `defaultConfig.versionCode`、`versionName` | 商店 AAB 以此为准 |
+| 8 | `ml-express-client/package.json` | `version` | 与仓库、发版说明一致（可选但建议同步） |
+
+**自检（在项目根执行）：**
+
+```bash
+rg 'versionCode|versionName|MARKETING_VERSION|CURRENT_PROJECT_VERSION|CFBundleShortVersionString|CFBundleVersion|"version"' ml-express-client/app.json ml-express-client/package.json ml-express-client/android/app/build.gradle ml-express-client/ios -g '*.plist' -g '*.pbxproj'
+```
+
+确认输出中不再出现旧的 `versionName` / `versionCode` / `CFBundleVersion` 组合。
+
+### 9.3 商家端 App（`ml-express-merchant-app`）
+
+与客户端相同原则：除 `app.json`、`package.json` 外，必须同步修改：
+
+- `ml-express-merchant-app/android/app/build.gradle`（`versionCode`、`versionName`）
+- `ml-express-merchant-app/ios/.../project.pbxproj`（`MARKETING_VERSION`、`CURRENT_PROJECT_VERSION`，两处配置）
+- 若 `Info.plist` 内为固定字符串而非 `$(MARKETING_VERSION)`，也需同步修改
+
+### 9.4 骑手端 App（`ml-express-mobile-app`）
+
+仓库内**无**提交的 `android/`、`ios/` 目录时，以 **`app.json` / `app.config.js`**（及 EAS 环境变量）为版本主来源即可；若日后执行 `expo prebuild` 并提交原生目录，则改回与 **§9.2** 相同的多文件同步策略。
+
+### 9.5 改完后如何验证
+
+1. 本地 `git diff` 确认上述文件均已变更且已 **commit、push**（EAS 默认用远程仓库构建时，未推送的修改不会进云端）。
+2. 重新触发 `eas build`；在 Expo 网页 Builds 列表中确认新条目显示 **预期版本名与构建号** 后再下载 IPA / AAB。
+
+---
+
+*文档维护：随仓库结构变更请同步更新「构建命令」「Netlify 对照」「Functions 列表」「Expo 版本号文件清单」四节。*
