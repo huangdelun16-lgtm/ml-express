@@ -241,7 +241,7 @@ rg 'versionCode|versionName|MARKETING_VERSION|CURRENT_PROJECT_VERSION|CFBundleSh
 
 ### 9.4 骑手端 App（`ml-express-mobile-app`）
 
-仓库内**无**提交的 `android/`、`ios/` 目录时，以 **`app.json` / `app.config.js`**（及 EAS 环境变量）为版本主来源即可；若日后执行 `expo prebuild` 并提交原生目录，则改回与 **§9.2** 相同的多文件同步策略。
+仓库内**无**提交的 `android/`、`ios/` 目录时，以 **`app.json`** 为主（`app.config.js` 仅合并地图 Key 等，**不覆盖** `version` / `buildNumber` / `versionCode`）：需同步 **`expo.version`**、**`ios.buildNumber`**（iOS 构建号 / `CFBundleVersion`）、**`android.versionCode`**（Play 须单调递增，勿随意改小）。**`eas.json` 的 `production.autoIncrement`** 若为 `true`，EAS 可能在云端自动递增构建号，导致与 `app.json` 不一致；若要固定发版号（例如一次打出 **2.2.1 (11)**），请保持 **`autoIncrement: false`**。若日后执行 `expo prebuild` 并提交原生目录，则改回与 **§9.2** 相同的多文件同步策略。
 
 ### 9.5 改完后如何验证
 

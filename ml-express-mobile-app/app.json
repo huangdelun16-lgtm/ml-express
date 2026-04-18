@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK STAFF",
     "slug": "MarketLinkStaffApp",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "scheme": "ml-express-staff",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.courier",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "infoPlist": {
         "CFBundleDisplayName": "MARKET LINK STAFF",
         "CFBundleName": "MARKET LINK STAFF",
@@ -44,7 +44,7 @@
         "backgroundColor": "#2c5282"
       },
       "package": "com.mlexpress.courier",
-      "versionCode": 66,
+      "versionCode": 67,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",

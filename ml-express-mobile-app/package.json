@@ -1,6 +1,6 @@
 {
   "name": "market-link-express-mobile",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "MARKET LINK STAFF - 缅甸专业快递骑手端",
   "main": "index.ts",
   "scripts": {

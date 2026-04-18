@@ -14,10 +14,46 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { packageService, supabase } from '../services/supabase';
+import {
+  supabase,
+  systemSettingsService,
+  getRegionalPricingForPackage,
+} from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+import {
+  normalizePackageStatusZh,
+  isActiveCourierTaskStatus,
+} from '../utils/packageStatusNormalize';
 
 const { width } = Dimensions.get('window');
+
+function isWaySidePackage(p: { package_type?: string }): boolean {
+  const t = (p.package_type || '').trim();
+  return t === '顺路递' || t === 'Eco Way' || t === 'တန်တန်လေးပို့';
+}
+
+function getRiderEstimatedShareMmk(
+  p: {
+    price?: string;
+    package_type?: string;
+    pricing_base_fee_mmk?: number | null;
+  },
+  pricing: Record<string, number>,
+): number {
+  const fee = parseFloat(p.price?.toString().replace(/[^\d.]/g, '') || '0');
+  if (isWaySidePackage(p)) {
+    const fixed = Number(pricing.way_side_courier_per_order) || 0;
+    if (fixed > 0) {
+      return Math.min(fee, Math.max(0, fixed));
+    }
+  }
+  const snap = p.pricing_base_fee_mmk;
+  const base =
+    snap != null && Number.isFinite(Number(snap)) && Number(snap) >= 0
+      ? Number(snap)
+      : pricing.base_fee || 1500;
+  return Math.max(0, fee - base);
+}
 
 export default function ProfileScreen({ navigation }: any) {
   const { language } = useApp();
@@ -64,6 +100,8 @@ export default function ProfileScreen({ navigation }: any) {
       if (error) throw error;
 
       const myPackages = allPackages || [];
+      const regionalPricingMap =
+        await systemSettingsService.getRegionalPricingMap();
       
       // 归一化状态判定函数
       const isDelivered = (p: any) => {
@@ -72,9 +110,9 @@ export default function ProfileScreen({ navigation }: any) {
       };
       
       const isInProgress = (p: any) => {
-        const s = (p.status || '').trim();
         if (isDelivered(p)) return false;
-        return ['已取件', '配送中', '配送进行中'].some(status => s.includes(status));
+        const s = normalizePackageStatusZh(p.status);
+        return isActiveCourierTaskStatus(s);
       };
 
       const deliveredPackages = myPackages.filter(p => isDelivered(p));
@@ -108,20 +146,10 @@ export default function ProfileScreen({ navigation }: any) {
         todayCOD: todayDelivered.reduce((sum, p) => {
           return sum + (p.cod_amount || 0);
         }, 0),
-        // 🚀 优化：今日预计收入计算 (排除基础起步价，只保留附加费)
-        // 逻辑：预计收入 = 总金额 - (单量 * 基础起步价)
+        // 今日预计收入：每单按订单领区计费（曼德勒/仰光互不串用）
         todayIncome: todayDelivered.reduce((sum, p) => {
-          // 基础起步价 (平台收入)
-          const BASE_STARTING_FEE = 1500; 
-          
-          // 获取该订单的总配送费 (字符串转数字)
-          const totalDeliveryFee = parseFloat(p.price?.toString().replace(/[^\d.]/g, '') || '0');
-          
-          // 骑手收入 = 总配送费 - 基础起步价
-          // 如果总费小于起步价(理论不应该)，则骑手收入为0
-          const courierEarning = Math.max(0, totalDeliveryFee - BASE_STARTING_FEE);
-          
-          return sum + courierEarning;
+          const regional = getRegionalPricingForPackage(p, regionalPricingMap);
+          return sum + getRiderEstimatedShareMmk(p, regional);
         }, 0),
       });
     } catch (error) {
@@ -217,7 +245,9 @@ export default function ProfileScreen({ navigation }: any) {
       icon: '📖', 
       title: language === 'zh' ? '使用帮助' : language === 'my' ? 'အသုံးပြုမှုအကူအညီ' : 'User Guide', 
       subtitle: language === 'zh' ? '功能使用指南' : language === 'my' ? 'လုပ်ဆောင်ချက်အသုံးပြုမှုလမ်းညွှန်' : 'Feature usage guide', 
-      screen: 'Help' 
+      action: () => {
+        navigation.navigate('Settings', { openHelp: true });
+      },
     },
     { 
       icon: '🌐', 
@@ -374,7 +404,7 @@ export default function ProfileScreen({ navigation }: any) {
         {/* 版本信息 */}
         <View style={styles.footer}>
           <Text style={styles.version}>
-            MARKET LINK STAFF v{Constants.expoConfig?.version ?? '2.2.0'}
+            MARKET LINK STAFF v{Constants.expoConfig?.version ?? '2.2.1'}
           </Text>
           <Text style={styles.copyright}>© 2025 Market Link Express</Text>
         </View>
