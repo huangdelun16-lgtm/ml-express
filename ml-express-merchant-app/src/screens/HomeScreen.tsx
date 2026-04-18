@@ -34,14 +34,16 @@ import { analytics } from "../services/AnalyticsService";
 const { width } = Dimensions.get("window");
 
 interface MerchantStats {
-  pending: number;
+  pendingConfirm: number;
+  awaitingPickup: number;
   processing: number;
+  delivering: number;
   completed: number;
-  totalSales: number;
+  totalRevenueMmk: number;
   urgent: number;
   standard: number;
-  todayRevenue: number;
-  yesterdayRevenue: number;
+  todayOrderCount: number;
+  yesterdayOrderCount: number;
 }
 
 export default function HomeScreen({ navigation }: any) {
@@ -51,14 +53,16 @@ export default function HomeScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [merchantInfo, setMerchantInfo] = useState<any>(null);
   const [stats, setStats] = useState<MerchantStats>({
-    pending: 0,
+    pendingConfirm: 0,
+    awaitingPickup: 0,
     processing: 0,
+    delivering: 0,
     completed: 0,
-    totalSales: 0,
+    totalRevenueMmk: 0,
     urgent: 0,
     standard: 0,
-    todayRevenue: 0,
-    yesterdayRevenue: 0,
+    todayOrderCount: 0,
+    yesterdayOrderCount: 0,
   });
   const [loading, setLoading] = useState(true);
   const scrollY = new Animated.Value(0);
@@ -68,7 +72,9 @@ export default function HomeScreen({ navigation }: any) {
       welcome: "欢迎回来, 合作伙伴",
       businessStatus: "经营概况",
       pendingOrders: "待确认",
+      pickupPendingOrders: "待取件",
       processingOrders: "打包中",
+      deliveringOrders: "配送中",
       completedOrders: "已完成",
       totalSales: "总营收 (MMK)",
       manageProducts: "商品管理",
@@ -81,6 +87,7 @@ export default function HomeScreen({ navigation }: any) {
       urgentOrders: "急件",
       standardOrders: "标准",
       revenueChart: "营收对比 (今日 vs 昨日)",
+      orderCountUnit: "单",
       today: "今日",
       yesterday: "昨日",
       placeOrder: "立即下单",
@@ -89,8 +96,10 @@ export default function HomeScreen({ navigation }: any) {
     en: {
       welcome: "Welcome Back, Partner",
       businessStatus: "Business Overview",
-      pendingOrders: "Pending",
+      pendingOrders: "To confirm",
+      pickupPendingOrders: "Awaiting pickup",
       processingOrders: "Packing",
+      deliveringOrders: "In transit",
       completedOrders: "Completed",
       totalSales: "Total Revenue (MMK)",
       manageProducts: "Products",
@@ -103,6 +112,7 @@ export default function HomeScreen({ navigation }: any) {
       urgentOrders: "Urgent",
       standardOrders: "Standard",
       revenueChart: "Revenue (Today vs Yesterday)",
+      orderCountUnit: " orders",
       today: "Today",
       yesterday: "Yesterday",
       placeOrder: "Place Order",
@@ -112,7 +122,9 @@ export default function HomeScreen({ navigation }: any) {
       welcome: "ပြန်လည်ကြိုဆိုပါတယ် မိတ်ဖက်",
       businessStatus: "စီးပွားရေးအခြေအနေ",
       pendingOrders: "အတည်ပြုရန်",
+      pickupPendingOrders: "ယူရန်စောင့်ဆိုင်း",
       processingOrders: "ထုပ်ပိုးနေသည်",
+      deliveringOrders: "ပို့ဆောင်နေသည်",
       completedOrders: "ပြီးစီးသည်",
       totalSales: "စုစုပေါင်းဝင်ငွေ (MMK)",
       manageProducts: "ကုန်ပစ္စည်းများ",
@@ -125,6 +137,7 @@ export default function HomeScreen({ navigation }: any) {
       urgentOrders: "အရေးကြီး",
       standardOrders: "ပုံမှန်",
       revenueChart: "ဝင်ငွေနှိုင်းယှဉ်ချက်",
+      orderCountUnit: " ခု",
       today: "ယနေ့",
       yesterday: "မနေ့က",
       placeOrder: "အော်ဒါတင်မည်",
@@ -161,14 +174,16 @@ export default function HomeScreen({ navigation }: any) {
       ]);
 
       setStats({
-        pending: orderData.pending || 0,
+        pendingConfirm: orderData.pendingConfirm ?? 0,
+        awaitingPickup: orderData.awaitingPickup ?? 0,
         processing: orderData.processing || 0,
+        delivering: orderData.delivering ?? 0,
         completed: orderData.delivered || 0,
-        totalSales: orderData.total || 0,
+        totalRevenueMmk: revenueData.totalRevenue ?? 0,
         urgent: orderData.urgent || 0,
         standard: orderData.standard || 0,
-        todayRevenue: revenueData.todayRevenue || 0,
-        yesterdayRevenue: revenueData.yesterdayRevenue || 0,
+        todayOrderCount: revenueData.todayOrderCount ?? 0,
+        yesterdayOrderCount: revenueData.yesterdayOrderCount ?? 0,
       });
     } catch (error) {
       console.error("Failed to load merchant data:", error);
@@ -249,25 +264,47 @@ export default function HomeScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.statsCard}
               onPress={() =>
-                navigation.navigate("MyOrders", { filter: "pending" })
+                navigation.navigate("MyOrders", { filterStatus: "待确认" })
               }
             >
-              <Text style={styles.statsValue}>{stats.pending}</Text>
+              <Text style={styles.statsValue}>{stats.pendingConfirm}</Text>
               <Text style={styles.statsLabel}>{currentT.pendingOrders}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.statsCard}
               onPress={() =>
-                navigation.navigate("MyOrders", { filter: "processing" })
+                navigation.navigate("MyOrders", { filterStatus: "待取件" })
+              }
+            >
+              <Text style={styles.statsValue}>{stats.awaitingPickup}</Text>
+              <Text style={styles.statsLabel}>
+                {currentT.pickupPendingOrders}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.statsCard}
+              onPress={() =>
+                navigation.navigate("MyOrders", { filterStatus: "打包中" })
               }
             >
               <Text style={styles.statsValue}>{stats.processing}</Text>
               <Text style={styles.statsLabel}>{currentT.processingOrders}</Text>
             </TouchableOpacity>
+          </View>
+          <View style={[styles.statsGrid, { marginTop: 12 }]}>
             <TouchableOpacity
               style={styles.statsCard}
               onPress={() =>
-                navigation.navigate("MyOrders", { filter: "completed" })
+                navigation.navigate("MyOrders", { filterStatus: "配送中" })
+              }
+            >
+              <Text style={styles.statsValue}>{stats.delivering}</Text>
+              <Text style={styles.statsLabel}>{currentT.deliveringOrders}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.statsCard}
+              onPress={() =>
+                navigation.navigate("MyOrders", { filterStatus: "已送达" })
               }
             >
               <Text style={styles.statsValue}>{stats.completed}</Text>
@@ -334,15 +371,17 @@ export default function HomeScreen({ navigation }: any) {
                       {
                         backgroundColor: "#94a3b8",
                         width:
-                          stats.yesterdayRevenue > 0 || stats.todayRevenue > 0
-                            ? `${(stats.yesterdayRevenue / Math.max(stats.todayRevenue, stats.yesterdayRevenue, 1)) * 100}%`
+                          stats.yesterdayOrderCount > 0 ||
+                          stats.todayOrderCount > 0
+                            ? `${(stats.yesterdayOrderCount / Math.max(stats.todayOrderCount, stats.yesterdayOrderCount, 1)) * 100}%`
                             : "0%",
                       },
                     ]}
                   />
                 </View>
                 <Text style={styles.chartValueLabel}>
-                  {stats.yesterdayRevenue.toLocaleString()}
+                  {stats.yesterdayOrderCount.toLocaleString()}
+                  {currentT.orderCountUnit}
                 </Text>
               </View>
 
@@ -357,8 +396,9 @@ export default function HomeScreen({ navigation }: any) {
                       styles.barFill,
                       {
                         width:
-                          stats.todayRevenue > 0 || stats.yesterdayRevenue > 0
-                            ? `${(stats.todayRevenue / Math.max(stats.todayRevenue, stats.yesterdayRevenue, 1)) * 100}%`
+                          stats.todayOrderCount > 0 ||
+                          stats.yesterdayOrderCount > 0
+                            ? `${(stats.todayOrderCount / Math.max(stats.todayOrderCount, stats.yesterdayOrderCount, 1)) * 100}%`
                             : "0%",
                       },
                     ]}
@@ -370,7 +410,8 @@ export default function HomeScreen({ navigation }: any) {
                     { color: "#d97706", fontWeight: "bold" },
                   ]}
                 >
-                  {stats.todayRevenue.toLocaleString()}
+                  {stats.todayOrderCount.toLocaleString()}
+                  {currentT.orderCountUnit}
                 </Text>
               </View>
             </View>
@@ -385,7 +426,7 @@ export default function HomeScreen({ navigation }: any) {
             >
               <Text style={styles.salesLabel}>{currentT.totalSales}</Text>
               <Text style={styles.salesValue}>
-                {(stats.todayRevenue + stats.yesterdayRevenue).toLocaleString()}
+                {stats.totalRevenueMmk.toLocaleString()}
               </Text>
             </LinearGradient>
           </View>
@@ -542,9 +583,11 @@ const styles = StyleSheet.create({
   },
   statsCard: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -553,15 +596,16 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statsValue: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "900",
     color: "#1e3a8a",
   },
   statsLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#64748b",
     marginTop: 4,
     fontWeight: "600",
+    textAlign: "center",
   },
   salesCard: {
     marginTop: 12,

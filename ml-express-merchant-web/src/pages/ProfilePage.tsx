@@ -421,6 +421,8 @@ const ProfilePage: React.FC = () => {
     Record<string, number>
   >({});
   const [cartTotal, setCartTotal] = useState(0);
+  const [selectedPackageType, setSelectedPackageType] = useState("");
+  const [orderWeight, setOrderWeight] = useState("");
   const [pricingSettings, setPricingSettings] = useState({
     baseFee: 1500,
     perKmFee: 250,
@@ -1287,6 +1289,13 @@ const ProfilePage: React.FC = () => {
     setDescription("");
     setSelectedProducts({});
     setCartTotal(0);
+    setSelectedPackageType("");
+    setOrderWeight("");
+    setSelectedDeliverySpeed("");
+    setShowWeightInput(false);
+    setScheduledDeliveryTime("");
+    setCalculatedPriceDetail(0);
+    setCalculatedDistanceDetail(0);
     setIsCalculated(false);
     setShowOrderForm(true);
   };
@@ -1352,46 +1361,209 @@ const ProfilePage: React.FC = () => {
     }
   }, [selectedProducts, hasCOD, language]);
 
-  // 🚀 新增：估算价格 (对齐 HomePage)
-  const calculatePriceEstimate = async () => {
-    if (!selectedSenderLocation || !selectedReceiverLocation) {
-      alert(
-        language === "zh"
-          ? "请先在地图上选择寄件和收件位置"
-          : "Please select locations on map",
-      );
-      return;
+  const calculatePriceForOrder = (
+    packageType: string,
+    weight: string,
+    deliverySpeed: string,
+    distanceKm: number,
+  ): number => {
+    const ui = allT.ui;
+    const billingDistance = Math.max(1, Math.ceil(distanceKm));
+
+    if (packageType === ui.waySide) {
+      return Math.round(pricingSettings.baseFee);
     }
+
+    let totalPrice = pricingSettings.baseFee;
+    const distanceFee =
+      Math.max(0, billingDistance - pricingSettings.freeKmThreshold) *
+      pricingSettings.perKmFee;
+    totalPrice += distanceFee;
+
+    const weightNum = parseFloat(weight) || 0;
+    const weightThreshold = 5;
+    if (
+      (packageType === ui.overweightPackageDetail ||
+        packageType === "超重件（5KG）以上") &&
+      weightNum > weightThreshold
+    ) {
+      totalPrice +=
+        (weightNum - weightThreshold) * pricingSettings.weightSurcharge;
+    }
+
+    if (
+      packageType === ui.oversizedPackageDetail ||
+      packageType === "超规件（45x60x15cm）以上"
+    ) {
+      totalPrice += billingDistance * pricingSettings.oversizeSurcharge;
+    } else if (packageType === ui.fragile || packageType === "易碎品") {
+      totalPrice += billingDistance * pricingSettings.fragileSurcharge;
+    } else if (
+      packageType === ui.foodDrinks ||
+      packageType === "食品和饮料"
+    ) {
+      totalPrice += billingDistance * pricingSettings.foodBeverageSurcharge;
+    }
+
+    if (
+      deliverySpeed === ui.urgentDelivery ||
+      deliverySpeed === "加急配送" ||
+      deliverySpeed === "急送达"
+    ) {
+      totalPrice += pricingSettings.urgentSurcharge;
+    } else if (
+      deliverySpeed === ui.scheduledDelivery ||
+      deliverySpeed === "定时达" ||
+      deliverySpeed === "预约配送"
+    ) {
+      totalPrice += pricingSettings.scheduledSurcharge;
+    }
+
+    return Math.round(totalPrice);
+  };
+
+  // 🚀 估算价格：silent 为自动结算时不弹窗、不占用全页 loading
+  const calculatePriceEstimate = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    const ui = allT.ui;
 
     try {
-      setLoading(true);
-      // 计算距离 (简化版，实际应调用 Google Distance Matrix)
-      const dist = packageService.calculateDistance(
-        selectedSenderLocation.lat,
-        selectedSenderLocation.lng,
-        selectedReceiverLocation.lat,
-        selectedReceiverLocation.lng,
+      const effectivePackageType =
+        selectedDeliverySpeed === "Eco Way" ? ui.waySide : selectedPackageType;
+
+      const needsWeightForEstimate =
+        showWeightInput &&
+        (selectedPackageType === ui.overweightPackageDetail ||
+          selectedPackageType === "超重件（5KG）以上" ||
+          selectedPackageType === ui.oversizedPackageDetail ||
+          selectedPackageType === "超规件（45x60x15cm）以上" ||
+          selectedPackageType === "中转包裹");
+
+      const readyForEstimate =
+        !!senderAddressText?.trim() &&
+        !!receiverAddressText?.trim() &&
+        !!selectedDeliverySpeed &&
+        (selectedDeliverySpeed === "Eco Way" ? true : !!selectedPackageType) &&
+        (!needsWeightForEstimate || !!orderWeight?.trim());
+
+      if (!readyForEstimate) {
+        if (silent) {
+          setIsCalculated(false);
+          setCalculatedPriceDetail(0);
+          setCalculatedDistanceDetail(0);
+        }
+        return;
+      }
+
+      const parseCoords = (
+        loc: { lat: number; lng: number } | null,
+        addressText: string,
+      ): { lat: number; lng: number } | null => {
+        if (loc?.lat != null && loc?.lng != null) {
+          return { lat: loc.lat, lng: loc.lng };
+        }
+        const match = addressText?.match(
+          /📍 坐标:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/,
+        );
+        if (match) {
+          return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+        }
+        return null;
+      };
+
+      const senderCoords = parseCoords(
+        selectedSenderLocation,
+        senderAddressText,
+      );
+      const receiverCoords = parseCoords(
+        selectedReceiverLocation,
+        receiverAddressText,
       );
 
-      setCalculatedDistanceDetail(dist);
+      if (!senderCoords || !receiverCoords) {
+        if (!silent) {
+          alert(
+            language === "zh"
+              ? "请先在地图上选择寄件和收件位置（或确保地址中含坐标）"
+              : "Please select sender and receiver locations on the map (or ensure coordinates in address)",
+          );
+        } else {
+          setIsCalculated(false);
+          setCalculatedPriceDetail(0);
+          setCalculatedDistanceDetail(0);
+        }
+        return;
+      }
 
-      // 这里根据 pricingSettings 计算价格
-      const base = pricingSettings.baseFee;
-      const kmFee =
-        Math.max(0, dist - pricingSettings.freeKmThreshold) *
-        pricingSettings.perKmFee;
+      if (!silent) {
+        setLoading(true);
+      }
 
-      // 简单估算，不包含所有附加费
-      const total = base + kmFee;
+      const dist = packageService.calculateDistance(
+        senderCoords.lat,
+        senderCoords.lng,
+        receiverCoords.lat,
+        receiverCoords.lng,
+      );
 
-      setCalculatedPriceDetail(total);
+      const roundedDistanceForBilling = Math.max(1, Math.ceil(dist));
+      const isWaySide = effectivePackageType === ui.waySide;
+      setCalculatedDistanceDetail(isWaySide ? 0 : roundedDistanceForBilling);
+
+      const priceValue = calculatePriceForOrder(
+        effectivePackageType,
+        orderWeight,
+        selectedDeliverySpeed,
+        roundedDistanceForBilling,
+      );
+
+      setCalculatedPriceDetail(priceValue);
       setIsCalculated(true);
+
+      if (!silent) {
+        alert(
+          language === "zh"
+            ? `计算完成！\n配送距离: ${isWaySide ? "—" : `${roundedDistanceForBilling}km`}\n总费用: ${priceValue} MMK`
+            : `Done.\nDistance: ${isWaySide ? "—" : `${roundedDistanceForBilling} km`}\nTotal: ${priceValue} MMK`,
+        );
+      }
     } catch (error) {
       console.error("价格估算失败:", error);
+      if (!silent) {
+        alert(
+          language === "zh" ? "计算失败，请重试" : "Calculation failed, try again",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  const calculatePriceEstimateRef = useRef(calculatePriceEstimate);
+  calculatePriceEstimateRef.current = calculatePriceEstimate;
+
+  useEffect(() => {
+    if (!showOrderForm) return;
+    const timer = window.setTimeout(() => {
+      void calculatePriceEstimateRef.current({ silent: true });
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [
+    showOrderForm,
+    selectedSenderLocation,
+    selectedReceiverLocation,
+    senderAddressText,
+    receiverAddressText,
+    selectedDeliverySpeed,
+    selectedPackageType,
+    orderWeight,
+    showWeightInput,
+    scheduledDeliveryTime,
+    pricingSettings,
+    language,
+  ]);
 
   // 🚀 新增：提交订单 (对齐 HomePage)
   const handleOrderSubmit = async (e: React.FormEvent) => {
@@ -1426,8 +1598,8 @@ const ProfilePage: React.FC = () => {
         receiver_address: receiverAddressText,
         receiver_latitude: selectedReceiverLocation?.lat,
         receiver_longitude: selectedReceiverLocation?.lng,
-        package_type: "标准件",
-        weight: "1.0",
+        package_type: selectedPackageType || "标准件",
+        weight: orderWeight?.trim() ? orderWeight.trim() : "1.0",
         description: description,
         price: `${calculatedPriceDetail} MMK`,
         delivery_distance: calculatedDistanceDetail,
@@ -1439,6 +1611,7 @@ const ProfilePage: React.FC = () => {
         pickup_time: "",
         delivery_time: "",
         courier: "待分配",
+        pricing_base_fee_mmk: Math.round(Number(pricingSettings.baseFee) || 0),
       };
 
       const result = await packageService.createPackage(orderData);
@@ -11360,8 +11533,11 @@ const ProfilePage: React.FC = () => {
         calculatedDistanceDetail={calculatedDistanceDetail}
         pricingSettings={pricingSettings}
         handleOpenMapModal={handleOpenMapModal}
-        calculatePriceEstimate={calculatePriceEstimate}
         handleOrderSubmit={handleOrderSubmit}
+        selectedPackageType={selectedPackageType}
+        setSelectedPackageType={setSelectedPackageType}
+        orderWeight={orderWeight}
+        setOrderWeight={setOrderWeight}
         setSelectedSenderLocation={setSelectedSenderLocation}
         setSelectedReceiverLocation={setSelectedReceiverLocation}
         merchantProducts={products}

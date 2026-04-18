@@ -9,6 +9,8 @@ interface PackageInfoProps {
   styles: any;
   currentT: any;
   packageType: string;
+  /** 选择「顺路递（24小时内）」时为 Eco Way，包裹类型展示为顺路递说明 */
+  deliverySpeed?: string;
   weight: string;
   description: string;
   showWeightInput: boolean;
@@ -26,6 +28,7 @@ const PackageInfo = memo<PackageInfoProps>(({
   styles,
   currentT,
   packageType,
+  deliverySpeed = '',
   weight,
   description,
   showWeightInput,
@@ -50,20 +53,26 @@ const PackageInfo = memo<PackageInfoProps>(({
           <Text style={styles.sectionTitle}> {currentT.packageInfo}</Text>
         </View>
 
-        {/* 包裹类型部分 */}
+        {/* 包裹类型部分：顺路递仅在配送选项中选择 */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>包裹类型 *</Text>
-          <View style={styles.chipContainer}>
-            {packageTypes.map((type) => (
-              <PackageTypeChip
-                key={type.value}
-                type={type}
-                isSelected={packageType === type.value}
-                onPress={handlePackageTypeClick}
-                styles={styles}
-              />
-            ))}
-          </View>
+          {deliverySpeed === 'Eco Way' ? (
+            <View style={[styles.radioOption, styles.radioOptionActive, { backgroundColor: '#ecfdf5', borderColor: '#34d399', marginTop: 4 }]}>
+              <Text style={[styles.radioText, styles.radioTextActive]}>{currentT.speedWaySide}</Text>
+            </View>
+          ) : (
+            <View style={styles.chipContainer}>
+              {packageTypes.map((type) => (
+                <PackageTypeChip
+                  key={type.value}
+                  type={type}
+                  isSelected={packageType === type.value}
+                  onPress={handlePackageTypeClick}
+                  styles={styles}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* 重量输入框 - 只在选择超重件或超规件时显示 */}

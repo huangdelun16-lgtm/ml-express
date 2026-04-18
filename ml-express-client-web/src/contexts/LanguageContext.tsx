@@ -563,6 +563,8 @@ const translations: any = {
       orderEmailSentDev: '开发模式：系统未实际发送邮件，请手动保存二维码。',
       orderFollowup: '我们会在1小时内联系您取件。',
       speed: '速度',
+      deliveryOptions: '配送选项',
+      waySideDeliveryOption: '顺路递（24小时内）',
       packageTypeInfo: {
         title: '包裹类型说明',
         standard: '适用于常规大小的包裹（45x60x15cm）和（5KG）以内。',
@@ -1139,6 +1141,8 @@ const translations: any = {
       orderEmailSentDev: 'Development mode: email not actually sent. Please save the QR code manually.',
       orderFollowup: 'We will contact you within 1 hour to arrange pickup.',
       speed: 'Speed',
+      deliveryOptions: 'Delivery options',
+      waySideDeliveryOption: 'Eco Way (within 24h)',
       packageTypeInfo: {
         title: 'Package Type Description',
         standard: 'Standard package within (45x60x15cm) and (5KG).',
@@ -1715,6 +1719,8 @@ const translations: any = {
       orderEmailSentDev: 'ဖွံ့ဖြိုးတိုးတက်မှု မုဒ် - အီးမေးလ်ကို မပို့ရသေးပါ။ QR ကုဒ်ကို ကိုယ်တိုင် သိမ်းဆည်းပါ။',
       orderFollowup: '၁ နာရီအတွင်း ကူရီယာမှ ပစ္စည်းယူဖို့ ဆက်သွယ်ပါမည်။',
       speed: 'မြန်နှုန်း',
+      deliveryOptions: 'ပို့ဆောင်ရွေးချယ်မှု',
+      waySideDeliveryOption: 'တန်တန်လေးပို့ (၂၄ နာရီအတွင်း)',
       packageTypeInfo: {
         title: 'ထုပ်ပိုးအမျိုးအစား ရှင်းလင်းချက်',
         standard: 'စံထုပ်ပိုး (45x60x15cm) နှင့် (5KG) အတွင်း။',

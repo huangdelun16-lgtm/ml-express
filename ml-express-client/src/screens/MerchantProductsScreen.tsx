@@ -205,7 +205,13 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await merchantService.getStoreProducts(storeId);
+      const currentUserId = await AsyncStorage.getItem('userId');
+      const userType = await AsyncStorage.getItem('userType');
+      const isMerchantOwnStore =
+        userType === 'merchant' && currentUserId === storeId;
+      const data = isMerchantOwnStore
+        ? await merchantService.getStoreProducts(storeId)
+        : await merchantService.getPublicStoreProducts(storeId);
       setProducts(data);
     } catch (error) {
       showToast('加载失败', 'error');

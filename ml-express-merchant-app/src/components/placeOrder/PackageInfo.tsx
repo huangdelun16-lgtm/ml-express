@@ -1,5 +1,5 @@
-import React, { memo, useMemo } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { memo } from 'react';
+import { View, Text, TextInput } from 'react-native';
 import { PackageIcon } from '../Icon';
 import { FadeInView } from '../Animations';
 import PackageTypeChip from './PackageTypeChip';
@@ -19,6 +19,9 @@ interface PackageInfoProps {
   onPackageTypeInfoClick: (type: string) => void;
   cartTotal?: number;
   accountBalance?: number;
+  /** 选择「顺路递（24小时内）」配送时锁定包裹类型为顺路递 */
+  isWaySideDeliveryLocked?: boolean;
+  waySideLockedLabel?: string;
 }
 
 const PackageInfo = memo<PackageInfoProps>(({
@@ -36,8 +39,11 @@ const PackageInfo = memo<PackageInfoProps>(({
   onPackageTypeInfoClick,
   cartTotal,
   accountBalance = 0,
+  isWaySideDeliveryLocked = false,
+  waySideLockedLabel = '',
 }) => {
   const handlePackageTypeClick = (typeValue: string) => {
+    if (isWaySideDeliveryLocked) return;
     onPackageTypeChange(typeValue);
     onPackageTypeInfoClick(typeValue);
   };
@@ -53,17 +59,28 @@ const PackageInfo = memo<PackageInfoProps>(({
         {/* 包裹类型部分 */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>包裹类型 *</Text>
-          <View style={styles.chipContainer}>
-            {packageTypes.map((type) => (
-              <PackageTypeChip
-                key={type.value}
-                type={type}
-                isSelected={packageType === type.value}
-                onPress={handlePackageTypeClick}
-                styles={styles}
-              />
-            ))}
-          </View>
+          {isWaySideDeliveryLocked ? (
+            <View style={[styles.radioOption, styles.radioOptionActive, { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1', marginTop: 4 }]}>
+              <View style={styles.radio}>
+                <View style={[styles.radioInner, { backgroundColor: '#10b981' }]} />
+              </View>
+              <View style={styles.radioContent}>
+                <Text style={[styles.radioText, { color: '#64748b' }]}>🌿 {waySideLockedLabel}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.chipContainer}>
+              {packageTypes.map((type) => (
+                <PackageTypeChip
+                  key={type.value}
+                  type={type}
+                  isSelected={packageType === type.value}
+                  onPress={handlePackageTypeClick}
+                  styles={styles}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* 重量输入框 - 只在选择超重件或超规件时显示 */}

@@ -59,6 +59,7 @@ export interface Package {
   customer_name?: string; // 客户姓名
   cod_settled?: boolean; // 代收款是否已结清
   cod_settled_at?: string; // 代收款结清时间
+  pricing_base_fee_mmk?: number | null;
 }
 
 // 广告横幅接口
@@ -220,6 +221,7 @@ export const packageService = {
         error.message.includes('delivery_store_id') || 
         error.message.includes('delivery_store_name') || 
         error.message.includes('cod_amount') ||
+        error.message.includes('pricing_base_fee') ||
         error.code === 'PGRST204'
       )) {
         LoggerService.warn('检测到列不存在，尝试移除可选字段后重试:', error.message);
@@ -237,6 +239,9 @@ export const packageService = {
         if (error.message.includes('cod_amount')) {
           delete dataToInsert.cod_amount;
         }
+        if (error.message.includes('pricing_base_fee')) {
+          delete dataToInsert.pricing_base_fee_mmk;
+        }
         
         // 如果是通用错误，移除所有可能导致问题的可选字段
         if (error.code === 'PGRST204') {
@@ -246,6 +251,7 @@ export const packageService = {
           delete dataToInsert.delivery_store_id;
           delete dataToInsert.delivery_store_name;
           delete dataToInsert.cod_amount;
+          delete dataToInsert.pricing_base_fee_mmk;
         }
         
         // 重试插入
@@ -1176,10 +1182,50 @@ export const merchantService = {
   }
 };
 
+/** Admin 仅保存领区键时回退；与 ml-express-client-web 一致 */
+const DEFAULT_PRICING_REGION_FALLBACK = 'mandalay';
+
+function isGlobalPricingKey(settingsKey: string): boolean {
+  const parts = settingsKey.split('.');
+  return parts.length === 2 && parts[0] === 'pricing';
+}
+
+function pricingFieldToCamel(rawKey: string): string {
+  return rawKey.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
+}
+
+function parsePricingValue(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
+    return parsePricingValue((raw as { value: unknown }).value);
+  }
+  if (typeof raw === 'string') {
+    try {
+      const j = JSON.parse(raw);
+      return parsePricingValue(j);
+    } catch {
+      return parseFloat(raw) || 0;
+    }
+  }
+  return 0;
+}
+
 // 系统设置服务（客户端使用）
 export const systemSettingsService = {
-  // 获取计费规则
   async getPricingSettings(region?: string) {
+    const defaults: Record<string, number> = {
+      baseFee: 1500,
+      perKmFee: 250,
+      weightSurcharge: 150,
+      urgentSurcharge: 500,
+      oversizeSurcharge: 300,
+      scheduledSurcharge: 200,
+      fragileSurcharge: 300,
+      foodBeverageSurcharge: 300,
+      freeKmThreshold: 3,
+      waySideCourierPerOrder: 0,
+    };
+
     try {
       const { data, error } = await supabase
         .from('system_settings')
@@ -1188,67 +1234,35 @@ export const systemSettingsService = {
 
       if (error) throw error;
 
-      // 默认全局计费
-      const settings: any = {
-        baseFee: 1500,
-        perKmFee: 250,
-        weightSurcharge: 150,
-        urgentSurcharge: 500,
-        oversizeSurcharge: 300,
-        scheduledSurcharge: 200,
-        fragileSurcharge: 300,
-        foodBeverageSurcharge: 300,
-        freeKmThreshold: 3,
+      const settings: any = { ...defaults };
+
+      const applyRegionPrefix = (prefix: string) => {
+        data?.forEach((item: any) => {
+          if (!item.settings_key.startsWith(prefix)) return;
+          const rawField = item.settings_key.slice(prefix.length);
+          const camelKey = pricingFieldToCamel(rawField);
+          settings[camelKey] = parsePricingValue(item.settings_value);
+        });
       };
 
       if (data && data.length > 0) {
-        // 如果指定了区域，优先寻找该区域的配置
-        if (region) {
-          const regionPrefix = `pricing.${region.toLowerCase()}.`;
-          const regionSettings = data.filter(item => item.settings_key.startsWith(regionPrefix));
-          
-          if (regionSettings.length > 0) {
-            regionSettings.forEach((item: any) => {
-              const key = item.settings_key.replace(regionPrefix, '');
-              const camelKey = key.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
-              let value = item.settings_value;
-              if (typeof value === 'string') {
-                try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-              }
-              settings[camelKey] = typeof value === 'number' ? value : parseFloat(value) || 0;
-            });
-            return settings;
-          }
-        }
-
-        // 应用全局默认设置（排除掉其他领区的设置）
         data.forEach((item: any) => {
-          if (!item.settings_key.match(/\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./)) {
-            const key = item.settings_key.replace('pricing.', '');
-            const camelKey = key.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
-            let value = item.settings_value;
-            if (typeof value === 'string') {
-              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-            }
-            settings[camelKey] = typeof value === 'number' ? value : parseFloat(value) || 0;
-          }
+          if (!isGlobalPricingKey(item.settings_key)) return;
+          const rawField = item.settings_key.replace('pricing.', '');
+          const camelKey = pricingFieldToCamel(rawField);
+          settings[camelKey] = parsePricingValue(item.settings_value);
         });
+
+        const regionalPrefix = region
+          ? `pricing.${region.toLowerCase()}.`
+          : `pricing.${DEFAULT_PRICING_REGION_FALLBACK}.`;
+        applyRegionPrefix(regionalPrefix);
       }
 
       return settings;
     } catch (error) {
       LoggerService.error('获取计费设置异常:', error);
-      return {
-        baseFee: 1500,
-        perKmFee: 250,
-        weightSurcharge: 150,
-        urgentSurcharge: 500,
-        oversizeSurcharge: 300,
-        scheduledSurcharge: 200,
-        fragileSurcharge: 300,
-        foodBeverageSurcharge: 300,
-        freeKmThreshold: 3
-      };
+      return { ...defaults };
     }
   }
 };

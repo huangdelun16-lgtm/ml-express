@@ -17,6 +17,7 @@ import {
   FlatList,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -436,6 +437,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       speedStandard: '准时达（1小时内）',
       speedExpress: '急送达（30分钟内）',
       speedScheduled: '定时达（指定时间）',
+      speedWaySide: '顺路递（24小时内）',
       scheduledTime: '指定送达时间',
       priceEstimate: '预估价格',
       distance: '配送距离',
@@ -444,6 +446,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       speedPrice: '时效费',
       totalPrice: '总计',
       calculateButton: '计算',
+      priceEstimateAutoHint: '填写地址、包裹与配送选项后将自动显示费用',
+      priceEstimateAutoSubtext: '超重/超规件请填写重量',
       calculating: '计算中...',
       calculateSuccess: '计算完成',
       calculateFailed: '计算失败',
@@ -555,6 +559,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       speedStandard: 'Standard (within 1 hour)',
       speedExpress: 'Express (within 30 mins)',
       speedScheduled: 'Scheduled (specific time)',
+      speedWaySide: 'Eco Way (within 24h)',
       scheduledTime: 'Scheduled Time',
       priceEstimate: 'Price Estimate',
       distance: 'Distance',
@@ -563,6 +568,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       speedPrice: 'Speed Fee',
       totalPrice: 'Total',
       calculateButton: 'Calculate',
+      priceEstimateAutoHint: 'Fee updates automatically when address, package and delivery are set',
+      priceEstimateAutoSubtext: 'Enter weight for overweight/oversized items',
       calculating: 'Calculating...',
       calculateSuccess: 'Calculation Complete',
       calculateFailed: 'Calculation Failed',
@@ -671,6 +678,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       speedStandard: 'စံချိန် (၁နာရီအတွင်း)',
       speedExpress: 'အမြန် (၃၀မိနစ်အတွင်း)',
       speedScheduled: 'အချိန်သတ်မှတ် (သတ်မှတ်ထားသောအချိန်)',
+      speedWaySide: 'တန်တန်လေးပို့ (၂၄ နာရီအတွင်း)',
       scheduledTime: 'သတ်မှတ်အချိန်',
       priceEstimate: 'ခန့်မှန်းစျေးနှုန်း',
       distance: 'အကွာအဝေး',
@@ -679,6 +687,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       speedPrice: 'မြန်နှုန်းအခကြေး',
       totalPrice: 'စုစုပေါင်း',
       calculateButton: 'တွက်ချက်မည်',
+      priceEstimateAutoHint: 'လိပ်စာ၊ ပါဆယ်နှင့် ပို့ဆောင်ရွေးချယ်မှု ပြီးပါက အလိုအလျောက် ပြသပါမည်',
+      priceEstimateAutoSubtext: 'အလေးချိန်ပိုပါဆယ် သို့မဟုတ် အရွယ်ပိုပါဆယ်အတွက် အလေးချိန်ကို ဖြည့်ပါ',
       calculating: 'တွက်ချက်နေသည်...',
       calculateSuccess: 'တွက်ချက်ပြီးပြီ',
       calculateFailed: 'တွက်ချက်မအောင်မြင်',
@@ -823,7 +833,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   // 包裹类型选项（与Web端一致）- 使用 useMemo 优化
   const packageTypes = useMemo(() => {
     const types = [
-      { value: '顺路递', label: currentT.packageTypes.waySide },
       { value: '文件', label: currentT.packageTypes.document },
       { value: '标准件（45x60x15cm）和（5KG）以内', label: currentT.packageTypes.standard },
       { value: '超重件（5KG）以上', label: currentT.packageTypes.overweight },
@@ -840,7 +849,23 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     { value: '准时达', label: currentT.speedStandard, extra: 0 },
     { value: '急送达', label: currentT.speedExpress, extra: pricingSettings.urgent_surcharge },
     { value: '定时达', label: currentT.speedScheduled, extra: pricingSettings.scheduled_surcharge },
-  ], [currentT.speedStandard, currentT.speedExpress, currentT.speedScheduled, pricingSettings.urgent_surcharge, pricingSettings.scheduled_surcharge]);
+    { value: 'Eco Way', label: currentT.speedWaySide, extra: 0 },
+  ], [currentT.speedStandard, currentT.speedExpress, currentT.speedScheduled, currentT.speedWaySide, pricingSettings.urgent_surcharge, pricingSettings.scheduled_surcharge]);
+
+  const handleDeliverySpeedChange = useCallback((value: string) => {
+    if (value === 'Eco Way') {
+      setDeliverySpeed('Eco Way');
+      setPackageType('顺路递');
+      setShowWeightInput(false);
+      setScheduledTime('');
+    } else {
+      setDeliverySpeed(value);
+      if (packageType === '顺路递') {
+        setPackageType('标准件（45x60x15cm）和（5KG）以内');
+        setShowWeightInput(false);
+      }
+    }
+  }, [packageType]);
 
   const persistOrderLocally = useCallback(
     async (payload: any, syncStatus: 'pending' | 'synced', errorMessage?: string) => {
@@ -937,8 +962,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
             // 加载店铺商品
             try {
-              const products = await merchantService.getStoreProducts(store.id);
-              setMerchantProducts(products.filter(p => p.is_available));
+              const products = await merchantService.getPublicStoreProducts(store.id);
+              setMerchantProducts(products);
               LoggerService.debug('✅ 已加载店铺商品:', products.length);
             } catch (err) {
               LoggerService.error('加载店铺商品失败:', err);
@@ -1015,6 +1040,24 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       errorService.handleError(error, { context: 'PlaceOrderScreen.loadPricingSettings' });
     }
   };
+
+  // 每次进入「立即下单」页重新拉取计费，与 Admin 最新设置一致
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const settings = await systemSettingsService.getPricingSettings(currentRegion || undefined);
+          if (!cancelled) setPricingSettings(settings);
+        } catch (error) {
+          errorService.handleError(error, { context: 'PlaceOrderScreen.useFocusEffect pricing', silent: true });
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [currentRegion])
+  );
 
   // 根据寄件地址检测领区并加载对应计费规则
   useEffect(() => {
@@ -1322,19 +1365,31 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     return R * c;
   };
 
-  // 精准计算费用
-  const calculatePrice = useCallback(async () => {
+  // 精准计算费用；silent 用于自动更新预估，不弹窗、不显示全屏 loading
+  const calculatePrice = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
-      showLoading(currentT.calculating, 'package');
-      
-      // 检查是否有坐标信息
       if (!senderCoordinates || !receiverCoordinates) {
-        Alert.alert('提示', '请先选择寄件和收件地址的精确位置');
-        hideLoading();
+        if (!silent) {
+          Alert.alert('提示', '请先选择寄件和收件地址的精确位置');
+          hideLoading();
+        } else {
+          setIsCalculated(false);
+        }
         return;
       }
 
-      // 计算精确距离
+      if (showWeightInput && !String(weight).trim()) {
+        if (silent) {
+          setIsCalculated(false);
+        }
+        return;
+      }
+
+      if (!silent) {
+        showLoading(currentT.calculating, 'package');
+      }
+
       const exactDistance = calculateDistance(
         senderCoordinates.lat,
         senderCoordinates.lng,
@@ -1342,65 +1397,70 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         receiverCoordinates.lng
       );
 
-      // 按照要求：6.1km = 7km（向上取整）用于给客户计费
       const roundedDistanceForPrice = Math.ceil(exactDistance);
-      
-      // 存储原始精确距离，用于给骑手算 KM 费
+
       setCalculatedDistance(exactDistance);
 
-      // 🚀 核心逻辑：如果是“顺路递”，只计算基础费用，且不计距离费和其他附加费
       if (packageType === '顺路递') {
         const basePrice = pricingSettings.base_fee;
         setCalculatedPrice(Math.round(basePrice).toString());
         setIsCalculated(true);
-        hideLoading();
-        Alert.alert(currentT.calculateSuccess, `配送类型: 顺路递 (24小时内送达)\n总费用: ${Math.round(basePrice)} MMK`);
+        if (!silent) {
+          hideLoading();
+          Alert.alert(currentT.calculateSuccess, `配送类型: ${currentT.speedWaySide}\n总费用: ${Math.round(basePrice)} MMK`);
+        }
         return;
       }
 
-      // 计算各项费用（计费仍按取整后的距离）
-      let totalPrice = pricingSettings.base_fee; // 基础费用
+      let totalPrice = pricingSettings.base_fee;
 
-      // 距离费用（超过免费公里数后收费）
       const distanceFee = Math.max(0, roundedDistanceForPrice - pricingSettings.free_km_threshold) * pricingSettings.per_km_fee;
       totalPrice += distanceFee;
 
-      // 重量附加费
       const weightNum = parseFloat(weight || '0');
       if (packageType === '超重件（5KG）以上' && weightNum > 5) {
         totalPrice += Math.max(0, weightNum - 5) * pricingSettings.weight_surcharge;
       }
 
-      // 速度附加费
       if (deliverySpeed !== '准时达') {
         const speedExtra = deliverySpeeds.find(s => s.value === deliverySpeed)?.extra || 0;
         totalPrice += speedExtra;
       }
 
-      // 包裹类型附加费
       if (packageType === '超规件（45x60x15cm）以上') {
         totalPrice += roundedDistanceForPrice * pricingSettings.oversize_surcharge;
       }
       if (packageType === '易碎品') {
-        // 易碎品：按距离计算附加费 (MMK/公里)
         totalPrice += roundedDistanceForPrice * pricingSettings.fragile_surcharge;
       }
       if (packageType === '食品和饮料') {
         totalPrice += roundedDistanceForPrice * pricingSettings.food_beverage_surcharge;
       }
 
-      // 更新计算结果
       setCalculatedPrice(Math.round(totalPrice).toString());
       setIsCalculated(true);
-      
-      hideLoading();
-      Alert.alert(currentT.calculateSuccess, `距离: ${roundedDistanceForPrice}km\n总费用: ${Math.round(totalPrice)} MMK`);
-      
+
+      if (!silent) {
+        hideLoading();
+        Alert.alert(currentT.calculateSuccess, `距离: ${roundedDistanceForPrice}km\n总费用: ${Math.round(totalPrice)} MMK`);
+      }
     } catch (error) {
-      hideLoading();
+      if (!silent) {
+        hideLoading();
+      }
       errorService.handleError(error, { context: 'PlaceOrderScreen.calculateFee' });
     }
-  }, [senderCoordinates, receiverCoordinates, packageType, weight, deliverySpeed, pricingSettings, currentT, showLoading, hideLoading]);
+  }, [senderCoordinates, receiverCoordinates, packageType, weight, deliverySpeed, deliverySpeeds, pricingSettings, currentT, showLoading, hideLoading, showWeightInput]);
+
+  const calculatePriceRef = useRef(calculatePrice);
+  calculatePriceRef.current = calculatePrice;
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      void calculatePriceRef.current({ silent: true });
+    }, 400);
+    return () => clearTimeout(id);
+  }, [senderCoordinates, receiverCoordinates, packageType, weight, deliverySpeed, showWeightInput, pricingSettings]);
 
   // 估算距离（简化版，实际应该使用地图API）
   const estimateDistance = () => {
@@ -1777,6 +1837,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         courier: '待分配',
         price: String(Math.round(finalPriceNumber)),
         payment_method: paymentMethod, // 添加支付方式字段
+        pricing_base_fee_mmk: Math.round(Number(pricingSettings.base_fee) || 0),
       };
 
       offlinePayload = { ...orderData };
@@ -2306,18 +2367,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             styles={styles}
             currentT={currentT}
             packageType={packageType}
+            deliverySpeed={deliverySpeed}
             weight={weight}
             description={description}
             showWeightInput={showWeightInput}
             packageTypes={packageTypes}
             onPackageTypeChange={(value) => {
               setPackageType(value);
-              // 🚀 核心逻辑：如果是顺路递，速度设为 Eco Way 且不可选
-              if (value === '顺路递') {
-                setDeliverySpeed('Eco Way');
-              } else if (deliverySpeed === 'Eco Way') {
-                setDeliverySpeed('准时达');
-              }
             }}
             onWeightChange={setWeight}
             onDescriptionChange={setDescription}
@@ -2372,14 +2428,12 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
           {/* 配送选项 */}
           <DeliveryOptions
-            language={language as any}
             styles={styles}
             currentT={currentT}
             deliverySpeed={deliverySpeed}
             deliverySpeeds={deliverySpeeds}
-            onDeliverySpeedChange={setDeliverySpeed}
+            onDeliverySpeedChange={handleDeliverySpeedChange}
             onScheduleTimeClick={() => setShowTimePicker(true)}
-            isDisabled={packageType === '顺路递'} // 🚀 顺路递时禁用
           />
 
           {/* 价格计算 */}
@@ -2395,7 +2449,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             deliverySpeed={deliverySpeed}
             deliverySpeeds={deliverySpeeds}
             pricingSettings={pricingSettings as any}
-            onCalculate={calculatePrice}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
             accountBalance={currentUser?.user_type === 'merchant' ? undefined : (accountBalance - cartTotal)}

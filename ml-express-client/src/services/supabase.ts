@@ -98,6 +98,7 @@ export interface Package {
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
   cod_amount?: number; // 代收款金额
   delivery_store_id?: string; // 🚀 新增：配送店ID
+  pricing_base_fee_mmk?: number | null;
 }
 
 // 商店评价接口
@@ -212,6 +213,8 @@ export interface Product {
   stock: number;
   is_available: boolean;
   sales_count: number;
+  /** pending=待审 approved=已上架 rejected=已拒绝 */
+  listing_status?: 'pending' | 'approved' | 'rejected' | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -904,6 +907,11 @@ export const packageService = {
         courier: '待分配',
         payment_method: packageData.payment_method || 'cash', // 添加支付方式
         cod_amount: packageData.cod_amount || 0, // 添加代收款
+        pricing_base_fee_mmk:
+          packageData.pricing_base_fee_mmk != null &&
+          !Number.isNaN(Number(packageData.pricing_base_fee_mmk))
+            ? Number(packageData.pricing_base_fee_mmk)
+            : null,
       };
 
       // 如果提供了自定义ID，使用它
@@ -1533,8 +1541,31 @@ export const systemSettingsService = {
     }
   },
 
-  // 获取计费规则
+  // 获取计费规则（与 Admin system_settings、客户端 Web 对齐）
   async getPricingSettings(region?: string) {
+    const DEFAULT_REGION_FALLBACK = 'mandalay';
+
+    const isGlobalPricingKey = (settingsKey: string) => {
+      const parts = settingsKey.split('.');
+      return parts.length === 2 && parts[0] === 'pricing';
+    };
+
+    const parseVal = (raw: unknown): number => {
+      if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+      if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
+        return parseVal((raw as { value: unknown }).value);
+      }
+      if (typeof raw === 'string') {
+        try {
+          const j = JSON.parse(raw);
+          return parseVal(j);
+        } catch {
+          return parseFloat(raw) || 0;
+        }
+      }
+      return 0;
+    };
+
     return retry(async () => {
       try {
         const { data, error } = await supabase
@@ -1544,7 +1575,6 @@ export const systemSettingsService = {
 
         if (error) throw error;
 
-        // 默认全局计费
         const settings: any = {
           base_fee: 1500,
           per_km_fee: 250,
@@ -1555,37 +1585,29 @@ export const systemSettingsService = {
           fragile_surcharge: 300,
           food_beverage_surcharge: 300,
           free_km_threshold: 3,
+          way_side_courier_per_order: 0,
         };
 
-        // 如果指定了区域，尝试寻找该区域的配置
-        if (region) {
-          const regionPrefix = `pricing.${region.toLowerCase()}.`;
-          const regionSettings = data?.filter(item => item.settings_key.startsWith(regionPrefix));
-          
-          if (regionSettings && regionSettings.length > 0) {
-            regionSettings.forEach((item: any) => {
-              const key = item.settings_key.replace(regionPrefix, '');
-              let value = item.settings_value;
-              if (typeof value === 'string') {
-                try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-              }
-              settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
-            });
-            return settings;
-          }
-        }
+        const applyRegionPrefix = (prefix: string) => {
+          data?.forEach((item: any) => {
+            if (!item.settings_key.startsWith(prefix)) return;
+            const field = item.settings_key.slice(prefix.length);
+            settings[field] = parseVal(item.settings_value);
+          });
+        };
 
-        // 如果没有指定区域或没有特殊配置，使用默认的全局配置（排除掉带区域后缀的）
-        data?.forEach((item: any) => {
-          if (!item.settings_key.match(/\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./)) {
-            const key = item.settings_key.replace('pricing.', '');
-            let value = item.settings_value;
-            if (typeof value === 'string') {
-              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-            }
-            settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
-          }
-        });
+        if (data && data.length > 0) {
+          data.forEach((item: any) => {
+            if (!isGlobalPricingKey(item.settings_key)) return;
+            const field = item.settings_key.replace('pricing.', '');
+            settings[field] = parseVal(item.settings_value);
+          });
+
+          const regionalPrefix = region
+            ? `pricing.${region.toLowerCase()}.`
+            : `pricing.${DEFAULT_REGION_FALLBACK}.`;
+          applyRegionPrefix(regionalPrefix);
+        }
 
         return settings;
       } catch (error) {
@@ -1607,6 +1629,7 @@ export const systemSettingsService = {
         fragile_surcharge: 300,
         food_beverage_surcharge: 300,
         free_km_threshold: 3,
+        way_side_courier_per_order: 0,
       };
     });
   },
@@ -1706,9 +1729,59 @@ export const rechargeService = {
   }
 };
 
+/** 后台「广告管理 → 余额充值 QR」与客户端扫码图共用此 key（system_settings.settings_key） */
+export const CLIENT_RECHARGE_QR_SETTING_KEY = 'client.recharge_qr_urls';
+
+const RECHARGE_QR_PUBLIC_BASE = 'https://market-link-express.com';
+
+export const RECHARGE_QR_AMOUNT_TIERS = [10000, 50000, 100000, 300000, 500000, 1000000] as const;
+
+export function getDefaultRechargeQrUrlMap(): Record<number, string> {
+  return {
+    10000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_10000.png`,
+    50000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_50000.png`,
+    100000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_100000.png`,
+    300000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_300000.png`,
+    500000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_500000.png`,
+    1000000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_1000000.png`,
+  };
+}
+
+/** 合并 Supabase 配置与默认静态图；无网或失败时返回默认 */
+export async function fetchRechargeQrUrlMap(): Promise<Record<number, string>> {
+  const defaults = getDefaultRechargeQrUrlMap();
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('settings_value')
+      .eq('settings_key', CLIENT_RECHARGE_QR_SETTING_KEY)
+      .maybeSingle();
+    if (error || data == null) return { ...defaults };
+    let raw: unknown = data.settings_value;
+    if (typeof raw === 'string') {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        return { ...defaults };
+      }
+    }
+    if (!raw || typeof raw !== 'object') return { ...defaults };
+    const merged = { ...defaults };
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      const n = Number(k);
+      if (Number.isFinite(n) && typeof v === 'string' && v.trim()) {
+        merged[n] = v.trim();
+      }
+    }
+    return merged;
+  } catch {
+    return { ...defaults };
+  }
+}
+
 // 商家服务 (外卖/零售)
 export const merchantService = {
-  // 获取商店的所有商品
+  // 获取商店的所有商品（商家后台：含待审核）
   async getStoreProducts(storeId: string): Promise<Product[]> {
     try {
       const { data, error } = await supabase
@@ -1721,6 +1794,25 @@ export const merchantService = {
       return data || [];
     } catch (error) {
       LoggerService.error('获取商店商品失败:', error);
+      return [];
+    }
+  },
+
+  /** 客户侧同城商品：仅 Admin 已通过且在售（与 client-web 一致） */
+  async getPublicStoreProducts(storeId: string): Promise<Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('is_available', true)
+        .eq('listing_status', 'approved')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      LoggerService.error('获取公开商店商品失败:', error);
       return [];
     }
   },
@@ -1885,6 +1977,7 @@ export const merchantService = {
         `)
         .ilike('name', `%${query}%`)
         .eq('is_available', true)
+        .eq('listing_status', 'approved')
         .limit(20);
 
       if (error) throw error;

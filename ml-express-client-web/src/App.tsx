@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import LoggerService from './services/LoggerService';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
@@ -91,6 +91,24 @@ class ErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
+/** 客户端 Web 仅服务会员；若本地误存商家会话则清除并刷新，避免与商家端混淆 */
+function ClientWebMerchantSessionGuard() {
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('ml-express-customer');
+      if (!raw) return;
+      const u = JSON.parse(raw) as { user_type?: string };
+      if (u?.user_type === 'merchant') {
+        localStorage.removeItem('ml-express-customer');
+        window.location.reload();
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -98,6 +116,7 @@ function App() {
         <CartProvider>
           <Router>
             <div className="App" style={{ minHeight: '100vh' }}>
+              <ClientWebMerchantSessionGuard />
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
                   {/* 首页保持同步加载，避免 LCP 变差；其余路由懒加载 */}

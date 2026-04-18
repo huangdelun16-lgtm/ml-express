@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService, rechargeService, reviewService, StoreReview, userService } from '../services/supabase';
+import { packageService, supabase, merchantService, Product, DeliveryStore, deliveryStoreService, rechargeService, reviewService, StoreReview, userService, fetchRechargeQrUrlMap, getDefaultRechargeQrUrlMap, RECHARGE_QR_AMOUNT_TIERS } from '../services/supabase';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -143,6 +143,9 @@ const ProfilePage: React.FC = () => {
   const [selectedRechargeAmount, setSelectedRechargeAmount] = useState<number | null>(null);
   const [rechargeProof, setRechargeProof] = useState<File | null>(null);
   const [rechargeProofPreview, setRechargeProofPreview] = useState<string | null>(null);
+  const [rechargeQrImages, setRechargeQrImages] = useState<Record<number, string>>(() => getDefaultRechargeQrUrlMap());
+  /** 打开「扫码支付」弹窗时更新，用于 img 防缓存，与后台更换 QR 后浏览器仍拉新图 */
+  const [paymentQrCacheBust, setPaymentQrCacheBust] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [userPackages, setUserPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -706,6 +709,18 @@ const ProfilePage: React.FC = () => {
     if (savedUser) {
       try {
         const user = JSON.parse(savedUser);
+        if (user.user_type === 'merchant') {
+          localStorage.removeItem('ml-express-customer');
+          alert(
+            language === 'zh'
+              ? '商家账号请使用商家端网站登录。已退出本地会话。'
+              : language === 'en'
+                ? 'Please sign in on the merchant portal. Local session cleared.'
+                : 'ကုန်သည်ဘက်တွင် ဝင်ရောက်ပါ။ ဒေသဆိုင်ရာ အချိန်ကို ရှင်းလင်းပြီးပါပြီ။'
+          );
+          navigate('/');
+          return;
+        }
         setCurrentUser(user);
         setUserBalance(user.balance || 0); // 🚀 获取余额
         setIsGuest(false);
@@ -783,7 +798,7 @@ const ProfilePage: React.FC = () => {
       setIsGuest(true);
       navigate('/');
     }
-  }, [navigate, checkIfPartnerStore]);
+  }, [navigate, checkIfPartnerStore, language]);
 
   // 加载用户的包裹列表
   const loadUserPackages = useCallback(async () => {
@@ -831,6 +846,16 @@ const ProfilePage: React.FC = () => {
     setIsVisible(true);
     loadUserFromStorage();
   }, [loadUserFromStorage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRechargeQrUrlMap().then((map) => {
+      if (!cancelled) setRechargeQrImages(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 加载合伙店铺代收款统计
   const loadPartnerCODStats = useCallback(async () => {
@@ -1738,12 +1763,24 @@ const ProfilePage: React.FC = () => {
 
   // 🚀 新增：处理充值逻辑
   // 🚀 核心优化：充值流程
-  const handleOpenPaymentQR = () => {
-    const amount = parseFloat(rechargeAmount);
-    if (isNaN(amount) || amount <= 0) {
+  const handleOpenPaymentQR = async () => {
+    const parsed = parseFloat(rechargeAmount);
+    if (isNaN(parsed) || parsed <= 0) {
       alert(language === 'zh' ? '请输入有效的充值金额' : 'Please enter a valid amount');
       return;
     }
+    const amount = Math.round(parsed);
+    if (!RECHARGE_QR_AMOUNT_TIERS.includes(amount as (typeof RECHARGE_QR_AMOUNT_TIERS)[number])) {
+      alert(language === 'zh' ? '请选择列表中的充值档位' : 'Please pick a valid recharge amount');
+      return;
+    }
+    try {
+      const map = await fetchRechargeQrUrlMap();
+      setRechargeQrImages(map);
+    } catch (e) {
+      console.error('fetchRechargeQrUrlMap', e);
+    }
+    setPaymentQrCacheBust(Date.now());
     setSelectedRechargeAmount(amount);
     setShowRechargeModal(false);
     setShowPaymentQRModal(true);
@@ -1802,13 +1839,48 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const handleSaveQRCode = () => {
-    const link = document.createElement('a');
-    link.href = `/kbz_qr_${selectedRechargeAmount}.png`;
-    link.download = `kbz_qr_${selectedRechargeAmount}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const resolveRechargeQrBaseUrl = (amount: number | null) => {
+    if (amount == null || !Number.isFinite(amount)) return '';
+    const n = Math.round(amount);
+    const def = getDefaultRechargeQrUrlMap();
+    const map = rechargeQrImages as Record<number, string> & Record<string, string>;
+    const strKey = String(n);
+    return map[n] ?? map[strKey] ?? def[n] ?? (def as Record<string, string>)[strKey] ?? '';
+  };
+
+  const getPaymentQrSrc = (amount: number | null) => {
+    const raw = resolveRechargeQrBaseUrl(amount);
+    if (!raw) return '';
+    if (!paymentQrCacheBust) return raw;
+    const sep = raw.includes('?') ? '&' : '?';
+    return `${raw}${sep}_=${paymentQrCacheBust}`;
+  };
+
+  const handleSaveQRCode = async () => {
+    if (selectedRechargeAmount == null) return;
+    const url = resolveRechargeQrBaseUrl(selectedRechargeAmount);
+    if (!url) return;
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `kbz_qr_${selectedRechargeAmount}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `kbz_qr_${selectedRechargeAmount}.png`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   return (
@@ -5147,7 +5219,8 @@ const ProfilePage: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
               <div style={{ background: 'white', padding: '15px', borderRadius: '24px', position: 'relative', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
                 <img 
-                  src={`/kbz_qr_${selectedRechargeAmount}.png`} 
+                  key={getPaymentQrSrc(selectedRechargeAmount)}
+                  src={getPaymentQrSrc(selectedRechargeAmount)} 
                   alt="KBZPay QR" 
                   style={{ width: '220px', height: '220px', objectFit: 'contain' }}
                 />

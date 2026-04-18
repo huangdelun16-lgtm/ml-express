@@ -60,6 +60,7 @@ export interface Package {
   customer_name?: string; // 客户姓名
   cod_settled?: boolean; // 代收款是否已结清
   cod_settled_at?: string; // 代收款结清时间
+  pricing_base_fee_mmk?: number | null;
 }
 
 // 广告横幅接口
@@ -237,6 +238,9 @@ export const packageService = {
         if (error.message.includes('cod_amount')) {
           delete dataToInsert.cod_amount;
         }
+        if (error.message.includes('pricing_base_fee')) {
+          delete dataToInsert.pricing_base_fee_mmk;
+        }
         
         // 如果是通用错误，移除所有可能导致问题的可选字段
         if (error.code === 'PGRST204') {
@@ -246,6 +250,7 @@ export const packageService = {
           delete dataToInsert.delivery_store_id;
           delete dataToInsert.delivery_store_name;
           delete dataToInsert.cod_amount;
+          delete dataToInsert.pricing_base_fee_mmk;
         }
         
         // 重试插入
@@ -1012,24 +1017,19 @@ export const merchantService = {
     }
   },
 
-  /** 客户侧可见：已审核通过且在售（待审/已拒绝一律不可见） */
+  /** 客户侧可见：仅 listing_status=approved 且 is_available（同城商品/店铺页） */
   async getPublicStoreProducts(storeId: string): Promise<Product[]> {
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*')
         .eq('store_id', storeId)
+        .eq('is_available', true)
+        .eq('listing_status', 'approved')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      const rows = data || [];
-      return rows.filter((p) => {
-        if (!p.is_available) return false;
-        const ls = (p.listing_status ?? '').toString().trim();
-        if (ls === 'pending' || ls === 'rejected') return false;
-        if (ls === 'approved') return true;
-        return ls === '';
-      });
+      return data || [];
     } catch (error) {
       LoggerService.error('获取公开商店商品失败:', error);
       return [];
@@ -1137,15 +1137,12 @@ export const merchantService = {
         `)
         .ilike('name', `%${query}%`)
         .eq('is_available', true)
+        .eq('listing_status', 'approved')
         .limit(40);
 
       if (error) throw error;
       const rows = data || [];
-      return rows.filter((p: Product) => {
-        const ls = (p.listing_status ?? '').toString().trim();
-        if (ls === 'pending' || ls === 'rejected') return false;
-        return ls === 'approved' || ls === '';
-      }).slice(0, 20);
+      return rows.slice(0, 20);
     } catch (error: any) {
       LoggerService.error('搜索商品失败:', error?.message || '未知错误');
       return [];
@@ -1180,10 +1177,55 @@ export const merchantService = {
   }
 };
 
+/** Admin 仅保存「领区」键（如 pricing.mandalay.base_fee）时，无全局 pricing.base_fee 则回退该领区 */
+const DEFAULT_PRICING_REGION_FALLBACK = 'mandalay';
+
+function isGlobalPricingKey(settingsKey: string): boolean {
+  const parts = settingsKey.split('.');
+  return parts.length === 2 && parts[0] === 'pricing';
+}
+
+function pricingFieldToCamel(rawKey: string): string {
+  return rawKey.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
+}
+
+function parsePricingValue(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
+    return parsePricingValue((raw as { value: unknown }).value);
+  }
+  if (typeof raw === 'string') {
+    try {
+      const j = JSON.parse(raw);
+      return parsePricingValue(j);
+    } catch {
+      return parseFloat(raw) || 0;
+    }
+  }
+  return 0;
+}
+
 // 系统设置服务（客户端使用）
 export const systemSettingsService = {
-  // 获取计费规则
+  /**
+   * 获取计费规则（与 Admin「计费规则」一致）
+   * 合并顺序：默认值 → 全局 pricing.base_fee → 领区 pricing.{region}.* 覆盖
+   * （避免库中残留旧的全局起步价挡住 Admin 在领区里改过的价格）
+   */
   async getPricingSettings(region?: string) {
+    const defaults: Record<string, number> = {
+      baseFee: 1500,
+      perKmFee: 250,
+      weightSurcharge: 150,
+      urgentSurcharge: 500,
+      oversizeSurcharge: 300,
+      scheduledSurcharge: 200,
+      fragileSurcharge: 300,
+      foodBeverageSurcharge: 300,
+      freeKmThreshold: 3,
+      waySideCourierPerOrder: 0,
+    };
+
     try {
       const { data, error } = await supabase
         .from('system_settings')
@@ -1192,67 +1234,35 @@ export const systemSettingsService = {
 
       if (error) throw error;
 
-      // 默认全局计费
-      const settings: any = {
-        baseFee: 1500,
-        perKmFee: 250,
-        weightSurcharge: 150,
-        urgentSurcharge: 500,
-        oversizeSurcharge: 300,
-        scheduledSurcharge: 200,
-        fragileSurcharge: 300,
-        foodBeverageSurcharge: 300,
-        freeKmThreshold: 3,
+      const settings: any = { ...defaults };
+
+      const applyRegionPrefix = (prefix: string) => {
+        data?.forEach((item: any) => {
+          if (!item.settings_key.startsWith(prefix)) return;
+          const rawField = item.settings_key.slice(prefix.length);
+          const camelKey = pricingFieldToCamel(rawField);
+          settings[camelKey] = parsePricingValue(item.settings_value);
+        });
       };
 
       if (data && data.length > 0) {
-        // 如果指定了区域，优先寻找该区域的配置
-        if (region) {
-          const regionPrefix = `pricing.${region.toLowerCase()}.`;
-          const regionSettings = data.filter(item => item.settings_key.startsWith(regionPrefix));
-          
-          if (regionSettings.length > 0) {
-            regionSettings.forEach((item: any) => {
-              const key = item.settings_key.replace(regionPrefix, '');
-              const camelKey = key.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
-              let value = item.settings_value;
-              if (typeof value === 'string') {
-                try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-              }
-              settings[camelKey] = typeof value === 'number' ? value : parseFloat(value) || 0;
-            });
-            return settings;
-          }
-        }
-
-        // 应用全局默认设置（排除掉其他领区的设置）
         data.forEach((item: any) => {
-          if (!item.settings_key.match(/\.(mandalay|yangon|maymyo|naypyidaw|taunggyi|lashio|muse)\./)) {
-            const key = item.settings_key.replace('pricing.', '');
-            const camelKey = key.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
-            let value = item.settings_value;
-            if (typeof value === 'string') {
-              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-            }
-            settings[camelKey] = typeof value === 'number' ? value : parseFloat(value) || 0;
-          }
+          if (!isGlobalPricingKey(item.settings_key)) return;
+          const rawField = item.settings_key.replace('pricing.', '');
+          const camelKey = pricingFieldToCamel(rawField);
+          settings[camelKey] = parsePricingValue(item.settings_value);
         });
+
+        const regionalPrefix = region
+          ? `pricing.${region.toLowerCase()}.`
+          : `pricing.${DEFAULT_PRICING_REGION_FALLBACK}.`;
+        applyRegionPrefix(regionalPrefix);
       }
 
       return settings;
     } catch (error) {
       LoggerService.error('获取计费设置异常:', error);
-      return {
-        baseFee: 1500,
-        perKmFee: 250,
-        weightSurcharge: 150,
-        urgentSurcharge: 500,
-        oversizeSurcharge: 300,
-        scheduledSurcharge: 200,
-        fragileSurcharge: 300,
-        foodBeverageSurcharge: 300,
-        freeKmThreshold: 3
-      };
+      return { ...defaults };
     }
   }
 };
@@ -1461,4 +1471,53 @@ export const testConnection = async (): Promise<boolean> => {
     return false;
   }
 };
+
+/** 与 Admin 广告管理「余额充值 QR」、App 端共用 */
+export const CLIENT_RECHARGE_QR_SETTING_KEY = 'client.recharge_qr_urls';
+
+const RECHARGE_QR_PUBLIC_BASE = 'https://market-link-express.com';
+
+export const RECHARGE_QR_AMOUNT_TIERS = [10000, 50000, 100000, 300000, 500000, 1000000] as const;
+
+export function getDefaultRechargeQrUrlMap(): Record<number, string> {
+  return {
+    10000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_10000.png`,
+    50000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_50000.png`,
+    100000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_100000.png`,
+    300000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_300000.png`,
+    500000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_500000.png`,
+    1000000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_1000000.png`,
+  };
+}
+
+export async function fetchRechargeQrUrlMap(): Promise<Record<number, string>> {
+  const defaults = getDefaultRechargeQrUrlMap();
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('settings_value')
+      .eq('settings_key', CLIENT_RECHARGE_QR_SETTING_KEY)
+      .maybeSingle();
+    if (error || data == null) return { ...defaults };
+    let raw: unknown = data.settings_value;
+    if (typeof raw === 'string') {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        return { ...defaults };
+      }
+    }
+    if (!raw || typeof raw !== 'object') return { ...defaults };
+    const merged = { ...defaults };
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      const n = Number(k);
+      if (Number.isFinite(n) && typeof v === 'string' && v.trim()) {
+        merged[n] = v.trim();
+      }
+    }
+    return merged;
+  } catch {
+    return { ...defaults };
+  }
+}
 

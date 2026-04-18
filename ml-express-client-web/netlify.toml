@@ -1,7 +1,12 @@
-# 在 Netlify 站点设置中将「Base directory」设为 ml-express-client-web（本文件所在目录）。
-# 若从仓库根目录用单站点构建，请在 UI 中同样指定 Base directory，勿在下方重复写 base 子路径。
+# =============================================================================
+# 客户端 Web（C 端 market-link-express.com 等）
+# -----------------------------------------------------------------------------
+# Netlify：Base directory = ml-express-client-web（本文件所在目录）
+# 环境变量：REACT_APP_SUPABASE_*、REACT_APP_GOOGLE_MAPS_API_KEY 及 Functions 所需密钥
+# CLI（在本目录下且已 link 到对应站点）：npm run deploy:netlify
+# =============================================================================
 [build]
-  command = "npm install --legacy-peer-deps && npm run build"
+  command = "npm install --legacy-peer-deps && CI=false npm run build"
   publish = "build"
   functions = "netlify/functions"
 

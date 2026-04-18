@@ -32,8 +32,11 @@ interface OrderModalProps {
   calculatedDistanceDetail: number;
   pricingSettings: any;
   handleOpenMapModal: (type: 'sender' | 'receiver') => void;
-  calculatePriceEstimate: () => void;
   handleOrderSubmit: (e: React.FormEvent) => void;
+  selectedPackageType: string;
+  setSelectedPackageType: (v: string) => void;
+  orderWeight: string;
+  setOrderWeight: (v: string) => void;
   handleCancelOrder?: () => void; // 🚀 新增：取消订单处理
   // 🚀 优化：坐标自动选择相关
   setSelectedSenderLocation?: (loc: {lat: number, lng: number} | null) => void;
@@ -84,8 +87,11 @@ const OrderModal: React.FC<OrderModalProps> = ({
   calculatedDistanceDetail,
   pricingSettings,
   handleOpenMapModal,
-  calculatePriceEstimate,
   handleOrderSubmit,
+  selectedPackageType,
+  setSelectedPackageType,
+  orderWeight,
+  setOrderWeight,
   handleCancelOrder = () => setShowOrderForm(false),
   setSelectedSenderLocation = () => {},
   setSelectedReceiverLocation = () => {},
@@ -102,7 +108,6 @@ const OrderModal: React.FC<OrderModalProps> = ({
   setPaymentMethod = () => {},
   merchantStore = null
 }) => {
-  const [selectedPackageType, setSelectedPackageType] = useState('');
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
   const [showProductSelector, setShowProductSelector] = useState(false); // 🚀 新增：商品选择器显示状态
@@ -110,7 +115,6 @@ const OrderModal: React.FC<OrderModalProps> = ({
   if (!showOrderForm) return null;
 
   const packageTypes = [
-    { value: t.ui.waySide, label: t.ui.waySide, icon: '🌿', description: t.ui.packageTypeInfo.waySide },
     { value: t.ui.document, label: t.ui.document, icon: '📄', description: t.ui.packageTypeInfo.document },
     { value: t.ui.standardPackageDetail, label: t.ui.standardPackage, icon: '📦', description: t.ui.packageTypeInfo.standard },
     { value: t.ui.overweightPackageDetail, label: t.ui.overweightPackage, icon: '⚖️', description: t.ui.packageTypeInfo.overweight },
@@ -123,6 +127,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
     { value: t.ui.onTimeDelivery, label: t.ui.onTimeDelivery, icon: '🕒' },
     { value: t.ui.urgentDelivery, label: t.ui.urgentDelivery, icon: '⚡' },
     { value: t.ui.scheduledDelivery, label: t.ui.scheduledDelivery, icon: '📅' },
+    { value: 'Eco Way', label: t.ui.waySideDeliveryLabel, icon: '🌿' },
   ];
 
   return (
@@ -644,36 +649,43 @@ const OrderModal: React.FC<OrderModalProps> = ({
             <div style={{ position: 'relative', marginBottom: 'var(--spacing-2)' }}>
               <input type="hidden" name="packageType" value={selectedPackageType} required />
               <div
-                onClick={() => setShowPackageDropdown(!showPackageDropdown)}
+                onClick={() => {
+                  if (selectedDeliverySpeed === 'Eco Way') return;
+                  setShowPackageDropdown(!showPackageDropdown);
+                }}
                 style={{
                   width: '100%',
                   padding: 'var(--spacing-3) var(--spacing-4)',
                   border: '2px solid var(--color-border-dark)',
                   borderRadius: 'var(--radius-md)',
                   fontSize: 'var(--font-size-base)',
-                  background: 'rgba(255, 255, 255, 0.9)',
+                  background: selectedDeliverySpeed === 'Eco Way' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.9)',
                   backdropFilter: 'blur(5px)',
-                  cursor: 'pointer',
+                  cursor: selectedDeliverySpeed === 'Eco Way' ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  color: selectedPackageType ? 'var(--color-text-primary)' : 'rgba(0,0,0,0.4)',
+                  color: selectedDeliverySpeed === 'Eco Way' ? 'rgba(0,0,0,0.35)' : (selectedPackageType ? 'var(--color-text-primary)' : 'rgba(0,0,0,0.4)'),
                   fontWeight: 'var(--font-weight-medium)',
                   transition: 'all 0.3s'
                 }}
               >
                 <span>
-                  {selectedPackageType 
+                  {selectedDeliverySpeed === 'Eco Way'
+                    ? `🌿 ${t.ui.waySideDeliveryLabel}`
+                    : selectedPackageType 
                     ? packageTypes.find(p => p.value === selectedPackageType)?.icon + ' ' + packageTypes.find(p => p.value === selectedPackageType)?.label
                     : t.order.selectType}
                 </span>
+                {selectedDeliverySpeed !== 'Eco Way' && (
                 <span style={{ 
                   transform: showPackageDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.3s'
                 }}>▼</span>
+                )}
               </div>
 
-              {showPackageDropdown && (
+              {showPackageDropdown && selectedDeliverySpeed !== 'Eco Way' && (
                 <div style={{
                   position: 'absolute',
                   top: '105%',
@@ -694,14 +706,6 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       onClick={() => {
                         setSelectedPackageType(type.value);
                         setShowPackageDropdown(false);
-                        
-                        // 🚀 新增：如果是顺路递，清除速度选择并设置为默认
-                        if (type.value === t.ui.waySide) {
-                          setSelectedDeliverySpeed('Eco Way');
-                        } else if (selectedDeliverySpeed === 'Eco Way') {
-                          // 如果从顺路递切换回其他类型，重置速度
-                          setSelectedDeliverySpeed('');
-                        }
 
                         const isOversized = type.value === t.ui.oversizedPackageDetail || type.value === '超规件（45x60x15cm）以上';
                         const isOverweight = type.value === t.ui.overweightPackageDetail || type.value === '超重件（5KG）以上';
@@ -758,7 +762,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 lineHeight: '1.4'
               }}>
                 <span style={{ marginRight: '5px' }}>💡</span>
-                {packageTypes.find(p => p.value === selectedPackageType)?.description}
+                {selectedPackageType === t.ui.waySide
+                  ? t.ui.packageTypeInfo.waySide
+                  : packageTypes.find(p => p.value === selectedPackageType)?.description}
               </div>
             )}
             
@@ -770,6 +776,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 <input
                   type="number"
                   name="weight"
+                  value={orderWeight}
+                  onChange={(e) => setOrderWeight(e.target.value)}
                   placeholder="0.0"
                   step="0.1"
                   min="0"
@@ -885,40 +893,33 @@ const OrderModal: React.FC<OrderModalProps> = ({
             <div style={{ position: 'relative', marginBottom: 'var(--spacing-2)' }}>
               <input type="hidden" name="deliverySpeed" value={selectedDeliverySpeed} required />
               <div
-                onClick={() => {
-                  if (selectedPackageType === t.ui.waySide) return;
-                  setShowSpeedDropdown(!showSpeedDropdown);
-                }}
+                onClick={() => setShowSpeedDropdown(!showSpeedDropdown)}
                 style={{
                   width: '100%',
                   padding: 'var(--spacing-3) var(--spacing-4)',
                   border: '2px solid var(--color-border-dark)',
                   borderRadius: 'var(--radius-md)',
                   fontSize: 'var(--font-size-base)',
-                  background: selectedPackageType === t.ui.waySide ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.9)',
+                  background: 'rgba(255, 255, 255, 0.9)',
                   backdropFilter: 'blur(5px)',
-                  cursor: selectedPackageType === t.ui.waySide ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  color: selectedPackageType === t.ui.waySide ? 'rgba(0,0,0,0.3)' : (selectedDeliverySpeed ? 'var(--color-text-primary)' : 'rgba(0,0,0,0.4)'),
+                  color: selectedDeliverySpeed ? 'var(--color-text-primary)' : 'rgba(0,0,0,0.4)',
                   fontWeight: 'var(--font-weight-medium)',
                   transition: 'all 0.3s'
                 }}
               >
                 <span>
-                  {selectedPackageType === t.ui.waySide 
-                    ? (language === 'zh' ? '顺路送达 (不可选)' : language === 'en' ? 'Eco Way (Disabled)' : 'တန်တန်လေးပို့ (မရနိုင်ပါ)')
-                    : (selectedDeliverySpeed 
-                        ? deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.icon + ' ' + deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.label
-                        : t.ui.selectDeliverySpeed)}
+                  {selectedDeliverySpeed 
+                    ? deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.icon + ' ' + deliverySpeeds.find(s => s.value === selectedDeliverySpeed)?.label
+                    : t.ui.selectDeliverySpeed}
                 </span>
-                {selectedPackageType !== t.ui.waySide && (
-                  <span style={{ 
-                    transform: showSpeedDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.3s'
-                  }}>▼</span>
-                )}
+                <span style={{ 
+                  transform: showSpeedDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.3s'
+                }}>▼</span>
               </div>
 
               {showSpeedDropdown && (
@@ -937,7 +938,16 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     <div
                       key={speed.value}
                       onClick={() => {
-                        setSelectedDeliverySpeed(speed.value);
+                        if (speed.value === 'Eco Way') {
+                          setSelectedDeliverySpeed('Eco Way');
+                          setSelectedPackageType(t.ui.waySide);
+                          setShowWeightInput(false);
+                        } else {
+                          setSelectedDeliverySpeed(speed.value);
+                          if (selectedPackageType === t.ui.waySide) {
+                            setSelectedPackageType('');
+                          }
+                        }
                         setShowSpeedDropdown(false);
                         if (speed.value === t.ui.scheduledDelivery) {
                           setShowTimePickerModal(true);
@@ -1091,34 +1101,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
           {/* 💰 价格估算部分 */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ color: 'white', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>💰 {language === 'zh' ? '价格估算' : language === 'en' ? 'Price Estimate' : 'စျေးနှုန်းခန့်မှန်းခြင်း'}</span>
-              <button
-                type="button"
-                onClick={calculatePriceEstimate}
-                style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)';
-                }}
-              >
-                🧮 {language === 'zh' ? '计算' : language === 'en' ? 'Calculate' : 'တွက်ချက်ရန်'}
-              </button>
+            <h3 style={{ color: 'white', marginBottom: '1rem' }}>
+              💰 {language === 'zh' ? '价格估算' : language === 'en' ? 'Price Estimate' : 'စျေးနှုန်းခန့်မှန်းခြင်း'}
             </h3>
             
             <div style={{
@@ -1131,14 +1115,14 @@ const OrderModal: React.FC<OrderModalProps> = ({
               {!isCalculated ? (
                 <div style={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.8)' }}>
                   <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
-                    📊 {language === 'zh' ? '点击"计算"按钮获取精准费用' : 
-                        language === 'en' ? 'Click "Calculate" button to get accurate pricing' : 
-                        'တိကျသော စျေးနှုန်းရရှိရန် "တွက်ချက်ရန်" ခလုတ်ကို နှိပ်ပါ'}
+                    📊 {language === 'zh' ? '填写地址、包裹与配送选项后将自动显示费用' :
+                        language === 'en' ? 'Fee updates automatically when address, package and delivery are set' :
+                        'လိပ်စာ၊ ပါဆယ်နှင့် ပို့ဆောင်ရွေးချယ်မှု ပြီးပါက အလိုအလျောက် ပြသပါမည်'}
                   </div>
                   <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>
-                    {language === 'zh' ? '需要先填写寄件和收件地址' : 
-                     language === 'en' ? 'Please fill in sender and receiver addresses first' : 
-                     'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ဦးစွာ ဖြည့်စွက်ပါ'}
+                    {language === 'zh' ? '超重/超规件请填写重量；建议在地图上选择地址以精准计费' :
+                     language === 'en' ? 'Enter weight for overweight/oversized items; map pick is recommended for accuracy' :
+                     'အလေးချိန်ပိုပါဆယ် သို့မဟုတ် အရွယ်ပိုပါဆယ်အတွက် အလေးချိန်ကို ဖြည့်ပါ၊ တိကျစေရန် မြေပုံမှ ရွေးချယ်ရန် အကြံပြုပါသည်'}
                   </div>
                 </div>
               ) : (
@@ -1178,9 +1162,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         </span>
                         <span style={{ color: '#ef4444', fontWeight: '600' }}>
                           {(() => {
-                            const form = document.querySelector('form') as HTMLFormElement;
-                            const weight = form ? (new FormData(form).get('weight') as string) : '0';
-                            const weightNum = parseFloat(weight) || 0;
+                            const weightNum = parseFloat(orderWeight) || 0;
                             const weightThreshold = 5;
                             const isOverweight = selectedPackageType === t.ui.overweightPackageDetail || selectedPackageType === '超重件（5KG）以上';
                             return Math.round((isOverweight && weightNum > weightThreshold) ? (weightNum - weightThreshold) * pricingSettings.weightSurcharge : 0);

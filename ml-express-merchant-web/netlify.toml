@@ -1,5 +1,12 @@
+# =============================================================================
+# 商家端 Web（mlexpress.merchants.com 等）
+# -----------------------------------------------------------------------------
+# Netlify：Base directory = ml-express-merchant-web
+# 环境变量：REACT_APP_SUPABASE_*、REACT_APP_GOOGLE_MAPS_API_KEY 及 netlify/functions 密钥
+# CLI（在本目录下）：npm run deploy:netlify（若 package.json 中已配置 site id）
+# =============================================================================
 [build]
-  command = "npm install --legacy-peer-deps && npm run build"
+  command = "npm install --legacy-peer-deps && CI=false npm run build"
   publish = "build"
   functions = "netlify/functions"
 

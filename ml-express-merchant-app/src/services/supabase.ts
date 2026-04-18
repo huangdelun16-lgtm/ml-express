@@ -106,6 +106,7 @@ export interface Package {
   payment_method?: "qr" | "cash"; // 支付方式：qr=二维码支付，cash=现金支付
   cod_amount?: number; // 代收款金额
   delivery_store_id?: string; // 🚀 新增：配送店ID
+  pricing_base_fee_mmk?: number | null;
 }
 
 // 商店评价接口
@@ -953,6 +954,11 @@ export const packageService = {
         courier: "待分配",
         payment_method: packageData.payment_method || "cash", // 添加支付方式
         cod_amount: packageData.cod_amount || 0, // 添加代收款
+        pricing_base_fee_mmk:
+          packageData.pricing_base_fee_mmk != null &&
+          !Number.isNaN(Number(packageData.pricing_base_fee_mmk))
+            ? Number(packageData.pricing_base_fee_mmk)
+            : null,
       };
 
       // 如果提供了自定义ID，使用它
@@ -1165,7 +1171,12 @@ export const packageService = {
             data?.filter((p) =>
               ["待确认", "待取件", "待收款"].includes(p.status),
             ).length || 0,
+          pendingConfirm:
+            data?.filter((p) => p.status === "待确认").length || 0,
+          awaitingPickup:
+            data?.filter((p) => p.status === "待取件").length || 0,
           processing: data?.filter((p) => p.status === "打包中").length || 0,
+          delivering: data?.filter((p) => p.status === "配送中").length || 0,
           inTransit:
             data?.filter((p) => ["已取件", "配送中"].includes(p.status))
               .length || 0,
@@ -1204,6 +1215,10 @@ export const packageService = {
       return {
         total: 0,
         pending: 0,
+        pendingConfirm: 0,
+        awaitingPickup: 0,
+        processing: 0,
+        delivering: 0,
         inTransit: 0,
         delivered: 0,
         cancelled: 0,
@@ -1213,7 +1228,7 @@ export const packageService = {
     }
   },
 
-  // 获取营收统计（今日 vs 昨日）
+  // 营收：今日/昨日「已送达」订单量；全量已送达金额汇总（总营收）
   async getRevenueStats(userId: string, storeName?: string) {
     try {
       const today = new Date();
@@ -1221,36 +1236,56 @@ export const packageService = {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
 
-      const runQuery = async (startDate: Date, endDate: Date) => {
+      const buildQuery = (startDate?: Date, endDate?: Date) => {
         let query = supabase
           .from("packages")
           .select("price")
-          .eq("status", "已送达")
-          .gte("created_at", startDate.toISOString())
-          .lt("created_at", endDate.toISOString());
-
+          .eq("status", "已送达");
         const conditions = [`delivery_store_id.eq.${userId}`];
         if (storeName) conditions.push(`sender_name.eq.${storeName}`);
         query = query.or(conditions.join(","));
+        if (startDate) {
+          query = query.gte("created_at", startDate.toISOString());
+        }
+        if (endDate) {
+          query = query.lt("created_at", endDate.toISOString());
+        }
+        return query;
+      };
 
-        const { data, error } = await query;
-        if (error) throw error;
-
-        return (data || []).reduce((sum, p) => {
+      const sumAndCount = (data: { price?: string }[] | null) => {
+        const rows = data || [];
+        const revenue = rows.reduce((sum, p) => {
           const val = parseFloat(p.price?.replace(/[^0-9.]/g, "") || "0");
           return sum + val;
         }, 0);
+        return { revenue, count: rows.length };
       };
 
-      const [todayRevenue, yesterdayRevenue] = await Promise.all([
-        runQuery(today, new Date()),
-        runQuery(yesterday, today),
+      const fetchStats = async (start?: Date, end?: Date) => {
+        const { data, error } = await buildQuery(start, end);
+        if (error) throw error;
+        return sumAndCount(data);
+      };
+
+      const [todayRes, yesterdayRes, allDelivered] = await Promise.all([
+        fetchStats(today, new Date()),
+        fetchStats(yesterday, today),
+        fetchStats(),
       ]);
 
-      return { todayRevenue, yesterdayRevenue };
+      return {
+        todayOrderCount: todayRes.count,
+        yesterdayOrderCount: yesterdayRes.count,
+        totalRevenue: allDelivered.revenue,
+      };
     } catch (error) {
       LoggerService.error("获取营收统计失败:", error);
-      return { todayRevenue: 0, yesterdayRevenue: 0 };
+      return {
+        todayOrderCount: 0,
+        yesterdayOrderCount: 0,
+        totalRevenue: 0,
+      };
     }
   },
 
@@ -1734,6 +1769,7 @@ export const systemSettingsService = {
             fragile_surcharge: 300,
             food_beverage_surcharge: 300,
             free_km_threshold: 3,
+            way_side_courier_per_order: 0,
           };
 
           // 如果指定了区域，尝试寻找该区域的配置
@@ -1809,6 +1845,7 @@ export const systemSettingsService = {
         fragile_surcharge: 300,
         food_beverage_surcharge: 300,
         free_km_threshold: 3,
+        way_side_courier_per_order: 0,
       };
     });
   },

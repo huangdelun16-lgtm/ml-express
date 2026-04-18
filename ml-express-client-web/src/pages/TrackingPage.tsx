@@ -64,9 +64,9 @@ const TrackingPage: React.FC = () => {
         currentUser.email,
         currentUser.phone,
         undefined,
-        currentUser.user_type === 'merchant' ? (currentUser.store_id || currentUser.id) : undefined,
+        undefined,
         currentUser.id,
-        currentUser.user_type === 'merchant' ? currentUser.name : undefined
+        undefined
       );
 
       const excludedStatuses = [...TERMINAL_EXCLUDED_STATUSES];

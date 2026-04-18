@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { packageService, supabase, userService, testConnection, systemSettingsService, merchantService, tutorialService, Tutorial } from '../services/supabase';
+import { packageService, supabase, userService, testConnection, systemSettingsService, tutorialService, Tutorial } from '../services/supabase';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
@@ -81,7 +81,6 @@ const HomePage: React.FC = () => {
   const [isFromCart, setIsFromCart] = useState(false);
   const [cartTotal, setCartTotal] = useState(0);
   const [hasCOD, setHasCOD] = useState(true);
-  const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
   const isFromCartRef = React.useRef(false); // 🚀 新增：使用 ref 确保在异步闭包中能获取最新值
 
   const navigate = useNavigate();
@@ -282,6 +281,8 @@ const HomePage: React.FC = () => {
   const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState<string>('');
   const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState<string>('');
   const [showWeightInput, setShowWeightInput] = useState<boolean>(false);
+  const [selectedPackageType, setSelectedPackageType] = useState('');
+  const [orderWeight, setOrderWeight] = useState('');
   const [isCalculated, setIsCalculated] = useState(false);
   const [calculatedPriceDetail, setCalculatedPriceDetail] = useState<number>(0);
   const [calculatedDistanceDetail, setCalculatedDistanceDetail] = useState<number>(0);
@@ -374,25 +375,6 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 🚀 新增：当商家打开下单窗口时，自动加载其商品
-  useEffect(() => {
-    if (showOrderForm && currentUser?.user_type === 'merchant' && !isFromCart) {
-      const loadMerchantProducts = async () => {
-        try {
-          const storeId = currentUser.store_id || currentUser.id;
-          console.log('正在加载商家商品，storeId:', storeId);
-          const products = await merchantService.getPublicStoreProducts(storeId);
-          // 仅显示上架的商品（已通过审核且在售）
-          setMerchantProducts(products.filter(p => p.is_available));
-          console.log(`✅ 已加载商家商品: ${products.length} 个`);
-        } catch (error) {
-          console.error('加载商家商品失败:', error);
-        }
-      };
-      loadMerchantProducts();
-    }
-  }, [showOrderForm, currentUser, isFromCart]);
-
   // 当打开订单表单且用户已登录时，自动填充信息
   useEffect(() => {
     if (showOrderForm && currentUser) {
@@ -423,43 +405,23 @@ const HomePage: React.FC = () => {
   }, [countdown]);
 
 
-  // 从本地存储加载用户信息
+  // 从本地存储加载用户信息（客户端仅会员；商家会话由 App 层统一清除）
   const loadUserFromStorage = () => {
     const savedUser = localStorage.getItem('ml-express-customer');
     if (savedUser) {
       try {
-        setCurrentUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser) as { user_type?: string };
+        if (parsed.user_type === 'merchant') {
+          localStorage.removeItem('ml-express-customer');
+          setCurrentUser(null);
+          return;
+        }
+        setCurrentUser(parsed);
       } catch (error) {
         console.error('加载用户信息失败:', error);
       }
     }
   };
-
-  // 加载合伙店铺信息（当currentUser变化时）
-  useEffect(() => {
-    if (currentUser?.user_type === 'merchant') {
-      const loadMerchantStore = async () => {
-        try {
-          const { data: store } = await supabase
-            .from('delivery_stores')
-            .select('*')
-            .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
-            .limit(1)
-            .maybeSingle();
-          
-          if (store) {
-            console.log('✅ 已加载合伙店铺信息:', store.store_name);
-            setMerchantStore(store);
-          }
-        } catch (error) {
-          console.error('加载合伙店铺失败:', error);
-        }
-      };
-      loadMerchantStore();
-    } else {
-      setMerchantStore(null);
-    }
-  }, [currentUser]);
 
   // 加载价格配置（从系统设置中心获取计费规则）
   const loadPricingSettings = async (region?: string) => {
@@ -528,6 +490,33 @@ const HomePage: React.FC = () => {
 
     detectAndLoadPricing();
   }, [senderAddressText]);
+
+  // 打开「立即下单」时重新拉取计费规则，避免 Admin 已改价但页面仍用旧缓存
+  useEffect(() => {
+    if (!showOrderForm) return;
+    const address = senderAddressText;
+    if (!address) {
+      loadPricingSettings();
+      return;
+    }
+    const regionMap: { [key: string]: string } = {
+      '曼德勒': 'mandalay', 'Mandalay': 'mandalay', 'မန္တလေး': 'mandalay',
+      '彬乌伦': 'maymyo', 'Pyin Oo Lwin': 'maymyo', 'ပင်းတလဲ': 'maymyo',
+      '仰光': 'yangon', 'Yangon': 'yangon', 'ရန်ကုန်': 'yangon',
+      '内比都': 'naypyidaw', 'NPW': 'naypyidaw', 'နေပြည်တော်': 'naypyidaw',
+      '东枝': 'taunggyi', 'TGI': 'taunggyi', 'တောင်ကြီး': 'taunggyi',
+      '腊戌': 'lashio', 'Lashio': 'lashio', 'လားရှိုး': 'lashio',
+      '木姐': 'muse', 'Muse': 'muse', 'မူဆယ်': 'muse'
+    };
+    let detectedRegion = '';
+    for (const [city, regionId] of Object.entries(regionMap)) {
+      if (address.includes(city)) {
+        detectedRegion = regionId;
+        break;
+      }
+    }
+    loadPricingSettings(detectedRegion || undefined);
+  }, [showOrderForm, senderAddressText]);
 
   // 处理"立即下单"按钮点击
   const handleOrderButtonClick = () => {
@@ -676,9 +665,16 @@ const HomePage: React.FC = () => {
           return;
         }
         
-        // 检查用户类型，如果不是客户类型，给出提示（但不阻止登录，兼容旧数据）
-        if (existingUser.user_type && existingUser.user_type !== 'customer') {
-          console.warn('用户类型不匹配:', existingUser.user_type, '但允许登录（兼容模式）');
+        // 商家账号请使用商家端 Web，不在客户端登录
+        if (existingUser.user_type === 'merchant') {
+          alert(
+            language === 'zh'
+              ? '商家账号请使用商家端网站登录与管理。客户端仅支持会员账号。'
+              : language === 'en'
+                ? 'Merchant accounts must sign in on the merchant portal. This site is for customers only.'
+                : 'ကုန်သည်အကောင့်များကို ကုန်သည်ဘက်တွင် ဝင်ရောက်ပါ။ ဤဆိုဒ်သည် ဖောက်သည်များအတွက်သာ ဖြစ်သည်။'
+          );
+          return;
         }
 
         // 验证密码
@@ -953,34 +949,6 @@ const HomePage: React.FC = () => {
   // 打开地图模态框时自动定位
   const handleOpenMapModal = async (type: 'sender' | 'receiver') => {
     setMapSelectionType(type);
-    
-    // 如果是 merchant 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
-    if (currentUser?.user_type === 'merchant' && type === 'sender' && merchantStore) {
-        console.log('📍 MERCHANTS账号，自动锁定店铺位置:', merchantStore.store_name);
-        
-        // 设置地图中心和选中位置
-        setMapCenter({ lat: merchantStore.latitude, lng: merchantStore.longitude });
-        setSelectedLocation({
-            lat: merchantStore.latitude,
-            lng: merchantStore.longitude,
-            address: merchantStore.address
-        });
-        
-        // 根据店铺位置自动切换到对应城市
-        const detectedCity = detectCityFromLocation(merchantStore.latitude, merchantStore.longitude);
-        setSelectedCity(detectedCity);
-        
-        // 自动填充地址输入框（如果存在）
-        setTimeout(() => {
-          const addressInput = document.getElementById('map-address-input') as HTMLInputElement;
-          if (addressInput) {
-            addressInput.value = merchantStore.address;
-          }
-        }, 100);
-
-        setShowMapModal(true);
-        return; // 跳过后续的自动定位逻辑
-    }
     
     // 尝试获取用户位置
     if (navigator.geolocation) {
@@ -1284,13 +1252,15 @@ const HomePage: React.FC = () => {
   };
 
   // 计算两个地址之间的距离（使用Google Maps Distance Matrix API）
-  const calculateDistance = async (origin: string, destination: string): Promise<number> => {
+  const calculateDistance = async (origin: string, destination: string, silent = false): Promise<number> => {
     console.log('开始计算距离:', { origin, destination });
     
     try {
       if (!window.google || !window.google.maps) {
         console.warn('⚠️ Google Maps API未加载，使用默认距离 5km');
-        alert(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n使用默认距离: 5 km`);
+        if (!silent) {
+          alert(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n使用默认距离: 5 km`);
+        }
         return 5;
       }
 
@@ -1330,7 +1300,9 @@ const HomePage: React.FC = () => {
                 resolve(distanceInKm);
               } else if (element?.status === 'ZERO_RESULTS') {
                 console.warn('⚠️ 无法找到路线，使用默认距离');
-                alert((language === 'zh' ? '无法计算两地之间的距离，可能地址不够详细' : language === 'en' ? 'Unable to calculate distance between two locations, address may be insufficient' : 'နေရာနှစ်ခုကြားအကွာအဝေးကို တွက်ချက်နိုင်ခြင်းမရှိပါ၊ လိပ်စာမလုံလောက်နိုင်သည်') + '\n' + (language === 'zh' ? '使用默认距离: 5 km' : language === 'en' ? 'Using default distance: 5 km' : 'ပုံမှန်အကွာအဝေး: 5 km'));
+                if (!silent) {
+                  alert((language === 'zh' ? '无法计算两地之间的距离，可能地址不够详细' : language === 'en' ? 'Unable to calculate distance between two locations, address may be insufficient' : 'နေရာနှစ်ခုကြားအကွာအဝေးကို တွက်ချက်နိုင်ခြင်းမရှိပါ၊ လိပ်စာမလုံလောက်နိုင်သည်') + '\n' + (language === 'zh' ? '使用默认距离: 5 km' : language === 'en' ? 'Using default distance: 5 km' : 'ပုံမှန်အကွာအဝေး: 5 km'));
+                }
                 resolve(5);
               } else {
                 console.warn('⚠️ 距离计算状态异常:', element?.status);
@@ -1338,11 +1310,15 @@ const HomePage: React.FC = () => {
               }
             } else if (status === 'OVER_QUERY_LIMIT') {
               console.error('❌ Google Maps API 查询限额已达上限');
-              alert(language === 'zh' ? '系统繁忙，使用默认距离: 5 km' : language === 'en' ? 'System busy, using default distance: 5 km' : 'စနစ်မှာ အလုပ်များနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
+              if (!silent) {
+                alert(language === 'zh' ? '系统繁忙，使用默认距离: 5 km' : language === 'en' ? 'System busy, using default distance: 5 km' : 'စနစ်မှာ အလုပ်များနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
+              }
               resolve(5);
             } else if (status === 'REQUEST_DENIED') {
               console.error('❌ Google Maps API 请求被拒绝，可能是 API Key 问题');
-              alert(language === 'zh' ? '地图服务配置错误，使用默认距离: 5 km' : language === 'en' ? 'Map service configuration error, using default distance: 5 km' : 'မြေပုံဝန်ဆောင်မှု ကွန်ဖီဂူရေးရှင်းမှားနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
+              if (!silent) {
+                alert(language === 'zh' ? '地图服务配置错误，使用默认距离: 5 km' : language === 'en' ? 'Map service configuration error, using default distance: 5 km' : 'မြေပုံဝန်ဆောင်မှု ကွန်ဖီဂူရေးရှင်းမှားနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
+              }
               resolve(5);
             } else {
               console.warn('⚠️ 距离计算失败，状态:', status);
@@ -1354,7 +1330,9 @@ const HomePage: React.FC = () => {
     } catch (error) {
       console.error('❌ 距离计算异常:', error);
       const errorMsg = error instanceof Error ? error.message : '未知错误';
-      alert(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n${errorMsg}\n使用默认距离: 5 km`);
+      if (!silent) {
+        alert(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n${errorMsg}\n使用默认距离: 5 km`);
+      }
       return 5;
     }
   };
@@ -1416,6 +1394,9 @@ const HomePage: React.FC = () => {
     setSelectedReceiverLocation(null);
     setScheduledDeliveryTime('');
     setSelectedDeliverySpeed('');
+    setSelectedPackageType('');
+    setOrderWeight('');
+    setShowWeightInput(false);
     setOrderConfirmationStatus('idle');
     setOrderConfirmationMessage('');
     setQrCodeDataUrl('');
@@ -1435,31 +1416,51 @@ const HomePage: React.FC = () => {
     return R * c;
   };
 
-  // 预估费用计算函数（类似客户端App）
-  const calculatePriceEstimate = async () => {
+  // 预估费用计算函数（类似客户端App）；silent 用于自动结算，不弹窗打扰
+  const calculatePriceEstimate = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
-      // 获取表单数据
-      const form = document.querySelector('form') as HTMLFormElement;
-      if (!form) return;
-      
-      const formData = new FormData(form);
+      const effectivePackageType =
+        selectedDeliverySpeed === 'Eco Way' ? t.ui.waySide : selectedPackageType;
+      const needsWeightForEstimate =
+        showWeightInput &&
+        (selectedPackageType === t.ui.overweightPackageDetail ||
+          selectedPackageType === '超重件（5KG）以上' ||
+          selectedPackageType === t.ui.oversizedPackageDetail ||
+          selectedPackageType === '超规件（45x60x15cm）以上' ||
+          selectedPackageType === '中转包裹');
+
+      const readyForEstimate =
+        !!senderAddressText?.trim() &&
+        !!receiverAddressText?.trim() &&
+        !!selectedDeliverySpeed &&
+        (selectedDeliverySpeed === 'Eco Way' ? true : !!selectedPackageType) &&
+        (!needsWeightForEstimate || !!orderWeight?.trim());
+
+      if (!readyForEstimate) {
+        if (silent) {
+          setIsCalculated(false);
+          setCalculatedPriceDetail(0);
+          setCalculatedDistanceDetail(0);
+        }
+        return;
+      }
+
       const orderInfo = {
-        packageType: formData.get('packageType') as string,
-        weight: formData.get('weight') as string,
-        deliverySpeed: formData.get('deliverySpeed') as string,
+        packageType: effectivePackageType,
+        weight: orderWeight,
+        deliverySpeed: selectedDeliverySpeed,
       };
 
-      // 检查坐标信息（优先使用地图选择的精确坐标）
       let distance = 0;
-      
-      // 🚀 优化：从地址文本中尝试提取坐标（如果 state 为空但文本里有）
+
       let senderLat = selectedSenderLocation?.lat;
       let senderLng = selectedSenderLocation?.lng;
       let receiverLat = selectedReceiverLocation?.lat;
       let receiverLng = selectedReceiverLocation?.lng;
 
-      const senderAddressTextValue = formData.get('senderName') ? senderAddressText : (formData.get('senderAddress') as string);
-      const receiverAddressTextValue = formData.get('receiverAddress') as string;
+      const senderAddressTextValue = senderAddressText;
+      const receiverAddressTextValue = receiverAddressText;
 
       if (!senderLat || !senderLng) {
         const match = senderAddressTextValue?.match(/📍 坐标: (-?\d+\.\d+), (-?\d+\.\d+)/);
@@ -1480,87 +1481,86 @@ const HomePage: React.FC = () => {
         console.log('📍 使用精确坐标计算距离:', { sender: { lat: senderLat, lng: senderLng }, receiver: { lat: receiverLat, lng: receiverLng } });
         distance = calculateDistanceKm(senderLat, senderLng, receiverLat, receiverLng);
       } else {
-        // 如果没有坐标，尝试使用地址字符串计算（备用方案）
         if (!senderAddressTextValue || !receiverAddressTextValue) {
-          alert(language === 'zh' ? '请先选择寄件和收件地址（建议从地图选择以获得精准费用）' : 
-                language === 'en' ? 'Please select sender and receiver addresses (Map selection recommended for accurate pricing)' : 
-                'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ရွေးချယ်ပါ (တိကျသောစျေးနှုန်းအတွက် မြေပုံမှရွေးချယ်ရန် အကြံပြုပါသည်)');
+          if (!silent) {
+            alert(language === 'zh' ? '请先选择寄件和收件地址（建议从地图选择以获得精准费用）' :
+                  language === 'en' ? 'Please select sender and receiver addresses (Map selection recommended for accurate pricing)' :
+                  'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ရွေးချယ်ပါ (တိကျသောစျေးနှုန်းအတွက် မြေပုံမှရွေးချယ်ရန် အကြံပြုပါသည်)');
+          }
           return;
         }
 
-        // 清理地址文本中的坐标信息，防止 Google API 识别失败
         const cleanSenderAddr = senderAddressTextValue.split('\n').filter(l => !l.includes('📍 坐标:')).join(' ').trim();
         const cleanReceiverAddr = receiverAddressTextValue.split('\n').filter(l => !l.includes('📍 坐标:')).join(' ').trim();
 
         console.log('📝 无坐标，尝试使用清理后的地址文本计算距离:', { cleanSenderAddr, cleanReceiverAddr });
-        distance = await calculateDistance(cleanSenderAddr, cleanReceiverAddr);
+        distance = await calculateDistance(cleanSenderAddr, cleanReceiverAddr, silent);
       }
-      
-      // 按照要求：用于给客户计费的距离向上取整（例如 6.1km = 7km）
+
       const roundedDistanceForBilling = Math.max(1, Math.ceil(distance));
-      
-      // 🚀 核心修改：如果是“顺路递”，强制将显示距离设为 0 (或保持原样但说明不计费)
+
       const isWaySide = orderInfo.packageType === t.ui.waySide;
       setCalculatedDistanceDetail(isWaySide ? 0 : roundedDistanceForBilling);
-      
-      // 计算价格
+
       const priceValue = calculatePrice(
         orderInfo.packageType,
         orderInfo.weight,
         orderInfo.deliverySpeed,
         roundedDistanceForBilling
       );
-      
+
       setCalculatedPriceDetail(priceValue);
       setIsCalculated(true);
-      
-      // 显示计算结果
-      let resultMsg = '';
-      if (isWaySide) {
-        resultMsg = language === 'zh' ? 
-          `计算完成！\n配送类型: 顺路递 (24小时内送达)\n总费用: ${priceValue} MMK` :
-          language === 'en' ? 
-          `Calculation Complete!\nType: Eco Way (24h Delivery)\nTotal Cost: ${priceValue} MMK` :
-          'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nအမျိုးအစား: တန်တန်လေးပို့ (၂၄ နာရီအတွင်း)\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK';
-      } else {
-        resultMsg = language === 'zh' ? 
-          `计算完成！\n配送距离: ${roundedDistanceForBilling}km\n总费用: ${priceValue} MMK` :
-          language === 'en' ? 
-          `Calculation Complete!\nDelivery Distance: ${roundedDistanceForBilling}km\nTotal Cost: ${priceValue} MMK` :
-          'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + roundedDistanceForBilling + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK';
+
+      if (!silent) {
+        let resultMsg = '';
+        if (isWaySide) {
+          resultMsg = language === 'zh' ?
+            `计算完成！\n配送类型: ${t.ui.waySideDeliveryOption}\n总费用: ${priceValue} MMK` :
+            language === 'en' ?
+            `Calculation Complete!\nType: Eco Way (24h Delivery)\nTotal Cost: ${priceValue} MMK` :
+            'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nအမျိုးအစား: တန်တန်လေးပို့ (၂၄ နာရီအတွင်း)\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK';
+        } else {
+          resultMsg = language === 'zh' ?
+            `计算完成！\n配送距离: ${roundedDistanceForBilling}km\n总费用: ${priceValue} MMK` :
+            language === 'en' ?
+            `Calculation Complete!\nDelivery Distance: ${roundedDistanceForBilling}km\nTotal Cost: ${priceValue} MMK` :
+            'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + roundedDistanceForBilling + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK';
+        }
+        alert(resultMsg);
       }
-      
-      alert(resultMsg);
-      
     } catch (error) {
       console.error('计算费用失败:', error);
-      alert(language === 'zh' ? '计算失败，请重试' : 
-            language === 'en' ? 'Calculation failed, please try again' : 
-            'တွက်ချက်မှု မအောင်မြင်ပါ၊ ပြန်လည်ကြိုးစားပါ');
+      if (!silent) {
+        alert(language === 'zh' ? '计算失败，请重试' :
+              language === 'en' ? 'Calculation failed, please try again' :
+              'တွက်ချက်မှု မအောင်မြင်ပါ၊ ပြန်လည်ကြိုးစားပါ');
+      }
     }
   };
 
-  // 🚀 新增：处理商品数量变化
-  const handleProductQuantityChange = (productId: string, delta: number) => {
-    setSelectedProducts(prev => {
-      const newQty = Math.max(0, (prev[productId] || 0) + delta);
-      const newSelected = { ...prev };
-      if (newQty === 0) {
-        delete newSelected[productId];
-      } else {
-        newSelected[productId] = newQty;
-      }
-      
-      // 更新总价
-      const newTotal = Object.entries(newSelected).reduce((sum, [id, qty]) => {
-        const product = merchantProducts.find(p => p.id === id);
-        return sum + (product ? product.price * qty : 0);
-      }, 0);
-      setCartTotal(newTotal);
-      
-      return newSelected;
-    });
-  };
+  const calculatePriceEstimateRef = useRef(calculatePriceEstimate);
+  calculatePriceEstimateRef.current = calculatePriceEstimate;
+
+  useEffect(() => {
+    if (!showOrderForm) return;
+    const timer = window.setTimeout(() => {
+      void calculatePriceEstimateRef.current({ silent: true });
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [
+    showOrderForm,
+    selectedSenderLocation,
+    selectedReceiverLocation,
+    senderAddressText,
+    receiverAddressText,
+    selectedDeliverySpeed,
+    selectedPackageType,
+    orderWeight,
+    showWeightInput,
+    scheduledDeliveryTime,
+    pricingSettings,
+  ]);
 
   const handleCancelOrder = () => {
     setShowOrderForm(false);
@@ -1605,34 +1605,6 @@ const HomePage: React.FC = () => {
       return;
     }
 
-    // 如果是 MERCHANTS 账号，强制使用店铺信息（地址和经纬度）
-    if (currentUser?.user_type === 'merchant') {
-      try {
-        console.log('正在查找商家店铺信息...', currentUser);
-        // 尝试通过多种方式匹配店铺（优先匹配 store_code，即 name）
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { data: store } = await supabase
-          .from('delivery_stores')
-          .select('*')
-          .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
-          .limit(1)
-          .maybeSingle();
-
-        if (store) {
-          console.log('找到商家店铺，强制使用店铺坐标:', store.store_name);
-          // 覆盖 orderInfo 中的寄件经纬度
-          orderInfo.senderLatitude = store.latitude;
-          orderInfo.senderLongitude = store.longitude;
-          // 更新状态，确保后续逻辑（如距离计算）使用新坐标
-          setSelectedSenderLocation({ lat: store.latitude, lng: store.longitude });
-        } else {
-          console.warn('未找到关联的合伙店铺');
-        }
-      } catch (err) {
-        console.error('查找商家店铺异常:', err);
-      }
-    }
-    
     // 根据包裹类型决定是否需要重量
     const needWeight = orderInfo.packageType === t.ui.overweightPackageDetail || 
                       orderInfo.packageType === t.ui.oversizedPackageDetail ||
@@ -1698,12 +1670,12 @@ const HomePage: React.FC = () => {
 
       // 4. 余额扣款逻辑 (仅限会员/VIP，且针对商城订单)
       let totalDeduction = 0;
-      if (isFromCart && cartTotal > 0 && currentUser?.user_type !== 'merchant') {
+      if (isFromCart && cartTotal > 0) {
         totalDeduction += cartTotal;
       }
 
       // 如果跑腿费也选择余额支付
-      if (paymentMethod === 'balance' && currentUser?.user_type !== 'merchant') {
+      if (paymentMethod === 'balance') {
         totalDeduction += finalPrice;
       }
 
@@ -1743,11 +1715,10 @@ const HomePage: React.FC = () => {
       // 5. 身份标记与描述准备
       let ordererTypeTag = '';
       if (currentUser) {
-        const type = currentUser.user_type === 'merchant' ? '商家' : 
-                    ((currentUser.balance > 0 || currentUser.user_type === 'vip') ? 'VIP' : '会员');
+        const type = (currentUser.balance > 0 || currentUser.user_type === 'vip') ? 'VIP' : '会员';
         const zhTag = `[下单身份: ${type}]`;
-        const enTag = `[Orderer: ${type === '商家' ? 'MERCHANTS' : (type === 'VIP' ? 'VIP' : 'Member')}]`;
-        const myTag = `[အော်ဒါတင်သူ: ${type === '商家' ? 'MERCHANTS' : (type === 'VIP' ? 'VIP' : 'Member')}]`;
+        const enTag = `[Orderer: ${type === 'VIP' ? 'VIP' : 'Member'}]`;
+        const myTag = `[အော်ဒါတင်သူ: ${type === 'VIP' ? 'VIP' : 'Member'}]`;
         ordererTypeTag = language === 'zh' ? zhTag : (language === 'en' ? enTag : myTag);
       }
 
@@ -1755,7 +1726,6 @@ const HomePage: React.FC = () => {
       
       const orderStatus = deriveInitialOrderStatus({
         isFromCart,
-        userType: currentUser?.user_type,
         paymentMethod
       });
 
@@ -1788,15 +1758,12 @@ const HomePage: React.FC = () => {
         cod_amount: orderInfo.codAmount || 0,
         customer_id: currentUser?.id || null,
         customer_email: currentUser?.email || null,
-        customer_name: currentUser?.name || orderInfo.senderName
+        customer_name: currentUser?.name || orderInfo.senderName,
+        pricing_base_fee_mmk: Math.round(Number(pricingSettings.baseFee) || 0),
       };
 
       if (isFromCart && merchantProducts.length > 0) {
         packageData.delivery_store_id = merchantProducts[0].store_id;
-      } else if (currentUser && currentUser.user_type === 'merchant') {
-        packageData.delivery_store_id = currentUser.store_id || currentUser.id;
-        packageData.delivery_store_name = currentUser.name;
-        packageData.sender_code = currentUser.store_code;
       }
 
       console.log('准备保存包裹数据:', packageData);
@@ -2229,8 +2196,8 @@ const HomePage: React.FC = () => {
               📦 {t.ui.packageTracking}
             </button>
 
-            {/* 🚀 恢复：同城商场和购物车入口 (仅限非 MERCHANTS 账号) */}
-            {(!currentUser || (currentUser?.user_type !== 'merchant' && currentUser?.user_type !== 'partner')) ? (
+            {/* 同城商场和购物车入口（合伙店铺账号在管理端处理，客户端不展示商场入口） */}
+            {(!currentUser || currentUser?.user_type !== 'partner') ? (
               <>
                 <button
                   onClick={() => handleNavigation('/mall')}
@@ -2424,22 +2391,22 @@ const HomePage: React.FC = () => {
         setSelectedDeliverySpeed={setSelectedDeliverySpeed}
         setShowTimePickerModal={setShowTimePickerModal}
         scheduledDeliveryTime={scheduledDeliveryTime}
+        setScheduledDeliveryTime={setScheduledDeliveryTime}
         showWeightInput={showWeightInput}
         setShowWeightInput={setShowWeightInput}
+        selectedPackageType={selectedPackageType}
+        setSelectedPackageType={setSelectedPackageType}
+        orderWeight={orderWeight}
+        setOrderWeight={setOrderWeight}
         isCalculated={isCalculated}
         calculatedPriceDetail={calculatedPriceDetail}
         calculatedDistanceDetail={calculatedDistanceDetail}
         pricingSettings={pricingSettings}
         handleOpenMapModal={handleOpenMapModal}
-        calculatePriceEstimate={calculatePriceEstimate}
         handleOrderSubmit={handleOrderSubmit}
         // 🚀 优化：坐标自动选择相关
         setSelectedSenderLocation={setSelectedSenderLocation}
         setSelectedReceiverLocation={setSelectedReceiverLocation}
-        // 🚀 新增：商家商品选择相关
-        merchantProducts={merchantProducts}
-        selectedProducts={selectedProducts}
-        handleProductQuantityChange={handleProductQuantityChange}
         cartTotal={cartTotal}
         hasCOD={hasCOD}
         setHasCOD={setHasCOD}
@@ -2448,7 +2415,6 @@ const HomePage: React.FC = () => {
         setDescription={setDescription}
         paymentMethod={paymentMethod}
         setPaymentMethod={setPaymentMethod}
-        merchantStore={merchantStore}
       />
 
       {/* 订单成功模态框 */}

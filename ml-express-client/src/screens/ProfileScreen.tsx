@@ -14,23 +14,12 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { customerService, packageService, deliveryStoreService, rechargeService, reviewService, supabase } from '../services/supabase';
+import { customerService, packageService, deliveryStoreService, rechargeService, reviewService, supabase, fetchRechargeQrUrlMap, getDefaultRechargeQrUrlMap } from '../services/supabase';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
 import Skeleton, { StatsCardSkeleton } from '../components/Skeleton';
 import { printerService, PrinterSettings } from '../services/PrinterService';
-
-// 🚀 新增：充值二维码图片资源映射（使用线上URL，避免本地资源编译问题）
-const RECHARGE_QR_BASE_URL = 'https://market-link-express.com';
-const RECHARGE_QR_IMAGES: Record<number, string> = {
-  10000: `${RECHARGE_QR_BASE_URL}/kbz_qr_10000.png`,
-  50000: `${RECHARGE_QR_BASE_URL}/kbz_qr_50000.png`,
-  100000: `${RECHARGE_QR_BASE_URL}/kbz_qr_100000.png`,
-  300000: `${RECHARGE_QR_BASE_URL}/kbz_qr_300000.png`,
-  500000: `${RECHARGE_QR_BASE_URL}/kbz_qr_500000.png`,
-  1000000: `${RECHARGE_QR_BASE_URL}/kbz_qr_1000000.png`,
-};
 
 const { width } = Dimensions.get('window');
 
@@ -111,6 +100,7 @@ export default function ProfileScreen({ navigation }: any) {
   // 🚀 新增：支付二维码模态框状态
   const [showPaymentQRModal, setShowPaymentQRModal] = useState(false);
   const [rechargeProofUri, setRechargeProofUri] = useState<string | null>(null);
+  const [rechargeQrImages, setRechargeQrImages] = useState<Record<number, string>>(() => getDefaultRechargeQrUrlMap());
 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -188,6 +178,17 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：用于捕获二维码的 Ref
   const qrCodeRef = useRef<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRechargeQrUrlMap().then((map) => {
+      if (!cancelled) setRechargeQrImages(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
 
   const isMerchantStore = userType === 'merchant';
 
@@ -1319,6 +1320,7 @@ export default function ProfileScreen({ navigation }: any) {
     if (!selectedRechargeAmount) return;
     setShowRechargeModal(false);
     setShowPaymentQRModal(true);
+    fetchRechargeQrUrlMap().then(setRechargeQrImages);
   };
 
   // 🚀 新增：保存二维码到本机
@@ -2783,14 +2785,29 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
             </ScrollView>
 
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonConfirm]}
-              onPress={() => setShowAboutModal(false)}
-            >
-              <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                {t.confirm}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowAboutModal(false)}
+              >
+                <Text style={styles.modalButtonText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+                onPress={() => setShowAboutModal(false)}
+              >
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modalButtonGradient}
+                >
+                  <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                    {t.confirm}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -3358,9 +3375,9 @@ export default function ProfileScreen({ navigation }: any) {
                     style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
                   >
                     {/* 🚀 使用预定义的映射显示二维码 */}
-                    {selectedRechargeAmount && RECHARGE_QR_IMAGES[selectedRechargeAmount] ? (
+                    {selectedRechargeAmount && rechargeQrImages[selectedRechargeAmount] ? (
                       <Image 
-                        source={{ uri: RECHARGE_QR_IMAGES[selectedRechargeAmount] }} 
+                        source={{ uri: rechargeQrImages[selectedRechargeAmount] }} 
                         style={{ width: '100%', height: '100%' }} 
                         resizeMode="contain" 
                       />

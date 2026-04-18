@@ -26,7 +26,7 @@
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy:netlify": "netlify deploy --prod --site 126af2b9-244f-47fd-9be9-58fb45b6e7a2"
+    "deploy:netlify": "netlify deploy --prod --build --site 126af2b9-244f-47fd-9be9-58fb45b6e7a2"
   },
   "eslintConfig": {
     "extends": [

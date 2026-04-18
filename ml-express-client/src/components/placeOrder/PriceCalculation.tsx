@@ -1,6 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, Switch } from 'react-native';
 import { MoneyIcon } from '../Icon';
 import { ScaleInView } from '../Animations';
 
@@ -34,7 +33,6 @@ interface PriceCalculationProps {
   deliverySpeed: string;
   deliverySpeeds: DeliverySpeed[];
   pricingSettings: PricingSettings;
-  onCalculate: () => void;
   paymentMethod: 'balance' | 'cash';
   onPaymentMethodChange: (method: 'balance' | 'cash') => void;
   accountBalance?: number;
@@ -54,7 +52,6 @@ const PriceCalculation = memo<PriceCalculationProps>(({
   deliverySpeed,
   deliverySpeeds,
   pricingSettings,
-  onCalculate,
   paymentMethod,
   onPaymentMethodChange,
   accountBalance,
@@ -109,30 +106,16 @@ const PriceCalculation = memo<PriceCalculationProps>(({
             <MoneyIcon size={18} color="#1e293b" />
             <Text style={styles.sectionTitle}> {currentT.priceEstimate}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.calculateButton}
-            onPress={onCalculate}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#10b981', '#059669']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.calculateButtonGradient}
-            >
-              <Text style={styles.calculateButtonText}>🧮 {currentT.calculateButton}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.priceCard}>
           {!isCalculated ? (
             <View style={styles.pricePlaceholder}>
               <Text style={styles.pricePlaceholderText}>
-                📊 点击"计算"按钮获取精准费用
+                📊 {currentT.priceEstimateAutoHint}
               </Text>
               <Text style={styles.pricePlaceholderSubtext}>
-                需要先选择寄件和收件地址的精确位置
+                {currentT.priceEstimateAutoSubtext}
               </Text>
             </View>
           ) : (
