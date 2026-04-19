@@ -34,6 +34,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppState, AppStateStatus } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  normalizePackageStatusZh,
+  isMerchantGeofenceStatus,
+  isPickupFlowStatus,
+} from '../utils/packageStatusNormalize';
 
 const { width, height } = Dimensions.get('window');
 
@@ -205,23 +210,10 @@ export default function MapScreen({ navigation }: any) {
 
   // 3. 核心功能函数 (useCallback)
   
-  const normalizeStatus = useCallback((status?: string) => {
-    if (!status) return '';
-    const trimmed = status.trim();
-    if (trimmed.includes('已送达')) return '已送达';
-    if (trimmed.includes('已取消')) return '已取消';
-    if (trimmed.includes('配送中')) return '配送中';
-    if (trimmed.includes('已取件')) return '已取件';
-    if (trimmed.includes('待收款')) return '待收款';
-    if (trimmed.includes('待取件')) return '待取件';
-    if (trimmed.includes('待确认')) return '待确认';
-    return trimmed;
-  }, []);
-
   const resolvePackageStatus = useCallback((pkg: PackageWithExtras, override?: string) => {
     if (pkg.delivery_time) return '已送达';
-    return normalizeStatus(override || pkg.status);
-  }, [normalizeStatus]);
+    return normalizePackageStatusZh(override || pkg.status);
+  }, []);
 
   const COMPLETED_IDS_KEY = 'completed_delivery_ids';
   const COMPLETED_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -248,31 +240,39 @@ export default function MapScreen({ navigation }: any) {
   }, []);
 
   const getStatusColor = useCallback((status: string) => {
-    switch (normalizeStatus(status)) {
+    switch (normalizePackageStatusZh(status)) {
       case '待取件': return '#f39c12';
       case '待收款': return '#f39c12';
+      case '待确认': return '#a855f7';
+      case '打包中': return '#0ea5e9';
       case '已取件': return '#3498db';
       case '配送中': return '#9b59b6';
-      case '已送达': return '#27ae60';
-      case '异常上报': return '#ef4444'; // 🚀 新增：异常状态为红色
+      case '已送达':
+      case '已完成':
+        return '#27ae60';
+      case '异常上报': return '#ef4444';
       default: return '#95a5a6';
     }
-  }, [normalizeStatus]);
+  }, []);
 
   // 🚀 新增：获取状态文本函数
   const getStatusDisplayText = useCallback((status: string) => {
-    const s = normalizeStatus(status);
+    const s = normalizePackageStatusZh(status);
     switch (s) {
       case '待取件': return language === 'zh' ? '待取件' : 'Pending';
       case '待收款': return language === 'zh' ? '待收款' : 'Wait Collect';
+      case '待确认': return language === 'zh' ? '待确认' : 'Pending confirm';
+      case '打包中': return language === 'zh' ? '打包中' : 'Packing';
       case '已取件': return language === 'zh' ? '已取件' : 'Picked Up';
       case '配送中': return language === 'zh' ? '配送中' : 'Delivering';
-      case '已送达': return language === 'zh' ? '已送达' : 'Delivered';
+      case '已送达':
+      case '已完成':
+        return language === 'zh' ? '已送达' : 'Delivered';
       case '异常上报': return language === 'zh' ? '异常上报' : 'Anomaly Reported';
       case '已取消': return language === 'zh' ? '已取消' : 'Cancelled';
       default: return s;
     }
-  }, [language, normalizeStatus]);
+  }, [language]);
 
   const getMarkerIcon = useCallback((speed?: string) => speed === '急送达' ? '⚡' : (speed === '定时达' ? '⏰' : '📦'), []);
 
@@ -524,13 +524,13 @@ export default function MapScreen({ navigation }: any) {
       
       const normalizedPackages = allPackages.map(pkg => ({
         ...pkg,
-        status: normalizeStatus(pkg.status)
+        status: normalizePackageStatusZh(pkg.status)
       }));
 
       // 过滤属于当前骑手且未完成的包裹
       const packagePromises = normalizedPackages
         .filter(pkg => {
-          const status = normalizeStatus(pkg.status);
+          const status = normalizePackageStatusZh(pkg.status);
           const isFinished = status === '已送达' || status === '已取消' || !!pkg.delivery_time;
           const isMyPackage = pkg.courier === currentUser;
           const isLocallyCompleted = !!completedPackageIds[pkg.id];
@@ -567,7 +567,7 @@ export default function MapScreen({ navigation }: any) {
       setStatusOverrides(prev => {
         const next = { ...prev };
         myPackages.forEach(pkg => {
-          const serverResolved = pkg.delivery_time ? '已送达' : normalizeStatus(pkg.status);
+          const serverResolved = pkg.delivery_time ? '已送达' : normalizePackageStatusZh(pkg.status);
           if (next[pkg.id] && next[pkg.id] === serverResolved) {
             delete next[pkg.id];
           }
@@ -595,7 +595,7 @@ export default function MapScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [isOnline, getPickupCoordinates, getDeliveryCoordinates, trackPerformance, completedPackageIds, normalizeStatus, resolvePackageStatus]);
+  }, [isOnline, getPickupCoordinates, getDeliveryCoordinates, trackPerformance, completedPackageIds, resolvePackageStatus]);
 
   const loadCurrentDeliveringPackage = useCallback(async () => {
     try {
@@ -952,7 +952,7 @@ export default function MapScreen({ navigation }: any) {
           // 🚀 核心：地理围栏自动检测 (到达商家或目的地)
           if (optimizedPackagesWithCoords.length > 0) {
             optimizedPackagesWithCoords.forEach(pkg => {
-              if (pkg.status === '待取件' || pkg.status === '待收款') {
+              if (isMerchantGeofenceStatus(normalizePackageStatusZh(pkg.status))) {
                 const dist = calculateDistanceKm(latitude, longitude, pkg.coords?.lat || 0, pkg.coords?.lng || 0);
                 if (dist <= 0.1) { // 100米内
                   Vibration.vibrate(400);
@@ -1539,7 +1539,7 @@ export default function MapScreen({ navigation }: any) {
                     {getStatusDisplayText(effectiveStatus)}
                 </Text>
               </TouchableOpacity>
-            ) : effectiveStatus === '待取件' ? (
+            ) : effectiveStatus === '待取件' || effectiveStatus === '待收款' ? (
                 <View style={styles.dualButtons}>
                   <TouchableOpacity 
                     style={[styles.placeholderButton, { backgroundColor: '#3b82f6' }]} 
@@ -1558,6 +1558,22 @@ export default function MapScreen({ navigation }: any) {
                 </Text>
                   </TouchableOpacity>
               </View>
+            ) : effectiveStatus === '打包中' || effectiveStatus === '待确认' ? (
+                <View style={styles.completedButton}>
+                  <Text style={styles.completedText}>
+                    {effectiveStatus === '打包中'
+                      ? language === 'zh'
+                        ? '📦 商家备货中'
+                        : language === 'en'
+                          ? 'Merchant packing'
+                          : 'ထုပ်ပိုးနေသည်'
+                      : language === 'zh'
+                        ? '⏳ 待商家确认'
+                        : language === 'en'
+                          ? 'Awaiting merchant'
+                          : 'စောင့်ဆိုင်းနေသည်'}
+                  </Text>
+              </View>
             ) : (
                 <View style={styles.completedButton}>
                   <Text style={styles.completedText}>✅ {item.status}</Text>
@@ -1568,7 +1584,7 @@ export default function MapScreen({ navigation }: any) {
         </View>
       </TouchableOpacity>
     );
-  }, [currentDeliveringPackageId, navigation, startDelivering, finishDelivering, handleManualPickup, getMarkerIcon, getStatusColor, statusOverrides, language, normalizeStatus, resolvePackageStatus]);
+  }, [currentDeliveringPackageId, navigation, startDelivering, finishDelivering, handleManualPickup, getMarkerIcon, getStatusColor, statusOverrides, language, resolvePackageStatus]);
 
   // 7. 初始化效果
   useEffect(() => {
@@ -1813,7 +1829,10 @@ export default function MapScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
             <View style={[styles.modalBody, { flexDirection: 'row', gap: 12, flexWrap: 'wrap' }]}>
-              {currentPackageForDelivery?.status === '待取件' ? (
+              {currentPackageForDelivery &&
+              isPickupFlowStatus(
+                normalizePackageStatusZh(currentPackageForDelivery.status),
+              ) ? (
                 <>
                   <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); navigation.navigate('Scan'); }}>
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>

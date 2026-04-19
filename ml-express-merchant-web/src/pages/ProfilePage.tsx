@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   packageService,
@@ -24,6 +30,7 @@ import NavigationBar from "../components/home/NavigationBar";
 import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
 import OrderQRCode from "../components/profile/OrderQRCode";
+import { getPackingModalModel } from "../utils/parseOrderPackingItems";
 
 // 注入样式
 if (typeof document !== "undefined") {
@@ -409,6 +416,10 @@ const ProfilePage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<"qr" | "cash" | "balance">(
     "cash",
   );
+  /** 商家「立即下单」：商品费用可余额/现金；跑腿费仅现金（见 OrderModal + handleOrderSubmit） */
+  const [productPaymentMethod, setProductPaymentMethod] = useState<
+    "cash" | "balance"
+  >("balance");
   const [selectedSenderLocation, setSelectedSenderLocation] = useState<{
     lat: number;
     lng: number;
@@ -463,7 +474,12 @@ const ProfilePage: React.FC = () => {
   });
   const [showCODOrdersModal, setShowCODOrdersModal] = useState(false);
   const [codOrders, setCodOrders] = useState<
-    Array<{ orderId: string; codAmount: number; deliveryTime?: string }>
+    Array<{
+      orderId: string;
+      codAmount: number;
+      deliveryTime?: string;
+      deliveryFeeLabel?: string;
+    }>
   >([]);
   const [codModalTitle, setCodModalTitle] = useState("");
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -1297,6 +1313,7 @@ const ProfilePage: React.FC = () => {
     setCalculatedPriceDetail(0);
     setCalculatedDistanceDetail(0);
     setIsCalculated(false);
+    setProductPaymentMethod("balance");
     setShowOrderForm(true);
   };
 
@@ -1345,11 +1362,22 @@ const ProfilePage: React.FC = () => {
             : language === "en"
               ? "Balance Payment"
               : "လက်ကျန်ငွေဖြင့် ပေးချေခြင်း";
-        const productsText = `[${selectedProductsText}: ${productDetails.join(", ")}][${balancePaymentText}: ${totalProductPrice.toLocaleString()} MMK]`;
+        const cashPaymentTextForProducts =
+          language === "zh"
+            ? "现金支付"
+            : language === "en"
+              ? "Cash Payment"
+              : "ငွေသားဖြင့် ပေးချေခြင်း";
+        const isMerchantUser = currentUser?.user_type === "merchant";
+        const productFeeLabel =
+          isMerchantUser && productPaymentMethod === "cash"
+            ? cashPaymentTextForProducts
+            : balancePaymentText;
+        const productsText = `[${selectedProductsText}: ${productDetails.join(", ")}][${productFeeLabel}: ${totalProductPrice.toLocaleString()} MMK]`;
 
         const cleanDesc = description
           .replace(
-            /\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]|\[商品费用（仅余额支付）:.*?\]|\[Item Cost \(Balance Only\):.*?\]|\[ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\):.*?\]/g,
+            /\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]|\[现金支付:.*?\]|\[Cash Payment:.*?\]|\[ငွေသားဖြင့် ပေးချေခြင်း:.*?\]|\[商品费用（仅余额支付）:.*?\]|\[Item Cost \(Balance Only\):.*?\]|\[ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\):.*?\]/g,
             "",
           )
           .trim();
@@ -1359,7 +1387,7 @@ const ProfilePage: React.FC = () => {
       setCartTotal(0);
       setCodAmount("0");
     }
-  }, [selectedProducts, hasCOD, language]);
+  }, [selectedProducts, hasCOD, language, productPaymentMethod, currentUser?.user_type]);
 
   const calculatePriceForOrder = (
     packageType: string,
@@ -1584,6 +1612,32 @@ const ProfilePage: React.FC = () => {
       const orderId = `MDY${datePart}${randomPart}`;
       setGeneratedOrderId(orderId);
 
+      const isMerchantUser = currentUser.user_type === "merchant";
+      const hasStoreProducts =
+        isMerchantUser && Object.keys(selectedProducts).length > 0 && cartTotal > 0;
+      const effectivePaymentMethod = isMerchantUser
+        ? hasStoreProducts
+          ? productPaymentMethod
+          : "cash"
+        : paymentMethod;
+
+      let finalDescription = description.trim();
+      if (isMerchantUser) {
+        const hasDeliveryTag =
+          /\[跑腿费（仅现金）:|\[Delivery fee \(cash only\):|\[ပို့ဆောင်ခ \(ငွေသားသာ\):/.test(
+            finalDescription,
+          );
+        if (!hasDeliveryTag) {
+          const deliveryTag =
+            language === "zh"
+              ? `[跑腿费（仅现金）: ${calculatedPriceDetail} MMK]`
+              : language === "en"
+                ? `[Delivery fee (cash only): ${calculatedPriceDetail} MMK]`
+                : `[ပို့ဆောင်ခ (ငွေသားသာ): ${calculatedPriceDetail} MMK]`;
+          finalDescription = `${finalDescription} ${deliveryTag}`.trim();
+        }
+      }
+
       const orderData: any = {
         id: orderId,
         customer_id: currentUser.id,
@@ -1600,11 +1654,11 @@ const ProfilePage: React.FC = () => {
         receiver_longitude: selectedReceiverLocation?.lng,
         package_type: selectedPackageType || "标准件",
         weight: orderWeight?.trim() ? orderWeight.trim() : "1.0",
-        description: description,
+        description: finalDescription,
         price: `${calculatedPriceDetail} MMK`,
         delivery_distance: calculatedDistanceDetail,
         status: "待取件",
-        payment_method: paymentMethod,
+        payment_method: effectivePaymentMethod,
         cod_amount: parseFloat(codAmount) || 0,
         delivery_store_id: currentUser.store_id || currentUser.id,
         create_time: now.toLocaleString("zh-CN"),
@@ -2779,6 +2833,14 @@ const ProfilePage: React.FC = () => {
     setShowPackingModal(true);
     setShowPackageDetailModal(false);
   };
+
+  const packingModalModel = useMemo(() => {
+    if (!packingOrderData) return null;
+    return getPackingModalModel(
+      packingOrderData.description,
+      productPriceMap,
+    );
+  }, [packingOrderData, productPriceMap]);
 
   // 🚀 新增：切换打包项勾选状态
   const toggleItem = (itemId: string) => {
@@ -7427,13 +7489,24 @@ const ProfilePage: React.FC = () => {
             
             <div style={{ flex: 1, overflowY: "auto", paddingRight: "0.5rem" }}>
               {codOrders.length > 0 ? (
-                codOrders.map((order: any, index: number) => (
+                codOrders.map((order, index: number) => {
+                  const formatDt = (dateStr?: string) => {
+                    if (!dateStr) return "—";
+                    try {
+                      const d = new Date(dateStr);
+                      if (Number.isNaN(d.getTime())) return dateStr;
+                      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                    } catch {
+                      return dateStr;
+                    }
+                  };
+                  return (
                   <div
-                    key={index}
+                    key={`${order.orderId}-${index}`}
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
-                      alignItems: "center",
+                      alignItems: "flex-start",
                       padding: "1.25rem",
                       marginBottom: "1rem",
                       background: "rgba(255, 255, 255, 0.05)",
@@ -7441,7 +7514,7 @@ const ProfilePage: React.FC = () => {
                       border: "1px solid rgba(255, 255, 255, 0.1)",
                     }}
                   >
-                    <div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
                           color: "rgba(255, 255, 255, 0.5)",
@@ -7458,12 +7531,38 @@ const ProfilePage: React.FC = () => {
                           fontSize: "1rem",
                           fontWeight: "800",
                           fontFamily: "monospace",
+                          wordBreak: "break-all",
                         }}
                       >
                         {order.orderId}
                       </div>
+                      <div
+                        style={{
+                          color: "rgba(255, 255, 255, 0.45)",
+                          fontSize: "0.75rem",
+                          marginTop: "8px",
+                        }}
+                      >
+                        {language === "zh"
+                          ? "送达"
+                          : language === "en"
+                            ? "Delivered"
+                            : "ပြီးမြောက်ချိန်"}
+                        : {formatDt(order.deliveryTime)}
+                      </div>
+                      {order.deliveryFeeLabel ? (
+                        <div
+                          style={{
+                            color: "rgba(255, 255, 255, 0.55)",
+                            fontSize: "0.75rem",
+                            marginTop: "4px",
+                          }}
+                        >
+                          {t.price}: {order.deliveryFeeLabel}
+                        </div>
+                      ) : null}
                     </div>
-                    <div style={{ textAlign: "right" }}>
+                    <div style={{ textAlign: "right", marginLeft: "12px" }}>
                       <div
                         style={{
                           color: "rgba(255, 255, 255, 0.5)",
@@ -7481,12 +7580,15 @@ const ProfilePage: React.FC = () => {
                           fontWeight: "900",
                         }}
                       >
-                        {order.codAmount.toLocaleString()}{" "}
+                        {order.codAmount > 0
+                          ? `${order.codAmount.toLocaleString()} `
+                          : "— "}
                         <span style={{ fontSize: "0.8rem" }}>MMK</span>
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <div
                   style={{
@@ -7499,11 +7601,7 @@ const ProfilePage: React.FC = () => {
                     📭
                   </div>
                   <div style={{ fontSize: "1.2rem", fontWeight: "700" }}>
-                    {language === "zh"
-                      ? "暂无订单"
-                      : language === "en"
-                        ? "No orders"
-                        : "အော်ဒါမရှိပါ"}
+                    {t.noDeliveredOrdersMonth}
                   </div>
                 </div>
               )}
@@ -9547,128 +9645,246 @@ const ProfilePage: React.FC = () => {
                     gap: "1rem",
                   }}
                 >
-                  {(() => {
-                    // 解析商品信息
-                    const productsMatch =
-                      packingOrderData.description?.match(
-                        /\[商品清单: (.*?)\]/,
-                      );
-                    const productItems = productsMatch
-                      ? productsMatch[1].split(", ")
-                      : [];
-                    
-                    if (productItems.length === 0) {
-                      return (
-                        <div
-                          style={{
-                            padding: "1.5rem",
-                            textAlign: "center",
-                            background: "#f8fafc",
-                            borderRadius: "24px",
-                            border: "2px dashed #e2e8f0",
-                          }}
-                        >
-                          <p style={{ color: "#64748b", fontWeight: "600" }}>
-                            {language === "zh"
-                              ? "暂无详细商品清单，请核对包裹内容"
-                              : "No detailed list, please check package content"}
-                          </p>
-                          <label
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "12px",
-                              marginTop: "1rem",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <input 
-                              type="checkbox" 
-                              checked={checkedItems["default"]}
-                              onChange={() => toggleItem("default")}
-                              style={{
-                                width: "24px",
-                                height: "24px",
-                                cursor: "pointer",
-                              }}
-                            />
-                            <span
-                              style={{
-                                fontSize: "1.1rem",
-                                fontWeight: "800",
-                                color: "#1e293b",
-                              }}
-                            >
-                              {language === "zh"
-                                ? "确认商品已备齐"
-                                : "Confirm all items ready"}
-                            </span>
-                          </label>
-                        </div>
-                      );
-                    }
-
-                    return productItems.map((item: string, index: number) => (
-                      <div 
-                        key={index}
-                        onClick={() => toggleItem(`item-${index}`)}
+                  {packingModalModel && packingModalModel.lineCount === 0 ? (
+                    <div
+                      style={{
+                        padding: "1.5rem",
+                        textAlign: "center",
+                        background: "#f8fafc",
+                        borderRadius: "24px",
+                        border: "2px dashed #e2e8f0",
+                      }}
+                    >
+                      <p style={{ color: "#64748b", fontWeight: "600" }}>
+                        {language === "zh"
+                          ? "暂无详细商品清单，请核对包裹内容"
+                          : language === "en"
+                            ? "No detailed list, please check package content"
+                            : "အသေးစိတ် စာရင်းမရှိသေးပါ၊ ထုပ်ပိုးမှုကို စစ်ဆေးပါ"}
+                      </p>
+                      <label
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "15px",
-                          padding: "1.2rem",
-                          background: checkedItems[`item-${index}`]
-                            ? "rgba(16, 185, 129, 0.05)"
-                            : "#f8fafc",
-                          borderRadius: "18px",
-                          border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#f1f5f9"}`,
+                          justifyContent: "center",
+                          gap: "12px",
+                          marginTop: "1rem",
                           cursor: "pointer",
-                          transition: "all 0.2s ease",
                         }}
                       >
-                        <div
+                        <input
+                          type="checkbox"
+                          checked={checkedItems["default"]}
+                          onChange={() => toggleItem("default")}
                           style={{
-                            width: "28px",
-                            height: "28px",
-                            borderRadius: "8px",
-                            border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#cbd5e1"}`,
-                            backgroundColor: checkedItems[`item-${index}`]
-                              ? "#10b981"
-                              : "transparent",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "white",
-                            fontSize: "1rem",
+                            width: "24px",
+                            height: "24px",
+                            cursor: "pointer",
                           }}
-                        >
-                          {checkedItems[`item-${index}`] && "✓"}
-                        </div>
+                        />
                         <span
                           style={{
                             fontSize: "1.1rem",
-                            fontWeight: "700",
-                            color: checkedItems[`item-${index}`]
-                              ? "#64748b"
-                              : "#1e293b",
-                            textDecoration: checkedItems[`item-${index}`]
-                              ? "line-through"
-                              : "none",
-                            flex: 1,
+                            fontWeight: "800",
+                            color: "#1e293b",
                           }}
                         >
-                          {item}
+                          {language === "zh"
+                            ? "确认商品已备齐"
+                            : language === "en"
+                              ? "Confirm all items ready"
+                              : "ပစ္စည်းအားလုံး ပြင်ဆင်ပြီးပါပြီ"}
                         </span>
-                      </div>
-                    ));
-                  })()}
+                      </label>
+                    </div>
+                  ) : (
+                    <>
+                      {packingModalModel && (
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "28px 1fr minmax(36px, auto) minmax(64px, auto) minmax(76px, auto)",
+                            gap: "6px",
+                            alignItems: "center",
+                            padding: "0 0.35rem 0.35rem",
+                            color: "#64748b",
+                            fontSize: "0.72rem",
+                            fontWeight: "800",
+                          }}
+                        >
+                          <span />
+                          <span>
+                            {language === "zh"
+                              ? "商品"
+                              : language === "en"
+                                ? "Item"
+                                : "ပစ္စည်း"}
+                          </span>
+                          <span style={{ textAlign: "right" }}>
+                            {language === "zh"
+                              ? "数量"
+                              : language === "en"
+                                ? "Qty"
+                                : "အရေ.အတွက်"}
+                          </span>
+                          <span style={{ textAlign: "right" }}>
+                            {language === "zh"
+                              ? "单价"
+                              : language === "en"
+                                ? "Unit"
+                                : "တစ်ခုဈေး"}
+                          </span>
+                          <span style={{ textAlign: "right" }}>
+                            {language === "zh"
+                              ? "小计"
+                              : language === "en"
+                                ? "Subtotal"
+                                : "စုစုပေါင်း"}
+                          </span>
+                        </div>
+                      )}
+                      {packingModalModel?.rows.map((row, index: number) => (
+                        <div
+                          key={`${row.name}-${index}`}
+                          onClick={() => toggleItem(`item-${index}`)}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "28px 1fr minmax(36px, auto) minmax(64px, auto) minmax(76px, auto)",
+                            gap: "6px",
+                            alignItems: "center",
+                            padding: "1rem 0.75rem",
+                            background: checkedItems[`item-${index}`]
+                              ? "rgba(16, 185, 129, 0.05)"
+                              : "#f8fafc",
+                            borderRadius: "18px",
+                            border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#f1f5f9"}`,
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "8px",
+                              border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#cbd5e1"}`,
+                              backgroundColor: checkedItems[`item-${index}`]
+                                ? "#10b981"
+                                : "transparent",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "white",
+                              fontSize: "1rem",
+                            }}
+                          >
+                            {checkedItems[`item-${index}`] && "✓"}
+                          </div>
+                          <span
+                            style={{
+                              fontSize: "0.95rem",
+                              fontWeight: "700",
+                              color: checkedItems[`item-${index}`]
+                                ? "#64748b"
+                                : "#1e293b",
+                              textDecoration: checkedItems[`item-${index}`]
+                                ? "line-through"
+                                : "none",
+                              lineHeight: 1.35,
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {row.name}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.95rem",
+                              fontWeight: "700",
+                              textAlign: "right",
+                              color: checkedItems[`item-${index}`]
+                                ? "#94a3b8"
+                                : "#334155",
+                            }}
+                          >
+                            {row.qty}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.85rem",
+                              fontWeight: "600",
+                              textAlign: "right",
+                              color: checkedItems[`item-${index}`]
+                                ? "#94a3b8"
+                                : "#475569",
+                            }}
+                          >
+                            {row.unitPrice != null
+                              ? `${row.unitPrice.toLocaleString()}`
+                              : "—"}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.9rem",
+                              fontWeight: "800",
+                              textAlign: "right",
+                              color: checkedItems[`item-${index}`]
+                                ? "#94a3b8"
+                                : "#0f172a",
+                            }}
+                          >
+                            {row.lineTotal != null
+                              ? `${row.lineTotal.toLocaleString()}`
+                              : "—"}
+                          </span>
+                        </div>
+                      ))}
+                      {packingModalModel &&
+                        packingModalModel.summaryTotal != null && (
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "1rem 0.75rem",
+                              marginTop: "0.25rem",
+                              background: "#ecfdf5",
+                              borderRadius: "16px",
+                              border: "1px solid #a7f3d0",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontWeight: "900",
+                                color: "#065f46",
+                                fontSize: "0.95rem",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "商品合计（MMK）"
+                                : language === "en"
+                                  ? "Items total (MMK)"
+                                  : "ပစ္စည်းစုစုပေါင်း (MMK)"}
+                            </span>
+                            <span
+                              style={{
+                                fontWeight: "950",
+                                color: "#047857",
+                                fontSize: "1.05rem",
+                              }}
+                            >
+                              {packingModalModel.summaryTotal.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* 订单备注 */}
-              {packingOrderData.description &&
-                !packingOrderData.description.includes("商品清单") && (
+              {/* 订单备注（去掉系统自动标签后的纯文本） */}
+              {packingModalModel?.customerNote ? (
                   <div
                     style={{
                       background: "#fffbeb",
@@ -9686,7 +9902,12 @@ const ProfilePage: React.FC = () => {
                         fontWeight: "900",
                       }}
                     >
-                      💡 {language === "zh" ? "客户备注" : "Customer Note"}
+                      💡{" "}
+                      {language === "zh"
+                        ? "客户备注"
+                        : language === "en"
+                          ? "Customer Note"
+                          : "ဖောက်သည်မှတ်ချက်"}
                     </h4>
                     <p
                       style={{
@@ -9696,10 +9917,10 @@ const ProfilePage: React.FC = () => {
                         fontWeight: "600",
                       }}
                     >
-                      {packingOrderData.description}
+                      {packingModalModel.customerNote}
                     </p>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* 底部操作栏 */}
@@ -9715,17 +9936,11 @@ const ProfilePage: React.FC = () => {
                 disabled={
                   loading ||
                   (() => {
-                    const productsMatch =
-                      packingOrderData.description?.match(
-                        /\[商品清单: (.*?)\]/,
-                      );
-                    const productItems = productsMatch
-                      ? productsMatch[1].split(", ")
-                      : [];
-                    if (productItems.length === 0)
+                    if (!packingModalModel) return true;
+                    if (packingModalModel.lineCount === 0)
                       return !checkedItems["default"];
-                    return productItems.some(
-                      (_: any, index: number) => !checkedItems[`item-${index}`],
+                    return packingModalModel.rows.some(
+                      (_row, index: number) => !checkedItems[`item-${index}`],
                     );
                   })()
                 }
@@ -9743,18 +9958,12 @@ const ProfilePage: React.FC = () => {
                   boxShadow: "0 10px 25px rgba(16, 185, 129, 0.3)",
                   transition: "all 0.3s ease",
                   opacity: (() => {
-                    const productsMatch =
-                      packingOrderData.description?.match(
-                        /\[商品清单: (.*?)\]/,
-                      );
-                    const productItems = productsMatch
-                      ? productsMatch[1].split(", ")
-                      : [];
+                    if (!packingModalModel) return 0.6;
                     const allChecked =
-                      productItems.length === 0
+                      packingModalModel.lineCount === 0
                         ? checkedItems["default"]
-                        : !productItems.some(
-                            (_: any, index: number) =>
+                        : !packingModalModel.rows.some(
+                            (_row, index: number) =>
                               !checkedItems[`item-${index}`],
                           );
                     return allChecked && !loading ? 1 : 0.6;
@@ -9776,8 +9985,10 @@ const ProfilePage: React.FC = () => {
                   ></div>
                 ) : language === "zh" ? (
                   "确认打包完成"
-                ) : (
+                ) : language === "en" ? (
                   "Confirm Packing Done"
+                ) : (
+                  "ထုပ်ပိုးပြီးကြောင်း အတည်ပြုပါ"
                 )}
               </button>
               <p
@@ -11550,6 +11761,8 @@ const ProfilePage: React.FC = () => {
         setDescription={setDescription}
         paymentMethod={paymentMethod}
         setPaymentMethod={setPaymentMethod}
+        productPaymentMethod={productPaymentMethod}
+        setProductPaymentMethod={setProductPaymentMethod}
         merchantStore={storeInfo}
       />
 

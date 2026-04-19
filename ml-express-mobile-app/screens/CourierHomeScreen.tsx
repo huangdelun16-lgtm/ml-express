@@ -17,6 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import { packageService, Package, supabase } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+import {
+  normalizePackageStatusZh,
+  isActiveCourierTaskStatus,
+} from '../utils/packageStatusNormalize';
 
 const { width } = Dimensions.get('window');
 
@@ -101,11 +105,11 @@ export default function CourierHomeScreen({ navigation }: any) {
       const currentUser = await AsyncStorage.getItem('currentUserName') || '';
       const allPackages = await packageService.getAllPackages();
       
-      // 筛选分配给当前快递员的包裹，且未完成的
-      const myPackages = allPackages.filter(pkg => 
-        pkg.courier === currentUser && 
-        !['已送达', '已取消', '配送失败'].includes(pkg.status)
-      );
+      const myPackages = allPackages.filter((pkg) => {
+        if (pkg.courier !== currentUser) return false;
+        const s = normalizePackageStatusZh(pkg.status);
+        return isActiveCourierTaskStatus(s);
+      });
       
       setPackages(myPackages);
     } catch (error) {
@@ -122,22 +126,42 @@ export default function CourierHomeScreen({ navigation }: any) {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case '待取件': 
-      case '待收款': return '#f59e0b';
-      case '已取件': return '#3b82f6';
-      case '配送中': return '#8b5cf6';
-      default: return '#64748b';
+    const s = normalizePackageStatusZh(status);
+    switch (s) {
+      case '待取件':
+      case '待收款':
+        return '#f59e0b';
+      case '待确认':
+        return '#a855f7';
+      case '打包中':
+        return '#0ea5e9';
+      case '已取件':
+        return '#3b82f6';
+      case '配送中':
+        return '#8b5cf6';
+      case '异常上报':
+        return '#ef4444';
+      default:
+        return '#64748b';
     }
   };
 
   const getNextStatus = (currentStatus: string) => {
-    switch (currentStatus) {
-      case '待取件': 
-      case '待收款': return language === 'zh' ? '去取件' : 'Pickup';
-      case '已取件': return language === 'zh' ? '去配送' : 'Deliver';
-      case '配送中': return language === 'zh' ? '签收' : 'Complete';
-      default: return '';
+    const s = normalizePackageStatusZh(currentStatus);
+    switch (s) {
+      case '待取件':
+      case '待收款':
+        return language === 'zh' ? '去取件' : 'Pickup';
+      case '打包中':
+      case '待确认':
+        return language === 'zh' ? '等待商家' : 'Wait';
+      case '已取件':
+        return language === 'zh' ? '去配送' : 'Deliver';
+      case '配送中':
+      case '异常上报':
+        return language === 'zh' ? '签收' : 'Complete';
+      default:
+        return '';
     }
   };
 
@@ -231,9 +255,17 @@ export default function CourierHomeScreen({ navigation }: any) {
   );
 
   // 统计
-  const todoCount = packages.filter(p => p.status === '待取件' || p.status === '待收款').length;
-  const pickedCount = packages.filter(p => p.status === '已取件').length;
-  const deliveringCount = packages.filter(p => p.status === '配送中' || p.status === '配送进行中').length;
+  const todoCount = packages.filter((p) => {
+    const s = normalizePackageStatusZh(p.status);
+    return ['待取件', '待收款', '打包中', '待确认'].includes(s);
+  }).length;
+  const pickedCount = packages.filter(
+    (p) => normalizePackageStatusZh(p.status) === '已取件',
+  ).length;
+  const deliveringCount = packages.filter((p) => {
+    const s = normalizePackageStatusZh(p.status);
+    return s === '配送中' || s === '异常上报';
+  }).length;
 
   return (
     <View style={styles.container}>

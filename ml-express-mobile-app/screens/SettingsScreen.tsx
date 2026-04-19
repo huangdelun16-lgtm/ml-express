@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { supabase, adminAccountService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 
@@ -32,6 +33,7 @@ const HOTLINE_NUMBERS = [
 ];
 
 export default function SettingsScreen({ navigation }: any) {
+  const route = useRoute<any>();
   const { language, setLanguage: setAppLanguage, setThemeMode: setAppTheme } = useApp();
   const [settings, setSettings] = useState({
     notifications: true,
@@ -83,6 +85,15 @@ export default function SettingsScreen({ navigation }: any) {
     loadSettings();
     loadUserInfo();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (route.params?.openHelp === true) {
+        setShowHelpModal(true);
+        navigation.setParams({ openHelp: false });
+      }
+    }, [navigation, route.params?.openHelp]),
+  );
 
   const loadSettings = async () => {
     try {

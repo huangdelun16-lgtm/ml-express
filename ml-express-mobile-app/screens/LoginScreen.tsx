@@ -13,7 +13,7 @@ import {
   Dimensions,
   StatusBar
 } from 'react-native';
-import { adminAccountService, supabase } from '../services/supabase';
+import { adminAccountService, supabase, resolveRiderPricingRegionId } from '../services/supabase';
 import { notificationService } from '../services/notificationService';
 import { locationService } from '../services/locationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -76,13 +76,18 @@ export default function LoginScreen({ navigation }: any) {
               .eq('employee_id', account.employee_id || ''); // 通过员工编号关联
           }
 
+          const pricingRegionId = resolveRiderPricingRegionId(
+            (account as { region?: string }).region,
+            userUsername,
+          );
           await Promise.all([
             AsyncStorage.setItem('currentUserId', userId),
             AsyncStorage.setItem('currentUser', userUsername),
             AsyncStorage.setItem('currentUserName', userEmployeeName),
             AsyncStorage.setItem('currentUserRole', userRole),
             AsyncStorage.setItem('currentUserPosition', userPosition),
-            AsyncStorage.setItem('currentSessionId', newSessionId) // 本地也存一份
+            AsyncStorage.setItem('currentSessionId', newSessionId), // 本地也存一份
+            AsyncStorage.setItem('pricingRegionId', pricingRegionId),
           ]);
         } catch (storageError) {
           console.error('❌ AsyncStorage 保存失败:', storageError);

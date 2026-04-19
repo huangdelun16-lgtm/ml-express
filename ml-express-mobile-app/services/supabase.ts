@@ -100,11 +100,12 @@ export interface Package {
   cod_amount?: number; // 代收款金额 (COD)
   rider_settled?: boolean; // 骑手是否已结清
   rider_settled_at?: string; // 骑手结清时间
+  pricing_base_fee_mmk?: number | null;
   // 费用明细字段
   store_fee?: string | number; // 待付款（店铺填写）
-    delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
-    delivery_distance?: number; // 配送距离 (KM)
-  }
+  delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
+  delivery_distance?: number; // 配送距离 (KM)
+}
 
 export interface AdminAccount {
   id?: string;
@@ -119,6 +120,8 @@ export interface AdminAccount {
   role: 'admin' | 'manager' | 'operator' | 'finance';
   status: 'active' | 'inactive' | 'suspended';
   last_login?: string;
+  /** 员工所属领区，用于骑手端拉取对应计费规则 */
+  region?: string;
 }
 
 export interface AuditLog {
@@ -377,6 +380,230 @@ export const adminAccountService = {
       return false;
     }
   }
+};
+
+/** 与 Admin Web、财务管理一致的计费读取（领区默认 mandalay） */
+const DEFAULT_PRICING_REGION_FALLBACK = 'mandalay';
+
+export const PRICING_REGION_IDS = [
+  'mandalay',
+  'maymyo',
+  'yangon',
+  'naypyidaw',
+  'taunggyi',
+  'lashio',
+  'muse',
+] as const;
+
+const PACKAGE_PREFIX_TO_REGION: Record<string, string> = {
+  MDY: 'mandalay',
+  POL: 'maymyo',
+  YGN: 'yangon',
+  NPW: 'naypyidaw',
+  TGI: 'taunggyi',
+  LSO: 'lashio',
+  MUSE: 'muse',
+};
+
+const PRICING_REGION_ID_SET = new Set<string>(PRICING_REGION_IDS);
+
+function normalizePackageRegionField(raw?: string | null): string | null {
+  if (raw == null || !String(raw).trim()) return null;
+  const s = String(raw).trim().toLowerCase();
+  if (PRICING_REGION_ID_SET.has(s)) return s;
+  const aliases: Record<string, string> = {
+    mdy: 'mandalay',
+    ygn: 'yangon',
+    pol: 'maymyo',
+    npw: 'naypyidaw',
+    tgi: 'taunggyi',
+    lso: 'lashio',
+    muse: 'muse',
+  };
+  const mapped = aliases[s];
+  return mapped && PRICING_REGION_ID_SET.has(mapped) ? mapped : null;
+}
+
+/** 订单计费领区：与 Admin / 财务一致 */
+export function resolvePackagePricingRegionId(pkg: {
+  id?: string;
+  region?: string | null;
+}): string {
+  const fromField = normalizePackageRegionField(pkg.region);
+  if (fromField) return fromField;
+  const id = (pkg.id || '').toUpperCase();
+  for (const [prefix, rid] of Object.entries(PACKAGE_PREFIX_TO_REGION)) {
+    if (id.startsWith(prefix)) return rid;
+  }
+  return DEFAULT_PRICING_REGION_FALLBACK;
+}
+
+export function getRegionalPricingForPackage(
+  pkg: { id?: string; region?: string | null },
+  map: Record<string, Record<string, number>>,
+): Record<string, number> {
+  const rid = resolvePackagePricingRegionId(pkg);
+  return map[rid] || map[DEFAULT_PRICING_REGION_FALLBACK] || {};
+}
+
+/** 骑手账号所属领区（登录时写入 AsyncStorage pricingRegionId） */
+export function resolveRiderPricingRegionId(
+  accountRegion?: string | null,
+  username?: string | null,
+): string {
+  const fromAccount = normalizePackageRegionField(accountRegion);
+  if (fromAccount) return fromAccount;
+  const u = (username || '').toUpperCase();
+  for (const [prefix, rid] of Object.entries(PACKAGE_PREFIX_TO_REGION)) {
+    if (u.startsWith(prefix)) return rid;
+  }
+  return DEFAULT_PRICING_REGION_FALLBACK;
+}
+
+function isGlobalPricingKey(settingsKey: string): boolean {
+  const parts = settingsKey.split('.');
+  return parts.length === 2 && parts[0] === 'pricing';
+}
+
+function parsePricingSettingValue(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
+    return parsePricingSettingValue((raw as { value: unknown }).value);
+  }
+  if (typeof raw === 'string') {
+    try {
+      const j = JSON.parse(raw);
+      return parsePricingSettingValue(j);
+    } catch {
+      return parseFloat(raw) || 0;
+    }
+  }
+  return 0;
+}
+
+export const systemSettingsService = {
+  async getPricingSettings(region?: string): Promise<Record<string, number>> {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('settings_key, settings_value')
+        .like('settings_key', 'pricing.%');
+
+      if (error) throw error;
+
+      const settings: Record<string, number> = {
+        base_fee: 1500,
+        per_km_fee: 250,
+        weight_surcharge: 150,
+        urgent_surcharge: 500,
+        scheduled_surcharge: 200,
+        oversize_surcharge: 300,
+        fragile_surcharge: 300,
+        food_beverage_surcharge: 300,
+        free_km_threshold: 3,
+        courier_km_rate: 500,
+        way_side_courier_per_order: 0,
+      };
+
+      const applyRegionPrefix = (prefix: string) => {
+        data?.forEach((item: { settings_key: string; settings_value: unknown }) => {
+          if (!item.settings_key.startsWith(prefix)) return;
+          const field = item.settings_key.slice(prefix.length);
+          settings[field] = parsePricingSettingValue(item.settings_value);
+        });
+      };
+
+      if (data && data.length > 0) {
+        data.forEach((item: { settings_key: string; settings_value: unknown }) => {
+          if (!isGlobalPricingKey(item.settings_key)) return;
+          const field = item.settings_key.replace('pricing.', '');
+          settings[field] = parsePricingSettingValue(item.settings_value);
+        });
+
+        const regionalPrefix = region
+          ? `pricing.${region.toLowerCase()}.`
+          : `pricing.${DEFAULT_PRICING_REGION_FALLBACK}.`;
+        applyRegionPrefix(regionalPrefix);
+      }
+
+      return settings;
+    } catch (err) {
+      console.warn('获取计费规则失败，使用默认值:', err);
+      return {
+        base_fee: 1500,
+        per_km_fee: 250,
+        weight_surcharge: 150,
+        urgent_surcharge: 500,
+        scheduled_surcharge: 200,
+        oversize_surcharge: 300,
+        fragile_surcharge: 300,
+        food_beverage_surcharge: 300,
+        free_km_threshold: 3,
+        courier_km_rate: 500,
+        way_side_courier_per_order: 0,
+      };
+    }
+  },
+
+  /** 一次拉取各领区合并后的计费（财务/骑手按单匹配领区） */
+  async getRegionalPricingMap(
+    regionIds: readonly string[] = PRICING_REGION_IDS,
+  ): Promise<Record<string, Record<string, number>>> {
+    const DEFAULTS: Record<string, number> = {
+      base_fee: 1500,
+      per_km_fee: 250,
+      weight_surcharge: 150,
+      urgent_surcharge: 500,
+      oversize_surcharge: 300,
+      scheduled_surcharge: 200,
+      fragile_surcharge: 300,
+      food_beverage_surcharge: 300,
+      free_km_threshold: 3,
+      courier_km_rate: 500,
+      way_side_courier_per_order: 0,
+      delivery_bonus_rate: 0,
+    };
+
+    const globalOverrides: Record<string, number> = {};
+    const regionalOverrides: Record<string, Record<string, number>> = {};
+
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('settings_key, settings_value')
+        .like('settings_key', 'pricing.%');
+
+      if (error) throw error;
+
+      data?.forEach((item: { settings_key: string; settings_value: unknown }) => {
+        const key = item.settings_key;
+        const parts = key.split('.');
+        if (parts[0] !== 'pricing') return;
+        const val = parsePricingSettingValue(item.settings_value);
+        if (parts.length === 2) {
+          globalOverrides[parts[1]] = val;
+        } else if (parts.length === 3) {
+          const reg = parts[1].toLowerCase();
+          const field = parts[2];
+          if (!regionalOverrides[reg]) regionalOverrides[reg] = {};
+          regionalOverrides[reg][field] = val;
+        }
+      });
+    } catch (e) {
+      console.warn('getRegionalPricingMap failed:', e);
+    }
+
+    const result: Record<string, Record<string, number>> = {};
+    for (const rid of regionIds) {
+      const r = rid.toLowerCase();
+      result[r] = {
+        ...DEFAULTS,
+        ...globalOverrides,
+        ...(regionalOverrides[r] || {}),
+      };
+    }
+    return result;
+  },
 };
 
 // 包裹服务
@@ -983,18 +1210,40 @@ export const deliveryStoreService = {
         .select('*')
         .eq('id', storeId)
         .single();
-      
+
       if (error) {
         console.error('获取快递店详情失败:', error);
         return null;
       }
-      
+
       return data;
     } catch (err) {
       console.error('获取快递店详情异常:', err);
       return null;
     }
-  }
+  },
+
+  /** 合伙店铺商品 name → price，用于骑手端解析订单商品单价/小计（与商家端一致） */
+  async getProductPriceMapByStoreId(
+    storeId: string | undefined | null,
+  ): Promise<Record<string, number>> {
+    if (!storeId) return {};
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('name, price')
+        .eq('store_id', storeId);
+      if (error || !data?.length) return {};
+      return data.reduce<Record<string, number>>((acc, row: any) => {
+        if (row?.name != null)
+          acc[String(row.name).trim()] = Number(row.price) || 0;
+        return acc;
+      }, {});
+    } catch (err) {
+      console.warn('获取店铺商品价格映射失败:', err);
+      return {};
+    }
+  },
 };
 
 // 通知接口

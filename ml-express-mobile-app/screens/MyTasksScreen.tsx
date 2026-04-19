@@ -33,6 +33,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { geofenceService } from '../services/geofenceService';
 import { DeviceHealthShield } from '../components/DeviceHealthShield';
+import {
+  normalizePackageStatusZh,
+  isActiveCourierTaskStatus,
+  isMerchantGeofenceStatus,
+  isPickupFlowStatus,
+  isNavigateMerchantFirstPhase,
+} from '../utils/packageStatusNormalize';
+import { openMapsToAddress } from '../utils/openMapsNavigation';
 
 const { width, height } = Dimensions.get('window');
 
@@ -187,8 +195,9 @@ const MyTasksScreen: React.FC = () => {
     if (!currentLocation || packages.length === 0) return;
 
     packages.forEach(pkg => {
-      // 1. 到达商家自动签到 (100米内)
-      if (pkg.status === '待取件' || pkg.status === '待收款') {
+      // 1. 到达商家自动签到 (100米内)；含「打包中」（可在店外等待备货）
+      const ns = normalizePackageStatusZh(pkg.status);
+      if (isMerchantGeofenceStatus(ns)) {
         const dist = calculateDistance(
           currentLocation.coords.latitude,
           currentLocation.coords.longitude,
@@ -277,27 +286,16 @@ const MyTasksScreen: React.FC = () => {
         }
       }
       
-      const normalizeStatus = (status?: string) => {
-        if (!status) return '';
-        const trimmed = status.trim();
-        if (trimmed.includes('已送达')) return '已送达';
-        if (trimmed.includes('已取消')) return '已取消';
-        if (trimmed.includes('配送中') || trimmed.includes('配送进行中')) return '配送中';
-        if (trimmed.includes('已取件')) return '已取件';
-        if (trimmed.includes('待收款')) return '待收款';
-        if (trimmed.includes('待取件')) return '待取件';
-        if (trimmed.includes('待确认')) return '待确认';
-        return trimmed;
-      };
-
-      const myPackages = allPackages.filter(pkg => {
-        if (pkg.courier !== userName) return false;
-        const s = normalizeStatus(pkg.status);
-        return ['待取件', '待收款', '已取件', '配送中', '已送达', '异常上报'].includes(s);
-      }).map(pkg => ({
-        ...pkg,
-        status: normalizeStatus(pkg.status)
-      }));
+      const myPackages = allPackages
+        .filter((pkg) => {
+          if (pkg.courier !== userName) return false;
+          const s = normalizePackageStatusZh(pkg.status);
+          return isActiveCourierTaskStatus(s);
+        })
+        .map((pkg) => ({
+          ...pkg,
+          status: normalizePackageStatusZh(pkg.status),
+        }));
       
       setPackages(myPackages);
       const grouped = groupPackagesByDate(myPackages);
@@ -333,25 +331,38 @@ const MyTasksScreen: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    const s = (status || '').trim();
-    if (s.includes('已送达')) return '#27ae60'; // 绿色 - 已送达
-    if (s.includes('已取消')) return '#e74c3c'; // 红色 - 已取消
-    if (s.includes('配送中') || s.includes('配送进行中')) return '#9b59b6'; // 紫色 - 配送中
-    if (s.includes('已取件')) return '#3498db'; // 蓝色 - 已取件
-    if (s.includes('待取件') || s.includes('待收款')) return '#f39c12'; // 橙色 - 待取件
-    if (s.includes('异常上报')) return '#ef4444'; // 🚀 新增：红色 - 异常上报
+    const s = normalizePackageStatusZh(status);
+    if (s === '已送达' || s === '已完成') return '#27ae60';
+    if (s === '已取消') return '#e74c3c';
+    if (s === '配送中') return '#9b59b6';
+    if (s === '已取件') return '#3498db';
+    if (s === '待取件' || s === '待收款') return '#f39c12';
+    if (s === '打包中') return '#0ea5e9';
+    if (s === '待确认') return '#a855f7';
+    if (s === '异常上报') return '#ef4444';
     return '#95a5a6';
   };
 
   const getStatusText = (status: string) => {
-    const s = (status || '').trim();
-    if (s.includes('已送达')) return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
-    if (s.includes('已取消')) return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
-    if (s.includes('配送中') || s.includes('配送进行中')) return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
-    if (s.includes('已取件')) return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
-    if (s.includes('待取件')) return language === 'zh' ? '待取件' : language === 'en' ? 'Pending' : 'ကောက်ယူရန်စောင့်ဆိုင်း';
-    if (s.includes('待收款')) return language === 'zh' ? '待收款' : language === 'en' ? 'Wait Collect' : 'ငွေကောက်ခံရန်';
-    if (s.includes('异常上报')) return language === 'zh' ? '异常上报' : language === 'en' ? 'Anomaly' : 'မူမမှန်မှု';
+    const s = normalizePackageStatusZh(status);
+    if (s === '已送达' || s === '已完成')
+      return language === 'zh' ? '已送达' : language === 'en' ? 'Delivered' : 'ပေးပို့ပြီး';
+    if (s === '已取消')
+      return language === 'zh' ? '已取消' : language === 'en' ? 'Cancelled' : 'ပယ်ဖျက်ပြီး';
+    if (s === '配送中')
+      return language === 'zh' ? '配送中' : language === 'en' ? 'Delivering' : 'ပို့ဆောင်နေသည်';
+    if (s === '已取件')
+      return language === 'zh' ? '已取件' : language === 'en' ? 'Picked Up' : 'ကောက်ယူပြီး';
+    if (s === '待取件')
+      return language === 'zh' ? '待取件' : language === 'en' ? 'Pending' : 'ကောက်ယူရန်စောင့်ဆိုင်း';
+    if (s === '待收款')
+      return language === 'zh' ? '待收款' : language === 'en' ? 'Wait Collect' : 'ငွေကောက်ခံရန်';
+    if (s === '打包中')
+      return language === 'zh' ? '打包中' : language === 'en' ? 'Packing' : 'ထုပ်ပိုးနေသည်';
+    if (s === '待确认')
+      return language === 'zh' ? '待确认' : language === 'en' ? 'Pending confirm' : 'အတည်ပြုရန်';
+    if (s === '异常上报')
+      return language === 'zh' ? '异常上报' : language === 'en' ? 'Anomaly' : 'မူမမှန်မှု';
     return language === 'zh' ? '未知状态' : language === 'en' ? 'Unknown' : 'အခြေအနေမသိ';
   };
 
@@ -366,11 +377,28 @@ const MyTasksScreen: React.FC = () => {
     }
   };
 
-  const handleNavigate = () => {
-    if (selectedPackage) {
-      const address = encodeURIComponent(selectedPackage.receiver_address);
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${address}`);
+  const handleCallSender = () => {
+    if (selectedPackage?.sender_phone) {
+      Linking.openURL(`tel:${selectedPackage.sender_phone}`);
     }
+  };
+
+  const handleNavigateToMerchant = () => {
+    if (!selectedPackage) return;
+    openMapsToAddress(
+      selectedPackage.sender_address,
+      selectedPackage.sender_latitude,
+      selectedPackage.sender_longitude,
+    );
+  };
+
+  const handleNavigateToCustomer = () => {
+    if (!selectedPackage) return;
+    openMapsToAddress(
+      selectedPackage.receiver_address,
+      selectedPackage.receiver_latitude,
+      selectedPackage.receiver_longitude,
+    );
   };
 
   const handleShowAddress = () => {
@@ -619,7 +647,11 @@ const MyTasksScreen: React.FC = () => {
 
       // 2. 🚀 距离检查 (如果是送达操作且不是扫码送达中转站)
       const isStoreCode = data.startsWith('STORE_');
-      if (selectedPackage && selectedPackage.status !== '待取件' && !isStoreCode) {
+      if (
+        selectedPackage &&
+        !isPickupFlowStatus(normalizePackageStatusZh(selectedPackage.status)) &&
+        !isStoreCode
+      ) {
         const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         const { data: pkgData } = await supabase.from('packages').select('receiver_latitude, receiver_longitude').eq('id', selectedPackage.id).single();
         
@@ -655,7 +687,8 @@ const MyTasksScreen: React.FC = () => {
         const storeName = storeDetails ? storeDetails.store_name : `中转站`;
         
         // 🚀 核心逻辑：支持异常上报状态送达中转站
-        const isAnomalyResolution = selectedPackage?.status === '异常上报';
+        const isAnomalyResolution =
+          normalizePackageStatusZh(selectedPackage?.status) === "异常上报";
         const statusMsg = isAnomalyResolution ? '已送达 (异常转中转站)' : '已送达';
         const alertMsg = isAnomalyResolution ? `包裹已作为异常件送达至：${storeName}` : `包裹已送达至：${storeName}`;
 
@@ -773,12 +806,20 @@ const MyTasksScreen: React.FC = () => {
                 <TouchableOpacity style={styles.gridActionBtn} onPress={() => setShowCameraModal(true)}>
                   <LinearGradient colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']} style={styles.gridBtnGradient}>
                     <Ionicons 
-                      name={selectedPackage.status === '待取件' || selectedPackage.status === '待收款' ? "archive" : "checkmark-circle"} 
+                      name={
+                        isPickupFlowStatus(
+                          normalizePackageStatusZh(selectedPackage.status),
+                        )
+                          ? "archive"
+                          : "checkmark-circle"
+                      } 
                       size={26} 
                       color="#10b981" 
                     />
                     <Text style={styles.gridBtnText}>
-                      {selectedPackage.status === '待取件' || selectedPackage.status === '待收款' 
+                      {isPickupFlowStatus(
+                        normalizePackageStatusZh(selectedPackage.status),
+                      )
                         ? (language === 'zh' ? '立即取件' : 'Pickup') 
                         : (language === 'zh' ? '完成配送' : 'Complete')}
                     </Text>
@@ -889,27 +930,177 @@ const MyTasksScreen: React.FC = () => {
 
       {renderDetailModal()}
 
-      {/* 地址模态框 */}
+      {/* 地址模态框：取件/待收款优先商家导航 */}
       <Modal visible={showAddressModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.glassModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📍 {language === 'zh' ? '送货地址' : 'Address'}</Text>
+              <Text style={styles.modalTitle}>
+                📍{" "}
+                {selectedPackage &&
+                isNavigateMerchantFirstPhase(
+                  normalizePackageStatusZh(selectedPackage.status),
+                )
+                  ? language === "zh"
+                    ? "取件与导航"
+                    : language === "en"
+                      ? "Pickup & map"
+                      : "ကောက်ယူရန်နှင့်မြေပုံ"
+                  : language === "zh"
+                    ? "地址与导航"
+                    : language === "en"
+                      ? "Address & map"
+                      : "လိပ်စာနှင့်မြေပုံ"}
+              </Text>
               <TouchableOpacity onPress={() => setShowAddressModal(false)} style={styles.closeBtn}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
             </View>
-            <View style={styles.modalBody}>
+            <ScrollView
+              style={{ maxHeight: height * 0.62 }}
+              contentContainerStyle={{ padding: 24 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {selectedPackage &&
+              isNavigateMerchantFirstPhase(
+                normalizePackageStatusZh(selectedPackage.status),
+              ) &&
+              (selectedPackage.sender_address || selectedPackage.sender_name) ? (
+                <View style={[styles.glassInfoCard, { borderColor: "rgba(245, 158, 11, 0.35)" }]}>
+                  <Text style={[styles.infoLineLabel, { color: "#fbbf24" }]}>
+                    🏪{" "}
+                    {language === "zh"
+                      ? "商家 / 取件点"
+                      : language === "en"
+                        ? "Merchant / Pickup"
+                        : "ဆိုင်"}
+                  </Text>
+                  {normalizePackageStatusZh(selectedPackage.status) ===
+                  "待收款" ? (
+                    <Text
+                      style={{
+                        color: "#fcd34d",
+                        fontSize: 12,
+                        fontWeight: "700",
+                        marginBottom: 10,
+                        marginTop: 4,
+                      }}
+                    >
+                      {language === "zh"
+                        ? "请先到商家收款并取货。"
+                        : language === "en"
+                          ? "Go to merchant first for COD & pickup."
+                          : "ဆိုင်တွင်ငွေကောက်ယူပါ။"}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.infoLineValue}>
+                    {selectedPackage.sender_name
+                      ? `${selectedPackage.sender_name}\n`
+                      : ""}
+                    {selectedPackage.sender_address || "—"}
+                  </Text>
+                  <View style={styles.modalActionsGrid}>
+                    <TouchableOpacity
+                      style={styles.gridActionBtn}
+                      onPress={handleCallSender}
+                      disabled={!selectedPackage.sender_phone}
+                    >
+                      <LinearGradient
+                        colors={
+                          selectedPackage.sender_phone
+                            ? ["#3b82f6", "#2563eb"]
+                            : ["#475569", "#334155"]
+                        }
+                        style={styles.gridBtnGradient}
+                      >
+                        <Text style={styles.gridBtnText}>
+                          📞{" "}
+                          {language === "zh"
+                            ? "联系商家"
+                            : language === "en"
+                              ? "Call merchant"
+                              : "ဆိုင်ကိုခေါ်ပါ"}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.gridActionBtn}
+                      onPress={handleNavigateToMerchant}
+                    >
+                      <LinearGradient
+                        colors={["#f59e0b", "#d97706"]}
+                        style={styles.gridBtnGradient}
+                      >
+                        <Text style={styles.gridBtnText}>
+                          🗺️{" "}
+                          {language === "zh"
+                            ? "导航商家"
+                            : language === "en"
+                              ? "To merchant"
+                              : "ဆိုင်သို့"}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
+
               <View style={styles.glassInfoCard}>
-                <Text style={styles.infoLineLabel}>{language === 'zh' ? '收件人' : 'Receiver'}</Text>
-                <Text style={styles.infoLineValue}>{selectedPackage?.receiver_name}</Text>
+                <Text style={styles.infoLineLabel}>
+                  {selectedPackage &&
+                  isNavigateMerchantFirstPhase(
+                    normalizePackageStatusZh(selectedPackage.status),
+                  )
+                    ? language === "zh"
+                      ? "客户 · 送达（取件后）"
+                      : language === "en"
+                        ? "Customer · After pickup"
+                        : "ဖောက်သည်"
+                    : language === "zh"
+                      ? "收件人"
+                      : language === "en"
+                        ? "Receiver"
+                        : "လက်ခံသူ"}
+                </Text>
+                <Text style={styles.infoLineValue}>
+                  {selectedPackage?.receiver_name}
+                </Text>
                 <View style={styles.glassDivider} />
-                <Text style={styles.infoLineLabel}>{language === 'zh' ? '详细地址' : 'Address'}</Text>
-                <Text style={styles.infoLineValue}>{selectedPackage?.receiver_address}</Text>
+                <Text style={styles.infoLineLabel}>
+                  {language === "zh" ? "详细地址" : language === "en" ? "Address" : "လိပ်စာ"}
+                </Text>
+                <Text style={styles.infoLineValue}>
+                  {selectedPackage?.receiver_address}
+                </Text>
               </View>
               <View style={styles.modalActionsGrid}>
-                <TouchableOpacity style={styles.gridActionBtn} onPress={handleCall}><LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.gridBtnGradient}><Text style={styles.gridBtnText}>📞 {language === 'zh' ? '拨打电话' : 'Call'}</Text></LinearGradient></TouchableOpacity>
-                <TouchableOpacity style={styles.gridActionBtn} onPress={handleNavigate}><LinearGradient colors={['#10b981', '#059669']} style={styles.gridBtnGradient}><Text style={styles.gridBtnText}>🗺️ {language === 'zh' ? '导航前往' : 'Map'}</Text></LinearGradient></TouchableOpacity>
+                <TouchableOpacity style={styles.gridActionBtn} onPress={handleCall}>
+                  <LinearGradient colors={["#3b82f6", "#2563eb"]} style={styles.gridBtnGradient}>
+                    <Text style={styles.gridBtnText}>
+                      📞{" "}
+                      {language === "zh"
+                        ? "联系客户"
+                        : language === "en"
+                          ? "Call customer"
+                          : "ဖောက်သည်ကိုခေါ်ပါ"}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.gridActionBtn}
+                  onPress={handleNavigateToCustomer}
+                >
+                  <LinearGradient colors={["#10b981", "#059669"]} style={styles.gridBtnGradient}>
+                    <Text style={styles.gridBtnText}>
+                      🗺️{" "}
+                      {language === "zh"
+                        ? "导航客户"
+                        : language === "en"
+                          ? "To customer"
+                          : "ဖောက်သည်ထံ"}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -923,7 +1114,10 @@ const MyTasksScreen: React.FC = () => {
               <TouchableOpacity onPress={() => setShowCameraModal(false)} style={styles.closeBtn}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
             </View>
             <View style={[styles.modalBody, { flexDirection: 'row', gap: 12, flexWrap: 'wrap' }]}>
-              {selectedPackage?.status === '待取件' ? (
+              {selectedPackage &&
+              isPickupFlowStatus(
+                normalizePackageStatusZh(selectedPackage.status),
+              ) ? (
                 <>
                   <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowScanModal(true); setScanning(true); }}>
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>

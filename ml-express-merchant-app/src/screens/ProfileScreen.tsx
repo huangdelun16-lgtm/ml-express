@@ -275,7 +275,12 @@ export default function ProfileScreen({ navigation }: any) {
     undefined,
   );
   const [codOrders, setCodOrders] = useState<
-    Array<{ orderId: string; codAmount: number; deliveryTime?: string }>
+    Array<{
+      orderId: string;
+      codAmount: number;
+      deliveryTime?: string;
+      deliveryFeeLabel?: string;
+    }>
   >([]);
   const [codOrdersPage, setCodOrdersPage] = useState(1);
   const [codOrdersTotal, setCodOrdersTotal] = useState(0);
@@ -284,7 +289,12 @@ export default function ProfileScreen({ navigation }: any) {
   const [codOrdersLoadingMore, setCodOrdersLoadingMore] = useState(false);
   const [codOrdersSearchText, setCodOrdersSearchText] = useState("");
   const [allCodOrders, setAllCodOrders] = useState<
-    Array<{ orderId: string; codAmount: number; deliveryTime?: string }>
+    Array<{
+      orderId: string;
+      codAmount: number;
+      deliveryTime?: string;
+      deliveryFeeLabel?: string;
+    }>
   >([]);
 
   // 月份选择器状态
@@ -663,6 +673,9 @@ export default function ProfileScreen({ navigation }: any) {
       month: "月",
       searchOrder: "搜索订单号",
       totalAmount: "总金额",
+      codSumTotal: "代收合计",
+      deliveryFee: "跑腿费",
+      noDeliveredOrdersMonth: "本月暂无已送达订单",
       refresh: "刷新",
       // 注销账号相关
       deleteAccount: "注销账号",
@@ -808,6 +821,9 @@ export default function ProfileScreen({ navigation }: any) {
       month: "Month",
       searchOrder: "Search Order ID",
       totalAmount: "Total Amount",
+      codSumTotal: "COD sum",
+      deliveryFee: "Delivery fee",
+      noDeliveredOrdersMonth: "No delivered orders this month",
       refresh: "Refresh",
       // Account deletion
       deleteAccount: "Delete Account",
@@ -954,6 +970,9 @@ export default function ProfileScreen({ navigation }: any) {
       month: "လ",
       searchOrder: "အော်ဒါနံပါတ်ရှာဖွေရန်",
       totalAmount: "စုစုပေါင်းငွေ",
+      codSumTotal: "ကောက်ခံမှုပေါင်း",
+      deliveryFee: "ပို့ဆောင်ခ",
+      noDeliveredOrdersMonth: "ယနေ့လတွင် ပြီးမြောက်ပို့ဆောင်မှု မရှိသေးပါ",
       refresh: "ပြန်လည်စတင်ရန်",
       // အကောင့်ဖျက်သိမ်းခြင်း
       deleteAccount: "အကောင့်ဖျက်သိမ်းရန်",
@@ -4470,16 +4489,34 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
             </ScrollView>
 
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonConfirm]}
-              onPress={() => setShowAboutModal(false)}
-            >
-              <Text
-                style={[styles.modalButtonText, styles.modalButtonTextConfirm]}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowAboutModal(false)}
               >
-                {t.confirm}
-              </Text>
-            </TouchableOpacity>
+                <Text style={styles.modalButtonText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+                onPress={() => setShowAboutModal(false)}
+              >
+                <LinearGradient
+                  colors={["#3b82f6", "#2563eb"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modalButtonGradient}
+                >
+                  <Text
+                    style={[
+                      styles.modalButtonText,
+                      styles.modalButtonTextConfirm,
+                    ]}
+                  >
+                    {t.confirm}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -4922,7 +4959,7 @@ export default function ProfileScreen({ navigation }: any) {
                         color: "white",
                       }}
                     >
-                      {t.totalAmount}: {formatMoney(calculateTotalAmount())} MMK
+                      {t.codSumTotal}: {formatMoney(calculateTotalAmount())} MMK
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -5077,6 +5114,17 @@ export default function ProfileScreen({ navigation }: any) {
                                 {formatDate(item.deliveryTime)}
                               </Text>
                             </View>
+                            {!!item.deliveryFeeLabel && (
+                              <Text
+                                style={{
+                                  color: "#64748b",
+                                  fontSize: 11,
+                                  marginTop: 6,
+                                }}
+                              >
+                                {t.deliveryFee}: {item.deliveryFeeLabel}
+                              </Text>
+                            )}
                           </View>
                           <View
                             style={{ alignItems: "flex-end", marginLeft: 12 }}
@@ -5107,7 +5155,11 @@ export default function ProfileScreen({ navigation }: any) {
                                   lineHeight: 24,
                                 }}
                               >
-                                {formatMoney(item.codAmount)}
+                                {item.codAmount > 0
+                                  ? formatMoney(item.codAmount)
+                                  : language === "zh"
+                                    ? "—"
+                                    : "—"}
                               </Text>
                               <Text
                                 style={{
@@ -5163,11 +5215,7 @@ export default function ProfileScreen({ navigation }: any) {
                             : language === "en"
                               ? "No matching orders"
                               : "အော်ဒါမတွေ့ရှိပါ"
-                          : language === "zh"
-                            ? "本月暂无代收款订单"
-                            : language === "en"
-                              ? "No COD orders this month"
-                              : "အော်ဒါမရှိပါ"}
+                          : t.noDeliveredOrdersMonth}
                       </Text>
                       {codOrdersSearchText.trim() && (
                         <TouchableOpacity

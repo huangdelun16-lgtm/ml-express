@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import LoggerService from "../services/LoggerService";
 import { useNavigate, useLocation } from "react-router-dom";
 import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
@@ -11,6 +17,7 @@ import {
 import NavigationBar from "../components/home/NavigationBar";
 import { useLanguage } from "../contexts/LanguageContext";
 import QRCode from "qrcode";
+import { getPackingModalModel } from "../utils/parseOrderPackingItems";
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
 const GOOGLE_MAPS_LIBRARIES: any = ["places"];
@@ -397,6 +404,14 @@ const TrackingPage: React.FC = () => {
     setShowPackingModal(true);
     setShowPackageDetailModal(false);
   };
+
+  const packingModalModel = useMemo(() => {
+    if (!packingOrderData) return null;
+    return getPackingModalModel(
+      packingOrderData.description,
+      productPriceMap,
+    );
+  }, [packingOrderData, productPriceMap]);
 
   const toggleItem = (itemId: string) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -1460,7 +1475,12 @@ const TrackingPage: React.FC = () => {
                   marginBottom: "1.5rem",
                 }}
               >
-                📋 {language === "zh" ? "核对商品清单" : "Checklist"}
+                📋{" "}
+                {language === "zh"
+                  ? "核对商品清单"
+                  : language === "en"
+                    ? "Checklist"
+                    : "ပစ္စည်းစာရင်းစစ်ဆေးရန်"}
               </h3>
               <div
                 style={{
@@ -1469,109 +1489,276 @@ const TrackingPage: React.FC = () => {
                   gap: "1rem",
                 }}
               >
-                {(() => {
-                  const productsMatch =
-                    packingOrderData.description?.match(/\[商品清单: (.*?)\]/);
-                  const productItems = productsMatch
-                    ? productsMatch[1].split(", ")
-                    : [];
-                  if (productItems.length === 0) {
-                    return (
-                      <div
-                        style={{
-                          padding: "1.5rem",
-                          textAlign: "center",
-                          background: "#f8fafc",
-                          borderRadius: "24px",
-                          border: "2px dashed #e2e8f0",
-                        }}
-                      >
-                        <p style={{ color: "#64748b" }}>
-                          {language === "zh"
-                            ? "暂无详细商品清单"
-                            : "No detailed list"}
-                        </p>
-                        <label
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "12px",
-                            marginTop: "1rem",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checkedItems["default"]}
-                            onChange={() => toggleItem("default")}
-                            style={{ width: "24px", height: "24px" }}
-                          />
-                          <span
-                            style={{
-                              fontSize: "1.1rem",
-                              fontWeight: "800",
-                              color: "#1e293b",
-                            }}
-                          >
-                            {language === "zh" ? "确认商品已备齐" : "Confirm"}
-                          </span>
-                        </label>
-      </div>
-                    );
-                  }
-                  return productItems.map((item: string, index: number) => (
-                    <div
-                      key={index}
-                      onClick={() => toggleItem(`item-${index}`)}
+                {packingModalModel && packingModalModel.lineCount === 0 ? (
+                  <div
+                    style={{
+                      padding: "1.5rem",
+                      textAlign: "center",
+                      background: "#f8fafc",
+                      borderRadius: "24px",
+                      border: "2px dashed #e2e8f0",
+                    }}
+                  >
+                    <p style={{ color: "#64748b", fontWeight: "600" }}>
+                      {language === "zh"
+                        ? "暂无详细商品清单，请核对包裹内容"
+                        : language === "en"
+                          ? "No detailed list, please check package content"
+                          : "အသေးစိတ် စာရင်းမရှိသေးပါ၊ ထုပ်ပိုးမှုကို စစ်ဆေးပါ"}
+                    </p>
+                    <label
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "15px",
-                        padding: "1.2rem",
-                        background: checkedItems[`item-${index}`]
-                          ? "rgba(16, 185, 129, 0.05)"
-                          : "#f8fafc",
-                        borderRadius: "18px",
-                        border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#f1f5f9"}`,
+                        justifyContent: "center",
+                        gap: "12px",
+                        marginTop: "1rem",
                         cursor: "pointer",
                       }}
                     >
-                      <div
-                        style={{
-                          width: "28px",
-                          height: "28px",
-                          borderRadius: "8px",
-                          border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#cbd5e1"}`,
-                          backgroundColor: checkedItems[`item-${index}`]
-                            ? "#10b981"
-                            : "transparent",
-                          color: "white",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {checkedItems[`item-${index}`] && "✓"}
-                      </div>
+                      <input
+                        type="checkbox"
+                        checked={checkedItems["default"]}
+                        onChange={() => toggleItem("default")}
+                        style={{ width: "24px", height: "24px" }}
+                      />
                       <span
                         style={{
                           fontSize: "1.1rem",
-                          fontWeight: "700",
-                          color: checkedItems[`item-${index}`]
-                            ? "#64748b"
-                            : "#1e293b",
-                          textDecoration: checkedItems[`item-${index}`]
-                            ? "line-through"
-                            : "none",
+                          fontWeight: "800",
+                          color: "#1e293b",
                         }}
                       >
-                        {item}
+                        {language === "zh"
+                          ? "确认商品已备齐"
+                          : language === "en"
+                            ? "Confirm all items ready"
+                            : "ပစ္စည်းအားလုံး ပြင်ဆင်ပြီးပါပြီ"}
                       </span>
-                    </div>
-                  ));
-                })()}
+                    </label>
+                  </div>
+                ) : (
+                  <>
+                    {packingModalModel && (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "28px 1fr minmax(36px, auto) minmax(64px, auto) minmax(76px, auto)",
+                          gap: "6px",
+                          alignItems: "center",
+                          padding: "0 0.35rem 0.35rem",
+                          color: "#64748b",
+                          fontSize: "0.72rem",
+                          fontWeight: "800",
+                        }}
+                      >
+                        <span />
+                        <span>
+                          {language === "zh"
+                            ? "商品"
+                            : language === "en"
+                              ? "Item"
+                              : "ပစ္စည်း"}
+                        </span>
+                        <span style={{ textAlign: "right" }}>
+                          {language === "zh"
+                            ? "数量"
+                            : language === "en"
+                              ? "Qty"
+                              : "အရေ.အတွက်"}
+                        </span>
+                        <span style={{ textAlign: "right" }}>
+                          {language === "zh"
+                            ? "单价"
+                            : language === "en"
+                              ? "Unit"
+                              : "တစ်ခုဈေး"}
+                        </span>
+                        <span style={{ textAlign: "right" }}>
+                          {language === "zh"
+                            ? "小计"
+                            : language === "en"
+                              ? "Subtotal"
+                              : "စုစုပေါင်း"}
+                        </span>
+                      </div>
+                    )}
+                    {packingModalModel?.rows.map((row, index: number) => (
+                      <div
+                        key={`${row.name}-${index}`}
+                        onClick={() => toggleItem(`item-${index}`)}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "28px 1fr minmax(36px, auto) minmax(64px, auto) minmax(76px, auto)",
+                          gap: "6px",
+                          alignItems: "center",
+                          padding: "1rem 0.75rem",
+                          background: checkedItems[`item-${index}`]
+                            ? "rgba(16, 185, 129, 0.05)"
+                            : "#f8fafc",
+                          borderRadius: "18px",
+                          border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#f1f5f9"}`,
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "8px",
+                            border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#cbd5e1"}`,
+                            backgroundColor: checkedItems[`item-${index}`]
+                              ? "#10b981"
+                              : "transparent",
+                            color: "white",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "1rem",
+                          }}
+                        >
+                          {checkedItems[`item-${index}`] && "✓"}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "0.95rem",
+                            fontWeight: "700",
+                            color: checkedItems[`item-${index}`]
+                              ? "#64748b"
+                              : "#1e293b",
+                            textDecoration: checkedItems[`item-${index}`]
+                              ? "line-through"
+                              : "none",
+                            lineHeight: 1.35,
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {row.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.95rem",
+                            fontWeight: "700",
+                            textAlign: "right",
+                            color: checkedItems[`item-${index}`]
+                              ? "#94a3b8"
+                              : "#334155",
+                          }}
+                        >
+                          {row.qty}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.85rem",
+                            fontWeight: "600",
+                            textAlign: "right",
+                            color: checkedItems[`item-${index}`]
+                              ? "#94a3b8"
+                              : "#475569",
+                          }}
+                        >
+                          {row.unitPrice != null
+                            ? `${row.unitPrice.toLocaleString()}`
+                            : "—"}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.9rem",
+                            fontWeight: "800",
+                            textAlign: "right",
+                            color: checkedItems[`item-${index}`]
+                              ? "#94a3b8"
+                              : "#0f172a",
+                          }}
+                        >
+                          {row.lineTotal != null
+                            ? `${row.lineTotal.toLocaleString()}`
+                            : "—"}
+                        </span>
+                      </div>
+                    ))}
+                    {packingModalModel &&
+                      packingModalModel.summaryTotal != null && (
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "1rem 0.75rem",
+                            marginTop: "0.25rem",
+                            background: "#ecfdf5",
+                            borderRadius: "16px",
+                            border: "1px solid #a7f3d0",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: "900",
+                              color: "#065f46",
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {language === "zh"
+                              ? "商品合计（MMK）"
+                              : language === "en"
+                                ? "Items total (MMK)"
+                                : "ပစ္စည်းစုစုပေါင်း (MMK)"}
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: "950",
+                              color: "#047857",
+                              fontSize: "1.05rem",
+                            }}
+                          >
+                            {packingModalModel.summaryTotal.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                  </>
+                )}
               </div>
+
+              {packingModalModel?.customerNote ? (
+                <div
+                  style={{
+                    background: "#fffbeb",
+                    padding: "1.5rem",
+                    borderRadius: "24px",
+                    border: "1px solid #fde68a",
+                    marginTop: "1.5rem",
+                  }}
+                >
+                  <h4
+                    style={{
+                      color: "#92400e",
+                      margin: "0 0 0.5rem 0",
+                      fontSize: "0.95rem",
+                      fontWeight: "900",
+                    }}
+                  >
+                    💡{" "}
+                    {language === "zh"
+                      ? "客户备注"
+                      : language === "en"
+                        ? "Customer Note"
+                        : "ဖောက်သည်မှတ်ချက်"}
+                  </h4>
+                  <p
+                    style={{
+                      color: "#b45309",
+                      margin: 0,
+                      fontSize: "1rem",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {packingModalModel.customerNote}
+                  </p>
+                </div>
+              ) : null}
             </div>
             <div
               style={{
@@ -1585,17 +1772,11 @@ const TrackingPage: React.FC = () => {
                 disabled={
                   loading ||
                   (() => {
-                    const productsMatch =
-                      packingOrderData.description?.match(
-                        /\[商品清单: (.*?)\]/,
-                      );
-                    const productItems = productsMatch
-                      ? productsMatch[1].split(", ")
-                      : [];
-                    if (productItems.length === 0)
+                    if (!packingModalModel) return true;
+                    if (packingModalModel.lineCount === 0)
                       return !checkedItems["default"];
-                    return productItems.some(
-                      (_: any, index: number) => !checkedItems[`item-${index}`],
+                    return packingModalModel.rows.some(
+                      (_row, index: number) => !checkedItems[`item-${index}`],
                     );
                   })()
                 }
@@ -1609,16 +1790,28 @@ const TrackingPage: React.FC = () => {
                   border: "none",
                   fontSize: "1.2rem",
                   fontWeight: "950",
-                  cursor: "pointer",
+                  cursor: loading ? "not-allowed" : "pointer",
                   boxShadow: "0 10px 25px rgba(16, 185, 129, 0.3)",
-                  opacity: loading ? 0.6 : 1,
+                  opacity: (() => {
+                    if (!packingModalModel) return 0.6;
+                    const allChecked =
+                      packingModalModel.lineCount === 0
+                        ? checkedItems["default"]
+                        : !packingModalModel.rows.some(
+                            (_row, index: number) =>
+                              !checkedItems[`item-${index}`],
+                          );
+                    return allChecked && !loading ? 1 : 0.6;
+                  })(),
                 }}
               >
                 {loading
                   ? "..."
                   : language === "zh"
                     ? "确认打包完成"
-                    : "Packing Done"}
+                    : language === "en"
+                      ? "Confirm Packing Done"
+                      : "ထုပ်ပိုးပြီးကြောင်း အတည်ပြုပါ"}
               </button>
     </div>
           </div>

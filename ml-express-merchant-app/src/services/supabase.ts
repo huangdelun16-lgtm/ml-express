@@ -5,6 +5,7 @@ import LoggerService from "./../services/LoggerService";
 import NotificationService from "./notificationService";
 import { errorService } from "./ErrorService";
 import { retry } from "../utils/retry";
+import { getProductFeeMmkForPackage } from "../utils/parseMerchantProductFee";
 
 type SupabaseExtra = { supabaseUrl?: string; supabaseAnonKey?: string };
 const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra) as SupabaseExtra | undefined;
@@ -1228,7 +1229,7 @@ export const packageService = {
     }
   },
 
-  // 营收：今日/昨日「已送达」订单量；全量已送达金额汇总（总营收）
+  // 营收：今日/昨日「已送达」订单量；全量已送达「商品费」汇总（非跑腿费 price）
   async getRevenueStats(userId: string, storeName?: string) {
     try {
       const today = new Date();
@@ -1239,7 +1240,7 @@ export const packageService = {
       const buildQuery = (startDate?: Date, endDate?: Date) => {
         let query = supabase
           .from("packages")
-          .select("price")
+          .select("cod_amount, description")
           .eq("status", "已送达");
         const conditions = [`delivery_store_id.eq.${userId}`];
         if (storeName) conditions.push(`sender_name.eq.${storeName}`);
@@ -1253,12 +1254,14 @@ export const packageService = {
         return query;
       };
 
-      const sumAndCount = (data: { price?: string }[] | null) => {
+      const sumAndCount = (
+        data: { cod_amount?: number | null; description?: string | null }[] | null,
+      ) => {
         const rows = data || [];
-        const revenue = rows.reduce((sum, p) => {
-          const val = parseFloat(p.price?.replace(/[^0-9.]/g, "") || "0");
-          return sum + val;
-        }, 0);
+        const revenue = rows.reduce(
+          (sum, p) => sum + getProductFeeMmkForPackage(p),
+          0,
+        );
         return { revenue, count: rows.length };
       };
 
@@ -1294,11 +1297,7 @@ export const packageService = {
     try {
       // 构建查询函数
       const runQuery = async (fields: string) => {
-        let q = supabase
-          .from("packages")
-          .select(fields)
-          .eq("status", "已送达")
-          .gt("cod_amount", 0);
+        let q = supabase.from("packages").select(fields).eq("status", "已送达");
 
         const conditions = [`delivery_store_id.eq.${userId}`];
         if (storeName) {
@@ -1386,7 +1385,7 @@ export const packageService = {
     }
   },
 
-  // 获取指定月份的有代收款的订单列表
+  /** 指定月份已送达订单列表（含代收为 0，便于商家对账） */
   async getMerchantCODOrders(
     userId: string,
     storeName?: string,
@@ -1398,11 +1397,10 @@ export const packageService = {
     try {
       let q = supabase
         .from("packages")
-        .select("id, cod_amount, delivery_time, cod_settled", {
+        .select("id, cod_amount, delivery_time, cod_settled, price", {
           count: "exact",
         })
-        .eq("status", "已送达")
-        .gt("cod_amount", 0);
+        .eq("status", "已送达");
 
       const conditions = [`delivery_store_id.eq.${userId}`];
       if (storeName) {
@@ -1443,10 +1441,11 @@ export const packageService = {
         `[getMerchantCODOrders] Fetched ${data?.length} orders, total count: ${count}`,
       );
 
-      const orders = (data || []).map((pkg) => ({
+      const orders = (data || []).map((pkg: any) => ({
         orderId: pkg.id,
         codAmount: pkg.cod_amount || 0,
         deliveryTime: pkg.delivery_time,
+        deliveryFeeLabel: pkg.price || "",
       }));
 
       return { orders, total: count || 0 };

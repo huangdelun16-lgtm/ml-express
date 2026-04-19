@@ -489,11 +489,7 @@ export const packageService = {
     try {
       // 构建查询函数
       const runQuery = async (fields: string) => {
-        let q = supabase
-          .from('packages')
-          .select(fields)
-          .eq('status', '已送达')
-          .gt('cod_amount', 0);
+        let q = supabase.from('packages').select(fields).eq('status', '已送达');
 
         const conditions = [`delivery_store_id.eq.${userId}`];
         if (storeName) {
@@ -572,14 +568,13 @@ export const packageService = {
     }
   },
 
-  // 获取指定月份的有代收款的订单列表
+  /** 指定月份已送达订单（含代收为 0，便于合伙店铺对账） */
   async getPartnerCODOrders(userId: string, storeName?: string, month?: string, settled?: boolean, page: number = 1, pageSize: number = 20) {
     try {
       let q = supabase
         .from('packages')
-        .select('id, cod_amount, delivery_time, cod_settled', { count: 'exact' })
-        .eq('status', '已送达')
-        .gt('cod_amount', 0);
+        .select('id, cod_amount, delivery_time, cod_settled, price', { count: 'exact' })
+        .eq('status', '已送达');
 
       const conditions = [`delivery_store_id.eq.${userId}`];
       if (storeName) {
@@ -615,10 +610,11 @@ export const packageService = {
       
       if (error) throw error;
       
-      const orders = (data || []).map(pkg => ({
+      const orders = (data || []).map((pkg: any) => ({
         orderId: pkg.id,
         codAmount: pkg.cod_amount || 0,
-        deliveryTime: pkg.delivery_time
+        deliveryTime: pkg.delivery_time,
+        deliveryFeeLabel: pkg.price || '',
       }));
       
       // 为了兼容Web端现有调用，直接返回数组，但也返回total以防未来需要

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { packageService, supabase, reviewService } from '../services/supabase';
+import { packageService, supabase, reviewService, merchantService } from '../services/supabase';
 import { chatService } from '../services/chatService';
 import LoggerService from '../services/LoggerService';
 import { useApp } from '../contexts/AppContext';
@@ -43,6 +43,9 @@ interface Order {
   customer_comment?: string;
   cod_amount?: number;
   payment_method?: string; // 🚀 新增支付方式
+  payment_status?: string;
+  delivery_store_id?: string;
+  notes?: string;
 }
 
 export default function MyOrdersScreen({ navigation, route }: any) {
@@ -70,6 +73,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 打包模态框状态
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [packingOrderData, setPackingOrderData] = useState<Order | null>(null);
+  /** 与商家端 Web 一致：打包弹窗用店铺商品名→单价 */
+  const [packingProductPriceMap, setPackingProductPriceMap] = useState<Record<string, number>>({});
 
   // 🚀 新增：评价管理状态
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
@@ -266,6 +271,36 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       filterOrders(orders, selectedStatus);
     }
   }, [orders, selectedStatus]);
+
+  // 打包弹窗：加载店铺商品价格表（与商家端 Web getPackingModalModel 一致；无 delivery_store_id 时回退为当前商家 id）
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!showPackingModal || !packingOrderData) {
+        setPackingProductPriceMap({});
+        return;
+      }
+      const storeId = packingOrderData.delivery_store_id || customerId;
+      if (!storeId) {
+        setPackingProductPriceMap({});
+        return;
+      }
+      try {
+        const products = await merchantService.getStoreProducts(storeId);
+        if (cancelled) return;
+        const priceMap = products.reduce<Record<string, number>>((acc, product) => {
+          acc[product.name] = product.price;
+          return acc;
+        }, {});
+        setPackingProductPriceMap(priceMap);
+      } catch {
+        if (!cancelled) setPackingProductPriceMap({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showPackingModal, packingOrderData?.id, packingOrderData?.delivery_store_id, customerId]);
 
   // 当筛选状态改变且从首页跳转来时，自动滚动到对应卡片
   useEffect(() => {
@@ -1072,6 +1107,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       <PackingModal
         visible={showPackingModal}
         orderData={packingOrderData}
+        productPriceMap={packingProductPriceMap}
         language={language}
         onClose={() => {
           setShowPackingModal(false);
@@ -1081,7 +1117,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           if (!packingOrderData) return;
           try {
             showLoading(language === 'zh' ? '提交中...' : 'Processing...', 'package');
-            const newStatus = packingOrderData.payment_method === 'cash' ? '待收款' : '待取件';
+            const isPaid =
+              packingOrderData.payment_method === 'balance' ||
+              packingOrderData.payment_status === 'paid';
+            const newStatus = isPaid ? '待取件' : '待收款';
             const { error } = await supabase
               .from('packages')
               .update({ status: newStatus, updated_at: new Date().toISOString() })

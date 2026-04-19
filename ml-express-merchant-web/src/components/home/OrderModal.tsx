@@ -51,8 +51,11 @@ interface OrderModalProps {
   isFromCart?: boolean;
   description?: string; // 🚀 新增：物品描述
   setDescription?: (val: string) => void; // 🚀 新增：设置描述
-  paymentMethod?: 'qr' | 'cash' | 'balance'; // 🚀 新增：支付方式
-  setPaymentMethod?: (val: 'qr' | 'cash' | 'balance') => void; // 🚀 新增：设置支付方式
+  paymentMethod?: 'qr' | 'cash' | 'balance'; // 🚀 新增：支付方式（非商家下单时用于跑腿费等）
+  setPaymentMethod?: (val: 'qr' | 'cash' | 'balance') => void;
+  /** 商家「立即下单」：仅用于商品费用；跑腿费固定现金 */
+  productPaymentMethod?: 'cash' | 'balance';
+  setProductPaymentMethod?: (val: 'cash' | 'balance') => void;
   merchantStore?: any; // 🚀 新增：商家店铺信息
 }
 
@@ -106,8 +109,11 @@ const OrderModal: React.FC<OrderModalProps> = ({
   setDescription = () => {},
   paymentMethod = 'cash',
   setPaymentMethod = () => {},
+  productPaymentMethod = 'balance',
+  setProductPaymentMethod = () => {},
   merchantStore = null
 }) => {
+  const isMerchant = currentUser?.user_type === 'merchant';
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
   const [showProductSelector, setShowProductSelector] = useState(false); // 🚀 新增：商品选择器显示状态
@@ -1240,49 +1246,153 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       </span>
                     </div>
 
-                    {/* 🚀 跑腿费支付方式选择 (优化视觉效果) */}
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '0.5rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('balance')}
-                        style={{
-                          flex: 1,
-                          padding: '10px',
-                          borderRadius: '12px',
-                          fontSize: '0.85rem',
-                          fontWeight: '800',
-                          border: '2px solid',
-                          borderColor: paymentMethod === 'balance' ? '#fbbf24' : 'rgba(255,255,255,0.15)',
-                          background: paymentMethod === 'balance' ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' : 'rgba(255,255,255,0.05)',
-                          color: paymentMethod === 'balance' ? '#1e293b' : 'white',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          boxShadow: paymentMethod === 'balance' ? '0 4px 15px rgba(251, 191, 36, 0.3)' : 'none'
-                        }}
-                      >
-                        💳 {language === 'zh' ? '余额支付' : 'Balance'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('cash')}
-                        style={{
-                          flex: 1,
-                          padding: '10px',
-                          borderRadius: '12px',
-                          fontSize: '0.85rem',
-                          fontWeight: '800',
-                          border: '2px solid',
-                          borderColor: paymentMethod === 'cash' ? '#10b981' : 'rgba(255,255,255,0.15)',
-                          background: paymentMethod === 'cash' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(255,255,255,0.05)',
-                          color: 'white',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          boxShadow: paymentMethod === 'cash' ? '0 4px 15px rgba(16, 185, 129, 0.3)' : 'none'
-                        }}
-                      >
-                        💵 {language === 'zh' ? '现金支付' : 'Cash'}
-                      </button>
-                    </div>
+                    {/* 商家：跑腿费仅现金；商品费用另选。非商家：跑腿费可选余额/现金 */}
+                    {isMerchant ? (
+                      <>
+                        <div
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '12px',
+                            fontSize: '0.82rem',
+                            fontWeight: '700',
+                            border: '2px solid rgba(16, 185, 129, 0.5)',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            color: 'white',
+                            marginBottom: cartTotal > 0 ? '10px' : '0.5rem',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          💵{' '}
+                          {language === 'zh'
+                            ? '跑腿费仅支持现金支付（骑手取件时收取），不能使用余额。'
+                            : language === 'en'
+                              ? 'Delivery fee is cash only (paid to courier at pickup), not from balance.'
+                              : 'ပို့ဆောင်ခ သည် ငွေသားဖြင့်သာ၊ ကောင်ရီယာလာယူစဉ် ပေးချေရမည်။ လက်ကျန်ငွေဖြင့် မရပါ။'}
+                        </div>
+                        {cartTotal > 0 && (
+                          <>
+                            <div
+                              style={{
+                                color: 'rgba(255,255,255,0.95)',
+                                fontSize: '0.85rem',
+                                fontWeight: '800',
+                                marginBottom: '6px',
+                              }}
+                            >
+                              {language === 'zh'
+                                ? '🛒 商品费用支付方式'
+                                : language === 'en'
+                                  ? '🛒 Product payment'
+                                  : '🛒 ကုန်ပစ္စည်းဖိုး ပေးချေမှု'}
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px', marginBottom: '0.5rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => setProductPaymentMethod('balance')}
+                                style={{
+                                  flex: 1,
+                                  padding: '10px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.85rem',
+                                  fontWeight: '800',
+                                  border: '2px solid',
+                                  borderColor:
+                                    productPaymentMethod === 'balance'
+                                      ? '#fbbf24'
+                                      : 'rgba(255,255,255,0.15)',
+                                  background:
+                                    productPaymentMethod === 'balance'
+                                      ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)'
+                                      : 'rgba(255,255,255,0.05)',
+                                  color:
+                                    productPaymentMethod === 'balance' ? '#1e293b' : 'white',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.3s ease',
+                                  boxShadow:
+                                    productPaymentMethod === 'balance'
+                                      ? '0 4px 15px rgba(251, 191, 36, 0.3)'
+                                      : 'none',
+                                }}
+                              >
+                                💳 {language === 'zh' ? '余额支付' : 'Balance'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setProductPaymentMethod('cash')}
+                                style={{
+                                  flex: 1,
+                                  padding: '10px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.85rem',
+                                  fontWeight: '800',
+                                  border: '2px solid',
+                                  borderColor:
+                                    productPaymentMethod === 'cash'
+                                      ? '#10b981'
+                                      : 'rgba(255,255,255,0.15)',
+                                  background:
+                                    productPaymentMethod === 'cash'
+                                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                      : 'rgba(255,255,255,0.05)',
+                                  color: 'white',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.3s ease',
+                                  boxShadow:
+                                    productPaymentMethod === 'cash'
+                                      ? '0 4px 15px rgba(16, 185, 129, 0.3)'
+                                      : 'none',
+                                }}
+                              >
+                                💵 {language === 'zh' ? '现金支付' : 'Cash'}
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '0.5rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('balance')}
+                          style={{
+                            flex: 1,
+                            padding: '10px',
+                            borderRadius: '12px',
+                            fontSize: '0.85rem',
+                            fontWeight: '800',
+                            border: '2px solid',
+                            borderColor: paymentMethod === 'balance' ? '#fbbf24' : 'rgba(255,255,255,0.15)',
+                            background: paymentMethod === 'balance' ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' : 'rgba(255,255,255,0.05)',
+                            color: paymentMethod === 'balance' ? '#1e293b' : 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            boxShadow: paymentMethod === 'balance' ? '0 4px 15px rgba(251, 191, 36, 0.3)' : 'none'
+                          }}
+                        >
+                          💳 {language === 'zh' ? '余额支付' : 'Balance'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('cash')}
+                          style={{
+                            flex: 1,
+                            padding: '10px',
+                            borderRadius: '12px',
+                            fontSize: '0.85rem',
+                            fontWeight: '800',
+                            border: '2px solid',
+                            borderColor: paymentMethod === 'cash' ? '#10b981' : 'rgba(255,255,255,0.15)',
+                            background: paymentMethod === 'cash' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(255,255,255,0.05)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            boxShadow: paymentMethod === 'cash' ? '0 4px 15px rgba(16, 185, 129, 0.3)' : 'none'
+                          }}
+                        >
+                          💵 {language === 'zh' ? '现金支付' : 'Cash'}
+                        </button>
+                      </div>
+                    )}
 
                     {/* 🚀 余额信息 (仅限会员) */}
                     {currentUser && currentUser.user_type !== 'merchant' && (

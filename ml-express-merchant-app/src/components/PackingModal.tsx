@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,225 +6,240 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  Animated,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../config/theme';
+import { getPackingModalModel } from '../utils/parseOrderPackingItems';
 
 interface PackingModalProps {
   visible: boolean;
   orderData: any;
+  /** 与商家端 Web ProfilePage 一致：店铺商品名 -> 单价 */
+  productPriceMap: Record<string, number>;
   language: 'zh' | 'en' | 'my';
   onComplete: () => void;
-  onClose: () => void; // 🚀 新增：关闭回调
+  onClose: () => void;
 }
 
 const getLabels = (lang: 'zh' | 'en' | 'my') => {
   if (lang === 'en') {
     return {
-      title: 'Packing Checklist',
-      orderId: 'Order No',
-      merchant: 'Merchant',
-      customer: 'Customer',
-      items: 'Items to Pack',
-      complete: 'Packing Done',
-      notes: 'Notes',
-      payment: 'Payment',
-      checkAll: 'Check all items to complete',
-      cod: 'Collect COD:',
-      paid: 'Paid via Balance',
+      title: 'Order Packing',
+      packageId: 'Order ID',
+      checklist: 'Checklist',
+      noListHint: 'No detailed list, please check package content',
+      confirmReady: 'Confirm all items ready',
+      colItem: 'Item',
+      colQty: 'Qty',
+      colUnit: 'Unit',
+      colSub: 'Subtotal',
+      itemsTotal: 'Items total (MMK)',
+      customerNote: 'Customer Note',
+      complete: 'Confirm Packing Done',
+      footerHint: 'Please ensure all items are packed securely',
+      close: 'Close',
     };
   }
   if (lang === 'my') {
     return {
-      title: 'ပစ္စည်းပြင်ဆင်ခြင်း',
-      orderId: 'အော်ဒါနံပါတ်',
-      merchant: 'ဆိုင်',
-      customer: 'ဖောက်သည်',
-      items: 'ပစ္စည်းများ',
-      complete: 'ပြင်ဆင်ပြီး',
-      notes: 'မှတ်ချက်',
-      payment: 'ငွေပေးချေမှု',
-      checkAll: 'ပြီးစီးရန် အားလုံးကို ရွေးပါ',
-      cod: 'COD ကောက်ခံရန်:',
-      paid: 'လက်ကျန်ငွေဖြင့် ပေးချေပြီး',
+      title: 'အော်ဒါထုပ်ပိုးနေသည်',
+      packageId: 'အော်ဒါနံပါတ်',
+      checklist: 'ပစ္စည်းစာရင်းစစ်ဆေးရန်',
+      noListHint: 'အသေးစိတ် စာရင်းမရှိသေးပါ၊ ထုပ်ပိုးမှုကို စစ်ဆေးပါ',
+      confirmReady: 'ပစ္စည်းအားလုံး ပြင်ဆင်ပြီးပါပြီ',
+      colItem: 'ပစ္စည်း',
+      colQty: 'အရေ.အတွက်',
+      colUnit: 'တစ်ခုဈေး',
+      colSub: 'စုစုပေါင်း',
+      itemsTotal: 'ပစ္စည်းစုစုပေါင်း (MMK)',
+      customerNote: 'ဖောက်သည်မှတ်ချက်',
+      complete: 'ထုပ်ပိုးပြီးကြောင်း အတည်ပြုပါ',
+      footerHint: 'ပစ္စည်းအားလုံး မှန်ကန်စွာ ထုပ်ပိုးထားကြောင်း သေချာပါစေ',
+      close: 'ပိတ်ရန်',
     };
   }
   return {
-    title: '商品打包核对单',
-    orderId: '订单号',
-    merchant: '商家',
-    customer: '客户',
-    items: '待打包商品',
+    title: '订单打包中',
+    packageId: '订单号',
+    checklist: '核对商品清单',
+    noListHint: '暂无详细商品清单，请核对包裹内容',
+    confirmReady: '确认商品已备齐',
+    colItem: '商品',
+    colQty: '数量',
+    colUnit: '单价',
+    colSub: '小计',
+    itemsTotal: '商品合计（MMK）',
+    customerNote: '客户备注',
     complete: '确认打包完成',
-    notes: '客户备注',
-    payment: '支付信息',
-    checkAll: '请勾选所有商品以完成打包',
-    cod: '需代收货款 (COD):',
-    paid: '已余额支付',
+    footerHint: '请确保所有商品已备齐并打包好',
+    close: '关闭',
   };
 };
 
-const parseItems = (description?: string) => {
-  if (!description) return [];
-  const itemsMatch = description.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
-  if (!itemsMatch || !itemsMatch[1]) return [];
-  return itemsMatch[1].split(', ').map((item: string) => item.trim()).filter(Boolean);
-};
-
-export default function PackingModal({ visible, orderData, language, onComplete, onClose }: PackingModalProps) {
+export default function PackingModal({
+  visible,
+  orderData,
+  productPriceMap,
+  language,
+  onComplete,
+  onClose,
+}: PackingModalProps) {
   const t = getLabels(language);
-  const items = parseItems(orderData?.description);
-  const orderId = orderData?.id ? `#${orderData.id.slice(-5)}` : '-';
-  
-  const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const packingModalModel = useMemo(
+    () =>
+      orderData
+        ? getPackingModalModel(orderData.description, productPriceMap)
+        : null,
+    [orderData?.description, productPriceMap],
+  );
 
-  // 每次打开模态框时重置勾选状态
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     if (visible) {
-      setCheckedItems(new Set());
+      setCheckedItems({});
     }
-  }, [visible]);
+  }, [visible, orderData?.id]);
 
-  const toggleItem = (index: number) => {
-    const newSet = new Set(checkedItems);
-    if (newSet.has(index)) {
-      newSet.delete(index);
-    } else {
-      newSet.add(index);
-      // 轻微震动反馈效果
-      Animated.sequence([
-        Animated.timing(scaleAnim, { toValue: 1.05, duration: 100, useNativeDriver: true }),
-        Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true })
-      ]).start();
-    }
-    setCheckedItems(newSet);
+  const toggleItem = (itemId: string) => {
+    setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
   };
 
-  const isAllChecked = items.length > 0 && checkedItems.size === items.length;
-
-  // 解析支付信息
-  const payMatch = orderData?.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
-  const payToMerchantAmount = payMatch ? payMatch[1] : null;
-  const isCOD = orderData?.payment_method === 'cash';
+  const completeDisabled =
+    !packingModalModel ||
+    (packingModalModel.lineCount === 0
+      ? !checkedItems.default
+      : packingModalModel.rows.some(
+          (_row, index) => !checkedItems[`item-${index}`],
+        ));
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
         <View style={styles.card}>
-          {/* 顶部票头区域 */}
-          <LinearGradient colors={['#1e3a8a', '#2563eb']} style={styles.header}>
-            <TouchableOpacity 
-              style={styles.closeBtn} 
-              onPress={onClose}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close" size={24} color="rgba(255,255,255,0.8)" />
+          <LinearGradient colors={['#10b981', '#059669']} style={styles.header}>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
-            
-            <View style={styles.headerIcon}>
-              <Ionicons name="cube" size={26} color="#fbbf24" />
-            </View>
+            <Text style={styles.headerEmoji}>📦</Text>
             <Text style={styles.title}>{t.title}</Text>
-            <Text style={styles.orderIdText}>{t.orderId}: <Text style={{fontWeight: '900', fontSize: 16}}>{orderId}</Text></Text>
+            <Text style={styles.packageIdText}>
+              {t.packageId}: {orderData?.id ?? '—'}
+            </Text>
           </LinearGradient>
 
-          {/* 锯齿边缘效果 */}
-          <View style={styles.zigZagContainer}>
-            {Array.from({ length: 20 }).map((_, i) => (
-              <View key={i} style={styles.zigZag} />
-            ))}
-          </View>
-
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            
-            {/* 客户备注高亮 */}
-            {orderData?.notes && (
-              <View style={styles.notesBox}>
-                <Ionicons name="warning" size={20} color="#b45309" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.notesTitle}>{t.notes}</Text>
-                  <Text style={styles.notesText}>{orderData.notes}</Text>
-                </View>
-              </View>
-            )}
+            <Text style={styles.sectionTitle}>
+              📋 {t.checklist}
+            </Text>
 
-            {/* 财务/收款提示 */}
-            <View style={styles.paymentBox}>
-              <Ionicons name={isCOD ? "cash" : "card"} size={24} color={isCOD ? "#ea580c" : "#059669"} />
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={styles.paymentLabel}>{t.payment}</Text>
-                {isCOD ? (
-                  <Text style={[styles.paymentValue, { color: '#ea580c' }]}>
-                    {t.cod} {(orderData?.price || '0').replace('MMK', '')} MMK
-                  </Text>
-                ) : (
-                  <Text style={[styles.paymentValue, { color: '#059669' }]}>
-                    {t.paid} {payToMerchantAmount ? `(${payToMerchantAmount} MMK)` : ''}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* 商品清单 Checklist */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{t.items}</Text>
-                <Text style={styles.progressText}>
-                  {checkedItems.size} / {items.length}
-                </Text>
-              </View>
-              
-              {items.length === 0 ? (
-                <Text style={styles.emptyText}>-</Text>
-              ) : (
-                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                  {items.map((item, index) => {
-                    const isChecked = checkedItems.has(index);
-                    return (
-                      <TouchableOpacity 
-                        key={`${item}-${index}`} 
-                        style={[styles.checkItem, isChecked && styles.checkItemActive]}
-                        onPress={() => toggleItem(index)}
-                        activeOpacity={0.7}
+            <View style={styles.checklistContainer}>
+              {packingModalModel && packingModalModel.lineCount === 0 ? (
+                <View style={styles.emptyListBox}>
+                  <Text style={styles.emptyListText}>{t.noListHint}</Text>
+                  <TouchableOpacity
+                    style={styles.defaultCheckRow}
+                    onPress={() => toggleItem('default')}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.defaultCheckBoxWrap}>
+                      <View
+                        style={[
+                          styles.checkBox,
+                          checkedItems.default && styles.checkBoxActive,
+                        ]}
                       >
-                        <View style={[styles.checkBox, isChecked && styles.checkBoxActive]}>
-                          {isChecked && <Ionicons name="checkmark" size={16} color="white" />}
+                        {checkedItems.default ? (
+                          <Ionicons name="checkmark" size={16} color="white" />
+                        ) : null}
+                      </View>
+                    </View>
+                    <Text style={styles.defaultCheckLabel}>{t.confirmReady}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  {packingModalModel ? (
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.thText, styles.thName]}>{t.colItem}</Text>
+                      <View style={styles.metricsRowHeader}>
+                        <Text style={[styles.thText, styles.thNum]}>{t.colQty}</Text>
+                        <Text style={[styles.thText, styles.thNum]}>{t.colUnit}</Text>
+                        <Text style={[styles.thText, styles.thNum]}>{t.colSub}</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                  {packingModalModel?.rows.map((row, index) => {
+                    const key = `item-${index}`;
+                    const isOn = !!checkedItems[key];
+                    return (
+                      <TouchableOpacity
+                        key={`${row.name}-${index}`}
+                        style={[styles.tableRow, isOn && styles.tableRowOn]}
+                        onPress={() => toggleItem(key)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={styles.itemCol}>
+                          <View style={styles.checkboxAbove}>
+                            <View style={[styles.checkBoxSm, isOn && styles.checkBoxActive]}>
+                              {isOn ? <Ionicons name="checkmark" size={14} color="white" /> : null}
+                            </View>
+                          </View>
+                          <Text
+                            style={[styles.cellName, isOn && styles.cellStrike]}
+                          >
+                            {row.name}
+                          </Text>
                         </View>
-                        <Text style={[styles.itemText, isChecked && styles.itemTextActive]}>
-                          {item}
-                        </Text>
+                        <View style={styles.metricsRow}>
+                          <Text style={[styles.cellNum, isOn && styles.cellMuted]}>{row.qty}</Text>
+                          <Text style={[styles.cellNumSm, isOn && styles.cellMuted]}>
+                            {row.unitPrice != null ? row.unitPrice.toLocaleString() : '—'}
+                          </Text>
+                          <Text style={[styles.cellSub, isOn && styles.cellMuted]}>
+                            {row.lineTotal != null ? row.lineTotal.toLocaleString() : '—'}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
-                </Animated.View>
+                  {packingModalModel && packingModalModel.summaryTotal != null ? (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>{t.itemsTotal}</Text>
+                      <Text style={styles.summaryValue}>
+                        {packingModalModel.summaryTotal.toLocaleString()}
+                      </Text>
+                    </View>
+                  ) : null}
+                </>
               )}
             </View>
+
+            {packingModalModel?.customerNote ? (
+              <View style={styles.noteBox}>
+                <Text style={styles.noteTitle}>💡 {t.customerNote}</Text>
+                <Text style={styles.noteBody}>{packingModalModel.customerNote}</Text>
+              </View>
+            ) : null}
           </ScrollView>
 
-          {/* 底部按钮区域 */}
           <View style={styles.footer}>
-            {!isAllChecked && items.length > 0 && (
-              <Text style={styles.hintText}>{t.checkAll}</Text>
-            )}
-            <TouchableOpacity 
-              style={[styles.completeBtn, (!isAllChecked && items.length > 0) && styles.completeBtnDisabled]} 
+            <TouchableOpacity
+              style={[styles.completeBtn, completeDisabled && styles.completeBtnDisabled]}
               onPress={onComplete}
-              disabled={!isAllChecked && items.length > 0}
+              disabled={completeDisabled}
+              activeOpacity={0.85}
             >
-              <LinearGradient 
-                colors={(!isAllChecked && items.length > 0) ? ['#94a3b8', '#64748b'] : ['#10b981', '#059669']} 
+              <LinearGradient
+                colors={completeDisabled ? ['#94a3b8', '#64748b'] : ['#10b981', '#059669']}
                 style={styles.completeGradient}
               >
-                <Ionicons name={isAllChecked ? "checkmark-done-circle" : "cube-outline"} size={22} color="white" />
                 <Text style={styles.completeText}>{t.complete}</Text>
               </LinearGradient>
             </TouchableOpacity>
+            <Text style={styles.footerHint}>{t.footerHint}</Text>
           </View>
         </View>
       </View>
@@ -235,173 +250,120 @@ export default function PackingModal({ visible, orderData, language, onComplete,
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
   },
   card: {
+    zIndex: 1,
     width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#f8fafc',
-    borderRadius: 24,
+    maxWidth: 500,
+    maxHeight: '90%',
+    backgroundColor: 'white',
+    borderRadius: 35,
     overflow: 'hidden',
     ...theme.shadows.large,
   },
   header: {
-    padding: 20,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    paddingBottom: 24,
-    position: 'relative', // 🚀 必须设置，用于子元素绝对定位
+    position: 'relative',
   },
   closeBtn: {
     position: 'absolute',
-    top: 15,
-    right: 15,
-    zIndex: 10,
-    padding: 5,
-  },
-  headerIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    top: 16,
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: 'rgba(251, 191, 36, 0.5)',
+    zIndex: 2,
+  },
+  closeBtnText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerEmoji: {
+    fontSize: 42,
+    marginBottom: 8,
   },
   title: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
-    marginBottom: 4,
-    letterSpacing: 1,
+    marginBottom: 6,
   },
-  orderIdText: {
-    color: 'rgba(255, 255, 255, 0.8)',
+  packageIdText: {
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 14,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  zigZagContainer: {
-    flexDirection: 'row',
-    height: 10,
-    width: '100%',
-    backgroundColor: '#f8fafc',
-    marginTop: -5,
-    overflow: 'hidden',
-    justifyContent: 'space-around',
-  },
-  zigZag: {
-    width: 14,
-    height: 14,
-    backgroundColor: '#2563eb', // Matches bottom of gradient
-    transform: [{ rotate: '45deg' }],
-    marginTop: -10,
+    fontWeight: '600',
   },
   body: {
-    padding: 20,
-    maxHeight: 400,
-  },
-  notesBox: {
-    flexDirection: 'row',
-    backgroundColor: '#fef3c7',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#fde68a',
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  notesTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#b45309',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  notesText: {
-    fontSize: 15,
-    color: '#92400e',
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  paymentBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  paymentLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  paymentValue: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    marginVertical: 10,
-  },
-  section: {
-    marginTop: 10,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 8,
+    maxHeight: 420,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '900',
     color: '#1e293b',
+    fontSize: 17,
+    fontWeight: '900',
+    marginBottom: 16,
   },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#3b82f6',
+  checklistContainer: {
+    marginBottom: 20,
   },
-  checkItem: {
+  emptyListBox: {
+    padding: 18,
+    backgroundColor: '#f8fafc',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+  },
+  emptyListText: {
+    color: '#64748b',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  defaultCheckRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    justifyContent: 'center',
   },
-  checkItemActive: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#10b981',
+  defaultCheckBoxWrap: {
+    marginRight: 12,
+  },
+  defaultCheckLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1e293b',
+    flex: 1,
   },
   checkBox: {
     width: 24,
     height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkBoxSm: {
+    width: 28,
+    height: 28,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: '#cbd5e1',
-    marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -409,61 +371,169 @@ const styles = StyleSheet.create({
     backgroundColor: '#10b981',
     borderColor: '#10b981',
   },
-  itemText: {
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingBottom: 8,
+    marginBottom: 4,
+  },
+  thText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  thName: {
     flex: 1,
-    fontSize: 15,
-    color: '#334155',
-    fontWeight: '700',
+    minWidth: 0,
   },
-  itemTextActive: {
-    color: '#10b981',
-    textDecorationLine: 'line-through',
-    opacity: 0.8,
+  thNum: {
+    width: 56,
+    textAlign: 'right',
   },
-  emptyText: {
+  metricsRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    marginLeft: 4,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    backgroundColor: '#f8fafc',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#f1f5f9',
+  },
+  tableRowOn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.06)',
+    borderColor: '#10b981',
+  },
+  itemCol: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 6,
+  },
+  checkboxAbove: {
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    marginLeft: 4,
+  },
+  cellName: {
     fontSize: 14,
+    fontWeight: '700',
+    color: '#1e293b',
+    lineHeight: 20,
+    flexShrink: 1,
+  },
+  cellStrike: {
+    color: '#64748b',
+    textDecorationLine: 'line-through',
+  },
+  cellNum: {
+    width: 56,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'right',
+    color: '#334155',
+  },
+  cellNumSm: {
+    width: 56,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
+    color: '#475569',
+  },
+  cellSub: {
+    width: 64,
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'right',
+    color: '#0f172a',
+  },
+  cellMuted: {
     color: '#94a3b8',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    padding: 20,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  summaryLabel: {
+    fontWeight: '900',
+    color: '#065f46',
+    fontSize: 14,
+    flex: 1,
+    marginRight: 8,
+  },
+  summaryValue: {
+    fontWeight: '900',
+    color: '#047857',
+    fontSize: 16,
+  },
+  noteBox: {
+    backgroundColor: '#fffbeb',
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    marginBottom: 16,
+  },
+  noteTitle: {
+    color: '#92400e',
+    fontSize: 14,
+    fontWeight: '900',
+    marginBottom: 6,
+  },
+  noteBody: {
+    color: '#b45309',
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
   },
   footer: {
-    padding: 20,
-    backgroundColor: 'white',
+    padding: 18,
+    backgroundColor: '#f8fafc',
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
   },
-  hintText: {
-    textAlign: 'center',
-    color: '#ef4444',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
   completeBtn: {
-    borderRadius: 16,
+    borderRadius: 24,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   completeBtnDisabled: {
-    elevation: 0,
-    shadowOpacity: 0,
+    opacity: 0.65,
   },
   completeGradient: {
     paddingVertical: 16,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
   },
   completeText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '900',
-    letterSpacing: 0.5,
+  },
+  footerHint: {
+    textAlign: 'center',
+    color: '#94a3b8',
+    fontSize: 13,
+    marginTop: 12,
+    fontWeight: '600',
   },
 });

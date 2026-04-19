@@ -17,6 +17,7 @@ import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Vibration } from 'react-native';
+import { shouldAlertCourierOnNewAssignment } from './utils/packageStatusNormalize';
 
 // 🚀 定义后台定位任务名称
 // 已迁移至 services/locationService.ts
@@ -375,8 +376,8 @@ const GlobalOrderMonitor = () => {
           const isNewRecord = eventType === 'INSERT' && isMyOrder;
 
           if ((isNewRecord || isNewlyAssigned) && !announcedOrders.current.has(newPkg.id)) {
-            // 过滤状态，只有待处理状态才播报
-            if (['待取件', '已分配', '待收款', '待派送'].includes(newPkg.status)) {
+            // 与网站「活跃订单」一致：进行中状态才播报（含待确认、打包中等）
+            if (shouldAlertCourierOnNewAssignment(newPkg.status)) {
               console.log('🚨 [监控器] 成功捕捉到新任务分配:', newPkg.id);
               announcedOrders.current.add(newPkg.id);
               

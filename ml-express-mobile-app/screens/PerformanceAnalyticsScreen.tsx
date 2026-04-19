@@ -12,6 +12,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { supabase } from '../services/supabase';
+import {
+  normalizePackageStatusZh,
+  isActiveCourierTaskStatus,
+} from '../utils/packageStatusNormalize';
 
 const { width } = Dimensions.get('window');
 
@@ -105,7 +109,9 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
   const calculatePerformanceStats = (packages: any[]): PerformanceStats => {
     const totalDeliveries = packages.length;
     const completedDeliveries = packages.filter(p => p.status === '已送达').length;
-    const pendingDeliveries = packages.filter(p => ['待取件', '已取件', '配送中'].includes(p.status)).length;
+    const pendingDeliveries = packages.filter((p) =>
+      isActiveCourierTaskStatus(normalizePackageStatusZh(p.status)),
+    ).length;
     
     // 计算总距离 - 使用精确的 delivery_distance
     const totalDistance = packages.reduce((sum, pkg) => {

@@ -31,15 +31,21 @@ import * as MediaLibrary from 'expo-media-library';
 import { CameraView } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
+import {
+  normalizePackageStatusZh,
+  isPickupFlowStatus,
+  isNavigateMerchantFirstPhase,
+} from '../utils/packageStatusNormalize';
+import { getPackingModalModel } from '../utils/parseOrderPackingItems';
+import { openMapsToAddress } from '../utils/openMapsNavigation';
 
 const { width } = Dimensions.get('window');
 
 export default function PackageDetailScreen({ route, navigation }: any) {
   const isFocused = useIsFocused();
   const { language } = useApp();
-  const { packageId, package: initialPackage, coords: initialCoords } = route.params || {};
+  const { packageId, package: initialPackage } = route.params || {};
   const [pkg, setPkg] = useState<any>(initialPackage || null);
-  const [coords, setCoords] = useState<any>(initialCoords || null);
   const [loading, setLoading] = useState(!initialPackage);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
@@ -71,6 +77,10 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   const chatSubscriptionRef = React.useRef<any>(null);
   const flatListRef = React.useRef<FlatList>(null);
 
+  const [orderPacking, setOrderPacking] = useState<ReturnType<
+    typeof getPackingModalModel
+  > | null>(null);
+
   // 自动检查未读消息
   useEffect(() => {
     if (!pkg?.id || !courierId) return;
@@ -97,6 +107,24 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       }
     };
   }, [packageId, route.params?.id, initialPackage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!pkg) {
+        setOrderPacking(null);
+        return;
+      }
+      const priceMap = await deliveryStoreService.getProductPriceMapByStoreId(
+        pkg.delivery_store_id,
+      );
+      if (cancelled) return;
+      setOrderPacking(getPackingModalModel(pkg.description, priceMap));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pkg?.id, pkg?.description, pkg?.delivery_store_id]);
 
   const loadCourierInfo = async () => {
     const id = await AsyncStorage.getItem('currentCourierId');
@@ -234,37 +262,33 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case '已取件': return '#10b981';
+    const s = normalizePackageStatusZh(status);
+    switch (s) {
+      case '待取件':
+      case '待收款':
+        return '#f39c12';
+      case '待确认':
+        return '#a855f7';
+      case '打包中':
+        return '#0ea5e9';
+      case '已取件':
+        return '#3498db';
       case '配送中':
-      case '配送进行中': return '#f59e0b';
-      case '已送达': return '#3b82f6';
-      case '异常上报': return '#ef4444'; // 🚀 新增：异常状态为红色
-      default: return '#64748b';
+        return '#9b59b6';
+      case '已送达':
+      case '已完成':
+        return '#27ae60';
+      case '已取消':
+        return '#e74c3c';
+      case '异常上报':
+        return '#ef4444';
+      default:
+        return '#64748b';
     }
   };
 
   const handleCall = (phone: string) => {
     Linking.openURL(`tel:${phone}`);
-  };
-
-  const handleNavigate = (address: string) => {
-    if (coords && coords.lat && coords.lng) {
-      // 如果有坐标，使用精确导航
-      const origin = 'current_location';
-      const destination = `${coords.lat},${coords.lng}`;
-      const url = Platform.select({
-        ios: `maps:0,0?q=${destination}`,
-        android: `geo:0,0?q=${destination}(${encodeURIComponent(address)})`,
-      });
-      
-      if (url) {
-        Linking.openURL(url);
-      }
-    } else {
-      // 否则使用地址搜索
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`);
-    }
   };
 
   const handleOpenCamera = async () => {
@@ -456,7 +480,11 @@ export default function PackageDetailScreen({ route, navigation }: any) {
 
       // 2. 🚀 距离检查 (如果是送达操作且不是扫码送达中转站)
       const isStoreCode = data.startsWith('STORE_');
-      if (pkg?.status !== '待取件' && !isStoreCode) {
+      if (
+        pkg &&
+        !isPickupFlowStatus(normalizePackageStatusZh(pkg.status)) &&
+        !isStoreCode
+      ) {
         const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         if (currentLoc && pkg.receiver_latitude && pkg.receiver_longitude) {
           // ... 距离计算 ...
@@ -480,7 +508,8 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         const storeId = data.replace('STORE_', '').split('_')[0];
         
         // 🚀 核心逻辑：如果是异常上报状态送达中转站，增加备注说明
-        const isAnomalyResolution = pkg?.status === '异常上报';
+        const isAnomalyResolution =
+          normalizePackageStatusZh(pkg?.status) === '异常上报';
         const statusMsg = isAnomalyResolution ? '已送达 (异常转中转站)' : '已送达';
         const alertMsg = isAnomalyResolution ? '包裹已作为异常件送达至中转站' : '包裹已送达至代收点';
 
@@ -518,6 +547,8 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     );
   }
 
+  const statusNorm = normalizePackageStatusZh(pkg.status);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -534,7 +565,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.statusSection}>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(pkg.status) }]}>
-            <Text style={styles.statusText}>{pkg.status}</Text>
+            <Text style={styles.statusText}>{statusNorm || pkg.status}</Text>
           </View>
           <Text style={styles.packageId}>{pkg.id}</Text>
         </View>
@@ -598,10 +629,189 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             return null;
           })()}
 
+          {orderPacking && orderPacking.lineCount > 0 ? (
+            <>
+              <View style={styles.glassDivider} />
+              <Text style={styles.sectionTitle}>
+                🛒{" "}
+                {language === "zh"
+                  ? "商品明细"
+                  : language === "en"
+                    ? "Order items"
+                    : "ပစ္စည်းစာရင်း"}
+              </Text>
+              <View style={styles.packingTableHeader}>
+                <Text
+                  style={[styles.packingHdrText, { flex: 1, marginRight: 8 }]}
+                >
+                  {language === "zh"
+                    ? "商品"
+                    : language === "en"
+                      ? "Item"
+                      : "ပစ္စည်း"}
+                </Text>
+                <Text style={[styles.packingHdrText, styles.packingColQty]}>
+                  {language === "zh"
+                    ? "数量"
+                    : language === "en"
+                      ? "Qty"
+                      : "အရေ"}
+                </Text>
+                <Text style={[styles.packingHdrText, styles.packingColMoney]}>
+                  {language === "zh"
+                    ? "单价"
+                    : language === "en"
+                      ? "Unit"
+                      : "ဈေး"}
+                </Text>
+                <Text style={[styles.packingHdrText, styles.packingColMoney]}>
+                  {language === "zh"
+                    ? "小计"
+                    : language === "en"
+                      ? "Sub"
+                      : "စုစုပေါင်း"}
+                </Text>
+              </View>
+              {orderPacking.rows.map((row, idx) => (
+                <View key={`${row.name}-${idx}`} style={styles.packingDataRow}>
+                  <Text
+                    style={[styles.packingCellName, { flex: 1, marginRight: 8 }]}
+                    numberOfLines={3}
+                  >
+                    {row.name}
+                  </Text>
+                  <Text style={[styles.packingCell, styles.packingColQty]}>
+                    {row.qty}
+                  </Text>
+                  <Text style={[styles.packingCell, styles.packingColMoney]}>
+                    {row.unitPrice != null
+                      ? Number(row.unitPrice).toLocaleString()
+                      : "—"}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.packingCell,
+                      styles.packingColMoney,
+                      { fontWeight: "800" },
+                    ]}
+                  >
+                    {row.lineTotal != null
+                      ? Number(row.lineTotal).toLocaleString()
+                      : "—"}
+                  </Text>
+                </View>
+              ))}
+              {orderPacking.summaryTotal != null ? (
+                <View style={styles.packingSummaryBar}>
+                  <Text style={styles.packingSummaryLabel}>
+                    {language === "zh"
+                      ? "商品合计（MMK）"
+                      : language === "en"
+                        ? "Items total (MMK)"
+                        : "ပစ္စည်းစုစုပေါင်း"}
+                  </Text>
+                  <Text style={styles.packingSummaryValue}>
+                    {orderPacking.summaryTotal.toLocaleString()}
+                  </Text>
+                </View>
+              ) : null}
+            </>
+          ) : null}
+
+          {orderPacking?.customerNote ? (
+            <View style={styles.packingCustomerNote}>
+              <Text style={styles.packingCustomerNoteTitle}>
+                {language === "zh"
+                  ? "客户备注"
+                  : language === "en"
+                    ? "Customer note"
+                    : "ဖောက်သည်မှတ်ချက်"}
+              </Text>
+              <Text style={styles.packingCustomerNoteBody}>
+                {orderPacking.customerNote}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.glassDivider} />
           <Text style={styles.sectionTitle}>👥 {language === 'zh' ? '联系人' : 'Contacts'}</Text>
+          {isNavigateMerchantFirstPhase(statusNorm) &&
+          (pkg.sender_name || pkg.sender_address) ? (
+            <View style={[styles.contactItem, styles.pickupHighlightCard]}>
+              <Text style={styles.contactRole}>
+                {language === 'zh'
+                  ? '商家 · 取件/收款'
+                  : language === 'en'
+                    ? 'Merchant · Pickup / COD'
+                    : 'ဆိုင် · ကောက်ယူ/ငွေကောက်ခံ'}
+              </Text>
+              {statusNorm === '待收款' ? (
+                <Text style={styles.pickupCodHint}>
+                  {language === 'zh'
+                    ? '待收款单请先到商家处收款并完成取货。'
+                    : language === 'en'
+                      ? 'For COD: go to the merchant first to collect payment and pick up.'
+                      : 'ငွေကောက်ခံအမှာစာဖြစ်ပါက ဆိုင်သို့ ဦးစွာသွားပါ။'}
+                </Text>
+              ) : null}
+              <View style={styles.contactInfo}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.contactName}>
+                    {pkg.sender_name || '—'}
+                  </Text>
+                  {pkg.sender_phone ? (
+                    <Text style={styles.contactPhone}>{pkg.sender_phone}</Text>
+                  ) : null}
+                  <Text style={[styles.addressText, { marginTop: 8 }]}>
+                    {pkg.sender_address || '—'}
+                  </Text>
+                </View>
+                {pkg.sender_phone ? (
+                  <TouchableOpacity
+                    style={styles.miniCallBtn}
+                    onPress={() => handleCall(pkg.sender_phone)}
+                  >
+                    <Ionicons name="call" size={18} color="white" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                style={styles.pickupNavBtn}
+                onPress={() =>
+                  openMapsToAddress(
+                    pkg.sender_address,
+                    pkg.sender_latitude,
+                    pkg.sender_longitude,
+                  )
+                }
+              >
+                <LinearGradient
+                  colors={['#f59e0b', '#d97706']}
+                  style={styles.pickupNavBtnGradient}
+                >
+                  <Ionicons name="navigate" size={18} color="white" />
+                  <Text style={styles.pickupNavBtnText}>
+                    {language === 'zh'
+                      ? '导航到商家'
+                      : language === 'en'
+                        ? 'Navigate to merchant'
+                        : 'ဆိုင်သို့လမ်းညွှန်'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          ) : null}
           <View style={styles.contactItem}>
             <Text style={styles.contactRole}>{language === 'zh' ? '收件人' : 'Receiver'}</Text>
+            {isNavigateMerchantFirstPhase(statusNorm) ? (
+              <Text style={styles.receiverAfterPickupHint}>
+                {language === 'zh'
+                  ? '取件完成后前往以下地址配送'
+                  : language === 'en'
+                    ? 'After pickup, deliver to:'
+                    : 'ကောက်ယူပြီးနောက် ပို့ရမည့်လိပ်စာ'}
+              </Text>
+            ) : null}
             <View style={styles.contactInfo}>
               <View>
                 <Text style={styles.contactName}>{pkg.receiver_name}</Text>
@@ -615,6 +825,30 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           <View style={styles.contactItem}>
             <Text style={styles.contactRole}>{language === 'zh' ? '收件地址' : 'Address'}</Text>
             <Text style={styles.addressText}>{pkg.receiver_address}</Text>
+            <TouchableOpacity
+              style={[styles.pickupNavBtn, { marginTop: 12 }]}
+              onPress={() =>
+                openMapsToAddress(
+                  pkg.receiver_address,
+                  pkg.receiver_latitude,
+                  pkg.receiver_longitude,
+                )
+              }
+            >
+              <LinearGradient
+                colors={['#3b82f6', '#2563eb']}
+                style={styles.pickupNavBtnGradient}
+              >
+                <Ionicons name="navigate" size={18} color="white" />
+                <Text style={styles.pickupNavBtnText}>
+                  {language === 'zh'
+                    ? '导航到客户'
+                    : language === 'en'
+                      ? 'Navigate to customer'
+                      : 'ဖောက်သည်ထံလမ်းညွှန်'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
 
           {/* 🚀 新增：聊天入口按钮 */}
@@ -651,12 +885,12 @@ export default function PackageDetailScreen({ route, navigation }: any) {
           <TouchableOpacity style={styles.actionBtn} onPress={() => setShowCameraModal(true)}>
             <LinearGradient colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']} style={styles.btnGradient}>
               <Ionicons 
-                name={pkg.status === '待取件' || pkg.status === '待收款' ? "archive" : "checkmark-circle"} 
+                name={isPickupFlowStatus(statusNorm) ? "archive" : "checkmark-circle"} 
                 size={24} 
                 color="#10b981" 
               />
               <Text style={styles.btnText}>
-                {pkg.status === '待取件' || pkg.status === '待收款' 
+                {isPickupFlowStatus(statusNorm)
                   ? (language === 'zh' ? '立即取件' : 'Pickup') 
                   : (language === 'zh' ? '完成配送' : 'Complete')}
               </Text>
@@ -667,26 +901,154 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* 地址模态框 */}
+      {/* 地址模态框：取件阶段区分商家与客户导航 */}
       <Modal visible={showAddressModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.glassModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📍 {language === 'zh' ? '位置服务' : 'Location'}</Text>
+              <Text style={styles.modalTitle}>
+                📍{" "}
+                {isNavigateMerchantFirstPhase(statusNorm)
+                  ? language === "zh"
+                    ? "取件与导航"
+                    : language === "en"
+                      ? "Pickup & navigate"
+                      : "ကောက်ယူရန်နှင့်လမ်းညွှန်"
+                  : language === "zh"
+                    ? "位置与导航"
+                    : language === "en"
+                      ? "Location"
+                      : "တည်နေရာနှင့်လမ်းညွှန်"}
+              </Text>
               <TouchableOpacity onPress={() => setShowAddressModal(false)} style={styles.closeBtn}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
             </View>
-            <View style={styles.modalBody}>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {isNavigateMerchantFirstPhase(statusNorm) &&
+              (pkg.sender_address || pkg.sender_name) ? (
+                <View style={[styles.glassInfoCard, { marginBottom: 16 }]}>
+                  <Text style={[styles.infoLabel, { color: "#fbbf24" }]}>
+                    🏪{" "}
+                    {language === "zh"
+                      ? "商家 / 取件点"
+                      : language === "en"
+                        ? "Merchant / Pickup"
+                        : "ဆိုင် / ကောက်ယူရာ"}
+                  </Text>
+                  {statusNorm === "待收款" ? (
+                    <Text style={styles.pickupCodHint}>
+                      {language === "zh"
+                        ? "待收款：请先到商家处收款并取货。"
+                        : language === "en"
+                          ? "COD: collect payment at merchant before pickup."
+                          : "ငွေကောက်ခံရမည့်အမှာစာဖြစ်ပါက ဆိုင်တွင်ငွေကောက်ယူပါ။"}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.infoValueText}>
+                    {pkg.sender_name ? `${pkg.sender_name}\n` : ""}
+                    {pkg.sender_address || "—"}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.bigNavBtn}
+                    onPress={() =>
+                      openMapsToAddress(
+                        pkg.sender_address,
+                        pkg.sender_latitude,
+                        pkg.sender_longitude,
+                      )
+                    }
+                  >
+                    <LinearGradient colors={["#f59e0b", "#d97706"]} style={styles.bigBtnGradient}>
+                      <Ionicons name="navigate" size={20} color="white" />
+                      <Text style={styles.bigBtnText}>
+                        {language === "zh"
+                          ? "导航到商家"
+                          : language === "en"
+                            ? "To merchant"
+                            : "ဆိုင်သို့"}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
               <View style={styles.glassInfoCard}>
-                <Text style={styles.infoLabel}>{language === 'zh' ? '收件地址' : 'Address'}</Text>
+                <Text style={styles.infoLabel}>
+                  {isNavigateMerchantFirstPhase(statusNorm)
+                    ? language === "zh"
+                      ? "客户 · 送达地址（取件后）"
+                      : language === "en"
+                        ? "Customer · After pickup"
+                        : "ဖောက်သည် · ကောက်ယူပြီးနောက်"
+                    : language === "zh"
+                      ? "收件地址"
+                      : language === "en"
+                        ? "Delivery address"
+                        : "လက်ခံလိပ်စာ"}
+                </Text>
                 <Text style={styles.infoValueText}>{pkg.receiver_address}</Text>
-              </View>
-              <TouchableOpacity style={styles.bigNavBtn} onPress={() => handleNavigate(pkg.receiver_address)}>
-                <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.bigBtnGradient}>
-                  <Ionicons name="navigate" size={20} color="white" />
-                  <Text style={styles.bigBtnText}>{language === 'zh' ? '导航前往' : 'Navigate'}</Text>
-                </LinearGradient>
+                <TouchableOpacity
+                  style={styles.bigNavBtn}
+                  onPress={() =>
+                    openMapsToAddress(
+                      pkg.receiver_address,
+                      pkg.receiver_latitude,
+                      pkg.receiver_longitude,
+                    )
+                  }
+                >
+                  <LinearGradient colors={["#3b82f6", "#2563eb"]} style={styles.bigBtnGradient}>
+                    <Ionicons name="navigate" size={20} color="white" />
+                    <Text style={styles.bigBtnText}>
+                      {language === "zh"
+                        ? "导航到客户"
+                        : language === "en"
+                          ? "To customer"
+                          : "ဖောက်သည်ထံ"}
+                    </Text>
+                  </LinearGradient>
                 </TouchableOpacity>
-            </View>
+              </View>
+
+              {!isNavigateMerchantFirstPhase(statusNorm) &&
+              (pkg.sender_address || pkg.sender_name) ? (
+                <View style={[styles.glassInfoCard, { marginTop: 16 }]}>
+                  <Text style={styles.infoLabel}>
+                    {language === "zh"
+                      ? "寄件 / 商家（参考）"
+                      : language === "en"
+                        ? "Sender (reference)"
+                        : "ပေးပို့သူ"}
+                  </Text>
+                  <Text style={[styles.infoValueText, { fontSize: 14 }]}>
+                    {pkg.sender_address || "—"}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.bigNavBtn}
+                    onPress={() =>
+                      openMapsToAddress(
+                        pkg.sender_address,
+                        pkg.sender_latitude,
+                        pkg.sender_longitude,
+                      )
+                    }
+                  >
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0.12)", "rgba(255,255,255,0.06)"]}
+                      style={styles.bigBtnGradient}
+                    >
+                      <Ionicons name="storefront" size={20} color="#94a3b8" />
+                      <Text style={[styles.bigBtnText, { color: "#e2e8f0" }]}>
+                        {language === "zh"
+                          ? "导航到商家"
+                          : language === "en"
+                            ? "To merchant"
+                            : "ဆိုင်သို့"}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -700,7 +1062,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
               <TouchableOpacity onPress={() => setShowCameraModal(false)} style={styles.closeBtn}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
             </View>
             <View style={[styles.modalBody, { flexDirection: 'row', gap: 12, flexWrap: 'wrap' }]}>
-              {pkg?.status === '待取件' ? (
+              {isPickupFlowStatus(statusNorm) ? (
                 <>
                   <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowScanModal(true); }}>
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
@@ -1070,6 +1432,83 @@ const styles = StyleSheet.create({
   infoLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: '600' },
   infoValue: { color: '#fff', fontSize: 14, fontWeight: '800' },
   glassDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 24 },
+  packingTableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  packingHdrText: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  packingColQty: { width: 36, textAlign: 'right' },
+  packingColMoney: { width: 72, textAlign: 'right' },
+  packingDataRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  packingCellName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  packingCell: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  packingSummaryBar: {
+    marginTop: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  packingSummaryLabel: {
+    color: '#6ee7b7',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  packingSummaryValue: {
+    color: '#34d399',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  packingCustomerNote: {
+    marginTop: 16,
+    backgroundColor: 'rgba(251, 191, 36, 0.08)',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.25)',
+  },
+  packingCustomerNoteTitle: {
+    color: '#fcd34d',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  packingCustomerNoteBody: {
+    color: '#fde68a',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
   contactItem: { marginBottom: 20 },
   contactRole: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '800', marginBottom: 8 },
   contactInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -1077,6 +1516,41 @@ const styles = StyleSheet.create({
   contactPhone: { color: '#3b82f6', fontSize: 14, fontWeight: '700', marginTop: 2 },
   miniCallBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center' },
   addressText: { color: '#fff', fontSize: 15, fontWeight: '600', lineHeight: 22 },
+  pickupHighlightCard: {
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.28)',
+  },
+  pickupCodHint: {
+    color: '#fcd34d',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  receiverAfterPickupHint: {
+    color: 'rgba(148, 163, 184, 0.95)',
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  pickupNavBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 4 },
+  pickupNavBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  pickupNavBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   actionGrid: { flexDirection: 'row', gap: 16, marginTop: 24 },
   actionBtn: { flex: 1, height: 80, borderRadius: 20, overflow: 'hidden' },
   btnGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
