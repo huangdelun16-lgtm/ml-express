@@ -22,6 +22,7 @@ import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 
 const { width, height } = Dimensions.get('window');
 
@@ -80,7 +81,7 @@ export default function LoginScreen({ navigation }: any) {
             (account as { region?: string }).region,
             userUsername,
           );
-          await Promise.all([
+          const storageOps: Promise<void>[] = [
             AsyncStorage.setItem('currentUserId', userId),
             AsyncStorage.setItem('currentUser', userUsername),
             AsyncStorage.setItem('currentUserName', userEmployeeName),
@@ -88,7 +89,11 @@ export default function LoginScreen({ navigation }: any) {
             AsyncStorage.setItem('currentUserPosition', userPosition),
             AsyncStorage.setItem('currentSessionId', newSessionId), // 本地也存一份
             AsyncStorage.setItem('pricingRegionId', pricingRegionId),
-          ]);
+          ];
+          if (userPosition === '骑手' || userPosition === '骑手队长') {
+            storageOps.push(AsyncStorage.setItem(COURIER_ONLINE_MODE_KEY, 'true'));
+          }
+          await Promise.all(storageOps);
         } catch (storageError) {
           console.error('❌ AsyncStorage 保存失败:', storageError);
         }

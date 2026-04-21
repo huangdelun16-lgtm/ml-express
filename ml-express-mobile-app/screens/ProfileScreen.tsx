@@ -8,6 +8,9 @@ import {
   Alert,
   Linking,
   Dimensions,
+  Switch,
+  ActivityIndicator,
+  DeviceEventEmitter,
 } from 'react-native';
 import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,6 +27,9 @@ import {
   normalizePackageStatusZh,
   isActiveCourierTaskStatus,
 } from '../utils/packageStatusNormalize';
+import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
+import { locationService } from '../services/locationService';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -56,10 +62,13 @@ function getRiderEstimatedShareMmk(
 }
 
 export default function ProfileScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, t } = useApp();
   const [currentUserName, setCurrentUserName] = useState('');
   const [currentUser, setCurrentUser] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState('');
+  const [currentUserPosition, setCurrentUserPosition] = useState('');
+  const [courierOnline, setCourierOnline] = useState(true);
+  const [togglingOnline, setTogglingOnline] = useState(false);
   const [stats, setStats] = useState({
     totalDelivered: 0,
     todayDelivered: 0,
@@ -83,9 +92,95 @@ export default function ProfileScreen({ navigation }: any) {
     const userName = await AsyncStorage.getItem('currentUserName') || '用户';
     const user = await AsyncStorage.getItem('currentUser') || '';
     const userRole = await AsyncStorage.getItem('currentUserRole') || 'operator';
+    const position = await AsyncStorage.getItem('currentUserPosition') || '';
+    const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
     setCurrentUserName(userName);
     setCurrentUser(user);
     setCurrentUserRole(userRole);
+    setCurrentUserPosition(position);
+    setCourierOnline(onlinePref !== 'false');
+  };
+
+  const isRider =
+    currentUserPosition === '骑手' || currentUserPosition === '骑手队长';
+
+  const setCourierOnlineState = async (next: boolean) => {
+    const courierId = await AsyncStorage.getItem('currentCourierId');
+    if (!courierId) {
+      Alert.alert(
+        language === 'zh' ? '提示' : 'Notice',
+        language === 'zh'
+          ? '未找到骑手档案，请重新登录'
+          : 'Courier profile not found. Please login again.',
+      );
+      return;
+    }
+    setTogglingOnline(true);
+    try {
+      if (next) {
+        const perm = await Location.requestForegroundPermissionsAsync();
+        if (perm.status !== 'granted') {
+          if (!perm.canAskAgain) {
+            Alert.alert(t.locationPermissionDenied, t.locationOpenSettingsHint, [
+              { text: t.cancel, style: 'cancel' },
+              { text: t.openSystemSettings, onPress: () => Linking.openSettings() },
+            ]);
+          } else {
+            Alert.alert(t.tipTitle, t.locationPermissionMessage);
+          }
+          setTogglingOnline(false);
+          return;
+        }
+      }
+
+      await AsyncStorage.setItem(COURIER_ONLINE_MODE_KEY, next ? 'true' : 'false');
+      setCourierOnline(next);
+      if (next) {
+        await supabase
+          .from('couriers')
+          .update({
+            status: 'active',
+            last_active: new Date().toISOString(),
+          })
+          .eq('id', courierId);
+        await locationService.startBackgroundTracking();
+        try {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          await supabase.from('courier_locations').upsert(
+            {
+              courier_id: courierId,
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+              last_update: new Date().toISOString(),
+            },
+            { onConflict: 'courier_id' },
+          );
+        } catch (e) {
+          console.warn('courier_locations 首包同步失败', e);
+        }
+        DeviceEventEmitter.emit('courier_online_changed', { online: true });
+      } else {
+        await supabase
+          .from('couriers')
+          .update({
+            status: 'inactive',
+            last_active: new Date().toISOString(),
+          })
+          .eq('id', courierId);
+        await locationService.stopBackgroundTracking();
+        DeviceEventEmitter.emit('courier_online_changed', { online: false });
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert(
+        language === 'zh' ? '失败' : 'Failed',
+        language === 'zh' ? '状态更新失败，请重试' : 'Could not update status',
+      );
+    } finally {
+      setTogglingOnline(false);
+    }
   };
 
   const loadStats = async () => {
@@ -126,7 +221,7 @@ export default function ProfileScreen({ navigation }: any) {
         return dTime.includes(todayStr);
       });
 
-      setStats({
+      setStats(prev => ({
         totalDelivered: deliveredPackages.length,
         todayDelivered: todayDelivered.length,
         // 🚀 优化：包含所有配送中的中间状态
@@ -151,7 +246,8 @@ export default function ProfileScreen({ navigation }: any) {
           const regional = getRegionalPricingForPackage(p, regionalPricingMap);
           return sum + getRiderEstimatedShareMmk(p, regional);
         }, 0),
-      });
+        creditScore: prev.creditScore,
+      }));
     } catch (error) {
       console.error('加载统计失败:', error);
     }
@@ -353,6 +449,48 @@ export default function ProfileScreen({ navigation }: any) {
           </LinearGradient>
         </View>
 
+        {/* 骑手：在线接单（与 Admin 实时跟踪 / 待分配派单联动） */}
+        {isRider && (
+          <View style={[styles.statsContainer, { marginTop: 4 }]}>
+            <LinearGradient
+              colors={['rgba(16, 185, 129, 0.25)', 'rgba(15, 23, 42, 0.6)']}
+              style={styles.onlineCard}
+            >
+              <View style={styles.onlineRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.onlineTitle}>
+                    {language === 'zh'
+                      ? '在线接单'
+                      : language === 'my'
+                        ? 'အွန်လိုင်းမှာယူရန်'
+                        : 'Online for orders'}
+                  </Text>
+                  <Text style={styles.onlineHint}>
+                    {language === 'zh'
+                      ? '开启后后台可同步您的位置，管理端「实时跟踪」可派单；收工请关闭以省电'
+                      : language === 'my'
+                        ? 'ဖွင့်ထားလျှင် တည်နေရာကို ချိတ်ဆက်ပြီး စီမံခန့်ခွဲမှုမှ အော်ဒါခန့်ထားနိုင်သည်'
+                        : 'When on, your location syncs so admins can assign orders on Live Tracking.'}
+                  </Text>
+                </View>
+                {togglingOnline ? (
+                  <ActivityIndicator color="#10b981" />
+                ) : (
+                  <Switch
+                    value={courierOnline}
+                    onValueChange={(v) => setCourierOnlineState(v)}
+                    trackColor={{ false: '#475569', true: 'rgba(16, 185, 129, 0.5)' }}
+                    thumbColor={courierOnline ? '#10b981' : '#94a3b8'}
+                    accessibilityRole="switch"
+                    accessibilityLabel={t.a11yOnlineToggle}
+                    accessibilityState={{ checked: courierOnline }}
+                  />
+                )}
+              </View>
+            </LinearGradient>
+          </View>
+        )}
+
         {/* 功能菜单 */}
         <View style={styles.menuContainer}>
           <Text style={styles.sectionTitle}>{language === 'zh' ? '快捷功能' : language === 'my' ? 'အမြန်လုပ်ဆောင်ချက်များ' : 'Quick Actions'}</Text>
@@ -364,6 +502,9 @@ export default function ProfileScreen({ navigation }: any) {
                   styles.menuItem,
                   index === menuItems.length - 1 && { borderBottomWidth: 0 }
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+                accessibilityHint={item.subtitle}
                 onPress={() => {
                   if ((item as any).action) {
                     (item as any).action();
@@ -391,7 +532,12 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
 
         {/* 退出登录按钮 */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          accessibilityRole="button"
+          accessibilityLabel={t.a11yLogout}
+        >
           <LinearGradient
             colors={['#ef4444', '#b91c1c']}
             style={styles.logoutGradient}
@@ -494,6 +640,27 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  onlineCard: {
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  onlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  onlineTitle: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  onlineHint: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 12,
+    lineHeight: 18,
   },
   statsContainer: {
     paddingHorizontal: 20,

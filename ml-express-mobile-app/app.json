@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK STAFF",
     "slug": "MarketLinkStaffApp",
-    "version": "2.2.1",
+    "version": "2.2.2",
     "scheme": "ml-express-staff",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -44,7 +44,7 @@
         "backgroundColor": "#2c5282"
       },
       "package": "com.mlexpress.courier",
-      "versionCode": 67,
+      "versionCode": 68,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",

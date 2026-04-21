@@ -13,10 +13,12 @@ import {
   TextInput,
   Alert,
   Platform,
+  type DimensionValue,
 } from 'react-native';
 import { supabase, auditLogService } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
+import { formatI18n } from '../utils/i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -32,7 +34,7 @@ interface FinanceRecord {
 }
 
 export default function FinanceManagementScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { t } = useApp();
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -143,7 +145,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
   // 记录管理函数
   const handleAddRecord = async () => {
     if (!recordForm.category || !recordForm.amount) {
-      Alert.alert('提示', '请填写分类和金额');
+      Alert.alert(t.tipTitle, t.financeFillCategoryAndAmount);
       return;
     }
 
@@ -159,7 +161,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
         .insert([newRecord]);
 
       if (error) {
-        Alert.alert('错误', '添加记录失败');
+        Alert.alert(t.error, t.financeAddFailed);
         return;
       }
 
@@ -177,23 +179,27 @@ export default function FinanceManagementScreen({ navigation }: any) {
         action_description: `移动端创建财务记录，类型：${newRecord.record_type === 'income' ? '收入' : '支出'}，分类：${newRecord.category}，金额：${newRecord.amount} ${newRecord.currency}`,
       });
 
-      Alert.alert('成功', '财务记录添加成功');
+      Alert.alert(t.success, t.financeAddSuccess);
       setShowAddRecord(false);
       resetForm();
       await loadRecords();
     } catch (error) {
-      Alert.alert('错误', '添加记录失败');
+      Alert.alert(t.error, t.financeAddFailed);
     }
   };
 
   const handleDeleteRecord = async (record: FinanceRecord) => {
     Alert.alert(
-      '确认删除',
-      `确定要删除这条财务记录吗？\n\n分类：${record.category}\n金额：${record.amount} ${record.currency}`,
+      t.financeConfirmDeleteTitle,
+      formatI18n(t.financeConfirmDeleteBody, {
+        category: record.category,
+        amount: String(record.amount),
+        currency: record.currency,
+      }),
       [
-        { text: '取消', style: 'cancel' },
+        { text: t.cancel, style: 'cancel' },
         {
-          text: '删除',
+          text: t.delete,
           style: 'destructive',
           onPress: async () => {
             try {
@@ -203,7 +209,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
                 .eq('id', record.id);
 
               if (error) {
-                Alert.alert('错误', '删除失败');
+                Alert.alert(t.error, t.financeDeleteFailed);
                 return;
               }
 
@@ -221,10 +227,10 @@ export default function FinanceManagementScreen({ navigation }: any) {
                 action_description: `移动端删除财务记录，类型：${record.record_type === 'income' ? '收入' : '支出'}，分类：${record.category}，金额：${record.amount} ${record.currency}`,
               });
 
-              Alert.alert('成功', '记录删除成功');
+              Alert.alert(t.success, t.financeRecordDeleted);
               await loadRecords();
             } catch (error) {
-              Alert.alert('错误', '删除失败');
+              Alert.alert(t.error, t.financeDeleteFailed);
             }
           }
         }
@@ -268,12 +274,12 @@ export default function FinanceManagementScreen({ navigation }: any) {
     if (selectedRecords.size === 0) return;
 
     Alert.alert(
-      language === 'zh' ? '确认批量删除' : 'Confirm Batch Delete',
-      language === 'zh' ? `确定要删除选中的 ${selectedRecords.size} 条记录吗？` : `Are you sure you want to delete ${selectedRecords.size} selected records?`,
+      t.financeConfirmBatchDelete,
+      formatI18n(t.financeBatchDeleteConfirm, { count: selectedRecords.size }),
       [
-        { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
+        { text: t.cancel, style: 'cancel' },
         {
-          text: language === 'zh' ? '删除' : 'Delete',
+          text: t.delete,
           style: 'destructive',
           onPress: async () => {
             try {
@@ -284,16 +290,16 @@ export default function FinanceManagementScreen({ navigation }: any) {
                 .in('id', recordIds);
 
               if (error) {
-                Alert.alert(language === 'zh' ? '错误' : 'Error', language === 'zh' ? '批量删除失败' : 'Batch delete failed');
+                Alert.alert(t.error, t.financeBatchDeleteFailed);
                 return;
               }
 
-              Alert.alert(language === 'zh' ? '成功' : 'Success', language === 'zh' ? `成功删除 ${recordIds.length} 条记录` : `Successfully deleted ${recordIds.length} records`);
+              Alert.alert(t.success, formatI18n(t.financeBatchDeleteSuccess, { count: recordIds.length }));
               setSelectedRecords(new Set());
               setBatchMode(false);
               await loadRecords();
             } catch (error) {
-              Alert.alert(language === 'zh' ? '错误' : 'Error', language === 'zh' ? '批量删除失败' : 'Batch delete failed');
+              Alert.alert(t.error, t.financeBatchDeleteFailed);
             }
           }
         }
@@ -332,11 +338,11 @@ export default function FinanceManagementScreen({ navigation }: any) {
         onLongPress={() => {
           if (!batchMode) {
             Alert.alert(
-              language === 'zh' ? '操作选项' : 'Action Options',
-              language === 'zh' ? `选择对 "${item.category}" 的操作` : `Choose action for "${item.category}"`,
+              t.financeActionOptions,
+              formatI18n(t.financeChooseActionFor, { category: item.category }),
               [
-                { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
-                { text: language === 'zh' ? '编辑' : 'Edit', onPress: () => {
+                { text: t.cancel, style: 'cancel' },
+                { text: t.edit, onPress: () => {
                   setSelectedRecord(item);
                   setRecordForm({
                     record_type: item.record_type,
@@ -353,7 +359,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
                   });
                   setShowEditRecord(true);
                 }},
-                { text: language === 'zh' ? '删除' : 'Delete', style: 'destructive', onPress: () => handleDeleteRecord(item) }
+                { text: t.delete, style: 'destructive', onPress: () => handleDeleteRecord(item) }
               ]
             );
           }
@@ -410,10 +416,10 @@ export default function FinanceManagementScreen({ navigation }: any) {
                 item.status === 'pending' ? '#f39c12' : '#e74c3c'
             }]}>
               {item.status === 'completed' 
-                ? (language === 'zh' ? '已完成' : 'Completed')
+                ? t.financeStatusCompleted
                 : item.status === 'pending' 
-                ? (language === 'zh' ? '待处理' : 'Pending')
-                : (language === 'zh' ? '已取消' : 'Cancelled')
+                ? t.financeStatusPending
+                : t.financeStatusCancelled
               }
             </Text>
           </View>
@@ -442,7 +448,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>💰 {language === 'zh' ? '财务管理' : 'Finance Management'}</Text>
+        <Text style={styles.headerTitle}>💰 {t.financeManagementTitle}</Text>
         <TouchableOpacity onPress={() => setShowAddRecord(true)} style={styles.addButton}>
           <Text style={styles.addIcon}>+</Text>
         </TouchableOpacity>
@@ -451,10 +457,10 @@ export default function FinanceManagementScreen({ navigation }: any) {
       {/* 标签页导航 */}
       <View style={styles.tabContainer}>
         {[
-          { key: 'overview', label: language === 'zh' ? '概览' : 'Overview', icon: '📊' },
-          { key: 'records', label: language === 'zh' ? '记录' : 'Records', icon: '📋' },
-          { key: 'analytics', label: language === 'zh' ? '分析' : 'Analytics', icon: '📈' },
-          { key: 'reports', label: language === 'zh' ? '报表' : 'Reports', icon: '📄' }
+          { key: 'overview', label: t.financeTabOverview, icon: '📊' },
+          { key: 'records', label: t.financeTabRecords, icon: '📋' },
+          { key: 'analytics', label: t.financeTabAnalytics, icon: '📈' },
+          { key: 'reports', label: t.financeTabReports, icon: '📄' }
         ].map(tab => (
           <TouchableOpacity
             key={tab.key}
@@ -473,7 +479,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2c5282" />
-          <Text style={styles.loadingText}>{language === 'zh' ? '加载财务数据...' : 'Loading finance data...'}</Text>
+          <Text style={styles.loadingText}>{t.financeLoadingData}</Text>
         </View>
       ) : (
         <>
@@ -494,7 +500,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
         <View style={styles.centeredModalOverlay}>
           <View style={styles.largeModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>➕ {language === 'zh' ? '新增财务记录' : 'Add Finance Record'}</Text>
+              <Text style={styles.modalTitle}>➕ {t.financeAddRecordTitle}</Text>
               <TouchableOpacity onPress={() => setShowAddRecord(false)} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -863,7 +869,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
                 </View>
                 <View style={styles.categoryProgressBar}>
                   <View 
-                    style={[styles.categoryProgressFill, { width: `${percentage}%` }]} 
+                    style={[styles.categoryProgressFill, { width: `${percentage}%` as DimensionValue }]} 
                   />
                 </View>
               </View>
@@ -920,7 +926,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
           <View style={styles.reportOptions}>
             <TouchableOpacity 
               style={styles.reportOption}
-              onPress={() => Alert.alert('月度报表', '生成本月财务报表...')}
+              onPress={() => Alert.alert(t.financeMonthlyReport, t.financeMonthlyReportHint)}
             >
               <Text style={styles.reportOptionIcon}>📊</Text>
               <Text style={styles.reportOptionTitle}>月度财务报表</Text>
@@ -929,7 +935,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
 
             <TouchableOpacity 
               style={styles.reportOption}
-              onPress={() => Alert.alert('导出数据', '导出所有财务数据...')}
+              onPress={() => Alert.alert(t.financeExportData, t.financeExportDataHint)}
             >
               <Text style={styles.reportOptionIcon}>📤</Text>
               <Text style={styles.reportOptionTitle}>导出财务数据</Text>
@@ -938,7 +944,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
 
             <TouchableOpacity 
               style={styles.reportOption}
-              onPress={() => Alert.alert('税务报表', '生成税务申报资料...')}
+              onPress={() => Alert.alert(t.financeTaxReport, t.financeTaxReportHint)}
             >
               <Text style={styles.reportOptionIcon}>🧾</Text>
               <Text style={styles.reportOptionTitle}>税务报表</Text>

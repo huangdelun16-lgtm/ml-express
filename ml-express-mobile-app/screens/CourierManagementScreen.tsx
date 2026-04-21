@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  type DimensionValue,
 } from 'react-native';
 import { courierService, packageService, Courier, Package } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
@@ -1011,7 +1012,7 @@ export default function CourierManagementScreen({ navigation }: any) {
                 <View style={styles.vehicleStats}>
                   <View style={styles.progressBar}>
                     <View 
-                      style={[styles.progressFill, { width: `${percentage}%` }]} 
+                      style={[styles.progressFill, { width: `${percentage}%` as DimensionValue }]} 
                     />
                   </View>
                   <Text style={styles.vehicleCount}>{count}人 ({percentage}%)</Text>

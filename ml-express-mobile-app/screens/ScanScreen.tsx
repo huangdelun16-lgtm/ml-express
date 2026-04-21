@@ -25,7 +25,7 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ScanScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, t: a11y } = useApp();
   const [permission, requestPermission] = useCameraPermissions();
   const isFocused = useIsFocused();
   const [scanned, setScanned] = useState(false);
@@ -258,7 +258,12 @@ export default function ScanScreen({ navigation }: any) {
           <Text style={styles.permissionText}>📷</Text>
           <Text style={styles.permissionTitle}>{t.needPermission}</Text>
           <Text style={styles.permissionDesc}>{t.permissionDesc}</Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestPermission}
+            accessibilityRole="button"
+            accessibilityLabel={a11y.a11yScanGrantCamera}
+          >
             <Text style={styles.permissionButtonText}>{t.grantPermission}</Text>
           </TouchableOpacity>
         </View>
@@ -687,6 +692,9 @@ export default function ScanScreen({ navigation }: any) {
         <TouchableOpacity 
           onPress={() => setShowManualInput(!showManualInput)}
           style={styles.manualButton}
+          accessibilityRole="button"
+          accessibilityLabel={a11y.a11yScanToggleMode}
+          accessibilityHint={showManualInput ? t.scanButton : t.inputButton}
         >
           <Text style={styles.manualButtonText}>
             {showManualInput ? t.scanButton : t.inputButton}
@@ -701,8 +709,14 @@ export default function ScanScreen({ navigation }: any) {
             <View style={styles.cameraContainer}>
               {isFocused ? (
                 <>
-                  <CameraView
+                  <View
                     style={styles.camera}
+                    accessible
+                    accessibilityLabel={a11y.scanInstruction}
+                    accessibilityRole="none"
+                  >
+                  <CameraView
+                    style={StyleSheet.absoluteFillObject}
                     facing="back"
                     onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                     barcodeScannerSettings={{
@@ -717,6 +731,7 @@ export default function ScanScreen({ navigation }: any) {
                       setCameraError('相机无法启动，请检查设备权限或重启应用');
                     }}
                   />
+                  </View>
 
                   {/* 🚀 优化布局：使用绝对定位覆盖层，提高启动速度和稳定性 */}
                   <View style={styles.overlayContainer}>
@@ -783,6 +798,8 @@ export default function ScanScreen({ navigation }: any) {
                         // 重新请求权限
                         requestPermission();
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel={a11y.a11yScanRetryCamera}
                     >
                       <LinearGradient
                         colors={['#3498db', '#2980b9']}
@@ -805,6 +822,8 @@ export default function ScanScreen({ navigation }: any) {
               <TouchableOpacity 
                 style={styles.retryButton}
                 onPress={requestPermission}
+                accessibilityRole="button"
+                accessibilityLabel={a11y.a11yScanGrantCamera}
               >
                 <LinearGradient
                   colors={['#3498db', '#2980b9']}
@@ -835,6 +854,8 @@ export default function ScanScreen({ navigation }: any) {
                   <TouchableOpacity 
                     style={styles.rescanButton}
                     onPress={resetScanState}
+                    accessibilityRole="button"
+                    accessibilityLabel={a11y.a11yScanRescan}
                   >
                     <LinearGradient
                       colors={['#10b981', '#059669']}
@@ -861,10 +882,13 @@ export default function ScanScreen({ navigation }: any) {
               onChangeText={setManualInput}
               autoCapitalize="characters"
               autoFocus
+              accessibilityLabel={a11y.a11yScanPackageInput}
             />
             <TouchableOpacity 
               style={styles.searchButton}
               onPress={handleManualSearch}
+              accessibilityRole="button"
+              accessibilityLabel={a11y.a11yScanLookupPackage}
             >
               <Text style={styles.searchButtonText}>{t.searchPackage}</Text>
             </TouchableOpacity>

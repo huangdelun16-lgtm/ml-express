@@ -369,6 +369,12 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 16,
+  },
   totalStatsGlassCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 24,

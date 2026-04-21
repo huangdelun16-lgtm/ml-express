@@ -59,8 +59,8 @@ async function saveLocationToSupabase(latitude: number, longitude: number, isMov
     const now = Date.now();
     const lastUpdate = lastUpdateStr ? parseInt(lastUpdateStr) : 0;
 
-    // 🚀 动态间隔：高速移动时 10s 更新，静止时 60s 更新
-    const minInterval = isMoving ? 10 * 1000 : 60 * 1000;
+    // 动态间隔：移动时 12s，静止 90s（上报仍节流，减轻服务器与射频唤醒）
+    const minInterval = isMoving ? 12 * 1000 : 90 * 1000;
     if (now - lastUpdate < minInterval) return;
 
     // 更新 courier_locations 表
@@ -159,21 +159,22 @@ export const locationService = {
       try { await Location.stopLocationUpdatesAsync(LOCATION_TRACKING_TASK); } catch (e) {}
     }
 
+    // High：相较 BestForNavigation 明显省电，仍足够用于配送轨迹与电子围栏
     await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
-      accuracy: Location.Accuracy.BestForNavigation, // 🚀 升级为导航最高精度
-      timeInterval: 5000, // 🚀 缩短至 5 秒采集一次，处理动态频率逻辑
-      distanceInterval: 10, // 🚀 缩短至 10 米位移触发
-      showsBackgroundLocationIndicator: true, // 🚀 iOS 专属：显示蓝色持续定位指示器
+      accuracy: Location.Accuracy.High,
+      timeInterval: 8000,
+      distanceInterval: 22,
+      showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: "ML Express 配送员助手正在运行",
         notificationBody: "保持后台运行以接收新订单并记录配送轨迹",
         notificationColor: "#3b82f6",
       },
-      pausesUpdatesAutomatically: false,
-      deferredUpdatesInterval: 5000,
-      deferredUpdatesDistance: 10,
+      pausesUpdatesAutomatically: true,
+      deferredUpdatesInterval: 12000,
+      deferredUpdatesDistance: 25,
     });
-    console.log('🚀 后台位置追踪已启动 (最高精度导航模式)');
+    console.log('🚀 后台位置追踪已启动 (High 精度 · 省电优化)');
   },
 
   /**

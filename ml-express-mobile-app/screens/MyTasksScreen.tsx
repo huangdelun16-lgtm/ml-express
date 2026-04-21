@@ -73,6 +73,13 @@ const MyTasksScreen: React.FC = () => {
   const [scannedData, setScannedData] = useState<string | null>(null);
   const scannedOnce = useRef(false); // 跟踪是否已经扫描过一次
 
+  const resetScanState = () => {
+    scannedOnce.current = false;
+    setScannedData(null);
+    setShowScanModal(true);
+    setScanning(true);
+  };
+
   // 当前骑手信息状态
   const [currentCourierName, setCurrentCourierName] = useState('');
   const [currentCourierId, setCurrentCourierId] = useState('');

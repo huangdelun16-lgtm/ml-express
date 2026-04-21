@@ -31,7 +31,7 @@ import { useApp } from '../contexts/AppContext';
 import { packageService, Package, supabase, deliveryPhotoService } from '../services/supabase';
 import { cacheService } from '../services/cacheService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, DeviceEventEmitter } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -39,6 +39,8 @@ import {
   isMerchantGeofenceStatus,
   isPickupFlowStatus,
 } from '../utils/packageStatusNormalize';
+import { MAP_STYLE_LOGISTICS_PRO } from '../utils/mapStyles';
+import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 
 const { width, height } = Dimensions.get('window');
 
@@ -139,7 +141,7 @@ const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: num
 };
 
 export default function MapScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, t } = useApp();
   const isFocused = useIsFocused();
   
   // 1. 状态定义
@@ -310,27 +312,28 @@ export default function MapScreen({ navigation }: any) {
   }, [currentDeliveringPackageId, packages]);
 
   const buildLocationConfig = useCallback(() => {
+    // 省电策略：避免 BestForNavigation；配送中用 High + 适中间隔，仍可满足围栏与轨迹
     if (isBackground) {
       return {
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: 240000,
-        distanceInterval: 250,
-        mode: 'background'
+        timeInterval: 120000,
+        distanceInterval: 220,
+        mode: 'background' as const,
       };
     }
     if (hasInTransitOrders) {
       return {
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 10000,
-        distanceInterval: 15,
-        mode: 'active'
+        accuracy: Location.Accuracy.High,
+        timeInterval: 12000,
+        distanceInterval: 20,
+        mode: 'active' as const,
       };
     }
     return {
       accuracy: Location.Accuracy.Balanced,
-      timeInterval: 20000,
-      distanceInterval: 80,
-      mode: 'idle'
+      timeInterval: 35000,
+      distanceInterval: 100,
+      mode: 'idle' as const,
     };
   }, [hasInTransitOrders, isBackground]);
 
@@ -865,7 +868,10 @@ export default function MapScreen({ navigation }: any) {
       const courierId = await AsyncStorage.getItem('currentCourierId');
       if (!courierId) return;
 
-      if (!hasInTransitOrders) {
+      const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
+      const wantOnline = onlinePref !== 'false';
+      // 无在途单时：仅在「账号页关闭在线」时停止定位；否则保持 idle 级上报，供 Admin 实时跟踪派单
+      if (!hasInTransitOrders && !wantOnline) {
         stopLocationTracking();
         return;
       }
@@ -901,21 +907,31 @@ export default function MapScreen({ navigation }: any) {
       if (!isExpoGo) {
         try {
           const isStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING_TASK);
-          if (!isStarted) {
-            await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
-              accuracy: locationConfig.accuracy,
-              timeInterval: locationConfig.timeInterval,
-              distanceInterval: locationConfig.distanceInterval,
-              // 🚀 iOS 专属：显示蓝色持续定位指示器（苹果审核最看重这一点）
-              showsBackgroundLocationIndicator: true,
-              foregroundService: {
-                notificationTitle: language === 'zh' ? '正在追踪您的配送进度' : 'Tracking Delivery',
-                notificationBody: language === 'zh' ? '骑手 App 正在后台运行以同步位置' : 'App is running in background',
-                notificationColor: '#2c5282',
-              },
-            });
-            console.log('✅ [后台任务] 启动成功');
+          if (isStarted) {
+            await Location.stopLocationUpdatesAsync(LOCATION_TRACKING_TASK);
           }
+          // 与登录页 locationService 使用同一任务名；此处按配送状态覆盖为省电参数
+          const pauseWhenStatic =
+            locationConfig.mode === 'idle' || locationConfig.mode === 'background';
+          await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
+            accuracy: locationConfig.accuracy,
+            timeInterval: Math.min(locationConfig.timeInterval, 600000),
+            distanceInterval: locationConfig.distanceInterval,
+            showsBackgroundLocationIndicator: true,
+            pausesUpdatesAutomatically: pauseWhenStatic,
+            foregroundService: {
+              notificationTitle: language === 'zh' ? '正在追踪您的配送进度' : 'Tracking Delivery',
+              notificationBody: language === 'zh' ? '骑手 App 正在后台运行以同步位置' : 'App is running in background',
+              notificationColor: '#2c5282',
+            },
+            ...(Platform.OS === 'android'
+              ? {
+                  deferredUpdatesInterval: Math.min(locationConfig.timeInterval, 120000),
+                  deferredUpdatesDistance: Math.max(locationConfig.distanceInterval, 15),
+                }
+              : {}),
+          });
+          console.log('✅ [后台任务] 已同步启动/刷新 (模式:', locationConfig.mode, ')');
         } catch (err) {
           console.error('❌ [后台任务] 启动失败:', err);
           // 仅在非开发模式下且不是由于权限问题导致时抛出严重错误
@@ -930,6 +946,7 @@ export default function MapScreen({ navigation }: any) {
           accuracy: locationConfig.accuracy,
           timeInterval: locationConfig.timeInterval,
           distanceInterval: locationConfig.distanceInterval,
+          mayShowUserSettingsDialog: false,
         },
         async (currentLocation) => {
           const now = Date.now();
@@ -993,7 +1010,21 @@ export default function MapScreen({ navigation }: any) {
       setIsLocationTracking(false); 
       console.error('追踪启动异常:', e);
     }
-  }, [buildLocationConfig, hasInTransitOrders, isBackground, isLocationTracking, stopLocationTracking]);
+  }, [buildLocationConfig, hasInTransitOrders, isBackground, isLocationTracking, stopLocationTracking, language]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      'courier_online_changed',
+      (payload?: { online?: boolean }) => {
+        if (payload?.online === false) {
+          stopLocationTracking();
+        } else {
+          startLocationTracking();
+        }
+      },
+    );
+    return () => sub.remove();
+  }, [startLocationTracking, stopLocationTracking]);
 
   const requestLocationPermission = useCallback(async () => {
     try {
@@ -1374,6 +1405,8 @@ export default function MapScreen({ navigation }: any) {
           isCurrent && styles.currentDeliveringCard
         ]}
         onPress={() => navigation.navigate('PackageDetail', { package: item, coords: item.coords })}
+        accessibilityRole="button"
+        accessibilityLabel={`${t.a11yPackageOpenDetail} ${item.id}`}
       >
         <View style={styles.packageInfo}>
           <View style={styles.cardHeader}>
@@ -1455,6 +1488,8 @@ export default function MapScreen({ navigation }: any) {
                         <TouchableOpacity 
                           style={styles.pointNavAction} 
                           onPress={() => handleSingleNavigate(item.pickupCoords!.lat, item.pickupCoords!.lng)}
+                          accessibilityRole="button"
+                          accessibilityLabel={t.a11yMapNavPickup}
                         >
                           <Ionicons name="navigate-circle" size={16} color="#3b82f6" />
                           <Text style={styles.pointNavActionText}>{language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}</Text>
@@ -1488,6 +1523,8 @@ export default function MapScreen({ navigation }: any) {
                         <TouchableOpacity 
                           style={styles.pointNavAction} 
                           onPress={() => handleSingleNavigate(item.deliveryCoords!.lat, item.deliveryCoords!.lng)}
+                          accessibilityRole="button"
+                          accessibilityLabel={t.a11yMapNavDelivery}
                         >
                           <Ionicons name="navigate-circle" size={16} color="#3b82f6" />
                           <Text style={styles.pointNavActionText}>{language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}</Text>
@@ -1511,6 +1548,8 @@ export default function MapScreen({ navigation }: any) {
                 <TouchableOpacity 
                   style={styles.startDeliveryButton}
                     onPress={(e) => { e?.stopPropagation?.(); startDelivering(item.id); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.a11yMapStartDelivery}
                 >
                   <Text style={styles.startDeliveryText}>
                     🚀 {language === 'zh' ? '开始配送' : language === 'en' ? 'Start Delivery' : 'ပို့ဆောင်မှုစတင်'}
@@ -1520,6 +1559,8 @@ export default function MapScreen({ navigation }: any) {
                 <TouchableOpacity 
                   style={styles.finishDeliveryButton}
                     onPress={(e) => { e?.stopPropagation?.(); finishDelivering(item.id); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.a11yMapFinishDelivery}
                 >
                   <Text style={styles.finishDeliveryText}>
                       🏁 {language === 'zh' ? '完成配送' : language === 'en' ? 'Complete' : 'ပြီးမြောက်ပါ'}
@@ -1533,6 +1574,8 @@ export default function MapScreen({ navigation }: any) {
                   effectiveStatus === '异常上报' && { backgroundColor: '#ef4444' }
                 ]}
                   onPress={(e) => { e?.stopPropagation?.(); finishDelivering(item.id); }}
+                accessibilityRole="button"
+                accessibilityLabel={t.a11yMapFinishDelivery}
               >
                 <Text style={styles.finishDeliveryText}>
                     {effectiveStatus === '异常上报' ? '⚠️ ' : '🏁 '}
@@ -1544,6 +1587,8 @@ export default function MapScreen({ navigation }: any) {
                   <TouchableOpacity 
                     style={[styles.placeholderButton, { backgroundColor: '#3b82f6' }]} 
                     onPress={(e) => { e?.stopPropagation?.(); navigation.navigate('Scan'); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapScanPickup}
                   >
                 <Text style={styles.placeholderText}>
                       {language === 'zh' ? '扫码取件' : language === 'en' ? 'Scan' : 'စကင်န်ဖတ်ပါ'}
@@ -1552,6 +1597,8 @@ export default function MapScreen({ navigation }: any) {
                   <TouchableOpacity 
                     style={[styles.placeholderButton, { backgroundColor: '#10b981' }]} 
                     onPress={(e) => { e?.stopPropagation?.(); handleManualPickup(item.id); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapManualPickup}
                   >
                     <Text style={styles.placeholderText}>
                       {language === 'zh' ? '手动取件' : language === 'en' ? 'Manual' : 'ကိုယ်တိုင်ယူ'}
@@ -1584,7 +1631,7 @@ export default function MapScreen({ navigation }: any) {
         </View>
       </TouchableOpacity>
     );
-  }, [currentDeliveringPackageId, navigation, startDelivering, finishDelivering, handleManualPickup, getMarkerIcon, getStatusColor, statusOverrides, language, resolvePackageStatus]);
+  }, [currentDeliveringPackageId, navigation, startDelivering, finishDelivering, handleManualPickup, getMarkerIcon, getStatusColor, statusOverrides, language, resolvePackageStatus, t]);
 
   // 7. 初始化效果
   useEffect(() => {
@@ -1594,7 +1641,10 @@ export default function MapScreen({ navigation }: any) {
       await loadPackages();
       await loadDeliveryStores();
       await loadCurrentDeliveringPackage();
-      await updateCourierStatus('active');
+      const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
+      if (onlinePref !== 'false') {
+        await updateCourierStatus('active');
+      }
       initNetworkListener();
       initAppStateListener();
       startLocationTracking();
@@ -1602,8 +1652,7 @@ export default function MapScreen({ navigation }: any) {
     };
     init();
     return () => {
-      stopLocationTracking();
-      updateCourierStatus('inactive');
+      // 不在此停止定位：否则切换 Tab 会停掉后台轨迹，Admin「实时跟踪」会判离线。停止仅通过账号「在线」关闭或登出。
       cleanupMemory();
       stopAutoRefresh();
       removeNetworkListener();
@@ -1654,7 +1703,12 @@ export default function MapScreen({ navigation }: any) {
             {!isOnline ? '📡 ' : '⚠️ '}{errorMessage}
                 </Text>
           {!isOnline && (
-            <TouchableOpacity onPress={() => loadPackages(true)} style={styles.retryButton}>
+            <TouchableOpacity
+              onPress={() => loadPackages(true)}
+              style={styles.retryButton}
+              accessibilityRole="button"
+              accessibilityLabel={t.retry}
+            >
               <Text style={styles.retryButtonText}>
                 {language === 'zh' ? '重试' : language === 'en' ? 'Retry' : 'ပြန်ကြိုးစားပါ'}
                 </Text>
@@ -1678,11 +1732,17 @@ export default function MapScreen({ navigation }: any) {
               style={styles.searchInput} 
               placeholder={language === 'zh' ? '搜索包裹...' : language === 'en' ? 'Search packages...' : 'ပါဆယ်ထုပ်များကိုရှာဖွေပါ...'} 
               value={searchQuery} 
-              onChangeText={setSearchQuery} 
+              onChangeText={setSearchQuery}
+              accessibilityLabel={t.a11yMapSearchPackages}
             />
           </View>
           {location && (
-            <TouchableOpacity style={styles.filterButton} onPress={handleNavigateAll}>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={handleNavigateAll}
+              accessibilityRole="button"
+              accessibilityLabel={t.a11yMapPlanRoute}
+            >
               <Text style={styles.filterButtonText}>
                 {language === 'zh' ? '🗺️ 规划路线' : language === 'en' ? '🗺️ Plan Route' : '🗺️ လမ်းကြောင်းစီစဉ်ပါ'}
             </Text>
@@ -1699,7 +1759,12 @@ export default function MapScreen({ navigation }: any) {
             <Text style={styles.emptyTitle}>
                 {language === 'zh' ? '暂无任务' : language === 'en' ? 'No Tasks' : 'တာဝန်မရှိပါ'}
             </Text>
-              <TouchableOpacity style={styles.refreshButton} onPress={() => loadPackages(true)}>
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={() => loadPackages(true)}
+                accessibilityRole="button"
+                accessibilityLabel={t.refresh}
+              >
               <Text style={styles.refreshButtonText}>
                   {language === 'zh' ? '🔄 刷新' : language === 'en' ? '🔄 Refresh' : '🔄 ပြန်လည်ရယူပါ'}
               </Text>
@@ -1719,7 +1784,12 @@ export default function MapScreen({ navigation }: any) {
       <Modal visible={showMapPreview} animationType="slide">
         <View style={styles.mapModalContainer}>
           <LinearGradient colors={['#0f172a', '#1e293b']} style={styles.mapModalHeader}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => setShowMapPreview(false)}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowMapPreview(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t.a11yMapRoutePreviewClose}
+            >
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.mapModalTitle}>
@@ -1729,10 +1799,22 @@ export default function MapScreen({ navigation }: any) {
           </LinearGradient>
           <View style={{ flex: 1, position: 'relative' }}>
             {isFocused ? (
+              <View
+                style={StyleSheet.absoluteFillObject}
+                accessible
+                accessibilityLabel={t.map}
+                accessibilityRole="none"
+              >
               <MapView
                 ref={mapRef}
                 provider={PROVIDER_GOOGLE}
-                style={StyleSheet.absoluteFillObject} 
+                style={StyleSheet.absoluteFillObject}
+                customMapStyle={MAP_STYLE_LOGISTICS_PRO}
+                mapType="standard"
+                pitchEnabled={false}
+                rotateEnabled
+                loadingEnabled
+                toolbarEnabled={false}
                 initialRegion={{
                   latitude: location?.latitude || 21.9588, 
                   longitude: location?.longitude || 96.0891, 
@@ -1744,6 +1826,7 @@ export default function MapScreen({ navigation }: any) {
                 <Marker
                     coordinate={{ latitude: location.latitude, longitude: location.longitude }} 
                     title={language === 'zh' ? '当前位置' : 'My Location'}
+                    tracksViewChanges={false}
                 >
                   <View style={styles.courierMarker}>
                       <Text style={styles.courierMarkerText}>🛵</Text>
@@ -1758,6 +1841,7 @@ export default function MapScreen({ navigation }: any) {
                         coordinate={{ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng }}
                         title={`${language === 'zh' ? '取货点' : 'Pickup'} P${i + 1}`}
                         description={p.sender_address}
+                        tracksViewChanges={false}
                     >
                       <View style={styles.pickupMarker}>
                           <Text style={styles.pickupMarkerText}>P{i + 1}</Text>
@@ -1769,6 +1853,7 @@ export default function MapScreen({ navigation }: any) {
                         coordinate={{ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng }}
                         title={`${language === 'zh' ? '送货点' : 'Delivery'} D${i + 1}`}
                         description={p.receiver_address}
+                        tracksViewChanges={false}
                     >
                       <View style={styles.packageMarker}>
                           <Text style={styles.pickupMarkerText}>D{i + 1}</Text>
@@ -1778,6 +1863,7 @@ export default function MapScreen({ navigation }: any) {
                   </React.Fragment>
                 ))}
               </MapView>
+              </View>
             ) : (
               <View style={styles.mapPausedContainer}>
                 <Text style={styles.mapPausedText}>
@@ -1791,7 +1877,12 @@ export default function MapScreen({ navigation }: any) {
                   <Text style={styles.routeListTitle}>
                     {language === 'zh' ? '📦 配送顺序' : language === 'en' ? '📦 Delivery Order' : '📦 ပို့ဆောင်မည့်အစဉ်'}
               </Text>
-                  <TouchableOpacity style={styles.startNavigationButtonCompact} onPress={openGoogleMapsNavigation}>
+                  <TouchableOpacity
+                    style={styles.startNavigationButtonCompact}
+                    onPress={openGoogleMapsNavigation}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapOpenGoogleNav}
+                  >
                     <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.navBtnGradientSmall}>
                       <Text style={styles.navBtnTextSmall}>
                         {language === 'zh' ? '🚀 开始导航' : language === 'en' ? '🚀 Start Nav' : '🚀 လမ်းညွှန်စတင်ပါ'}
@@ -1824,7 +1915,11 @@ export default function MapScreen({ navigation }: any) {
               <Text style={styles.cameraModalTitle}>
                 {language === 'zh' ? '📸 配送操作' : language === 'en' ? '📸 Delivery' : '📸 ပို့ဆောင်မှု'}
               </Text>
-              <TouchableOpacity onPress={() => setShowCameraModal(false)}>
+              <TouchableOpacity
+                onPress={() => setShowCameraModal(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t.close}
+              >
                 <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
@@ -1834,19 +1929,34 @@ export default function MapScreen({ navigation }: any) {
                 normalizePackageStatusZh(currentPackageForDelivery.status),
               ) ? (
                 <>
-                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); navigation.navigate('Scan'); }}>
+                  <TouchableOpacity
+                    style={styles.gridActionBtn}
+                    onPress={() => { setShowCameraModal(false); navigation.navigate('Scan'); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapScanPickup}
+                  >
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
                       <Ionicons name="qr-code" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码取件' : 'Scan'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); handleManualPickup(currentPackageForDelivery.id); }}>
+                  <TouchableOpacity
+                    style={styles.gridActionBtn}
+                    onPress={() => { setShowCameraModal(false); handleManualPickup(currentPackageForDelivery.id); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapManualPickup}
+                  >
                     <LinearGradient colors={['#10b981', '#059669']} style={styles.gridBtnGradient}>
                       <Ionicons name="hand-right" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '手动取件' : 'Manual'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowAnomalyModal(true); }}>
+                  <TouchableOpacity
+                    style={styles.gridActionBtn}
+                    onPress={() => { setShowCameraModal(false); setShowAnomalyModal(true); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapReportAnomaly}
+                  >
                     <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.gridBtnGradient}>
                       <Ionicons name="warning" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '异常上报' : 'Anomaly'}</Text>
@@ -1855,19 +1965,34 @@ export default function MapScreen({ navigation }: any) {
                 </>
               ) : (
                 <>
-                  <TouchableOpacity style={styles.gridActionBtn} onPress={handleOpenCamera}>
+                  <TouchableOpacity
+                    style={styles.gridActionBtn}
+                    onPress={handleOpenCamera}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapPhotoDelivery}
+                  >
                     <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.gridBtnGradient}>
                       <Ionicons name="camera" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '拍照送达' : 'Photo'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); navigation.navigate('Scan'); }}>
+                  <TouchableOpacity
+                    style={styles.gridActionBtn}
+                    onPress={() => { setShowCameraModal(false); navigation.navigate('Scan'); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapScanPickup}
+                  >
                     <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.gridBtnGradient}>
                       <Ionicons name="qr-code" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '扫码送达' : 'Scan'}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.gridActionBtn} onPress={() => { setShowCameraModal(false); setShowAnomalyModal(true); }}>
+                  <TouchableOpacity
+                    style={styles.gridActionBtn}
+                    onPress={() => { setShowCameraModal(false); setShowAnomalyModal(true); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.a11yMapReportAnomaly}
+                  >
                     <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.gridBtnGradient}>
                       <Ionicons name="warning" size={28} color="white" />
                       <Text style={styles.gridBtnText}>{language === 'zh' ? '异常上报' : 'Anomaly'}</Text>
@@ -1893,7 +2018,12 @@ export default function MapScreen({ navigation }: any) {
                   {language === 'zh' ? '异常场景申报' : 'Anomaly Report'}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setShowAnomalyModal(false)} style={[styles.closeBtn, { backgroundColor: '#f1f5f9' }]}>
+              <TouchableOpacity
+                onPress={() => setShowAnomalyModal(false)}
+                style={[styles.closeBtn, { backgroundColor: '#f1f5f9' }]}
+                accessibilityRole="button"
+                accessibilityLabel={t.close}
+              >
                 <Ionicons name="close" size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
@@ -1916,6 +2046,9 @@ export default function MapScreen({ navigation }: any) {
                   <TouchableOpacity 
                     key={type}
                     onPress={() => setAnomalyType(type)}
+                    accessibilityRole="button"
+                    accessibilityLabel={type}
+                    accessibilityState={{ selected: anomalyType === type }}
                     style={{
                       paddingHorizontal: 12,
                       paddingVertical: 8,
@@ -1959,6 +2092,8 @@ export default function MapScreen({ navigation }: any) {
                 style={[{ height: 56, borderRadius: 16, overflow: 'hidden' }, (reporting || !anomalyType || !anomalyDescription) && styles.disabledBtn]} 
                 onPress={handleReportAnomaly}
                 disabled={reporting || !anomalyType || !anomalyDescription}
+                accessibilityRole="button"
+                accessibilityLabel={t.a11yMapSubmitAnomaly}
               >
                 <LinearGradient colors={['#ef4444', '#dc2626']} style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
                   {reporting ? (
@@ -1985,13 +2120,22 @@ export default function MapScreen({ navigation }: any) {
               <Text style={styles.photoModalTitle}>
                 {language === 'zh' ? '配送照片预览' : language === 'en' ? 'Photo Preview' : 'ဓာတ်ပုံအစမ်းကြည့်'}
               </Text>
-              <TouchableOpacity onPress={() => setShowPhotoModal(false)}>
+              <TouchableOpacity
+                onPress={() => setShowPhotoModal(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t.close}
+              >
                 <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
             <View style={styles.photoModalBody}>
               <Image source={{ uri: capturedPhoto || '' }} style={styles.photoPreviewWrapper} />
-              <TouchableOpacity onPress={handleUploadPhoto} style={styles.uploadButton}>
+              <TouchableOpacity
+                onPress={handleUploadPhoto}
+                style={styles.uploadButton}
+                accessibilityRole="button"
+                accessibilityLabel={t.confirmDelivery}
+              >
                 <LinearGradient colors={['#10b981', '#059669']} style={styles.uploadButtonGradient}>
                     <Text style={styles.uploadButtonText}>
                     {uploadingPhoto 

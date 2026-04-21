@@ -3,8 +3,11 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
+import { useApp } from '../contexts/AppContext';
+import { formatI18n } from '../utils/i18n';
 
 export const SyncIndicator = () => {
+  const { t } = useApp();
   const [pendingCount, setPendingCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const [opacity] = useState(new Animated.Value(0));
@@ -45,8 +48,12 @@ export const SyncIndicator = () => {
   if (pendingCount === 0) return null;
 
   return (
-    <Animated.View style={[styles.container, { opacity }]}>
-      <View style={[styles.badge, !isOnline && styles.offlineBadge]}>
+    <Animated.View
+      style={[styles.container, { opacity }]}
+      accessibilityLiveRegion="polite"
+      accessibilityLabel={formatI18n(isOnline ? t.syncInProgress : t.syncPending, { count: pendingCount })}
+    >
+      <View style={[styles.badge, !isOnline && styles.offlineBadge]} accessible={false}>
         <Ionicons 
           name={isOnline ? "sync" : "cloud-offline"} 
           size={14} 
@@ -54,9 +61,7 @@ export const SyncIndicator = () => {
           style={isOnline ? styles.spin : undefined}
         />
         <Text style={styles.text}>
-          {isOnline 
-            ? `同步中 (${pendingCount})` 
-            : `待同步 (${pendingCount})`}
+          {formatI18n(isOnline ? t.syncInProgress : t.syncPending, { count: pendingCount })}
         </Text>
       </View>
     </Animated.View>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { supabase, adminAccountService } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+import { getPushRuntimeSummary } from '../services/notificationService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -34,7 +35,28 @@ const HOTLINE_NUMBERS = [
 
 export default function SettingsScreen({ navigation }: any) {
   const route = useRoute<any>();
-  const { language, setLanguage: setAppLanguage, setThemeMode: setAppTheme } = useApp();
+  const { language, setLanguage: setAppLanguage, setThemeMode: setAppTheme, t } = useApp();
+  const pushSummary = useMemo(() => getPushRuntimeSummary(), []);
+  const runtimeDescription = useMemo(() => {
+    switch (pushSummary.channel) {
+      case 'expo_go_ios':
+        return t.envRuntimeExpoGoIos;
+      case 'expo_go_android':
+        return t.envRuntimeExpoGoAndroid;
+      case 'standalone':
+        return t.envRuntimeStandalone;
+      case 'bare':
+        return t.envRuntimeBare;
+      default:
+        return t.envRuntimeUnknown;
+    }
+  }, [pushSummary.channel, t]);
+  const pushDescription = useMemo(() => {
+    if (pushSummary.simulator) return t.envPushSimulator;
+    if (pushSummary.expoGoAndroid) return t.envPushExpoGoAndroid;
+    if (!pushSummary.hasNotificationsModule) return t.envPushNoModule;
+    return t.envPushReady;
+  }, [pushSummary, t]);
   const [settings, setSettings] = useState({
     notifications: true,
     language: 'zh',
@@ -232,7 +254,12 @@ export default function SettingsScreen({ navigation }: any) {
       <View style={[styles.circle, { bottom: -50, left: -50, backgroundColor: 'rgba(30, 58, 138, 0.2)' }]} />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel={t.back}
+        >
           <Ionicons name="chevron-back" size={28} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{language === 'zh' ? '设置中心' : 'Settings'}</Text>
@@ -240,6 +267,22 @@ export default function SettingsScreen({ navigation }: any) {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t.envSectionTitle}</Text>
+          <View style={styles.sectionGlassCard}>
+            <View style={styles.envBlock}>
+              <Text style={styles.itemLabel}>{t.envRuntimeLabel}</Text>
+              <Text style={styles.envBody}>{runtimeDescription}</Text>
+            </View>
+            <View style={[styles.glassDivider, { marginLeft: 0 }]} />
+            <View style={styles.envBlock}>
+              <Text style={styles.itemLabel}>{t.envPushLabel}</Text>
+              <Text style={styles.envBody}>{pushDescription}</Text>
+              <Text style={styles.envFootnote}>{t.envPushFootnote}</Text>
+            </View>
+          </View>
+        </View>
+
         {settingSections.map((section, sectionIndex) => (
           <View key={sectionIndex} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -484,4 +527,19 @@ const styles = StyleSheet.create({
   helpBoxContent: { color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 22, fontWeight: '600' },
   contactSupportBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#3b82f6', height: 56, borderRadius: 16, marginTop: 10, marginBottom: 40 },
   contactSupportText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  envBlock: { padding: 16 },
+  envBody: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 20,
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  envFootnote: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.38)',
+    lineHeight: 17,
+    marginTop: 12,
+    fontWeight: '600',
+  },
 });

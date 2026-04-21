@@ -9,8 +9,14 @@ module.exports = ({ config }) => {
                            (expoConfig.ios && expoConfig.ios.config && expoConfig.ios.config.googleMapsApiKey) ||
                            '';
 
+  const plugins = [...(expoConfig.plugins || [])];
+  if (!plugins.some((p) => p === '@sentry/react-native/expo' || (Array.isArray(p) && p[0] === '@sentry/react-native/expo'))) {
+    plugins.push('@sentry/react-native/expo');
+  }
+
   return {
     ...expoConfig,
+    plugins,
     android: {
       ...(expoConfig.android || {}),
       config: {

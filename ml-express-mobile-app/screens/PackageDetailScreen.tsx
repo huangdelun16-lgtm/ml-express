@@ -43,7 +43,7 @@ const { width } = Dimensions.get('window');
 
 export default function PackageDetailScreen({ route, navigation }: any) {
   const isFocused = useIsFocused();
-  const { language } = useApp();
+  const { language, t } = useApp();
   const { packageId, package: initialPackage } = route.params || {};
   const [pkg, setPkg] = useState<any>(initialPackage || null);
   const [loading, setLoading] = useState(!initialPackage);
@@ -555,7 +555,12 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       <LinearGradient colors={['#0f172a', '#1e3a8a', '#334155']} style={StyleSheet.absoluteFill} />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t.a11yBack}
+        >
           <Ionicons name="chevron-back" size={28} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{language === 'zh' ? '包裹详情' : 'Package Detail'}</Text>
@@ -770,6 +775,9 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                   <TouchableOpacity
                     style={styles.miniCallBtn}
                     onPress={() => handleCall(pkg.sender_phone)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.call}
+                    accessibilityHint={pkg.sender_name || undefined}
                   >
                     <Ionicons name="call" size={18} color="white" />
                   </TouchableOpacity>
@@ -784,6 +792,8 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                     pkg.sender_longitude,
                   )
                 }
+                accessibilityRole="button"
+                accessibilityLabel={t.a11yNavigateToAddress}
               >
                 <LinearGradient
                   colors={['#f59e0b', '#d97706']}
@@ -817,7 +827,12 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                 <Text style={styles.contactName}>{pkg.receiver_name}</Text>
                 <Text style={styles.contactPhone}>{pkg.receiver_phone}</Text>
           </View>
-              <TouchableOpacity style={styles.miniCallBtn} onPress={() => handleCall(pkg.receiver_phone)}>
+              <TouchableOpacity
+                style={styles.miniCallBtn}
+                onPress={() => handleCall(pkg.receiver_phone)}
+                accessibilityRole="button"
+                accessibilityLabel={t.a11yCallRecipient}
+              >
                 <Ionicons name="call" size={18} color="white" />
               </TouchableOpacity>
           </View>
@@ -834,6 +849,8 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                   pkg.receiver_longitude,
                 )
               }
+              accessibilityRole="button"
+              accessibilityLabel={t.a11yNavigateToAddress}
             >
               <LinearGradient
                 colors={['#3b82f6', '#2563eb']}

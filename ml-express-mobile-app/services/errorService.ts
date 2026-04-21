@@ -1,5 +1,7 @@
 import { Alert, LogBox, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Sentry from '@sentry/react-native';
+import { translations } from '../utils/i18n';
 
 // 忽略某些已知的非严重警告
 LogBox.ignoreLogs([
@@ -8,6 +10,33 @@ LogBox.ignoreLogs([
   'Non-serializable values were found in the navigation state',
 ]);
 
+async function getLocalizedStrings() {
+  try {
+    const raw = await AsyncStorage.getItem('appSettings');
+    if (raw) {
+      const lang = JSON.parse(raw).language as string | undefined;
+      if (lang && translations[lang]) {
+        return translations[lang];
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return translations.zh;
+}
+
+function captureToSentry(error: unknown) {
+  try {
+    if (error instanceof Error) {
+      Sentry.captureException(error);
+    } else {
+      Sentry.captureException(new Error(typeof error === 'string' ? error : JSON.stringify(error)));
+    }
+  } catch {
+    // Sentry 未初始化或不可用时忽略
+  }
+}
+
 export const errorService = {
   /**
    * 初始化全局错误捕获
@@ -15,30 +44,30 @@ export const errorService = {
   initGlobalErrorHandler() {
     // 1. 捕获 JS 层面的未处理异常
     const defaultHandler = ErrorUtils.getGlobalHandler();
-    
+
     ErrorUtils.setGlobalHandler(async (error: any, isFatal?: boolean) => {
-      // 记录日志
       console.error('🚨 全局捕获异常:', error);
       await this.saveErrorLog(error);
+      captureToSentry(error);
 
-      // 如果是致命错误，弹窗提示
+      const t = await getLocalizedStrings();
+
       if (isFatal) {
         Alert.alert(
-          '⚠️ 应用程序异常 (Critical)',
-          '很抱歉，程序遇到一个致命错误。我们已记录此问题，请尝试重启应用。\n\n' + (error.message || '未知错误'),
+          t.criticalAppErrorTitle,
+          `${t.criticalAppErrorMessage}\n\n${error?.message || t.unknownError}`,
           [
             {
-              text: '确定',
+              text: t.ok,
               onPress: () => {
                 if (__DEV__) {
                   defaultHandler(error, isFatal);
                 }
-              }
-            }
+              },
+            },
           ]
         );
       } else {
-        // 非致命错误且在开发环境，显示红屏
         if (__DEV__) {
           defaultHandler(error, isFatal);
         }
@@ -49,11 +78,12 @@ export const errorService = {
     const originalHandler = (global as any).Promise.onUnhandledRejection;
     (global as any).Promise.onUnhandledRejection = (id: string, error: any) => {
       console.warn('⚠️ 未处理的 Promise 拒绝:', error);
-      this.saveErrorLog({ 
+      this.saveErrorLog({
         message: error?.message || 'Unhandled Promise Rejection',
         stack: error?.stack || '',
-        type: 'PROMISE_REJECTION' 
+        type: 'PROMISE_REJECTION',
       });
+      captureToSentry(error ?? new Error('Unhandled Promise Rejection'));
       if (originalHandler) originalHandler(id, error);
     };
   },
@@ -69,13 +99,12 @@ export const errorService = {
         message: typeof error === 'string' ? error : (error.message || 'No message'),
         stack: error.stack || 'No stack',
         device: `${Platform.OS} ${Platform.Version}`,
-        type: error.type || 'JS_ERROR'
+        type: error.type || 'JS_ERROR',
       };
 
       const existingLogsStr = await AsyncStorage.getItem('app_error_logs');
       const existingLogs = existingLogsStr ? JSON.parse(existingLogsStr) : [];
-      
-      // 只保留最近 20 条日志
+
       const newLogs = [logEntry, ...existingLogs].slice(0, 20);
       await AsyncStorage.setItem('app_error_logs', JSON.stringify(newLogs));
     } catch (e) {
@@ -102,6 +131,5 @@ export const errorService = {
     try {
       await AsyncStorage.removeItem('app_error_logs');
     } catch (e) {}
-  }
+  },
 };
-

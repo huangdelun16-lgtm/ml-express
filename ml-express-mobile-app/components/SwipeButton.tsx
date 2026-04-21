@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,26 +14,41 @@ import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface SwipeButtonProps {
-  onSwipeComplete: () => void;
+type SwipeButtonBaseProps = {
   title: string;
   subTitle?: string;
   color?: string;
   gradientColors?: string[];
   disabled?: boolean;
-}
+};
+
+/** 滑动完成回调：`onSwipeComplete` 与 `onSwipeSuccess` 二选一（兼容不同命名） */
+export type SwipeButtonProps = SwipeButtonBaseProps &
+  (
+    | { onSwipeComplete: () => void; onSwipeSuccess?: never }
+    | { onSwipeSuccess: () => void; onSwipeComplete?: never }
+  );
 
 const BUTTON_HEIGHT = 64;
 const SWIPE_SIZE = 56;
 const SWIPE_MARGIN = 4;
 
-export const SwipeButton: React.FC<SwipeButtonProps> = ({
-  onSwipeComplete,
-  title,
-  subTitle,
-  gradientColors = ['#10b981', '#059669'],
-  disabled = false,
-}) => {
+export const SwipeButton: React.FC<SwipeButtonProps> = (props) => {
+  const {
+    title,
+    subTitle,
+    gradientColors = ['#10b981', '#059669'],
+    disabled = false,
+  } = props;
+  const swipeCompleteHandler: () => void =
+    'onSwipeComplete' in props
+      ? props.onSwipeComplete!
+      : props.onSwipeSuccess!;
+  const onCompleteRef = useRef(swipeCompleteHandler);
+  useEffect(() => {
+    onCompleteRef.current = swipeCompleteHandler;
+  }, [swipeCompleteHandler]);
+
   const [isComplete, setIsComplete] = useState(false);
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH * 0.8);
   const translateX = useRef(new Animated.Value(0)).current;
@@ -70,7 +85,7 @@ export const SwipeButton: React.FC<SwipeButtonProps> = ({
             useNativeDriver: true,
           }).start(() => {
             setIsComplete(true);
-            onSwipeComplete();
+            onCompleteRef.current();
             // 延迟一点重置，给用户看一眼完成状态
             setTimeout(() => {
               reset();
@@ -141,7 +156,13 @@ export const SwipeButton: React.FC<SwipeButtonProps> = ({
         {...panResponder.panHandlers}
       >
         <LinearGradient
-          colors={isComplete ? ['#3b82f6', '#2563eb'] : gradientColors}
+          colors={
+            (isComplete ? ['#3b82f6', '#2563eb'] : gradientColors) as [
+              string,
+              string,
+              ...string[],
+            ]
+          }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.thumbGradient}

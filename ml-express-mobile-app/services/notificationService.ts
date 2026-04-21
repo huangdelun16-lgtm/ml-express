@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import * as Speech from 'expo-speech';
 import { supabase } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getRuntimeChannel, type RuntimeChannel } from '../utils/runtimeEnv';
 
 // 🚩 核心修复：更严格的环境检测
 // SDK 53+ 在 Android Expo Go 中完全禁用了远程推送
@@ -24,6 +25,23 @@ if (!isExpoGoAndroid) {
   } catch (e) {
     console.warn('❌ 无法加载 expo-notifications:', e);
   }
+}
+
+/** 供设置页展示：推送是否可能注册、运行载体等（同步、无 IO） */
+export function getPushRuntimeSummary(): {
+  channel: RuntimeChannel;
+  pushRegisterSupported: boolean;
+  expoGoAndroid: boolean;
+  simulator: boolean;
+  hasNotificationsModule: boolean;
+} {
+  return {
+    channel: getRuntimeChannel(),
+    pushRegisterSupported: !isExpoGoAndroid && !!Notifications && Device.isDevice,
+    expoGoAndroid: isExpoGoAndroid,
+    simulator: !Device.isDevice,
+    hasNotificationsModule: !!Notifications,
+  };
 }
 
 export const notificationService = {

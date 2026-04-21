@@ -25,7 +25,7 @@ import {
 const { width } = Dimensions.get('window');
 
 export default function CourierHomeScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, t } = useApp();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -170,6 +170,9 @@ export default function CourierHomeScreen({ navigation }: any) {
       activeOpacity={0.9}
       style={styles.packageCardWrapper}
       onPress={() => navigation.navigate('PackageDetail', { package: item })}
+      accessibilityRole="button"
+      accessibilityLabel={`${t.a11yPackageOpenDetail} ${item.id}`}
+      accessibilityHint={item.receiver_name}
     >
       <LinearGradient
         colors={['rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.05)']}
@@ -240,6 +243,8 @@ export default function CourierHomeScreen({ navigation }: any) {
               e.stopPropagation();
               navigation.navigate('PackageDetail', { package: item, action: 'updateStatus' });
             }}
+            accessibilityRole="button"
+            accessibilityLabel={t.a11yNextStepAction}
           >
             <LinearGradient
               colors={[getStatusColor(item.status), getStatusColor(item.status) + 'dd']}
@@ -314,7 +319,11 @@ export default function CourierHomeScreen({ navigation }: any) {
       <View style={styles.listContainer}>
         <View style={styles.listHeader}>
           <Text style={styles.listTitle}>📦 {language === 'zh' ? '当前任务' : 'Current Tasks'}</Text>
-          <TouchableOpacity onPress={onRefresh}>
+          <TouchableOpacity
+            onPress={onRefresh}
+            accessibilityRole="button"
+            accessibilityLabel={t.a11yRefreshTaskList}
+          >
             <Ionicons name="refresh" size={20} color="rgba(255,255,255,0.5)" />
           </TouchableOpacity>
         </View>

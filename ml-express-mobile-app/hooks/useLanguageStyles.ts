@@ -19,27 +19,33 @@ export const useLanguageStyles = <T extends Record<string, any>>(
     const adjustedStyles: any = {};
     
     for (const key in baseStyles) {
-      const style = baseStyles[key];
+      const style = baseStyles[key as keyof T];
       
       // 如果是数组样式，递归处理
       if (Array.isArray(style)) {
-        adjustedStyles[key] = style.map(s => {
-          if (s && typeof s === 'object' && s.fontSize) {
-            return { ...s, fontSize: Math.max(s.fontSize - 2, 10) };
+        adjustedStyles[key as keyof T] = style.map((s: unknown) => {
+          if (
+            s &&
+            typeof s === 'object' &&
+            'fontSize' in s &&
+            typeof (s as { fontSize?: number }).fontSize === 'number'
+          ) {
+            const o = s as { fontSize: number };
+            return { ...o, fontSize: Math.max(o.fontSize - 2, 10) };
           }
           return s;
         });
       } 
       // 如果是对象样式且有fontSize
       else if (style && typeof style === 'object' && style.fontSize) {
-        adjustedStyles[key] = {
+        adjustedStyles[key as keyof T] = {
           ...style,
           fontSize: Math.max(style.fontSize - 2, 10)
         };
       } 
       // 其他情况保持原样
       else {
-        adjustedStyles[key] = style;
+        adjustedStyles[key as keyof T] = style;
       }
     }
     
