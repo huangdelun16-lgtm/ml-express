@@ -53,6 +53,45 @@ const REGIONS = [
   { id: "muse", name: "木姐", prefix: "MUSE" },
 ];
 
+const DEFAULT_PRICING_REGION_ID = "mandalay";
+const PRICING_REGION_ID_SET = new Set(REGIONS.map((r) => r.id));
+
+const normalizePackageRegionField = (raw?: string | null): string | null => {
+  if (raw == null || !String(raw).trim()) return null;
+  const s = String(raw).trim().toLowerCase();
+  if (PRICING_REGION_ID_SET.has(s)) return s;
+  const aliases: Record<string, string> = {
+    mdy: "mandalay",
+    ygn: "yangon",
+    pol: "maymyo",
+    npw: "naypyidaw",
+    tgi: "taunggyi",
+    lso: "lashio",
+    muse: "muse",
+  };
+  const mapped = aliases[s];
+  return mapped && PRICING_REGION_ID_SET.has(mapped) ? mapped : null;
+};
+
+/** 包裹计费领区：库里的 region → 单号前缀 → 默认曼德勒（与 Admin 分领区改价一致） */
+const resolvePackagePricingRegionId = (pkg: Package): string => {
+  const fromField = normalizePackageRegionField(pkg.region);
+  if (fromField) return fromField;
+  const id = (pkg.id || "").toUpperCase();
+  for (const r of REGIONS) {
+    if (id.startsWith(r.prefix)) return r.id;
+  }
+  return DEFAULT_PRICING_REGION_ID;
+};
+
+const getRegionalPricingForPackage = (
+  pkg: Package,
+  map: Record<string, Record<string, any>>,
+): Record<string, any> => {
+  const rid = resolvePackagePricingRegionId(pkg);
+  return map[rid] || map[DEFAULT_PRICING_REGION_ID] || {};
+};
+
 const getDateKey = (value?: string): string => {
   if (!value) return "";
   const match = value.match(/\d{4}-\d{2}-\d{2}/);
@@ -71,6 +110,55 @@ const getLocalDateYYYYMMDD = (): string => {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+};
+
+const getLocalDateMinusDays = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+/** 骑手分成用的起步价：有快照用下单时起步价，否则用当前系统设置（仅旧数据） */
+const getRiderShareBaseFeeMmk = (
+  pkg: Package,
+  settingsBaseFee: number,
+): number => {
+  const snap = pkg.pricing_base_fee_mmk;
+  if (snap != null && Number.isFinite(Number(snap)) && Number(snap) >= 0) {
+    return Number(snap);
+  }
+  return settingsBaseFee;
+};
+
+const isWaySidePackage = (pkg: Package): boolean => {
+  const t = pkg.package_type || "";
+  return (
+    t === "顺路递" || t === "Eco Way" || t === "တန်တန်လေးပို့"
+  );
+};
+
+/** 骑手实得跑腿分成：顺路递且配置了固定骑手费时优先；否则 跑腿费 − 起步价快照 */
+const getRiderDeliveryShareMmk = (
+  pkg: Package,
+  settingsBaseFee: number,
+  pricingSettings: Record<string, any>,
+): number => {
+  const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, "") || "0");
+  if (isWaySidePackage(pkg)) {
+    const fixed =
+      Number(
+        pricingSettings.way_side_courier_per_order ??
+          pricingSettings.waySideCourierPerOrder,
+      ) || 0;
+    if (fixed > 0) {
+      return Math.min(pkgPrice, Math.max(0, fixed));
+    }
+  }
+  const baseForPkg = getRiderShareBaseFeeMmk(pkg, settingsBaseFee);
+  return Math.max(0, pkgPrice - baseForPkg);
 };
 
 type TabKey =
@@ -414,6 +502,42 @@ const FinanceManagement: React.FC = () => {
     cashUnsettledForCollectionDate.length,
   ]);
 
+  const cashUnsettledForYesterdayLocal = useMemo(() => {
+    const yesterday = getLocalDateMinusDays(1);
+    return packages.filter((pkg) => {
+      if (pkg.payment_method !== "cash") return false;
+      if (pkg.status !== "已送达" && pkg.status !== "已完成") return false;
+      if (pkg.rider_settled) return false;
+      const dateKey = getDateKey(
+        pkg.delivery_time ||
+          pkg.updated_at ||
+          pkg.created_at ||
+          pkg.create_time,
+      );
+      if (!dateKey || dateKey !== yesterday) return false;
+      if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix))
+        return false;
+      return true;
+    });
+  }, [packages, isRegionalUser, currentRegionPrefix, cashReminderTick]);
+
+  const showYesterdayCashUnsettledReminder = useMemo(() => {
+    if (activeTab !== "cash_collection") return false;
+    if (getLocalDateYYYYMMDD() !== cashCollectionDate) return false;
+    return cashUnsettledForYesterdayLocal.length > 0;
+  }, [
+    activeTab,
+    cashCollectionDate,
+    cashUnsettledForYesterdayLocal.length,
+    cashReminderTick,
+  ]);
+
+  /** 顶部「当日收款管理」标签上的提示：昨日未结清时任意标签页均显示 */
+  const showYesterdayCashTabIndicator = useMemo(
+    () => cashUnsettledForYesterdayLocal.length > 0,
+    [cashUnsettledForYesterdayLocal.length, cashReminderTick],
+  );
+
   const packagePagination = useMemo(() => {
     const totalPages = Math.max(
       1,
@@ -695,9 +819,9 @@ const FinanceManagement: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<FinanceRecord | null>(
     null,
   );
-  const [pricingSettings, setPricingSettings] = useState<Record<string, any>>({
-    courier_km_rate: 500,
-  });
+  const [regionalPricingMap, setRegionalPricingMap] = useState<
+    Record<string, Record<string, any>>
+  >({});
   const [summary, setSummary] = useState({
     totalIncome: 0,
     totalExpense: 0,
@@ -750,9 +874,37 @@ const FinanceManagement: React.FC = () => {
   }, []);
 
   const loadPricingSettings = async () => {
-    const settings = await systemSettingsService.getPricingSettings();
-    setPricingSettings(settings);
+    const map = await systemSettingsService.getRegionalPricingMap(
+      REGIONS.map((r) => r.id),
+    );
+    setRegionalPricingMap(map);
   };
+
+  /** 卡片展示用：领区账号看本领区起步价；总部默认曼德勒（汇总已按每单领区计算） */
+  const pricingSettingsDisplay = useMemo(() => {
+    const fallback = {
+      base_fee: 1500,
+      way_side_courier_per_order: 0,
+      courier_km_rate: 500,
+      delivery_bonus_rate: 0,
+    };
+    const m = regionalPricingMap;
+    if (!m || Object.keys(m).length === 0) return fallback;
+    if (isRegionalUser) {
+      const prefixToId: Record<string, string> = {
+        MDY: "mandalay",
+        YGN: "yangon",
+        POL: "maymyo",
+        NPW: "naypyidaw",
+        TGI: "taunggyi",
+        LSO: "lashio",
+        MUSE: "muse",
+      };
+      const rid = prefixToId[currentRegionPrefix] || DEFAULT_PRICING_REGION_ID;
+      return m[rid] || m[DEFAULT_PRICING_REGION_ID] || fallback;
+    }
+    return m[DEFAULT_PRICING_REGION_ID] || Object.values(m)[0] || fallback;
+  }, [regionalPricingMap, isRegionalUser, currentRegionPrefix]);
 
   useEffect(() => {
     const calculateSummary = () => {
@@ -831,12 +983,14 @@ const FinanceManagement: React.FC = () => {
 
       const packageCount = settledPackageCount;
 
-      // 计算快递员送货费用 (跑腿费 - 起步价)
-      const BASE_FEE = pricingSettings.base_fee || 1500;
+      // 快递员送货费用：每单按包裹所属领区计费（与系统设置分领区一致）
       const courierKmCost = deliveredPackages.reduce((sum, pkg) => {
-        const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, "") || "0");
-        const riderFee = Math.max(0, pkgPrice - BASE_FEE);
-        return sum + riderFee;
+        const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
+        const settingsBaseFee = regional.base_fee || 1500;
+        return (
+          sum +
+          getRiderDeliveryShareMmk(pkg, settingsBaseFee, regional)
+        );
       }, 0);
 
       const totalKm = deliveredPackages.reduce((sum, pkg) => {
@@ -852,8 +1006,12 @@ const FinanceManagement: React.FC = () => {
         return sum + codAmount;
       }, 0);
 
-      // 计算总订单起步费 (所有已送达订单 * 起步价)
-      const totalStartingFee = deliveredPackages.length * BASE_FEE;
+      // 总起步费：每单快照；无快照时回退该单领区的当前起步价
+      const totalStartingFee = deliveredPackages.reduce((sum, pkg) => {
+        const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
+        const settingsBaseFee = regional.base_fee || 1500;
+        return sum + getRiderShareBaseFeeMmk(pkg, settingsBaseFee);
+      }, 0);
 
       // 🚀 新增：计算当月和当日骑手收入统计
       const now_current = new Date();
@@ -865,8 +1023,13 @@ const FinanceManagement: React.FC = () => {
       let dailyRiderCount = 0;
 
       deliveredPackages.forEach((pkg) => {
-        const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, "") || "0");
-        const riderShare = Math.max(0, pkgPrice - BASE_FEE);
+        const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
+        const settingsBaseFee = regional.base_fee || 1500;
+        const riderShare = getRiderDeliveryShareMmk(
+          pkg,
+          settingsBaseFee,
+          regional,
+        );
         const dateKey = getDateKey(
           pkg.delivery_time || pkg.updated_at || pkg.created_at,
         );
@@ -906,7 +1069,7 @@ const FinanceManagement: React.FC = () => {
     };
 
     calculateSummary();
-  }, [records, packages, deliveryStores, cashCollectionDate]);
+  }, [records, packages, deliveryStores, cashCollectionDate, regionalPricingMap]);
 
   // 计算合伙店铺代收款统计
   const merchantsCollectionStats = useMemo(() => {
@@ -1198,11 +1361,14 @@ const FinanceManagement: React.FC = () => {
         );
         const relatedPackageIds = pkgs.map((p) => p.id);
 
-        // 计算公里提成 (现在改为: 总跑腿费 - 起步价)
-        const BASE_FEE = pricingSettings.base_fee || 1500;
+        // 配送提成：每单 max(0, 跑腿费 - 该单起步价快照)
         const kmFee = pkgs.reduce((sum, pkg) => {
-          const pkgPrice = parseFloat(pkg.price?.replace(/[^\d.]/g, "") || "0");
-          return sum + Math.max(0, pkgPrice - BASE_FEE);
+          const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
+          const settingsBaseFee = regional.base_fee || 1500;
+          return (
+            sum +
+            getRiderDeliveryShareMmk(pkg, settingsBaseFee, regional)
+          );
         }, 0);
 
         // 从账号管理中获取骑手的基本工资 (严格以员工账号设置的工资为准)
@@ -1217,8 +1383,10 @@ const FinanceManagement: React.FC = () => {
             ? courierAccount.salary
             : 0;
 
-        const deliveryBonusRate = pricingSettings.delivery_bonus_rate || 0;
-        const deliveryBonus = totalDeliveries * deliveryBonusRate;
+        const deliveryBonus = pkgs.reduce((sum, pkg) => {
+          const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
+          return sum + (regional.delivery_bonus_rate || 0);
+        }, 0);
 
         const grossSalary = baseSalary + kmFee + deliveryBonus;
         const netSalary = grossSalary;
@@ -1814,7 +1982,10 @@ const FinanceManagement: React.FC = () => {
                 style={{
                   padding: "12px 24px",
                   borderRadius: "12px",
-                  border: "1px solid rgba(255, 255, 255, 0.25)",
+                  border:
+                    key === "cash_collection" && showYesterdayCashTabIndicator
+                      ? "1px solid rgba(249, 115, 22, 0.55)"
+                      : "1px solid rgba(255, 255, 255, 0.25)",
                   background:
                     activeTab === key
                       ? "rgba(255, 255, 255, 0.22)"
@@ -1824,13 +1995,41 @@ const FinanceManagement: React.FC = () => {
                   fontSize: "1rem",
                   transition: "all 0.3s ease",
                 }}
+                title={
+                  key === "cash_collection" && showYesterdayCashTabIndicator
+                    ? t.cashYesterdayUnsettledReminder
+                    : undefined
+                }
               >
                 {key === "overview" && t.financeOverview}
                 {key === "records" && t.financialRecords}
                 {key === "analytics" && t.dataAnalysis}
                 {key === "package_records" && t.packageFinanceRecords}
                 {key === "courier_records" && t.courierFinanceRecords}
-                {key === "cash_collection" && t.dailyCollection}
+                {key === "cash_collection" && (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <span>{t.dailyCollection}</span>
+                    {showYesterdayCashTabIndicator && (
+                      <span
+                        aria-hidden
+                        style={{
+                          width: "10px",
+                          height: "10px",
+                          borderRadius: "50%",
+                          background: "#f97316",
+                          boxShadow: "0 0 0 2px rgba(249, 115, 22, 0.45)",
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                  </span>
+                )}
                 {key === "merchants_collection" && t.merchantsCollection}
               </button>
             ))}
@@ -1928,7 +2127,9 @@ const FinanceManagement: React.FC = () => {
             {renderSummaryCard(
               t.courierKmCost,
               summary.courierKmCost,
-              `${language === "zh" ? "骑手分得总额 (总跑腿费 - 总起步价)" : "Total rider share (Delivery fee - Base fee)"} (起步价: ${pricingSettings.base_fee || 1500} MMK)`,
+              language === "zh"
+                ? "骑手分得总额：按每单所属领区读取计费规则；普通单=跑腿费−起步价快照；顺路递可设固定 MMK/单。曼德勒改价不影响仰光单。"
+                : "Rider share uses each package's region pricing (Admin billing regions). Mandalay changes do not affect Yangon orders.",
               "#fd79a8",
             )}
             {renderSummaryCard(
@@ -6348,7 +6549,7 @@ const FinanceManagement: React.FC = () => {
                         fontWeight: "bold",
                       }}
                     >
-                      {pricingSettings.base_fee || 1500} MMK
+                      {pricingSettingsDisplay.base_fee || 1500} MMK
                     </div>
                     <div
                       style={{
@@ -6356,7 +6557,7 @@ const FinanceManagement: React.FC = () => {
                         fontSize: "0.9rem",
                       }}
                     >
-                      基础起步价 (平台收费)
+                      当前系统起步价（新单默认）
                     </div>
                   </div>
                   <div
@@ -6654,7 +6855,6 @@ const FinanceManagement: React.FC = () => {
                             totalRiderFee: number;
                           }
                         > = {};
-                        const BASE_FEE = pricingSettings.base_fee || 1500;
 
                         packages
                           .filter(
@@ -6673,10 +6873,16 @@ const FinanceManagement: React.FC = () => {
                               };
                             }
 
-                            const pkgPrice = parseFloat(
-                              pkg.price?.replace(/[^\d.]/g, "") || "0",
+                            const regional = getRegionalPricingForPackage(
+                              pkg,
+                              regionalPricingMap,
                             );
-                            const riderFee = Math.max(0, pkgPrice - BASE_FEE);
+                            const settingsBaseFee = regional.base_fee || 1500;
+                            const riderFee = getRiderDeliveryShareMmk(
+                              pkg,
+                              settingsBaseFee,
+                              regional,
+                            );
 
                             courierStats[courierId].count++;
                             courierStats[courierId].totalKm +=
@@ -6834,6 +7040,16 @@ const FinanceManagement: React.FC = () => {
                             fontSize: "0.9rem",
                           }}
                         >
+                          包裹类型
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px",
+                            textAlign: "left",
+                            color: "white",
+                            fontSize: "0.9rem",
+                          }}
+                        >
                           总跑腿费
                         </th>
                         <th
@@ -6844,7 +7060,7 @@ const FinanceManagement: React.FC = () => {
                             fontSize: "0.9rem",
                           }}
                         >
-                          起步价(平台)
+                          起步价(该单)
                         </th>
                         <th
                           style={{
@@ -6870,7 +7086,6 @@ const FinanceManagement: React.FC = () => {
                     </thead>
                     <tbody>
                       {(() => {
-                        const BASE_FEE = pricingSettings.base_fee || 1500;
                         const todayDelivered = packages
                           .filter((pkg) => {
                             if (
@@ -6899,7 +7114,7 @@ const FinanceManagement: React.FC = () => {
                           return (
                             <tr>
                               <td
-                                colSpan={6}
+                                colSpan={7}
                                 style={{
                                   padding: "24px",
                                   textAlign: "center",
@@ -6916,7 +7131,20 @@ const FinanceManagement: React.FC = () => {
                           const pkgPrice = parseFloat(
                             pkg.price?.replace(/[^\d.]/g, "") || "0",
                           );
-                          const riderShare = Math.max(0, pkgPrice - BASE_FEE);
+                          const regional = getRegionalPricingForPackage(
+                            pkg,
+                            regionalPricingMap,
+                          );
+                          const settingsBaseFee = regional.base_fee || 1500;
+                          const rowBaseFee = getRiderShareBaseFeeMmk(
+                            pkg,
+                            settingsBaseFee,
+                          );
+                          const riderShare = getRiderDeliveryShareMmk(
+                            pkg,
+                            settingsBaseFee,
+                            regional,
+                          );
 
                           return (
                             <tr
@@ -6948,6 +7176,15 @@ const FinanceManagement: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
+                                  color: "rgba(255, 255, 255, 0.85)",
+                                  fontSize: "0.9rem",
+                                }}
+                              >
+                                {String(pkg.package_type || "").trim() || "—"}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px",
                                   color: "rgba(255, 255, 255, 0.8)",
                                   fontSize: "0.9rem",
                                 }}
@@ -6961,7 +7198,7 @@ const FinanceManagement: React.FC = () => {
                                   fontSize: "0.9rem",
                                 }}
                               >
-                                {BASE_FEE.toLocaleString()}
+                                {rowBaseFee.toLocaleString()}
                               </td>
                               <td
                                 style={{
@@ -7972,6 +8209,20 @@ const FinanceManagement: React.FC = () => {
                     }}
                   >
                     {t.statusFilter}:
+                    {showYesterdayCashUnsettledReminder && (
+                      <span
+                        title={t.cashYesterdayUnsettledReminder}
+                        style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          background: "#f97316",
+                          boxShadow: "0 0 0 2px rgba(249, 115, 22, 0.4)",
+                          flexShrink: 0,
+                        }}
+                        aria-hidden
+                      />
+                    )}
                     {showCashSettlementReminder && (
                       <span
                         title={t.cashSettlementReminder}
@@ -8014,6 +8265,27 @@ const FinanceManagement: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {showYesterdayCashUnsettledReminder && (
+                <div
+                  role="status"
+                  style={{
+                    marginBottom: "12px",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    background: "rgba(249, 115, 22, 0.2)",
+                    border: "1px solid rgba(249, 115, 22, 0.5)",
+                    color: "rgba(255, 255, 255, 0.96)",
+                    fontSize: "0.95rem",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <span style={{ marginRight: "8px" }} aria-hidden>
+                    ⚠️
+                  </span>
+                  {t.cashYesterdayUnsettledReminder}
+                </div>
+              )}
 
               {showCashSettlementReminder && (
                 <div

@@ -293,7 +293,7 @@ const AccountManagement: React.FC = () => {
     { id: 'tracking', name: '实时跟踪', icon: '📍' },
     { id: 'settings', name: '系统设置', icon: '⚙️' },
     { id: 'delivery_alerts', name: '配送警报', icon: '🚨' },
-    { id: 'banners', name: '广告管理', icon: '🖼️' },
+    { id: 'banners', name: '页面管理', icon: '🖼️' },
     { id: 'recharges', name: '充值管理', icon: '💳' },
   ];
 

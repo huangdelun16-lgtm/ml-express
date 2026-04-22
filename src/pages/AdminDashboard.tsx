@@ -29,14 +29,17 @@ const AdminDashboard: React.FC = () => {
   const [pendingRechargeCount, setPendingRechargeCount] = useState(0);
   const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0);
   const [pendingProductReviewCount, setPendingProductReviewCount] = useState(0);
+  const [pendingDeliveryAlertsCount, setPendingDeliveryAlertsCount] = useState(0);
   const prevPendingAssignmentCountRef = useRef<number>(0); // 🚀 新增：记录上次待分配数量
+  const prevPendingDeliveryAlertsCountRef = useRef<number>(0);
 
   // 🚀 新增：语音播报函数
   const speakNotification = (text: string) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
+      utterance.lang =
+        language === 'en' ? 'en-US' : language === 'my' ? 'my-MM' : 'zh-CN';
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
@@ -45,7 +48,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  // 🚀 新增：轮询逻辑 (充值申请 + 待分配包裹)
+  // 🚀 新增：轮询逻辑 (充值申请 + 配送警报 + 待分配包裹 + 待审商品)
   useEffect(() => {
     const pollData = async () => {
       try {
@@ -76,7 +79,35 @@ const AdminDashboard: React.FC = () => {
           prevRechargeCountRef.current = currentCount;
         }
 
-        // 2. 获取待分配包裹数量
+        let hasDeliveryAlertNotification = false;
+
+        // 2. 待处理配送警报（与配送警报页 status === 'pending' 一致）
+        const { count: deliveryAlertsPending, error: deliveryAlertsErr } = await supabase
+          .from('delivery_alerts')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
+
+        if (!deliveryAlertsErr && typeof deliveryAlertsPending === 'number') {
+          setPendingDeliveryAlertsCount(deliveryAlertsPending);
+          if (
+            deliveryAlertsPending > prevPendingDeliveryAlertsCountRef.current &&
+            !hasRechargeNotification
+          ) {
+            alertAudioRef.current?.play().catch(() => {});
+            const alertMsg =
+              language === 'zh'
+                ? '有新的配送警报，请及时处理'
+                : 'New delivery alert. Please review.';
+            speakNotification(alertMsg);
+            hasDeliveryAlertNotification = true;
+          }
+          prevPendingDeliveryAlertsCountRef.current = deliveryAlertsPending;
+        } else {
+          setPendingDeliveryAlertsCount(0);
+          prevPendingDeliveryAlertsCountRef.current = 0;
+        }
+
+        // 3. 获取待分配包裹数量（实时跟踪相关新单）
         const { count: assignmentCount, error: pkgError } = await supabase
           .from('packages')
           .select('*', { count: 'exact', head: true })
@@ -87,22 +118,31 @@ const AdminDashboard: React.FC = () => {
           const currentAssignCount = assignmentCount || 0;
           setPendingAssignmentCount(currentAssignCount);
 
-          // 🚀 逻辑优化：如果有待分配订单且没有正在进行的充值提醒，播报待分配提醒
-          if (currentAssignCount > prevPendingAssignmentCountRef.current && !hasRechargeNotification) {
+          const skipAssignmentVoice =
+            hasRechargeNotification || hasDeliveryAlertNotification;
+
+          if (currentAssignCount > prevPendingAssignmentCountRef.current && !skipAssignmentVoice) {
             console.log('🚨 检测到新待分配订单:', currentAssignCount);
-            // 这里也可以加一个独立的音频或者使用语音
-            speakNotification(`你有 ${currentAssignCount} 件新订单等待分配`);
-          } else if (currentAssignCount > 0 && !hasRechargeNotification) {
+            alertAudioRef.current?.play().catch(() => {});
+            const assignMsg =
+              language === 'zh'
+                ? `你有 ${currentAssignCount} 件新订单等待分配，请打开实时跟踪`
+                : `${currentAssignCount} new orders pending assignment. Open real-time tracking.`;
+            speakNotification(assignMsg);
+          } else if (currentAssignCount > 0 && !skipAssignmentVoice) {
             const now = Date.now();
-            // 如果只有待分配订单，也进行周期性提醒（每 60 秒一次，优先级低于充值）
             if (now - lastVoiceBroadcastRef.current >= 60000) {
-              speakNotification(`你有 ${currentAssignCount} 件订单等待分配`);
+              const periodic =
+                language === 'zh'
+                  ? `你有 ${currentAssignCount} 件订单等待分配`
+                  : `${currentAssignCount} orders pending assignment`;
+              speakNotification(periodic);
             }
           }
           prevPendingAssignmentCountRef.current = currentAssignCount;
         }
 
-        // 3. 待审核商品（商家提交、需后台通过后才能上架）
+        // 4. 待审核商品（商家提交、需后台通过后才能上架）
         const { count: pendingProducts, error: productReviewErr } = await supabase
           .from('products')
           .select('*', { count: 'exact', head: true })
@@ -288,8 +328,8 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
     },
     {
       id: 'banners',
-      title: language === 'zh' ? '广告管理' : language === 'en' ? 'Ad Management' : 'ကြော်ငြာစီမံခန့်ခွဲမှု',
-      description: language === 'zh' ? '管理移动端首页轮播广告内容' : language === 'en' ? 'Manage mobile app home carousel content' : 'မိုဘိုင်းအက်ပ်ပင်မစာမျက်နှาကြော်ငြာများစီမံခန့်ခွဲမှု',
+      title: language === 'zh' ? '页面管理' : language === 'en' ? 'Page Management' : 'စာမျက်နှာစီမံခန့်ခွဲမှု',
+      description: language === 'zh' ? '管理客户端首页轮播、教学与欢迎页等页面内容' : language === 'en' ? 'Manage home carousel, tutorials, welcome screens and related content' : 'ပင်မစာမျက်နှာ ကြော်ငြာ၊ သင်ခန်းစာနှင့် ကြိုဆိုစာမျက်နှာများစီမံခန့်ခွဲမှု',
       color: '#805ad5',
       icon: '🖼️',
       roles: ['admin', 'manager'] // 管理员和经理可访问
@@ -333,7 +373,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       navigate('/admin/settings');
     } else if (title === '配送警报' || title === 'Delivery Alerts' || title === 'ပို့ဆောင်ရေးသတိပေးချက်များ') {
       navigate('/admin/delivery-alerts');
-    } else if (title === '广告管理' || title === 'Ad Management' || title === 'ကြော်ငြာစီမံခန့်ခွဲမှု') {
+    } else if (title === '页面管理' || title === '广告管理' || title === 'Page Management' || title === 'Ad Management' || title === 'စာမျက်နှာစီမံခန့်ခွဲမှု' || title === 'ကြော်ငြာစီမံခန့်ခွဲမှု') {
       navigate('/admin/banners');
     } else if (title === '充值管理' || title === 'Recharge Management' || title === 'ငွေဖြည့်သွင်းမှုစီမံခန့်ခွဲမှု') {
       navigate('/admin/recharges');
@@ -434,7 +474,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
           <button 
             onClick={() => {
               speakNotification('语音提醒功能已开启');
-              alert('✅ 语音播报已激活！\n\n系统现在将自动在后台为您监控新充值申请和待分配包裹。');
+              alert('✅ 语音播报已激活！\n\n系统现在将自动在后台为您监控新充值申请、待分配订单（实时跟踪）与配送警报。');
             }}
             style={{
               background: 'rgba(46, 204, 113, 0.2)',
@@ -559,7 +599,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
       </div>
       
       {/* 🚀 新增：核心指标警报栏 */}
-      {(pendingRechargeCount > 0 || pendingAssignmentCount > 0 || pendingProductReviewCount > 0) && (
+      {(pendingRechargeCount > 0 || pendingAssignmentCount > 0 || pendingProductReviewCount > 0 || pendingDeliveryAlertsCount > 0) && (
         <div style={{
           display: 'flex',
           gap: '15px',
@@ -620,6 +660,7 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 cursor: 'pointer',
+                animation: 'pulse-alert 2s infinite',
                 boxShadow: '0 8px 25px rgba(52, 152, 219, 0.3)'
               }}
             >
@@ -636,6 +677,42 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
               </div>
               <div style={{ background: '#3498db', color: 'white', padding: '5px 15px', borderRadius: '15px', fontWeight: '900', fontSize: '1.4rem' }}>
                 {pendingAssignmentCount}
+              </div>
+            </div>
+          )}
+
+          {pendingDeliveryAlertsCount > 0 && (
+            <div
+              onClick={() => navigate('/admin/delivery-alerts')}
+              style={{
+                flex: 1,
+                minWidth: '280px',
+                background: 'rgba(220, 38, 38, 0.15)',
+                backdropFilter: 'blur(15px)',
+                borderRadius: '20px',
+                padding: '15px 25px',
+                border: '2px solid #dc2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                animation: 'pulse-alert 2s infinite',
+                boxShadow: '0 8px 25px rgba(220, 38, 38, 0.35)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <span style={{ fontSize: '2rem' }}>🚨</span>
+                <div>
+                  <div style={{ color: '#fecaca', fontWeight: '900', fontSize: '1.1rem' }}>
+                    {language === 'zh' ? '待处理配送警报' : language === 'en' ? 'Pending delivery alerts' : 'Pending alerts'}
+                  </div>
+                  <div style={{ color: 'white', fontSize: '0.85rem', opacity: 0.85 }}>
+                    {language === 'zh' ? '有新的骑手异常警报需处理' : language === 'en' ? 'Courier alerts need attention' : 'Tap to review'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ background: '#dc2626', color: 'white', padding: '5px 15px', borderRadius: '15px', fontWeight: '900', fontSize: '1.4rem' }}>
+                {pendingDeliveryAlertsCount}
               </div>
             </div>
           )}
@@ -697,12 +774,27 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                 backdropFilter: 'blur(20px)',
                 borderRadius: '24px',
                 padding: '32px',
-                border: '1px solid rgba(255, 255, 255, 0.25)',
+                border:
+                  card.id === 'tracking' && pendingAssignmentCount > 0
+                    ? '1px solid rgba(52, 152, 219, 0.55)'
+                    : card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0
+                      ? '1px solid rgba(220, 38, 38, 0.55)'
+                      : '1px solid rgba(255, 255, 255, 0.25)',
                 cursor: 'pointer',
                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 color: 'white',
                 textAlign: 'center',
-                boxShadow: '0 10px 30px rgba(26, 54, 93, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                boxShadow:
+                  card.id === 'tracking' && pendingAssignmentCount > 0
+                    ? '0 10px 30px rgba(52, 152, 219, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                    : card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0
+                      ? '0 10px 30px rgba(220, 38, 38, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                      : '0 10px 30px rgba(26, 54, 93, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                animation:
+                  (card.id === 'tracking' && pendingAssignmentCount > 0) ||
+                  (card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0)
+                    ? 'pulse-alert 2s infinite'
+                    : undefined,
                 position: 'relative',
                 overflow: 'hidden'
               }}
@@ -819,6 +911,60 @@ const [showUserEditModal, setShowUserEditModal] = useState(false);
                   : language === 'en'
                     ? `${pendingRechargeCount} pending`
                     : `ငွေဖြည့် ${pendingRechargeCount}`}
+              </div>
+            )}
+            {card.id === 'tracking' && pendingAssignmentCount > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  right: '14px',
+                  background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                  color: 'white',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  boxShadow: '0 6px 16px rgba(52, 152, 219, 0.45)',
+                  zIndex: 10,
+                  letterSpacing: '0.02em',
+                  maxWidth: 'calc(100% - 28px)',
+                  textAlign: 'center',
+                  lineHeight: 1.35
+                }}
+              >
+                {language === 'zh'
+                  ? `待分配 ${pendingAssignmentCount} 单`
+                  : language === 'en'
+                    ? `${pendingAssignmentCount} to assign`
+                    : `Assign ${pendingAssignmentCount}`}
+              </div>
+            )}
+            {card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  right: '14px',
+                  background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                  color: 'white',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  boxShadow: '0 6px 16px rgba(220, 38, 38, 0.45)',
+                  zIndex: 10,
+                  letterSpacing: '0.02em',
+                  maxWidth: 'calc(100% - 28px)',
+                  textAlign: 'center',
+                  lineHeight: 1.35
+                }}
+              >
+                {language === 'zh'
+                  ? `待处理警报 ${pendingDeliveryAlertsCount} 条`
+                  : language === 'en'
+                    ? `${pendingDeliveryAlertsCount} alerts`
+                    : `Alerts ${pendingDeliveryAlertsCount}`}
               </div>
             )}
             <h3 style={{ 

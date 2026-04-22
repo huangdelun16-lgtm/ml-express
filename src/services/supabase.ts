@@ -59,6 +59,8 @@ export interface Package {
   cod_settled_at?: string; // 代收款结清时间
   rider_settled?: boolean; // 骑手是否已结清
   rider_settled_at?: string; // 骑手结清时间
+  /** 下单时的基础起步价快照(MMK)；财务算骑手分成时优先用此值，避免日后改系统起步价追溯旧单 */
+  pricing_base_fee_mmk?: number | null;
 }
 
 export interface Tutorial {
@@ -1246,10 +1248,32 @@ export const systemSettingsService = {
     }
   },
 
-  // 获取计费规则（管理端专用格式）
+  // 获取计费规则（与客户端下单、SystemSettings 保存格式一致）
   async getPricingSettings(region?: string): Promise<Record<string, any>> {
+    const DEFAULT_REGION_FALLBACK = 'mandalay';
+
+    const isGlobalPricingKey = (settingsKey: string) => {
+      const parts = settingsKey.split('.');
+      return parts.length === 2 && parts[0] === 'pricing';
+    };
+
+    const parseVal = (raw: unknown): number => {
+      if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+      if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
+        return parseVal((raw as { value: unknown }).value);
+      }
+      if (typeof raw === 'string') {
+        try {
+          const j = JSON.parse(raw);
+          return parseVal(j);
+        } catch {
+          return parseFloat(raw) || 0;
+        }
+      }
+      return 0;
+    };
+
     try {
-      const prefix = region ? `pricing.${region}.` : 'pricing.';
       const { data, error } = await supabase
         .from('system_settings')
         .select('settings_key, settings_value')
@@ -1267,45 +1291,30 @@ export const systemSettingsService = {
         fragile_surcharge: 300,
         food_beverage_surcharge: 300,
         free_km_threshold: 3,
-        courier_km_rate: 500
+        courier_km_rate: 500,
+        way_side_courier_per_order: 0
       };
 
-      // 如果提供了 region，先尝试寻找该区域的配置，如果没有则使用全局配置
-      if (region) {
-        const regionPrefix = `pricing.${region}.`;
-        const regionSettings = data?.filter(item => item.settings_key.startsWith(regionPrefix));
-        
-        if (regionSettings && regionSettings.length > 0) {
-          regionSettings.forEach((item: any) => {
-            const key = item.settings_key.replace(regionPrefix, '');
-            let value = item.settings_value;
-            if (typeof value === 'string') {
-              try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-            }
-            settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
-          });
-          return settings;
-        }
-      }
+      const applyRegionPrefix = (prefix: string) => {
+        data?.forEach((item: any) => {
+          if (!item.settings_key.startsWith(prefix)) return;
+          const field = item.settings_key.slice(prefix.length);
+          settings[field] = parseVal(item.settings_value);
+        });
+      };
 
-      // 如果没有指定区域或该区域没有特殊配置，使用默认的 pricing. 前缀配置
-      data?.forEach((item: any) => {
-        if (!item.settings_key.includes('.mandalay.') && 
-            !item.settings_key.includes('.yangon.') && 
-            !item.settings_key.includes('.maymyo.') &&
-            !item.settings_key.includes('.naypyidaw.') &&
-            !item.settings_key.includes('.taunggyi.') &&
-            !item.settings_key.includes('.lashio.') &&
-            !item.settings_key.includes('.muse.')) {
-          
-          const key = item.settings_key.replace('pricing.', '');
-          let value = item.settings_value;
-          if (typeof value === 'string') {
-            try { value = JSON.parse(value); } catch { value = parseFloat(value) || 0; }
-          }
-          settings[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
-        }
-      });
+      if (data && data.length > 0) {
+        data.forEach((item: any) => {
+          if (!isGlobalPricingKey(item.settings_key)) return;
+          const field = item.settings_key.replace('pricing.', '');
+          settings[field] = parseVal(item.settings_value);
+        });
+
+        const regionalPrefix = region
+          ? `pricing.${region.toLowerCase()}.`
+          : `pricing.${DEFAULT_REGION_FALLBACK}.`;
+        applyRegionPrefix(regionalPrefix);
+      }
 
       return settings;
     } catch (err) {
@@ -1320,9 +1329,96 @@ export const systemSettingsService = {
         fragile_surcharge: 300,
         food_beverage_surcharge: 300,
         free_km_threshold: 3,
-        courier_km_rate: 500
+        courier_km_rate: 500,
+        way_side_courier_per_order: 0
       };
     }
+  },
+
+  /**
+   * 一次拉取并按领区合并计费（global pricing.xxx + 各领区 pricing.{region}.xxx）
+   * 用于财务等需「每单按订单领区」计算的场景，避免曼德勒改价影响仰光。
+   */
+  async getRegionalPricingMap(
+    regionIds: string[],
+  ): Promise<Record<string, Record<string, any>>> {
+    const DEFAULTS: Record<string, any> = {
+      base_fee: 1500,
+      per_km_fee: 250,
+      weight_surcharge: 150,
+      urgent_surcharge: 500,
+      oversize_surcharge: 300,
+      scheduled_surcharge: 200,
+      fragile_surcharge: 300,
+      food_beverage_surcharge: 300,
+      free_km_threshold: 3,
+      courier_km_rate: 500,
+      way_side_courier_per_order: 0,
+      delivery_bonus_rate: 0,
+    };
+
+    const isGlobalPricingKey = (settingsKey: string) => {
+      const parts = settingsKey.split('.');
+      return parts.length === 2 && parts[0] === 'pricing';
+    };
+
+    const parseVal = (raw: unknown): number => {
+      if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+      if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
+        return parseVal((raw as { value: unknown }).value);
+      }
+      if (typeof raw === 'string') {
+        try {
+          const j = JSON.parse(raw);
+          return parseVal(j);
+        } catch {
+          return parseFloat(raw) || 0;
+        }
+      }
+      return 0;
+    };
+
+    const globalOverrides: Record<string, number> = {};
+    const regionalOverrides: Record<string, Record<string, number>> = {};
+
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('settings_key, settings_value')
+        .like('settings_key', 'pricing.%');
+
+      if (error) throw error;
+
+      data?.forEach((item: any) => {
+        const key = item.settings_key as string;
+        const parts = key.split('.');
+        if (parts[0] !== 'pricing') return;
+        const val = parseVal(item.settings_value);
+        if (parts.length === 2) {
+          globalOverrides[parts[1]] = val;
+        } else if (parts.length === 3) {
+          const reg = parts[1].toLowerCase();
+          const field = parts[2];
+          if (!regionalOverrides[reg]) regionalOverrides[reg] = {};
+          regionalOverrides[reg][field] = val;
+        }
+      });
+    } catch (err) {
+      console.error('获取分领区计费失败:', err);
+    }
+
+    const result: Record<string, Record<string, any>> = {};
+    const ids = regionIds.length
+      ? regionIds.map((r) => r.toLowerCase())
+      : ['mandalay'];
+    for (const rid of ids) {
+      result[rid] = {
+        ...DEFAULTS,
+        ...globalOverrides,
+        ...(regionalOverrides[rid] || {}),
+      };
+    }
+    return result;
   }
 };
 
@@ -1726,7 +1822,7 @@ export const userService = {
 // 管理员账号数据库操作
 export const adminAccountService = {
   // 登录验证（使用加密密码验证）
-  async login(username: string, password: string): Promise<AdminAccount | null> {
+  async login(username: string, password: string): Promise<{ account: AdminAccount | null; authToken?: string }> {
     try {
       // 使用 Netlify Function 验证登录（包含密码加密验证）
       const response = await fetch('/.netlify/functions/admin-password', {
@@ -1746,7 +1842,7 @@ export const adminAccountService = {
 
       if (!result.success || !result.account) {
         console.error('登录失败:', result.error || '未知错误');
-        return null;
+        return { account: null };
       }
 
       // 更新最后登录时间
@@ -1757,8 +1853,10 @@ export const adminAccountService = {
           .eq('id', result.account.id);
       }
 
-      // 返回账户信息（不包含密码）
-      return result.account as AdminAccount;
+      return {
+        account: result.account as AdminAccount,
+        authToken: typeof result.token === 'string' ? result.token : undefined,
+      };
     } catch (err) {
       console.error('登录异常:', err);
       // 如果 Function 调用失败，回退到旧的验证方式（向后兼容）
@@ -1772,7 +1870,7 @@ export const adminAccountService = {
           .single();
 
         if (error || !data) {
-          return null;
+          return { account: null };
         }
 
         // 更新最后登录时间
@@ -1783,10 +1881,10 @@ export const adminAccountService = {
             .eq('id', data.id);
         }
 
-        return data;
+        return { account: data };
       } catch (fallbackErr) {
         console.error('回退登录验证失败:', fallbackErr);
-        return null;
+        return { account: null };
       }
     }
   },

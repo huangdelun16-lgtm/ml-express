@@ -2763,7 +2763,8 @@ const HomePage: React.FC = () => {
                     pickup_time: '',
                     delivery_time: '',
                     courier: '待分配',
-                    price: `${orderInfo.price || calculatedPrice} MMK`
+                    price: `${orderInfo.price || calculatedPrice} MMK`,
+                    pricing_base_fee_mmk: Math.round(Number(pricingSettings.baseFee) || 0),
                   };
                   
                   // 保存到数据库

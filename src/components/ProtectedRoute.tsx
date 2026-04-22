@@ -48,7 +48,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     };
 
     checkAuthStatus();
-  }, [requiredRoles]);
+  }, [requiredRoles, permissionId]);
 
   // 正在检查权限时显示加载状态
   if (isChecking) {

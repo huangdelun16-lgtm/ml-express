@@ -105,10 +105,13 @@ async function verifyAdminToken(token, requiredRoles = [], permissionId = null) 
       const safeReceived = signature.replace(/=+$/, '');
       
       // 使用时间安全的比较方法（避免时序攻击）
-      const isValidSignature = crypto.timingSafeEqual(
-        Buffer.from(safeExpected),
-        Buffer.from(safeReceived)
-      );
+      let isValidSignature = false;
+      if (safeExpected.length === safeReceived.length) {
+        isValidSignature = crypto.timingSafeEqual(
+          Buffer.from(safeExpected),
+          Buffer.from(safeReceived)
+        );
+      }
       
       if (!isValidSignature) {
         console.error('签名验证失败详情:', {
@@ -244,12 +247,20 @@ exports.handler = async (event, context) => {
     if (action === 'verify') {
       // 优先从 Cookie 获取 Token（更安全）
       const cookieHeader = event.headers?.cookie || event.headers?.Cookie || '';
-      const cookieToken = cookieHeader
+      const tokenCookiePair = cookieHeader
         .split(';')
         .map(c => c.trim())
-        .find(c => c.startsWith('admin_auth_token='))
-        ?.split('=')[1]
-        ?.trim();
+        .find(c => c.startsWith('admin_auth_token='));
+      let cookieToken = tokenCookiePair
+        ? tokenCookiePair.slice('admin_auth_token='.length).trim()
+        : undefined;
+      if (cookieToken) {
+        try {
+          cookieToken = decodeURIComponent(cookieToken);
+        } catch (_) {
+          /* 未编码的旧 Cookie 原样使用 */
+        }
+      }
       
       // 使用 Cookie 中的 Token 或请求体中的 Token
       const tokenToVerify = cookieToken || token;
@@ -275,7 +286,7 @@ exports.handler = async (event, context) => {
       
       // 如果验证失败，清除 Cookie
       if (!result.valid) {
-        headers['Set-Cookie'] = 'admin_auth_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict';
+        headers['Set-Cookie'] = 'admin_auth_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax';
       }
       
       return {
@@ -285,7 +296,7 @@ exports.handler = async (event, context) => {
       };
     } else if (action === 'logout') {
       // 清除 httpOnly Cookie
-      headers['Set-Cookie'] = 'admin_auth_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict';
+      headers['Set-Cookie'] = 'admin_auth_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax';
       return {
         statusCode: 200,
         headers,

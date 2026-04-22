@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, HeatmapLayer, TrafficLayer } from '@react-google-maps/api';
-import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore, adminAccountService, auditLogService } from '../services/supabase';
+import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore, adminAccountService, auditLogService, systemSettingsService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Courier, CourierWithLocation, Coordinates } from '../types';
@@ -14,6 +14,27 @@ if (!GOOGLE_MAPS_API_KEY) {
 }
 
 // 配送商店接口已在types/index.ts中定义
+
+/** 与「系统设置中心 → 实时跟踪」相同的配置项（system_settings.settings_key） */
+const TRACKING_SETTING_KEYS = [
+  'tracking.refresh_interval_seconds',
+  'tracking.map_theme',
+  'tracking.route_prediction_enabled',
+  'tracking.webhook_push_enabled',
+] as const;
+
+type MapThemeSetting = 'dark' | 'light' | 'satellite';
+
+/** 暗色地图样式（与系统设置「地图主题 → 暗色」对应） */
+const GOOGLE_MAP_DARK_STYLES = [
+  { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#98a5be' }] },
+  { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#1d2c4d' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+] as const;
 
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
@@ -111,7 +132,12 @@ const RealTimeTracking: React.FC = () => {
     coordinates: Coordinates;
   } | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<string>(new Date().toLocaleTimeString()); // 🚀 新增：最后刷新时间
-  const [nextRefreshCountdown, setNextRefreshCountdown] = useState<number>(60); // 🚀 新增：倒计时
+  const [nextRefreshCountdown, setNextRefreshCountdown] = useState<number>(15); // 与系统设置 tracking.refresh_interval_seconds 对齐（默认 15）
+  /** 与「系统设置中心 → 实时跟踪」卡片中的配置联动 */
+  const [trackingRefreshSec, setTrackingRefreshSec] = useState(15);
+  const [mapThemeSetting, setMapThemeSetting] = useState<MapThemeSetting>('dark');
+  const [routePredictionEnabled, setRoutePredictionEnabled] = useState(false);
+  const [webhookPushEnabled, setWebhookPushEnabled] = useState(false);
 
   // 音频提示相关状态
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -225,35 +251,6 @@ const RealTimeTracking: React.FC = () => {
       console.log('✅ Google Maps API Key 已加载:', GOOGLE_MAPS_API_KEY.substring(0, 20) + '...');
     }
   }, [isMapLoaded, loadError, GOOGLE_MAPS_API_KEY]);
-
-  // 加载包裹数据
-  useEffect(() => {
-    const refreshData = async () => {
-      console.log('🔄 正在自动刷新数据...');
-      await Promise.all([
-        loadPackages(),
-        loadCouriers(),
-        loadStores()
-      ]);
-      setLastRefreshTime(new Date().toLocaleTimeString());
-      setNextRefreshCountdown(30); // 🚀 优化：缩短刷新间隔
-    };
-
-    refreshData();
-    
-    // 🚀 倒计时逻辑
-    const countdownInterval = setInterval(() => {
-      setNextRefreshCountdown(prev => {
-        if (prev <= 1) {
-          refreshData();
-          return 30; // 🚀 优化：缩短刷新间隔
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(countdownInterval);
-  }, []);
 
   // 🚨 新增：检测配送中的异常包裹（超过2小时未更新状态/位置）
   useEffect(() => {
@@ -534,11 +531,151 @@ const RealTimeTracking: React.FC = () => {
     }
   };
 
+  const parseSettingRaw = (raw: unknown): unknown => {
+    if (raw && typeof raw === 'object' && raw !== null && 'value' in raw) {
+      return (raw as { value: unknown }).value;
+    }
+    return raw;
+  };
+
+  const loadTrackingSettings = useCallback(async () => {
+    try {
+      const rows = await systemSettingsService.getSettingsByKeys([...TRACKING_SETTING_KEYS]);
+      const map: Record<string, unknown> = {};
+      rows.forEach(r => {
+        map[r.settings_key] = parseSettingRaw(r.settings_value);
+      });
+
+      const sec = Number(map['tracking.refresh_interval_seconds']);
+      const clamped = Number.isFinite(sec) ? Math.min(300, Math.max(5, sec)) : 15;
+      setTrackingRefreshSec(clamped);
+      setNextRefreshCountdown(clamped);
+
+      const themeRaw = String(map['tracking.map_theme'] || 'dark').toLowerCase();
+      if (themeRaw === 'light' || themeRaw === 'satellite' || themeRaw === 'dark') {
+        setMapThemeSetting(themeRaw as MapThemeSetting);
+      } else {
+        setMapThemeSetting('dark');
+      }
+
+      const rp = map['tracking.route_prediction_enabled'];
+      setRoutePredictionEnabled(rp === true || rp === 'true');
+
+      const wh = map['tracking.webhook_push_enabled'];
+      setWebhookPushEnabled(wh === true || wh === 'true');
+    } catch (e) {
+      console.warn('加载实时跟踪系统设置失败，使用默认值', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTrackingSettings();
+  }, [loadTrackingSettings]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-tracking-settings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'system_settings' },
+        payload => {
+          const key = (payload.new as { settings_key?: string } | null)?.settings_key
+            || (payload.old as { settings_key?: string } | null)?.settings_key;
+          if (key?.startsWith('tracking.')) {
+            void loadTrackingSettings();
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadTrackingSettings]);
+
+  const loadPackagesRef = useRef(loadPackages);
+  const loadCouriersRef = useRef(loadCouriers);
+  const loadStoresRef = useRef(loadStores);
+  loadPackagesRef.current = loadPackages;
+  loadCouriersRef.current = loadCouriers;
+  loadStoresRef.current = loadStores;
+
+  /** 自动刷新：间隔与「系统设置 → 实时跟踪 → 定位刷新间隔」一致 */
+  useEffect(() => {
+    const intervalSec = trackingRefreshSec;
+
+    const refreshData = async () => {
+      console.log('🔄 正在自动刷新数据...');
+      await Promise.all([
+        loadPackagesRef.current(),
+        loadCouriersRef.current(),
+        loadStoresRef.current(),
+      ]);
+      setLastRefreshTime(new Date().toLocaleTimeString());
+      setNextRefreshCountdown(intervalSec);
+    };
+
+    void refreshData();
+
+    const countdownInterval = window.setInterval(() => {
+      setNextRefreshCountdown(prev => {
+        if (prev <= 1) {
+          void refreshData();
+          return intervalSec;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(countdownInterval);
+  }, [trackingRefreshSec]);
+
+  const googleMapOptions = useMemo(() => {
+    const position =
+      typeof window !== 'undefined' && window.google?.maps?.ControlPosition !== undefined
+        ? window.google.maps.ControlPosition.TOP_RIGHT
+        : 3;
+
+    const base = {
+      fullscreenControl: true,
+      fullscreenControlOptions: { position },
+      zoomControl: true,
+      streetViewControl: false,
+      mapTypeControl: false,
+    };
+
+    if (mapThemeSetting === 'satellite') {
+      return {
+        ...base,
+        mapTypeId: 'hybrid' as const,
+        styles: undefined,
+      };
+    }
+
+    if (mapThemeSetting === 'dark') {
+      return {
+        ...base,
+        mapTypeId: 'roadmap' as const,
+        styles: [...GOOGLE_MAP_DARK_STYLES] as any,
+      };
+    }
+
+    return {
+      ...base,
+      mapTypeId: 'roadmap' as const,
+      styles: [{ featureType: 'poi' as const, elementType: 'labels' as const, stylers: [{ visibility: 'off' }] }],
+    };
+  }, [mapThemeSetting]);
+
   // 自动分配包裹
   const autoAssignPackage = async (packageData: Package) => {
     // 找到在线且当前包裹最少的快递员
     const availableCouriers = couriers
-      .filter(c => c.status === 'online' || c.status === 'active')
+      .filter(
+        c =>
+          c.status === 'online' ||
+          c.status === 'active' ||
+          c.status === 'busy',
+      )
       .sort((a, b) => (a.currentPackages || 0) - (b.currentPackages || 0));
 
     if (availableCouriers.length === 0) {
@@ -777,7 +914,7 @@ const RealTimeTracking: React.FC = () => {
               <span>📍 {isRegionalUser ? `${currentRegionPrefix} 专区` : myanmarCities[selectedCity].name}</span>
             </div>
 
-            {/* 刷新卡片 */}
+            {/* 刷新卡片（间隔与系统设置「定位刷新间隔」一致） */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -789,17 +926,53 @@ const RealTimeTracking: React.FC = () => {
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.1' }}>
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: '700' }}>AUTO SYNC</span>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: '700' }}>AUTO {trackingRefreshSec}s</span>
                 <span style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: '850', fontFamily: 'monospace' }}>{nextRefreshCountdown}s</span>
               </div>
               <button 
+                type="button"
                 onClick={() => setNextRefreshCountdown(1)}
                 style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', transition: 'transform 0.3s' }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'rotate(180deg)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'rotate(0deg)'}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'rotate(180deg)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'rotate(0deg)'; }}
                 title={`上次更新: ${lastRefreshTime}`}
               >🔄</button>
             </div>
+
+            <div
+              title="与「系统设置中心 → 实时跟踪」保存的配置一致"
+              style={{
+                fontSize: '0.72rem',
+                color: '#475569',
+                background: '#f1f5f9',
+                padding: '6px 10px',
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0',
+                maxWidth: '280px',
+                lineHeight: 1.35,
+              }}
+            >
+              地图 {mapThemeSetting === 'dark' ? '暗色' : mapThemeSetting === 'light' ? '浅色' : '卫星'} · 路线预测 {routePredictionEnabled ? '开' : '关'} · Webhook {webhookPushEnabled ? '开' : '关'}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/admin/settings', { state: { activeTab: 'tracking' as const } })}
+              style={{
+                background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
+              }}
+            >
+              ⚙️ 实时跟踪设置
+            </button>
           </div>
         </div>
       </div>
@@ -944,26 +1117,11 @@ const RealTimeTracking: React.FC = () => {
                 </div>
               ) : (
                 <GoogleMap
-                  key={`${selectedCity}-${selectedLocationPoint?.coordinates.lat || 'default'}`}
+                  key={`${selectedCity}-${mapThemeSetting}-${selectedLocationPoint?.coordinates.lat || 'default'}`}
                   mapContainerStyle={{ width: '100%', height: '100%' }}
                   center={mapCenter}
                   zoom={13}
-                  options={{
-                    fullscreenControl: true,
-                    fullscreenControlOptions: {
-                      position: window.google.maps.ControlPosition.TOP_RIGHT
-                    },
-                    zoomControl: true,
-                    streetViewControl: false,
-                    mapTypeControl: false,
-                    styles: [
-                      {
-                        featureType: 'poi',
-                        elementType: 'labels',
-                        stylers: [{ visibility: 'off' }]
-                      }
-                    ]
-                  }}
+                  options={googleMapOptions}
                 >
                   {/* 显示快递员位置 */}
                   {couriers

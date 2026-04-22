@@ -26,6 +26,20 @@ interface AdminToken {
 const TOKEN_STORAGE_KEY = 'admin_auth_token';
 const TOKEN_EXPIRY_TIME = 2 * 60 * 60 * 1000; // 2小时
 
+/** 短时间内复用 verify-admin 成功结果，减少首屏多次路由重复验证造成的延迟与 401 闪烁 */
+const VERIFY_CACHE_MS = 45_000;
+type VerifyOk = {
+  valid: boolean;
+  user?: { username: string; role: string; name: string; region?: string; permissions?: string[] };
+  error?: string;
+};
+let lastVerifySuccess: {
+  expires: number;
+  rolesKey: string;
+  permissionId?: string;
+  result: VerifyOk;
+} | null = null;
+
 /**
  * 使用 HMAC-SHA256 生成安全的 Token 签名
  * @param data - 要签名的数据
@@ -149,9 +163,25 @@ function parseToken(token: string): { username: string; role: string } | null {
  * 保存 Token（通过服务器设置 httpOnly Cookie）
  * ⚠️ 注意：不再使用 localStorage，改为服务器设置 httpOnly Cookie
  */
-export async function saveToken(username: string, role: string, name: string, region?: string, permissions?: string[]): Promise<string> {
-  // Token 现在由服务器通过 httpOnly Cookie 设置
-  // 客户端只保存非敏感的用户信息（用于显示）
+export async function saveToken(
+  username: string,
+  role: string,
+  name: string,
+  region?: string,
+  permissions?: string[],
+  /** 登录接口下发的与服务端 Cookie 一致的 token（优先）；缺省时客户端自签（兼容离线回退登录） */
+  serverIssuedToken?: string | null
+): Promise<string> {
+  const tokenToStore = serverIssuedToken
+    ? serverIssuedToken
+    : await generateToken(username, role);
+  try {
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, tokenToStore);
+    localStorage.setItem(TOKEN_STORAGE_KEY, tokenToStore);
+  } catch (error) {
+    logger.warn('无法缓存会话令牌（verify-admin 请求体备用）:', error);
+  }
+
   const userInfo = { username, role, name, region, permissions };
   
   // 只保存非敏感的用户信息到 sessionStorage 和 localStorage（页面关闭后清除 sessionStorage，但保留 localStorage 以兼容）
@@ -174,8 +204,7 @@ export async function saveToken(username: string, role: string, name: string, re
     logger.warn('无法保存用户信息到存储:', error);
   }
   
-  // 返回空字符串，因为 Token 现在由服务器管理
-  return '';
+  return tokenToStore;
 }
 
 /**
@@ -202,6 +231,13 @@ export async function validateToken(token: string): Promise<boolean> {
  * 调用服务器 API 清除 httpOnly Cookie
  */
 export async function clearToken(): Promise<void> {
+  lastVerifySuccess = null;
+  try {
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch (error) {
+    logger.warn('清除本地会话令牌失败:', error);
+  }
   // 清除 sessionStorage 中的用户信息
   try {
     sessionStorage.removeItem('currentUser');
@@ -238,24 +274,51 @@ export async function verifyToken(requiredRoles: string[] = [], permissionId?: s
   error?: string;
 }> {
   try {
-    // 调用 Netlify Function 验证 Token
-    // Token 会通过 httpOnly Cookie 自动发送
+    const now = Date.now();
+    const rolesKey = [...requiredRoles].sort().join(',');
+    if (
+      lastVerifySuccess &&
+      lastVerifySuccess.expires > now &&
+      lastVerifySuccess.rolesKey === rolesKey &&
+      lastVerifySuccess.permissionId === permissionId &&
+      lastVerifySuccess.result.valid
+    ) {
+      return lastVerifySuccess.result;
+    }
+
+    let bodyToken: string | undefined;
+    try {
+      bodyToken =
+        sessionStorage.getItem(TOKEN_STORAGE_KEY) ||
+        localStorage.getItem(TOKEN_STORAGE_KEY) ||
+        undefined;
+    } catch {
+      bodyToken = undefined;
+    }
+
     const response = await fetch('/.netlify/functions/verify-admin', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      credentials: 'include', // 重要：包含 Cookie
+      credentials: 'include',
       body: JSON.stringify({
         action: 'verify',
         requiredRoles,
-        permissionId // 传递权限 ID
-      })
+        permissionId,
+        token: bodyToken,
+      }),
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as VerifyOk;
 
     if (result.valid && result.user) {
+      lastVerifySuccess = {
+        expires: now + VERIFY_CACHE_MS,
+        rolesKey,
+        permissionId,
+        result: { valid: true, user: result.user },
+      };
       try {
         const existingRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || undefined;
         const normalizedPermissions = Array.isArray(result.user.permissions)
@@ -289,9 +352,10 @@ export async function verifyToken(requiredRoles: string[] = [], permissionId?: s
         logger.warn('更新权限缓存失败:', error);
       }
     } else if (!result.valid) {
+      lastVerifySuccess = null;
       await clearToken();
     }
-    
+
     return result;
   } catch (error) {
     logger.error('验证 Token 失败:', error);

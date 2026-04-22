@@ -235,34 +235,34 @@ exports.handler = async (event, context) => {
         };
       }
       const result = await verifyLogin(username, password);
-      
+      let issuedToken = null;
+
       // 如果登录成功，设置 httpOnly Cookie
       if (result.success && result.account) {
         // 生成 Token（用于设置 Cookie）
         const { generateAdminToken } = require('./verify-admin');
         const token = generateAdminToken(result.account.username, result.account.role);
+        issuedToken = token;
         
         // 检测是否为 HTTPS（通过请求头判断）
         const protoHeader = event.headers?.['x-forwarded-proto'] || event.headers?.['X-Forwarded-Proto'];
         const isHttps = (protoHeader && protoHeader.includes('https')) || process.env.NODE_ENV === 'production';
 
-        // 计算 Cookie 域名
+        // Cookie：默认不设置 Domain（host-only），避免与自定义域名 / Netlify 主机不一致导致浏览器拒收或后续请求不带 Cookie。
+        // 仅在明确配置 COOKIE_DOMAIN 时再设置 Domain=（例如统一子域场景）。
         const hostHeader = event.headers?.host || event.headers?.Host || '';
-        const requestHost = hostHeader.split(':')[0];
-        const cookieDomain = process.env.COOKIE_DOMAIN || requestHost || 'admin-market-link-express.com';
-        
-        // 设置 httpOnly Cookie（2小时过期）
+
         const cookieMaxAge = 2 * 60 * 60; // 2小时（秒）
-        const cookieOptions = [
+        const cookieParts = [
           `admin_auth_token=${token}`,
           `Max-Age=${cookieMaxAge}`,
           'Path=/',
-          `Domain=${cookieDomain}`,
-          'HttpOnly', // 防止 JavaScript 访问
-          isHttps ? 'Secure' : '',
-          // Windows 浏览器在 HTTPS 下也可以使用 Lax，稳定性更好
-          'SameSite=Lax'
-        ].filter(Boolean).join('; ');
+        ];
+        if (process.env.COOKIE_DOMAIN) {
+          cookieParts.push(`Domain=${process.env.COOKIE_DOMAIN}`);
+        }
+        cookieParts.push('HttpOnly', isHttps ? 'Secure' : '', 'SameSite=Lax');
+        const cookieOptions = cookieParts.filter(Boolean).join('; ');
         
         headers['Set-Cookie'] = cookieOptions;
         
@@ -274,10 +274,14 @@ exports.handler = async (event, context) => {
         }
       }
       
+      const loginBody = issuedToken
+        ? { ...result, token: issuedToken }
+        : result;
+
       return {
         statusCode: result.success ? 200 : 401,
         headers,
-        body: JSON.stringify(result)
+        body: JSON.stringify(loginBody)
       };
     } else if (action === 'updatePassword') {
       // 修改密码逻辑

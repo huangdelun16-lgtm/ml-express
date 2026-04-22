@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SystemSetting, systemSettingsService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
@@ -9,11 +9,15 @@ type SettingCategory = 'general' | 'pricing' | 'notification' | 'automation' | '
 
 type SettingFieldType = 'text' | 'number' | 'textarea' | 'switch' | 'select';
 
+type PricingGroup = 'client' | 'courier';
+
 interface SettingDefinition {
   key: string;
   label: string;
   description: string;
   category: SettingCategory;
+  /** 仅 category 为 pricing 时有效：区分客户端向客户计费 vs 骑手结算相关 */
+  pricingGroup?: PricingGroup;
   type: SettingFieldType;
   defaultValue: string | number | boolean;
   placeholder?: string;
@@ -75,6 +79,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '基础起步价 (MMK)',
     description: '所有订单的基础费用，适用于首公里或首重。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 1500,
     suffix: 'MMK'
@@ -84,6 +89,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '每公里费用 (MMK)',
     description: '超出基础里程后的每公里计费标准。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 250,
     suffix: 'MMK/公里'
@@ -93,6 +99,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '超重附加费',
     description: '当包裹超过默认重量阈值时，每公斤额外增加的费用。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 150,
     suffix: 'MMK/公斤'
@@ -102,6 +109,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '急送达附加费',
     description: '选择急送达配送方式时额外收取的固定费用。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 500,
     suffix: 'MMK'
@@ -111,6 +119,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '超规附加费',
     description: '当包裹尺寸超过标准规格时，每公里额外增加的费用。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 300,
     suffix: 'MMK/公里'
@@ -120,6 +129,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '定时达附加费',
     description: '选择定时达配送方式时额外收取的预约服务费。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 200,
     suffix: 'MMK'
@@ -129,6 +139,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '易碎品附加费',
     description: '运输易碎物品时收取的额外保护和小心处理费用，按距离计算（MMK/公里）。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 300,
     suffix: 'MMK/公里'
@@ -138,6 +149,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '食品和饮料附加费',
     description: '配送食品和饮料类包裹时，每公里额外增加的费用。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 300,
     suffix: 'MMK/公里'
@@ -147,6 +159,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '免费公里数',
     description: '订单在该距离内免收每公里费用，用于新用户或促销活动。',
     category: 'pricing',
+    pricingGroup: 'client',
     type: 'number',
     defaultValue: 3,
     suffix: '公里'
@@ -156,6 +169,7 @@ const settingDefinitions: SettingDefinition[] = [
     label: '骑手配送费 (MMK/KM)',
     description: '结算给骑手的配送提成，按每公里送货距离计算。',
     category: 'pricing',
+    pricingGroup: 'courier',
     type: 'number',
     defaultValue: 500,
     suffix: 'MMK/公里'
@@ -165,8 +179,19 @@ const settingDefinitions: SettingDefinition[] = [
     label: '每单配送奖金 (MMK/单)',
     description: '每完成一笔配送订单给予骑手的额外奖金。如果设置为 0 则代表不发放配送奖金。',
     category: 'pricing',
+    pricingGroup: 'courier',
     type: 'number',
     defaultValue: 1000,
+    suffix: 'MMK/单'
+  },
+  {
+    key: 'pricing.way_side_courier_per_order',
+    label: '「顺路递」骑手配送费 (MMK/单)',
+    description: '顺路递（Eco Way）订单每单结算给骑手的金额；不超过该单客户实付跑腿费。设为 0 时仍按「跑腿费 − 该单起步价」计算骑手分成。',
+    category: 'pricing',
+    pricingGroup: 'courier',
+    type: 'number',
+    defaultValue: 0,
     suffix: 'MMK/单'
   },
   {
@@ -328,7 +353,7 @@ const settingDefinitions: SettingDefinition[] = [
 
 const categories: Array<{ id: SettingCategory; name: string; description: string; icon: string }> = [
   { id: 'general', name: '基础信息', description: '公司信息、营业时间与客服渠道配置', icon: '🏢' },
-  { id: 'pricing', name: '计费规则', description: '配送价格、附加费与优惠策略', icon: '💸' },
+  { id: 'pricing', name: '计费规则', description: '客户端运费规则与骑手结算参数（分区配置）', icon: '💸' },
   { id: 'notification', name: '通知中心', description: '短信、邮件通知开关与模板', icon: '🔔' },
   { id: 'automation', name: '自动化', description: '派单策略、超时改派等自动化流程', icon: '🤖' },
   { id: 'tracking', name: '实时跟踪', description: '地图刷新、路线预测与数据推送', icon: '🗺️' },
@@ -347,6 +372,7 @@ const REGIONS = [
 
 const SystemSettings: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { language, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<SettingCategory>('general');
   const [selectedRegion, setSelectedRegion] = useState<string>('mandalay');
@@ -474,6 +500,14 @@ const SystemSettings: React.FC = () => {
     loadSettings();
   }, [loadSettings]);
 
+  /** 从实时跟踪页「系统设置」入口携带 state，自动切换到「实时跟踪」分类 */
+  useEffect(() => {
+    const state = location.state as { activeTab?: SettingCategory } | undefined;
+    if (state?.activeTab && categories.some(c => c.id === state.activeTab)) {
+      setActiveTab(state.activeTab);
+    }
+  }, [location.state]);
+
   const handleValueChange = (key: string, value: SettingValue) => {
     setSettingsValues(prev => ({
       ...prev,
@@ -561,6 +595,16 @@ const SystemSettings: React.FC = () => {
   const currentDefinitions = useMemo(
     () => settingDefinitions.filter(def => def.category === activeTab),
     [activeTab]
+  );
+
+  const pricingClientDefinitions = useMemo(
+    () => settingDefinitions.filter(d => d.category === 'pricing' && d.pricingGroup === 'client'),
+    []
+  );
+
+  const pricingCourierDefinitions = useMemo(
+    () => settingDefinitions.filter(d => d.category === 'pricing' && d.pricingGroup === 'courier'),
+    []
   );
 
   const renderInput = (def: SettingDefinition) => {
@@ -664,6 +708,66 @@ const SystemSettings: React.FC = () => {
         onChange={event => handleValueChange(def.key, def.type === 'number' ? event.target.value : event.target.value)}
         style={baseInputStyle}
       />
+    );
+  };
+
+  const renderSettingCard = (def: SettingDefinition) => {
+    const displayLabel = def.label;
+    const displayDesc = def.description;
+
+    return (
+      <div
+        key={def.key}
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '24px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          transition: 'all 0.3s ease',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+          e.currentTarget.style.transform = 'translateY(-4px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>{displayLabel}</h3>
+            <p style={{ margin: '4px 0 0 0', opacity: 0.5, fontSize: '0.88rem', lineHeight: 1.5 }}>{displayDesc}</p>
+          </div>
+          {def.suffix && def.type !== 'switch' && (
+            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6' }}>
+              {def.suffix}
+            </div>
+          )}
+        </div>
+
+        <div>
+          {renderInput(def)}
+        </div>
+
+        {(def.helpText) && (
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            {def.helpText ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fbbf24', fontSize: '0.8rem', fontWeight: 600 }}>
+                <span>💡</span>
+                <span>{def.helpText}</span>
+              </div>
+            ) : <div />}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -859,6 +963,39 @@ const SystemSettings: React.FC = () => {
                 <div style={{ opacity: 0.5, fontSize: '0.75rem' }}>操作日志与监控</div>
               </div>
             </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/admin/realtime-tracking')}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                background: 'rgba(59, 130, 246, 0.15)',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                borderRadius: '16px',
+                padding: '12px 16px',
+                color: 'white',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.28)';
+                e.currentTarget.style.transform = 'translateX(5px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                e.currentTarget.style.transform = 'translateX(0)';
+              }}
+            >
+              <div style={{ width: '40px', height: '40px', background: 'rgba(59, 130, 246, 0.35)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>🗺️</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>实时跟踪工作台</div>
+                <div style={{ opacity: 0.5, fontSize: '0.75rem' }}>地图、骑手与订单（与下方「实时跟踪」配置联动）</div>
+              </div>
+            </button>
           </div>
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
@@ -954,6 +1091,27 @@ const SystemSettings: React.FC = () => {
               </div>
             </div>
 
+            {/* 实时跟踪：跳转工作台（与 RealTimeTracking 共用同一套 tracking.* 配置） */}
+            {activeTab === 'tracking' && (
+              <button
+                type="button"
+                onClick={() => navigate('/admin/realtime-tracking')}
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 22px',
+                  borderRadius: '14px',
+                  cursor: 'pointer',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
+                  boxShadow: '0 8px 24px rgba(37, 99, 235, 0.35)',
+                }}
+              >
+                🗺️ 打开实时跟踪工作台
+              </button>
+            )}
+
             {/* 计费规则专属：领区选择器 */}
             {activeTab === 'pricing' && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
@@ -1015,68 +1173,51 @@ const SystemSettings: React.FC = () => {
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
               gap: '24px' 
             }}>
-              {currentDefinitions.map(def => {
-                const metadata = settingsMetadata[def.key];
-                
-                // 支持多语言覆盖
-                let displayLabel = def.label;
-                let displayDesc = def.description;
-
-                return (
+              {activeTab === 'pricing' ? (
+                <>
                   <div
-                    key={def.key}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '24px',
-                      padding: '24px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '16px',
-                      transition: 'all 0.3s ease',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                      e.currentTarget.style.transform = 'translateY(0)';
+                      gridColumn: isMobile ? undefined : '1 / -1',
+                      padding: '16px 20px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(15, 32, 60, 0.35) 100%)',
+                      border: '1px solid rgba(147, 197, 253, 0.25)'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>{displayLabel}</h3>
-                        <p style={{ margin: '4px 0 0 0', opacity: 0.5, fontSize: '0.88rem', lineHeight: 1.5 }}>{displayDesc}</p>
-                      </div>
-                      {def.suffix && def.type !== 'switch' && (
-                        <div style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6' }}>
-                          {def.suffix}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      {renderInput(def)}
-                    </div>
-
-                    {(def.helpText) && (
-                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                        {def.helpText ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fbbf24', fontSize: '0.8rem', fontWeight: 600 }}>
-                            <span>💡</span>
-                            <span>{def.helpText}</span>
-                          </div>
-                        ) : <div />}
-                      </div>
-                    )}
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1.25rem' }}>📱</span>
+                      客户端计费
+                    </h3>
+                    <p style={{ margin: '8px 0 0 0', opacity: 0.65, fontSize: '0.86rem', lineHeight: 1.55 }}>
+                      面向客户下单时的跑腿费计价（起步价、里程、附加费等）。当前领区：<strong style={{ color: 'rgba(255,255,255,0.95)' }}>{REGIONS.find(r => r.id === selectedRegion)?.name ?? selectedRegion}</strong>
+                      。各领区配置相互独立；财务与骑手预估收入按订单领区（包裹 region 或单号前缀）选用对应规则，避免曼德勒调价影响仰光骑手。
+                    </p>
                   </div>
-                );
-              })}
+                  {pricingClientDefinitions.map(renderSettingCard)}
+
+                  <div
+                    style={{
+                      gridColumn: isMobile ? undefined : '1 / -1',
+                      marginTop: '8px',
+                      padding: '16px 20px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(15, 32, 60, 0.35) 100%)',
+                      border: '1px solid rgba(110, 231, 183, 0.22)'
+                    }}
+                  >
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1.25rem' }}>🚚</span>
+                      骑手端计费
+                    </h3>
+                    <p style={{ margin: '8px 0 0 0', opacity: 0.65, fontSize: '0.86rem', lineHeight: 1.55 }}>
+                      与骑手结算相关的参数（顺路递固定费、每单奖金等）。与上方领区选择一致：当前编辑的是 <strong style={{ color: 'rgba(255,255,255,0.95)' }}>{REGIONS.find(r => r.id === selectedRegion)?.name ?? selectedRegion}</strong> 的规则，不影响其他领区。
+                    </p>
+                  </div>
+                  {pricingCourierDefinitions.map(renderSettingCard)}
+                </>
+              ) : (
+                currentDefinitions.map(renderSettingCard)
+              )}
             </div>
           )}
         </div>
@@ -1088,7 +1229,7 @@ const SystemSettings: React.FC = () => {
         onClose={() => setShowVerificationModal(false)}
         onVerifySuccess={executeSave}
         title="修改计费规则验证"
-        description="修改计费规则将直接影响全平台的运费计算，请验证您的管理员密码以确认此操作。"
+        description="修改计费规则将影响客户端运费与骑手结算相关参数，请验证您的管理员密码以确认此操作。"
       />
     </div>
   );

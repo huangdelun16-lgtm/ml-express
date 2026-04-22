@@ -1,8 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { bannerService, tutorialService, welcomeScreenService, Banner, Tutorial, WelcomeScreen } from '../services/supabase';
+import { bannerService, tutorialService, welcomeScreenService, systemSettingsService, Banner, Tutorial, WelcomeScreen } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
-import { fileUploadService } from '../services/FileUploadService';
+
+const CLIENT_RECHARGE_QR_SETTING_KEY = 'client.recharge_qr_urls';
+const RECHARGE_QR_TIERS = [10000, 50000, 100000, 300000, 500000, 1000000] as const;
+
+const defaultRechargeQrUrlMap = (): Record<number, string> => {
+  const base = 'https://market-link-express.com';
+  return {
+    10000: `${base}/kbz_qr_10000.png`,
+    50000: `${base}/kbz_qr_50000.png`,
+    100000: `${base}/kbz_qr_100000.png`,
+    300000: `${base}/kbz_qr_300000.png`,
+    500000: `${base}/kbz_qr_500000.png`,
+    1000000: `${base}/kbz_qr_1000000.png`,
+  };
+};
 
 const BannerManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -22,7 +36,12 @@ const BannerManagement: React.FC = () => {
   const [showWelcomeMainModal, setShowWelcomeMainModal] = useState(false); // 🚀 窗口3：欢迎页面管理
   const [showWelcomeEditModal, setShowWelcomeEditModal] = useState(false); // 🚀 窗口4：编辑欢迎页面
   const [editingWelcomeScreen, setEditingWelcomeScreen] = useState<WelcomeScreen | null>(null);
-  
+  const rechargeQrFileInputRef = useRef<HTMLInputElement>(null);
+  const rechargeQrPickAmountRef = useRef<number | null>(null);
+  const [showRechargeQRModal, setShowRechargeQRModal] = useState(false);
+  const [rechargeQrMap, setRechargeQrMap] = useState<Record<number, string>>(() => defaultRechargeQrUrlMap());
+  const [rechargeQrSaving, setRechargeQrSaving] = useState(false);
+
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
@@ -114,6 +133,83 @@ const BannerManagement: React.FC = () => {
   const loadWelcomeScreens = async () => {
     const data = await welcomeScreenService.getAllWelcomeScreens();
     setWelcomeScreens(data);
+  };
+
+  const loadRechargeQrSettings = async () => {
+    const rows = await systemSettingsService.getSettingsByKeys([CLIENT_RECHARGE_QR_SETTING_KEY]);
+    const merged = defaultRechargeQrUrlMap();
+    const row = rows[0];
+    if (row?.settings_value != null) {
+      let raw: unknown = row.settings_value;
+      if (typeof raw === 'string') {
+        try {
+          raw = JSON.parse(raw);
+        } catch {
+          raw = {};
+        }
+      }
+      if (raw && typeof raw === 'object') {
+        for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+          const n = Number(k);
+          if (Number.isFinite(n) && typeof v === 'string' && v.trim()) {
+            merged[n] = v.trim();
+          }
+        }
+      }
+    }
+    setRechargeQrMap(merged);
+  };
+
+  const saveRechargeQrSettings = async () => {
+    setRechargeQrSaving(true);
+    const ok = await systemSettingsService.upsertSetting({
+      category: 'client',
+      settings_key: CLIENT_RECHARGE_QR_SETTING_KEY,
+      settings_value: rechargeQrMap,
+      description: '客户端 App/Web 余额充值扫码支付图片 URL（按 MMK 档位，后台可更换）',
+      updated_by:
+        sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || 'admin',
+    });
+    setRechargeQrSaving(false);
+    if (ok) {
+      alert('已保存。用户端打开「余额充值 → 扫码支付」时会从服务器拉取最新图片。');
+    } else {
+      alert('保存失败，请检查网络与权限后重试');
+    }
+  };
+
+  const triggerRechargeQrUpload = (amount: number) => {
+    rechargeQrPickAmountRef.current = amount;
+    rechargeQrFileInputRef.current?.click();
+  };
+
+  const handleRechargeQrFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const amount = rechargeQrPickAmountRef.current;
+    if (!file || amount == null) {
+      rechargeQrPickAmountRef.current = null;
+      if (rechargeQrFileInputRef.current) rechargeQrFileInputRef.current.value = '';
+      return;
+    }
+    try {
+      setUploading(true);
+      const base64 = await readFileAsBase64(file);
+      const response = await fetch('/.netlify/functions/upload-banner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type, base64 }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.url) throw new Error(result?.error || '上传失败');
+      setRechargeQrMap((prev) => ({ ...prev, [amount]: result.url as string }));
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : '上传失败');
+    } finally {
+      setUploading(false);
+      rechargeQrPickAmountRef.current = null;
+      if (rechargeQrFileInputRef.current) rechargeQrFileInputRef.current.value = '';
+    }
   };
 
   const handleBannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -449,7 +545,7 @@ const BannerManagement: React.FC = () => {
             ←
           </button>
           <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 800, margin: 0, background: 'linear-gradient(to right, #60a5fa, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            广告管理
+            页面管理
           </h1>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -457,6 +553,7 @@ const BannerManagement: React.FC = () => {
             onClick={() => {
               setShowForm(false);
               setShowTutorialMainModal(false);
+              setShowRechargeQRModal(false);
               setShowWelcomeMainModal(!showWelcomeMainModal);
             }}
             style={{ padding: '12px 24px', borderRadius: '14px', background: showWelcomeMainModal ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #f59e0b, #d97706)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showWelcomeMainModal ? 'none' : '0 4px 12px rgba(245, 158, 11, 0.3)', transition: 'all 0.3s' }}
@@ -467,6 +564,7 @@ const BannerManagement: React.FC = () => {
             onClick={() => {
               setShowForm(false);
               setShowWelcomeMainModal(false);
+              setShowRechargeQRModal(false);
               setShowTutorialMainModal(!showTutorialMainModal);
             }}
             style={{ padding: '12px 24px', borderRadius: '14px', background: showTutorialMainModal ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #10b981, #059669)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showTutorialMainModal ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)', transition: 'all 0.3s' }}
@@ -491,14 +589,193 @@ const BannerManagement: React.FC = () => {
               setShowTutorialEditModal(false);
               setShowWelcomeMainModal(false);
               setShowWelcomeEditModal(false);
+              setShowRechargeQRModal(false);
               setShowForm(!showForm);
             }}
             style={{ padding: '12px 24px', borderRadius: '14px', background: showForm ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showForm ? 'none' : '0 4px 12px rgba(37, 99, 235, 0.3)', transition: 'all 0.3s' }}
           >
             {showForm ? '取消' : '新建广告'}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowForm(false);
+              setShowTutorialMainModal(false);
+              setShowWelcomeMainModal(false);
+              setShowTutorialEditModal(false);
+              setShowWelcomeEditModal(false);
+              loadRechargeQrSettings();
+              setShowRechargeQRModal(true);
+            }}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #059669, #047857)',
+              border: 'none',
+              color: 'white',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(5, 150, 105, 0.35)',
+              transition: 'all 0.3s',
+            }}
+          >
+            + 余额充值QR
+          </button>
         </div>
       </div>
+
+      <input
+        ref={rechargeQrFileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleRechargeQrFileChange}
+      />
+
+      {showRechargeQRModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.85)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            overflowY: 'auto',
+          }}
+          onClick={() => !uploading && !rechargeQrSaving && setShowRechargeQRModal(false)}
+        >
+          <div
+            style={{
+              ...cardStyle,
+              maxWidth: 720,
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              margin: 0,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem' }}>余额充值扫码图（客户端账户页）</h2>
+              <button
+                type="button"
+                onClick={() => !uploading && !rechargeQrSaving && setShowRechargeQRModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  color: 'white',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ opacity: 0.85, fontSize: '0.9rem', marginTop: 0, marginBottom: 16 }}>
+              按充值档位上传收款码图片，保存后 App / Web 用户打开「扫描二维码支付」窗口时会显示此处配置的图片（未配置档位仍使用 market-link-express.com 默认静态图）。
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {RECHARGE_QR_TIERS.map((amt) => (
+                <div
+                  key={amt}
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: 12,
+                    background: 'rgba(0,0,0,0.2)',
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <div style={{ minWidth: 100, fontWeight: 800 }}>{amt.toLocaleString()} MMK</div>
+                  <img
+                    src={rechargeQrMap[amt] || defaultRechargeQrUrlMap()[amt]}
+                    alt={`qr ${amt}`}
+                    style={{ width: 72, height: 72, objectFit: 'contain', background: '#fff', borderRadius: 8 }}
+                  />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, flex: 1 }}>
+                    <button
+                      type="button"
+                      disabled={uploading || rechargeQrSaving}
+                      onClick={() => triggerRechargeQrUpload(amt)}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        border: 'none',
+                        background: '#2563eb',
+                        color: 'white',
+                        fontWeight: 600,
+                        cursor: uploading ? 'wait' : 'pointer',
+                      }}
+                    >
+                      上传图片
+                    </button>
+                    <button
+                      type="button"
+                      disabled={uploading || rechargeQrSaving}
+                      onClick={() =>
+                        setRechargeQrMap((prev) => ({ ...prev, [amt]: defaultRechargeQrUrlMap()[amt] }))
+                      }
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        background: 'transparent',
+                        color: 'white',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      恢复默认
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
+              <button
+                type="button"
+                disabled={uploading || rechargeQrSaving}
+                onClick={() => setShowRechargeQRModal(false)}
+                style={{
+                  padding: '12px 20px',
+                  borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'transparent',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                关闭
+              </button>
+              <button
+                type="button"
+                disabled={uploading || rechargeQrSaving}
+                onClick={saveRechargeQrSettings}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: 'white',
+                  fontWeight: 700,
+                  cursor: rechargeQrSaving ? 'wait' : 'pointer',
+                }}
+              >
+                {rechargeQrSaving ? '保存中…' : '保存到服务器'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showTutorialMainModal && (
         <div style={{ ...cardStyle, border: '1px solid rgba(16, 185, 129, 0.2)', position: 'relative', overflow: 'hidden', maxWidth: '400px', margin: '0 auto 24px' }}>

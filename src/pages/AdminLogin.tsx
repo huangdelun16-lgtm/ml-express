@@ -14,12 +14,10 @@ const AdminLogin: React.FC = () => {
     setLoading(true);
 
     try {
-      // 尝试数据库登录
-      const account = await adminAccountService.login(username, password);
-      
+      const { account, authToken } = await adminAccountService.login(username, password);
+
       if (account) {
-        // 登录成功，生成并保存 Token
-        await saveToken(account.username, account.role, account.employee_name, account.region);
+        await saveToken(account.username, account.role, account.employee_name, account.region, account.permissions as string[] | undefined, authToken);
         
         // 记录登录日志
         await auditLogService.log({
@@ -34,7 +32,7 @@ const AdminLogin: React.FC = () => {
       } else {
         // 如果数据库登录失败，回退到硬编码验证（兼容模式，仅用于紧急情况）
         if (username === 'admin' && password === 'admin') {
-          await saveToken('admin', 'admin', '管理员');
+          await saveToken('admin', 'admin', '管理员', undefined, undefined, undefined);
           
           // 记录登录日志
           await auditLogService.log({
