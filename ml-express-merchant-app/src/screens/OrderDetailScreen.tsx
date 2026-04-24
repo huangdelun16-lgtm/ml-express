@@ -32,6 +32,7 @@ import { useLoading } from "../contexts/LoadingContext";
 import Toast from "../components/Toast";
 import BackToHomeButton from "../components/BackToHomeButton";
 import { printerService } from "../services/PrinterService";
+import { type AppLang, getJourneyCopy, getJourneyLabels } from "../utils/orderJourney";
 
 const { width } = Dimensions.get("window");
 
@@ -906,6 +907,110 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
+        {(() => {
+          const appLang: AppLang =
+            language === "en" ? "en" : language === "my" ? "my" : "zh";
+          const journey = getJourneyCopy(order.status, appLang);
+          const labels = getJourneyLabels(appLang);
+          const stepIdx = journey.activeStep;
+          const isComplete = (i: number) =>
+            stepIdx === 3 || (stepIdx >= 0 && stepIdx > i);
+          const isCurrent = (i: number) =>
+            i === stepIdx && stepIdx >= 0 && stepIdx < 3;
+          const titleJourney =
+            appLang === "en"
+              ? "Order progress"
+              : appLang === "my"
+                ? "အော်ဒါတိုးတက်မှု"
+                : "订单进度";
+          const trackLabel =
+            appLang === "en"
+              ? "Live tracking"
+              : appLang === "my"
+                ? "တိုက်ရိုက်ပြမြေပုံ"
+                : "实时追踪";
+          const chatLabel =
+            appLang === "en"
+              ? "Chat"
+              : appLang === "my"
+                ? "ဆက်သွယ်ရန်"
+                : "联系骑手";
+          return (
+            <View style={styles.journeyCard}>
+              <Text style={styles.journeyCardTitle}>📍 {titleJourney}</Text>
+              <View style={styles.journeyStepsRow}>
+                {labels.map((label, i) => (
+                  <View key={i} style={styles.journeyStepItem}>
+                    {isCurrent(i) ? (
+                      <View style={styles.journeyDotCurrentOuter}>
+                        <View style={styles.journeyDotCurrentInner} />
+                      </View>
+                    ) : (
+                      <View
+                        style={[
+                          styles.journeyDot,
+                          isComplete(i) && styles.journeyDotDone,
+                        ]}
+                      />
+                    )}
+                    <Text numberOfLines={2} style={styles.journeyStepLabel}>
+                      {label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View
+                style={[
+                  styles.journeyMessageBox,
+                  journey.variant === "warning" && styles.journeyMessageWarn,
+                  journey.variant === "success" && styles.journeyMessageOk,
+                  journey.variant === "muted" && styles.journeyMessageMuted,
+                ]}
+              >
+                <Text style={styles.journeyHeadline}>{journey.headline}</Text>
+                <Text style={styles.journeyDetail}>{journey.detail}</Text>
+              </View>
+              <View style={styles.journeyActions}>
+                {journey.suggestTrack && order.status !== "已取消" && (
+                  <TouchableOpacity
+                    style={styles.journeyActionBtn}
+                    onPress={() =>
+                      navigation.navigate("TrackOrder", { orderId: order.id })
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="map-outline" size={18} color="#fff" />
+                    <Text style={styles.journeyActionBtnText}>{trackLabel}</Text>
+                  </TouchableOpacity>
+                )}
+                {journey.suggestChat &&
+                  order.courier &&
+                  order.courier !== "待分配" && (
+                    <TouchableOpacity
+                      style={[
+                        styles.journeyActionBtn,
+                        styles.journeyActionBtnSecondary,
+                      ]}
+                      onPress={() => {
+                        setShowChatModal(true);
+                        loadChatMessages();
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={18}
+                        color={theme.colors.primary.DEFAULT}
+                      />
+                      <Text style={styles.journeyActionBtnTextSecondary}>
+                        {chatLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+              </View>
+            </View>
+          );
+        })()}
         {/* 订单信息卡片 */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📋 {t.orderInfo}</Text>
@@ -2165,6 +2270,127 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
   },
+  journeyCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  journeyCardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 12,
+  },
+  journeyStepsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  journeyStepItem: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 2,
+  },
+  journeyDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#e2e8f0",
+  },
+  journeyDotDone: {
+    backgroundColor: "#10b981",
+  },
+  journeyDotCurrentOuter: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: theme.colors.primary.DEFAULT,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  journeyDotCurrentInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.primary.DEFAULT,
+  },
+  journeyStepLabel: {
+    fontSize: 10,
+    color: "#64748b",
+    textAlign: "center",
+    marginTop: 6,
+    lineHeight: 12,
+  },
+  journeyMessageBox: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#f1f5f9",
+  },
+  journeyMessageWarn: {
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+    borderColor: "#fcd34d",
+  },
+  journeyMessageOk: {
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#6ee7b7",
+  },
+  journeyMessageMuted: {
+    backgroundColor: "#f1f5f9",
+  },
+  journeyHeadline: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 6,
+  },
+  journeyDetail: {
+    fontSize: 14,
+    color: "#475569",
+    lineHeight: 20,
+  },
+  journeyActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 12,
+    marginHorizontal: -4,
+  },
+  journeyActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginHorizontal: 4,
+    marginBottom: 8,
+    backgroundColor: theme.colors.primary.DEFAULT,
+    borderRadius: 12,
+  },
+  journeyActionBtnText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 15,
+    marginLeft: 6,
+  },
+  journeyActionBtnSecondary: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: theme.colors.primary.DEFAULT,
+  },
+  journeyActionBtnTextSecondary: {
+    color: theme.colors.primary.DEFAULT,
+    fontWeight: "600",
+    fontSize: 15,
+    marginLeft: 6,
+  },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -2309,17 +2535,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#0369a1",
-  },
-  contactButton: {
-    backgroundColor: "#0284c7",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  contactButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#ffffff",
   },
   trackingItem: {
     flexDirection: "row",

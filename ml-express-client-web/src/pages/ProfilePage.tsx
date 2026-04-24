@@ -8,6 +8,11 @@ import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import NavigationBar from '../components/home/NavigationBar';
 import { useLanguage } from '../contexts/LanguageContext';
+import {
+  getDismissedReviewOrderIdsWeb,
+  addDismissedReviewOrderIdWeb,
+  pickUnratedDeliveredPackage,
+} from '../utils/reviewPromptStorage';
 
 // 注入样式
 if (typeof document !== 'undefined') {
@@ -175,8 +180,19 @@ const ProfilePage: React.FC = () => {
     settledCOD: 0,
     lastSettledAt: null as string | null,
   }); // 合伙店铺代收款统计
-  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // 🚀 新增：是否开启语音提醒
-  const [, setPendingMerchantOrdersCount] = useState(0); // 🚀 新增：待处理订单数
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+    try {
+      return localStorage.getItem('ml-merchant-voice') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const [, setPendingMerchantOrdersCount] = useState(0);
+  const isVoiceEnabledRef = useRef(isVoiceEnabled);
+  const languageRef = useRef(language);
   const [productPriceMap, setProductPriceMap] = useState<Record<string, number>>({}); // 🚀 新增：商品价格映射
   const [isSavingStatus, setIsSavingStatus] = useState(false); // 🚀 新增：保存状态反馈
   const [, setIsGuest] = useState(false); // 🚀 新增：访客状态
@@ -207,31 +223,42 @@ const ProfilePage: React.FC = () => {
   const [showReviewSubmitModal, setShowReviewSubmitModal] = useState(false);
   const [reviewOrder, setReviewOrder] = useState<any>(null);
   const [reviewRating, setReviewRating] = useState(5);
+  const [reviewCourierRating, setReviewCourierRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [isUploadingReviewImage, setIsUploadingReviewImage] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
+  const [reviewStoreName, setReviewStoreName] = useState('');
   const reviewImageInputRef = useRef<HTMLInputElement>(null);
+  const webReviewAutoOpenedForId = useRef<string | null>(null);
 
-  const lastBroadcastCountRef = useRef<number>(0); // 🚀 新增：上次播报的订单数
-  const lastVoiceTimeRef = useRef<number>(0); // 🚀 新增：上次播报的时间
-  // 🚀 新增：语音播报函数
+  const lastBroadcastCountRef = useRef<number>(0);
+  const lastVoiceTimeRef = useRef<number>(0);
+  /** 首次轮询只建立待确认数量基线，避免把进页面前已存在的订单当成“新单”播报 */
+  const merchantPendingVoicePrimedRef = useRef(false);
+
+  useEffect(() => {
+    isVoiceEnabledRef.current = isVoiceEnabled;
+  }, [isVoiceEnabled]);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
+
   const speakNotification = (text: string) => {
-    if ('speechSynthesis' in window) {
-      // 停止当前的，防止堆叠
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-
-      window.speechSynthesis.speak(utterance);
-      lastVoiceTimeRef.current = Date.now();
-      console.log('🗣️ 正在播报:', text);
+    if (!('speechSynthesis' in window)) {
+      return;
     }
+    window.speechSynthesis.cancel();
+    const lang = languageRef.current;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang === 'en' ? 'en-US' : lang === 'my' ? 'my-MM' : 'zh-CN';
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    window.speechSynthesis.speak(utterance);
+    lastVoiceTimeRef.current = Date.now();
   };
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -800,47 +827,57 @@ const ProfilePage: React.FC = () => {
     }
   }, [navigate, checkIfPartnerStore, language]);
 
-  // 加载用户的包裹列表
-  const loadUserPackages = useCallback(async () => {
-    if (!currentUser?.id) {
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      // 🚀 核心优化：移除所有账号的注册时间限制，确保 Web 端与 App 端数据完全同步一致
-      const queryStartDate = undefined;
-      
-      const packages = await packageService.getPackagesByUser(
-        currentUser.email,
-        currentUser.phone,
-        queryStartDate,
-        isPartnerStore ? (currentUser.store_id || currentUser.id) : undefined,
-        currentUser.id,
-        isPartnerStore ? currentUser.name : undefined
-      );
-      
-      setUserPackages(packages);
+  // 加载用户的包裹列表；silent 时不触发全屏 loading，用于商家端定时轮询
+  const loadUserPackages = useCallback(
+    async (opts?: { silent?: boolean }): Promise<any[] | null> => {
+      const silent = !!opts?.silent;
+      if (!currentUser?.id) {
+        if (!silent) {
+          setLoading(false);
+        }
+        return null;
+      }
 
-      // 🚀 新增：获取已评价的订单ID列表
-      if (packages.length > 0) {
-        const { data: reviews } = await supabase
-          .from('store_reviews')
-          .select('order_id')
-          .eq('user_id', currentUser.id);
-        
-        if (reviews) {
-          setReviewedOrderIds(new Set(reviews.map(r => r.order_id)));
+      if (!silent) {
+        setLoading(true);
+      }
+      try {
+        const queryStartDate = undefined;
+
+        const packages = await packageService.getPackagesByUser(
+          currentUser.email,
+          currentUser.phone,
+          queryStartDate,
+          isPartnerStore ? (currentUser.store_id || currentUser.id) : undefined,
+          currentUser.id,
+          isPartnerStore ? currentUser.name : undefined
+        );
+
+        setUserPackages(packages);
+
+        if (packages.length > 0) {
+          const { data: reviews } = await supabase
+            .from('store_reviews')
+            .select('order_id')
+            .eq('user_id', currentUser.id);
+
+          if (reviews) {
+            setReviewedOrderIds(new Set(reviews.map((r) => r.order_id)));
+          }
+        }
+        return packages;
+      } catch (error) {
+        LoggerService.error('加载包裹列表失败:', error);
+        setUserPackages([]);
+        return null;
+      } finally {
+        if (!silent) {
+          setLoading(false);
         }
       }
-    } catch (error) {
-      LoggerService.error('加载包裹列表失败:', error);
-      setUserPackages([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUser?.id, currentUser?.email, currentUser?.phone, currentUser?.name, currentUser?.store_id, isPartnerStore]);
+    },
+    [currentUser?.id, currentUser?.email, currentUser?.phone, currentUser?.name, currentUser?.store_id, isPartnerStore]
+  );
 
   useEffect(() => {
     setIsVisible(true);
@@ -944,64 +981,80 @@ const ProfilePage: React.FC = () => {
     }
   }, [isPartnerStore, loadStoreReviews]);
 
-  // 🚀 新增：商家订单实时监控逻辑
+  // 商家：定时静默刷新订单列表 + 待确认数量变化时语音提醒（不依赖 isVoiceEnabled 闭包，避免漏播、漏刷）
   useEffect(() => {
-    if (!isPartnerStore || !currentUser?.id) return;
+    if (!isPartnerStore || !currentUser?.id) {
+      merchantPendingVoicePrimedRef.current = false;
+      return;
+    }
+    merchantPendingVoicePrimedRef.current = false;
 
-    // 每 15 秒轮询一次新订单
-    const timer = setInterval(async () => {
-      try {
-        const storeId = currentUser.store_id || currentUser.id;
-        
-        // 🚀 修正：仅查询该商家的“待确认”订单（从商城进来的新订单）
-        const { count, error } = await supabase
-          .from('packages')
-          .select('id', { count: 'exact' })
-          .eq('delivery_store_id', storeId)
-          .eq('status', '待确认');
-
-        if (!error && count !== null) {
-          setPendingMerchantOrdersCount(count);
-
-          // 🚀 核心优化：检测到有待接单订单时，自动开启语音提醒功能
-          if (count > 0 && !isVoiceEnabled) {
-            console.log('🚨 检测到待确认订单，自动开启语音提醒状态');
-            setIsVoiceEnabled(true);
-          }
-
-          // 🚀 播报逻辑
-          if (count > 0 && isVoiceEnabled) {
-            const now = Date.now();
-            
-            // 情况1：有新订单进来（数量增加）
-            if (count > lastBroadcastCountRef.current) {
-              console.log('🚨 检测到新待确认订单!', count);
-              speakNotification('你有新的订单 请接单');
-              // 🚀 核心：自动刷新包裹列表，让新订单“弹出来”显示在卡片里
-              loadUserPackages();
-            } 
-            // 情况2：仍然有待确认订单，且距离上次播报超过 60 秒
-            else if (now - lastVoiceTimeRef.current >= 60000) {
-              console.log('📢 60秒周期性播报提醒...');
-              speakNotification('你有新的订单 请接单');
-            }
-          } 
-          // 🚀 核心逻辑：假如没有了 “待确认” 状态的订单，且之前是开启状态，则语音播报功能自动关闭
-          else if (count === 0 && isVoiceEnabled) {
-            console.log('✅ 所有订单已处理，自动关闭语音提醒');
-            setIsVoiceEnabled(false);
-            speakNotification(language === 'zh' ? '订单已全部接单 语音提醒已关闭' : 'All orders accepted, voice alert disabled');
-          }
-          
-          lastBroadcastCountRef.current = count;
-        }
-      } catch (err) {
-        console.error('监控商家订单失败:', err);
+    const getSpeechNewOrder = () => {
+      const lang = languageRef.current;
+      if (lang === 'en') {
+        return 'You have a new order. Please accept it.';
       }
-    }, 15000);
+      if (lang === 'my') {
+        return 'အော်ဒါအသစ်တစ်ခု ရောက်ရှိပါသည်။ အချိန်မီ လက်ခံပေးပါ။';
+      }
+      return '你有新的订单，请尽快接单';
+    };
 
-    return () => clearInterval(timer);
-  }, [isPartnerStore, currentUser?.id, currentUser?.store_id, isVoiceEnabled, language, loadUserPackages]);
+    const getSpeechStillPending = () => {
+      const lang = languageRef.current;
+      if (lang === 'en') {
+        return 'You still have orders waiting to be accepted.';
+      }
+      if (lang === 'my') {
+        return 'လက်ခံရန် စောင့်ဆိုင်း အော်ဒါတွေ အချို့ ရှိနေဆဲ ဖြစ်ပါတယ်။';
+      }
+      return '您仍有待接订单，请及时处理';
+    };
+
+    const tick = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      try {
+        const packages = await loadUserPackages({ silent: true });
+        if (!packages) {
+          return;
+        }
+        const count = packages.filter((p) => p.status === '待确认').length;
+        setPendingMerchantOrdersCount(count);
+        if (!merchantPendingVoicePrimedRef.current) {
+          lastBroadcastCountRef.current = count;
+          merchantPendingVoicePrimedRef.current = true;
+          return;
+        }
+        const prev = lastBroadcastCountRef.current;
+        if (count > prev) {
+          if (isVoiceEnabledRef.current) {
+            speakNotification(getSpeechNewOrder());
+          }
+        } else if (count > 0 && count === prev && isVoiceEnabledRef.current) {
+          if (Date.now() - lastVoiceTimeRef.current >= 60_000) {
+            speakNotification(getSpeechStillPending());
+          }
+        }
+        lastBroadcastCountRef.current = count;
+      } catch (err) {
+        LoggerService.error('商家订单轮询失败:', err);
+      }
+    };
+
+    const timer = window.setInterval(tick, 8_000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void tick();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [isPartnerStore, currentUser?.id, loadUserPackages]);
 
   // 查看代收款订单
   const handleViewCODOrders = async (settled?: boolean) => {
@@ -1283,14 +1336,23 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  // 🚀 新增：客户评价相关逻辑
-  const handleOpenReviewModal = (pkg: any) => {
+  // 客户评价
+  const handleOpenReviewModal = useCallback((pkg: any) => {
     setReviewOrder(pkg);
     setReviewRating(5);
+    setReviewCourierRating(5);
     setReviewComment('');
     setReviewImages([]);
     setShowReviewSubmitModal(true);
-  };
+  }, []);
+
+  const handleCloseReviewSubmitModal = useCallback(() => {
+    if (isSubmittingReview) return;
+    if (reviewOrder?.id) {
+      addDismissedReviewOrderIdWeb(reviewOrder.id);
+    }
+    setShowReviewSubmitModal(false);
+  }, [isSubmittingReview, reviewOrder]);
 
   const handleReviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1319,10 +1381,6 @@ const ProfilePage: React.FC = () => {
 
   const handleSubmitReview = async () => {
     if (!reviewOrder || !currentUser?.id) return;
-    if (!reviewComment.trim()) {
-      alert(language === 'zh' ? '请输入评价内容' : 'Please enter review comment');
-      return;
-    }
 
     try {
       setIsSubmittingReview(true);
@@ -1332,7 +1390,8 @@ const ProfilePage: React.FC = () => {
         user_id: currentUser.id,
         user_name: currentUser.name || 'User',
         rating: reviewRating,
-        comment: reviewComment,
+        courier_rating: reviewCourierRating,
+        comment: reviewComment.trim(),
         images: reviewImages,
         is_anonymous: false
       };
@@ -1361,6 +1420,58 @@ const ProfilePage: React.FC = () => {
       setIsSubmittingReview(false);
     }
   };
+
+  // 评价弹窗：根据 delivery_store_id 拉取店名
+  useEffect(() => {
+    if (!reviewOrder?.delivery_store_id) {
+      setReviewStoreName('');
+      return;
+    }
+    let cancelled = false;
+    void supabase
+      .from('delivery_stores')
+      .select('store_name')
+      .eq('id', reviewOrder.delivery_store_id)
+      .maybeSingle()
+      .then(({ data, error: _e }) => {
+        if (cancelled) return;
+        setReviewStoreName((data as { store_name?: string } | null)?.store_name || '');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reviewOrder?.id, reviewOrder?.delivery_store_id]);
+
+  // 个人中心：客户账号有待评价送达单时自动弹窗（关闭则不再自动打扰，仍可手动点「评价订单」）
+  useEffect(() => {
+    if (isPartnerStore || loading || !currentUser?.id) return;
+    if (userPackages.length === 0 || showReviewSubmitModal || isSubmittingReview) return;
+    const dismissed = getDismissedReviewOrderIdsWeb();
+    const candidate = pickUnratedDeliveredPackage(
+      userPackages,
+      reviewedOrderIds,
+      dismissed
+    );
+    if (!candidate) {
+      webReviewAutoOpenedForId.current = null;
+      return;
+    }
+    if (webReviewAutoOpenedForId.current === candidate.id) return;
+    webReviewAutoOpenedForId.current = candidate.id;
+    const t = window.setTimeout(() => {
+      handleOpenReviewModal(candidate);
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [
+    isPartnerStore,
+    loading,
+    currentUser?.id,
+    userPackages,
+    reviewedOrderIds,
+    showReviewSubmitModal,
+    isSubmittingReview,
+    handleOpenReviewModal,
+  ]);
 
   // 🚀 新增：商家接单功能
   // 🚀 新增：自动打印小票功能
@@ -2658,11 +2769,28 @@ const ProfilePage: React.FC = () => {
                         {/* 🚀 新增：语音播报开启按钮 */}
                         <button
                           onClick={() => {
-                            if (!isVoiceEnabled) {
-                              speakNotification('语音提醒功能已开启');
-                              alert(language === 'zh' ? '✅ 语音提醒已开启！当有“待确认”新订单时，系统将自动为您播放播报并刷新列表。' : 'Voice Alert Active! List will auto-refresh on new orders.');
+                            const next = !isVoiceEnabled;
+                            isVoiceEnabledRef.current = next;
+                            try {
+                              localStorage.setItem('ml-merchant-voice', next ? '1' : '0');
+                            } catch {
+                              /* empty */
                             }
-                            setIsVoiceEnabled(!isVoiceEnabled);
+                            if (next) {
+                              speakNotification(
+                                language === 'zh'
+                                  ? '语音提醒已开启'
+                                  : language === 'en'
+                                    ? 'Voice alerts enabled'
+                                    : 'အသံ သတိပေးမှု ဖွင့်ထားသည်'
+                              );
+                              alert(
+                                language === 'zh'
+                                  ? '✅ 语音提醒已开启！待确认新订单会语音提醒；订单列表约每 8 秒自动刷新。'
+                                  : 'Voice on. Pending orders are announced. The list auto-refreshes about every 8 seconds.'
+                              );
+                            }
+                            setIsVoiceEnabled(next);
                           }}
                           style={{
                             background: isVoiceEnabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)',
@@ -6141,7 +6269,7 @@ const ProfilePage: React.FC = () => {
           justifyContent: 'center',
           padding: '1rem'
         }}
-        onClick={() => !isSubmittingReview && setShowReviewSubmitModal(false)}
+        onClick={() => !isSubmittingReview && handleCloseReviewSubmitModal()}
         >
           <div style={{
             background: 'white',
@@ -6173,17 +6301,52 @@ const ProfilePage: React.FC = () => {
               </p>
               {!isSubmittingReview && (
                 <button 
-                  onClick={() => setShowReviewSubmitModal(false)}
+                  onClick={() => handleCloseReviewSubmitModal()}
                   style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(0,0,0,0.1)', border: 'none', width: '32px', height: '32px', borderRadius: '50%', color: 'white', cursor: 'pointer' }}
                 >✕</button>
               )}
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
-              {/* 星级评分 */}
-              <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div style={{
+                background: '#f8fafc',
+                borderRadius: '14px',
+                padding: '14px 16px',
+                marginBottom: '1.25rem',
+                border: '1px solid #e2e8f0',
+                textAlign: 'left'
+              }}>
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, marginBottom: 4, letterSpacing: 0.4 }}>
+                    {language === 'zh' ? '订单号' : 'Order no.'}
+                  </div>
+                  <div style={{ fontSize: '0.95rem', color: '#0f172a', fontWeight: 700, wordBreak: 'break-all' }}>
+                    {reviewOrder?.id || '—'}
+                  </div>
+                </div>
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, marginBottom: 4, letterSpacing: 0.4 }}>
+                    {language === 'zh' ? '商店' : 'Store'}
+                  </div>
+                  <div style={{ fontSize: '0.95rem', color: '#0f172a', fontWeight: 600 }}>
+                    {reviewStoreName || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, marginBottom: 4, letterSpacing: 0.4 }}>
+                    {language === 'zh' ? '配送骑手' : 'Courier'}
+                  </div>
+                  <div style={{ fontSize: '0.95rem', color: '#0f172a', fontWeight: 600 }}>
+                    {String(reviewOrder?.courier || '').trim()
+                      ? String(reviewOrder.courier)
+                      : (language === 'zh' ? '暂无' : 'N/A')}
+                  </div>
+                </div>
+              </div>
+              {/* 商家商品评分 */}
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                 <div style={{ color: '#475569', fontSize: '1rem', fontWeight: '700', marginBottom: '1rem' }}>
-                  {language === 'zh' ? '总体满意度' : 'Overall Satisfaction'}
+                  {language === 'zh' ? '商家商品' : 'Merchant & product'}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -6211,10 +6374,41 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
 
+              {/* 骑手配送评分 */}
+              <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <div style={{ color: '#475569', fontSize: '1rem', fontWeight: '700', marginBottom: '1rem' }}>
+                  {language === 'zh' ? '骑手配送服务' : 'Delivery / courier'}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span 
+                      key={`c-${star}`}
+                      onClick={() => setReviewCourierRating(star)}
+                      style={{ 
+                        fontSize: '2.5rem', 
+                        cursor: 'pointer',
+                        color: star <= reviewCourierRating ? '#3b82f6' : '#e2e8f0',
+                        transition: 'transform 0.2s ease',
+                        transform: star <= reviewCourierRating ? 'scale(1.1)' : 'scale(1)'
+                      }}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <div style={{ color: '#3b82f6', fontSize: '0.9rem', fontWeight: '800', marginTop: '0.5rem' }}>
+                  {reviewCourierRating === 5 ? (language === 'zh' ? '非常满意' : 'Excellent') :
+                   reviewCourierRating === 4 ? (language === 'zh' ? '满意' : 'Good') :
+                   reviewCourierRating === 3 ? (language === 'zh' ? '一般' : 'Average') :
+                   reviewCourierRating === 2 ? (language === 'zh' ? '不满意' : 'Poor') :
+                   (language === 'zh' ? '非常不满意' : 'Very Poor')}
+                </div>
+              </div>
+
               {/* 评价文字 */}
               <div style={{ marginBottom: '2rem' }}>
                 <label style={{ color: '#1e293b', fontSize: '1rem', fontWeight: '800', display: 'block', marginBottom: '0.75rem' }}>
-                  {language === 'zh' ? '您的评价' : 'Your Review'}
+                  {language === 'zh' ? '您的评价（选填）' : 'Your review (optional)'}
                 </label>
                 <textarea
                   value={reviewComment}
@@ -6292,18 +6486,18 @@ const ProfilePage: React.FC = () => {
             <div style={{ padding: '2rem', borderTop: '1px solid #f1f5f9' }}>
               <button
                 onClick={handleSubmitReview}
-                disabled={isSubmittingReview || !reviewComment.trim()}
+                disabled={isSubmittingReview}
                 style={{
                   width: '100%',
                   padding: '1.2rem',
                   borderRadius: '20px',
-                  background: isSubmittingReview || !reviewComment.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  background: isSubmittingReview ? '#cbd5e1' : 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
                   color: 'white',
                   border: 'none',
                   fontSize: '1.2rem',
                   fontWeight: '950',
-                  cursor: isSubmittingReview || !reviewComment.trim() ? 'not-allowed' : 'pointer',
-                  boxShadow: isSubmittingReview || !reviewComment.trim() ? 'none' : '0 10px 25px rgba(245, 158, 11, 0.3)',
+                  cursor: isSubmittingReview ? 'not-allowed' : 'pointer',
+                  boxShadow: isSubmittingReview ? 'none' : '0 10px 25px rgba(245, 158, 11, 0.3)',
                   transition: 'all 0.3s ease'
                 }}
               >

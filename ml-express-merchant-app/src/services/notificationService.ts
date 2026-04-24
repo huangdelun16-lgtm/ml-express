@@ -344,6 +344,23 @@ class NotificationService {
     }
   }
 
+  /** 用于「权限引导」：区分未决定 / 拒绝 / 已授权；不可用（如 Expo Go）时返回 unavailable */
+  public async getDetailedPermissionStatus(): Promise<
+    'granted' | 'denied' | 'undetermined' | 'unavailable'
+  > {
+    try {
+      const NotificationsModule = loadNotificationsModule();
+      if (!NotificationsModule) return 'unavailable';
+      const { status } = await NotificationsModule.getPermissionsAsync();
+      if (status === 'granted') return 'granted';
+      if (status === 'denied') return 'denied';
+      return 'undetermined';
+    } catch (error) {
+      LoggerService.error('getDetailedPermissionStatus', error);
+      return 'unavailable';
+    }
+  }
+
   // 请求通知权限
   public async requestPermissions(): Promise<boolean> {
     try {

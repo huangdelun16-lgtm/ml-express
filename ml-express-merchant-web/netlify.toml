@@ -1,9 +1,14 @@
 # =============================================================================
-# 商家端 Web（mlexpress.merchants.com 等）
-# -----------------------------------------------------------------------------
-# Netlify：Base directory = ml-express-merchant-web
-# 环境变量：REACT_APP_SUPABASE_*、REACT_APP_GOOGLE_MAPS_API_KEY 及 netlify/functions 密钥
-# CLI（在本目录下）：npm run deploy:netlify（若 package.json 中已配置 site id）
+# 商家端 Web（ml-express-merchant-web）— Netlify
+#
+# 若仓库为 monorepo：在 Netlify → Site → Site configuration → Build & deploy
+#   · Base directory: ml-express-merchant-web
+#   · Build command: 可留空（使用本文件）或同下方 command
+#   · Publish directory: build（与 Base 搭配时为 ml-express-merchant-web/build 由 Netlify 自动处理）
+#
+# 环境变量：见本目录 .env.example（含 Functions 用密钥，在 Netlify 后台设置，不要提交到 Git）
+# CLI 生产发布（需已登录 netlify login，且 site id 与团队一致）：
+#   cd ml-express-merchant-web && npm run deploy:netlify
 # =============================================================================
 [build]
   command = "npm install --legacy-peer-deps && CI=false npm run build"
@@ -11,9 +16,8 @@
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
-  # 🚀 尝试强制跳过可能导致问题的插件安装
   NETLIFY_SKIP_PLUGINS = "true"
 
 # 勿用 releases/latest：若最新 Release 未附带 ml-express-merchants.apk 会 404。

@@ -94,6 +94,8 @@ export interface Package {
   delivery_distance?: number;
   customer_rating?: number;
   customer_comment?: string;
+  /** 骑手配送服务评分 1-5，与 store_reviews.courier_rating 同步 */
+  courier_service_rating?: number;
   rating_time?: string;
   payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
   cod_amount?: number; // 代收款金额
@@ -109,6 +111,8 @@ export interface StoreReview {
   user_id: string;
   user_name: string;
   rating: number;
+  /** 骑手配送服务评分 1-5 */
+  courier_rating?: number;
   comment: string;
   images: string[];
   reply_text?: string;
@@ -1354,7 +1358,7 @@ export const packageService = {
   },
 
   // 评价订单
-  async rateOrder(orderId: string, customerId: string, rating: number, comment?: string) {
+  async rateOrder(orderId: string, customerId: string, rating: number, comment?: string, courierRating?: number) {
     try {
       // 1. 检查订单状态和所有者
       const { data: order, error: checkError } = await supabase
@@ -1385,15 +1389,16 @@ export const packageService = {
       }
 
       // 3. 添加评价
-      const { error } = await supabase
-        .from('packages')
-        .update({ 
-          customer_rating: rating,
-          customer_comment: comment || '',
-          rating_time: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
+      const payload: Record<string, string | number> = {
+        customer_rating: rating,
+        customer_comment: comment || '',
+        rating_time: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      if (typeof courierRating === 'number' && courierRating >= 1 && courierRating <= 5) {
+        payload.courier_service_rating = courierRating;
+      }
+      const { error } = await supabase.from('packages').update(payload).eq('id', orderId);
 
       if (error) throw error;
       return { success: true, message: '评价成功' };
@@ -1991,21 +1996,94 @@ export const merchantService = {
 
 // 评价服务
 export const reviewService = {
-  // 提交评价
+  // 提交评价（若线上库未执行 migration 无 courier_rating 列，会自动去掉该字段重试一次）
   async createReview(reviewData: Omit<StoreReview, 'id' | 'created_at' | 'updated_at' | 'status'>) {
+    const ts = new Date().toISOString();
+    const row: Record<string, unknown> = {
+      ...reviewData,
+      status: 'published' as const,
+      created_at: ts,
+      updated_at: ts
+    };
+    const noCourier = (o: StoreReview) => {
+      const { courier_rating: _c, ...rest } = o as StoreReview;
+      return rest;
+    };
+
+    const trySyncPackage = async (withCourier: boolean) => {
+      if (!reviewData.order_id) return;
+      const now = new Date().toISOString();
+      const base = {
+        customer_rating: reviewData.rating,
+        customer_comment: reviewData.comment ?? '',
+        rating_time: now,
+        updated_at: now
+      } as Record<string, unknown>;
+      if (withCourier) {
+        base.courier_service_rating = reviewData.courier_rating ?? null;
+      }
+      const { error: pkgErr } = await supabase
+        .from('packages')
+        .update(base)
+        .eq('id', reviewData.order_id);
+      if (
+        pkgErr &&
+        withCourier &&
+        String(pkgErr.message || '').toLowerCase().includes('courier_service_rating')
+      ) {
+        const { error: e2 } = await supabase
+          .from('packages')
+          .update({
+            customer_rating: reviewData.rating,
+            customer_comment: reviewData.comment ?? '',
+            rating_time: now,
+            updated_at: now
+          })
+          .eq('id', reviewData.order_id);
+        if (e2) {
+          LoggerService.error('评价已保存，同步订单评分失败:', e2);
+        }
+        return;
+      }
+      if (pkgErr) {
+        LoggerService.error('评价已保存，同步订单评分失败:', pkgErr);
+      }
+    };
+
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('store_reviews')
-        .insert([{
-          ...reviewData,
-          status: 'published',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
+        .insert([row])
         .select()
         .single();
 
+      if (
+        error &&
+        (String(error.message).includes('courier_rating') ||
+          String(error.message).toLowerCase().includes('schema cache'))
+      ) {
+        const fallbackRow: Record<string, unknown> = {
+          ...noCourier(reviewData as StoreReview),
+          status: 'published' as const,
+          created_at: ts,
+          updated_at: ts
+        };
+        ({ data, error } = await supabase
+          .from('store_reviews')
+          .insert([fallbackRow])
+          .select()
+          .single());
+        if (error) throw error;
+        if (data && reviewData.order_id) {
+          await trySyncPackage(false);
+        }
+        return { success: true, data, courierRatingSkipped: true as const };
+      }
+
       if (error) throw error;
+      if (data && reviewData.order_id) {
+        await trySyncPackage(true);
+      }
       return { success: true, data };
     } catch (error: any) {
       LoggerService.error('提交评价失败:', error?.message || '未知错误');

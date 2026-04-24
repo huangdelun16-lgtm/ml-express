@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline } from '@react-google-maps/api';
 import { packageService, supabase } from '../services/supabase';
 import NavigationBar from '../components/home/NavigationBar';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -18,6 +18,18 @@ if (!GOOGLE_MAPS_API_KEY) {
   LoggerService.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
 const GOOGLE_MAPS_LIBRARIES: any = ['places'];
+
+/** 与客户端 App「追踪订单」一致：优先使用库里的收货坐标，其次才对地址做地理编码 */
+function parseReceiverLatLng(pkg: { receiver_latitude?: number | null; receiver_longitude?: number | null } | null): { lat: number; lng: number } | null {
+  if (!pkg) return null;
+  const la = pkg.receiver_latitude;
+  const lo = pkg.receiver_longitude;
+  if (la == null || lo == null) return null;
+  const lat = Number(la);
+  const lng = Number(lo);
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+  return { lat, lng };
+}
 
 const TrackingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -51,7 +63,11 @@ const TrackingPage: React.FC = () => {
   const targetLocationRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心
+  const [mapCenter, setMapCenter] = useState({ lat: 16.8661, lng: 96.1951 }); // 仰光中心（无订单时的默认；有订单时以收货地为准）
+  /** 收货地/目的地在地图上的坐标 — 与 App 的 receiver_latitude / receiver_longitude 一致，勿与 mapCenter(曾被错误设为骑手位置) 混用 */
+  const [receiverMapPosition, setReceiverMapPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const boundsFitStateRef = useRef<{ id?: string; mode?: 'r' | 'rc' }>({});
   const [selectedMarker, setSelectedMarker] = useState<'package' | 'courier' | null>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]); // 🚀 新增：进行中的订单列表
   const [loadingActiveOrders, setLoadingActiveOrders] = useState(false); // 🚀 新增：加载状态
@@ -93,6 +109,70 @@ const TrackingPage: React.FC = () => {
       loadActiveOrders();
     }
   }, [currentUser, loadActiveOrders]);
+
+  /** 与 App 一致：从 receiver_latitude / receiver_longitude 或地址解析出「收货地」图钉，不随骑手位置变化 */
+  useEffect(() => {
+    if (!trackingResult) {
+      setReceiverMapPosition(null);
+      return;
+    }
+    const fromDb = parseReceiverLatLng(trackingResult);
+    if (fromDb) {
+      setReceiverMapPosition(fromDb);
+      setMapCenter(fromDb);
+      return;
+    }
+    if (!isMapLoaded || !window.google?.maps || !trackingResult.receiver_address) {
+      return;
+    }
+    let cancelled = false;
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: trackingResult.receiver_address }, (results, status) => {
+      if (cancelled) return;
+      if (status === 'OK' && results?.[0]) {
+        const loc = results[0].geometry.location;
+        const p = { lat: loc.lat(), lng: loc.lng() };
+        setReceiverMapPosition(p);
+        setMapCenter(p);
+      } else {
+        LoggerService.error('[TrackingPage] 收货地址地理编码失败:', status);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isMapLoaded,
+    trackingResult?.id,
+    trackingResult?.receiver_latitude,
+    trackingResult?.receiver_longitude,
+    trackingResult?.receiver_address
+  ]);
+
+  useEffect(() => {
+    boundsFitStateRef.current = {};
+  }, [trackingResult?.id]);
+
+  /** 首次展示：仅收货地时居中；出现骑手后一次性 fit 两端（不在此用骑手覆盖收货坐标） */
+  useEffect(() => {
+    if (!trackingResult) return;
+    const map = mapInstanceRef.current;
+    if (!map || !receiverMapPosition || !window.google?.maps) return;
+    const id = trackingResult?.id;
+    if (courierLocation) {
+      if (boundsFitStateRef.current.id === id && boundsFitStateRef.current.mode === 'rc') return;
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(receiverMapPosition);
+      bounds.extend(new window.google.maps.LatLng(courierLocation.lat, courierLocation.lng));
+      map.fitBounds(bounds, 64);
+      boundsFitStateRef.current = { id, mode: 'rc' };
+    } else {
+      if (boundsFitStateRef.current.id === id && boundsFitStateRef.current.mode === 'r') return;
+      map.setCenter(receiverMapPosition);
+      map.setZoom(14);
+      boundsFitStateRef.current = { id, mode: 'r' };
+    }
+  }, [receiverMapPosition, courierLocation, trackingResult?.id]);
 
   // 从本地存储加载用户信息
   const loadUserFromStorage = () => {
@@ -193,8 +273,7 @@ const TrackingPage: React.FC = () => {
               targetLocationRef.current = initialLoc;
               setAnimatedCourierLocation(initialLoc);
               setCourierLocation(initialLoc);
-              // 自动调整地图中心到骑手位置
-              setMapCenter({ lat: locData.latitude, lng: locData.longitude });
+              // 勿将 mapCenter 设为骑手位置，否则「包裹」标记会与收货地址不一致（与 App 端一致：目的地单独用 receiverMapPosition）
               
               // 启动动画循环
               if (!animationFrameRef.current) {
@@ -293,35 +372,20 @@ const TrackingPage: React.FC = () => {
         const isWaySide = pkg.package_type === '顺路递' || pkg.package_type === 'Eco Way' || pkg.package_type === 'တန်တန်လေးပို့';
         if (isWaySide) {
           alert(language === 'zh' ? '该订单类型暂不支持实时跟踪' : 'Live tracking is not available for this package type');
+          setTrackingResult(null);
+          setCourierLocation(null);
+          setAnimatedCourierLocation(null);
           setLoading(false);
           return;
         }
 
         setTrackingResult(pkg);
-        
-        // 解析收件地址的坐标（如果有）
-        // 这里使用 Geocoding API 获取地址坐标
-        if (pkg.receiver_address && isMapLoaded) {
-          try {
-            const geocoder = new window.google.maps.Geocoder();
-            const response = await geocoder.geocode({ address: pkg.receiver_address });
-            
-            if (response.results && response.results[0]) {
-              const location = response.results[0].geometry.location;
-              setMapCenter({ lat: location.lat(), lng: location.lng() });
-            }
-          } catch (error) {
-            LoggerService.error('地址解析失败:', error);
-          }
-        }
-        // 加载快递员位置
-        if (pkg.courier) {
-          // 由于已改为实时订阅，这里可以保持逻辑
-        }
+        // 收货地坐标由上方 useEffect 根据 receiver_latitude/receiver_longitude 或地理编码写入 receiverMapPosition（与客户端 App 一致）
       } else {
         alert(t.tracking.notFound);
         setTrackingResult(null);
         setCourierLocation(null);
+        setAnimatedCourierLocation(null);
       }
     } catch (error) {
       LoggerService.error('查询失败:', error);
@@ -709,6 +773,9 @@ const TrackingPage: React.FC = () => {
                         mapContainerStyle={{ width: '100%', height: '100%' }}
                         center={mapCenter}
                         zoom={13}
+                        onLoad={(map) => {
+                          mapInstanceRef.current = map;
+                        }}
                         options={{
                           zoomControl: true,
                           streetViewControl: false,
@@ -716,9 +783,10 @@ const TrackingPage: React.FC = () => {
                           fullscreenControl: true
                         }}
                       >
-                        {/* 包裹位置标记 */}
+                        {/* 收货地/包裹目的地 — 与 App 一致使用 receiver_* 坐标，不用 mapCenter（避免与骑手位置混淆） */}
+                        {receiverMapPosition && (
                         <Marker
-                          position={mapCenter}
+                          position={receiverMapPosition}
                           icon={{
                             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                               <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${getStatusColor(trackingResult.status)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -732,6 +800,21 @@ const TrackingPage: React.FC = () => {
                           }}
                           onClick={() => setSelectedMarker('package')}
                         />
+                        )}
+
+                        {receiverMapPosition && animatedCourierLocation && (
+                          <Polyline
+                            path={[
+                              { lat: receiverMapPosition.lat, lng: receiverMapPosition.lng },
+                              { lat: animatedCourierLocation.lat, lng: animatedCourierLocation.lng },
+                            ]}
+                            options={{
+                              strokeColor: '#667eea',
+                              strokeOpacity: 0.85,
+                              strokeWeight: 3,
+                            }}
+                          />
+                        )}
                         
                         {/* 快递员位置标记 (使用动画坐标实现平滑移动) */}
                         {animatedCourierLocation && (
@@ -754,9 +837,9 @@ const TrackingPage: React.FC = () => {
                         )}
 
                         {/* 包裹信息窗口 */}
-                        {selectedMarker === 'package' && (
+                        {selectedMarker === 'package' && receiverMapPosition && (
                           <InfoWindow
-                            position={mapCenter}
+                            position={receiverMapPosition}
                             onCloseClick={() => setSelectedMarker(null)}
                           >
                             <div style={{ padding: '0.5rem' }}>

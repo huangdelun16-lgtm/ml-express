@@ -1,253 +1,369 @@
-# MARKET LINK EXPRESS - AI 开发指南
+# MARKET LINK EXPRESS - AI 开发指南（架构全记录）
 
-本文档供 AI 与开发者快速理解**单仓多应用**的布局、技术栈、构建命令与 Netlify 部署约定。
+本文档供 AI 与开发者理解本**单仓多应用**仓库的**整体架构、五端关系、技术栈、目录职责、数据流、Netlify/Expo 部署约定**与**跨端业务概念**。
 
-**最后更新：2026 年 4 月 2 日**
-
----
-
-## 1. 仓库总览（单仓多包）
-
-| 路径 | 应用 | 技术栈 | 典型用途 |
-|------|------|--------|----------|
-| **仓库根目录** (`src/`) | 后台管理 Web（Admin） | Create React App 5 + React 18 + TypeScript + React Router 6 | 运营、财务、骑手调度、合伙店铺与待审商品等 |
-| `ml-express-client-web/` | 客户端 Web（C 端） | CRA 5 + React 18 + TypeScript + React Router 7 | 会员下单、商场逛店、追踪、法律页等 |
-| `ml-express-merchant-web/` | 商家端 Web（B 端） | 同上 | 商家登录后的经营台、订单、商品 |
-| `ml-express-client/` | 客户端 App | Expo ~54 + React Native | 会员移动端 |
-| `ml-express-merchant-app/` | 商家端 App | Expo ~54 + React Native | 商家移动端 |
-| `ml-express-mobile-app/` | 骑手端 App（package名 `market-link-express-mobile`） | Expo 54 + React Native | 骑手作业端 |
-
-**共享后端**：各端通过 **Supabase**（`@supabase/supabase-js`）访问数据库与存储；部分敏感能力经 **Netlify Functions**（Node）暴露，前端用 `REACT_APP_*` 或运行时配置调用。
+**最后更新：2026 年 4 月 2 日**（含架构章节整合）
 
 ---
 
-## 2. 五端联动架构（概念图）
+## 目录（快速定位）
+
+| 章节 | 内容 |
+|------|------|
+| §1 | 产品定位与五端 |
+| §2 | 系统架构（图）与数据流 |
+| §3 | 生产域名、Netlify 站点与 Base directory |
+| §4 | 仓库目录与包职责 |
+| §5 | 后端：Supabase、迁移、Serverless（Netlify / Supabase Edge） |
+| §6 | 各子项目内部结构（Admin / 三 Web / 三 App） |
+| §7 | 跨端共享逻辑与文件 |
+| §8 | 构建命令与本地开发 |
+| §9 | Netlify 通用约定与 Functions 清单 |
+| §10 | 路由与页面索引（Web） |
+| §11 | 核心页面与业务摘要 |
+| §12 | 开发与部署注意事项 |
+| §13 | Expo 商店版本号（EAS）— 必改文件 |
+| §14 | 仓库内相关文档索引 |
+
+---
+
+## 1. 产品定位与五端
+
+**MARKET LINK EXPRESS**（对客品牌名）是一套面向缅甸等地的**同城快递 / 物流**系统：用户下单、商家发单、平台运营与财务、骑手配送，共用 **Supabase** 中的订单与主数据。
+
+| 端 | 路径 | 技术栈 | 生产入口（Web）/ 形态（App） |
+|----|------|--------|------------------------------|
+| **Admin 运营后台** | 仓库**根** `src/` | CRA5 + React18 + TS + React Router6 | 域名见 **§3**；Netlify 根目录构建 |
+| **客户端 Web（C 端）** | `ml-express-client-web/` | CRA5 + React18 + TS + React Router7 | 会员、商城、追踪、法律页 |
+| **商家端 Web（B 端）** | `ml-express-merchant-web/` | 同上 | 商家经营台、订单、商品、立即下单等 |
+| **客户端 App** | `ml-express-client/` | Expo ~54、RN、已提交 `android`/`ios` | 应用商店；Deep Link 见该 App `App.tsx` |
+| **商家端 App** | `ml-express-merchant-app/` | 同上 | 商家移动：`ml-express-merchants://` |
+| **骑手端 App** | `ml-express-mobile-app/`（包名常写作 `market-link-express-mobile`） | Expo54、RN；多数无提交原生目录 | 骑手任务、地图、扫码；`ml-express-merchants://` 等为其他 scheme |
+
+**共享后端**：各端用 **`@supabase/supabase-js`** 直连 `packages` 等表与 Storage；**不宜放在前端的操作**经 **Netlify Functions**（Node，按站点分目录）或 **Supabase Edge Functions**（`supabase/functions/`，如 `ensure-courier-auth`）提供。
+
+---
+
+## 2. 系统架构与数据流
+
+```mermaid
+flowchart TB
+  subgraph clients [用户与商家]
+    CW[客户端 Web]
+    MW[商家端 Web]
+    CA[客户端 App]
+    MA[商家端 App]
+  end
+  subgraph ops [运营与骑手]
+    AW[Admin Web 根 src]
+    RA[骑手端 App]
+  end
+  subgraph data [云]
+    SB[(Supabase\nPostgres + Auth + Realtime + Storage)]
+  end
+  subgraph edge [可编程边界]
+    NF[Netlify Functions\n按站点分目录]
+    EF[Supabase Edge Functions]
+  end
+  CW --> SB
+  MW --> SB
+  CA --> SB
+  MA --> SB
+  AW --> SB
+  RA --> SB
+  CW --> NF
+  MW --> NF
+  AW --> NF
+  CA -.短信邮件等.-> NF
+  SB -.需服务端密钥.-> NF
+  RA -.需鉴权.-> EF
+```
+
+**数据流要点**：
+
+- 订单、用户、店铺、商品、财务等以 **Supabase 表**为唯一事实来源；多终端通过 **同一 anon key + RLS 策略**（以实际 Supabase 项目配置为准）访问。
+- **实时性**：各端可对 `packages` 等开 **Supabase Realtime** 频道（如骑手 App `GlobalOrderMonitor`、聊天未读等）。
+- **敏感能力**：短信/邮件验证码、管理密码、对账单、部分管理接口走 **Netlify Functions**；避免把 Twilio/邮件私钥写进 `REACT_APP_*` 以外的客户端 bundle（以各函数实现为准）。
+
+---
+
+## 3. 生产域名、Netlify 站点与 Base directory
+
+三个 **Web 生产站点相互独立**；在 Netlify 上必须各自绑定域名，且 **Git 的 Base directory 不可混用**。
+
+| 生产域名 | 本仓库构建目录 | Netlify `publish` | `deploy:netlify` 中的 site ID（`package.json`） |
+|----------|----------------|-------------------|-----------------------------------------------|
+| **https://market-link-express.com** | `ml-express-client-web` | `build` | `52f5f573-ca0a-4769-a8c7-e5f675764056` |
+| **https://mlexpress-merchants.com** | `ml-express-merchant-web` | `build` | `126af2b9-244f-47fd-9be9-58fb45b6e7a2` |
+| **https://admin-market-link-express.com** | **仓库根** | `build` | `ed9c2173-4031-4f10-a466-5b041dfe3511` |
+
+- **环境变量**（每站点在 Netlify Dashboard 分别配置）：常见 `REACT_APP_SUPABASE_URL`、`REACT_APP_SUPABASE_ANON_KEY`、`REACT_APP_GOOGLE_MAPS_API_KEY`；Admin 与 Functions 可能另有 Twilio/邮件等（见 `netlify/functions` 源码）。
+- **本地 CLI 易错点**：`netlify link` 会写 `.netlify/state.json`（通常 **gitignore**），在 monorepo 子目录 deploy 时若未带 `--site`，可能把代码推到**错误站点**。优先使用各目录 `npm run deploy:netlify`（已带 `--site`），或按目录分别 `netlify link --id <上表 ID>`。详见仓库根 `NETLIFY_DOMAIN_CONFIG.md`。
+- **构建命令**（三站 `netlify.toml` 中常见）：`npm install --legacy-peer-deps && CI=false npm run build`；`NODE_VERSION=18` 等见各文件。
+
+**旧版五端 ASCII 示意（保留）**：
 
 ```
 +-----------------------------------------------------------------+
-|              MARKET LINK EXPRESS 五端与后端关系（概念）            |
-+-----------------------------------------------------------------+
-|  客户端 Web (ml-express-client-web)     -> Netlify（C 端站点）   |
-|  商家端 Web (ml-express-merchant-web)   -> Netlify（商家站点）   |
-|  后台管理 Web（仓库根目录 src/）         -> Netlify（Admin 站点） |
-|  客户端 / 商家 / 骑手 App               -> Expo / 应用商店构建   |
-|  数据与文件：Supabase；短信/邮件等敏感能力：各站点 Netlify Fn   |
+|  客户端 Web (ml-express-client-web)     ->  market-link-express  |
+|  商家端 Web (ml-express-merchant-web)  ->  mlexpress-merchants   |
+|  Admin（仓库根 src/）                    ->  admin-market-link…   |
+|  客户端 / 商家 / 骑手 App                 ->  Expo / 商店         |
+|  数据：Supabase；部分敏感：Netlify Functions / Supabase Edge    |
 +-----------------------------------------------------------------+
 ```
 
 ---
 
-## 3. 构建命令与本地开发（npm scripts）
+## 4. 仓库目录与包职责
 
-以下命令均在**对应目录**执行（根目录与各子项目各自有独立的 `package.json`）。
+```
+ml-express/                          # 本仓库根 = Admin Web
+├── package.json                     # 根：Admin
+├── src/                              # Admin 全部前端源码
+│   ├── App.tsx, index.tsx
+│   ├── pages/                        # 后台各业务页
+│   ├── components/, hooks/, services/, contexts/
+│   └── api/                          # 如 couriers
+├── public/
+├── netlify/                          # 根站点的 Functions
+│   └── functions/
+├── netlify.toml
+├── supabase/                         # 仓库级：迁移与 Edge
+│   ├── migrations/*.sql
+│   └── functions/                    # 如 ensure-courier-auth
+│
+├── ml-express-client-web/            # C 端 Web
+├── ml-express-merchant-web/          # B 端 Web
+│
+├── ml-express-client/                # C 端 App
+├── ml-express-merchant-app/          # 商家 App
+└── ml-express-mobile-app/            # 骑手 App
+```
 
-### 3.1 后台 Admin（仓库根目录）
+- **无** 共享的单一 `packages/` monorepo 库；各子项目**各自** `node_modules` 与 `package.json`。
+- **根目录** 与三子 Web 各自维护 **`netlify.toml`** 与（若存在）**`netlify/functions`**，勿复制混用。
+
+---
+
+## 5. 后端：Supabase、迁移与 Serverless
+
+| 类型 | 位置 | 说明 |
+|------|------|------|
+| **数据库** | Supabase 托管 Postgres | 业务表如 `packages`、`users`、店铺与商品、财务等；**以线上一致为准** |
+| **迁移文件** | `supabase/migrations/*.sql` | 版本化 schema 变更；发布前与线上一致性由团队流程保证 |
+| **Supabase Edge** | `supabase/functions/` 如 `ensure-courier-auth` | 与 riders / admin 联动的服务端逻辑，不在 CRA 中打包 |
+| **Netlify Functions** | 每 Web 子树 `netlify/functions/*.js` | 短信/邮件验证、对账单、admin 工具等，见 **§9** |
+
+客户端直连 Supabase 时，**`.env` / Netlify 环境变量** 中的 `REACT_APP_*` 在构建期注入；App 中多为 `expo-constants` / `app.config` 等。
+
+---
+
+## 6. 各子项目内部结构（索引级）
+
+### 6.1 Admin（仓库根 `src/`）
+
+- **入口**：`src/index.tsx` → `App.tsx`。
+- **页面**：`src/pages/*`（如 `AdminDashboard`、`CityPackages`、`FinanceManagement`、`DeliveryStoreManagement`、`UserManagement`、`RealTimeTracking`、`SystemSettings` 等）。
+- **服务**：`src/services/*`（`supabase.ts`、鉴权、短信、文件、错误处理等）；**`hooks/`** 含实时、节流等。
+- **权限**：`ProtectedRoute` + 角色/permission（见 `App.tsx` 路由表）。
+
+### 6.2 客户端 Web `ml-express-client-web/`
+
+- **入口**：`src/index.tsx` → `App.tsx`；大量路由 `React.lazy` + `Suspense`。
+- **大页**：`HomePage`、个人中心/商城/追踪/法律/删除账户等，见 `App.tsx`。
+- **会话**：`ClientWebMerchantSessionGuard` 防止 C 端与 **商家** 会话混用。
+
+### 6.3 商家端 Web `ml-express-merchant-web/`
+
+- **布局**：`MerchantLayout`、`Sidebar`；`LoginPage` 外均需登录且 `userType === 'merchant'`。
+- **主路由**：`/` → `ProfilePage`，`/products`，`/orders`（`TrackingPage` 等，以 `App.tsx` 为准）。
+
+### 6.4 客户端 App `ml-express-client/`
+
+- **导航**：`createNativeStackNavigator`；`Welcome` / `Main` / `MyOrders` / `OrderDetail` / `PlaceOrder` / `Profile` / 商城/购物车/地图等，见 `App.tsx`。
+- **服务**：`src/services/*`（`supabase`、`chatService`、`notificationService`、`AnalyticsService` 等）。
+- **全局**：`AppProvider`、`OrderAlertModal`、新订单待处理队列等。
+
+### 6.5 商家端 App `ml-express-merchant-app/`
+
+- 与客户端 App 结构类似，栈内为商家场景（`OrderAlertModal`、商品、我的订单、门店等），Deep Link 前缀 **`ml-express-merchants://`**。
+
+### 6.6 骑手端 `ml-express-mobile-app/`
+
+- **双角色 UI**：`App.tsx` 中根据 `userRole` 分 **Admin 端 Tab** 与 **Courier 端 Tab**（`CourierTabs`：首页、地图、扫码、我的等；Admin 有 Dashboard/财务等）。
+- **全局监控**：`GlobalOrderMonitor` 订阅 `packages` 表，新指派订单时语音+震动；**地图页** 另通过 `DeviceEventEmitter` 展示新单横幅等。
+- **路径**：`screens/` 含 `MapScreen`、`MyTasksScreen`、`PackageDetailScreen` 等；`services/` 与 `supabase` 封装订单、位置、通知。
+
+---
+
+## 7. 跨端共享逻辑与文件（仓库内可复用实现）
+
+| 领域 | 位置或约定 |
+|------|------------|
+| **订单状态归一** | 如 `ml-express-mobile-app/utils/packageStatusNormalize.ts` 与各端对 `packages.status` 的展示映射 |
+| **订单全链路文案（App）** | `ml-express-client/src/utils/orderJourney.ts`、`ml-express-merchant-app/src/utils/orderJourney.ts`：列表/详情的 `getJourneyCopy`、`getOrderListJourneyHint` |
+| **地图 / Google** | 各站 `REACT_APP_GOOGLE_MAPS_API_KEY` 与 **Google Cloud HTTP referrer** 中登记各生产域名（见历史 `CLIENT_WEB_MAPS_*.md`） |
+| **i18n** | Web：`LanguageContext`；App：`useApp` + `i18n` 工具，中/英/缅为主 |
+| **权限与通知引导（App）** | `NotificationSettingsScreen` + `NotificationService.getDetailedPermissionStatus` + `expo-location` |
+
+有业务变更时，需评估 **C/B/骑/管** 是否同步改展示或校验逻辑。
+
+---
+
+## 8. 构建命令与本地开发（npm scripts）
+
+以下命令均在**对应目录**执行（各子项目独立 `package.json`）。
+
+### 8.1 后台 Admin（仓库根目录）
 
 | 脚本 | 说明 |
 |------|------|
-| `npm start` | `react-scripts start`，开发服务器 |
-| `npm run build` | `CI=false react-scripts build`，产物目录 **`build/`** |
-| `npm test` | Jest（`react-scripts test`） |
-| `npm run deploy:netlify` | `netlify deploy --prod --build`（需在根目录已 `netlify link` 到 Admin 站点） |
+| `npm start` | `react-scripts start` |
+| `npm run build` | `CI=false react-scripts build` → `build/` |
+| `npm test` | Jest |
+| `npm run deploy:netlify` | `netlify deploy --prod --build --site ed9c2173-...`（见 `package.json`） |
 | `npm run build:netlify` | `netlify build` |
 
-依赖特点：`recharts`、`react-window`、`bcryptjs`、`sharp` 等偏后台与报表。
+### 8.2 客户端 Web / 商家端 Web
 
-### 3.2 客户端 Web（`ml-express-client-web`）
+`npm start` / `build` / `test` 标准 CRA；`deploy:netlify` 内联各自 **site id**（见 `package.json` 与 **§3**）。
 
-| 脚本 | 说明 |
-|------|------|
-| `npm start` / `npm run build` / `npm test` | 同 CRA 惯例，`build/` 为发布目录 |
-| `npm run deploy:netlify` | `netlify deploy --prod --build --site <client-site-id>`（具体 ID 见该目录 `package.json`） |
-
-额外依赖示例：`@sentry/react`、Google Maps、`jspdf`、`xlsx`、`qrcode`、`twilio`、`nodemailer`（与 Functions 配合时由服务端持有密钥）。
-
-### 3.3 商家端 Web（`ml-express-merchant-web`）
-
-与客户端 Web 相同模式：`start` / `build` / `test` / `deploy:netlify`（站点 ID 见该目录 `package.json`）。
-
-### 3.4 Expo 应用（`ml-express-client`、`ml-express-merchant-app`）
+### 8.3 Expo 应用（`ml-express-client`、`ml-express-merchant-app`）
 
 | 脚本 | 说明 |
 |------|------|
 | `npm start` | `expo start` |
-| `npm run start:offline` | `EXPO_OFFLINE=1 expo start --offline` |
-| `npm run android` / `npm run ios` | `expo run:android` / `expo run:ios` |
-| `npm run web` | `expo start --web` |
-| `npm run build:web` | `npx expo export --platform web` |
+| `npm run start:offline` | 离线调试用 |
+| `npm run android` / `ios` | `expo run:*`（Bare 工程） |
+| `npm run web` / `build:web` | Web 导出 |
 
-**版本号**：客户端 / 商家 App 在仓库里**带有已提交的 `android/`、`ios/`**（Bare 工作流），**商店构建以原生工程里的版本为准**；不要只看 `package.json`。发版时必须按 **§9** 同步修改所有列出的文件，否则 EAS 上仍会显示旧版本（例如只改 `app.json` 仍打出 `2.3.6 (58)`）。
+**版本号**：两 App 在仓库内**含** `android/`、`ios/`，**商店版本以原生工程为准**；发版见 **§13**。
 
-当前仓库内参考：客户端 App `package.json` 与原生多为 `2.4.0` / `59`，商家 App 多为 `2.2.0` / `5`；Expo SDK `~54`，React `19.1.x`，RN `0.81.x`。
+### 8.4 骑手端（`ml-express-mobile-app`）
 
-### 3.5 骑手端（`ml-express-mobile-app`）
-
-| 脚本 | 说明 |
-|------|------|
-| `npm start` | `expo start` |
-| `npm run android` / `npm run ios` | `expo run:android` / `expo run:ios` |
-| `npm run android:setup` | `./run-android.sh`（本地 Android 环境辅助） |
+`npm start`、`expo run:android/ios`；`run-android.sh` 等见该目录 `package.json`。
 
 ---
 
-## 4. Netlify：构建、发布目录与 Base directory
+## 9. Netlify：通用约定与 Functions 文件分布
 
-三个 Web 站点**各自独立**：根目录与各子项目下均有 `netlify.toml`，**不要混用 Base directory**。
+### 9.1 三 Web 共性
 
-### 4.1 通用约定（三个 Web 共性）
+- **Build**：`npm install --legacy-peer-deps && CI=false npm run build`；**Publish**：`build`。
+- **Functions**：**各自**子目录的 `netlify/functions`，勿与别站混用。
+- **SPA 回退**：`/*` → `/index.html`（200）。
+- **可选**：`NETLIFY_SKIP_PLUGINS=true`、缓存头、下载 APK 的 `/download` 重定向（各站 `netlify.toml` 略有差异，商家端有「勿用无附件的 `releases/latest`」的注释）。
 
-- **构建命令**（`netlify.toml`）：`npm install --legacy-peer-deps && CI=false npm run build`
-- **发布目录**：`build`
-- **Functions 目录**：各站点使用**自己目录下**的 `netlify/functions`（见下节）
-- **环境变量**（示例）：`NODE_VERSION=18`、`NETLIFY_SKIP_PLUGINS=true`；前端常用 `REACT_APP_SUPABASE_URL`、`REACT_APP_SUPABASE_ANON_KEY`、`REACT_APP_GOOGLE_MAPS_API_KEY`；Functions 另需 Twilio、邮件、管理密钥等（按函数实现配置）
-- **SPA**：`/*` → `/index.html`（200），保证 React Router 刷新可用
+### 9.2 Admin（`netlify/functions`）
 
-### 4.2 三站点对照
+`send-sms.js`、`verify-sms.js`、`send-email-code.js`、`verify-email-code.js`、`send-order-confirmation.js`、`upload-banner.js`、`admin-password.js`、`verify-admin.js`、`ensure-courier-auth.js`、`utils/cors.js` 等（以实际目录为准）。
 
-| 站点 | Base directory | Publish | Functions |
-|------|----------------|---------|-----------|
-| **Admin后台** | **仓库根**（留空，勿选子文件夹） | `build` | `netlify/functions` |
-| **客户端 Web** | `ml-express-client-web` | `build` | `ml-express-client-web/netlify/functions` |
-| **商家端 Web** | `ml-express-merchant-web` | `build` | `ml-express-merchant-web/netlify/functions` |
+### 9.3 客户端 Web / 商家端 Web
 
-**CLI 部署注意**：若在子目录执行 `netlify` 总连错站点，可在根目录 `netlify unlink` 后重新 `netlify link` 选择正确站点；或使用各包 `package.json` 里带 `--site <id>` 的 `deploy:netlify`。
+常见：`send-sms.js`、`verify-sms.js`、`send-email-code.js`、`verify-email-code.js`、**`send-statement.js`**（两站有）、`utils/cors.js`。
 
-**下载重定向**：客户端/商家 `netlify.toml` 中 `/download` 可重定向到 GitHub Release 的 APK；商家端注释说明勿用 `releases/latest` 除非保证附件存在，否则 404。
+生产 **短信/测试码** 行为以 `verify-sms` 等实现与注释为准，勿在客户端写死“万能码”业务逻辑（避免泄露策略）。
 
 ---
 
-## 5. Netlify Functions 文件分布
+## 10. 路由与前端结构索引
 
-### 5.1 Admin（根目录 `netlify/functions`）
+### 10.1 Admin（`src/App.tsx`）
 
-`send-sms.js`、`verify-sms.js`、`send-email-code.js`、`verify-email-code.js`、`send-order-confirmation.js`、`upload-banner.js`、`admin-password.js`、`verify-admin.js`、`ensure-courier-auth.js`、以及 `utils/cors.js`。
+- 公开 `/` → `/admin/login`；**受保护** 路由含 `/admin/dashboard`、`/admin/city-packages`、`/admin/users`、`/admin/finance`、`/admin/tracking`、`/admin/realtime-tracking`、`/admin/settings`、`/admin/system-settings`、`/admin/accounts`、`/admin/banners`、`/admin/delivery-stores`、`/admin/supervision`、`/admin/delivery-alerts`、`/admin/recharges` 等，带角色与 `permissionId` 见源码。
 
-### 5.2 客户端 Web / 商家端 Web（各自 `netlify/functions`）
+### 10.2 客户端 Web
 
-两站点均包含：`send-sms.js`、`verify-sms.js`、`send-email-code.js`、`verify-email-code.js`、`send-statement.js`、`utils/cors.js`。
+- 路由见 `ml-express-client-web/src/App.tsx`：`HomePage`、`/mall`、`/cart`、`/profile`、`/tracking`、政策页等；懒加载 + `Suspense`。
 
-**说明**：Admin 与 C/B 端的短信校验、万能测试码策略等以根目录与各 `netlify.toml` 注释及 `verify-sms` 实现为准（生产环境默认限制测试码等）。
+### 10.3 商家端 Web
 
----
-
-## 6. 路由与前端结构索引
-
-### 6.1 Admin（`src/App.tsx`）
-
-- 公开：`/` → 重定向 `/admin/login`，`/admin/login`
-- 受 `ProtectedRoute` 保护（角色如 `admin` / `manager` / `operator` / `finance`，部分带 `permissionId`）：
-  - `/admin/dashboard`
-  - `/admin/city-packages`（`city_packages`）
-  - `/admin/users`（`users`）
-  - `/admin/finance`（`finance`）
-  - `/admin/tracking`、`/admin/realtime-tracking`（`tracking`）
-  - `/admin/settings`、`/admin/system-settings`（`settings`）
-  - `/admin/accounts`（`settings`）
-  - `/admin/banners`（`banners`）
-  - `/admin/delivery-stores`（`merchant_stores`，含合伙店铺与待审商品相关能力）
-  - `/admin/supervision`
-  - `/admin/delivery-alerts`（`delivery_alerts`）
-  - `/admin/recharges`（`recharges`）
-
-主要页面文件位于 `src/pages/`（如 `AdminDashboard.tsx`、`DeliveryStoreManagement.tsx`、`FinanceManagement.tsx` 等）。
-
-### 6.2 客户端 Web（`ml-express-client-web/src/App.tsx`）
-
-- 首页同步加载；其余多路由 **`React.lazy` + `Suspense`**
-- 路由示例：`/`（`HomePage`）、`/login` → `Navigate` 回 `/`、`/services`、`/tracking`、`/contact`、`/privacy-policy`、`/terms-of-service`、`/profile`、`/delete-account`、`/mall`、`/mall/:storeId`、`/cart`
-- **`ClientWebMerchantSessionGuard`**：若本地会话为商家 `user_type === 'merchant'`，清除并刷新，**避免 C 端与商家端会话混用**
-
-### 6.3 商家端 Web（`ml-express-merchant-web/src/App.tsx`）
-
-- `/login`（`LoginPage`）
-- `/`（`ProfilePage`）、`/products`（`StoreProductsPage`）、`/orders`（`TrackingPage`），均由 `ProtectedRoute` + `MerchantLayout` 包裹；认证信息来自 `localStorage`（`ml-express-customer` + `userType === 'merchant'`）
+- `/login`；受保护 `ProfilePage`（常作首页）、`StoreProductsPage`、`TrackingPage`（订单），见 `ml-express-merchant-web/src/App.tsx`。
 
 ---
 
-## 7. 核心页面与业务逻辑（摘要）
+## 11. 核心页面与业务逻辑（摘要）
 
-### 7.1 商家端 Web 重点文件
+### 11.1 商家端 Web 重点
 
-- `ProfilePage.tsx`：经营统计、营业时间/休假、对账导出等
-- `TrackingPage.tsx`：订单列表与详情
-- `StoreProductsPage.tsx`：商品与库存
-- `components/Logo.tsx`：品牌展示规范
+- `ProfilePage.tsx`：体量大，含经营、休假、对账、立即下单相关逻辑；修改注意闭合与构建。
+- `TrackingPage.tsx`、`StoreProductsPage.tsx`：订单与商品。
 
-### 7.2 客户端 Web
+### 11.2 客户端 Web 重点
 
-- `PrivacyPolicyPage.tsx`、`TermsOfServicePage.tsx`：合规页面
-- 多语言：`contexts/LanguageContext.tsx`（中/英/缅等）
+- 合规与账户：`PrivacyPolicyPage`、`TermsOfServicePage`、`DeleteAccount` 等；语言 `LanguageContext`。
 
-### 7.3 跨端业务概念（与数据库字段相关）
+### 11.3 业务概念与库表（方向性）
 
-- **商家营业时间覆盖**：`manual_override_status` 等与 `operating_hours` 的配合
-- **休假**：`vacation_dates` 等，下单侧按日期禁用
-- **状态归一化**：现金/余额等展示与骑手、商家、客户一致
-- **财务**：订单完成产生对账记录；写入前过滤空字段以提高 Supabase 稳定性
+- **营业时间/休假/手工打烊**：`operating_hours`、`vacation_dates`、`manual_override_status` 等与下单页联动，以当前 schema 为准。
+- **支付展示**：`payment_method`、描述字段中的 `余额支付/现金` 等标签；**财务对账**在 Admin `FinanceManagement` 等与订单完成、骑手结清等流程相关。
+- **订单状态**：多终端需一致理解（待取件、配送中、已送达、异常等），避免仅改一方 UI。
 
 ---
 
-## 8. 开发与部署注意事项
+## 12. 开发与部署注意事项
 
-1. **大文件 JSX**：修改 `ProfilePage.tsx` 等巨型组件后，建议格式化并检查标签闭合，避免构建失败。
-2. **ESLint**：CRA 在开发时可能将部分规则打成 **warning**；若需临时跳过插件可用 `DISABLE_ESLINT_PLUGIN=true`（仅作权宜，长期应修警告）。
-3. **Netlify 插件**：`NETLIFY_SKIP_PLUGINS=true` 用于规避部分托管环境插件问题（以各 `netlify.toml` 为准）。
-4. **移动端**：发版前按 **§9** 核对版本号（客户端 / 商家须改原生文件；骑手端见该节说明）。
-5. **上架与合规**：隐私政策与客户站点路径一致（如 `https://market-link-express.com/privacy-policy`）；向商店提供可登录的测试账号说明。
-6. **可观测性（客户端 Web）**：可选 `REACT_APP_SENTRY_DSN`；`LoggerService` 在生产且存在 DSN 时可上报 WARN/ERROR 摘要。
-7. **Git安全**：远程 URL **不要**嵌入个人访问令牌；使用 SSH、`gh` 或系统凭据管理。
-8. **GitHub Release 与 `/download`**：确保重定向指向的 Release **确实包含**对应 APK 文件名。
+1. 巨型 `ProfilePage.tsx` 等改后运行 `build` 或 CI，避免未闭合标签。
+2. **ESLint**：CRA 可能仅 warning；长期应消除；临时可用 `DISABLE_ESLINT_PLUGIN=true`（不推荐长期）。
+3. **移动端发版**：**§13** 必读；**骑手端** 无提交原生时以 `app.json` 与 `eas.json` 的 `autoIncrement` 策略为准。
+4. **隐私与商店**：对外 URL 与 C 站一致（如 `https://market-link-express.com/privacy-policy`）。
+5. **Sentry**（部分 Web）：`REACT_APP_SENTRY_DSN` + 客户端 `LoggerService` 或 error service。
+6. **Git 安全**：不在远程 URL 中嵌入个人 token；用 SSH/凭据管理。
+7. **GitHub Release**：`/download` 若指向固定 APK 文件名，发版时附件必须存在（勿依赖空的 `latest` 附言）。
 
 ---
 
-## 9. Expo 应用商店版本号（EAS）：必须改哪些文件
+## 13. Expo 应用商店版本号（EAS）：必须改哪些文件
 
-### 9.1 为什么「只改了 app.json」在 EAS 上还是旧版本？
+### 13.1 为什么「只改了 app.json」在 EAS 上仍是旧版本？
 
-`ml-express-client` 与 `ml-express-merchant-app` 采用 **已提交到 Git 的 `ios/`、`android/` 原生目录**（`expo run:ios` / `expo run:android` 即用此工程）。**EAS Build 打 iOS / Android 商店包时，Xcode 与 Gradle 读取的是这些原生文件里的版本字段**，不会自动以 `app.json` 为唯一来源。若只更新 `app.json`（或只改 `package.json`）而未改 `build.gradle` / `project.pbxproj` / `Info.plist`，云端构建产物上的 **Marketing 版本号** 与 **Build 号 / versionCode** 会保持原样。
+`ml-express-client` 与 `ml-express-merchant-app` 含 **已提交的 `ios/`、`android/`**。EAS 打 iOS/Android **商店包** 时以 **Xcode/Gradle 内版本**为主；**仅**改 `app.json` 而原生未同步则列表仍可能显示旧 `Marketing Version` / `versionCode`。**`appVersionSource: local` 的 Bare 工程仍须多文件一致**。
 
-`eas.json` 中的 `"appVersionSource": "local"` 表示从本地配置读取应用版本策略，**在 Bare 工程下仍须与原生文件内容一致**，否则会出现「Git 有新提交，但 Expo 列表里仍是 2.3.6 (58)」的情况。
+### 13.2 客户端 App（`ml-express-client`）发版
 
-### 9.2 客户端 App（`ml-express-client`）发版检查清单
+| 顺序 | 文件 | 说明 |
+|------|------|------|
+| | `app.json` | `expo.version`、`ios.buildNumber`、`android.versionCode` 等 |
+| | `ios/.../Info.plist` | 若硬编码，与上同步 |
+| | `ios/.../project.pbxproj` | `MARKETING_VERSION`、`CURRENT_PROJECT_VERSION`（**Debug/Release 均可能有两处**） |
+| | `android/app/build.gradle` | `versionCode` / `versionName` |
+| | `package.json` | `version` 建议同步 |
 
-以下 **同一轮发版须全部改到同一组数字**（示例：版本名 `2.4.0`，iOS Build / Android versionCode `59`）：
-
-| 顺序 | 文件 | 字段 | 说明 |
-|------|------|------|------|
-| 1 | `ml-express-client/app.json` | `expo.version` | 用户可见版本名（如 `2.4.0`） |
-| 2 | 同上 | `expo.ios.buildNumber` | iOS 构建号（整数字符串，如 `"59"`） |
-| 3 | 同上 | `expo.android.versionCode` | Android `versionCode`（整数，如 `59`） |
-| 4 | 同上 | `expo.ios.infoPlist.CFBundleShortVersionString`、`CFBundleVersion` | 与上保持一致，避免本地 Info 与云端不一致 |
-| 5 | `ml-express-client/ios/MARKETLINKEXPRESS/Info.plist` | `CFBundleShortVersionString`、`CFBundleVersion` | **硬编码**字面量，须手动与 2.4.0 / 59 对齐 |
-| 6 | `ml-express-client/ios/MARKETLINKEXPRESS.xcodeproj/project.pbxproj` | `MARKETING_VERSION`、`CURRENT_PROJECT_VERSION` | **Debug / Release 两段**都要改（文件中各出现两次） |
-| 7 | `ml-express-client/android/app/build.gradle` | `defaultConfig.versionCode`、`versionName` | 商店 AAB 以此为准 |
-| 8 | `ml-express-client/package.json` | `version` | 与仓库、发版说明一致（可选但建议同步） |
-
-**自检（在项目根执行）：**
+**自检示例**（仓库根）：
 
 ```bash
 rg 'versionCode|versionName|MARKETING_VERSION|CURRENT_PROJECT_VERSION|CFBundleShortVersionString|CFBundleVersion|"version"' ml-express-client/app.json ml-express-client/package.json ml-express-client/android/app/build.gradle ml-express-client/ios -g '*.plist' -g '*.pbxproj'
 ```
 
-确认输出中不再出现旧的 `versionName` / `versionCode` / `CFBundleVersion` 组合。
+### 13.3 商家端 App（`ml-express-merchant-app`）
 
-### 9.3 商家端 App（`ml-express-merchant-app`）
+同原则：`android/app/build.gradle`、`ios` 工程 `pbxproj` / `Info.plist` 与 `app.json` 对齐。
 
-与客户端相同原则：除 `app.json`、`package.json` 外，必须同步修改：
+### 13.4 骑手端（`ml-express-mobile-app`）
 
-- `ml-express-merchant-app/android/app/build.gradle`（`versionCode`、`versionName`）
-- `ml-express-merchant-app/ios/.../project.pbxproj`（`MARKETING_VERSION`、`CURRENT_PROJECT_VERSION`，两处配置）
-- 若 `Info.plist` 内为固定字符串而非 `$(MARKETING_VERSION)`，也需同步修改
+若**无**提交 `android`/`ios`：以 **`app.json`** 的 `expo.version`、`ios.buildNumber`、`android.versionCode` 为主；`app.config.js` 通常合并 Key **不覆盖** 版本。`eas.json` 若 `production.autoIncrement: true` 可能云端自增，与本地期望不一致时改为 `false` 或按团队策略执行。若日后 `expo prebuild` 并提交原生目录，则与 **§13.2** 相同的多文件策略。
 
-### 9.4 骑手端 App（`ml-express-mobile-app`）
+### 13.5 发版后验证
 
-仓库内**无**提交的 `android/`、`ios/` 目录时，以 **`app.json`** 为主（`app.config.js` 仅合并地图 Key 等，**不覆盖** `version` / `buildNumber` / `versionCode`）：需同步 **`expo.version`**、**`ios.buildNumber`**（iOS 构建号 / `CFBundleVersion`）、**`android.versionCode`**（Play 须单调递增，勿随意改小）。**`eas.json` 的 `production.autoIncrement`** 若为 `true`，EAS 可能在云端自动递增构建号，导致与 `app.json` 不一致；若要固定发版号（例如一次打出 **2.2.1 (11)**），请保持 **`autoIncrement: false`**。若日后执行 `expo prebuild` 并提交原生目录，则改回与 **§9.2** 相同的多文件同步策略。
-
-### 9.5 改完后如何验证
-
-1. 本地 `git diff` 确认上述文件均已变更且已 **commit、push**（EAS 默认用远程仓库构建时，未推送的修改不会进云端）。
-2. 重新触发 `eas build`；在 Expo 网页 Builds 列表中确认新条目显示 **预期版本名与构建号** 后再下载 IPA / AAB。
+`git` 全量 `commit`+`push` 后再触发 EAS；在 **Expo Builds** 页确认**版本名与 build 号**再分发 IPA/AAB。
 
 ---
 
-*文档维护：随仓库结构变更请同步更新「构建命令」「Netlify 对照」「Functions 列表」「Expo 版本号文件清单」四节。*
+## 14. 仓库内相关文档索引
+
+| 文档 | 内容方向 |
+|------|----------|
+| `NETLIFY_DOMAIN_CONFIG.md` | 三站域名、Base directory、Netlify CLI、DNS |
+| `NETLIFY_DEPLOY_CHECKLIST.md` / `CLIENT_WEB_DEPLOYMENT_GUIDE.md` | 发布检查 |
+| `ENV_VAR_SETUP.md` / `NETLIFY_ENV_UPDATE_INSTRUCTIONS.md` | 环境变量 |
+| `CLIENT_WEB_MAPS_*.md` / `GOOGLE_MAPS_*.md` | 地图与 API Key 域名 |
+| `DEPLOYMENT_*.md` / `VERCEL_USAGE_SUMMARY.md` | 历史部署说明（部分为 Netlify 现状的交叉引用） |
+| `ml-express-mobile-app/docs/**` | 骑手端、登录、EAS 等 |
+| 各子项目 `README.md` | 子项目级说明（若有） |
+
+**维护约定**：子项目增删、换路由、增 Netlify 函数、换生产域名、换 Expo 策略时，**同步更新** 本文 **§1–§7、§3、§9、§10** 中对应表或段落。
+
+---
+
+*本文档为《MARKET LINK EXPRESS 单仓架构》的单一入口；与具体 PR 冲突时，以当前仓库内源码与 `netlify.toml` / `app.json` 为准。*

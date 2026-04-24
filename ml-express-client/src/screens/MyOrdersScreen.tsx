@@ -14,6 +14,13 @@ import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import PackingModal from '../components/PackingModal';
+import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
+import { useFocusEffect } from '@react-navigation/native';
+import {
+  getDismissedReviewOrderIds,
+  addDismissedReviewOrderId,
+  pickUnratedDeliveredOrder,
+} from '../utils/reviewPromptStorage';
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +43,7 @@ interface Order {
   price: string;
   delivery_speed?: string;
   courier?: string;
+  delivery_store_id?: string;
   created_at: string;
   pickup_time?: string;
   delivery_time?: string;
@@ -71,15 +79,26 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [packingOrderData, setPackingOrderData] = useState<Order | null>(null);
 
-  // 🚀 新增：评价管理状态
+  // 🚀 评价：已读 store_reviews 的订单；自动弹窗关闭时写入 reviewPromptStorage
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
   const [showReviewSubmitModal, setShowReviewSubmitModal] = useState(false);
   const [reviewOrder, setReviewOrder] = useState<any>(null);
   const [reviewRating, setReviewRating] = useState(5);
+  const [reviewCourierRating, setReviewCourierRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [isUploadingReviewImage, setIsUploadingReviewImage] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewStoreName, setReviewStoreName] = useState('');
+
+  const ordersRef = useRef(orders);
+  const reviewedRef = useRef(reviewedOrderIds);
+  const showReviewModalRef = useRef(showReviewSubmitModal);
+  const submittingRef = useRef(isSubmittingReview);
+  ordersRef.current = orders;
+  reviewedRef.current = reviewedOrderIds;
+  showReviewModalRef.current = showReviewSubmitModal;
+  submittingRef.current = isSubmittingReview;
 
   // 🚀 新增：聊天未读数状态
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
@@ -277,6 +296,55 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     }
   }, [route?.params?.filterStatus, selectedStatus]);
 
+  /** 有未评价的已送达/已完成单时，进入页面后自动弹评价（关闭=不再自动打扰，仍可从列表手动点「评价」） */
+  useFocusEffect(
+    useCallback(() => {
+      if (userType !== 'customer' || loading || !customerId) {
+        return () => {};
+      }
+      const t = setTimeout(() => {
+        void (async () => {
+          if (showReviewModalRef.current || submittingRef.current) return;
+          const dismissed = await getDismissedReviewOrderIds();
+          const candidate = pickUnratedDeliveredOrder(
+            ordersRef.current,
+            reviewedRef.current,
+            dismissed
+          );
+          if (!candidate) return;
+          setReviewOrder(candidate);
+          setReviewRating(5);
+          setReviewCourierRating(5);
+          setReviewComment('');
+          setReviewImages([]);
+          setShowReviewSubmitModal(true);
+        })();
+      }, 500);
+      return () => clearTimeout(t);
+    }, [userType, customerId, loading])
+  );
+
+  // 打开评价弹窗时解析店铺名（delivery_stores）
+  useEffect(() => {
+    if (!reviewOrder?.delivery_store_id) {
+      setReviewStoreName('');
+      return;
+    }
+    let cancelled = false;
+    void supabase
+      .from('delivery_stores')
+      .select('store_name')
+      .eq('id', reviewOrder.delivery_store_id)
+      .maybeSingle()
+      .then(({ data, error: _e }) => {
+        if (cancelled) return;
+        setReviewStoreName((data as { store_name?: string } | null)?.store_name || '');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reviewOrder?.id, reviewOrder?.delivery_store_id]);
+
   // 🚀 新增：实时监听所有订单的消息
   useEffect(() => {
     if (!customerId) return;
@@ -420,17 +488,19 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         }
       }
 
-      // 🚀 新增：获取已评价的订单ID列表
+      // 已写入 store_reviews 的订单
+      let nextReviewed = new Set<string>();
       if (data.length > 0) {
         const { data: reviews } = await supabase
           .from('store_reviews')
           .select('order_id')
           .eq('user_id', userId);
-        
         if (reviews) {
-          setReviewedOrderIds(new Set(reviews.map(r => r.order_id)));
+          nextReviewed = new Set(reviews.map((r) => r.order_id));
+          setReviewedOrderIds(nextReviewed);
         }
       }
+
     } catch (error: any) {
       errorService.handleError(error, { context: 'MyOrdersScreen.loadOrders' });
     } finally {
@@ -534,14 +604,23 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     navigation.navigate('OrderDetail', { orderId });
   };
 
-  // 🚀 新增：评价相关逻辑
+  // 🚀 评价相关
   const handleOpenReviewModal = (order: any) => {
     setReviewOrder(order);
     setReviewRating(5);
+    setReviewCourierRating(5);
     setReviewComment('');
     setReviewImages([]);
     setShowReviewSubmitModal(true);
   };
+
+  const handleCloseReviewModal = useCallback(async () => {
+    if (isSubmittingReview) return;
+    if (reviewOrder?.id) {
+      await addDismissedReviewOrderId(reviewOrder.id);
+    }
+    setShowReviewSubmitModal(false);
+  }, [isSubmittingReview, reviewOrder]);
 
   const handleReviewImagePick = async () => {
     if (reviewImages.length >= 6) {
@@ -592,10 +671,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   const handleSubmitReview = async () => {
     if (!reviewOrder || !customerId) return;
-    if (!reviewComment.trim()) {
-      Alert.alert(language === 'zh' ? '提示' : 'Alert', language === 'zh' ? '请输入评价内容' : 'Please enter review');
-      return;
-    }
 
     try {
       setIsSubmittingReview(true);
@@ -609,7 +684,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         user_id: customerId,
         user_name: user?.name || 'User',
         rating: reviewRating,
-        comment: reviewComment,
+        courier_rating: reviewCourierRating,
+        comment: reviewComment.trim(),
         images: reviewImages,
         is_anonymous: false
       };
@@ -617,6 +693,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       const result = await reviewService.createReview(reviewData);
       if (result.success) {
         showToast(language === 'zh' ? '评价提交成功' : 'Review submitted', 'success');
+        DeviceEventEmitter.emit('order_status_updated');
         
         // 更新已评价列表
         setReviewedOrderIds(prev => {
@@ -920,6 +997,15 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   <Text style={styles.orderStatusText}>{getStatusTranslation(order.status)}</Text>
                 </View>
               </View>
+              {(() => {
+                const appLang: AppLang =
+                  language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
+                return (
+                  <Text style={styles.orderJourneyHint} numberOfLines={2}>
+                    {getOrderListJourneyHint(order.status, appLang)}
+                  </Text>
+                );
+              })()}
 
               {/* 寄件人信息 */}
               <View style={styles.orderInfo}>
@@ -1109,7 +1195,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         visible={showReviewSubmitModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => !isSubmittingReview && setShowReviewSubmitModal(false)}
+        onRequestClose={() => {
+          if (!isSubmittingReview) void handleCloseReviewModal();
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -1120,15 +1208,47 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               <Text style={styles.modalTitle}>{language === 'zh' ? '评价订单' : 'Rate Order'}</Text>
               <TouchableOpacity 
                 style={styles.modalCloseButton}
-                onPress={() => setShowReviewSubmitModal(false)}
+                onPress={() => void handleCloseReviewModal()}
               >
                 <Ionicons name="close" size={24} color="white" />
               </TouchableOpacity>
             </LinearGradient>
 
             <ScrollView style={styles.modalBody}>
+              <View style={styles.reviewInfoCard}>
+                <View style={styles.reviewInfoBlock}>
+                  <Text style={styles.reviewInfoLabel}>
+                    {language === 'zh' ? '订单号' : 'Order no.'}
+                  </Text>
+                  <Text style={styles.reviewInfoValue} selectable>
+                    {reviewOrder?.id || '—'}
+                  </Text>
+                </View>
+                <View style={[styles.reviewInfoBlock, { marginTop: 10 }]}>
+                  <Text style={styles.reviewInfoLabel}>
+                    {language === 'zh' ? '商店' : 'Store'}
+                  </Text>
+                  <Text style={styles.reviewInfoValue} numberOfLines={3}>
+                    {reviewStoreName || '—'}
+                  </Text>
+                </View>
+                <View style={[styles.reviewInfoBlock, { marginTop: 10 }]}>
+                  <Text style={styles.reviewInfoLabel}>
+                    {language === 'zh' ? '配送骑手' : 'Courier'}
+                  </Text>
+                  <Text style={styles.reviewInfoValue} numberOfLines={3}>
+                    {reviewOrder?.courier?.trim()
+                      ? reviewOrder.courier
+                      : language === 'zh'
+                        ? '暂无'
+                        : 'N/A'}
+                  </Text>
+                </View>
+              </View>
               <View style={styles.ratingContainer}>
-                <Text style={styles.ratingLabel}>{language === 'zh' ? '点击星星评分' : 'Tap to Rate'}</Text>
+                <Text style={styles.ratingLabel}>
+                  {language === 'zh' ? '商家商品' : 'Merchant & product'}
+                </Text>
                 <View style={styles.starsRow}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
@@ -1149,8 +1269,32 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                 </Text>
               </View>
 
+              <View style={[styles.ratingContainer, { marginTop: 8 }]}>
+                <Text style={styles.ratingLabel}>
+                  {language === 'zh' ? '骑手配送服务' : 'Delivery / courier'}
+                </Text>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setReviewCourierRating(star)}>
+                      <Ionicons 
+                        name={star <= reviewCourierRating ? "star" : "star-outline"} 
+                        size={40} 
+                        color="#3b82f6" 
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.ratingText}>
+                  {reviewCourierRating === 5 ? (language === 'zh' ? '非常满意' : 'Excellent') :
+                   reviewCourierRating === 4 ? (language === 'zh' ? '满意' : 'Good') :
+                   reviewCourierRating === 3 ? (language === 'zh' ? '一般' : 'Average') :
+                   reviewCourierRating === 2 ? (language === 'zh' ? '不满意' : 'Poor') :
+                   (language === 'zh' ? '非常不满意' : 'Very Poor')}
+                </Text>
+              </View>
+
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{language === 'zh' ? '评价内容' : 'Comment'}</Text>
+                <Text style={styles.inputLabel}>{language === 'zh' ? '评价内容（选填）' : 'Comment (optional)'}</Text>
                 <TextInput
                   style={styles.textInput}
                   multiline
@@ -1220,6 +1364,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  content: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -1433,10 +1580,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 12,
+    marginBottom: 8,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+  },
+  orderJourneyHint: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 18,
+    marginBottom: 10,
   },
   orderHeaderLeft: {
     flexDirection: 'row',
@@ -1669,6 +1822,27 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+  },
+  reviewInfoCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  reviewInfoBlock: {},
+  reviewInfoLabel: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  reviewInfoValue: {
+    fontSize: 15,
+    color: '#0f172a',
+    fontWeight: '600',
+    lineHeight: 22,
   },
   ratingContainer: {
     alignItems: 'center',

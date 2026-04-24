@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Dimensions, Modal, TextInput, Linking, Image, Vibration, FlatList, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Dimensions, Modal, TextInput, Linking, Image, Vibration, FlatList, Platform, DeviceEventEmitter } from 'react-native';
 import { theme } from '../config/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,11 +10,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
 import ViewShot, { captureRef } from 'react-native-view-shot';
-import { packageService } from '../services/supabase';
+import { packageService, reviewService, supabase } from '../services/supabase';
+import { addDismissedReviewOrderId, getDismissedReviewOrderIds } from '../utils/reviewPromptStorage';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
+import { type AppLang, getJourneyCopy, getJourneyLabels } from '../utils/orderJourney';
 
 const { width } = Dimensions.get('window');
 
@@ -43,6 +45,8 @@ interface Order {
   delivery_time?: string;
   customer_rating?: number;
   customer_comment?: string;
+  courier_service_rating?: number;
+  delivery_store_id?: string;
   sender_code?: string;
   transfer_code?: string;
   store_receive_code?: string;
@@ -97,7 +101,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   // 评价相关
   const [showRateModal, setShowRateModal] = useState(false);
   const [rating, setRating] = useState(5);
+  const [courierRating, setCourierRating] = useState(5);
   const [comment, setComment] = useState('');
+  const rateAutoHandledRef = useRef(false);
+  const [rateModalStoreName, setRateModalStoreName] = useState('');
 
   // QR码模态框
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
@@ -149,6 +156,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       title: '订单详情',
       orderInfo: '订单信息',
       orderNumber: '订单号',
+      storeLabel: '商店',
+      courierLabel: '配送骑手',
       orderStatus: '订单状态',
       ordererIdentity: '下单人身份',
       orderTime: '下单时间',
@@ -187,6 +196,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       cancelFailed: '取消失败',
       rateTitle: '评价订单',
       rateLabel: '服务评分',
+      merchantProductRating: '商家商品',
+      courierServiceRating: '骑手配送服务',
       commentLabel: '评价内容（选填）',
       commentPlaceholder: '请输入您的评价...',
       submitRate: '提交评价',
@@ -210,6 +221,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       title: 'Order Details',
       orderInfo: 'Order Information',
       orderNumber: 'Order No.',
+      storeLabel: 'Store',
+      courierLabel: 'Courier',
       orderStatus: 'Status',
       ordererIdentity: 'Orderer Identity',
       orderTime: 'Order Time',
@@ -248,6 +261,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       cancelFailed: 'Cancel failed',
       rateTitle: 'Rate Order',
       rateLabel: 'Rating',
+      merchantProductRating: 'Merchant & product',
+      courierServiceRating: 'Delivery / courier',
       commentLabel: 'Comment (Optional)',
       commentPlaceholder: 'Enter your comment...',
       submitRate: 'Submit',
@@ -271,6 +286,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       title: 'အော်ဒါအသေးစိတ်',
       orderInfo: 'အော်ဒါအချက်အလက်',
       orderNumber: 'အော်ဒါနံပါတ်',
+      storeLabel: 'ဆိုင်',
+      courierLabel: 'ပို့ဆောင်သူ',
       orderStatus: 'အခြေအနေ',
       ordererIdentity: 'အော်ဒါတင်သူ အမျိုးအစား',
       orderTime: 'အော်ဒါအချိန်',
@@ -309,6 +326,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       cancelFailed: 'ပယ်ဖျက်မအောင်မြင်',
       rateTitle: 'အဆင့်သတ်မှတ်',
       rateLabel: 'ရမှတ်',
+      merchantProductRating: 'ကုန်ပစ္စည်း/ဆိုင်',
+      courierServiceRating: 'ပို့ဆောင်မှု',
       commentLabel: 'မှတ်ချက် (ရွေးချယ်)',
       commentPlaceholder: 'မှတ်ချက်ထည့်ပါ...',
       submitRate: 'တင်သွင်း',
@@ -360,6 +379,60 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       }
     };
   }, [orderId]);
+
+  useEffect(() => {
+    rateAutoHandledRef.current = false;
+  }, [orderId]);
+
+  // 已送达且未评：进入详情后自动弹评价（可关闭，关闭后同「我的订单」会写入「不再自动打扰」）
+  useEffect(() => {
+    if (!order) return;
+    if (order.status !== '已送达' || order.customer_rating) return;
+    if (rateAutoHandledRef.current) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    void (async () => {
+      const dismissed = await getDismissedReviewOrderIds();
+      if (!alive) return;
+      if (dismissed.has(orderId)) {
+        rateAutoHandledRef.current = true;
+        return;
+      }
+      timer = setTimeout(() => {
+        if (!alive) return;
+        if (rateAutoHandledRef.current) return;
+        rateAutoHandledRef.current = true;
+        setRating(5);
+        setCourierRating(5);
+        setComment('');
+        setShowRateModal(true);
+      }, 500);
+    })();
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [order, orderId]);
+
+  useEffect(() => {
+    if (!order?.delivery_store_id) {
+      setRateModalStoreName('');
+      return;
+    }
+    let alive = true;
+    void supabase
+      .from('delivery_stores')
+      .select('store_name')
+      .eq('id', order.delivery_store_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive) return;
+        setRateModalStoreName((data as { store_name?: string } | null)?.store_name || '');
+      });
+    return () => {
+      alive = false;
+    };
+  }, [order?.id, order?.delivery_store_id]);
 
   const loadChatMessages = async () => {
     const chatMsgs = await chatService.getOrderMessages(orderId);
@@ -496,26 +569,60 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   // 打开评价弹窗
   const handleOpenRateModal = () => {
+    rateAutoHandledRef.current = true;
+    setRating(5);
+    setCourierRating(5);
+    setComment('');
     setShowRateModal(true);
   };
 
-  // 提交评价
+  const handleCloseRateModal = useCallback(async () => {
+    await addDismissedReviewOrderId(orderId);
+    setShowRateModal(false);
+  }, [orderId]);
+
+  // 提交评价（商家商品 + 骑手配送，写入 store_reviews 并同步 packages）
   const handleSubmitRating = async () => {
-    if (rating === 0) {
-      Alert.alert('提示', '请选择评分');
+    if (!order || !customerId) return;
+    const customerIdFromDescription = order.description?.match(/\[客户ID: ([^\]]+)\]/)?.[1];
+    if (customerIdFromDescription !== customerId) {
+      Alert.alert('提示', language === 'zh' ? '无权操作此订单' : 'Not allowed');
+      return;
+    }
+    if (order.status !== '已送达') {
+      Alert.alert('提示', language === 'zh' ? '只有已送达的订单可以评价' : 'Only delivered orders can be rated');
       return;
     }
 
     showLoading();
-    const result = await packageService.rateOrder(orderId, customerId, rating, comment);
-    hideLoading();
-    
-    if (result.success) {
-      Alert.alert(t.rateSuccess, result.message);
-      setShowRateModal(false);
-      loadData(); // 重新加载数据
-    } else {
-      Alert.alert(t.rateFailed, result.message);
+    try {
+      const userData = await AsyncStorage.getItem('currentUser');
+      const user = userData ? JSON.parse(userData) : null;
+      const result = await reviewService.createReview({
+        store_id: order.delivery_store_id || '00000000-0000-0000-0000-000000000000',
+        order_id: orderId,
+        user_id: customerId,
+        user_name: user?.name || 'User',
+        rating,
+        courier_rating: courierRating,
+        comment: comment.trim(),
+        images: [],
+        is_anonymous: false,
+      });
+      hideLoading();
+
+      if (result.success) {
+        DeviceEventEmitter.emit('order_status_updated');
+        Alert.alert(t.rateSuccess, language === 'zh' ? '感谢您的评价' : 'Thank you for your feedback');
+        setShowRateModal(false);
+        loadData();
+      } else {
+        Alert.alert(t.rateFailed, language === 'zh' ? '请稍后再试' : 'Please try again');
+      }
+    } catch (error) {
+      hideLoading();
+      LoggerService.error('提交评价失败:', error);
+      Alert.alert(t.rateFailed, language === 'zh' ? '请稍后再试' : 'Please try again');
     }
   };
 
@@ -618,82 +725,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const senderPhone = (order.sender_phone || '').trim();
   const receiverPhone = (order.receiver_phone || '').trim();
 
-  const handleRate = async () => {
-    if (!order) return;
-    try {
-      const result = await packageService.rateOrder(orderId, customerId, rating, comment);
-      if (result.success) {
-        showToast(t.rateSuccess, 'success');
-        setShowRateModal(false);
-        // 重新加载数据
-        const data = await packageService.getOrderById(orderId);
-        if (data) setOrder(data);
-      } else {
-        showToast(result.message || t.rateFailed, 'error');
-      }
-    } catch (error) {
-      LoggerService.error('提交评价失败:', error);
-      showToast(t.rateFailed, 'error');
-    }
-  };
-
-  const renderRatingModal = () => (
-    <Modal visible={showRateModal} animationType="fade" transparent>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20, zIndex: 1000 }}>
-        <View style={{ backgroundColor: 'white', borderRadius: 20, padding: 24, ...theme.shadows.large }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: theme.colors.text.primary }}>{t.rateTitle}</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24 }}>
-            {[1, 2, 3, 4, 5].map(star => (
-              <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                <Ionicons 
-                  name={star <= rating ? "star" : "star-outline"} 
-                  size={42} 
-                  color={star <= rating ? "#fbbf24" : "#cbd5e1"} 
-                  style={{ marginHorizontal: 6 }}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TextInput
-            style={{ 
-              backgroundColor: '#f8fafc', 
-              borderRadius: 12, 
-              padding: 14, 
-              height: 120, 
-              textAlignVertical: 'top', 
-              marginBottom: 24,
-              borderWidth: 1,
-              borderColor: '#e2e8f0',
-              color: theme.colors.text.primary
-            }}
-            placeholder={t.commentPlaceholder}
-            placeholderTextColor="#94a3b8"
-            multiline
-            value={comment}
-            onChangeText={setComment}
-          />
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity 
-              style={{ flex: 1, padding: 15, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center' }}
-              onPress={() => setShowRateModal(false)}
-            >
-              <Text style={{ fontWeight: '600', color: '#64748b' }}>{t.close}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={{ flex: 2, padding: 15, borderRadius: 12, backgroundColor: theme.colors.primary.DEFAULT, alignItems: 'center' }}
-              onPress={handleRate}
-            >
-              <Text style={{ color: 'white', fontWeight: 'bold' }}>{t.submitRate}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-    return (
-      <View style={styles.container}>
-        {renderRatingModal()}
+  return (
+    <View style={styles.container}>
       {/* Toast通知 */}
       <Toast
         visible={toastVisible}
@@ -733,6 +766,83 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       </LinearGradient>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {(() => {
+          const appLang: AppLang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
+          const journey = getJourneyCopy(order.status, appLang);
+          const labels = getJourneyLabels(appLang);
+          const stepIdx = journey.activeStep;
+          const isComplete = (i: number) => stepIdx === 3 || (stepIdx >= 0 && stepIdx > i);
+          const isCurrent = (i: number) => i === stepIdx && stepIdx >= 0 && stepIdx < 3;
+          const titleJourney =
+            appLang === 'en' ? 'Order progress' : appLang === 'my' ? 'အော်ဒါတိုးတက်မှု' : '订单进度';
+          const trackLabel =
+            appLang === 'en' ? 'Live tracking' : appLang === 'my' ? 'တိုက်ရိုက်ပြမြေပုံ' : '实时追踪';
+          const chatLabel =
+            appLang === 'en' ? 'Chat' : appLang === 'my' ? 'ဆက်သွယ်ရန်' : '联系骑手';
+          return (
+            <View style={styles.journeyCard}>
+              <Text style={styles.journeyCardTitle}>📍 {titleJourney}</Text>
+              <View style={styles.journeyStepsRow}>
+                {labels.map((label, i) => (
+                  <View key={i} style={styles.journeyStepItem}>
+                    {isCurrent(i) ? (
+                      <View style={styles.journeyDotCurrentOuter}>
+                        <View style={styles.journeyDotCurrentInner} />
+                      </View>
+                    ) : (
+                      <View
+                        style={[styles.journeyDot, isComplete(i) && styles.journeyDotDone]}
+                      />
+                    )}
+                    <Text numberOfLines={2} style={styles.journeyStepLabel}>
+                      {label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View
+                style={[
+                  styles.journeyMessageBox,
+                  journey.variant === 'warning' && styles.journeyMessageWarn,
+                  journey.variant === 'success' && styles.journeyMessageOk,
+                  journey.variant === 'muted' && styles.journeyMessageMuted,
+                ]}
+              >
+                <Text style={styles.journeyHeadline}>{journey.headline}</Text>
+                <Text style={styles.journeyDetail}>{journey.detail}</Text>
+              </View>
+              <View style={styles.journeyActions}>
+                {journey.suggestTrack && order.status !== '已取消' && (
+                  <TouchableOpacity
+                    style={styles.journeyActionBtn}
+                    onPress={() => navigation.navigate('TrackOrder', { orderId: order.id })}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="map-outline" size={18} color="#fff" />
+                    <Text style={styles.journeyActionBtnText}>{trackLabel}</Text>
+                  </TouchableOpacity>
+                )}
+                {journey.suggestChat && order.courier && order.courier !== '待分配' && (
+                  <TouchableOpacity
+                    style={[styles.journeyActionBtn, styles.journeyActionBtnSecondary]}
+                    onPress={() => {
+                      setShowChatModal(true);
+                      loadChatMessages();
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons
+                      name="chatbubble-ellipses-outline"
+                      size={18}
+                      color={theme.colors.primary.DEFAULT}
+                    />
+                    <Text style={styles.journeyActionBtnTextSecondary}>{chatLabel}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })()}
         {/* 订单信息卡片 */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📋 {t.orderInfo}</Text>
@@ -1100,6 +1210,7 @@ return (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>⭐ {t.myRating}</Text>
             <View style={styles.ratingDisplay}>
+              <Text style={[styles.modalLabel, { marginBottom: 8, marginTop: 0 }]}>{t.merchantProductRating}</Text>
               <View style={styles.starsContainer}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Text key={star} style={styles.starDisplay}>
@@ -1107,6 +1218,18 @@ return (
                   </Text>
                 ))}
               </View>
+              {typeof order.courier_service_rating === 'number' && order.courier_service_rating >= 1 && (
+                <>
+                  <Text style={[styles.modalLabel, { marginBottom: 8, marginTop: 14 }]}>{t.courierServiceRating}</Text>
+                  <View style={styles.starsContainer}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Text key={`c-${star}`} style={styles.starDisplay}>
+                        {star <= order.courier_service_rating! ? '⭐' : '☆'}
+                      </Text>
+                    ))}
+                  </View>
+                </>
+              )}
               {order.customer_comment && (
                 <Text style={styles.commentDisplay}>{order.customer_comment}</Text>
               )}
@@ -1300,14 +1423,34 @@ return (
         visible={showRateModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowRateModal(false)}
+        onRequestClose={() => void handleCloseRateModal()}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{t.rateTitle}</Text>
 
-            {/* 星级评分 */}
-            <Text style={styles.modalLabel}>{t.rateLabel}</Text>
+            {order && (
+              <View style={styles.rateModalInfoCard}>
+                <Text style={styles.rateModalInfoMuted}>{t.orderNumber}</Text>
+                <Text style={styles.rateModalInfoStrong} selectable>
+                  {order.id}
+                </Text>
+                <Text style={[styles.rateModalInfoMuted, { marginTop: 10 }]}>{t.storeLabel}</Text>
+                <Text style={styles.rateModalInfoStrong} numberOfLines={3}>
+                  {rateModalStoreName || '—'}
+                </Text>
+                <Text style={[styles.rateModalInfoMuted, { marginTop: 10 }]}>{t.courierLabel}</Text>
+                <Text style={styles.rateModalInfoStrong} numberOfLines={3}>
+                  {order.courier?.trim()
+                    ? order.courier
+                    : language === 'zh'
+                      ? '暂无'
+                      : 'N/A'}
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.modalLabel}>{t.merchantProductRating}</Text>
             <View style={styles.starsContainer}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
@@ -1320,8 +1463,21 @@ return (
               ))}
             </View>
 
+            <Text style={[styles.modalLabel, { marginTop: 16 }]}>{t.courierServiceRating}</Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={`cr-${star}`}
+                  onPress={() => setCourierRating(star)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.star}>{star <= courierRating ? '⭐' : '☆'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             {/* 评价内容 */}
-            <Text style={styles.modalLabel}>{t.commentLabel}</Text>
+            <Text style={[styles.modalLabel, { marginTop: 12 }]}>{t.commentLabel}</Text>
             <TextInput
               style={styles.commentInput}
               placeholder={t.commentPlaceholder}
@@ -1336,7 +1492,7 @@ return (
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => setShowRateModal(false)}
+                onPress={() => void handleCloseRateModal()}
                 activeOpacity={0.7}
               >
                 <Text style={styles.modalButtonTextCancel}>{t.close}</Text>
@@ -1444,14 +1600,6 @@ return (
           </View>
         </View>
       </Modal>
-
-      <Toast
-        message={toastMessage}
-        type={toastType}
-        visible={toastVisible}
-        duration={3000}
-        onHide={() => setToastVisible(false)}
-      />
     </View>
   );
 }
@@ -1546,6 +1694,127 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+  },
+  journeyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  journeyCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 12,
+  },
+  journeyStepsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  journeyStepItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  journeyDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#e2e8f0',
+  },
+  journeyDotDone: {
+    backgroundColor: '#10b981',
+  },
+  journeyDotCurrentOuter: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: theme.colors.primary.DEFAULT,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  journeyDotCurrentInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.primary.DEFAULT,
+  },
+  journeyStepLabel: {
+    fontSize: 10,
+    color: '#64748b',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 12,
+  },
+  journeyMessageBox: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+  },
+  journeyMessageWarn: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fcd34d',
+  },
+  journeyMessageOk: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#6ee7b7',
+  },
+  journeyMessageMuted: {
+    backgroundColor: '#f1f5f9',
+  },
+  journeyHeadline: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 6,
+  },
+  journeyDetail: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+  },
+  journeyActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    marginHorizontal: -4,
+  },
+  journeyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginHorizontal: 4,
+    marginBottom: 8,
+    backgroundColor: theme.colors.primary.DEFAULT,
+    borderRadius: 12,
+  },
+  journeyActionBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+    marginLeft: 6,
+  },
+  journeyActionBtnSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: theme.colors.primary.DEFAULT,
+  },
+  journeyActionBtnTextSecondary: {
+    color: theme.colors.primary.DEFAULT,
+    fontWeight: '600',
+    fontSize: 15,
+    marginLeft: 6,
   },
   card: {
     backgroundColor: '#ffffff',
@@ -1692,17 +1961,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#0369a1',
   },
-  contactButton: {
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  contactButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
   trackingItem: {
     flexDirection: 'row',
     marginBottom: 20,
@@ -1814,8 +2072,28 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
+  },
+  rateModalInfoCard: {
+    alignSelf: 'stretch',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  rateModalInfoMuted: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  rateModalInfoStrong: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0f172a',
   },
   modalLabel: {
     fontSize: 16,

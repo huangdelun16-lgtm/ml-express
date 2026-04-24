@@ -2009,14 +2009,16 @@ const ProfilePage: React.FC = () => {
 
   const location = useLocation();
 
-  // 🚀 响应侧边栏触发立即下单
+  // 🚀 响应侧边栏触发立即下单（用 react-router 清理 state，避免 replaceState 与不稳定依赖导致死循环、触发浏览器安全限制）
   useEffect(() => {
-    if (location.state && (location.state as any).triggerOrder) {
-      handleOpenPlaceOrder();
-      // 清除 state 防止重复触发
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state, handleOpenPlaceOrder]);
+    const st = location.state as { triggerOrder?: boolean } | null;
+    if (!st?.triggerOrder) return;
+    handleOpenPlaceOrder();
+    navigate(`${location.pathname}${location.search || ""}`, {
+      replace: true,
+      state: null,
+    });
+  }, [location.state, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     const handleTriggerOrder = () => {

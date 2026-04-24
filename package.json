@@ -3,6 +3,9 @@
   "version": "2.2.4",
   "description": "MARKET LINK EXPRESS - 缅甸专业快递服务",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@react-google-maps/api": "^2.20.7",
     "@supabase/supabase-js": "^2.76.1",

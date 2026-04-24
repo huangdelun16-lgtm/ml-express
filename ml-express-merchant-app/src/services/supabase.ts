@@ -118,6 +118,7 @@ export interface StoreReview {
   user_id: string;
   user_name: string;
   rating: number;
+  courier_rating?: number;
   comment: string;
   images: string[];
   reply_text?: string;

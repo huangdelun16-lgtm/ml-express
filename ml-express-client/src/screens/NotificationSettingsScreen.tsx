@@ -1,19 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import LoggerService from '../services/LoggerService';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   Switch,
   Alert,
-  Dimensions
+  Dimensions,
+  Linking,
+  AppState,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import { useApp } from '../contexts/AppContext';
 import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
+import NotificationService from '../services/notificationService';
 
 const { width } = Dimensions.get('window');
 interface NotificationSettings {
@@ -42,6 +47,35 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
+
+  const [notifPerm, setNotifPerm] = useState<
+    'granted' | 'denied' | 'undetermined' | 'unavailable' | null
+  >(null);
+  const [locStatus, setLocStatus] = useState<Location.LocationPermissionResponse['status'] | 'unavailable' | null>(
+    null
+  );
+
+  const refreshSystemPermissions = useCallback(async () => {
+    const n = await NotificationService.getInstance().getDetailedPermissionStatus();
+    setNotifPerm(n);
+    try {
+      const r = await Location.getForegroundPermissionsAsync();
+      setLocStatus(r.status);
+    } catch (e) {
+      LoggerService.warn('getForegroundPermissionsAsync', e);
+      setLocStatus('unavailable');
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshSystemPermissions();
+      const sub = AppState.addEventListener('change', (s) => {
+        if (s === 'active') refreshSystemPermissions();
+      });
+      return () => sub.remove();
+    }, [refreshSystemPermissions])
+  );
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     setToastMessage(message);
     setToastType(type);
@@ -74,6 +108,18 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
       confirmReset: '确定要恢复默认设置吗？',
       cancel: '取消',
       confirm: '确定',
+      permSectionTitle: '系统权限与说明',
+      permSectionLead:
+        '下列为系统级权限。若已关闭，请点下方按钮在系统设置中开启，才能收到通知并正常使用定位相关功能（填地址、追踪等）。',
+      notifSystemLabel: '系统通知',
+      notifSystemWhy: '用于订单与配送状态提醒；关闭后可能收不到重要更新。',
+      locSystemLabel: '定位（前台）',
+      locSystemWhy: '用于选点填地址、地图与「实时追踪」中展示与骑手、包裹位置信息。',
+      openSystemSettings: '打开系统设置',
+      statusOn: '已允许',
+      statusOff: '已拒绝',
+      statusAsk: '未决定',
+      statusNA: '不可用',
     },
     en: {
       title: 'Notification Settings',
@@ -100,6 +146,18 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
       confirmReset: 'Are you sure you want to reset to default settings?',
       cancel: 'Cancel',
       confirm: 'Confirm',
+      permSectionTitle: 'System permissions',
+      permSectionLead:
+        'These are OS-level permissions. If disabled, use the button below to open system settings. Notifications and location are needed for order updates, address, and live tracking.',
+      notifSystemLabel: 'Notifications',
+      notifSystemWhy: 'For order and delivery status updates. You may miss important alerts if off.',
+      locSystemLabel: 'Location (while using)',
+      locSystemWhy: 'For address selection, map, and live tracking of courier/parcel position.',
+      openSystemSettings: 'Open system settings',
+      statusOn: 'Allowed',
+      statusOff: 'Denied',
+      statusAsk: 'Not determined',
+      statusNA: 'Unavailable',
     },
     my: {
       title: 'အသိပေးချက်ဆက်တင်များ',
@@ -126,10 +184,38 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
       confirmReset: 'မူလဆက်တင်များသို့ပြန်သွားရန်သေချာပါသလား?',
       cancel: 'မလုပ်တော့',
       confirm: 'သေချာပါတယ်',
+      permSectionTitle: 'စနစ်ခွင့်ပုဒ်နှင့်ရှင်းလင်းချက်',
+      permSectionLead:
+        'အောက်တွင်စနစ်အဆင့် ခွင့်ပုဒ်များ ပြထားသည်။ ပိတ်ထားပါက အောက်တွင်ခလုတ်နှင့်ဆက်တင်သို့ဖွင့်ပြီး အသိပေးချက်နှင့်တည်နေရာ အသုံးပြုမှုပုံမှန်ဖြစ်စေနိုင်သည်။',
+      notifSystemLabel: 'စနစ်အသိပေးချက်',
+      notifSystemWhy: 'အော်ဒါနှင့်ပို့ဆောင်မှုအတွက်။ ပိတ်ထားပါက အရေးကြီးအပ်ဒိတ်လက်မခံနိုင်ပါ။',
+      locSystemLabel: 'တည်နေရာ (ဖွင့်ထားစဉ်)',
+      locSystemWhy: 'လိပ်စာရွေးချယ်ခြင်း၊ မြေပုံနှင့်တိုက်ရိုက်ခြေရာကောက်ခြင်း။',
+      openSystemSettings: 'စနစ်ဆက်တင်ဖွင့်ရန်',
+      statusOn: 'ခွင့်ပြုပြီး',
+      statusOff: 'ငြင်းပယ်ခံရ',
+      statusAsk: 'မဆုံးဖြတ်ရသေး',
+      statusNA: 'မရနိုင်',
     },
   };
   
   const t = translations[language as keyof typeof translations];
+
+  const formatNotifStatus = (s: typeof notifPerm) => {
+    if (s == null) return '—';
+    if (s === 'granted') return t.statusOn;
+    if (s === 'denied') return t.statusOff;
+    if (s === 'undetermined') return t.statusAsk;
+    return t.statusNA;
+  };
+  const formatLocStatus = (s: typeof locStatus) => {
+    if (s == null) return '—';
+    if (s === 'unavailable') return t.statusNA;
+    if (s === 'granted') return t.statusOn;
+    if (s === 'denied') return t.statusOff;
+    return t.statusAsk;
+  };
+
   // 处理设置变更
   const handleSettingChange = (key: keyof NotificationSettings, value: boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -213,6 +299,31 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
         <View style={styles.headerRight} />
       </LinearGradient>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.permCard}>
+          <Text style={styles.permTitle}>{t.permSectionTitle}</Text>
+          <Text style={styles.permLead}>{t.permSectionLead}</Text>
+          <View style={styles.permRow}>
+            <View style={styles.permRowText}>
+              <Text style={styles.permLabel}>{t.notifSystemLabel}</Text>
+              <Text style={styles.permWhy}>{t.notifSystemWhy}</Text>
+            </View>
+            <Text style={styles.permBadge}>{formatNotifStatus(notifPerm)}</Text>
+          </View>
+          <View style={styles.permRow}>
+            <View style={styles.permRowText}>
+              <Text style={styles.permLabel}>{t.locSystemLabel}</Text>
+              <Text style={styles.permWhy}>{t.locSystemWhy}</Text>
+            </View>
+            <Text style={styles.permBadge}>{formatLocStatus(locStatus)}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.permSettingsBtn}
+            onPress={() => Linking.openSettings()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.permSettingsBtnText}>{t.openSystemSettings}</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.descriptionContainer}>
           <Text style={styles.description}>{t.description}</Text>
         </View>
@@ -291,6 +402,71 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 40,
+  },
+  permCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  permTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  permLead: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  permRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  permRowText: {
+    flex: 1,
+    marginRight: 8,
+  },
+  permLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  permWhy: {
+    fontSize: 12,
+    color: '#6b7280',
+    lineHeight: 17,
+  },
+  permBadge: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563eb',
+    maxWidth: 100,
+    textAlign: 'right',
+  },
+  permSettingsBtn: {
+    marginTop: 12,
+    backgroundColor: '#1e3a8a',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  permSettingsBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   descriptionContainer: {
     backgroundColor: '#ffffff',

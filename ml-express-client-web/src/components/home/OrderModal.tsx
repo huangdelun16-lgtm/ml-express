@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Logo from '../Logo';
 
 interface OrderModalProps {
@@ -103,6 +103,13 @@ const OrderModal: React.FC<OrderModalProps> = ({
 }) => {
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
+
+  // 价格估算内跑腿费仅现金：若此前为「余额」则纠偏（余额按键已禁用，不可点）
+  useEffect(() => {
+    if (showOrderForm && paymentMethod === "balance") {
+      setPaymentMethod("cash");
+    }
+  }, [showOrderForm, paymentMethod, setPaymentMethod]);
 
   if (!showOrderForm) return null;
 
@@ -1085,7 +1092,15 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '0.5rem' }}>
                       <button
                         type="button"
-                        onClick={() => setPaymentMethod('balance')}
+                        disabled
+                        title={
+                          language === 'zh'
+                            ? '暂不支持在此选择余额支付跑腿费'
+                            : language === 'en'
+                              ? 'Balance for delivery fee is not available here'
+                              : 'ဤနေရာတွင် ပို့ဆောင်ခကို လက်ကျန်ငွေဖြင့် ရွေးချယ်နိုင်မည်မဟုတ်ပါ'
+                        }
+                        onClick={(e) => e.preventDefault()}
                         style={{
                           flex: 1,
                           padding: '10px',
@@ -1093,12 +1108,12 @@ const OrderModal: React.FC<OrderModalProps> = ({
                           fontSize: '0.85rem',
                           fontWeight: '800',
                           border: '2px solid',
-                          borderColor: paymentMethod === 'balance' ? '#fbbf24' : 'rgba(255,255,255,0.15)',
-                          background: paymentMethod === 'balance' ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' : 'rgba(255,255,255,0.05)',
-                          color: paymentMethod === 'balance' ? '#1e293b' : 'white',
-                          cursor: 'pointer',
+                          borderColor: 'rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.06)',
+                          color: 'rgba(255,255,255,0.4)',
+                          cursor: 'not-allowed',
+                          opacity: 0.7,
                           transition: 'all 0.3s ease',
-                          boxShadow: paymentMethod === 'balance' ? '0 4px 15px rgba(251, 191, 36, 0.3)' : 'none'
                         }}
                       >
                         💳 {language === 'zh' ? '余额支付' : 'Balance'}

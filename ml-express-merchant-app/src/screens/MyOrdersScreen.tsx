@@ -14,6 +14,7 @@ import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import PackingModal from '../components/PackingModal';
+import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
 
 const { width } = Dimensions.get('window');
 
@@ -955,6 +956,15 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   <Text style={styles.orderStatusText}>{getStatusTranslation(order.status)}</Text>
                 </View>
               </View>
+              {(() => {
+                const appLang: AppLang =
+                  language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
+                return (
+                  <Text style={styles.orderJourneyHint} numberOfLines={2}>
+                    {getOrderListJourneyHint(order.status, appLang)}
+                  </Text>
+                );
+              })()}
 
               {/* 寄件人信息 */}
               <View style={styles.orderInfo}>
@@ -1260,6 +1270,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  content: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1472,10 +1485,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 12,
+    marginBottom: 8,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+  },
+  orderJourneyHint: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 18,
+    marginBottom: 10,
   },
   orderHeaderLeft: {
     flexDirection: 'row',

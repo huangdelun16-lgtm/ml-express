@@ -1,18 +1,43 @@
-# Netlify 域名配置指南
+# Netlify 域名与三站点配置
 
-## 当前项目状态
+> **以该表为准，避免把商家端推成管理后台、或把客户端推错站。**
 
-你有两个 Netlify 项目：
+| 生产域名 | 代码目录 | Netlify Site ID | `package.json` 中 `deploy:netlify` |
+|----------|----------|-------------------|-------------------------------------|
+| `https://market-link-express.com` | `ml-express-client-web` | `52f5f573-ca0a-4769-a8c7-e5f675764056` | `ml-express-client-web` |
+| `https://mlexpress-merchants.com` | `ml-express-merchant-web` | `126af2b9-244f-47fd-9be9-58fb45b6e7a2` | `ml-express-merchant-web` |
+| `https://admin-market-link-express.com` | 仓库**根目录** | `ed9c2173-4031-4f10-a466-5b041dfe3511` | 仓库**根** |
 
-1. **client-ml-express** (ID: 52f5f573-ca0a-4769-a8c7-e5f675764056)
-   - 当前 URL: https://client-ml-express.netlify.app
-   - 应该使用域名: `market-link-express.com` (客户端 Web)
-   - 构建目录: `ml-express-client-web`
+- 每个 Netlify 站点在 **Build settings** 里设置正确的 **Base directory**；三个自定义域名应分别挂在**三个**不同站点上，不要复用错。
+- 在子目录执行 `netlify deploy` 前，请 `netlify link --id <上表 ID>` 或使用各目录的 `npm run deploy:netlify`（已带 `--site`），否则会部署到**当前 link 的站点**。
 
-2. **market-link-express** (ID: ed9c2173-4031-4f10-a466-5b041dfe3511)
-   - 当前 URL: https://market-link-express.com
-   - 应该使用域名: `admin-market-link-express.com` (后台管理)
-   - 构建目录: 根目录
+---
+
+## 历史说明（两站点时代的命名）
+
+1. **client-ml-express** (ID: `52f5f573-ca0a-4769-a8c7-e5f675764056`)
+   - 自定义域名: `market-link-express.com`（客户端 Web）
+   - 构建目录: 必须为 **`ml-express-client-web`**
+
+2. **market-link-express** (ID: `ed9c2173-4031-4f10-a466-5b041dfe3511`)
+   - 自定义域名: `admin-market-link-express.com`（Admin 后台）
+   - 构建目录: 仓库根目录
+
+## 本机 Netlify CLI 与多子项目（易错点）
+
+`netlify link` 可能只把**一个** `siteId` 记在全局/父目录，导致在 `ml-express-merchant-web` 里 deploy 却推到 **admin** 站。
+
+在仓库内可按目录写入 **`.netlify/state.json`**（该目录在 `.gitignore` 中，需每人本地各一份或部署时用 `--site`）：
+
+| 目录 | `siteId` 文件内容 |
+|------|------------------|
+| 仓库根 `/` | `{"siteId":"ed9c2173-4031-4f10-a466-5b041dfe3511"}` |
+| `ml-express-client-web/` | `{"siteId":"52f5f573-ca0a-4769-a8c7-e5f675764056"}` |
+| `ml-express-merchant-web/` | `{"siteId":"126af2b9-244f-47fd-9be9-58fb45b6e7a2"}` |
+
+或在各目录执行：`npx netlify link --id <上表 ID>`。部署时优先使用各目录的 **`npm run deploy:netlify`**（已带 `--site`）。
+
+---
 
 ## 需要配置的步骤
 

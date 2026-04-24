@@ -1,17 +1,8 @@
 # =============================================================================
-# Admin 后台 Web（仓库根目录的 React 应用）
-# -----------------------------------------------------------------------------
-# Netlify 控制台：新建/已有站点 → Build settings
-#   Base directory : 留空（使用仓库根目录，勿选子文件夹）
-#   Build command  : npm install --legacy-peer-deps && CI=false npm run build
-#   Publish dir    : build
-#   Functions dir  : netlify/functions（见下方 [build] functions）
-# 环境变量（Site settings → Environment variables）示例：
-#   REACT_APP_SUPABASE_URL、REACT_APP_SUPABASE_ANON_KEY
-#   REACT_APP_GOOGLE_MAPS_API_KEY
-#   以及 netlify/functions 内 send-sms / send-email-code 等所需密钥
-# CLI 部署（在仓库根目录、且已 netlify link 到本 Admin 站点）：npm run deploy:netlify
-# 若 netlify 命令总跳到子项目：先 netlify unlink，再在仓库根目录 netlify link 选 Admin 站点
+# Admin Web（仓库根目录 React 应用；勿与 ml-express-merchant-web 等子目录站点混用）
+# Netlify：Base directory 留空；Build/Publish 可留空（由本文件指定）
+# 环境变量：根目录 .env.example；Functions 密钥见 netlify/functions/*.js
+# CLI：仓库根目录 npx netlify login && npm run deploy:netlify（site id 须与账号一致）
 # =============================================================================
 
 [build]
@@ -20,7 +11,8 @@
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
   NETLIFY_SKIP_PLUGINS = "true"
 
 # SPA重定向配置 - 解决React Router路由问题

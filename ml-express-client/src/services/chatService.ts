@@ -1,6 +1,19 @@
 import { supabase } from './supabase';
 import LoggerService from './LoggerService';
 
+/** 断网/代理不可达等场景下 Supabase 会抛网络类错误，不应按 ERROR 打日志以免触发 RN LogBox 红屏 */
+function isLikelyNetworkError(err: unknown): boolean {
+  if (err == null) return false;
+  const e = err as { message?: string; name?: string; details?: string };
+  const text = [e.message, e.details, e.name, typeof err === 'string' ? err : ''].filter(Boolean).join(' ');
+  if (!text) return false;
+  return (
+    text.includes('Network request failed') ||
+    text.includes('Failed to fetch') ||
+    text.includes('The Internet connection appears to be offline')
+  );
+}
+
 export interface ChatMessage {
   id: string;
   order_id: string;
@@ -57,7 +70,11 @@ export const chatService = {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      LoggerService.error('获取聊天记录失败:', error);
+      if (isLikelyNetworkError(error)) {
+        LoggerService.debug('获取聊天记录：网络暂不可用', error);
+      } else {
+        LoggerService.error('获取聊天记录失败:', error);
+      }
       return [];
     }
   },
@@ -100,7 +117,11 @@ export const chatService = {
       if (error) throw error;
       return true;
     } catch (error) {
-      LoggerService.error('标记消息已读失败:', error);
+      if (isLikelyNetworkError(error)) {
+        LoggerService.debug('标记消息已读：网络暂不可用', error);
+      } else {
+        LoggerService.error('标记消息已读失败:', error);
+      }
       return false;
     }
   },
@@ -119,7 +140,11 @@ export const chatService = {
       if (error) throw error;
       return count || 0;
     } catch (error) {
-      LoggerService.error('获取未read消息数失败:', error);
+      if (isLikelyNetworkError(error)) {
+        LoggerService.debug('获取未读消息数：网络暂不可用，返回 0', error);
+      } else {
+        LoggerService.error('获取未读消息数失败:', error);
+      }
       return 0;
     }
   }
