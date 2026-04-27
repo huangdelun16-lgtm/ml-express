@@ -30,6 +30,7 @@ import {
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 import { locationService } from '../services/locationService';
 import * as Location from 'expo-location';
+import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
 
 const { width } = Dimensions.get('window');
 
@@ -118,6 +119,25 @@ export default function ProfileScreen({ navigation }: any) {
     setTogglingOnline(true);
     try {
       if (next) {
+        if (!(await hasAcceptedLocationDisclosure())) {
+          Alert.alert(
+            language === 'zh' ? '需要先阅读位置说明' : language === 'my' ? 'တည်နေရာအကြောင်းကြားချက်လိုအပ်သည်' : 'Location notice required',
+            language === 'zh'
+              ? '请先打开「位置使用说明」并同意后，再开启在线接单。'
+              : language === 'my'
+                ? 'တည်နေရာအသုံးပြုမှု ဖတ်ပြီး သဘောတူမှ ပြီးနောက် အွန်လိုင်းဖွင့်ပါ။'
+                : 'Please open the in-app location disclosure, accept it, then turn online.',
+            [
+              {
+                text: language === 'zh' ? '去查看' : language === 'my' ? 'ဖွင့်မည်' : 'Open',
+                onPress: () => navigation.navigate('LocationDisclosure', { fromProfile: true }),
+              },
+              { text: t.cancel, style: 'cancel' },
+            ],
+          );
+          setTogglingOnline(false);
+          return;
+        }
         const perm = await Location.requestForegroundPermissionsAsync();
         if (perm.status !== 'granted') {
           if (!perm.canAskAgain) {
@@ -336,6 +356,17 @@ export default function ProfileScreen({ navigation }: any) {
       title: language === 'zh' ? '应用设置' : language === 'my' ? 'အက်ပ်ဆက်တင်များ' : 'App Settings', 
       subtitle: language === 'zh' ? '通知、定位等设置' : language === 'my' ? 'အကြောင်းကြားချက်များ၊ တည်နေရာဆက်တင်များ' : 'Notifications, location settings', 
       screen: 'Settings' 
+    },
+    {
+      icon: '📍',
+      title: language === 'zh' ? '位置使用说明' : language === 'my' ? 'တည်နေရာအသုံးပြုမှု' : 'Location notice',
+      subtitle:
+        language === 'zh'
+          ? '阅读并同意后再使用定位与在线功能'
+          : language === 'my'
+            ? 'တည်နေရာနှင့် အွန်လိုင်းမီကြိုဖတ်ပါ'
+            : 'Read before location & online features',
+      action: () => navigation.navigate('LocationDisclosure', { fromProfile: true }),
     },
     { 
       icon: '📖', 

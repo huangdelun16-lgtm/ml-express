@@ -3,6 +3,7 @@
 
 import * as Location from 'expo-location';
 import { supabase } from './supabase';
+import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 
 export interface GeofenceResult {
   isWithinRange: boolean;
@@ -90,7 +91,7 @@ class GeofenceService {
   async getCurrentLocation(): Promise<Location.LocationObject | null> {
     try {
       // 检查权限
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await requestForegroundPermissionsIfDisclosed();
       if (status !== 'granted') {
         console.error('位置权限未授予');
         return null;

@@ -3,6 +3,7 @@ import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { Platform, Alert } from 'react-native';
+import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
 
 const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
 
@@ -102,6 +103,9 @@ export const locationService = {
    */
   async startBackgroundTracking() {
     try {
+      if (!(await hasAcceptedLocationDisclosure())) {
+        return false;
+      }
       // 1. 检查前台权限
       const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
       if (foregroundStatus !== 'granted') {

@@ -26,7 +26,7 @@ import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import * as MediaLibrary from 'expo-media-library';
+import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -175,7 +175,7 @@ const MyTasksScreen: React.FC = () => {
     // 🚀 启动前台高精度定位监听，用于自动签到和送达判定
     let locationSubscription: any = null;
     const startLocationWatch = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await requestForegroundPermissionsIfDisclosed();
       if (status !== 'granted') return;
 
       locationSubscription = await Location.watchPositionAsync(

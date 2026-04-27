@@ -1,15 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
 import { useLanguage } from '../contexts/LanguageContext';
+
+/** 构建期注入：在 .env / Netlify 中配置各应用商店链接，未设置则不显示对应按钮 */
+function getPublicStoreEnv() {
+  return {
+    clientIos: (process.env.REACT_APP_CLIENT_APP_IOS_URL || '').trim(),
+    clientAndroid: (process.env.REACT_APP_CLIENT_APP_ANDROID_URL || '').trim(),
+    merchantIos: (process.env.REACT_APP_MERCHANT_APP_IOS_URL || '').trim(),
+    merchantAndroid: (process.env.REACT_APP_MERCHANT_APP_ANDROID_URL || '').trim(),
+    riderIos: (process.env.REACT_APP_RIDER_APP_IOS_URL || '').trim(),
+    riderAndroid: (process.env.REACT_APP_RIDER_APP_ANDROID_URL || '').trim(),
+  };
+}
 
 const ContactPage: React.FC = () => {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const [isVisible, setIsVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  
+  const storeEnv = useMemo(() => getPublicStoreEnv(), []);
+
   useEffect(() => {
     setIsVisible(true);
     loadUserFromStorage();
@@ -139,35 +152,67 @@ const ContactPage: React.FC = () => {
           }}>
             {[
               {
-                icon: '📲',
-                title: language === 'zh' ? '下载 Android APP' : language === 'en' ? 'Download Android App' : 'Android App ဒေါင်းလုဒ်လုပ်ရန်',
-                value: language === 'zh' ? '苹果手机可以在 App Store 下载 APP' : language === 'en' ? 'Apple users can download from App Store' : 'Apple ဖုန်းများအတွက် App Store တွင် ဒေါင်းလုဒ်လုပ်နိုင်ပါသည်',
+                icon: '📱',
+                title:
+                  language === 'zh'
+                    ? '客户端 App'
+                    : language === 'en'
+                      ? 'Customer App'
+                      : 'ဖောက်သည်အက်ပ်',
+                value:
+                  language === 'zh'
+                    ? '下单、查件、商城与账户；iPhone 与 Android 请从下方官方商店安装。'
+                    : language === 'en'
+                      ? 'Orders, tracking, mall & account. Install from App Store or Google Play below.'
+                      : 'အော်ဒါ၊ ခြေရာကောက်၊ မီနှင့် အကောင့် — App Store / Google Play မှ တရားဝင်ထည့်သွင်းပါ။',
                 color: '#38a169',
                 bgGradient: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
                 iconBg: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-                isDownload: true,
-                downloadUrl: 'https://market-link-express.com/download'
-              },
-              {
-                icon: '🛵',
-                title: language === 'zh' ? '下载骑手端 APK' : language === 'en' ? 'Download Courier APK' : 'Rider App ဒေါင်းလုဒ်လုပ်ရန်',
-                value: language === 'zh' ? '仅限 Android 骑手使用' : language === 'en' ? 'For Android couriers only' : 'Android Rider များအတွက်သာ',
-                color: '#3182ce',
-                bgGradient: 'linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)',
-                iconBg: 'linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)',
-                isDownload: true,
-                downloadUrl: 'https://market-link-express.com/download-rider'
+                isAppStores: true,
+                iosUrl: storeEnv.clientIos,
+                playUrl: storeEnv.clientAndroid,
               },
               {
                 icon: '🏪',
-                title: language === 'zh' ? '下载商家端 App' : language === 'en' ? 'Download Merchant App' : 'Merchant App ဒေါင်းလုဒ်လုပ်ရန်',
-                value: language === 'zh' ? '店铺经营、订单与商品管理' : language === 'en' ? 'Store operations, orders & inventory' : 'ဆိုင်လုပ်ငန်း၊ အော်ဒါနှင့် ကုန်ပစ္စည်းစီမံခန့်ခွဲမှု',
+                title:
+                  language === 'zh'
+                    ? '商家端 App'
+                    : language === 'en'
+                      ? 'Merchant App'
+                      : 'ကုန်သည်အက်ပ်',
+                value:
+                  language === 'zh'
+                    ? '店铺经营、订单与商品管理；请在 App Store 或 Google Play 下载。'
+                    : language === 'en'
+                      ? 'Store ops, orders & products. Get it on App Store or Google Play.'
+                      : 'ဆိုင်လုပ်ငန်း၊ အော်ဒါနှင့် ကုန်ပစ္စည်း — App Store / Google Play။',
                 color: '#9f7aea',
                 bgGradient: 'linear-gradient(135deg, #805ad5 0%, #b794f4 100%)',
                 iconBg: 'linear-gradient(135deg, #805ad5 0%, #b794f4 100%)',
-                isDownload: true,
-                downloadUrl: 'https://mlexpress-merchant.netlify.app/download',
-                downloadButtonText: language === 'zh' ? '立即下载' : language === 'en' ? 'Download Now' : 'ယခုဒေါင်းလုဒ်လုပ်မည်'
+                isAppStores: true,
+                iosUrl: storeEnv.merchantIos,
+                playUrl: storeEnv.merchantAndroid,
+              },
+              {
+                icon: '🛵',
+                title:
+                  language === 'zh'
+                    ? '骑手端 App'
+                    : language === 'en'
+                      ? 'Courier App'
+                      : 'ပို့ဆောင်သူအက်ပ်',
+                value:
+                  language === 'zh'
+                    ? '接单与配送；目前可在 App Store 下载（若提供 Google Play 链接将显示第二枚按钮）。'
+                    : language === 'en'
+                      ? 'Tasks & delivery. Available on the App Store; Google Play appears if configured.'
+                      : 'လုပ်ငန်းစဉ်နှင့် ပို့ဆောင်မှု — App Store မှ ဒေါင်းလုဒ်လုပ်နိုင်သည်။',
+                color: '#3182ce',
+                bgGradient: 'linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)',
+                iconBg: 'linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)',
+                isAppStores: true,
+                iosUrl: storeEnv.riderIos,
+                playUrl: storeEnv.riderAndroid,
               },
               {
                 icon: '📞',
@@ -319,28 +364,90 @@ const ContactPage: React.FC = () => {
                 </h3>
 
                 {/* 内容 */}
-                {contact.isDownload ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
-                    <button
-                      onClick={() => window.open(contact.downloadUrl || 'https://market-link-express.com/download', '_blank')}
+                {contact.isAppStores ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', width: '100%' }}>
+                    <div
                       style={{
-                        background: contact.bgGradient,
-                        color: 'white',
-                        border: 'none',
-                        padding: '0.8rem 1.5rem',
-                        borderRadius: '12px',
-                        fontWeight: '900',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                        transition: 'all 0.3s ease',
-                        fontSize: '1rem'
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.65rem',
+                        justifyContent: 'center',
+                        width: '100%',
                       }}
-                      onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                      onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
                     >
-                      {contact.downloadButtonText ?? (language === 'zh' ? '立即下载 APK' : language === 'en' ? 'Download APK' : 'APK ဒေါင်းလုဒ်လုပ်မည်')}
-                    </button>
-                    <p style={{ fontSize: '0.9rem', color: '#4a5568', fontWeight: '600', opacity: 0.8, lineHeight: '1.4' }}>
+                      {contact.iosUrl ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(contact.iosUrl, '_blank', 'noopener,noreferrer');
+                          }}
+                          style={{
+                            background: 'linear-gradient(135deg, #1c1c1e 0%, #3a3a3c 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.75rem 1.25rem',
+                            borderRadius: '12px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+                            fontSize: '0.95rem',
+                            minWidth: '140px',
+                          }}
+                        >
+                          {language === 'zh'
+                            ? 'App Store 下载'
+                            : language === 'en'
+                              ? 'App Store'
+                              : 'App Store'}
+                        </button>
+                      ) : null}
+                      {contact.playUrl ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(contact.playUrl, '_blank', 'noopener,noreferrer');
+                          }}
+                          style={{
+                            background: 'linear-gradient(135deg, #01875f 0%, #00a070 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.75rem 1.25rem',
+                            borderRadius: '12px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 14px rgba(1,135,95,0.35)',
+                            fontSize: '0.95rem',
+                            minWidth: '140px',
+                          }}
+                        >
+                          {language === 'zh'
+                            ? 'Google Play 下载'
+                            : language === 'en'
+                              ? 'Google Play'
+                              : 'Google Play'}
+                        </button>
+                      ) : null}
+                    </div>
+                    {!contact.iosUrl && !contact.playUrl ? (
+                      <p
+                        style={{
+                          fontSize: '0.88rem',
+                          color: '#718096',
+                          fontWeight: '600',
+                          lineHeight: '1.45',
+                          margin: 0,
+                        }}
+                      >
+                        {language === 'zh'
+                          ? '商店链接正在配置中，请稍后在 Netlify 环境变量中填写各 REACT_APP_*_URL 后重新发布站点。'
+                          : language === 'en'
+                            ? 'Store links are not configured yet. Add REACT_APP_* URLs in Netlify and redeploy.'
+                            : 'ဒေါင်းလုဒ်လင့်ခ်များ ပြုပြင်နေပါသည်။'}
+                      </p>
+                    ) : null}
+                    <p style={{ fontSize: '0.9rem', color: '#4a5568', fontWeight: '600', opacity: 0.88, lineHeight: '1.5', margin: 0 }}>
                       {contact.value}
                     </p>
                   </div>

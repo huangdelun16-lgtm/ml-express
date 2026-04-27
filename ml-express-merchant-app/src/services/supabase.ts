@@ -5,7 +5,9 @@ import LoggerService from "./../services/LoggerService";
 import NotificationService from "./notificationService";
 import { errorService } from "./ErrorService";
 import { retry } from "../utils/retry";
-import { getProductFeeMmkForPackage } from "../utils/parseMerchantProductFee";
+import {
+  getProductItemFeeMmkForPackage,
+} from "../utils/parseMerchantProductFee";
 
 type SupabaseExtra = { supabaseUrl?: string; supabaseAnonKey?: string };
 const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra) as SupabaseExtra | undefined;
@@ -1230,13 +1232,15 @@ export const packageService = {
     }
   },
 
-  // 营收：今日/昨日「已送达」订单量；全量已送达「商品费」汇总（非跑腿费 price）
+  // 营收：今日/昨日「已送达」单量；总（自然年 1/1 至今）/昨/本日「已送达」仅商品费（getProductItemFeeMmkForPackage，不含跑腿与 price）
   async getRevenueStats(userId: string, storeName?: string) {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      yearStart.setHours(0, 0, 0, 0);
 
       const buildQuery = (startDate?: Date, endDate?: Date) => {
         let query = supabase
@@ -1255,40 +1259,61 @@ export const packageService = {
         return query;
       };
 
-      const sumAndCount = (
+      const sumItemFee = (
         data: { cod_amount?: number | null; description?: string | null }[] | null,
       ) => {
         const rows = data || [];
-        const revenue = rows.reduce(
-          (sum, p) => sum + getProductFeeMmkForPackage(p),
+        return rows.reduce(
+          (sum, p) => sum + getProductItemFeeMmkForPackage(p),
           0,
         );
-        return { revenue, count: rows.length };
       };
 
-      const fetchStats = async (start?: Date, end?: Date) => {
+      const countRows = (
+        data: { cod_amount?: number | null; description?: string | null }[] | null,
+      ) => (data || []).length;
+
+      const fetchItemFee = async (start?: Date, end?: Date) => {
         const { data, error } = await buildQuery(start, end);
         if (error) throw error;
-        return sumAndCount(data);
+        return sumItemFee(data);
       };
 
-      const [todayRes, yesterdayRes, allDelivered] = await Promise.all([
-        fetchStats(today, new Date()),
-        fetchStats(yesterday, today),
-        fetchStats(),
+      const fetchCount = async (start?: Date, end?: Date) => {
+        const { data, error } = await buildQuery(start, end);
+        if (error) throw error;
+        return countRows(data);
+      };
+
+      const [
+        todayRevenue,
+        yesterdayRevenue,
+        revenueOneYear,
+        todayOrderCount,
+        yesterdayOrderCount,
+      ] = await Promise.all([
+        fetchItemFee(today, new Date()),
+        fetchItemFee(yesterday, today),
+        fetchItemFee(yearStart, undefined),
+        fetchCount(today, new Date()),
+        fetchCount(yesterday, today),
       ]);
 
       return {
-        todayOrderCount: todayRes.count,
-        yesterdayOrderCount: yesterdayRes.count,
-        totalRevenue: allDelivered.revenue,
+        todayOrderCount,
+        yesterdayOrderCount,
+        todayRevenue,
+        yesterdayRevenue,
+        revenueOneYear,
       };
     } catch (error) {
       LoggerService.error("获取营收统计失败:", error);
       return {
         todayOrderCount: 0,
         yesterdayOrderCount: 0,
-        totalRevenue: 0,
+        todayRevenue: 0,
+        yesterdayRevenue: 0,
+        revenueOneYear: 0,
       };
     }
   },

@@ -17,7 +17,7 @@ import NetInfo from '@react-native-community/netinfo';
 import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { Vibration } from 'react-native';
+import { Vibration, DeviceEventEmitter } from 'react-native';
 import { shouldAlertCourierOnNewAssignment } from './utils/packageStatusNormalize';
 import type { LanguageTexts } from './utils/i18n';
 import LoginScreen from './screens/LoginScreen';
@@ -38,6 +38,8 @@ import {
 } from './navigation/lazyScreens';
 import { SyncIndicator } from './components/SyncIndicator';
 import { RoleGuardScreen } from './components/RoleGuardScreen';
+import { hasAcceptedLocationDisclosure } from './utils/locationDisclosureStorage';
+import LocationDisclosureScreen from './screens/LocationDisclosureScreen';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -337,6 +339,11 @@ const GlobalOrderMonitor = () => {
 
               Vibration.vibrate([0, 800, 200, 800, 200, 800]);
 
+              DeviceEventEmitter.emit('courier_new_order_assigned', {
+                id: newPkg.id,
+                status: newPkg.status,
+              });
+
               try {
                 const voiceMsg = t.newOrderVoiceAnnouncement;
                 const speechLang =
@@ -429,6 +436,9 @@ function AppContent() {
 
         const checkTracking = async () => {
           try {
+            if (!(await hasAcceptedLocationDisclosure())) {
+              return;
+            }
             const courierId = await AsyncStorage.getItem('currentCourierId');
             const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
             if (courierId && onlinePref !== 'false') {
@@ -488,6 +498,10 @@ function AppContent() {
             }}
           >
             <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen
+              name="LocationDisclosure"
+              component={LocationDisclosureScreen}
+            />
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="PackageDetail" component={LazyPackageDetailScreen} />
             <Stack.Screen name="DeliveryHistory" component={LazyDeliveryHistoryScreen} />

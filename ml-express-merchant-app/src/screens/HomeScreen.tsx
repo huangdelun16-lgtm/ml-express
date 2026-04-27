@@ -39,7 +39,9 @@ interface MerchantStats {
   processing: number;
   delivering: number;
   completed: number;
-  totalRevenueMmk: number;
+  revenueOneYear: number;
+  yesterdayRevenue: number;
+  todayRevenue: number;
   urgent: number;
   standard: number;
   todayOrderCount: number;
@@ -58,7 +60,9 @@ export default function HomeScreen({ navigation }: any) {
     processing: 0,
     delivering: 0,
     completed: 0,
-    totalRevenueMmk: 0,
+    revenueOneYear: 0,
+    yesterdayRevenue: 0,
+    todayRevenue: 0,
     urgent: 0,
     standard: 0,
     todayOrderCount: 0,
@@ -76,7 +80,11 @@ export default function HomeScreen({ navigation }: any) {
       processingOrders: "打包中",
       deliveringOrders: "配送中",
       completedOrders: "已完成",
-      totalSales: "商品总营收 (MMK)",
+      revenueOneYear: "总营收",
+      revenueOneYearHint: "本年度（1/1 起）· 已送达 · MMK",
+      revenueYesterday: "昨日营收",
+      revenueToday: "今日营收",
+      revenueMmkHint: "已送达 · MMK",
       manageProducts: "商品管理",
       printerSettings: "打印设置",
       myOrders: "订单列表",
@@ -101,7 +109,11 @@ export default function HomeScreen({ navigation }: any) {
       processingOrders: "Packing",
       deliveringOrders: "In transit",
       completedOrders: "Completed",
-      totalSales: "Product Revenue (MMK)",
+      revenueOneYear: "Total revenue",
+      revenueOneYearHint: "YTD (Jan 1) · delivered · MMK",
+      revenueYesterday: "Yesterday",
+      revenueToday: "Today",
+      revenueMmkHint: "Delivered · MMK",
       manageProducts: "Products",
       printerSettings: "Printer",
       myOrders: "Orders",
@@ -126,7 +138,11 @@ export default function HomeScreen({ navigation }: any) {
       processingOrders: "ထုပ်ပိုးနေသည်",
       deliveringOrders: "ပို့ဆောင်နေသည်",
       completedOrders: "ပြီးစီးသည်",
-      totalSales: "ကုန်ပစ္စည်းဝင်ငွေ (MMK)",
+      revenueOneYear: "စုစုဝင်ငွေ (၁ နှစ်)",
+      revenueOneYearHint: "ယခုနှစ် ၁.၁ မှ · ပို့ဆောင်ပြီး · MMK",
+      revenueYesterday: "မနေ့က ဝင်ငွေ",
+      revenueToday: "ယနေ့ ဝင်ငွေ",
+      revenueMmkHint: "ပို့ဆောင်ပြီး · MMK",
       manageProducts: "ကုန်ပစ္စည်းများ",
       printerSettings: "ပရင်တာ",
       myOrders: "အော်ဒါများ",
@@ -179,7 +195,9 @@ export default function HomeScreen({ navigation }: any) {
         processing: orderData.processing || 0,
         delivering: orderData.delivering ?? 0,
         completed: orderData.delivered || 0,
-        totalRevenueMmk: revenueData.totalRevenue ?? 0,
+        revenueOneYear: revenueData.revenueOneYear ?? 0,
+        yesterdayRevenue: revenueData.yesterdayRevenue ?? 0,
+        todayRevenue: revenueData.todayRevenue ?? 0,
         urgent: orderData.urgent || 0,
         standard: orderData.standard || 0,
         todayOrderCount: revenueData.todayOrderCount ?? 0,
@@ -417,18 +435,79 @@ export default function HomeScreen({ navigation }: any) {
             </View>
           </View>
 
-          <View style={styles.salesCard}>
-            <LinearGradient
-              colors={["#1e3a8a", "#1e40af"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.salesGradient}
-            >
-              <Text style={styles.salesLabel}>{currentT.totalSales}</Text>
-              <Text style={styles.salesValue}>
-                {stats.totalRevenueMmk.toLocaleString()}
-              </Text>
-            </LinearGradient>
+          <View style={styles.revenueCardsColumn}>
+            <View style={styles.revenueCard}>
+              <LinearGradient
+                colors={["#1e3a8a", "#1e40af"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.revenueCardGradient}
+              >
+                <View style={styles.revenueCardTextCol}>
+                  <Text style={styles.revenueCardLabel}>
+                    {currentT.revenueOneYear}
+                  </Text>
+                  <Text style={styles.revenueCardHint}>
+                    {currentT.revenueOneYearHint}
+                  </Text>
+                </View>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={styles.revenueCardValue}
+                >
+                  {stats.revenueOneYear.toLocaleString()}
+                </Text>
+              </LinearGradient>
+            </View>
+            <View style={styles.revenueCard}>
+              <LinearGradient
+                colors={["#0f766e", "#0d9488"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.revenueCardGradient}
+              >
+                <View style={styles.revenueCardTextCol}>
+                  <Text style={styles.revenueCardLabel}>
+                    {currentT.revenueYesterday}
+                  </Text>
+                  <Text style={styles.revenueCardHint}>
+                    {currentT.revenueMmkHint}
+                  </Text>
+                </View>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={styles.revenueCardValue}
+                >
+                  {stats.yesterdayRevenue.toLocaleString()}
+                </Text>
+              </LinearGradient>
+            </View>
+            <View style={styles.revenueCard}>
+              <LinearGradient
+                colors={["#b45309", "#d97706"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.revenueCardGradient}
+              >
+                <View style={styles.revenueCardTextCol}>
+                  <Text style={styles.revenueCardLabel}>
+                    {currentT.revenueToday}
+                  </Text>
+                  <Text style={styles.revenueCardHint}>
+                    {currentT.revenueMmkHint}
+                  </Text>
+                </View>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={styles.revenueCardValue}
+                >
+                  {stats.todayRevenue.toLocaleString()}
+                </Text>
+              </LinearGradient>
+            </View>
           </View>
         </View>
 
@@ -607,27 +686,50 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
-  salesCard: {
+  revenueCardsColumn: {
     marginTop: 12,
+    gap: 10,
+  },
+  revenueCard: {
     borderRadius: 16,
     overflow: "hidden",
     elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
-  salesGradient: {
-    padding: 20,
+  revenueCardGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    minHeight: 72,
+    gap: 10,
   },
-  salesLabel: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 14,
-    fontWeight: "600",
+  revenueCardTextCol: {
+    flex: 1,
+    minWidth: 0,
   },
-  salesValue: {
+  revenueCardLabel: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  revenueCardHint: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 10,
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  revenueCardValue: {
     color: "#fff",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "900",
+    flexShrink: 0,
+    maxWidth: "48%",
+    textAlign: "right",
   },
   quickActions: {
     flexDirection: "row",

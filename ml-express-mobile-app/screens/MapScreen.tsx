@@ -21,8 +21,8 @@ import {
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import * as Haptics from 'expo-haptics';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -41,6 +41,7 @@ import {
 } from '../utils/packageStatusNormalize';
 import { MAP_STYLE_LOGISTICS_PRO } from '../utils/mapStyles';
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
+import { getOrdererIdentityDisplay } from '../utils/ordererIdentity';
 
 const { width, height } = Dimensions.get('window');
 
@@ -179,7 +180,10 @@ export default function MapScreen({ navigation }: any) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deliveryStores, setDeliveryStores] = useState<any[]>([]);
   const [optimizationStrategy, setOptimizationStrategy] = useState<'shortest' | 'fastest' | 'priority'>('shortest');
-  
+  /** 全局配单事件：地图页内横幅（与 App 内语音/震动同源，避免重复订阅 packages 表） */
+  const [mapNewOrderBannerId, setMapNewOrderBannerId] = useState<string | null>(null);
+  const mapBannerDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // 🚀 坐标平滑处理状态
   const [smoothCoords, setSmoothCoords] = useState<{lat: number, lng: number} | null>(null);
   const lastSmoothCoords = useRef<{lat: number, lng: number} | null>(null);
@@ -1029,7 +1033,7 @@ export default function MapScreen({ navigation }: any) {
   const requestLocationPermission = useCallback(async () => {
     try {
       // 1. 请求前台权限
-      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+      const { status: foregroundStatus } = await requestForegroundPermissionsIfDisclosed();
       if (foregroundStatus === 'granted') {
         const c = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setLocation({ latitude: c.coords.latitude, longitude: c.coords.longitude });
@@ -1307,65 +1311,31 @@ export default function MapScreen({ navigation }: any) {
     setRefreshing(false);
   }, [loadPackages, loadCurrentDeliveringPackage]);
 
-  // 🔔 新增：实时订单监听功能
+  // 🔔 地图页：监听全局配单事件（GlobalOrderMonitor），展示横幅并刷新列表
   useEffect(() => {
-    let channel: any = null;
-
-    const setupRealtimeListener = async () => {
-      const currentUser = await AsyncStorage.getItem('currentUserName') || '';
-      if (!currentUser) return;
-
-      console.log('📡 正在开启新订单实时监听...', currentUser);
-
-      channel = supabase
-        .channel('rider-new-orders')
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // 监听所有变化（包括新指派和取消）
-            schema: 'public',
-            table: 'packages',
-            filter: `courier=eq.${currentUser}`
-          },
-          async (payload) => {
-            console.log('🔔 收到订单变更通知:', payload.eventType);
-            
-            // 如果是新增订单或状态变更为“已分配”
-            if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status === '已分配')) {
-              // 1. 触发震动
-              Vibration.vibrate([0, 500, 200, 500]); // 震动模式：等待0ms，震500ms，停200ms，震500ms
-              
-              // 2. 触觉反馈 (iOS/高级安卓)
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-              // 3. 弹窗提醒
-              Alert.alert(
-                language === 'zh' ? '新任务提醒' : 'New Task',
-                language === 'zh' ? `您有一单新的配送任务: #${payload.new.id.slice(-6)}` : `New task assigned: #${payload.new.id.slice(-6)}`,
-                [{ text: 'OK', onPress: () => loadPackages(true) }]
-              );
-
-              // 4. 自动刷新列表
-              loadPackages(true);
-            } else if (payload.eventType === 'DELETE' || (payload.eventType === 'UPDATE' && payload.new.status === '已取消')) {
-              // 订单取消提醒
-              Vibration.vibrate(300);
-              loadPackages(true);
-            }
-          }
-        )
-        .subscribe();
+    if (!isFocused) return;
+    const handler = (payload: { id?: string }) => {
+      if (!payload?.id) return;
+      if (mapBannerDismissRef.current) {
+        clearTimeout(mapBannerDismissRef.current);
+        mapBannerDismissRef.current = null;
+      }
+      setMapNewOrderBannerId(payload.id);
+      loadPackages(true);
+      mapBannerDismissRef.current = setTimeout(() => {
+        setMapNewOrderBannerId(null);
+        mapBannerDismissRef.current = null;
+      }, 18000);
     };
-
-    setupRealtimeListener();
-
+    const sub = DeviceEventEmitter.addListener('courier_new_order_assigned', handler);
     return () => {
-      if (channel) {
-        console.log('📴 正在关闭实时监听...');
-        supabase.removeChannel(channel);
+      sub.remove();
+      if (mapBannerDismissRef.current) {
+        clearTimeout(mapBannerDismissRef.current);
+        mapBannerDismissRef.current = null;
       }
     };
-  }, [language, loadPackages]);
+  }, [isFocused, loadPackages]);
 
   // 当弹窗打开时，自动调整地图缩放以显示所有点
   useEffect(() => {
@@ -1397,6 +1367,13 @@ export default function MapScreen({ navigation }: any) {
   const renderPackageItem = useCallback(({ item, index }: { item: PackageWithExtras; index: number }) => {
     const isCurrent = currentDeliveringPackageId === item.id;
     const effectiveStatus = resolvePackageStatus(item, statusOverrides[item.id]);
+    const orderer = getOrdererIdentityDisplay({
+      description: item.description,
+      delivery_store_id: item.delivery_store_id,
+      language,
+    });
+    const codNum = Number(item.cod_amount || 0);
+    const showMerchantCodBanner = orderer.kind === 'Merchant' && codNum > 0;
     return (
       <TouchableOpacity
         activeOpacity={0.7}
@@ -1418,21 +1395,11 @@ export default function MapScreen({ navigation }: any) {
                 <Text style={styles.speedText}>{item.delivery_speed}</Text>
               </View>
             )}
-              
-              {/* 🚀 新增：在顶部显示下单身份 */}
-              {(() => {
-                const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
-                if (identityMatch && identityMatch[1]) {
-                  const identity = identityMatch[1];
-                  const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
-                  return (
-                    <View style={[styles.identityBadge, { backgroundColor: isMERCHANTS ? '#3b82f6' : '#f59e0b' }]}>
-                      <Text style={styles.identityText}>{identity}</Text>
-                    </View>
-                  );
-                }
-                return null;
-              })()}
+              {orderer.kind !== 'Unknown' && (
+                <View style={[styles.identityBadge, { backgroundColor: orderer.badgeColor }]}>
+                  <Text style={styles.identityText}>{orderer.shortLabel}</Text>
+                </View>
+              )}
             </View>
             <View style={[styles.deliveringBadge, { backgroundColor: getStatusColor(effectiveStatus) + '20' }]}>
               <Ionicons 
@@ -1445,14 +1412,29 @@ export default function MapScreen({ navigation }: any) {
               </Text>
             </View>
           </View>
-          
+
+          {showMerchantCodBanner && (
+            <View style={styles.merchantCodBanner}>
+              <Ionicons name="cash" size={20} color="#b91c1c" style={{ marginRight: 6 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.merchantCodBannerTitle}>
+                  {language === 'zh'
+                    ? '商家单 · 骑手代收 (COD)'
+                    : language === 'en'
+                      ? 'Merchant order · Collect COD'
+                      : 'ဆိုင် မှ မှာယူ · COD'}
+                </Text>
+                <Text style={styles.merchantCodBannerAmount}>
+                  {language === 'zh' ? '需代收' : language === 'en' ? 'Collect' : 'ကောက်ခံရန်'}: {codNum.toLocaleString()}{' '}
+                  MMK
+                </Text>
+              </View>
+            </View>
+          )}
+
           <View style={styles.cardBody}>
             {(() => {
-              const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
-              const identity = identityMatch ? identityMatch[1] : 'Member';
-              const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
-              const isVIP = identity === 'VIP' || identity === 'VIP MEMBER' || identity === 'VIP အဖွဲ့ဝင်';
-              const isMember = identity === '会员' || identity === 'Member' || identity === 'အဖွဲ့ဝင်';
+              const isMERCHANTS = orderer.kind === 'Merchant';
 
               return (
                 <>
@@ -1468,19 +1450,11 @@ export default function MapScreen({ navigation }: any) {
                       </Text>
                       <Text style={styles.senderName}>{item.sender_name}</Text>
                       <Text style={styles.address} numberOfLines={1}>{item.sender_address}</Text>
-                      
-                      {/* 🚀 规则 1：MERCHANTS 账号显示 COD 信息 */}
-                      {isMERCHANTS && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                          {Number(item.cod_amount || 0) > 0 ? (
-                            <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>
-                              💰 {language === 'zh' ? '代收款 (COD)' : language === 'en' ? 'Collect COD' : 'COD ကောက်ခံရန်'}: {Number(item.cod_amount).toLocaleString()} MMK
-                            </Text>
-                          ) : (
-                            <Text style={{ color: '#64748b', fontSize: 11, fontWeight: 'bold' }}>
-                              💰 {language === 'zh' ? '无 (COD)' : language === 'en' ? 'No COD' : 'COD မရှိပါ'}
-                            </Text>
-                          )}
+                      {isMERCHANTS && !showMerchantCodBanner && (
+                        <View style={styles.merchantCodInline}>
+                          <Text style={styles.merchantCodInlineTextMuted}>
+                            💰 {language === 'zh' ? '无 (COD)' : language === 'en' ? 'No COD' : 'COD မရှိပါ'}
+                          </Text>
                         </View>
                       )}
 
@@ -1696,6 +1670,55 @@ export default function MapScreen({ navigation }: any) {
           🗺️ {language === 'zh' ? '配送路线' : language === 'en' ? 'Delivery Route' : 'ပို့ဆောင်ရေးလမ်းကြောင်း'}
         </Text>
       </View>
+
+      {mapNewOrderBannerId && (
+        <View style={styles.newOrderBannerWrap} accessibilityRole="alert">
+          <LinearGradient
+            colors={['#047857', '#10b981']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.newOrderBannerInner}
+          >
+            <Ionicons name="notifications" size={22} color="#fff" />
+            <View style={styles.newOrderBannerTextCol}>
+              <Text style={styles.newOrderBannerTitle}>{t.mapNewOrderBannerTitle}</Text>
+              <Text style={styles.newOrderBannerId}>
+                #{mapNewOrderBannerId.slice(-6).toUpperCase()}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.newOrderBannerBtn}
+              onPress={() => {
+                const id = mapNewOrderBannerId;
+                setMapNewOrderBannerId(null);
+                if (mapBannerDismissRef.current) {
+                  clearTimeout(mapBannerDismissRef.current);
+                  mapBannerDismissRef.current = null;
+                }
+                navigation.navigate('PackageDetail', { packageId: id });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t.mapNewOrderBannerViewDetail}
+            >
+              <Text style={styles.newOrderBannerBtnText}>{t.mapNewOrderBannerViewDetail}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setMapNewOrderBannerId(null);
+                if (mapBannerDismissRef.current) {
+                  clearTimeout(mapBannerDismissRef.current);
+                  mapBannerDismissRef.current = null;
+                }
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={t.mapNewOrderBannerClose}
+            >
+              <Ionicons name="close" size={22} color="rgba(255,255,255,0.9)" />
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+      )}
 
       {errorMessage && (
         <View style={[styles.statusBanner, !isOnline && styles.statusBannerOffline]}>
@@ -2167,6 +2190,51 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
+  newOrderBannerWrap: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+  },
+  newOrderBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  newOrderBannerTextCol: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  newOrderBannerTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  newOrderBannerId: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  newOrderBannerBtn: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginRight: 8,
+  },
+  newOrderBannerBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   statusBanner: { backgroundColor: '#fef3c7', padding: 12, margin: 16, borderRadius: 12, flexDirection: 'row', alignItems: 'center', borderLeftWidth: 4, borderLeftColor: '#f59e0b' },
   statusBannerOffline: { backgroundColor: '#fee2e2', borderLeftColor: '#ef4444' },
   statusBannerText: { fontSize: 13, color: '#92400e', flex: 1, fontWeight: '500' },
@@ -2540,5 +2608,37 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '800',
+  },
+  merchantCodBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1.5,
+    borderColor: '#fecaca',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  merchantCodBannerTitle: {
+    color: '#991b1b',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  merchantCodBannerAmount: {
+    color: '#b91c1c',
+    fontSize: 17,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  merchantCodInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  merchantCodInlineTextMuted: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

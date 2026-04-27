@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import { packageService, Package, Courier, courierService } from '../services/supabase';
 
 interface MapViewScreenProps {
@@ -61,7 +62,7 @@ export default function MapViewScreen({ visible, onClose }: MapViewScreenProps) 
 
   const getCurrentLocation = async () => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await requestForegroundPermissionsIfDisclosed();
       if (status !== 'granted') {
         Alert.alert('权限不足', '需要位置权限才能显示地图');
         return;

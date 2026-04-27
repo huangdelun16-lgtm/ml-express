@@ -539,14 +539,40 @@ export const packageService = {
       const unclearedCOD = unclearedPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
       const unclearedCount = unclearedPackages.length;
       
-      const settledPackages = packages.filter(pkg => pkg.cod_settled);
-      const settledCOD = settledPackages.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
-      
-      // 计算最后结清日期
-      const settledPackagesWithDate = settledPackages.filter(pkg => pkg.cod_settled_at);
+      // 「当年已结清」与 Admin 财务管理一致：按 cod_settled_at 自然年，而非按「送达月」
+      const storeOrConds = [`delivery_store_id.eq.${userId}`];
+      if (storeName) {
+        storeOrConds.push(`sender_name.eq.${storeName}`);
+      }
+      const y = new Date().getFullYear();
+      const yStart = new Date(y, 0, 1).toISOString();
+      const yEnd = new Date(y, 11, 31, 23, 59, 59, 999).toISOString();
+      let yq = supabase
+        .from('packages')
+        .select('cod_amount, cod_settled, cod_settled_at')
+        .in('status', ['已送达', '已完成'])
+        .or(storeOrConds.join(','))
+        .eq('cod_settled', true)
+        .not('cod_settled_at', 'is', null)
+        .gte('cod_settled_at', yStart)
+        .lte('cod_settled_at', yEnd);
+      const { data: yData, error: yError } = await yq;
+      if (yError) {
+        LoggerService.warn('当年已结清统计查询失败，可能缺少 cod_settled_at：', yError);
+      }
+      const yearPkgs = (yData || []) as Array<{
+        cod_amount?: number;
+        cod_settled?: boolean;
+        cod_settled_at?: string;
+      }>;
+      const settledCOD = yearPkgs.reduce((sum, pkg) => sum + (pkg.cod_amount || 0), 0);
+      const settledPackagesWithDate = yearPkgs.filter(pkg => pkg.cod_settled_at);
       let lastSettledAt: string | null = null;
       if (settledPackagesWithDate.length > 0) {
-        settledPackagesWithDate.sort((a, b) => new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime());
+        settledPackagesWithDate.sort(
+          (a, b) =>
+            new Date(b.cod_settled_at!).getTime() - new Date(a.cod_settled_at!).getTime(),
+        );
         lastSettledAt = settledPackagesWithDate[0].cod_settled_at || null;
       }
 
@@ -569,44 +595,54 @@ export const packageService = {
     }
   },
 
-  /** 指定月份已送达订单（含代收为 0，便于合伙店铺对账） */
+  /** 待结清：按月份+送达时间；已结清：按当前自然年 cod_settled_at（与 Admin、getPartnerStats 一致） */
   async getPartnerCODOrders(userId: string, storeName?: string, month?: string, settled?: boolean, page: number = 1, pageSize: number = 20) {
     try {
-      let q = supabase
-        .from('packages')
-        .select('id, cod_amount, delivery_time, cod_settled, price', { count: 'exact' })
-        .eq('status', '已送达');
-
       const conditions = [`delivery_store_id.eq.${userId}`];
       if (storeName) {
         conditions.push(`sender_name.eq.${storeName}`);
       }
-      
-      q = q.or(conditions.join(','));
-      
-      // 如果指定了结算状态
-      if (settled !== undefined) {
-        if (settled) {
-          q = q.eq('cod_settled', true);
-        } else {
-          // 处理 cod_settled 为 false 或 null 的情况
+
+      const y = new Date().getFullYear();
+      const yStart = new Date(y, 0, 1).toISOString();
+      const yEnd = new Date(y, 11, 31, 23, 59, 59, 999).toISOString();
+
+      let q: any;
+      if (settled === true) {
+        q = supabase
+          .from('packages')
+          .select('id, cod_amount, delivery_time, cod_settled, cod_settled_at, price', { count: 'exact' })
+          .in('status', ['已送达', '已完成'])
+          .or(conditions.join(','))
+          .eq('cod_settled', true)
+          .not('cod_settled_at', 'is', null)
+          .gte('cod_settled_at', yStart)
+          .lte('cod_settled_at', yEnd);
+      } else {
+        q = supabase
+          .from('packages')
+          .select('id, cod_amount, delivery_time, cod_settled, cod_settled_at, price', { count: 'exact' })
+          .eq('status', '已送达')
+          .or(conditions.join(','));
+        if (settled === false) {
           q = q.or('cod_settled.eq.false,cod_settled.is.null');
         }
+        if (month) {
+          const [yr, monthNum] = month.split('-');
+          const startDate = `${yr}-${monthNum}-01`;
+          const endDate = new Date(parseInt(yr), parseInt(monthNum), 0).toISOString().split('T')[0];
+          q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
+        }
       }
-      
-      // 如果指定了月份，添加日期过滤
-      if (month) {
-        const [year, monthNum] = month.split('-');
-        const startDate = `${year}-${monthNum}-01`;
-        const endDate = new Date(parseInt(year), parseInt(monthNum), 0).toISOString().split('T')[0];
-        q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
-      }
-      
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-      
+
+      const effectivePageSize = settled === true ? Math.max(pageSize, 5000) : pageSize;
+      const from = (page - 1) * effectivePageSize;
+      const to = from + effectivePageSize - 1;
+
       const { data, error, count } = await q
-        .order('delivery_time', { ascending: false })
+        .order(settled === true ? 'cod_settled_at' : 'delivery_time', {
+          ascending: false,
+        })
         .range(from, to);
       
       if (error) throw error;

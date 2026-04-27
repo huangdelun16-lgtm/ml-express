@@ -15,10 +15,9 @@ import {
 } from 'react-native';
 import { adminAccountService, supabase, resolveRiderPricingRegionId } from '../services/supabase';
 import { notificationService } from '../services/notificationService';
-import { locationService } from '../services/locationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
-import * as Location from 'expo-location';
+import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -159,13 +158,6 @@ export default function LoginScreen({ navigation }: any) {
               
               await AsyncStorage.setItem('currentCourierId', courierId);
               await AsyncStorage.setItem('currentUserName', courierData.name);
-              
-              // 启动后台位置追踪 (增加错误捕获，防止权限拒绝导致崩溃)
-              try {
-                await locationService.startBackgroundTracking();
-              } catch (locError) {
-                console.warn('📍 启动位置追踪被跳过:', locError);
-              }
             }
           } catch (error) {
             console.error('Courier data sync error:', error);
@@ -185,7 +177,8 @@ export default function LoginScreen({ navigation }: any) {
         }
         
         console.log('🏁 登录流程全部完成，跳转主页');
-        navigation.replace('Main');
+        const disclosed = await hasAcceptedLocationDisclosure();
+        navigation.replace(disclosed ? 'Main' : 'LocationDisclosure');
       } else {
         Alert.alert(
           language === 'zh' ? '登录失败' : 'Login Failed',

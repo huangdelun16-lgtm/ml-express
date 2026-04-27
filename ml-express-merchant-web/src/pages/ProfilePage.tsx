@@ -416,10 +416,10 @@ const ProfilePage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<"qr" | "cash" | "balance">(
     "cash",
   );
-  /** 商家「立即下单」：商品费用可余额/现金；跑腿费仅现金（见 OrderModal + handleOrderSubmit） */
+  /** 商家「立即下单」：商品费用仅现金（余额支付已禁用）；跑腿费仅现金（见 OrderModal + handleOrderSubmit） */
   const [productPaymentMethod, setProductPaymentMethod] = useState<
     "cash" | "balance"
-  >("balance");
+  >("cash");
   const [selectedSenderLocation, setSelectedSenderLocation] = useState<{
     lat: number;
     lng: number;
@@ -482,7 +482,63 @@ const ProfilePage: React.FC = () => {
     }>
   >([]);
   const [codModalTitle, setCodModalTitle] = useState("");
+  /** 代收款弹窗：筛选框、 settled | uncleared | all */
+  const [codOrderSearch, setCodOrderSearch] = useState("");
+  const [codModalKind, setCodModalKind] = useState<
+    "settled" | "uncleared" | "all"
+  >("all");
   const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredCodOrders = useMemo(() => {
+    const q = codOrderSearch.trim().toLowerCase();
+    if (!q) return codOrders;
+    return codOrders.filter((o) => {
+      if (o.orderId.toLowerCase().includes(q)) return true;
+      if (o.deliveryTime && o.deliveryTime.toLowerCase().includes(q))
+        return true;
+      if ((o.deliveryFeeLabel || "").toLowerCase().includes(q)) return true;
+      return false;
+    });
+  }, [codOrders, codOrderSearch]);
+
+  const exportFilteredCodStatement = useCallback(() => {
+    const headers =
+      language === "zh"
+        ? ["订单号", "送达时间", "代收款(MMK)", "跑腿费"]
+        : language === "en"
+          ? ["Order ID", "Delivered at", "COD (MMK)", "Delivery fee"]
+          : [
+              "Order ID",
+              "ပို့ဆောင်ချိန်",
+              "COD (MMK)",
+              "ကြေးနှုန်း",
+            ];
+    const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+    const lines = [headers.map(esc).join(",")];
+    filteredCodOrders.forEach((o) => {
+      lines.push(
+        [
+          o.orderId,
+          o.deliveryTime || "",
+          String(o.codAmount ?? 0),
+          o.deliveryFeeLabel || "",
+        ]
+          .map(esc)
+          .join(","),
+      );
+    });
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const tag =
+      codModalKind === "settled" ? "settled" : codModalKind === "uncleared" ? "pending" : "all";
+    a.download = `ML-Merchant-COD-${tag}-${selectedMonth}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filteredCodOrders, language, codModalKind, selectedMonth]);
 
   // 🚀 新增：店铺商品管理状态
   const [showProductsModal, setShowProductsModal] = useState(false);
@@ -1313,7 +1369,9 @@ const ProfilePage: React.FC = () => {
     setCalculatedPriceDetail(0);
     setCalculatedDistanceDetail(0);
     setIsCalculated(false);
-    setProductPaymentMethod("balance");
+    setProductPaymentMethod(
+      currentUser?.user_type === "merchant" ? "cash" : "balance",
+    );
     setShowOrderForm(true);
   };
 
@@ -2125,22 +2183,26 @@ const ProfilePage: React.FC = () => {
   // 查看代收款订单
   const handleViewCODOrders = async (settled?: boolean) => {
     if (!currentUser || !isPartnerStore) return;
-    
+
     try {
       const storeName = currentUser.name || storeInfo?.store_name;
       const userId = currentUser.id || storeInfo?.id;
-      
+
       if (userId) {
-        // 设置模态框标题
+        setCodOrderSearch("");
+        const yearLabel = String(new Date().getFullYear());
+
         if (settled === true) {
+          setCodModalKind("settled");
           setCodModalTitle(
             language === "zh"
-              ? "本月已结清订单"
+              ? `${yearLabel}年已结清订单`
               : language === "en"
-                ? "Monthly Settled Orders"
-                : "လအလိုက် ငွေရှင်းပြီးသော အော်ဒါများ",
+                ? `Settled orders (${yearLabel})`
+                : `${yearLabel} ငွေရှင်းပြီးအော်ဒါများ`,
           );
         } else if (settled === false) {
+          setCodModalKind("uncleared");
           setCodModalTitle(
             language === "zh"
               ? "待结清订单"
@@ -2149,16 +2211,16 @@ const ProfilePage: React.FC = () => {
                 : "ရှင်းလင်းရန် စောင့်ဆိုင်းနေသော အော်ဒါများ",
           );
         } else {
+          setCodModalKind("all");
           setCodModalTitle(
             language === "zh"
               ? "代收款订单"
               : language === "en"
                 ? "COD Orders"
-                : "ငွေကောက်ခံရန် အော်商များ",
+                : "ငွေကောက်ခံရန် အော်ဒါများ",
           );
         }
 
-        // 分页获取第一页
         const { orders } = await packageService.getPartnerCODOrders(
           userId,
           storeName,
@@ -4635,7 +4697,11 @@ const ProfilePage: React.FC = () => {
                         fontWeight: "800",
                       }}
                     >
-                      {t.totalCOD}
+                      {language === "zh"
+                        ? `${new Date().getFullYear()}年已结清订单`
+                        : language === "en"
+                          ? `Settled orders (${new Date().getFullYear()})`
+                          : `ငွေရှင်းပြီး COD (${new Date().getFullYear()})`}
                     </span>
                     </div>
                   <div
@@ -7423,7 +7489,7 @@ const ProfilePage: React.FC = () => {
               background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
               padding: window.innerWidth < 768 ? "1.5rem" : "2.5rem",
               borderRadius: "32px",
-              maxWidth: "600px",
+              maxWidth: "640px",
               width: "100%",
               maxHeight: "85vh",
               overflow: "hidden",
@@ -7438,7 +7504,7 @@ const ProfilePage: React.FC = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "2rem",
+                marginBottom: "1.25rem",
               }}
             >
               <div
@@ -7470,7 +7536,10 @@ const ProfilePage: React.FC = () => {
                 </h2>
               </div>
               <button
-                onClick={() => setShowCODOrdersModal(false)}
+                onClick={() => {
+                  setShowCODOrdersModal(false);
+                  setCodOrderSearch("");
+                }}
                 style={{
                   background: "rgba(255, 255, 255, 0.1)",
                   border: "none",
@@ -7488,10 +7557,93 @@ const ProfilePage: React.FC = () => {
                 ✕
               </button>
             </div>
+
+            {/* 筛选 + 导出对账单 */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "0.6rem",
+                  alignItems: "stretch",
+                }}
+              >
+                <input
+                  type="search"
+                  value={codOrderSearch}
+                  onChange={(e) => setCodOrderSearch(e.target.value)}
+                  placeholder={
+                    language === "zh"
+                      ? "筛选：输入订单号或关键词"
+                      : language === "en"
+                        ? "Filter by order ID or keyword"
+                        : "အော်ဒါနံပါတ် ရှာရန်"
+                  }
+                  style={{
+                    flex: "1 1 180px",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    background: "rgba(15,23,42,0.6)",
+                    color: "white",
+                    fontSize: "0.95rem",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={exportFilteredCodStatement}
+                  disabled={filteredCodOrders.length === 0}
+                  style={{
+                    padding: "12px 18px",
+                    borderRadius: "12px",
+                    border: "none",
+                    cursor:
+                      filteredCodOrders.length === 0 ? "not-allowed" : "pointer",
+                    opacity: filteredCodOrders.length === 0 ? 0.45 : 1,
+                    fontWeight: 800,
+                    fontSize: "0.95rem",
+                    color: "white",
+                    background:
+                      "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                    boxShadow: "0 4px 14px rgba(99, 102, 241, 0.35)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  📊{" "}
+                  {language === "zh"
+                    ? "导出对账单"
+                    : language === "en"
+                      ? "Export"
+                      : "Export"}
+                </button>
+              </div>
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  color: "rgba(255,255,255,0.45)",
+                  fontWeight: 600,
+                }}
+              >
+                {language === "zh"
+                  ? `共 ${codOrders.length} 条，显示 ${filteredCodOrders.length} 条`
+                  : language === "en"
+                    ? `${filteredCodOrders.length} of ${codOrders.length} shown`
+                    : `${filteredCodOrders.length} / ${codOrders.length}`}
+              </div>
+            </div>
             
             <div style={{ flex: 1, overflowY: "auto", paddingRight: "0.5rem" }}>
               {codOrders.length > 0 ? (
-                codOrders.map((order, index: number) => {
+                filteredCodOrders.length > 0 ? (
+                filteredCodOrders.map((order, index: number) => {
                   const formatDt = (dateStr?: string) => {
                     if (!dateStr) return "—";
                     try {
@@ -7591,6 +7743,22 @@ const ProfilePage: React.FC = () => {
                   </div>
                   );
                 })
+                ) : (
+                  <div
+                    style={{
+                      padding: "3rem 1.5rem",
+                      textAlign: "center",
+                      color: "rgba(255, 255, 255, 0.5)",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {language === "zh"
+                      ? "没有符合当前筛选的订单，请调整关键词"
+                      : language === "en"
+                        ? "No orders match the current filter"
+                        : "စာရင်းမတွေ့ရပါ — စကားလုံးပြန်ရှာကြည့်ပါ"}
+                  </div>
+                )
               ) : (
                 <div
                   style={{
@@ -7610,7 +7778,10 @@ const ProfilePage: React.FC = () => {
             </div>
 
             <button
-              onClick={() => setShowCODOrdersModal(false)}
+              onClick={() => {
+                setShowCODOrdersModal(false);
+                setCodOrderSearch("");
+              }}
               style={{
                 width: "100%",
                 marginTop: "2rem",

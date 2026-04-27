@@ -181,6 +181,10 @@ export interface LanguageTexts {
   syncInProgress: string;
   syncPending: string;
   newOrderVoiceAnnouncement: string;
+  /** 地图页：后台配单后的应用内横幅 */
+  mapNewOrderBannerTitle: string;
+  mapNewOrderBannerViewDetail: string;
+  mapNewOrderBannerClose: string;
 
   // 财务管理（管理端）
   financeManagementTitle: string;
@@ -440,6 +444,9 @@ export const translations: { [key: string]: LanguageTexts } = {
     syncInProgress: '同步中 ({count})',
     syncPending: '待同步 ({count})',
     newOrderVoiceAnnouncement: '您有新的同城配送订单，请及时查看',
+    mapNewOrderBannerTitle: '新订单已指派',
+    mapNewOrderBannerViewDetail: '查看详情',
+    mapNewOrderBannerClose: '关闭',
 
     financeManagementTitle: '财务管理',
     financeTabOverview: '概览',
@@ -695,6 +702,9 @@ export const translations: { [key: string]: LanguageTexts } = {
     syncInProgress: 'Syncing ({count})',
     syncPending: 'Pending sync ({count})',
     newOrderVoiceAnnouncement: 'You have a new local delivery order. Please check it in time.',
+    mapNewOrderBannerTitle: 'New order assigned',
+    mapNewOrderBannerViewDetail: 'View details',
+    mapNewOrderBannerClose: 'Dismiss',
 
     financeManagementTitle: 'Finance',
     financeTabOverview: 'Overview',
@@ -950,6 +960,9 @@ export const translations: { [key: string]: LanguageTexts } = {
     syncInProgress: 'ထပ်တူညီမှု ({count})',
     syncPending: 'စောင့်ဆိုင်းထပ်တူညီမှု ({count})',
     newOrderVoiceAnnouncement: 'သင့်တွင် မြို့တွင်းပို့ဆောင်ရေး အော်ဒါအသစ်တစ်ခုရှိသည်။ ကျေးဇူးပြု၍ အချိန်မီစစ်ဆေးပါ။',
+    mapNewOrderBannerTitle: 'အော်ဒါအသစ်တာဝန်ပေးပြီး',
+    mapNewOrderBannerViewDetail: 'အသေးစိတ်ကြည့်ရန်',
+    mapNewOrderBannerClose: 'ပိတ်မည်',
 
     financeManagementTitle: 'ဘဏ္ဍာရေးစီမံခန့်ခွဲခြင်း',
     financeTabOverview: 'ခြုံငုံသုံးသပ်',

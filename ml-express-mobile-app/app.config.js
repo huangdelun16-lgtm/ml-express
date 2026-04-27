@@ -1,5 +1,12 @@
 const baseConfig = require('./app.json');
 
+/** 合并清单时必须剔除；勿依赖旧轨道上的包（如 versionCode 8）——需在 Play 各发布轨道用新 AAB 覆盖 */
+const BLOCK_MEDIA_READ = [
+  'android.permission.READ_MEDIA_IMAGES',
+  'android.permission.READ_MEDIA_VIDEO',
+  'android.permission.READ_MEDIA_AUDIO',
+];
+
 module.exports = ({ config }) => {
   const expoConfig = baseConfig.expo || {};
   
@@ -19,6 +26,12 @@ module.exports = ({ config }) => {
     plugins,
     android: {
       ...(expoConfig.android || {}),
+      blockedPermissions: [
+        ...new Set([
+          ...(expoConfig.android?.blockedPermissions || []),
+          ...BLOCK_MEDIA_READ,
+        ]),
+      ],
       config: {
         ...(expoConfig.android?.config || {}),
         googleMaps: {

@@ -1,13 +1,14 @@
 {
   "name": "market-link-express-mobile",
-  "version": "2.2.2",
+  "version": "2.3.2",
   "description": "MARKET LINK STAFF - 缅甸专业快递骑手端",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "android:setup": "./run-android.sh",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "build:aab": "npx --yes eas-cli@latest build --platform android --profile production --clear-cache"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -29,7 +30,6 @@
     "expo-image-picker": "~17.0.8",
     "expo-linear-gradient": "~15.0.7",
     "expo-location": "~19.0.7",
-    "expo-media-library": "~18.2.0",
     "expo-notifications": "^0.32.15",
     "expo-sharing": "^14.0.7",
     "expo-speech": "~14.0.8",

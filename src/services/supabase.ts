@@ -406,6 +406,7 @@ export const packageService = {
       const now = new Date().toISOString();
       
       // 1. 更新通过 delivery_store_id 匹配的订单
+      // 含 cod_amount 为 0 / null 的订单：结清后商家端「待结清」应全部消失
       const { error: error1 } = await supabase
         .from('packages')
         .update({ 
@@ -413,9 +414,7 @@ export const packageService = {
           cod_settled_at: now
         })
         .eq('status', '已送达')
-        // .is('cod_settled', false) // 处理 null 或 false
         .or('cod_settled.is.false,cod_settled.is.null')
-        .gt('cod_amount', 0)
         .eq('delivery_store_id', storeId);
 
       if (error1) throw error1;
@@ -430,7 +429,6 @@ export const packageService = {
         })
         .eq('status', '已送达')
         .or('cod_settled.is.false,cod_settled.is.null')
-        .gt('cod_amount', 0)
         .is('delivery_store_id', null) 
         .eq('sender_name', storeName);
 

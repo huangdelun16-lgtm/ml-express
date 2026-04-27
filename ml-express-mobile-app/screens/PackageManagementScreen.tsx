@@ -18,6 +18,7 @@ import ScannerScreen from './ScannerScreen';
 import MapViewScreen from './MapViewScreen';
 import { useApp } from '../contexts/AppContext';
 import * as Location from 'expo-location';
+import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import * as ImagePicker from 'expo-image-picker';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -503,7 +504,7 @@ export default function PackageManagementScreen({ navigation }: any) {
       }
 
       // 获取当前位置
-      const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
+      const { status: locationStatus } = await requestForegroundPermissionsIfDisclosed();
       if (locationStatus !== 'granted') {
         Alert.alert('需要位置权限', '需要位置权限才能记录送达位置');
         return;

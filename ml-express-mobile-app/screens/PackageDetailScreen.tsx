@@ -27,7 +27,6 @@ import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import * as MediaLibrary from 'expo-media-library';
 import { CameraView } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
@@ -38,6 +37,7 @@ import {
 } from '../utils/packageStatusNormalize';
 import { getPackingModalModel } from '../utils/parseOrderPackingItems';
 import { openMapsToAddress } from '../utils/openMapsNavigation';
+import { getOrdererIdentityDisplay } from '../utils/ordererIdentity';
 
 const { width } = Dimensions.get('window');
 
@@ -578,23 +578,39 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         <View style={styles.glassCard}>
           <Text style={styles.sectionTitle}>📦 {language === 'zh' ? '包裹详情' : 'Information'}</Text>
           
-          {/* 🚀 新增：展示下单身份 */}
           {(() => {
-            const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
-            if (identityMatch && identityMatch[1]) {
-              const identity = identityMatch[1];
-              return (
-                <View style={[styles.infoLine, { backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: 10, borderRadius: 10, marginBottom: 15 }]}>
-                  <Text style={[styles.infoLabel, { color: '#fff', fontWeight: 'bold' }]}>
-                    👤 {language === 'zh' ? '下单身份' : 'Orderer'}:
-                  </Text>
-                  <Text style={[styles.infoValue, { color: '#3b82f6', fontWeight: 'bold', fontSize: 15 }]}>
-                    {identity}
-                  </Text>
-                </View>
-              );
-            }
-            return null;
+            const orderer = getOrdererIdentityDisplay({
+              description: pkg.description,
+              delivery_store_id: pkg.delivery_store_id,
+              language,
+            });
+            return (
+              <View
+                style={[
+                  styles.infoLine,
+                  {
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    padding: 10,
+                    borderRadius: 10,
+                    marginBottom: 15,
+                    borderLeftWidth: 3,
+                    borderLeftColor: orderer.badgeColor,
+                  },
+                ]}
+              >
+                <Text style={[styles.infoLabel, { color: '#fff', fontWeight: 'bold' }]}>
+                  👤 {language === 'zh' ? '下单身份' : language === 'en' ? 'Orderer' : 'အော်ဒါတင်သူ'}
+                </Text>
+                <Text
+                  style={[
+                    styles.infoValue,
+                    { color: orderer.badgeColor, fontWeight: '800', fontSize: 16 },
+                  ]}
+                >
+                  {orderer.displayLabel}
+                </Text>
+              </View>
+            );
           })()}
 
           <View style={styles.infoLine}>

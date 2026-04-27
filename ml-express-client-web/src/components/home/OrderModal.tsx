@@ -1,5 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type CSSProperties } from 'react';
 import Logo from '../Logo';
+
+/** 创建订单弹窗：与商家端 Web 统一视觉 */
+const MODAL_OVERLAY: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 2000,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
+  background: 'rgba(15, 23, 42, 0.78)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+};
+
+const MODAL_PANEL: CSSProperties = {
+  position: 'relative',
+  width: 'min(100%, 440px)',
+  maxHeight: 'min(90vh, 880px)',
+  overflow: 'auto',
+  WebkitOverflowScrolling: 'touch',
+  boxSizing: 'border-box',
+  padding: 'clamp(1.25rem, 4vw, 2rem)',
+  borderRadius: 20,
+  background: 'linear-gradient(165deg, #1e293b 0%, #0f172a 42%, #172554 100%)',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
+  boxShadow:
+    '0 25px 50px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.06) inset, 0 1px 0 rgba(255,255,255,0.08) inset',
+};
+
+const MODAL_HEADING: CSSProperties = {
+  color: '#f8fafc',
+  textAlign: 'center',
+  margin: '0 0 0.5rem 0',
+  fontSize: 'clamp(1.2rem, 3.8vw, 1.4rem)',
+  fontWeight: 800,
+  letterSpacing: '0.02em',
+  textShadow: '0 1px 2px rgba(0,0,0,0.35)',
+};
+
+const SECTION_HEADING: CSSProperties = {
+  color: 'rgba(248, 250, 252, 0.92)',
+  fontSize: '0.78rem',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+  marginBottom: '0.7rem',
+};
+
+const BLOCK_TITLE: CSSProperties = {
+  color: 'rgba(248, 250, 252, 0.96)',
+  fontSize: '1rem',
+  fontWeight: 700,
+  marginBottom: '0.85rem',
+  letterSpacing: '0.02em',
+};
+
+const PRICE_ESTIMATE_CARD: CSSProperties = {
+  background: 'rgba(15, 23, 42, 0.55)',
+  borderRadius: 14,
+  padding: '1rem 1.05rem',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+  boxShadow: '0 4px 24px rgba(0,0,0,0.2) inset',
+};
+
+const FORM_ACTIONS_ROW: CSSProperties = {
+  display: 'flex',
+  gap: '0.75rem',
+  justifyContent: 'center',
+  marginTop: '0.5rem',
+  flexWrap: 'wrap' as const,
+};
 
 interface OrderModalProps {
   showOrderForm: boolean;
@@ -130,35 +204,19 @@ const OrderModal: React.FC<OrderModalProps> = ({
   ];
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.8)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 2000,
-      backdropFilter: 'blur(5px)'
-    }}>
-      <div style={{
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        backdropFilter: 'blur(15px)',
-        padding: window.innerWidth < 768 ? '1.5rem' : '2rem',
-        borderRadius: '15px',
-        maxWidth: '420px',
-        width: '90%',
-        maxHeight: '80vh',
-        overflow: 'auto',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+    <div style={MODAL_OVERLAY}>
+      <div style={MODAL_PANEL}>
+        <div
+          style={{
+            textAlign: 'center',
+            marginBottom: '1.25rem',
+            paddingBottom: '1rem',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
           <Logo size="medium" />
         </div>
-        <h2 style={{ color: 'white', marginBottom: '2rem', textAlign: 'center' }}>
+        <h2 style={MODAL_HEADING}>
           {t.order.title}
         </h2>
 
@@ -201,7 +259,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
         
         <form onSubmit={handleOrderSubmit}>
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.sender}</h3>
+            <h3 style={BLOCK_TITLE}>{t.order.sender}</h3>
             <input
               type="text"
               name="senderName"
@@ -339,7 +397,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
           </div>
 
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.order.receiver}</h3>
+            <h3 style={BLOCK_TITLE}>{t.order.receiver}</h3>
             <input
               type="text"
               name="receiverName"
@@ -469,7 +527,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
           </div>
 
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ color: 'white', marginBottom: '1rem' }}>
+            <h3 style={BLOCK_TITLE}>
               📦 {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
             </h3>
 
@@ -735,7 +793,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
             )}
 
             {/* 配送选项（顺路递在定时达之下，与 App 一致） */}
-            <h3 style={{ color: 'white', marginBottom: '1rem' }}>{t.ui.deliveryOptions || t.ui.speed || '配送选项'}</h3>
+            <h3 style={BLOCK_TITLE}>{t.ui.deliveryOptions || t.ui.speed || '配送选项'}</h3>
             
             <div style={{ position: 'relative', marginBottom: 'var(--spacing-2)' }}>
               <input type="hidden" name="deliverySpeed" value={selectedDeliverySpeed} required />
@@ -949,17 +1007,11 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
           {/* 💰 价格估算部分 */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ color: 'white', marginBottom: '1rem' }}>
+            <h3 style={SECTION_HEADING}>
               💰 {language === 'zh' ? '价格估算' : language === 'en' ? 'Price Estimate' : 'စျေးနှုန်းခန့်မှန်းခြင်း'}
             </h3>
             
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '10px',
-              padding: '1rem',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              backdropFilter: 'blur(10px)'
-            }}>
+            <div style={PRICE_ESTIMATE_CARD}>
               {!isCalculated ? (
                 <div style={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.8)' }}>
                   <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
@@ -1167,52 +1219,62 @@ const OrderModal: React.FC<OrderModalProps> = ({
             </div>
           </div>
 
-          <div style={{ 
-            display: 'flex', 
-            gap: '1rem', 
-            justifyContent: 'center', 
-            flexDirection: window.innerWidth < 768 ? 'column' : 'row'
-          }}>
+          <div
+            style={{
+              ...FORM_ACTIONS_ROW,
+              flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+            }}
+          >
             <button
               type="button"
               onClick={handleCancelOrder}
               style={{
-                background: '#e2e8f0',
-                color: '#4a5568',
-                border: 'none',
-                padding: '1rem 2rem',
-                borderRadius: '8px',
+                flex: window.innerWidth < 768 ? 'none' : 1,
+                minWidth: 0,
+                background: 'rgba(255,255,255,0.1)',
+                color: 'rgba(248,250,252,0.95)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                padding: '0.9rem 1.25rem',
+                borderRadius: 12,
                 cursor: 'pointer',
-                fontWeight: 'bold',
+                fontWeight: 700,
                 width: window.innerWidth < 768 ? '100%' : 'auto',
-                transition: 'all 0.3s ease'
+                transition: 'background 0.2s ease, border-color 0.2s ease',
               }}
-              onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
-              onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+              }}
             >
               {t.order.cancel}
             </button>
             <button
               type="submit"
               style={{
-                background: 'linear-gradient(135deg, #2c5282 0%, #3182ce 100%)',
+                flex: window.innerWidth < 768 ? 'none' : 1.2,
+                minWidth: 0,
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 55%, #1e40af 100%)',
                 color: 'white',
                 border: 'none',
-                padding: '1rem 2rem',
-                borderRadius: '8px',
+                padding: '0.9rem 1.25rem',
+                borderRadius: 12,
                 cursor: 'pointer',
-                fontWeight: 'bold',
+                fontWeight: 800,
                 width: window.innerWidth < 768 ? '100%' : 'auto',
-                boxShadow: '0 4px 15px rgba(44, 82, 130, 0.3)',
-                transition: 'all 0.3s ease'
+                boxShadow: '0 8px 24px rgba(37, 99, 235, 0.45), 0 1px 0 rgba(255,255,255,0.15) inset',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
               }}
               onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(44, 82, 130, 0.4)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 12px 28px rgba(37, 99, 235, 0.5), 0 1px 0 rgba(255,255,255,0.2) inset';
               }}
               onMouseOut={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 15px rgba(44, 82, 130, 0.3)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.45), 0 1px 0 rgba(255,255,255,0.15) inset';
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { SkeletonCard } from "../components/SkeletonLoader";
 import { useNavigate } from "react-router-dom";
 import {
@@ -389,18 +389,18 @@ const FinanceManagement: React.FC = () => {
   // 新增：商家已结清和待结清弹窗状态
   const [showMerchantSettledModal, setShowMerchantSettledModal] =
     useState<boolean>(false);
+  /** 与商家 COD 共用的明细弹窗：代收款(当日口径) / 已结清历史 */
+  const [merchantCodModalKind, setMerchantCodModalKind] = useState<
+    "uncleared" | "settled_all"
+  >("uncleared");
   const [showPendingOrdersModal, setShowPendingOrdersModal] =
     useState<boolean>(false);
   const [modalOrders, setModalOrders] = useState<Package[]>([]);
-  const [
-    merchantCollectionCustomerFilter,
-    setMerchantCollectionCustomerFilter,
-  ] = useState<string>("all");
-  const [merchantCollectionRegionFilter, setMerchantCollectionRegionFilter] =
-    useState<string>("all");
   const [merchantRegionFilter, setMerchantRegionFilter] =
     useState<string>("all");
   const [modalTitle, setModalTitle] = useState<string>("");
+  const [merchantCodModalSearch, setMerchantCodModalSearch] =
+    useState<string>("");
 
   const deliveredPackages = useMemo(() => {
     let filtered = packages.filter((pkg) => pkg.status === "已送达");
@@ -845,10 +845,63 @@ const FinanceManagement: React.FC = () => {
   const getPlatformPaymentAmount = (description?: string): number => {
     if (!description) return 0;
     const payMatch = description.match(
-      /\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/,
+      /\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/,
     );
     if (!payMatch || !payMatch[1]) return 0;
     return parseFloat(payMatch[1].replace(/[^\d.]/g, "") || "0");
+  };
+
+  const getItemBalanceProductFeeFromDescription = (
+    description?: string,
+  ): number => {
+    if (!description) return 0;
+    const m = description.match(
+      /\[(?:商品费用 \(仅余额支付\)|商品费用（仅余额支付）|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)): (.*?) MMK\]/,
+    );
+    if (!m?.[1]) return 0;
+    return parseFloat(m[1].replace(/[^\d.]/g, "") || "0");
+  };
+
+  const parsePackagePriceMmk = (pkg: Package): number =>
+    parseFloat(String(pkg.price ?? "").replace(/[^\d.]/g, "") || "0");
+
+  /** 余额/平台列：描述有 […: x MMK] 优先；否则非现金单计 跑腿(price)+商品余额费 */
+  const getCashDetailPlatformLineTotal = (pkg: Package): number => {
+    const tagged = getPlatformPaymentAmount(pkg.description);
+    if (tagged > 0) return tagged;
+    if (pkg.payment_method === "cash") return 0;
+    return (
+      parsePackagePriceMmk(pkg) +
+      getItemBalanceProductFeeFromDescription(pkg.description)
+    );
+  };
+
+  /**
+   * 与总平台支付同一总额拆行：有描述标签的优先按总额扣减；无标签时 = 非现金 跑腿+商品。
+   * 商品费 = 商品费用(仅余额) 行；跑腿费(余额) = 总额 − 商品费(余额)。
+   */
+  const getCashDetailPlatformItemProductMmk = (pkg: Package): number => {
+    const total = getCashDetailPlatformLineTotal(pkg);
+    if (total <= 0) return 0;
+    const item = getItemBalanceProductFeeFromDescription(pkg.description);
+    const tagged = getPlatformPaymentAmount(pkg.description);
+    if (tagged > 0) {
+      return item > 0 ? Math.min(item, total) : 0;
+    }
+    if (pkg.payment_method === "cash") return 0;
+    return item;
+  };
+
+  const getCashDetailPlatformDeliveryBalanceMmk = (pkg: Package): number => {
+    const t = getCashDetailPlatformLineTotal(pkg);
+    const p = getCashDetailPlatformItemProductMmk(pkg);
+    return Math.max(0, t - p);
+  };
+
+  /** 总跑腿费（仅现金代收部分） */
+  const getCashDetailDeliveryLineCashOnly = (pkg: Package): number => {
+    if (pkg.payment_method !== "cash") return 0;
+    return parsePackagePriceMmk(pkg);
   };
 
   const isMerchantPackage = (pkg: Package): boolean => {
@@ -859,6 +912,46 @@ const FinanceManagement: React.FC = () => {
     );
     return !!pkg.delivery_store_id || isStoreMatch;
   };
+
+  /**
+   * 总代收款（现金）：仅 `payment_method === "cash"` 的商家单上的 cod_amount。
+   * 客户端 web/app 下单均为余额/二维码，不算现金代收，不会计入。
+   */
+  const getCashDetailMerchantRiderCodMmk = (pkg: Package): number => {
+    if (pkg.payment_method !== "cash") return 0;
+    if (!isMerchantPackage(pkg)) return 0;
+    return Number(pkg.cod_amount || 0);
+  };
+
+  /**
+   * 与「当日收款管理」统计卡片、快递员列表、courierCashMap、点击「查看详情」后的默认日期
+   * 使用同一套筛选，保证「商家 COD 明细」与「骑手现金收款详情」中的订单集合规则一致。
+   */
+  const isPackageInCashCollectionDayView = useCallback(
+    (pkg: Package): boolean => {
+      if (pkg.status !== "已送达" && pkg.status !== "已完成") return false;
+      if (cashSettlementStatus === "unsettled" && pkg.rider_settled)
+        return false;
+      if (cashSettlementStatus === "settled" && !pkg.rider_settled)
+        return false;
+      const dateKey = getDateKey(
+        pkg.delivery_time ||
+          pkg.updated_at ||
+          pkg.created_at ||
+          pkg.create_time,
+      );
+      if (!dateKey || dateKey !== cashCollectionDate) return false;
+      if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix))
+        return false;
+      return true;
+    },
+    [
+      cashCollectionDate,
+      cashSettlementStatus,
+      isRegionalUser,
+      currentRegionPrefix,
+    ],
+  );
 
   const getStoreRegionPrefix = (store?: {
     store_code?: string | null;
@@ -1114,17 +1207,40 @@ const FinanceManagement: React.FC = () => {
           return sum + pendingCod + platformAmount;
         }, 0);
 
-        // 今年代收款统计 = 累计已结清金额(COD + 余额支付)
+        // 已结清金额（全时期累计）+ 今年已结清单数（按 cod_settled_at 自然年）
         const settledPackages = storePackages.filter((pkg) => pkg.cod_settled);
         const totalAmount = settledPackages.reduce((sum, pkg) => {
           const platformAmount = getPlatformPaymentAmount(pkg.description);
           return sum + Number(pkg.cod_amount || 0) + platformAmount;
         }, 0);
+        const y = new Date().getFullYear();
+        const yStart = new Date(y, 0, 1).getTime();
+        const yEnd = new Date(y, 11, 31, 23, 59, 59, 999).getTime();
+        /** 含无代收/无平台金额但已向平台结清的订单（与已结清弹窗同口径） */
+        const settledThisYearCount = packages.filter((pkg) => {
+          const isStorePkg =
+            pkg.delivery_store_id === store.id ||
+            pkg.sender_name === store.store_name;
+          if (!isStorePkg) return false;
+          if (pkg.status !== "已送达" && pkg.status !== "已完成") return false;
+          if (!pkg.cod_settled || !pkg.cod_settled_at) return false;
+          const ts = new Date(pkg.cod_settled_at).getTime();
+          if (Number.isNaN(ts)) return false;
+          return ts >= yStart && ts <= yEnd;
+        }).length;
 
-        // 计算最后结清日期
-        const settledPackagesWithTime = storePackages.filter(
-          (pkg) => pkg.cod_settled && pkg.cod_settled_at,
-        );
+        // 计算最后结清日期（含零金额已结清单）
+        const settledPackagesWithTime = packages.filter((pkg) => {
+          const isStorePkg =
+            pkg.delivery_store_id === store.id ||
+            pkg.sender_name === store.store_name;
+          return (
+            isStorePkg &&
+            (pkg.status === "已送达" || pkg.status === "已完成") &&
+            !!pkg.cod_settled &&
+            !!pkg.cod_settled_at
+          );
+        });
         let lastSettledAt: string | null = null;
         if (settledPackagesWithTime.length > 0) {
           // 找到最新的结清日期
@@ -1139,6 +1255,7 @@ const FinanceManagement: React.FC = () => {
         return {
           ...store,
           totalAmount,
+          settledThisYearCount,
           unclearedAmount,
           unclearedCount: unclearedPackages.length,
           lastSettledAt,
@@ -1147,38 +1264,33 @@ const FinanceManagement: React.FC = () => {
       .sort((a, b) => b.unclearedAmount - a.unclearedAmount);
   }, [deliveryStores, packages, isRegionalUser, currentRegionPrefix]);
 
-  const getMerchantFilterKey = (pkg: Package): string => {
-    const store =
-      deliveryStores.find((item) => item.id === pkg.delivery_store_id) ||
-      deliveryStores.find(
-        (item) =>
-          item.store_name === pkg.sender_name ||
-          (pkg.sender_name && pkg.sender_name.startsWith(item.store_name)),
-      );
-    const storeName = store?.store_name || pkg.sender_name || "未知";
-    const storeCode = store?.store_code ? store.store_code : "";
-    return `${storeName}||${storeCode}`;
-  };
-
-  const merchantCustomerOptions = useMemo(() => {
-    const keys = modalOrders.map((pkg) => getMerchantFilterKey(pkg));
-    return Array.from(new Set(keys)).sort();
-  }, [modalOrders]);
-
-  const filteredMerchantOrders = useMemo(() => {
+  const filteredMerchantCodModalOrders = useMemo(() => {
+    const q = merchantCodModalSearch.trim().toLowerCase();
+    if (!q) return modalOrders;
     return modalOrders.filter((pkg) => {
-      const matchCustomer =
-        merchantCollectionCustomerFilter === "all" ||
-        getMerchantFilterKey(pkg) === merchantCollectionCustomerFilter;
-      const matchRegion =
-        merchantCollectionRegionFilter === "all" ||
-        pkg.id.startsWith(merchantCollectionRegionFilter);
-      return matchCustomer && matchRegion;
+      const id = (pkg.id || "").toLowerCase();
+      const sender = (pkg.sender_name || "").toLowerCase();
+      const receiver = (pkg.receiver_name || "").toLowerCase();
+      const rphone = (pkg.receiver_phone || "").toLowerCase();
+      const sphone = (pkg.sender_phone || "").toLowerCase();
+      return (
+        id.includes(q) ||
+        sender.includes(q) ||
+        receiver.includes(q) ||
+        rphone.includes(q) ||
+        sphone.includes(q)
+      );
     });
+  }, [modalOrders, merchantCodModalSearch]);
+
+  /** 商家 COD 弹窗用筛选结果；「待结清订单明细」弹窗用全量，避免与筛选状态串用 */
+  const merchantCodModalDisplayOrders = useMemo(() => {
+    if (showPendingOrdersModal) return modalOrders;
+    return filteredMerchantCodModalOrders;
   }, [
+    showPendingOrdersModal,
     modalOrders,
-    merchantCollectionCustomerFilter,
-    merchantCollectionRegionFilter,
+    filteredMerchantCodModalOrders,
   ]);
 
   // 结清合伙店铺代收款
@@ -1619,34 +1731,249 @@ const FinanceManagement: React.FC = () => {
     setShowForm(true);
   };
 
-  // 新增：处理合伙代收款卡片点击
+  /** 与商家端 Web `getPartnerCODOrders(..., settled: false, month: 当月)` 的月份范围一致 */
+  const getCurrentMonthKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+
+  const isPackageDeliveryInCalendarMonth = (
+    pkg: Package,
+    yearMonth: string,
+  ) => {
+    const parts = yearMonth.split("-").map(Number);
+    const y = parts[0];
+    const m = parts[1];
+    if (!y || !m) return false;
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 0, 23, 59, 59, 999);
+    const raw = pkg.delivery_time;
+    if (!raw) return false;
+    const dt = new Date(raw);
+    if (Number.isNaN(dt.getTime())) return false;
+    return dt >= start && dt <= end;
+  };
+
+  const downloadMerchantCodModalCsv = useCallback(() => {
+    const list = filteredMerchantCodModalOrders;
+    if (list.length === 0) return;
+    const escape = (v: string | number | null | undefined) => {
+      const s = v == null ? "" : String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const statusForRow = (pkg: Package) => {
+      const platformAmount = getPlatformPaymentAmount(pkg.description);
+      if (Number(pkg.cod_amount || 0) > 0) {
+        if (pkg.cod_settled) {
+          return language === "zh"
+            ? "已结清"
+            : language === "my"
+              ? "ရှင်းပြီး"
+              : "Settled";
+        }
+        return language === "zh"
+          ? "待结清"
+          : language === "my"
+            ? "စောင့်ဆိုင်း"
+            : "Pending";
+      }
+      if (platformAmount > 0) {
+        return language === "zh"
+          ? "余额/平台"
+          : language === "my"
+            ? "ဘဏ်လက်ကျန်"
+            : "Balance pay";
+      }
+      return "—";
+    };
+    const header =
+      language === "zh"
+        ? [
+            "订单号",
+            "店铺",
+            "客户",
+            "寄件电话",
+            "收件电话",
+            "代收_MMK",
+            "平台或余额_MMK",
+            "送达时间",
+            "结清时间",
+            "状态",
+          ]
+        : language === "my"
+          ? [
+              "အော်ဒါ",
+              "ဆိုင်",
+              "ဖောက်သည်",
+              "စေလွှတ်",
+              "လက်ခံ",
+              "COD_MMK",
+              "ဘဏ်_MMK",
+              "ပို့ဆောင်",
+              "ရှင်းချိန်",
+              "အခြေအနေ",
+            ]
+          : [
+              "Order ID",
+              "Store",
+              "Customer",
+              "Sender phone",
+              "Receiver phone",
+              "COD_MMK",
+              "Balance_MMK",
+              "Delivered",
+              "Settled at",
+              "Status",
+            ];
+    const body = list.map((pkg) => {
+      const platformAmount = getPlatformPaymentAmount(pkg.description);
+      return [
+        escape(pkg.id),
+        escape(pkg.sender_name),
+        escape(pkg.receiver_name),
+        escape(pkg.sender_phone),
+        escape(pkg.receiver_phone),
+        escape(String(Number(pkg.cod_amount || 0))),
+        escape(String(platformAmount)),
+        escape(pkg.delivery_time || ""),
+        escape(
+          pkg.cod_settled_at
+            ? new Date(pkg.cod_settled_at).toLocaleString("zh-CN")
+            : "",
+        ),
+        escape(statusForRow(pkg)),
+      ].join(",");
+    });
+    const blob = new Blob(
+      ["\uFEFF" + [header.map(escape).join(","), ...body].join("\r\n")],
+      { type: "text/csv;charset=utf-8" },
+    );
+    const y = new Date().getFullYear();
+    const m = (getCurrentMonthKey() || `${y}-01`)
+      .replace(/-/g, "")
+      .slice(0, 6);
+    const base =
+      merchantCodModalKind === "settled_all"
+        ? language === "zh"
+          ? `已结清订单_${y}`
+          : language === "my"
+            ? `settled_${y}`
+            : `settled_orders_${y}`
+        : language === "zh"
+          ? `代收款订单明细_${m}`
+          : language === "my"
+            ? `cod_pending_${m}`
+            : `cod_uncleared_${m}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${base}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [
+    filteredMerchantCodModalOrders,
+    getCurrentMonthKey,
+    getPlatformPaymentAmount,
+    language,
+    merchantCodModalKind,
+  ]);
+
+  /** 已结清：与 settledThisYearCount 同口径，含无代收但 cod_settled 的订单 */
+  const handleMerchantAllSettledOrdersClick = (storeName?: string) => {
+    setMerchantCodModalSearch("");
+    setMerchantCodModalKind("settled_all");
+    const st = storeName
+      ? deliveryStores.find((s) => s.store_name === storeName)
+      : undefined;
+    const y = new Date().getFullYear();
+    const yStart = new Date(y, 0, 1).getTime();
+    const yEnd = new Date(y, 11, 31, 23, 59, 59, 999).getTime();
+
+    const list = packages
+      .filter((pkg) => {
+        if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix))
+          return false;
+        if (pkg.status !== "已送达" && pkg.status !== "已完成")
+          return false;
+        if (storeName) {
+          const isStorePkg =
+            st &&
+            (pkg.delivery_store_id === st.id ||
+              pkg.sender_name === st.store_name);
+          if (st) {
+            if (!isStorePkg) return false;
+          } else if (pkg.sender_name !== storeName) {
+            return false;
+          }
+        }
+        if (!pkg.cod_settled) return false;
+        if (!pkg.cod_settled_at) return false;
+        const ts = new Date(pkg.cod_settled_at).getTime();
+        if (Number.isNaN(ts) || ts < yStart || ts > yEnd) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const tb = b.cod_settled_at
+          ? new Date(b.cod_settled_at).getTime()
+          : 0;
+        const ta = a.cod_settled_at
+          ? new Date(a.cod_settled_at).getTime()
+          : 0;
+        return tb - ta;
+      });
+
+    setModalOrders(list);
+    setModalTitle(
+      storeName
+        ? `${storeName} - ${y}年已结清订单`
+        : `${y}年已结清订单`,
+    );
+    setShowMerchantSettledModal(true);
+  };
+
+  // 代收款订单明细：与商家端 Web「待结清订单」一致（getPartnerCODOrders settled=false + 当月）
   const handleMerchantCollectionClick = (storeName?: string) => {
-    setMerchantCollectionCustomerFilter("all");
-    setMerchantCollectionRegionFilter("all");
-    // 找出所有已送达/已完成且有代收款的合伙店铺未结清订单
+    setMerchantCodModalSearch("");
+    setMerchantCodModalKind("uncleared");
+    const monthKey = getCurrentMonthKey();
+    const st = storeName
+      ? deliveryStores.find((s) => s.store_name === storeName)
+      : undefined;
+    const storesInScope = isRegionalUser
+      ? deliveryStores.filter(
+          (s) => s.store_code && s.store_code.startsWith(currentRegionPrefix),
+        )
+      : deliveryStores;
+
     const codOrders = packages
       .filter((pkg) => {
-        // 如果指定了店铺名，只看该店铺的
-        if (
-          storeName &&
-          pkg.sender_name !== storeName &&
-          !pkg.sender_name?.startsWith(storeName)
-        ) {
+        if (pkg.status !== "已送达") return false;
+        if (pkg.cod_settled) return false;
+        if (!isPackageDeliveryInCalendarMonth(pkg, monthKey)) return false;
+        if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix))
           return false;
+        if (!storeName) {
+          return storesInScope.some(
+            (s) =>
+              pkg.delivery_store_id === s.id ||
+              pkg.sender_name === s.store_name,
+          );
         }
-        const platformAmount = getPlatformPaymentAmount(pkg.description);
-        // 只要是合伙商家订单且已送达/已完成，且包含 COD 或平台支付，并且未结清
+        if (!st) {
+          return pkg.sender_name === storeName;
+        }
         return (
-          isMerchantPackage(pkg) &&
-          (pkg.status === "已送达" || pkg.status === "已完成") &&
-          !pkg.cod_settled &&
-          (Number(pkg.cod_amount || 0) > 0 || platformAmount > 0)
+          pkg.delivery_store_id === st.id || pkg.sender_name === st.store_name
         );
       })
       .sort((a, b) => {
-        const dateA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
-        const dateB = b.delivery_time ? new Date(b.delivery_time).getTime() : 0;
-        return dateB - dateA; // 最近的在前面
+        const dateA = a.delivery_time
+          ? new Date(a.delivery_time).getTime()
+          : 0;
+        const dateB = b.delivery_time
+          ? new Date(b.delivery_time).getTime()
+          : 0;
+        return dateB - dateA;
       });
 
     setModalOrders(codOrders);
@@ -1658,6 +1985,7 @@ const FinanceManagement: React.FC = () => {
 
   // 新增：处理待结清金额卡片点击
   const handlePendingPaymentsClick = (storeName?: string) => {
+    setMerchantCodModalSearch("");
     // 找出所有待结清的代收订单 (rider_settled && !cod_settled)
     const pendingOrders = packages.filter((pkg) => {
       // 如果指定了店铺名，只看该店铺的
@@ -8310,64 +8638,18 @@ const FinanceManagement: React.FC = () => {
 
               {/* 统计卡片 */}
               {(() => {
-                const cashPackages = packages.filter((pkg) => {
-                  if (pkg.payment_method !== "cash") return false;
-                  if (pkg.status !== "已送达" && pkg.status !== "已完成")
-                    return false;
-
-                  // 结清状态过滤
-                  if (cashSettlementStatus === "unsettled" && pkg.rider_settled)
-                    return false;
-                  if (cashSettlementStatus === "settled" && !pkg.rider_settled)
-                    return false;
-
-                  // 日期筛选：按日期精确匹配
-                  const dateKey = getDateKey(
-                    pkg.delivery_time ||
-                      pkg.updated_at ||
-                      pkg.created_at ||
-                      pkg.create_time,
-                  );
-                  if (!dateKey || dateKey !== cashCollectionDate) return false;
-
-                  // 领区过滤
-                  if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix))
-                    return false;
-
-                  return true;
-                });
+                const cashPackages = packages.filter(
+                  isPackageInCashCollectionDayView,
+                );
 
                 let totalDeliveryFee = 0;
                 let totalCOD = 0;
                 let totalPlatformPayment = 0;
 
                 cashPackages.forEach((pkg) => {
-                  const price = parseFloat(
-                    pkg.price?.replace(/[^\d.]/g, "") || "0",
-                  );
-                  totalDeliveryFee += price;
-
-                  // Check merchants
-                  const isStoreMatch = deliveryStores.some(
-                    (store) =>
-                      store.store_name === pkg.sender_name ||
-                      (pkg.sender_name &&
-                        pkg.sender_name.startsWith(store.store_name)),
-                  );
-                  const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
-                  if (isMerchant) {
-                    totalCOD += Number(pkg.cod_amount || 0);
-                  }
-
-                  // 🚀 新增：累加平台支付金额
-                  const payMatch = pkg.description?.match(
-                    /\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/,
-                  );
-                  if (payMatch && payMatch[1]) {
-                    totalPlatformPayment += parseFloat(
-                      payMatch[1].replace(/[^\d.]/g, "") || "0",
-                    );
-                  }
+                  totalDeliveryFee += getCashDetailDeliveryLineCashOnly(pkg);
+                  totalCOD += getCashDetailMerchantRiderCodMmk(pkg);
+                  totalPlatformPayment += getCashDetailPlatformLineTotal(pkg);
                 });
 
                 const totalAmount = totalDeliveryFee + totalCOD;
@@ -8382,88 +8664,7 @@ const FinanceManagement: React.FC = () => {
                       gap: "16px",
                     }}
                   >
-                    {/* 总跑腿费 */}
-                    <div
-                      style={{
-                        background: "rgba(254, 243, 199, 0.2)",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        border: "1px solid rgba(254, 243, 199, 0.3)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#fef3c7",
-                          fontSize: "0.9rem",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        {language === "my"
-                          ? "စုစုပေါင်း ပို့ဆောင်ခ"
-                          : "总跑腿费"}
-                      </div>
-                      <div
-                        style={{
-                          color: "white",
-                          fontSize: "1.5rem",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {totalDeliveryFee.toLocaleString()} MMK
-                      </div>
-                      <div
-                        style={{
-                          color: "rgba(255, 255, 255, 0.7)",
-                          fontSize: "0.85rem",
-                          marginTop: "4px",
-                        }}
-                      >
-                        {cashPackages.length} {t.packageSuffix}
-                      </div>
-                    </div>
-
-                    {/* 总代收款 */}
-                    <div
-                      style={{
-                        background: "rgba(254, 202, 202, 0.2)",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        border: "1px solid rgba(254, 202, 202, 0.3)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#fecaca",
-                          fontSize: "0.9rem",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        {language === "my"
-                          ? "စုစုပေါင်း ကိုယ်စားကောက်ခံငွေ"
-                          : "总代收款"}
-                      </div>
-                      <div
-                        style={{
-                          color: "white",
-                          fontSize: "1.5rem",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {totalCOD.toLocaleString()} MMK
-                      </div>
-                      <div
-                        style={{
-                          color: "rgba(255, 255, 255, 0.7)",
-                          fontSize: "0.85rem",
-                          marginTop: "4px",
-                        }}
-                      >
-                        MERCHANTS{" "}
-                        {language === "my" ? "ဆိုင်မှ ကောက်ခံငွေ" : "店铺代收"}
-                      </div>
-                    </div>
-
-                    {/* 总金额 */}
+                    {/* 总现金（未结清） */}
                     <div
                       style={{
                         background: "rgba(167, 243, 208, 0.2)",
@@ -8479,9 +8680,11 @@ const FinanceManagement: React.FC = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        {language === "my"
-                          ? "စုစုပေါင်း ပမာဏ (ပို့ဆောင်ခ+ကိုယ်စားကောက်)"
-                          : t.totalAmount}
+                        {language === "zh"
+                          ? "总现金（未结清）"
+                          : language === "en"
+                            ? "Total cash (unsettled)"
+                            : "စုစုပေါင်း ငွေသား (မရှင်းရသေးပါ)"}
                       </div>
                       <div
                         style={{
@@ -8491,6 +8694,19 @@ const FinanceManagement: React.FC = () => {
                         }}
                       >
                         {totalAmount.toLocaleString()} MMK
+                      </div>
+                      <div
+                        style={{
+                          color: "rgba(255, 255, 255, 0.65)",
+                          fontSize: "0.8rem",
+                          marginTop: "6px",
+                        }}
+                      >
+                        {language === "zh"
+                          ? "现金跑腿 + 代收款（现金），不含总平台支付"
+                          : language === "en"
+                            ? "Cash delivery fee + cash COD, excl. platform"
+                            : "ငွေသားပို့ဆောင်+ငွေသားကိုယ်စားကောက် (ပလက်ဖောင်းမပါ)"}
                       </div>
                     </div>
 
@@ -8580,26 +8796,10 @@ const FinanceManagement: React.FC = () => {
 
             {/* 快递员列表 */}
             {(() => {
-              // 筛选符合条件的包裹：现金支付、已送达、符合结清状态、且符合日期
-              const cashPackages = packages.filter((pkg) => {
-                if (pkg.payment_method !== "cash") return false;
-                if (pkg.status !== "已送达" && pkg.status !== "已完成")
-                  return false;
-
-                // 结清状态过滤
-                if (cashSettlementStatus === "unsettled" && pkg.rider_settled)
-                  return false;
-                if (cashSettlementStatus === "settled" && !pkg.rider_settled)
-                  return false;
-
-                const dateKey = getDateKey(
-                  pkg.delivery_time ||
-                    pkg.updated_at ||
-                    pkg.created_at ||
-                    pkg.create_time,
-                );
-                return Boolean(dateKey && dateKey === cashCollectionDate);
-              });
+              // 与统计卡片、商家代收款明细、现金详情弹窗默认日 使用同一筛选
+              const cashPackages = packages.filter(
+                isPackageInCashCollectionDayView,
+              );
 
               const courierCashMap: Record<
                 string,
@@ -8612,10 +8812,9 @@ const FinanceManagement: React.FC = () => {
                   courierCashMap[courier] = { packages: [], total: 0 };
                 }
                 courierCashMap[courier].packages.push(pkg);
-                const price = parseFloat(
-                  pkg.price?.replace(/[^\d.]/g, "") || "0",
-                );
-                courierCashMap[courier].total += price;
+                courierCashMap[courier].total +=
+                  getCashDetailDeliveryLineCashOnly(pkg) +
+                  getCashDetailPlatformLineTotal(pkg);
               });
 
               // 过滤快递员列表（如果为领区用户，仅显示所属领区的骑手）
@@ -8858,9 +9057,10 @@ const FinanceManagement: React.FC = () => {
                             onClick={() => {
                               setSelectedCourier(courierName);
                               setShowCashDetailModal(true);
-                              setCashDetailDateFilter("all");
-                              setCashDetailStartDate("");
-                              setCashDetailEndDate("");
+                              // 默认仅显示「当日收款管理」所选日期，与列表中该骑手的单量、商家 COD 明细口径一致
+                              setCashDetailDateFilter("custom");
+                              setCashDetailStartDate(cashCollectionDate);
+                              setCashDetailEndDate(cashCollectionDate);
                               setSelectedCashPackages(new Set());
                               setClearedCashPackages(new Set());
                             }}
@@ -8983,7 +9183,21 @@ const FinanceManagement: React.FC = () => {
                       color: "rgba(255,255,255,0.7)",
                     }}
                   >
-                    查看该快递员的所有现金收款包裹
+                    默认日期为上方「当日收款管理」所选日；与下方结清筛选项、商家代收款订单为同一套规则。可改日期以查看其他区间。
+                  </p>
+                  <p
+                    style={{
+                      margin: "10px 0 0 0",
+                      fontSize: "0.78rem",
+                      color: "rgba(255,255,255,0.55)",
+                      lineHeight: 1.45,
+                      maxWidth: "640px",
+                    }}
+                  >
+                    说明：总跑腿费为「现金代收」的跑腿；余额/二维码
+                    单的跑腿与商品余额费（或描述中余额/平台/付给商家: MMK
+                    标签）计入总平台支付。「总代收款（现金）」仅计现金支付单上商家填写的骑手代收；
+                    客户端 web/app 订单为余额支付，不计入。已结清的不列入。
                   </p>
                 </div>
                 <button
@@ -9113,11 +9327,13 @@ const FinanceManagement: React.FC = () => {
 
                 {/* 包裹列表 */}
                 {(() => {
+                  const courierMatch = (c: string | undefined, sel: string) =>
+                    String(c || "").trim() === String(sel || "").trim();
+
                   let filteredPackages = packages.filter(
                     (pkg) =>
-                      pkg.payment_method === "cash" &&
-                      (pkg.status === "已送达" || pkg.status === "已完成") &&
-                      pkg.courier === selectedCourier,
+                      courierMatch(pkg.courier, selectedCourier || "") &&
+                      (pkg.status === "已送达" || pkg.status === "已完成"),
                   );
 
                   // 日期筛选
@@ -9176,30 +9392,7 @@ const FinanceManagement: React.FC = () => {
                     }
                   }
 
-                  const cashRelevantPackages = filteredPackages.filter(
-                    (pkg) => {
-                      const price = parseFloat(
-                        pkg.price?.replace(/[^\d.]/g, "") || "0",
-                      );
-                      const hasDeliveryFee = price > 0;
-                      const hasMerchantCod =
-                        isMerchantPackage(pkg) &&
-                        Number(pkg.cod_amount || 0) > 0;
-                      return hasDeliveryFee || hasMerchantCod;
-                    },
-                  );
-
-                  const totalAmount = cashRelevantPackages.reduce(
-                    (sum, pkg) => {
-                      const price = parseFloat(
-                        pkg.price?.replace(/[^\d.]/g, "") || "0",
-                      );
-                      return sum + price;
-                    },
-                    0,
-                  );
-
-                  if (cashRelevantPackages.length === 0) {
+                  if (filteredPackages.length === 0) {
                     return (
                       <div
                         style={{
@@ -9219,51 +9412,40 @@ const FinanceManagement: React.FC = () => {
                             fontSize: "1.1rem",
                           }}
                         >
-                          该时间段内暂无现金收款包裹
+                          该时间段内暂无该骑手的已送达订单
                         </div>
                       </div>
                     );
                   }
 
-                  // 过滤掉已结清的包裹
-                  const visiblePackages = cashRelevantPackages.filter(
-                    (pkg) =>
-                      !clearedCashPackages.has(pkg.id) && !pkg.rider_settled,
-                  );
+                  // 与「当日收款管理」结清筛选项一致（未结清 / 已结清 / 全部），并排除本弹窗内已点结清
+                  const visiblePackages = filteredPackages.filter((pkg) => {
+                    if (clearedCashPackages.has(pkg.id)) return false;
+                    if (cashSettlementStatus === "unsettled" && pkg.rider_settled)
+                      return false;
+                    if (cashSettlementStatus === "settled" && !pkg.rider_settled)
+                      return false;
+                    return true;
+                  });
 
                   let visibleDeliveryFee = 0;
                   let visibleCOD = 0;
                   let visiblePlatformPayment = 0;
+                  let visiblePlatformItemProduct = 0;
+                  let visiblePlatformDeliveryBalance = 0;
 
                   visiblePackages.forEach((pkg) => {
-                    const price = parseFloat(
-                      pkg.price?.replace(/[^\d.]/g, "") || "0",
-                    );
-                    visibleDeliveryFee += price;
-
-                    const isStoreMatch = deliveryStores.some(
-                      (store) =>
-                        store.store_name === pkg.sender_name ||
-                        (pkg.sender_name &&
-                          pkg.sender_name.startsWith(store.store_name)),
-                    );
-                    const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
-                    if (isMerchant) {
-                      visibleCOD += Number(pkg.cod_amount || 0);
-                    }
-
-                    // 🚀 新增：累加平台支付金额
-                    const payMatch = pkg.description?.match(
-                      /\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/,
-                    );
-                    if (payMatch && payMatch[1]) {
-                      visiblePlatformPayment += parseFloat(
-                        payMatch[1].replace(/[^\d.]/g, "") || "0",
-                      );
-                    }
+                    visibleDeliveryFee += getCashDetailDeliveryLineCashOnly(pkg);
+                    visibleCOD += getCashDetailMerchantRiderCodMmk(pkg);
+                    visiblePlatformPayment += getCashDetailPlatformLineTotal(pkg);
+                    visiblePlatformItemProduct +=
+                      getCashDetailPlatformItemProductMmk(pkg);
+                    visiblePlatformDeliveryBalance +=
+                      getCashDetailPlatformDeliveryBalanceMmk(pkg);
                   });
 
-                  const visibleTotalAmount = visibleDeliveryFee + visibleCOD;
+                  const visibleTotalAmount =
+                    visibleDeliveryFee + visibleCOD;
 
                   // 检查是否全选
                   const allSelected =
@@ -9324,7 +9506,7 @@ const FinanceManagement: React.FC = () => {
                             display: "grid",
                             gridTemplateColumns: isMobile
                               ? "1fr"
-                              : "repeat(4, 1fr)",
+                              : "repeat(3, 1fr)",
                             gap: "12px",
                             marginBottom: "16px",
                           }}
@@ -9345,7 +9527,7 @@ const FinanceManagement: React.FC = () => {
                                 marginBottom: "4px",
                               }}
                             >
-                              总跑腿费
+                              总跑腿费（现金代收）
                             </div>
                             <div
                               style={{
@@ -9363,11 +9545,12 @@ const FinanceManagement: React.FC = () => {
                                 marginTop: "4px",
                               }}
                             >
-                              {visiblePackages.length} 个包裹
+                              未结清 {visiblePackages.length} 单 ·
+                              余额类跑腿在「总平台支付」
                             </div>
                           </div>
 
-                          {/* 总代收款 */}
+                          {/* 总代收款（现金） */}
                           <div
                             style={{
                               background: "rgba(254, 202, 202, 0.2)",
@@ -9383,7 +9566,11 @@ const FinanceManagement: React.FC = () => {
                                 marginBottom: "4px",
                               }}
                             >
-                              总代收款
+                              {language === "zh"
+                                ? "总代收款（现金）"
+                                : language === "en"
+                                  ? "Total collection (Cash)"
+                                  : "စုစုပေါင်း ကိုယ်စားကောက် (ငွေသားသာ)"}
                             </div>
                             <div
                               style={{
@@ -9394,9 +9581,161 @@ const FinanceManagement: React.FC = () => {
                             >
                               {visibleCOD.toLocaleString()} MMK
                             </div>
+                            <div
+                              style={{
+                                color: "rgba(255, 255, 255, 0.7)",
+                                fontSize: "0.8rem",
+                                marginTop: "4px",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "仅现金支付、商家要骑手面收；C 端/APP 余额单不计入"
+                                : language === "en"
+                                  ? "Cash & merchant-rider only; client balance N/A"
+                                  : "ဆိုင် ငွေသားကောက်ခံကိုယ်စားကောက် (ငွေသားသာ)"}
+                            </div>
                           </div>
 
-                          {/* 🚀 新增：总平台支付 */}
+                          {/* 总现金（未结清） */}
+                          <div
+                            style={{
+                              background: "rgba(191, 219, 254, 0.2)",
+                              borderRadius: "12px",
+                              padding: "16px",
+                              border: "1px solid rgba(191, 219, 254, 0.3)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: "#bfdbfe",
+                                fontSize: "0.9rem",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "总现金（未结清）"
+                                : language === "en"
+                                  ? "Total cash (unsettled)"
+                                  : "စုစုပေါင်း ငွေသား (မရှင်းရသေးပါ)"}
+                            </div>
+                            <div
+                              style={{
+                                color: "white",
+                                fontSize: "1.4rem",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              {visibleTotalAmount.toLocaleString()} MMK
+                            </div>
+                            <div
+                              style={{
+                                color: "rgba(255, 255, 255, 0.65)",
+                                fontSize: "0.75rem",
+                                marginTop: "6px",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "现金跑腿 + 代收款（现金），不含总平台支付"
+                                : language === "en"
+                                  ? "Cash delivery fee + cash COD, excl. platform"
+                                  : "ငွေသားပို့ဆောင်+ငွေသားကိုယ်စားကောက် (ပလက်ဖောင်း မပါ)"}
+                            </div>
+                          </div>
+
+                          {/* 商品费（余额支付）— 与总平台拆分明细之一 */}
+                          <div
+                            style={{
+                              background: "rgba(52, 211, 153, 0.12)",
+                              borderRadius: "12px",
+                              padding: "16px",
+                              border: "1px solid rgba(52, 211, 153, 0.28)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: "#6ee7b7",
+                                fontSize: "0.9rem",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "商品费（余额支付）"
+                                : language === "en"
+                                  ? "Item (balance pay)"
+                                  : "ကုန်ပစ္စည်းခ (လက်ကျန်ငွေ)"}
+                            </div>
+                            <div
+                              style={{
+                                color: "white",
+                                fontSize: "1.4rem",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              {visiblePlatformItemProduct.toLocaleString()} MMK
+                            </div>
+                            <div
+                              style={{
+                                color: "rgba(255, 255, 255, 0.65)",
+                                fontSize: "0.75rem",
+                                marginTop: "6px",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "描述中「商品费用(仅余额)」+ 有标签时扣入部分"
+                                : language === "en"
+                                  ? "From 商品(余额) in description (split)"
+                                  : "ကုန်ပစ္စည်းခ စာတန်းမှ တို့ခြင်း"}
+                            </div>
+                          </div>
+
+                          {/* 跑腿费（余额支付）— 与总平台拆分明细之二 */}
+                          <div
+                            style={{
+                              background: "rgba(45, 212, 191, 0.12)",
+                              borderRadius: "12px",
+                              padding: "16px",
+                              border: "1px solid rgba(45, 212, 191, 0.28)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: "#5eead4",
+                                fontSize: "0.9rem",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "跑腿费（余额支付）"
+                                : language === "en"
+                                  ? "Delivery fee (balance pay)"
+                                  : "ပို့ဆောင်ခ (လက်ကျန်ငွေ)"}
+                            </div>
+                            <div
+                              style={{
+                                color: "white",
+                                fontSize: "1.4rem",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              {visiblePlatformDeliveryBalance.toLocaleString()}{" "}
+                              MMK
+                            </div>
+                            <div
+                              style={{
+                                color: "rgba(255, 255, 255, 0.65)",
+                                fontSize: "0.75rem",
+                                marginTop: "6px",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "非现金 price + 标签总额中剩余部分"
+                                : language === "en"
+                                  ? "Non-cash price + remainder of tag"
+                                  : "ငွေသားမဟုတ် price + ကျန်ကွာကျား"}
+                            </div>
+                          </div>
+
+                          {/* 总平台支付 (余额支付) */}
                           <div
                             style={{
                               background: "rgba(167, 243, 208, 0.2)",
@@ -9423,34 +9762,18 @@ const FinanceManagement: React.FC = () => {
                             >
                               {visiblePlatformPayment.toLocaleString()} MMK
                             </div>
-                          </div>
-
-                          {/* 总金额 */}
-                          <div
-                            style={{
-                              background: "rgba(191, 219, 254, 0.2)",
-                              borderRadius: "12px",
-                              padding: "16px",
-                              border: "1px solid rgba(191, 219, 254, 0.3)",
-                            }}
-                          >
                             <div
                               style={{
-                                color: "#bfdbfe",
-                                fontSize: "0.9rem",
-                                marginBottom: "4px",
+                                color: "rgba(255, 255, 255, 0.65)",
+                                fontSize: "0.75rem",
+                                marginTop: "6px",
                               }}
                             >
-                              总金额 (未结清)
-                            </div>
-                            <div
-                              style={{
-                                color: "white",
-                                fontSize: "1.4rem",
-                                fontWeight: "bold",
-                              }}
-                            >
-                              {visibleTotalAmount.toLocaleString()} MMK
+                              {language === "zh"
+                                ? "= 上两项之和（同一口径）"
+                                : language === "en"
+                                  ? "= product + delivery (split)"
+                                  : "အထက် ၂ချိုင် ပေါင်းလဒ် နှင့် တူညီသည်"}
                             </div>
                           </div>
                         </div>
@@ -9754,32 +10077,42 @@ const FinanceManagement: React.FC = () => {
                                           : "无"}
                                       </div>
                                     )}
-                                    {/* 🚀 新增：展示平台支付金额 */}
-                                    {(() => {
-                                      const payMatch = pkg.description?.match(
-                                        /\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/,
-                                      );
-                                      if (payMatch && payMatch[1]) {
-                                        return (
-                                          <div
-                                            style={{
-                                              background:
-                                                "rgba(16, 185, 129, 0.2)",
-                                              color: "#10b981",
-                                              padding: "4px 12px",
-                                              borderRadius: "6px",
-                                              fontSize: "0.85rem",
-                                              fontWeight: "bold",
-                                              whiteSpace: "nowrap",
-                                              marginTop: "4px",
-                                            }}
-                                          >
-                                            平台支付: {payMatch[1]} MMK
-                                          </div>
-                                        );
-                                      }
-                                      return null;
-                                    })()}
+                                    <div
+                                      style={{
+                                        background: "rgba(148, 163, 184, 0.25)",
+                                        color: "#e2e8f0",
+                                        padding: "4px 12px",
+                                        borderRadius: "6px",
+                                        fontSize: "0.75rem",
+                                        fontWeight: "700",
+                                        whiteSpace: "nowrap",
+                                        marginTop: "4px",
+                                      }}
+                                    >
+                                      {pkg.payment_method === "cash"
+                                        ? "💵 现金"
+                                        : "💳 余额/二维码"}
+                                    </div>
+                                    {getCashDetailPlatformLineTotal(pkg) > 0 && (
+                                      <div
+                                        style={{
+                                          background: "rgba(16, 185, 129, 0.2)",
+                                          color: "#10b981",
+                                          padding: "4px 12px",
+                                          borderRadius: "6px",
+                                          fontSize: "0.85rem",
+                                          fontWeight: "bold",
+                                          whiteSpace: "nowrap",
+                                          marginTop: "4px",
+                                        }}
+                                      >
+                                        余额/平台支付:{" "}
+                                        {getCashDetailPlatformLineTotal(
+                                          pkg,
+                                        ).toLocaleString()}{" "}
+                                        MMK
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 <div
@@ -10079,7 +10412,9 @@ const FinanceManagement: React.FC = () => {
                             >
                               <div
                                 onClick={() =>
-                                  handlePendingPaymentsClick(store.store_name)
+                                  handleMerchantAllSettledOrdersClick(
+                                    store.store_name,
+                                  )
                                 }
                                 style={{
                                   background: "rgba(255, 255, 255, 0.08)",
@@ -10109,9 +10444,11 @@ const FinanceManagement: React.FC = () => {
                                     marginBottom: "4px",
                                   }}
                                 >
-                                  {language === "my"
-                                    ? "ယခုနှစ် ငွေကောက်ခံမှု စုစုပေါင်း"
-                                    : t.monthlyMerchantCollection}
+                                  {language === "zh"
+                                    ? `${new Date().getFullYear()}年已结清订单`
+                                    : language === "en"
+                                      ? `Settled in ${new Date().getFullYear()} (orders)`
+                                      : `${new Date().getFullYear()} နှစ် ငွေရှင်းပြီး အော်ဒါများ`}
                                 </div>
                                 <div
                                   style={{
@@ -10120,7 +10457,10 @@ const FinanceManagement: React.FC = () => {
                                     fontWeight: "bold",
                                   }}
                                 >
-                                  {store.totalAmount.toLocaleString()}
+                                  {store.settledThisYearCount}
+                                  {language === "zh" && " 单"}
+                                  {language === "en" && " orders"}
+                                  {language === "my" && " ခု"}
                                 </div>
                               </div>
                               <div
@@ -10548,7 +10888,7 @@ const FinanceManagement: React.FC = () => {
                     >
                       <div
                         onClick={() =>
-                          handlePendingPaymentsClick(store.store_name)
+                          handleMerchantAllSettledOrdersClick(store.store_name)
                         }
                         style={{
                           background: "rgba(255, 255, 255, 0.08)",
@@ -10576,9 +10916,11 @@ const FinanceManagement: React.FC = () => {
                             marginBottom: "4px",
                           }}
                         >
-                          {language === "my"
-                            ? "ယခုနှစ် ငွေကောက်ခံမှု စုစုပေါင်း"
-                            : t.monthlyMerchantCollection}
+                          {language === "zh"
+                            ? `${new Date().getFullYear()}年已结清订单`
+                            : language === "en"
+                              ? `Settled in ${new Date().getFullYear()} (orders)`
+                              : `${new Date().getFullYear()} နှစ် ငွေရှင်းပြီး အော်ဒါများ`}
                         </div>
                         <div
                           style={{
@@ -10587,7 +10929,10 @@ const FinanceManagement: React.FC = () => {
                             fontWeight: "bold",
                           }}
                         >
-                          {store.totalAmount.toLocaleString()}
+                          {store.settledThisYearCount}
+                          {language === "zh" && " 单"}
+                          {language === "en" && " orders"}
+                          {language === "my" && " ခု"}
                         </div>
                       </div>
                       <div
@@ -10930,12 +11275,15 @@ const FinanceManagement: React.FC = () => {
                     opacity: 0.8,
                   }}
                 >
-                  {filteredMerchantOrders.length}{" "}
+                  {showMerchantSettledModal && merchantCodModalSearch.trim()
+                    ? `${filteredMerchantCodModalOrders.length} / ${modalOrders.length}`
+                    : modalOrders.length}{" "}
                   {language === "zh" ? "单" : ""}
                 </span>
               </h2>
               <button
                 onClick={() => {
+                  setMerchantCodModalSearch("");
                   setShowMerchantSettledModal(false);
                   setShowPendingOrdersModal(false);
                 }}
@@ -10964,102 +11312,110 @@ const FinanceManagement: React.FC = () => {
               </button>
             </div>
 
-            {/* Content */}
-            <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
-              {/* 筛选工具栏 */}
+            {showMerchantSettledModal && merchantCodModalKind === "uncleared" && (
               <div
                 style={{
-                  display: "flex",
-                  gap: "12px",
-                  marginBottom: "20px",
-                  flexWrap: "wrap",
-                  background: "rgba(255, 255, 255, 0.08)",
-                  padding: "16px",
-                  borderRadius: "12px",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  padding: "0 24px 12px",
+                  color: "rgba(255,255,255,0.72)",
+                  fontSize: "0.84rem",
+                  lineHeight: 1.45,
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
                 }}
               >
-                <div style={{ flex: 1, minWidth: "200px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      color: "rgba(255,255,255,0.6)",
-                      fontSize: "0.8rem",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    {language === "zh" ? "商家筛选" : "Filter by Merchant"}
-                  </label>
-                  <select
-                    value={merchantCollectionCustomerFilter}
-                    onChange={(e) =>
-                      setMerchantCollectionCustomerFilter(e.target.value)
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      borderRadius: "8px",
-                      border: "1px solid rgba(255, 255, 255, 0.25)",
-                      background: "rgba(7, 23, 53, 0.65)",
-                      color: "white",
-                      fontSize: "0.9rem",
-                    }}
-                  >
-                    <option value="all">
-                      {language === "zh" ? "所有商家" : "All Merchants"}
-                    </option>
-                    {merchantCustomerOptions.map((optionKey) => {
-                      const [storeName, storeCode] = optionKey.split("||");
-                      const label = storeCode
-                        ? `${storeName}（${storeCode}）`
-                        : storeName;
-                      return (
-                        <option key={optionKey} value={optionKey}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-
-                <div style={{ flex: 1, minWidth: "200px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      color: "rgba(255,255,255,0.6)",
-                      fontSize: "0.8rem",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    {language === "zh" ? "按地区筛选" : "Filter by Region"}
-                  </label>
-                  <select
-                    value={merchantCollectionRegionFilter}
-                    onChange={(e) =>
-                      setMerchantCollectionRegionFilter(e.target.value)
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      borderRadius: "8px",
-                      border: "1px solid rgba(255, 255, 255, 0.25)",
-                      background: "rgba(7, 23, 53, 0.65)",
-                      color: "white",
-                      fontSize: "0.9rem",
-                    }}
-                  >
-                    <option value="all">
-                      {language === "zh" ? "所有地区" : "All Regions"}
-                    </option>
-                    {REGIONS.map((reg) => (
-                      <option key={reg.prefix} value={reg.prefix}>
-                        {reg.name} ({reg.prefix})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {language === "zh"
+                  ? `与商家端 Web「待结清订单」同一规则：当前自然月（${getCurrentMonthKey()}）内已送达、商家代收款未结清（cod_settled 为空或 false）；店铺匹配为 delivery_store_id 或 sender_name 与合伙店一致。`
+                  : language === "my"
+                    ? "ဆိုင် Web ရှင်းလင်းရန် စောင့်ဆိုင်းမှု နှင့်တူညီသော စည်းမျဉ်း—လက်ရှိလ၊ ပို့ဆောင်ပြီး cod မရှင်းရသေး"
+                    : `Same rules as merchant web “Uncleared orders”: current month (${getCurrentMonthKey()}), delivered, COD not settled; store by delivery_store_id or sender_name.`}
               </div>
+            )}
+            {showMerchantSettledModal && merchantCodModalKind === "settled_all" && (
+              <div
+                style={{
+                  padding: "0 24px 12px",
+                  color: "rgba(255,255,255,0.72)",
+                  fontSize: "0.84rem",
+                  lineHeight: 1.45,
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                {language === "zh"
+                  ? `与上方「当年已结清」笔数一致：只列出结清时间（cod_settled_at）落在 ${new Date().getFullYear()} 自然年内的订单（含无代收/平台金额但已作结清标记的单），由新到旧。`
+                  : language === "my"
+                    ? "ဖော်ပြထားသော နှစ်ကာလတွင် ရှင်းလင်းချိန် (cod_settled_at) အတိုင်း"
+                    : "Same count as the card: orders with settlement time (cod_settled_at) in the current year, newest first—aligned with merchant web."}
+              </div>
+            )}
 
+            {showMerchantSettledModal &&
+              (merchantCodModalKind === "uncleared" ||
+                merchantCodModalKind === "settled_all") && (
+                <div
+                  style={{
+                    padding: "12px 24px 0",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    alignItems: "center",
+                  }}
+                >
+                  <input
+                    type="search"
+                    value={merchantCodModalSearch}
+                    onChange={(e) => setMerchantCodModalSearch(e.target.value)}
+                    placeholder={
+                      language === "zh"
+                        ? "筛选：订单号 / 店铺 / 客户 / 电话"
+                        : language === "my"
+                          ? "အော်ဒါ/ဆိုင်/ဖုန်း ရှာရန်"
+                          : "Filter by order ID, store, customer, phone"
+                    }
+                    style={{
+                      flex: "1 1 220px",
+                      minWidth: 0,
+                      padding: "10px 14px",
+                      borderRadius: "12px",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      background: "rgba(0,0,0,0.25)",
+                      color: "white",
+                      fontSize: "0.95rem",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={downloadMerchantCodModalCsv}
+                    disabled={filteredMerchantCodModalOrders.length === 0}
+                    style={{
+                      padding: "10px 18px",
+                      borderRadius: "12px",
+                      border: "1px solid rgba(255,255,255,0.25)",
+                      background:
+                        filteredMerchantCodModalOrders.length === 0
+                          ? "rgba(255,255,255,0.08)"
+                          : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                      color:
+                        filteredMerchantCodModalOrders.length === 0
+                          ? "rgba(255,255,255,0.4)"
+                          : "#05221a",
+                      fontWeight: 700,
+                      cursor:
+                        filteredMerchantCodModalOrders.length === 0
+                          ? "not-allowed"
+                          : "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {language === "zh"
+                      ? "导出对账单 (CSV)"
+                      : language === "my"
+                        ? "CSV ထုတ်ရန်"
+                        : "Export statement (CSV)"}
+                  </button>
+                </div>
+              )}
+
+            {/* Content */}
+            <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
               <div
                 style={{
                   display: "grid",
@@ -11069,7 +11425,7 @@ const FinanceManagement: React.FC = () => {
                   gap: "16px",
                 }}
               >
-                {filteredMerchantOrders.map((pkg) => (
+                {merchantCodModalDisplayOrders.map((pkg) => (
                   <div
                     key={pkg.id}
                     style={{
@@ -11100,7 +11456,8 @@ const FinanceManagement: React.FC = () => {
                         const platformAmount = getPlatformPaymentAmount(
                           pkg.description,
                         );
-                        if (Number(pkg.cod_amount || 0) > 0) {
+                        const cod = Number(pkg.cod_amount || 0);
+                        if (cod > 0) {
                           return (
                             <span
                               style={{
@@ -11137,6 +11494,49 @@ const FinanceManagement: React.FC = () => {
                               }}
                             >
                               {language === "zh" ? "余额支付" : "Balance Pay"}
+                            </span>
+                          );
+                        }
+                        if (
+                          merchantCodModalKind === "uncleared" &&
+                          !pkg.cod_settled
+                        ) {
+                          return (
+                            <span
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: "8px",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                background: "rgba(243, 156, 18, 0.2)",
+                                color: "#f39c12",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "待结清"
+                                : language === "my"
+                                  ? "စောင့်ဆိုင်း"
+                                  : "Pending"}
+                            </span>
+                          );
+                        }
+                        if (merchantCodModalKind === "settled_all" && pkg.cod_settled) {
+                          return (
+                            <span
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: "8px",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                background: "rgba(39, 174, 96, 0.2)",
+                                color: "#2ecc71",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "已结清"
+                                : language === "my"
+                                  ? "ရှင်းပြီး"
+                                  : "Settled"}
                             </span>
                           );
                         }
@@ -11237,7 +11637,7 @@ const FinanceManagement: React.FC = () => {
                   </div>
                 ))}
 
-                {filteredMerchantOrders.length === 0 && (
+                {modalOrders.length === 0 && (
                   <div
                     style={{
                       gridColumn: "1 / -1",
@@ -11260,6 +11660,31 @@ const FinanceManagement: React.FC = () => {
                     </div>
                   </div>
                 )}
+                {modalOrders.length > 0 &&
+                  merchantCodModalDisplayOrders.length === 0 &&
+                  showMerchantSettledModal &&
+                  Boolean(merchantCodModalSearch.trim()) && (
+                    <div
+                      style={{
+                        gridColumn: "1 / -1",
+                        textAlign: "center",
+                        padding: "60px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: "rgba(255,255,255,0.5)",
+                          fontSize: "1.1rem",
+                        }}
+                      >
+                        {language === "zh"
+                          ? "没有符合筛选条件的订单"
+                          : language === "my"
+                            ? "စစ်ထုတ်ချက်နှင့် ကိုက်ညီသော အော်ဒါ မရှိပါ"
+                            : "No orders match your filter"}
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
 
@@ -11273,6 +11698,7 @@ const FinanceManagement: React.FC = () => {
             >
               <button
                 onClick={() => {
+                  setMerchantCodModalSearch("");
                   setShowMerchantSettledModal(false);
                   setShowPendingOrdersModal(false);
                 }}

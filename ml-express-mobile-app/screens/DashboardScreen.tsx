@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { packageService, supabase, notificationService, Notification } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
 import * as Location from 'expo-location';
+import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import { Alert } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -83,7 +84,7 @@ export default function DashboardScreen({ navigation }: any) {
   // 请求位置权限
   const requestLocationPermission = async () => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await requestForegroundPermissionsIfDisclosed();
       if (status === 'granted') {
         console.log('✅ 位置权限已获取');
         // 立即上传一次位置

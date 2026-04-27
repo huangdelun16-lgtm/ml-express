@@ -133,14 +133,26 @@ const TrackingPage: React.FC = () => {
     }
   }, [navigate, loadActiveOrders]);
 
+  // 与 ProfilePage 订单分类一致：全部=真全量；待取件含待收款；配送中含已取件；已完成含已送达/已完成
   useEffect(() => {
     if (statusFilter === "all") {
+      setFilteredOrders([...activeOrders]);
+    } else if (statusFilter === "待取件") {
       setFilteredOrders(
         activeOrders.filter(
-          (pkg) =>
-            !["已送达", "已取消", "Delivered", "Cancelled"].includes(
-              pkg.status,
-            ),
+          (pkg) => pkg.status === "待取件" || pkg.status === "待收款",
+        ),
+      );
+    } else if (statusFilter === "运输中") {
+      setFilteredOrders(
+        activeOrders.filter(
+          (pkg) => pkg.status === "运输中" || pkg.status === "已取件",
+        ),
+      );
+    } else if (statusFilter === "已完成") {
+      setFilteredOrders(
+        activeOrders.filter(
+          (pkg) => pkg.status === "已送达" || pkg.status === "已完成",
         ),
       );
     } else {
@@ -493,8 +505,17 @@ const TrackingPage: React.FC = () => {
                   fontWeight: "500",
                 }}
               >
-                {statusFilter === "all" ? "处理中的订单" : statusFilter}{" "}
-                {filteredOrders.length} 笔
+                {statusFilter === "all"
+                  ? t?.totalOrders || "全部订单"
+                  : statusFilter}{" "}
+                {filteredOrders.length}
+                {language === "zh"
+                  ? " 笔"
+                  : language === "en"
+                    ? " orders"
+                    : language === "my"
+                      ? " ခု"
+                      : ""}
           </p>
         </div>
           </div>
