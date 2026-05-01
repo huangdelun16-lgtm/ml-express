@@ -15,10 +15,15 @@ const MODAL_OVERLAY: CSSProperties = {
   WebkitBackdropFilter: 'blur(10px)',
 };
 
+/** 创建订单弹窗设计尺寸（与客户端 Web 一致）；小屏用 min 夹在视口内 */
+const ORDER_MODAL_WIDTH_PX = 680;
+const ORDER_MODAL_HEIGHT_PX = 828;
+
 const MODAL_PANEL: CSSProperties = {
   position: 'relative',
-  width: 'min(100%, 440px)',
-  maxHeight: 'min(90vh, 880px)',
+  width: `min(100%, ${ORDER_MODAL_WIDTH_PX}px)`,
+  height: `min(${ORDER_MODAL_HEIGHT_PX}px, calc(100vh - 24px))`,
+  maxHeight: `min(${ORDER_MODAL_HEIGHT_PX}px, calc(100vh - 24px))`,
   overflow: 'auto',
   WebkitOverflowScrolling: 'touch',
   boxSizing: 'border-box',

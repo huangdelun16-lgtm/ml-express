@@ -79,7 +79,9 @@ const translations: any = {
       clear: '清空全部',
       price: '单价',
       quantity: '数量',
-      items: '件商品'
+      items: '件商品',
+      remark: '备注',
+      openDetailHint: '查看详情与备注',
     },
     mall: {
       title: '同城商场',
@@ -111,7 +113,22 @@ const translations: any = {
       hours: '营业时间',
       openNow: '正在营业',
       closedNow: '休息中',
-      closedToday: '今日打烊'
+      closedToday: '今日打烊',
+      unavailable: '已下架',
+      productDetail: '商品详情',
+      description: '商品描述',
+      noDescription: '暂无详细描述',
+      quantity: '数量',
+      itemRemark: '本商品备注（选填）',
+      itemRemarkPlaceholder: '如：少糖、不要辣、口味等',
+      itemRemarkMultiHint: '每件可单独备注',
+      detailSelectionSaved: '已保存数量与备注，可在下方加入购物车',
+      clearCartDialogTitle: '清空购物车提示',
+      clearCartDialogMessage: '购物车中已存在其他店铺的商品，继续添加将清空原有商品。确定继续吗？',
+      cancel: '取消',
+      confirm: '确定',
+      cartUpdated: '购物车已更新',
+      outOfStock: '暂无库存'
     },
     contact: {
       title: '联系我们',
@@ -657,7 +674,9 @@ const translations: any = {
       clear: 'Clear All',
       price: 'Price',
       quantity: 'Qty',
-      items: 'Items'
+      items: 'Items',
+      remark: 'Note',
+      openDetailHint: 'Details & notes',
     },
     mall: {
       title: 'City Mall',
@@ -689,7 +708,22 @@ const translations: any = {
       hours: 'Hours',
       openNow: 'Open Now',
       closedNow: 'Closed',
-      closedToday: 'Closed Today'
+      closedToday: 'Closed Today',
+      unavailable: 'Unavailable',
+      productDetail: 'Product Details',
+      description: 'Description',
+      noDescription: 'No description available',
+      quantity: 'Quantity',
+      itemRemark: 'Note for this item (optional)',
+      itemRemarkPlaceholder: 'e.g. less sugar, no spicy',
+      itemRemarkMultiHint: 'Add a note per item',
+      detailSelectionSaved: 'Quantity and note saved. Add to cart below.',
+      clearCartDialogTitle: 'Clear cart?',
+      clearCartDialogMessage: 'Your cart has items from another store. Continuing will replace them. Continue?',
+      cancel: 'Cancel',
+      confirm: 'Continue',
+      cartUpdated: 'Cart updated',
+      outOfStock: 'Out of stock'
     },
     contact: {
       title: 'Contact Us',
@@ -1235,7 +1269,9 @@ const translations: any = {
       clear: 'အားလုံးဖျက်ရန်',
       price: 'စျေးနှုန်း',
       quantity: 'အရေအတွက်',
-      items: 'ခု'
+      items: 'ခု',
+      remark: 'မှတ်ချက်',
+      openDetailHint: 'အသေးစိတ်နှင့်မှတ်ချက်',
     },
     mall: {
       title: 'စျေးဝယ်စင်တာ',
@@ -1267,7 +1303,22 @@ const translations: any = {
       hours: 'ဖွင့်ချိန်',
       openNow: 'ဆိုင်ဖွင့်ထားသည်',
       closedNow: 'ဆိုင်ပိတ်ထားသည်',
-      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်'
+      closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်',
+      unavailable: 'မရရှိနိုင်',
+      productDetail: 'ကုန်ပစ္စည်းအသေးစိတ်',
+      description: 'ဖော်ပြချက်',
+      noDescription: 'အသေးစိတ်ဖော်ပြချက်မရှိပါ',
+      quantity: 'အရေအတွက်',
+      itemRemark: 'ဤပစ္စည်းအတွက် မှတ်ချက် (ရွေးချယ်နိုင်)',
+      itemRemarkPlaceholder: 'ဥပမာ- သကြားနည်း၊ မစပ်ပါ',
+      itemRemarkMultiHint: 'တစ်ခုချင်းစီမှတ်ချက်ထည့်နိုင်',
+      detailSelectionSaved: 'အရေအတွက်နှင့် မှတ်ချက်သိမ်းပြီး။ အောက်တွင်ထည့်နိုင်ပါသည်။',
+      clearCartDialogTitle: 'လှည်းသန့်ရှင်းရန်',
+      clearCartDialogMessage: 'အခြားဆိုင်ပစ္စည်းများ လှည်းထဲရှိပါသည်။ ဆက်လုပ်လိုပါက ဖျက်ပြီး အသစ်ထည့်မည်။',
+      cancel: 'ပယ်ဖျက်',
+      confirm: 'ဆက်လုပ်',
+      cartUpdated: 'လှည်းအပ်ဒိတ်လုပ်ပြီး',
+      outOfStock: 'လက်ကျန်မရှိ'
     },
     contact: {
       title: 'ဆက်သွယ်ရန်',

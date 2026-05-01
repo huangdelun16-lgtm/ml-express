@@ -25,7 +25,7 @@ import QRCode from 'react-native-qrcode-svg';
 import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { useCart } from '../contexts/CartContext';
+import { useCart, summarizeCustomerRemarks } from '../contexts/CartContext';
 import { packageService, systemSettingsService, supabase, merchantService, Product } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
@@ -2087,8 +2087,25 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       }
 
       // 如果原先有描述，保留它（避免重复添加）
-      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]/g, '').trim();
-      setDescription(`${productsText}${payToMerchantTag} ${cleanDesc}`.trim());
+      const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]|\[买家商品备注:.*?\]|\[Buyer item notes:.*?\]|\[ဝယ်ယူသူမှတ်ချက်:.*?\]/g, '').trim();
+      const remarkSegments: string[] = [];
+      Object.entries(selected).forEach(([id]) => {
+        const product = sourceProducts.find(p => p.id === id) as
+          | (Product & { customer_remark?: string; customer_remarks?: string[] })
+          | undefined;
+        let note: string | undefined;
+        if (product?.customer_remarks?.length) {
+          note = summarizeCustomerRemarks(product.customer_remarks);
+        } else if (product?.customer_remark?.trim()) {
+          note = product.customer_remark.trim();
+        }
+        if (product && note) remarkSegments.push(`${product.name}: ${note}`);
+      });
+      const buyerRemarkLabel =
+        language === 'zh' ? '买家商品备注' : language === 'en' ? 'Buyer item notes' : 'ဝယ်ယူသူမှတ်ချက်';
+      const buyerRemarksTag = remarkSegments.length > 0 ? ` [${buyerRemarkLabel}: ${remarkSegments.join(' | ')}]` : '';
+
+      setDescription(`${productsText}${payToMerchantTag}${buyerRemarksTag} ${cleanDesc}`.trim());
     } else {
       setCartTotal(0);
       setCodAmount('0');

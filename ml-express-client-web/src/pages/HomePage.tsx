@@ -210,7 +210,12 @@ const HomePage: React.FC = () => {
         const product = merchantProducts.find(p => p.id === id);
         if (product) {
           totalProductPrice += product.price * qty;
-          productDetails.push(`${product.name} x${qty}`);
+          let line = `${product.name} x${qty}`;
+          const remark = (product as any).customer_remark?.trim();
+          if (remark) {
+            line += ` (${remark})`;
+          }
+          productDetails.push(line);
         }
       });
 

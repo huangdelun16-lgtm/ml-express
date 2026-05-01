@@ -31,6 +31,7 @@ import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 import { locationService } from '../services/locationService';
 import * as Location from 'expo-location';
 import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
+import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 
 const { width } = Dimensions.get('window');
 
@@ -138,7 +139,7 @@ export default function ProfileScreen({ navigation }: any) {
           setTogglingOnline(false);
           return;
         }
-        const perm = await Location.requestForegroundPermissionsAsync();
+        const perm = await requestForegroundPermissionsIfDisclosed(language);
         if (perm.status !== 'granted') {
           if (!perm.canAskAgain) {
             Alert.alert(t.locationPermissionDenied, t.locationOpenSettingsHint, [

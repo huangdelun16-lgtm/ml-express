@@ -12,6 +12,7 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  DeviceEventEmitter,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -163,9 +164,10 @@ export default function HomeScreen({ navigation }: any) {
 
   const currentT = t[language] || t.zh;
 
-  const loadData = async () => {
+  const loadData = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const userId = await AsyncStorage.getItem("userId");
       if (!userId) {
         navigation.replace("Login");
@@ -206,15 +208,23 @@ export default function HomeScreen({ navigation }: any) {
     } catch (error) {
       console.error("Failed to load merchant data:", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, []),
+    }, [loadData]),
   );
+
+  /** 接单/拒单后全局会 emit，经营概况状态卡片即时对齐数据库 */
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("order_status_updated", () => {
+      loadData({ silent: true });
+    });
+    return () => sub.remove();
+  }, [loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);

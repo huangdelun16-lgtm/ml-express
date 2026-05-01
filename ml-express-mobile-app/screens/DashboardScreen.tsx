@@ -84,7 +84,7 @@ export default function DashboardScreen({ navigation }: any) {
   // 请求位置权限
   const requestLocationPermission = async () => {
     try {
-      const { status } = await requestForegroundPermissionsIfDisclosed();
+      const { status } = await requestForegroundPermissionsIfDisclosed(language);
       if (status === 'granted') {
         console.log('✅ 位置权限已获取');
         // 立即上传一次位置

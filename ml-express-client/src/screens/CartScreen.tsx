@@ -90,44 +90,61 @@ export default function CartScreen({ navigation }: any) {
     });
   };
 
+  const goToProductDetail = (item: CartItem) => {
+    navigation.navigate('MerchantProducts', {
+      storeId: item.store_id,
+      openProductDetailId: item.id,
+    });
+  };
+
   const renderCartItem = ({ item }: { item: CartItem }) => (
     <View style={styles.cartItem}>
-      <View style={styles.itemImageContainer}>
-        {item.image_url ? (
-          <Image source={{ uri: item.image_url }} style={styles.itemImage} />
-        ) : (
-          <View style={styles.itemImagePlaceholder}>
-            <Ionicons name="image-outline" size={32} color="#cbd5e1" />
-          </View>
-        )}
-      </View>
-      
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.itemPrice}>{item.price.toLocaleString()} MMK</Text>
-        
-        <View style={styles.quantityRow}>
-          <View style={styles.quantityControls}>
-            <TouchableOpacity 
-              style={styles.quantityBtn}
-              onPress={() => updateQuantity(item.id, item.quantity - 1)}
-            >
-              <Ionicons name="remove" size={18} color="#3b82f6" />
-            </TouchableOpacity>
-            <Text style={styles.quantityValue}>{item.quantity}</Text>
-            <TouchableOpacity 
-              style={styles.quantityBtn}
-              onPress={() => updateQuantity(item.id, item.quantity + 1)}
-            >
-              <Ionicons name="add" size={18} color="#3b82f6" />
-            </TouchableOpacity>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.deleteBtn}
-            onPress={() => removeFromCart(item.id)}
+      <TouchableOpacity
+        style={styles.cartItemTap}
+        activeOpacity={0.72}
+        onPress={() => goToProductDetail(item)}
+      >
+        <View style={styles.itemImageContainer}>
+          {item.image_url ? (
+            <Image source={{ uri: item.image_url }} style={styles.itemImage} />
+          ) : (
+            <View style={styles.itemImagePlaceholder}>
+              <Ionicons name="image-outline" size={32} color="#cbd5e1" />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+          {item.customer_remark ? (
+            <Text style={styles.itemRemark} numberOfLines={3}>
+              📝 {item.customer_remark}
+            </Text>
+          ) : null}
+          <Text style={styles.itemPrice}>{item.price.toLocaleString()} MMK</Text>
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.cartItemSide}>
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => removeFromCart(item.id)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#ef4444" />
+        </TouchableOpacity>
+        <View style={styles.quantityControls}>
+          <TouchableOpacity
+            style={styles.quantityBtn}
+            onPress={() => updateQuantity(item.id, item.quantity - 1)}
           >
-            <Ionicons name="trash-outline" size={20} color="#ef4444" />
+            <Ionicons name="remove" size={18} color="#3b82f6" />
+          </TouchableOpacity>
+          <Text style={styles.quantityValue}>{item.quantity}</Text>
+          <TouchableOpacity
+            style={styles.quantityBtn}
+            onPress={() => updateQuantity(item.id, item.quantity + 1)}
+          >
+            <Ionicons name="add" size={18} color="#3b82f6" />
           </TouchableOpacity>
         </View>
       </View>
@@ -250,6 +267,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     ...theme.shadows.small,
   },
+  cartItemTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  cartItemSide: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    paddingLeft: 8,
+    minHeight: 60,
+  },
   itemImageContainer: {
     width: 60,
     height: 60,
@@ -269,6 +299,7 @@ const styles = StyleSheet.create({
   itemInfo: {
     flex: 1,
     marginLeft: 16,
+    minWidth: 0,
   },
   itemName: {
     fontSize: 14,
@@ -276,16 +307,17 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     marginBottom: 2,
   },
+  itemRemark: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 4,
+    lineHeight: 16,
+  },
   itemPrice: {
     fontSize: 13,
     color: '#10b981',
     fontWeight: '700',
     marginBottom: 6,
-  },
-  quantityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   quantityControls: {
     flexDirection: 'row',
@@ -294,6 +326,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 2,
     gap: 8,
+    marginTop: 8,
   },
   quantityBtn: {
     width: 24,

@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
+import { requestForegroundPermissionsIfDisclosed, requestBackgroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -1033,16 +1033,15 @@ export default function MapScreen({ navigation }: any) {
   const requestLocationPermission = useCallback(async () => {
     try {
       // 1. 请求前台权限
-      const { status: foregroundStatus } = await requestForegroundPermissionsIfDisclosed();
+      const { status: foregroundStatus } = await requestForegroundPermissionsIfDisclosed(language);
       if (foregroundStatus === 'granted') {
         const c = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setLocation({ latitude: c.coords.latitude, longitude: c.coords.longitude });
         
-        // 2. 🚀 关键：请求后台权限 (这是通过苹果审核的必要步骤)
-        // 增加安全检查：避免在 Expo Go 或不支持的环境中崩溃
+        // 2. 🚀 后台权限：Android 上在系统弹窗前经 gate 展示说明（Google Play Prominent Disclosure）
         const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
         if (!isExpoGo && (Platform.OS === 'ios' || Platform.OS === 'android')) {
-          const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+          const { status: backgroundStatus } = await requestBackgroundPermissionsIfDisclosed(language);
           if (backgroundStatus !== 'granted') {
             console.warn('⚠️ 后台位置权限被拒绝，将无法在后台持续追踪配送进度');
           }

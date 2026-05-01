@@ -175,7 +175,7 @@ const MyTasksScreen: React.FC = () => {
     // 🚀 启动前台高精度定位监听，用于自动签到和送达判定
     let locationSubscription: any = null;
     const startLocationWatch = async () => {
-      const { status } = await requestForegroundPermissionsIfDisclosed();
+      const { status } = await requestForegroundPermissionsIfDisclosed(language);
       if (status !== 'granted') return;
 
       locationSubscription = await Location.watchPositionAsync(
@@ -195,7 +195,7 @@ const MyTasksScreen: React.FC = () => {
     return () => {
       if (locationSubscription) locationSubscription.remove();
     };
-  }, []);
+  }, [language]);
 
   // 🚀 自动地理围栏触发逻辑
   useEffect(() => {

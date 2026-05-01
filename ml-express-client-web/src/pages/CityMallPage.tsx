@@ -15,7 +15,7 @@ const CityMallPage: React.FC = () => {
   const [selectedRegion, setSelectedRegion] = useState<string>('MDY');
   const [selectedCategory, setSelectedCategory] = useState<string>('全部'); // 🚀 新增
   // 预留商品搜索模式；UI 切换接入前仅使用 stores
-  const [searchMode] = useState<'stores' | 'products'>('stores');
+  const [searchMode, setSearchMode] = useState<'stores' | 'products'>('stores');
   const [foundProducts, setFoundProducts] = useState<any[]>([]); // 🚀 新增
   const [searchingProducts, setSearchingProducts] = useState(false); // 🚀 新增
   const [banners, setBanners] = useState<Banner[]>([]); // 🚀 新增
@@ -657,6 +657,51 @@ const CityMallPage: React.FC = () => {
       </div>
 
       <div style={{ maxWidth: '1200px', margin: '2rem auto', padding: '0 1rem' }}>
+        {searchText.trim() && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setSearchMode('stores')}
+              style={{
+                padding: '0.65rem 1.4rem',
+                borderRadius: '999px',
+                border: searchMode === 'stores' ? 'none' : '1px solid rgba(255,255,255,0.35)',
+                background: searchMode === 'stores' ? 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)' : 'rgba(255,255,255,0.12)',
+                color: 'white',
+                fontWeight: 900,
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                boxShadow: searchMode === 'stores' ? '0 8px 20px rgba(30, 64, 175, 0.35)' : 'none',
+              }}
+            >
+              {uiT.storesTab}
+              <span style={{ opacity: 0.85, marginLeft: 8, fontWeight: 700 }}>
+                ({filteredStores.length})
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchMode('products')}
+              style={{
+                padding: '0.65rem 1.4rem',
+                borderRadius: '999px',
+                border: searchMode === 'products' ? 'none' : '1px solid rgba(255,255,255,0.35)',
+                background: searchMode === 'products' ? 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)' : 'rgba(255,255,255,0.12)',
+                color: 'white',
+                fontWeight: 900,
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                boxShadow: searchMode === 'products' ? '0 8px 20px rgba(30, 64, 175, 0.35)' : 'none',
+              }}
+            >
+              {uiT.productsTab}
+              <span style={{ opacity: 0.85, marginLeft: 8, fontWeight: 700 }}>
+                ({foundProducts.length})
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* 🚀 推荐和热门区域 (仅在非搜索模式显示) */}
         {!searchText.trim() && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem', marginBottom: '3.5rem' }}>
@@ -1006,7 +1051,12 @@ const CityMallPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && (searchMode === 'stores' ? filteredStores.length === 0 : foundProducts.length === 0) && (
+        {!loading &&
+          (searchMode === 'stores'
+            ? filteredStores.length === 0
+            : searchText.trim()
+              ? foundProducts.length === 0
+              : false) && (
           <div style={{ 
             textAlign: 'center', 
             padding: '10rem 0', 

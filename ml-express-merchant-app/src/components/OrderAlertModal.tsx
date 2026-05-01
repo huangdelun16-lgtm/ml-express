@@ -385,7 +385,6 @@ export const OrderAlertModal = ({
   // 🚀 解析商品列表显示
   const renderItems = () => {
     if (!orderData?.description) return null;
-    
     const itemsMatch = orderData.description.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
     if (!itemsMatch || !itemsMatch[1]) return null;
     
@@ -435,6 +434,27 @@ export const OrderAlertModal = ({
             <Text style={styles.cardLabel}>{language === 'zh' ? '统计' : language === 'my' ? 'စုစုပေါင်း' : 'Total'}</Text>
             <Text style={styles.value}>{totalFee.toLocaleString()} MMK</Text>
           </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderBuyerItemNotes = () => {
+    const desc = orderData?.description;
+    if (!desc) return null;
+    const m = desc.match(/\[(?:买家商品备注|Buyer item notes|ဝယ်ယူသူမှတ်ချက်): (.*?)\]/);
+    const text = m?.[1]?.trim();
+    if (!text) return null;
+    return (
+      <View style={styles.infoSection}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color="#d97706" />
+          <Text style={styles.sectionTitle}>
+            {language === 'zh' ? '买家商品备注' : language === 'my' ? 'ဝယ်ယူသူမှတ်ချက်' : 'Buyer item notes'}
+          </Text>
+        </View>
+        <View style={[styles.notesCard, { borderLeftWidth: 4, borderLeftColor: '#f59e0b' }]}>
+          <Text style={styles.notesText}>{text}</Text>
         </View>
       </View>
     );
@@ -553,6 +573,7 @@ export const OrderAlertModal = ({
 
               {/* 商品信息 */}
               {renderItems()}
+              {renderBuyerItemNotes()}
 
               {/* 客户信息 (收件人) */}
               <View style={styles.infoSection}>

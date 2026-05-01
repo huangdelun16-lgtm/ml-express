@@ -136,33 +136,56 @@ const CartPage: React.FC = () => {
                       boxShadow: '0 4px 6px rgba(0,0,0,0.02)'
                     }}
                   >
-                    <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#f8fafc', overflow: 'hidden', marginRight: '1rem', border: '1px solid #f1f5f9' }}>
-                      {item.image_url && !item.image_url.startsWith('file://') ? (
-                        <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.8rem', background: '#eff6ff' }}>📦</div>
-                      )}
-                    </div>
-                    
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ fontWeight: '900', fontSize: '1rem', marginBottom: '0.2rem', color: '#0f172a' }}>{item.name}</h3>
-                      <p style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: '800' }}>{item.price.toLocaleString()} MMK</p>
+                    <div
+                      onClick={() => item.store_id && navigate(`/mall/${item.store_id}?openDetail=${item.id}`)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        flex: 1,
+                        cursor: item.store_id ? 'pointer' : 'default',
+                        minWidth: 0,
+                      }}
+                      title={t.cart.openDetailHint}
+                    >
+                      <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#f8fafc', overflow: 'hidden', marginRight: '1rem', border: '1px solid #f1f5f9', flexShrink: 0 }}>
+                        {item.image_url && !item.image_url.startsWith('file://') ? (
+                          <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.8rem', background: '#eff6ff' }}>📦</div>
+                        )}
+                      </div>
+                      
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 style={{ fontWeight: '900', fontSize: '1rem', marginBottom: '0.2rem', color: '#0f172a' }}>{item.name}</h3>
+                        <p style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: '800' }}>{item.price.toLocaleString()} MMK</p>
+                        {item.customer_remark ? (
+                          <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0.35rem 0 0', fontWeight: 600, lineHeight: 1.4 }}>
+                            {t.cart.remark}：{item.customer_remark}
+                          </p>
+                        ) : null}
+                        {item.store_id ? (
+                          <p style={{ color: '#3b82f6', fontSize: '0.75rem', margin: '0.35rem 0 0', fontWeight: 700 }}>{t.cart.openDetailHint} →</p>
+                        ) : null}
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexShrink: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '12px', padding: '0.2rem' }}>
                         <button 
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, item.quantity - 1); }}
                           style={{ width: '24px', height: '24px', borderRadius: '8px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontWeight: 'bold', color: '#1e40af', fontSize: '0.9rem' }}
                         >-</button>
                         <span style={{ margin: '0 0.6rem', fontWeight: '900', width: '18px', textAlign: 'center', fontSize: '0.9rem', color: '#0f172a' }}>{item.quantity}</span>
                         <button 
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, item.quantity + 1); }}
                           style={{ width: '24px', height: '24px', borderRadius: '8px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontWeight: 'bold', color: '#1e40af', fontSize: '0.9rem' }}
                         >+</button>
                       </div>
                       <button 
-                        onClick={() => removeFromCart(item.id)}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
                         style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem', transition: 'all 0.2s ease', padding: '0.3rem' }}
                         onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
                         onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}

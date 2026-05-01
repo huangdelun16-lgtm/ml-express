@@ -2,8 +2,11 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
-import { Platform, Alert } from 'react-native';
 import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
+import {
+  requestForegroundPermissionsIfDisclosed,
+  requestBackgroundPermissionsIfDisclosed,
+} from '../utils/locationPermissionGate';
 
 const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
 
@@ -106,8 +109,8 @@ export const locationService = {
       if (!(await hasAcceptedLocationDisclosure())) {
         return false;
       }
-      // 1. 检查前台权限
-      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+      // 1. 检查前台权限（Android 上经 locationPermissionGate 在系统弹窗前展示说明）
+      const { status: foregroundStatus } = await requestForegroundPermissionsIfDisclosed();
       if (foregroundStatus !== 'granted') {
         console.warn('未获得前台位置权限');
         return false;
@@ -115,34 +118,13 @@ export const locationService = {
 
       // 2. 检查后台权限
       const { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
-      
+
       if (backgroundStatus !== 'granted') {
-        // Google Play 要求：必须向用户明确解释为什么需要后台位置权限
-        return new Promise((resolve) => {
-          Alert.alert(
-            '📍 后台位置权限说明',
-            '为了确保您在切换到后台或锁屏时，系统仍能为您精准派单并记录配送路径，我们需要您开启“始终允许”位置权限。',
-            [
-              {
-                text: '去设置',
-                onPress: async () => {
-                  const { status: newStatus } = await Location.requestBackgroundPermissionsAsync();
-                  if (newStatus === 'granted') {
-                    await this.enableUpdates();
-                    resolve(true);
-                  } else {
-                    resolve(false);
-                  }
-                }
-              },
-              {
-                text: '暂时不需要',
-                onPress: () => resolve(false),
-                style: 'cancel'
-              }
-            ]
-          );
-        });
+        const { status: newStatus } = await requestBackgroundPermissionsIfDisclosed();
+        if (newStatus !== 'granted') {
+          console.warn('后台位置权限被拒绝，将无法在后台持续追踪配送进度');
+          return false;
+        }
       }
 
       await this.enableUpdates();

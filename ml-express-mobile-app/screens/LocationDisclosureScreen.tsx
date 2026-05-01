@@ -62,6 +62,7 @@ export default function LocationDisclosureScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       await setLocationDisclosureAccepted();
+      // 紧邻用户「同意」操作，直接调系统权限；不经过 locationPermissionGate，避免全屏披露后再弹一层 Android 说明。
       await Location.requestForegroundPermissionsAsync();
       const courierId = await AsyncStorage.getItem('currentCourierId');
       const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);

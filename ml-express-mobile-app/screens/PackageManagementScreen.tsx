@@ -504,7 +504,7 @@ export default function PackageManagementScreen({ navigation }: any) {
       }
 
       // 获取当前位置
-      const { status: locationStatus } = await requestForegroundPermissionsIfDisclosed();
+      const { status: locationStatus } = await requestForegroundPermissionsIfDisclosed(language);
       if (locationStatus !== 'granted') {
         Alert.alert('需要位置权限', '需要位置权限才能记录送达位置');
         return;

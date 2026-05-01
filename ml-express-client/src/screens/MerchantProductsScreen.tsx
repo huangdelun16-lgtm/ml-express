@@ -18,20 +18,42 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../contexts/AppContext';
-import { useCart } from '../contexts/CartContext';
+import { useCart, CartItem } from '../contexts/CartContext';
 import { merchantService, Product, ProductCategory } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
 
-const { width } = Dimensions.get('window');
+const { width, height: WINDOW_HEIGHT } = Dimensions.get('window');
+/** 商品详情弹窗固定高度，否则内层 flex:1 在 RN 中会塌陷，只显示图片不显示备注区 */
+const DETAIL_MODAL_HEIGHT = Math.min(WINDOW_HEIGHT * 0.88, 720);
+const DETAIL_HERO_HEIGHT = 248;
+
+const PIECE_REMARK_LABELS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+
+function pieceRemarkPrefix(index: number): string {
+  return PIECE_REMARK_LABELS[index] ?? `${index + 1}.`;
+}
+
+function padLineRemarks(arr: string[], length: number): string[] {
+  const next = arr.slice(0, length);
+  while (next.length < length) next.push('');
+  return next;
+}
 
 export default function MerchantProductsScreen({ route, navigation }: any) {
-  const { storeId, storeName, highlightProductId, autoAddProductId } = route.params || {}; // 🚀 增加解析新参数
+  const {
+    storeId,
+    storeName,
+    highlightProductId,
+    autoAddProductId,
+    openProductDetailId,
+  } = route.params || {};
   const { language } = useApp();
-  const { addToCart, cartCount, cartItems } = useCart();
+  const { addToCart, cartCount, cartItems, updateCartItemDetails } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,6 +82,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   // 🚀 新增：产品详情模态框状态
   const [showDetailModal, setShowEditDetailModal] = useState(false);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
+
+  const [detailOpenedFromCart, setDetailOpenedFromCart] = useState(false);
 
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -104,6 +128,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: '商品详情',
       description: '商品描述',
       noDescription: '暂无详细描述',
+      itemRemark: '本商品备注（选填）',
+      itemRemarkPlaceholder: '如：少糖、不要辣、口味等',
+      itemRemarkMultiHint: '每件可单独备注',
+      detailSelectionSaved: '已保存数量与备注，可在下方加入购物车',
     },
     en: {
       title: 'Products',
@@ -136,6 +164,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: 'Product Details',
       description: 'Description',
       noDescription: 'No description available',
+      itemRemark: 'Note for this item (optional)',
+      itemRemarkPlaceholder: 'e.g. less sugar, no spicy',
+      itemRemarkMultiHint: 'Add a note per item',
+      detailSelectionSaved: 'Quantity and note saved. Add to cart below.',
     },
     my: {
       title: 'ကုန်ပစ္စည်းစီမံခန့်ခွဲမှု',
@@ -168,10 +200,15 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: 'ကုန်ပစ္စည်းအသေးစိတ်',
       description: 'ကုန်ပစ္စည်းအကြောင်းအရာ',
       noDescription: 'ဖော်ပြချက်မရှိပါ',
+      itemRemark: 'ဤပစ္စည်းအတွက် မှတ်ချက် (ရွေးချယ်နိုင်)',
+      itemRemarkPlaceholder: 'ဥပမာ- သကြားနည်း၊ မစပ်ပါ',
+      itemRemarkMultiHint: 'တစ်ခုချင်းစီမှတ်ချက်ထည့်နိုင်',
+      detailSelectionSaved: 'အရေအတွက်နှင့် မှတ်ချက် သိမ်းပြီးပါပြီ။ အောက်မှ ခြင်းထဲထည့်ပါ။',
     }
   };
 
   const currentT = t[language as keyof typeof t] || t.zh;
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     checkViewMode();
@@ -488,12 +525,24 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   };
 
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
+  /** 顾客备注：每件一行，与件数对齐 */
+  const [lineRemarks, setLineRemarks] = useState<Record<string, string[]>>({});
+  const [detailRemarks, setDetailRemarks] = useState<string[]>(['']);
+  const [detailQty, setDetailQty] = useState(1);
 
   const updateItemQuantity = (id: string, delta: number) => {
-    setItemQuantities(prev => ({
-      ...prev,
-      [id]: Math.max(0, (prev[id] || 0) + delta)
-    }));
+    setItemQuantities((prev) => {
+      const newQ = Math.max(0, (prev[id] || 0) + delta);
+      setLineRemarks((lr) => {
+        if (!Object.prototype.hasOwnProperty.call(lr, id)) return lr;
+        if (newQ === 0) {
+          const { [id]: _, ...rest } = lr;
+          return rest;
+        }
+        return { ...lr, [id]: padLineRemarks(lr[id], newQ) };
+      });
+      return { ...prev, [id]: newQ };
+    });
   };
 
   const getSelectedItems = () => {
@@ -503,10 +552,105 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }));
   };
 
-  const handleOpenProductDetail = (product: Product) => {
+  const maxSelectableStock = (p: Product | null) => {
+    if (!p) return 99999;
+    if (p.stock === -1) return 99999;
+    return Math.max(0, p.stock ?? 0);
+  };
+
+  const handleOpenProductDetail = (product: Product, cartLine?: CartItem | null) => {
     setSelectedProductDetail(product);
+    const cap = maxSelectableStock(product);
+
+    if (cartLine) {
+      setDetailOpenedFromCart(true);
+      let q = cartLine.quantity;
+      if (cap > 0 && cap !== 99999) q = Math.min(q, cap);
+      if (cap === 0) q = 1;
+      q = Math.max(1, q);
+      let base: string[] = [];
+      if (cartLine.customer_remarks && cartLine.customer_remarks.length > 0) {
+        base = [...cartLine.customer_remarks];
+      } else if (cartLine.customer_remark?.trim()) {
+        base = [cartLine.customer_remark.trim()];
+      }
+      setDetailRemarks(padLineRemarks(base, q));
+      setDetailQty(q);
+      setShowEditDetailModal(true);
+      return;
+    }
+
+    setDetailOpenedFromCart(false);
+    const gridQ = itemQuantities[product.id] || 0;
+    let q = gridQ > 0 ? gridQ : 1;
+    if (cap > 0 && cap !== 99999) q = Math.min(q, cap);
+    if (cap === 0) q = 1;
+    q = Math.max(1, q);
+    const existing = lineRemarks[product.id];
+    const base = Array.isArray(existing) ? [...existing] : [];
+    setDetailRemarks(padLineRemarks(base, q));
+    setDetailQty(q);
     setShowEditDetailModal(true);
   };
+
+  useEffect(() => {
+    if (!isFocused || !openProductDetailId || loading || products.length === 0) return;
+    const pid = openProductDetailId as string;
+    const product = products.find((p) => p.id === pid);
+    const cartLine = cartItems.find((c) => c.id === pid);
+    if (!product) {
+      navigation.setParams({ openProductDetailId: undefined });
+      return;
+    }
+    if (!product.is_available) {
+      showToast(
+        language === 'zh'
+          ? '商品已下架'
+          : language === 'en'
+            ? 'This item is unavailable'
+            : 'မရရှိနိုင်ပါ',
+        'warning'
+      );
+      navigation.setParams({ openProductDetailId: undefined });
+      return;
+    }
+    handleOpenProductDetail(product, cartLine);
+    navigation.setParams({ openProductDetailId: undefined });
+  }, [
+    isFocused,
+    loading,
+    products,
+    openProductDetailId,
+    cartItems,
+    navigation,
+    language,
+  ]);
+
+  const remarkForProductId = (id: string): string[] | undefined => {
+    if (!Object.prototype.hasOwnProperty.call(lineRemarks, id)) return undefined;
+    const q = itemQuantities[id] || 0;
+    if (q <= 0) return undefined;
+    const padded = padLineRemarks(lineRemarks[id], q);
+    if (!padded.some((r) => r.trim())) return undefined;
+    return padded;
+  };
+
+  const adjustDetailQty = (nextQty: number) => {
+    const n = Math.max(1, nextQty);
+    setDetailQty(n);
+    setDetailRemarks((prev) => {
+      if (prev.length > n) return prev.slice(0, n);
+      if (prev.length < n) return [...prev, ...Array(n - prev.length).fill('')];
+      return prev;
+    });
+  };
+
+  const detailStockCap = maxSelectableStock(selectedProductDetail);
+  const detailQtyPlusDisabled =
+    detailStockCap === 0 || (detailStockCap !== 99999 && detailQty >= detailStockCap);
+  const detailAddDisabled =
+    !selectedProductDetail ||
+    (selectedProductDetail.stock !== -1 && (selectedProductDetail.stock ?? 0) <= 0);
 
   const handleBulkAddToCart = () => {
     const selectedItems = getSelectedItems();
@@ -528,10 +672,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             text: language === 'zh' ? '确定' : 'Continue', 
             onPress: () => {
               selectedItems.forEach(item => {
-                addToCart(item, item.quantity);
+                addToCart(item, item.quantity, remarkForProductId(item.id));
               });
               showToast(currentT.addedToCart, 'success');
               setItemQuantities({});
+              setLineRemarks({});
             } 
           }
         ]
@@ -540,11 +685,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }
 
     selectedItems.forEach(item => {
-      addToCart(item, item.quantity);
+      addToCart(item, item.quantity, remarkForProductId(item.id));
     });
     showToast(currentT.addedToCart, 'success');
     // 可选：清空当前选择
     setItemQuantities({});
+    setLineRemarks({});
   };
 
   const renderProductItem = ({ item }: { item: Product }) => {
@@ -962,76 +1108,221 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         </View>
       </Modal>
 
-      {/* 商品详情模态框 */}
+      {/* 商品详情模态框：单 ScrollView 上滑时白底内容盖住头图 */}
       <Modal
         visible={showDetailModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowEditDetailModal(false)}
+        onRequestClose={() => {
+          setDetailOpenedFromCart(false);
+          setShowEditDetailModal(false);
+        }}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { padding: 0, overflow: 'hidden' }]}>
-            {selectedProductDetail?.image_url ? (
-              <Image source={{ uri: selectedProductDetail.image_url }} style={styles.detailImage} />
-            ) : (
-              <View style={styles.detailImagePlaceholder}>
-                <Ionicons name="image-outline" size={64} color="#cbd5e1" />
-              </View>
-            )}
-            
-            <TouchableOpacity 
-              style={styles.detailCloseBtn}
-              onPress={() => setShowEditDetailModal(false)}
+          <View
+            style={[
+              styles.modalContent,
+              styles.detailModalCard,
+              {
+                padding: 0,
+                overflow: 'hidden',
+                width: width * 0.92,
+                maxWidth: 440,
+                height: DETAIL_MODAL_HEIGHT,
+              },
+            ]}
+          >
+            <ScrollView
+              style={styles.detailMainScroll}
+              contentContainerStyle={styles.detailMainScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces
             >
-              <Ionicons name="close" size={24} color="white" />
-            </TouchableOpacity>
-
-            <View style={styles.detailInfoContainer}>
-              <View style={styles.detailHeader}>
-                <Text style={styles.detailName}>{selectedProductDetail?.name}</Text>
-                <View style={styles.detailPriceRow}>
-                  <Text style={styles.detailPrice}>{selectedProductDetail?.price.toLocaleString()} MMK</Text>
-                  {selectedProductDetail?.original_price && selectedProductDetail.original_price > selectedProductDetail.price && (
-                    <Text style={styles.detailOriginalPrice}>{selectedProductDetail.original_price.toLocaleString()} MMK</Text>
-                  )}
-                </View>
+              <View style={styles.detailHero}>
+                {selectedProductDetail?.image_url ? (
+                  <Image
+                    source={{ uri: selectedProductDetail.image_url }}
+                    style={styles.detailHeroImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.detailHeroPlaceholder}>
+                    <Ionicons name="image-outline" size={64} color="#cbd5e1" />
+                  </View>
+                )}
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={['rgba(0,0,0,0)', 'rgba(15,23,42,0.25)', 'rgba(15,23,42,0.62)']}
+                  locations={[0, 0.45, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <TouchableOpacity
+                  style={styles.detailCloseBtn}
+                  onPress={() => {
+                    setDetailOpenedFromCart(false);
+                    setShowEditDetailModal(false);
+                  }}
+                  accessibilityLabel="Close"
+                >
+                  <Ionicons name="close" size={22} color="white" />
+                </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.detailScroll} showsVerticalScrollIndicator={false}>
+              <View style={styles.detailSheet}>
+                <View style={styles.detailHeader}>
+                  <Text style={styles.detailName}>{selectedProductDetail?.name}</Text>
+                  <View style={styles.detailPriceRow}>
+                    <Text style={styles.detailPrice}>
+                      {selectedProductDetail?.price.toLocaleString()} MMK
+                    </Text>
+                    {selectedProductDetail?.original_price &&
+                      selectedProductDetail.original_price > selectedProductDetail.price && (
+                        <Text style={styles.detailOriginalPrice}>
+                          {selectedProductDetail.original_price.toLocaleString()} MMK
+                        </Text>
+                      )}
+                  </View>
+                </View>
+
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>✨ {currentT.description}</Text>
+                  <Text style={styles.detailSectionTitle}>{currentT.description}</Text>
                   <View style={styles.descriptionBox}>
                     <Text style={styles.detailDescription}>
                       {selectedProductDetail?.description || currentT.noDescription}
                     </Text>
                   </View>
                 </View>
-                
-                <View style={[styles.stockRow, { marginTop: 24, backgroundColor: '#f8fafc', padding: 12, borderRadius: 12 }]}>
-                  <Ionicons name="cube-outline" size={18} color="#3b82f6" />
-                  <Text style={[styles.productStock, { fontSize: 15, fontWeight: '700', color: '#1e293b' }]}>
-                    {currentT.stock}: {selectedProductDetail?.stock === -1 ? currentT.infinite : selectedProductDetail?.stock}
+
+                <View style={styles.detailStockCard}>
+                  <Ionicons name="cube-outline" size={20} color="#2563eb" />
+                  <Text style={styles.detailStockCardText}>
+                    {currentT.stock}:{' '}
+                    {selectedProductDetail?.stock === -1
+                      ? currentT.infinite
+                      : selectedProductDetail?.stock}
                   </Text>
                 </View>
-              </ScrollView>
 
-              <View style={styles.detailFooter}>
-                <TouchableOpacity 
-                  style={styles.detailAddBtn}
-                  onPress={() => {
-                    if (selectedProductDetail) {
-                      updateItemQuantity(selectedProductDetail.id, 1);
-                      setShowEditDetailModal(false);
-                      showToast(currentT.addedToCart, 'success');
-                    }
-                  }}
+                <View style={styles.detailRemarkSection}>
+                  <Text style={styles.detailSectionTitle}>{currentT.itemRemark}</Text>
+                  {detailQty >= 2 ? (
+                    <Text style={styles.detailRemarkMultiHint}>{currentT.itemRemarkMultiHint}</Text>
+                  ) : null}
+                  {detailRemarks.map((row, index) => (
+                    <View key={`remark-${index}`} style={styles.detailRemarkRow}>
+                      {detailQty >= 2 ? (
+                        <Text style={styles.detailRemarkPieceLabel}>{pieceRemarkPrefix(index)}</Text>
+                      ) : null}
+                      <TextInput
+                        style={[
+                          styles.detailRemarkInput,
+                          detailQty >= 2 && styles.detailRemarkInputInRow,
+                        ]}
+                        value={row}
+                        onChangeText={(text) => {
+                          setDetailRemarks((prev) => {
+                            const next = [...prev];
+                            next[index] = text;
+                            return next;
+                          });
+                        }}
+                        placeholder={currentT.itemRemarkPlaceholder}
+                        placeholderTextColor="#94a3b8"
+                        multiline
+                        maxLength={500}
+                        textAlignVertical="top"
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
+
+            <View
+              style={[
+                styles.detailFooter,
+                { paddingBottom: Platform.OS === 'ios' ? 16 : 10 },
+              ]}
+            >
+              <View style={styles.detailQtyControl}>
+                <TouchableOpacity
+                  style={[styles.detailQtyBtn, detailQty <= 1 && styles.detailQtyBtnDisabled]}
+                  onPress={() => adjustDetailQty(detailQty - 1)}
+                  disabled={detailQty <= 1}
                 >
-                  <LinearGradient colors={['#fbbf24', '#f59e0b']} style={styles.detailAddGradient}>
-                    <Ionicons name="cart-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                    <Text style={styles.detailAddText}>{currentT.addToCart}</Text>
-                  </LinearGradient>
+                  <Ionicons
+                    name="remove"
+                    size={22}
+                    color={detailQty <= 1 ? '#94a3b8' : '#0f172a'}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.detailQtyValue}>{detailQty}</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.detailQtyBtn,
+                    detailQtyPlusDisabled && styles.detailQtyBtnDisabled,
+                  ]}
+                  onPress={() => {
+                    if (detailStockCap === 0) return;
+                    const n =
+                      detailStockCap === 99999 ? detailQty + 1 : Math.min(detailStockCap, detailQty + 1);
+                    if (n > detailQty) adjustDetailQty(n);
+                  }}
+                  disabled={detailQtyPlusDisabled}
+                >
+                  <Ionicons
+                    name="add"
+                    size={22}
+                    color={detailQtyPlusDisabled ? '#94a3b8' : '#0f172a'}
+                  />
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity
+                style={[styles.detailAddBtn, detailAddDisabled && styles.detailAddBtnDisabled]}
+                disabled={detailAddDisabled}
+                onPress={() => {
+                  if (!selectedProductDetail) return;
+                  const pid = selectedProductDetail.id;
+                  if (detailStockCap === 0) {
+                    showToast(language === 'zh' ? '暂无库存' : 'Out of stock', 'warning');
+                    return;
+                  }
+                  const qty =
+                    detailStockCap === 99999 ? detailQty : Math.min(detailQty, detailStockCap);
+                  const padded = padLineRemarks(detailRemarks, qty);
+                  const fromCart = detailOpenedFromCart;
+                  setDetailOpenedFromCart(false);
+                  if (fromCart) {
+                    updateCartItemDetails(pid, qty, padded);
+                  } else {
+                    setLineRemarks((prev) => {
+                      const next = { ...prev };
+                      if (padded.some((r) => r.trim())) next[pid] = padded;
+                      else delete next[pid];
+                      return next;
+                    });
+                    setItemQuantities((prev) => ({ ...prev, [pid]: qty }));
+                  }
+                  setShowEditDetailModal(false);
+                  showToast(
+                    fromCart
+                      ? language === 'zh'
+                        ? '购物车已更新'
+                        : language === 'en'
+                          ? 'Cart updated'
+                          : 'ဈေးဝယ်လှည်းအပ်ဒိတ်လုပ်ပြီး'
+                      : currentT.detailSelectionSaved,
+                    'success'
+                  );
+                }}
+              >
+                <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.detailAddGradient}>
+                  <Ionicons name="cart-outline" size={20} color="white" style={{ marginRight: 8 }} />
+                  <Text style={styles.detailAddText}>{currentT.addToCart}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1354,6 +1645,11 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
     ...theme.shadows.large,
   },
+  /** 与 flex 子项配合：纵向铺满固定高度卡片 */
+  detailModalCard: {
+    flexDirection: 'column',
+    alignSelf: 'center',
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1619,70 +1915,95 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   // 详情模态框样式
-  detailImage: {
-    width: '100%',
-    height: 300,
-    backgroundColor: '#f1f5f9',
+  detailMainScroll: {
+    flex: 1,
+    minHeight: 0,
   },
-  detailImagePlaceholder: {
+  detailMainScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 8,
+  },
+  detailHero: {
     width: '100%',
-    height: 300,
+    height: DETAIL_HERO_HEIGHT,
+    backgroundColor: '#e2e8f0',
+    position: 'relative',
+  },
+  detailHeroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  detailHeroPlaceholder: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   detailCloseBtn: {
     position: 'absolute',
-    top: 20,
-    right: 20,
+    top: 14,
+    right: 14,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+    zIndex: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
-  detailInfoContainer: {
-    padding: 24,
-    flex: 1,
+  detailSheet: {
+    marginTop: -28,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 24,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 10,
   },
   detailHeader: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   detailName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
     color: '#0f172a',
-    marginBottom: 8,
+    marginBottom: 10,
+    lineHeight: 28,
   },
   detailPriceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 12,
+    flexWrap: 'wrap',
   },
   detailPrice: {
-    fontSize: 22,
-    color: '#10b981',
+    fontSize: 21,
+    color: '#059669',
     fontWeight: '900',
   },
   detailOriginalPrice: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#94a3b8',
     textDecorationLine: 'line-through',
   },
-  detailScroll: {
-    flex: 1,
-    marginBottom: 20,
-  },
   detailSectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
-    color: '#475569',
+    color: '#64748b',
     marginBottom: 10,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
   },
   detailSection: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   descriptionBox: {
     backgroundColor: '#f8fafc',
@@ -1693,19 +2014,114 @@ const styles = StyleSheet.create({
   },
   detailDescription: {
     fontSize: 15,
-    color: '#64748b',
+    color: '#475569',
     lineHeight: 22,
   },
+  detailStockCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#eff6ff',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginBottom: 18,
+  },
+  detailStockCardText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1e3a5f',
+    flex: 1,
+  },
+  detailRemarkSection: {
+    marginBottom: 4,
+  },
+  detailRemarkMultiHint: {
+    fontSize: 13,
+    color: '#64748b',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  detailRemarkRow: {
+    marginBottom: 12,
+  },
+  detailRemarkPieceLabel: {
+    fontSize: 16,
+    marginBottom: 6,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  detailRemarkInput: {
+    minHeight: 92,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+  },
+  detailRemarkInputInRow: {
+    minHeight: 72,
+  },
   detailFooter: {
-    paddingTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: '#e2e8f0',
+    flexShrink: 0,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0f172a',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 12 },
+    }),
+  },
+  detailQtyControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 14,
+    padding: 4,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  detailQtyBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailQtyBtnDisabled: {
+    opacity: 0.45,
+  },
+  detailQtyValue: {
+    minWidth: 36,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0f172a',
   },
   detailAddBtn: {
-    width: '100%',
-    height: 56,
-    borderRadius: 16,
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
     overflow: 'hidden',
+  },
+  detailAddBtnDisabled: {
+    opacity: 0.48,
   },
   detailAddGradient: {
     flex: 1,
@@ -1715,7 +2131,7 @@ const styles = StyleSheet.create({
   },
   detailAddText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
   },
 });
