@@ -228,7 +228,7 @@ export interface AuditLog {
   user_id: string;
   user_name: string;
   action_type: 'create' | 'update' | 'delete' | 'login' | 'logout' | 'view' | 'export';
-  module: 'packages' | 'users' | 'couriers' | 'finance' | 'settings' | 'accounts' | 'system' | 'delivery_stores';
+  module: 'packages' | 'users' | 'couriers' | 'finance' | 'settings' | 'accounts' | 'system' | 'delivery_stores' | 'delivery_alerts';
   target_id?: string;
   target_name?: string;
   action_description: string;

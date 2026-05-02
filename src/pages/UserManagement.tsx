@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { SkeletonTable } from '../components/SkeletonLoader';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
@@ -683,6 +683,7 @@ const StoreRow = ({ store, isMobile, pendingRecharge }: any) => {
 
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { language } = useLanguage();
 
   // 🚀 新增：注入动画样式
@@ -705,6 +706,7 @@ const UserManagement: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management' | 'recharge_requests'>('customer_list');
   const [rechargeRequests, setRechargeRequests] = useState<RechargeRequest[]>([]);
+
   const [loadingRequests, setLoadingRequests] = useState(false);
 
   // 🚀 新增：通知和警报逻辑
@@ -945,6 +947,19 @@ const UserManagement: React.FC = () => {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
+  useEffect(() => {
+    const q = searchParams.get('q');
+    const tab = searchParams.get('tab');
+    if (q) setSearchTerm(q);
+    if (
+      tab &&
+      ['customer_list', 'admin_list', 'merchant_store', 'courier_management', 'recharge_requests'].includes(tab)
+    ) {
+      setActiveTab(
+        tab as 'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management' | 'recharge_requests'
+      );
+    }
+  }, [searchParams]);
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);

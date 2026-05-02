@@ -295,6 +295,9 @@ const AccountManagement: React.FC = () => {
     { id: 'delivery_alerts', name: '配送警报', icon: '🚨' },
     { id: 'banners', name: '页面管理', icon: '🖼️' },
     { id: 'recharges', name: '充值管理', icon: '💳' },
+    { id: 'supervision', name: '操作审计', icon: '📜' },
+    { id: 'reports', name: '报表导出', icon: '📈' },
+    { id: 'courier_performance', name: '骑手绩效', icon: '🚴' },
   ];
 
   const togglePermission = (permId: string) => {

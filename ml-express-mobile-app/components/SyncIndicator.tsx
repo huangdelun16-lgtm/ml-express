@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { cacheService } from '../services/cacheService';
+import { cacheService, OFFLINE_QUEUE_CHANGED } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { formatI18n } from '../utils/i18n';
@@ -39,9 +39,14 @@ export const SyncIndicator = () => {
 
     const interval = setInterval(checkQueue, 5000);
 
+    const sub = DeviceEventEmitter.addListener(OFFLINE_QUEUE_CHANGED, () => {
+      checkQueue();
+    });
+
     return () => {
       unsubscribe();
       clearInterval(interval);
+      sub.remove();
     };
   }, []);
 

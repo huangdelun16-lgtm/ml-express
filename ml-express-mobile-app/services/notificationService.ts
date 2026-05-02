@@ -5,10 +5,17 @@ import * as Speech from 'expo-speech';
 import { supabase } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRuntimeChannel, type RuntimeChannel } from '../utils/runtimeEnv';
+import { navigateToPackageDetail } from '../navigation/navigationRef';
 
 // 🚩 核心修复：更严格的环境检测
 // SDK 53+ 在 Android Expo Go 中完全禁用了远程推送
 const isExpoGoAndroid = Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+function extractPackageIdFromNotificationData(data: Record<string, unknown> | undefined | null): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const raw = (data as { packageId?: unknown; package_id?: unknown }).packageId ?? (data as { package_id?: unknown }).package_id;
+  return raw != null && String(raw).length > 0 ? String(raw) : null;
+}
 
 // 动态获取 Notifications 模块，防止在不支持的环境下初始化
 let Notifications: any = null;
@@ -127,6 +134,10 @@ export const notificationService = {
         body: body,
         data: data || {},
       };
+
+      if (Platform.OS === 'android') {
+        message.channelId = 'new-task-channel';
+      }
 
       // 🚀 新增：富媒体推送支持 (图片附件)
       if (imageUrl) {
@@ -309,6 +320,11 @@ export const notificationService = {
       // 监听用户点击通知
       const responseListener = Notifications.addNotificationResponseReceivedListener((response: any) => {
         console.log('🖱️ 用户点击了通知:', response);
+        const data = response?.notification?.request?.content?.data as Record<string, unknown> | undefined;
+        const pkgId = extractPackageIdFromNotificationData(data);
+        if (pkgId) {
+          navigateToPackageDetail(pkgId);
+        }
       });
 
       return () => {
@@ -319,6 +335,24 @@ export const notificationService = {
       console.warn('Failed to init notification listeners:', e);
       return () => {};
     }
-  }
+  },
+
+  /**
+   * 冷启动：用户点击通知启动 App 时，在导航就绪后调用以打开对应包裹
+   */
+  async consumeInitialNotificationNavigation(): Promise<void> {
+    if (isExpoGoAndroid || !Notifications) return;
+    try {
+      const last = await Notifications.getLastNotificationResponseAsync();
+      if (!last) return;
+      const data = last.notification.request.content.data as Record<string, unknown> | undefined;
+      const pkgId = extractPackageIdFromNotificationData(data);
+      if (pkgId) {
+        navigateToPackageDetail(pkgId);
+      }
+    } catch (e) {
+      console.warn('consumeInitialNotificationNavigation:', e);
+    }
+  },
 };
 

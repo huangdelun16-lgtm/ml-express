@@ -40,8 +40,47 @@ import { SyncIndicator } from './components/SyncIndicator';
 import { RoleGuardScreen } from './components/RoleGuardScreen';
 import { hasAcceptedLocationDisclosure } from './utils/locationDisclosureStorage';
 import LocationDisclosureScreen from './screens/LocationDisclosureScreen';
+import * as Linking from 'expo-linking';
+import { navigationRef } from './navigation/navigationRef';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+const linking = {
+  prefixes: [
+    Linking.createURL('/'),
+    'ml-express-staff://',
+    'exp+marketlinkstaffapp://',
+  ],
+  config: {
+    screens: {
+      Login: 'login',
+      LocationDisclosure: 'location-disclosure',
+      Main: {
+        path: 'main',
+        screens: {
+          Dashboard: 'admin',
+          MyTasks: 'tasks',
+          Map: 'map',
+          Scan: 'scan',
+          Profile: 'account',
+        },
+      },
+      PackageDetail: {
+        path: 'package/:packageId',
+        parse: {
+          packageId: (id: string) => id,
+        },
+      },
+      DeliveryHistory: 'delivery-history',
+      PackageManagement: 'package-management',
+      CourierManagement: 'courier-management',
+      FinanceManagement: 'finance-management',
+      Settings: 'settings',
+      MyStatistics: 'statistics',
+      PerformanceAnalytics: 'performance',
+    },
+  },
+};
 
 errorService.initGlobalErrorHandler();
 
@@ -432,7 +471,6 @@ function AppContent() {
         };
 
         await initNotifications();
-        notificationService.initNotificationListeners();
 
         const checkTracking = async () => {
           try {
@@ -465,6 +503,13 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    const cleanup = notificationService.initNotificationListeners();
+    return () => {
+      if (typeof cleanup === 'function') cleanup();
+    };
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       if (state.isConnected && state.isInternetReachable !== false) {
         console.log('📶 网络已恢复，正在尝试同步离线数据...');
@@ -489,7 +534,13 @@ function AppContent() {
       <StatusBar barStyle="dark-content" />
       <GlobalOrderMonitor />
       <SyncIndicator />
-      <NavigationContainer>
+      <NavigationContainer
+        ref={navigationRef}
+        linking={linking}
+        onReady={() => {
+          notificationService.consumeInitialNotificationNavigation().catch(() => {});
+        }}
+      >
         <Suspense fallback={<NavSuspenseFallback />}>
           <Stack.Navigator
             initialRouteName="Login"

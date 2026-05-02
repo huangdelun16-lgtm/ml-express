@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { packageService, Package, supabase, auditLogService, deliveryPhotoService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useResponsive } from '../hooks/useResponsive';
 import SecurityVerificationModal from '../components/SecurityVerificationModal';
+import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
   
   // 获取当前用户角色和区域信息
@@ -148,6 +150,29 @@ const CityPackages: React.FC = () => {
       setLoading(false);
     }
   };
+
+  /** 全局搜索带 ?q= 时打开匹配运单详情 */
+  useEffect(() => {
+    const q = searchParams.get('q')?.trim();
+    if (!q || !packages.length) return;
+    const pool = isRegionalUser ? packages.filter((pkg) => pkg.id.startsWith(currentRegionPrefix)) : packages;
+    const lower = q.toLowerCase();
+    const match = pool.find(
+      (p) =>
+        p.id === q ||
+        p.id.toLowerCase() === lower ||
+        (p.receiver_phone && p.receiver_phone.includes(q)) ||
+        (p.sender_phone && p.sender_phone.includes(q)) ||
+        (p.transfer_code && p.transfer_code.toLowerCase() === lower)
+    );
+    if (match) {
+      setSelectedPackage(match);
+      setShowDetailModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('q');
+      setSearchParams(next, { replace: true });
+    }
+  }, [packages, searchParams, setSearchParams, isRegionalUser, currentRegionPrefix]);
 
   // 计算包裹统计信息
   const getPackageStatistics = () => {
@@ -494,6 +519,7 @@ const CityPackages: React.FC = () => {
     const success = await packageService.updatePackageStatus(id, newStatus);
     if (success) {
       await loadPackages();
+      notifyAdminTodosRefresh();
     }
   };
 
@@ -613,6 +639,7 @@ const CityPackages: React.FC = () => {
       });
       
       loadPackages();
+      notifyAdminTodosRefresh();
     }
   };
 

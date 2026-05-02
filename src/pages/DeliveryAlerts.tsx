@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../services/supabase';
+import { supabase, auditLogService } from '../services/supabase';
 import { deliveryAlertService } from '../services/deliveryAlertService';
 import { sanitizeHtml, escapeHtml } from '../utils/xssSanitizer';
 import { useLanguage } from '../contexts/LanguageContext';
+import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 
 interface DeliveryAlert {
   id: string;
@@ -457,6 +458,31 @@ export default function DeliveryAlerts() {
     }
   };
 
+  const logDeliveryAudit = async (
+    action_type: 'create' | 'update' | 'delete',
+    payload: {
+      target_id: string;
+      target_name?: string;
+      action_description: string;
+      old_value?: string;
+      new_value?: string;
+    }
+  ) => {
+    const userId = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser') || 'admin';
+    const userName = sessionStorage.getItem('currentUserName') || localStorage.getItem('currentUserName') || '管理员';
+    await auditLogService.log({
+      user_id: userId,
+      user_name: userName,
+      action_type,
+      module: 'delivery_alerts',
+      target_id: payload.target_id,
+      target_name: payload.target_name,
+      action_description: payload.action_description,
+      old_value: payload.old_value,
+      new_value: payload.new_value,
+    });
+  };
+
   // 💾 保存违规记录
   const handleSaveViolation = async () => {
     if (!selectedAlert) return;
@@ -483,14 +509,11 @@ export default function DeliveryAlerts() {
           })
           .eq('id', selectedAlert.courier_id);
 
-        // 记录操作日志
-        await logAdminAction({
-          action_type: 'create_violation',
-          target_type: 'courier',
+        await logDeliveryAudit('create', {
           target_id: selectedAlert.courier_id,
           target_name: selectedAlert.courier_name,
           action_description: `为骑手 ${selectedAlert.courier_name} 创建违规记录并扣除信用分 ${violationForm.penalty_points} (新分值: ${newScore})`,
-          new_values: { ...violationForm, new_credit_score: newScore }
+          new_value: JSON.stringify({ ...violationForm, new_credit_score: newScore }),
         });
 
         // 更新警报状态
@@ -503,37 +526,6 @@ export default function DeliveryAlerts() {
       console.error('保存违规记录失败:', error);
     } finally {
       setProcessing(false);
-    }
-  };
-
-  // 📝 记录管理员操作日志
-  const logAdminAction = async (actionData: {
-    action_type: string;
-    target_type: string;
-    target_id: string;
-    target_name?: string;
-    action_description: string;
-    old_values?: any;
-    new_values?: any;
-  }) => {
-    try {
-      const logData = {
-        admin_id: 'admin', // 可以从用户上下文获取
-        admin_name: '管理员', // 可以从用户上下文获取
-        ...actionData,
-        ip_address: null, // 前端无法直接获取
-        user_agent: navigator.userAgent
-      };
-
-      const { error } = await supabase
-        .from('admin_audit_logs')
-        .insert([logData]);
-
-      if (error) {
-        console.error('记录操作日志失败:', error);
-      }
-    } catch (error) {
-      console.error('记录操作日志异常:', error);
     }
   };
 
@@ -688,6 +680,7 @@ export default function DeliveryAlerts() {
 
       loadAlerts();
       updateRealTimeStats();
+      notifyAdminTodosRefresh();
       window.alert(`成功${action === 'acknowledge' ? '确认' : action === 'resolve' ? '解决' : '忽略'} ${alertIds.length} 个警报`);
     } catch (error) {
       console.error('批量处理异常:', error);
@@ -720,20 +713,18 @@ export default function DeliveryAlerts() {
         return;
       }
 
-      // 记录操作日志
-      await logAdminAction({
-        action_type: 'update_alert_status',
-        target_type: 'alert',
+      await logDeliveryAudit('update', {
         target_id: alertId,
         target_name: currentAlert?.title,
         action_description: `将警报状态从 ${currentAlert?.status} 更新为 ${newStatus}`,
-        old_values: { status: currentAlert?.status },
-        new_values: { status: newStatus, resolution_notes: resolutionNotes }
+        old_value: JSON.stringify({ status: currentAlert?.status }),
+        new_value: JSON.stringify({ status: newStatus, resolution_notes: resolutionNotes }),
       });
 
       setShowDetailModal(false);
       setResolutionNotes('');
       loadAlerts();
+      notifyAdminTodosRefresh();
       window.alert(`警报状态已更新为: ${newStatus}`);
     } catch (error) {
       console.error('更新警报状态异常:', error);
@@ -758,13 +749,13 @@ export default function DeliveryAlerts() {
         console.error('删除失败:', error);
         window.alert('删除失败，请重试');
       } else {
-        await logAdminAction({
-          action_type: 'delete_all_alerts',
-          target_type: 'system',
+        await logDeliveryAudit('delete', {
           target_id: 'all',
-          action_description: '删除了所有配送警报记录'
+          target_name: 'delivery_alerts',
+          action_description: '删除了所有配送警报记录',
         });
         loadAlerts();
+        notifyAdminTodosRefresh();
         window.alert('所有警报已成功清除');
       }
     } catch (err) {

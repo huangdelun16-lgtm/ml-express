@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
 import { supabase, deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import QRCode from 'qrcode';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
+import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
@@ -135,6 +136,8 @@ function normalizeProductListingStatus(product: { listing_status?: string | null
 
 const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const storeListSearchQ = (searchParams.get('q') || '').trim().toLowerCase();
   const { isMobile } = useResponsive();
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('ml-express-language') || 'zh';
@@ -340,19 +343,28 @@ const DeliveryStoreManagement: React.FC = () => {
     return minDistance <= 50 ? closestCity : null;
   };
 
-  /** 当前城市店铺列表；有待审核商品的店排在前面，便于处理 */
+  /** 当前城市店铺列表；有 ?q= 时按店名/编码全局筛选（便于全局搜索直达） */
   const stores = useMemo(() => {
-    const filtered = allStores.filter(store => {
-      const storeCity = getStoreCity(store);
-      return storeCity === selectedCity;
-    });
+    let filtered = allStores;
+    if (storeListSearchQ) {
+      filtered = allStores.filter(
+        (store) =>
+          (store.store_name || '').toLowerCase().includes(storeListSearchQ) ||
+          (store.store_code || '').toLowerCase().includes(storeListSearchQ)
+      );
+    } else {
+      filtered = allStores.filter((store) => {
+        const storeCity = getStoreCity(store);
+        return storeCity === selectedCity;
+      });
+    }
     return filtered.slice().sort((a, b) => {
       const pa = a.id ? (pendingReviewByStoreId[a.id] ?? 0) : 0;
       const pb = b.id ? (pendingReviewByStoreId[b.id] ?? 0) : 0;
       if (pb !== pa) return pb - pa;
       return (a.store_name || '').localeCompare(b.store_name || '', 'zh-Hans');
     });
-  }, [allStores, selectedCity, pendingReviewByStoreId]);
+  }, [allStores, selectedCity, pendingReviewByStoreId, storeListSearchQ]);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
@@ -733,6 +745,7 @@ const DeliveryStoreManagement: React.FC = () => {
       if (reloadError) throw reloadError;
       setStoreProducts(data || []);
       await loadPendingProductReviewSummary();
+      notifyAdminTodosRefresh();
     } catch (e) {
       console.error('更新商品审核状态失败:', e);
       alert('更新失败，请重试（请确认已在数据库执行 listing_status 迁移）');

@@ -1,0 +1,138 @@
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '../services/supabase';
+import { ADMIN_TODOS_REFRESH_EVENT } from '../utils/adminTodoBridge';
+
+export type AdminTodoCounts = {
+  pendingRecharge: number;
+  pendingAssignment: number;
+  pendingProductReview: number;
+  pendingDeliveryAlerts: number;
+};
+
+const emptyCounts: AdminTodoCounts = {
+  pendingRecharge: 0,
+  pendingAssignment: 0,
+  pendingProductReview: 0,
+  pendingDeliveryAlerts: 0,
+};
+
+export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
+  const [rechargeRes, alertsRes, assignRes, productsRes] = await Promise.all([
+    supabase.from('recharge_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('delivery_alerts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase
+      .from('packages')
+      .select('*', { count: 'exact', head: true })
+      .eq('courier', '待分配')
+      .in('status', ['待取件', '待收款']),
+    supabase.from('products').select('*', { count: 'exact', head: true }).eq('listing_status', 'pending'),
+  ]);
+
+  return {
+    pendingRecharge: rechargeRes.count ?? 0,
+    pendingDeliveryAlerts: alertsRes.count ?? 0,
+    pendingAssignment: assignRes.count ?? 0,
+    pendingProductReview: productsRes.count ?? 0,
+  };
+}
+
+type AdminTodoContextValue = {
+  counts: AdminTodoCounts;
+  refresh: () => Promise<void>;
+  lastUpdatedAt: number | null;
+};
+
+const AdminTodoContext = createContext<AdminTodoContextValue | null>(null);
+
+export const AdminTodoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  const [counts, setCounts] = useState<AdminTodoCounts>(emptyCounts);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const next = await fetchAdminTodoCounts();
+      setCounts(next);
+      setLastUpdatedAt(Date.now());
+    } catch (e) {
+      console.error('AdminTodoContext refresh failed:', e);
+    }
+  }, []);
+
+  const isAdminWorkspace =
+    location.pathname.startsWith('/admin') && location.pathname !== '/admin/login';
+
+  /** 进入后台或路由切换时拉一次，避免跨页处理完后计数仍旧 */
+  useEffect(() => {
+    if (!isAdminWorkspace) return;
+    void refresh();
+  }, [isAdminWorkspace, location.pathname, refresh]);
+
+  /** 其它 Tab 处理完业务后广播，或本页 mutation 后手动触发 */
+  useEffect(() => {
+    if (!isAdminWorkspace) return;
+    const onBroadcast = () => void refresh();
+    window.addEventListener(ADMIN_TODOS_REFRESH_EVENT, onBroadcast);
+    return () => window.removeEventListener(ADMIN_TODOS_REFRESH_EVENT, onBroadcast);
+  }, [isAdminWorkspace, refresh]);
+
+  /** 从后台切回浏览器页签时补拉（Realtime 偶发滞后） */
+  useEffect(() => {
+    if (!isAdminWorkspace) return;
+    let t: number;
+    const onVis = () => {
+      if (document.visibilityState !== 'visible') return;
+      window.clearTimeout(t);
+      t = window.setTimeout(() => void refresh(), 150);
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.clearTimeout(t);
+    };
+  }, [isAdminWorkspace, refresh]);
+
+  useEffect(() => {
+    if (!isAdminWorkspace) return;
+
+    const channel = supabase
+      .channel('admin-dashboard-todos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recharge_requests' }, () => {
+        void refresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_alerts' }, () => {
+        void refresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'packages' }, () => {
+        void refresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        void refresh();
+      })
+      .subscribe();
+
+    const fallbackTimer = window.setInterval(() => {
+      void refresh();
+    }, 45000);
+
+    return () => {
+      window.clearInterval(fallbackTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [isAdminWorkspace, refresh]);
+
+  return (
+    <AdminTodoContext.Provider value={{ counts, refresh, lastUpdatedAt }}>
+      {children}
+    </AdminTodoContext.Provider>
+  );
+};
+
+export function useAdminTodo(): AdminTodoContextValue {
+  const ctx = useContext(AdminTodoContext);
+  if (!ctx) {
+    throw new Error('useAdminTodo must be used within AdminTodoProvider');
+  }
+  return ctx;
+}

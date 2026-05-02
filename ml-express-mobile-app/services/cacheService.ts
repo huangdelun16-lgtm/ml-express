@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Package } from './supabase';
+import { DeviceEventEmitter } from 'react-native';
+import type { Package } from './supabase';
+
+export const OFFLINE_QUEUE_CHANGED = 'offline_queue_changed';
 
 const PACKAGES_CACHE_KEY = 'offline_packages_cache';
 const CACHE_TIMESTAMP_KEY = 'offline_cache_timestamp';
@@ -14,6 +17,9 @@ export interface OfflineUpdate {
   pickupTime?: string;
   deliveryTime?: string;
   courierName?: string;
+  transferCode?: string;
+  storeInfo?: { storeId: string; storeName: string; receiveCode: string };
+  courierLocation?: { latitude: number; longitude: number };
   photoData?: {
     photoBase64?: string;
     photoUrl?: string;
@@ -44,6 +50,7 @@ export const cacheService = {
       
       queue.push(newUpdate);
       await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+      DeviceEventEmitter.emit(OFFLINE_QUEUE_CHANGED, { count: queue.length });
       console.log(`📦 已加入离线更新队列 [${update.type}]:`, newUpdate.packageId);
       return true;
     } catch (error) {
@@ -64,6 +71,7 @@ export const cacheService = {
       if (index !== -1) {
         queue[index].retryCount += 1;
         await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+        DeviceEventEmitter.emit(OFFLINE_QUEUE_CHANGED, { count: queue.length });
       }
     } catch (error) {}
   },
@@ -91,6 +99,7 @@ export const cacheService = {
       const queue: OfflineUpdate[] = JSON.parse(queueJson);
       const newQueue = queue.filter(item => item.id !== updateId);
       await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(newQueue));
+      DeviceEventEmitter.emit(OFFLINE_QUEUE_CHANGED, { count: newQueue.length });
     } catch (error) {
       console.error('Failed to remove from queue:', error);
     }

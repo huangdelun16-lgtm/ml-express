@@ -28,11 +28,20 @@ const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: num
 // 使用环境变量配置 Supabase
 // 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
 // 注意：确保 URL 和 ANON_KEY 匹配同一个 Supabase 项目
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
-const supabaseKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl =
+  (Constants.expoConfig?.extra?.supabaseUrl as string | undefined) ||
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  '';
+const supabaseKey =
+  (Constants.expoConfig?.extra?.supabaseAnonKey as string | undefined) ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
 // Netlify URL 用于调用 admin-password function
 // 优先使用自定义域名，回退到默认 Netlify 域名
-const netlifyUrl = Constants.expoConfig?.extra?.netlifyUrl || process.env.EXPO_PUBLIC_NETLIFY_URL || 'https://admin-market-link-express.netlify.app';
+const netlifyUrl =
+  (Constants.expoConfig?.extra?.netlifyUrl as string | undefined) ||
+  process.env.EXPO_PUBLIC_NETLIFY_URL ||
+  'https://admin-market-link-express.netlify.app';
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Supabase 配置缺失:');
@@ -48,8 +57,8 @@ console.log('   Key:', supabaseKey ? `${supabaseKey.substring(0, 20)}...` : '未
 
 // 创建 Supabase 客户端
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseKey || 'placeholder-key', 
+  supabaseUrl || 'https://invalid.supabase.co',
+  supabaseKey || 'invalid-anon-key', 
   {
   auth: {
     persistSession: false, // 移动 app 不使用持久化 session
@@ -678,84 +687,123 @@ export const packageService = {
   },
 
   async updatePackageStatus(
-    id: string, 
-    status: string, 
-    pickupTime?: string, 
+    id: string,
+    status: string,
+    pickupTime?: string,
     deliveryTime?: string,
     courierName?: string,
     transferCode?: string,
-    storeInfo?: { storeId: string, storeName: string, receiveCode: string },
-    courierLocation?: { latitude: number, longitude: number }
+    storeInfo?: { storeId: string; storeName: string; receiveCode: string },
+    courierLocation?: { latitude: number; longitude: number },
+    options?: { fromSync?: boolean }
   ): Promise<boolean> {
-    // 🚀 离线支持逻辑
+    const queuePayload = {
+      packageId: id,
+      type: 'status' as const,
+      status,
+      pickupTime,
+      deliveryTime,
+      courierName,
+      transferCode,
+      storeInfo,
+      courierLocation,
+    };
+
     const netState = await NetInfo.fetch();
-    if (!netState.isConnected) {
-      console.log('📶 检测到离线状态，正在缓存状态更新...');
-      await cacheService.queueUpdate({
-        packageId: id,
-        type: 'status',
-        status,
-        pickupTime,
-        deliveryTime,
-        courierName
-      });
+    const treatOffline =
+      !netState.isConnected || netState.isInternetReachable === false;
+
+    if (treatOffline) {
+      if (options?.fromSync) {
+        return false;
+      }
+      console.log('📶 网络不可用，状态更新已加入待同步队列');
+      await cacheService.queueUpdate(queuePayload);
       return true;
     }
 
+    const ok = await this._applyPackageStatusRemote(
+      id,
+      status,
+      pickupTime,
+      deliveryTime,
+      courierName,
+      transferCode,
+      storeInfo,
+      courierLocation
+    );
+
+    if (!ok && !options?.fromSync) {
+      console.warn('📶 服务端更新失败，已加入待同步队列');
+      await cacheService.queueUpdate(queuePayload);
+      return true;
+    }
+
+    return ok;
+  },
+
+  /**
+   * 仅执行远端更新（不入队）；供 sync 与在线路径复用
+   */
+  async _applyPackageStatusRemote(
+    id: string,
+    status: string,
+    pickupTime?: string,
+    deliveryTime?: string,
+    courierName?: string,
+    transferCode?: string,
+    storeInfo?: { storeId: string; storeName: string; receiveCode: string },
+    courierLocation?: { latitude: number; longitude: number }
+  ): Promise<boolean> {
     const updateData: any = { status };
-    
+
     if (pickupTime) updateData.pickup_time = pickupTime;
     if (deliveryTime) updateData.delivery_time = deliveryTime;
     if (courierName) updateData.courier = courierName;
     if (transferCode) updateData.transfer_code = transferCode;
-    
-    // 如果是送达状态且有店铺信息，记录店铺信息
+
     if (status === '已送达' && storeInfo) {
       updateData.delivery_store_id = storeInfo.storeId;
       updateData.delivery_store_name = storeInfo.storeName;
       updateData.store_receive_code = storeInfo.receiveCode;
     }
-    
+
     console.log('更新包裹数据:', { id, updateData });
-    
-    const { error } = await supabase
-      .from('packages')
-      .update(updateData)
-      .eq('id', id);
-    
+
+    const { error } = await supabase.from('packages').update(updateData).eq('id', id);
+
     if (error) {
       console.error('更新包裹状态失败:', error);
       return false;
     }
-    
+
     console.log('包裹状态更新成功');
 
-    // 🚀 新增：自动记录审计日志
     try {
-      const currentUserId = await AsyncStorage.getItem('currentUser') || 'unknown_mobile';
-      const currentUserName = await AsyncStorage.getItem('currentUserName') || '骑手';
-      
-      await supabase.from('audit_logs').insert([{
-        user_id: currentUserId,
-        user_name: currentUserName,
-        action_type: 'update',
-        module: 'packages',
-        target_id: id,
-        target_name: `包裹 ${id}`,
-        action_description: `骑手更新状态为：${status}${courierName ? ' (执行人: ' + courierName + ')' : ''}`,
-        new_value: JSON.stringify({ status, courier: courierName }),
-        action_time: new Date().toISOString()
-      }]);
+      const currentUserId = (await AsyncStorage.getItem('currentUser')) || 'unknown_mobile';
+      const currentUserName = (await AsyncStorage.getItem('currentUserName')) || '骑手';
+
+      await supabase.from('audit_logs').insert([
+        {
+          user_id: currentUserId,
+          user_name: currentUserName,
+          action_type: 'update',
+          module: 'packages',
+          target_id: id,
+          target_name: `包裹 ${id}`,
+          action_description: `骑手更新状态为：${status}${courierName ? ' (执行人: ' + courierName + ')' : ''}`,
+          new_value: JSON.stringify({ status, courier: courierName }),
+          action_time: new Date().toISOString(),
+        },
+      ]);
     } catch (logError) {
       console.warn('记录移动端审计日志失败:', logError);
     }
-    
-    // 如果是送达状态，进行违规检测
+
     if (status === '已送达') {
       try {
         console.log('🏁 订单已送达，启动自动违规检测...');
-        
-        // 1. 获取包裹详情
+
         const { data: packageData } = await supabase
           .from('packages')
           .select('receiver_latitude, receiver_longitude, courier, customer_id')
@@ -763,7 +811,6 @@ export const packageService = {
           .single();
 
         if (packageData) {
-          // 2. 获取骑手坐标 (优先使用传入的，如果没有则尝试从 locationService 获取最新的)
           let finalLat = courierLocation?.latitude;
           let finalLng = courierLocation?.longitude;
 
@@ -781,11 +828,12 @@ export const packageService = {
             }
           }
 
-          // 3. 执行违规检测 (异步执行，不阻塞主流程)
-          const realCourierId = await AsyncStorage.getItem('currentCourierId') || courierName || packageData.courier || '未知';
-          detectViolationsAsync(id, realCourierId, finalLat || 0, finalLng || 0).catch(e => console.error('Violation detection failed:', e));
+          const realCourierId =
+            (await AsyncStorage.getItem('currentCourierId')) || courierName || packageData.courier || '未知';
+          detectViolationsAsync(id, realCourierId, finalLat || 0, finalLng || 0).catch((e) =>
+            console.error('Violation detection failed:', e)
+          );
 
-          // 4. 🚀 通知寄件人订单已送达
           if (packageData.customer_id) {
             try {
               const { notificationService } = require('./notificationService');
@@ -800,7 +848,7 @@ export const packageService = {
         console.error('❌ 送达后续处理失败:', error);
       }
     }
-    
+
     return true;
   },
 
@@ -811,8 +859,13 @@ export const packageService = {
     const queue = await cacheService.getOfflineQueue();
     if (queue.length === 0) return;
 
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected || netState.isInternetReachable === false) {
+      return;
+    }
+
     console.log(`🔄 正在同步 ${queue.length} 条离线记录...`);
-    
+
     for (const item of queue) {
       if (item.retryCount > 5) {
         console.warn(`⚠️ 记录 ${item.id} 重试次数过多，跳过`);
@@ -823,20 +876,24 @@ export const packageService = {
         let success = false;
         if (item.type === 'status') {
           success = await this.updatePackageStatus(
-            item.packageId, 
-            item.status!, 
-            item.pickupTime, 
-            item.deliveryTime, 
-            item.courierName
+            item.packageId,
+            item.status!,
+            item.pickupTime,
+            item.deliveryTime,
+            item.courierName,
+            item.transferCode,
+            item.storeInfo,
+            item.courierLocation,
+            { fromSync: true }
           );
         } else if (item.type === 'photo' && item.photoData) {
           success = await deliveryPhotoService.saveDeliveryPhoto({
             packageId: item.packageId,
             ...item.photoData,
-            courierName: item.courierName || '未知'
+            courierName: item.courierName || '未知',
           });
         }
-        
+
         if (success) {
           await cacheService.removeFromQueue(item.id);
           console.log(`✅ 成功同步离线记录: ${item.id}`);

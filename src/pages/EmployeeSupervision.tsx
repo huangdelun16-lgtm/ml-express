@@ -27,11 +27,8 @@ const [logs, setLogs] = useState<AuditLog[]>([]);
 
   const loadData = async () => {
     setLoading(true);
-    // 自动删除一周前的数据
-    await auditLogService.deleteOldLogs(7);
-    
     const [logsData, accountsData] = await Promise.all([
-      auditLogService.getAllLogs(1000), // 从5000减少到1000，提升性能
+      auditLogService.getAllLogs(1000),
       adminAccountService.getAllAccounts()
     ]);
     setLogs(logsData);
@@ -102,7 +99,9 @@ const [logs, setLogs] = useState<AuditLog[]>([]);
       'finance': '财务管理',
       'settings': '系统设置',
       'accounts': '账号管理',
-      'system': '系统'
+      'system': '系统',
+      'delivery_stores': '商家/店铺',
+      'delivery_alerts': '配送警报',
     };
     return map[module] || module;
   };
@@ -151,10 +150,23 @@ const [logs, setLogs] = useState<AuditLog[]>([]);
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700 }}>👁️ 员工监督中心</h1>
-          <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>实时监控所有员工操作行为，追踪系统变更记录</p>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700 }}>📜 操作审计日志</h1>
+          <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>查看后台关键操作记录（登录、财务、包裹、配送警报等），用于内控与追溯</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '10px 18px',
+              borderRadius: '10px',
+              cursor: 'pointer'
+            }}
+          >
+            ← 控制台
+          </button>
           <button
             onClick={() => navigate('/admin/settings')}
             style={{
@@ -279,6 +291,8 @@ const [logs, setLogs] = useState<AuditLog[]>([]);
               <option value="settings" style={{ color: '#000' }}>系统设置</option>
               <option value="accounts" style={{ color: '#000' }}>账号管理</option>
               <option value="system" style={{ color: '#000' }}>系统</option>
+              <option value="delivery_stores" style={{ color: '#000' }}>商家/店铺</option>
+              <option value="delivery_alerts" style={{ color: '#000' }}>配送警报</option>
             </select>
           </div>
           <div>

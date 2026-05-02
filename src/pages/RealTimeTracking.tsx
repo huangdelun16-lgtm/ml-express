@@ -7,6 +7,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Courier, CourierWithLocation, Coordinates } from '../types';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
+import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
@@ -721,6 +722,8 @@ const RealTimeTracking: React.FC = () => {
         setShowAssignModal(false);
         setSelectedPackage(null);
         
+        notifyAdminTodosRefresh();
+
         // 立即重新加载包裹数据
         await loadPackages();
         
@@ -847,9 +850,6 @@ const RealTimeTracking: React.FC = () => {
           >
             ← 返回后台
           </button>
-          <h1 style={{ margin: 0, color: '#1f2937', fontSize: '1.8rem' }}>
-            📍 实时跟踪管理
-          </h1>
         </div>
         <div style={{ 
           display: 'flex', 
@@ -977,26 +977,71 @@ const RealTimeTracking: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.15fr) minmax(360px, 1fr)',
+          gap: isMobile ? '1.25rem' : '1.75rem',
+        }}
+      >
         {/* 左侧：地图 */}
-        <div style={{
-          background: 'white',
-          borderRadius: '15px',
-          padding: '1.5rem',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ margin: 0, color: '#1f2937' }}>🗺️ 快递员实时位置</h2>
-            <div style={{ 
-              background: '#ecfdf5', 
-              border: '1px solid #86efac', 
-              borderRadius: '6px', 
-              padding: '0.5rem 1rem', 
-              fontSize: '0.8rem',
-              color: '#065f46',
-              fontWeight: 'bold'
-            }}>
-              ✅ {isRegionalUser ? currentRegionPrefix : (selectedCity === 'yangon' ? 'YGN' : (selectedCity === 'mandalay' ? 'MDY' : (selectedCity === 'pyinoolwin' ? 'POL' : '')))} 骑手账号: {regionalRiderCount}
+        <div
+          style={{
+            background: 'linear-gradient(165deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '18px',
+            padding: '1.2rem 1.35rem',
+            boxShadow:
+              '0 14px 44px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(148, 163, 184, 0.14)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem',
+              flexWrap: 'wrap',
+              gap: '0.65rem',
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                color: '#0f172a',
+                fontSize: '1.08rem',
+                fontWeight: 800,
+                letterSpacing: '-0.02em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <span aria-hidden>🗺️</span>
+              快递员实时位置
+            </h2>
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                border: '1px solid #86efac',
+                borderRadius: '10px',
+                padding: '0.45rem 0.95rem',
+                fontSize: '0.78rem',
+                color: '#065f46',
+                fontWeight: 800,
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)',
+              }}
+            >
+              ✅{' '}
+              {isRegionalUser
+                ? currentRegionPrefix
+                : selectedCity === 'yangon'
+                  ? 'YGN'
+                  : selectedCity === 'mandalay'
+                    ? 'MDY'
+                    : selectedCity === 'pyinoolwin'
+                      ? 'POL'
+                      : ''}{' '}
+              骑手账号: {regionalRiderCount}
             </div>
           </div>
           
@@ -1019,9 +1064,10 @@ const RealTimeTracking: React.FC = () => {
           <div style={{ 
             width: '100%', 
             height: '600px', 
-            borderRadius: '10px', 
+            borderRadius: '14px', 
             overflow: 'hidden',
-            border: '2px solid #e5e7eb',
+            border: '1px solid #e2e8f0',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85), 0 2px 12px rgba(15, 23, 42, 0.06)',
             position: 'relative'
           }}>
             <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }}>
@@ -1435,14 +1481,18 @@ const RealTimeTracking: React.FC = () => {
         </div>
 
         {/* 右侧：包裹管理 */}
-        <div style={{
-          background: 'white',
-          borderRadius: '15px',
-          padding: '1.5rem',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-          maxHeight: '700px',
-          overflow: 'auto'
-        }}>
+        <div
+          style={{
+            background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
+            borderRadius: '18px',
+            padding: '1.2rem 1.35rem',
+            boxShadow:
+              '0 14px 44px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(148, 163, 184, 0.14)',
+            maxHeight: 'min(820px, 88vh)',
+            overflow: 'auto',
+            minWidth: 0,
+          }}
+        >
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -1494,35 +1544,77 @@ const RealTimeTracking: React.FC = () => {
             <>
               {/* 待分配包裹 */}
               <div style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 style={{ color: '#dc2626', margin: 0, fontSize: '1.1rem' }}>
-                    ⏳ 待分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length})
-                  </h3>
-                  <button
-                    onClick={() => {
-                      loadPackages();
-                      loadCouriers();
-                      loadStores();
-                    }}
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, #fffbeb 0%, #fff7ed 55%, #fffdfb 100%)',
+                    border: '1px solid #fcd34d',
+                    borderRadius: '14px',
+                    padding: '1rem 1.2rem',
+                    marginBottom: '1rem',
+                    boxShadow: '0 6px 22px rgba(217, 119, 6, 0.12)',
+                  }}
+                >
+                  <div
                     style={{
-                      background: 'rgba(59, 130, 246, 0.1)',
-                      color: '#2563eb',
-                      border: '1px solid rgba(59, 130, 246, 0.2)',
-                      padding: '0.4rem 0.8rem',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: 'bold',
                       display: 'flex',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: '0.4rem',
-                      transition: 'all 0.2s'
+                      flexWrap: 'wrap',
+                      gap: '0.6rem',
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
                   >
-                    🔄 刷新
-                  </button>
+                    <h3
+                      style={{
+                        color: '#9a3412',
+                        margin: 0,
+                        fontSize: '1.05rem',
+                        fontWeight: 900,
+                        letterSpacing: '-0.02em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                      }}
+                    >
+                      <span aria-hidden>⏳</span>
+                      待分配包裹 (
+                      {
+                        filterPackagesByCity(packages).filter(
+                          (p) => p.status === '待取件' || p.status === '待收款',
+                        ).length
+                      }
+                      )
+                    </h3>
+                    <button
+                      onClick={() => {
+                        loadPackages();
+                        loadCouriers();
+                        loadStores();
+                      }}
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.12)',
+                        color: '#1d4ed8',
+                        border: '1px solid rgba(59, 130, 246, 0.28)',
+                        padding: '0.45rem 0.95rem',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.08)',
+                      }}
+                      onMouseOver={(e) =>
+                        (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)')
+                      }
+                      onMouseOut={(e) =>
+                        (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.12)')
+                      }
+                    >
+                      🔄 刷新
+                    </button>
+                  </div>
                 </div>
 
           {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length === 0 ? (
@@ -1541,16 +1633,20 @@ const RealTimeTracking: React.FC = () => {
                 <div
                   key={pkg.id}
                   style={{
-                    background: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                      ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
-                      : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                    padding: '1rem',
-                    borderRadius: '10px',
-                    marginBottom: '1rem',
-                    border: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                      ? '2px solid #22c55e'
-                      : '2px solid #bae6fd',
-                    opacity: pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.9 : 1
+                    background:
+                      pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
+                        ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
+                        : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                    padding: '1.1rem 1.3rem',
+                    borderRadius: '12px',
+                    marginBottom: '0.85rem',
+                    border:
+                      pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
+                        ? '1px solid #4ade80'
+                        : '1px solid #7dd3fc',
+                    boxShadow: '0 4px 14px rgba(15, 23, 42, 0.06)',
+                    opacity:
+                      pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.92 : 1,
                   }}
                 >
                   <div style={{ 

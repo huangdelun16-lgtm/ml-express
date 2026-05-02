@@ -4,6 +4,7 @@ import { supabase, rechargeService, RechargeRequest, auditLogService } from '../
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { errorHandler } from '../services/errorHandler';
+import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 
 // 🚀 新增：地区定义
 const REGIONS = [
@@ -68,6 +69,7 @@ const RechargeManagement: React.FC = () => {
           action_description: `通过充值申请: ${request.amount.toLocaleString()} MMK`,
           new_value: JSON.stringify({ status: 'completed' })
         });
+        notifyAdminTodosRefresh();
         alert('审核通过成功');
         loadRequests();
       }
@@ -96,6 +98,7 @@ const RechargeManagement: React.FC = () => {
           action_description: `拒绝充值申请: ${request.amount.toLocaleString()} MMK, 理由: ${reason}`,
           new_value: JSON.stringify({ status: 'rejected', reason })
         });
+        notifyAdminTodosRefresh();
         alert('已拒绝申请');
         loadRequests();
       }
