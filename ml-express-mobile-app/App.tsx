@@ -42,6 +42,7 @@ import { hasAcceptedLocationDisclosure } from './utils/locationDisclosureStorage
 import LocationDisclosureScreen from './screens/LocationDisclosureScreen';
 import * as Linking from 'expo-linking';
 import { navigationRef } from './navigation/navigationRef';
+import LocationPrecheckModalHost from './components/LocationPrecheckModalHost';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -258,6 +259,25 @@ function MainTabs() {
     loadRole();
   }, []);
 
+  /** 登录并进主界面后再恢复后台追踪（避免启动屏阶段未挂载 Permission 宿主即请求权限，违反 Play 披露顺序） */
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!(await hasAcceptedLocationDisclosure())) return;
+        const courierId = await AsyncStorage.getItem('currentCourierId');
+        const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
+        if (!courierId || onlinePref === 'false' || cancelled) return;
+        await locationService.startBackgroundTracking();
+      } catch (e) {
+        console.warn('MainTabs resume tracking:', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (userRole === 'admin' || userRole === 'manager') {
     return <AdminTabs />;
   }
@@ -472,22 +492,6 @@ function AppContent() {
 
         await initNotifications();
 
-        const checkTracking = async () => {
-          try {
-            if (!(await hasAcceptedLocationDisclosure())) {
-              return;
-            }
-            const courierId = await AsyncStorage.getItem('currentCourierId');
-            const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
-            if (courierId && onlinePref !== 'false') {
-              await locationService.startBackgroundTracking();
-            }
-          } catch (e) {
-            console.warn('Tracking init error:', e);
-          }
-        };
-        await checkTracking();
-
         await packageService.syncOfflineUpdates();
 
         clearTimeout(safetyTimer);
@@ -522,16 +526,20 @@ function AppContent() {
 
   if (!appIsReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <LoadingFallback t={t} />
-      </View>
+      <>
+        <LocationPrecheckModalHost />
+        <View style={{ flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <LoadingFallback t={t} />
+        </View>
+      </>
     );
   }
 
   return (
     <>
       <StatusBar barStyle="dark-content" />
+      <LocationPrecheckModalHost />
       <GlobalOrderMonitor />
       <SyncIndicator />
       <NavigationContainer

@@ -9,12 +9,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { locationService } from '../services/locationService';
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 import { setLocationDisclosureAccepted } from '../utils/locationDisclosureStorage';
+import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import { Ionicons } from '@expo/vector-icons';
 
 type Props = { navigation: any; route?: { params?: { fromProfile?: boolean } } };
@@ -62,15 +62,19 @@ export default function LocationDisclosureScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       await setLocationDisclosureAccepted();
-      // 紧邻用户「同意」操作，直接调系统权限；不经过 locationPermissionGate，避免全屏披露后再弹一层 Android 说明。
-      await Location.requestForegroundPermissionsAsync();
-      const courierId = await AsyncStorage.getItem('currentCourierId');
-      const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
-      if (courierId && onlinePref !== 'false') {
-        try {
-          await locationService.startBackgroundTracking();
-        } catch (e) {
-          console.warn('startBackgroundTracking after disclosure:', e);
+      // Android：在系统对话框前再经全屏 Modal（与 gate 一致），满足 Play「显著披露紧挨运行时权限」
+      const { status: fg } = await requestForegroundPermissionsIfDisclosed(language);
+      if (fg !== 'granted') {
+        // 用户拒绝系统权限：仍进入主页（与原先行为一致）
+      } else {
+        const courierId = await AsyncStorage.getItem('currentCourierId');
+        const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
+        if (courierId && onlinePref !== 'false') {
+          try {
+            await locationService.startBackgroundTracking();
+          } catch (e) {
+            console.warn('startBackgroundTracking after disclosure:', e);
+          }
         }
       }
     } catch (e) {

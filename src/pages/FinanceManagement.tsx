@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { SkeletonCard } from "../components/SkeletonLoader";
 import { useNavigate } from "react-router-dom";
 import {
@@ -819,6 +825,7 @@ const FinanceManagement: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<FinanceRecord | null>(
     null,
   );
+  const financeRecordAmountRef = useRef<HTMLInputElement | null>(null);
   const [regionalPricingMap, setRegionalPricingMap] = useState<
     Record<string, Record<string, any>>
   >({});
@@ -1630,6 +1637,32 @@ const FinanceManagement: React.FC = () => {
     setEditingRecord(null);
   };
 
+  const closeFinanceRecordForm = useCallback(() => {
+    setShowForm(false);
+    setFormData({
+      ...defaultForm,
+      record_date: new Date().toISOString().slice(0, 10),
+    });
+    setEditingRecord(null);
+  }, []);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeFinanceRecordForm();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showForm, closeFinanceRecordForm]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const id = window.setTimeout(() => {
+      if (!editingRecord) financeRecordAmountRef.current?.focus();
+    }, 120);
+    return () => clearTimeout(id);
+  }, [showForm, editingRecord]);
+
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.amount || Number.isNaN(Number(formData.amount))) {
@@ -1699,8 +1732,7 @@ const FinanceManagement: React.FC = () => {
 
       if (success) {
         await loadRecords();
-        resetForm();
-        setShowForm(false);
+        closeFinanceRecordForm();
       } else {
         window.alert("保存失败，请检查日志");
       }
@@ -2366,8 +2398,6 @@ const FinanceManagement: React.FC = () => {
               onClick={() => {
                 resetForm();
                 setShowForm(true);
-                // 默认类别设为其他收入/支出
-                setFormData((prev) => ({ ...prev, category: "其他收入" }));
               }}
               style={{
                 marginLeft: "auto",
@@ -2590,496 +2620,6 @@ const FinanceManagement: React.FC = () => {
                 />
               </div>
             </div>
-
-            {/* Form */}
-            {showForm && (
-              <div
-                style={{
-                  marginBottom: "24px",
-                  padding: "24px",
-                  background: "rgba(8, 27, 48, 0.72)",
-                  borderRadius: "16px",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                  position: "relative",
-                  zIndex: 10,
-                }}
-              >
-                <button
-                  onClick={() => {
-                    setShowForm(false);
-                    resetForm();
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    right: "16px",
-                    background: "transparent",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    fontSize: "1.5rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  ×
-                </button>
-                <h3 style={{ marginTop: 0, color: "white" }}>
-                  {editingRecord ? t.editRecord : t.addRecord}
-                </h3>
-                <form onSubmit={handleCreateOrUpdate}>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile
-                        ? "1fr"
-                        : "repeat(auto-fit, minmax(260px, 1fr))",
-                      gap: isMobile ? "12px" : "16px",
-                    }}
-                  >
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.incomeType}
-                      </label>
-                      <select
-                        value={formData.record_type}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            record_type: e.target
-                              .value as FinanceRecord["record_type"],
-                          }))
-                        }
-                        required
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(255, 255, 255, 0.25)",
-                          background: "rgba(7, 23, 53, 0.65)",
-                          color: "white",
-                        }}
-                      >
-                        <option value="income" style={{ color: "#000" }}>
-                          {t.income}
-                        </option>
-                        <option value="expense" style={{ color: "#000" }}>
-                          {t.expense}
-                        </option>
-                      </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.category}
-                      </label>
-                      <select
-                        value={formData.category}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            category: e.target.value,
-                          }))
-                        }
-                        required
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(255, 255, 255, 0.25)",
-                          background: "rgba(7, 23, 53, 0.65)",
-                          color: "white",
-                        }}
-                      >
-                        {categoryOptions.map((option) => (
-                          <option
-                            key={option}
-                            value={option}
-                            style={{ color: "#000" }}
-                          >
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.orderId} (
-                        {language === "zh"
-                          ? "可选"
-                          : language === "my"
-                            ? "မဖြစ်မနေမဟုတ်"
-                            : "Optional"}
-                        )
-                      </label>
-                      <input
-                        value={formData.order_id}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            order_id: e.target.value,
-                          }))
-                        }
-                        placeholder={
-                          language === "zh"
-                            ? "如：MDY20250928121501"
-                            : "e.g. MDY20250928121501"
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "none",
-                          background: "rgba(255, 255, 255, 0.18)",
-                          color: "white",
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.courierId} (
-                        {language === "zh"
-                          ? "可选"
-                          : language === "my"
-                            ? "မဖြစ်မနေမဟုတ်"
-                            : "Optional"}
-                        )
-                      </label>
-                      <input
-                        value={formData.courier_id}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            courier_id: e.target.value,
-                          }))
-                        }
-                        placeholder={
-                          language === "zh" ? "如：COU001" : "e.g. COU001"
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "none",
-                          background: "rgba(255, 255, 255, 0.18)",
-                          color: "white",
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.amount}
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.amount}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            amount: e.target.value,
-                          }))
-                        }
-                        required
-                        min="0"
-                        step="0.01"
-                        placeholder={
-                          language === "zh" ? "如：5000" : "e.g. 5000"
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "none",
-                          background: "rgba(255, 255, 255, 0.18)",
-                          color: "white",
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.currency}
-                      </label>
-                      <select
-                        value={formData.currency}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            currency: e.target.value,
-                          }))
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(255, 255, 255, 0.25)",
-                          background: "rgba(7, 23, 53, 0.65)",
-                          color: "white",
-                        }}
-                      >
-                        {currencyOptions.map((option) => (
-                          <option
-                            key={option}
-                            value={option}
-                            style={{ color: "#000" }}
-                          >
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.status}
-                      </label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            status: e.target.value as FinanceRecord["status"],
-                          }))
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(255, 255, 255, 0.25)",
-                          background: "rgba(7, 23, 53, 0.65)",
-                          color: "white",
-                        }}
-                      >
-                        <option value="pending" style={{ color: "#000" }}>
-                          {t.pending}
-                        </option>
-                        <option value="completed" style={{ color: "#000" }}>
-                          {t.completed}
-                        </option>
-                        <option value="cancelled" style={{ color: "#000" }}>
-                          {t.cancelled}
-                        </option>
-                      </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.paymentMethod}
-                      </label>
-                      <select
-                        value={formData.payment_method}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            payment_method: e.target.value,
-                          }))
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(255, 255, 255, 0.25)",
-                          background: "rgba(7, 23, 53, 0.65)",
-                          color: "white",
-                        }}
-                      >
-                        {paymentOptions.map((option) => (
-                          <option
-                            key={option.value}
-                            value={option.value}
-                            style={{ color: "#000" }}
-                          >
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {language === "zh"
-                          ? "参考号 (可选)"
-                          : language === "my"
-                            ? "ကိုးကားချက်နံပါတ် (မဖြစ်မနေမဟုတ်)"
-                            : "Reference (Optional)"}
-                      </label>
-                      <input
-                        value={formData.reference}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            reference: e.target.value,
-                          }))
-                        }
-                        placeholder={t.refPlaceholder}
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "none",
-                          background: "rgba(255, 255, 255, 0.18)",
-                          color: "white",
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          color: "rgba(255, 255, 255, 0.8)",
-                        }}
-                      >
-                        {t.recordDate}
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.record_date}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            record_date: e.target.value,
-                          }))
-                        }
-                        required
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          border: "none",
-                          background: "rgba(255, 255, 255, 0.18)",
-                          color: "white",
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ marginTop: "16px" }}>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "6px",
-                        color: "rgba(255, 255, 255, 0.8)",
-                      }}
-                    >
-                      {t.notes}
-                    </label>
-                    <textarea
-                      value={formData.notes}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          notes: e.target.value,
-                        }))
-                      }
-                      rows={3}
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: "rgba(255, 255, 255, 0.18)",
-                        color: "white",
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: isMobile ? "12px" : "16px",
-                      marginTop: "24px",
-                    }}
-                  >
-                    <button
-                      type="submit"
-                      disabled={isProcessing}
-                      style={{
-                        padding: "12px 28px",
-                        borderRadius: "12px",
-                        border: "none",
-                        background:
-                          "linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%)",
-                        color: "#031937",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        boxShadow: "0 12px 25px rgba(0, 210, 255, 0.35)",
-                        opacity: isProcessing ? 0.7 : 1,
-                      }}
-                    >
-                      {isProcessing
-                        ? t.loading
-                        : editingRecord
-                          ? t.saveChanges
-                          : t.createRecord}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowForm(false);
-                        resetForm();
-                      }}
-                      style={{
-                        padding: "12px 28px",
-                        borderRadius: "12px",
-                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                        background: "rgba(255, 255, 255, 0.12)",
-                        color: "white",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {t.cancel}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
 
             {/* Records Table - Reverted to standard table for reliability */}
             <div
@@ -12139,6 +11679,620 @@ const FinanceManagement: React.FC = () => {
                 {language === "zh" ? "确认" : "Close"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="finance-record-form-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(5, 12, 28, 0.82)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1200,
+            padding: isMobile ? "12px" : "24px",
+          }}
+          onClick={closeFinanceRecordForm}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              maxHeight: "min(92vh, 720px)",
+              background:
+                "linear-gradient(165deg, rgba(22, 45, 78, 0.98) 0%, rgba(12, 28, 54, 0.99) 100%)",
+              borderRadius: 20,
+              border: "1px solid rgba(120, 180, 255, 0.22)",
+              boxShadow:
+                "0 28px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06) inset",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                flexShrink: 0,
+                padding: "18px 20px 14px",
+                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <h2
+                  id="finance-record-form-title"
+                  style={{
+                    margin: 0,
+                    color: "#fff",
+                    fontSize: isMobile ? "1.2rem" : "1.35rem",
+                    fontWeight: 800,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {editingRecord ? t.editRecord : t.addRecord}
+                </h2>
+                <p
+                  style={{
+                    margin: "8px 0 0",
+                    color: "rgba(255,255,255,0.55)",
+                    fontSize: "0.85rem",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {language === "zh"
+                    ? "Esc 关闭 · 新建时焦点在金额"
+                    : language === "my"
+                      ? "Esc — ပိတ်ရန်"
+                      : "Press Esc to close. Amount is focused for new records."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeFinanceRecordForm}
+                aria-label={t.cancel}
+                style={{
+                  flexShrink: 0,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.75)",
+                  fontSize: "1.35rem",
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleCreateOrUpdate}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  WebkitOverflowScrolling: "touch",
+                  padding: "16px 20px 12px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    marginBottom: 18,
+                  }}
+                >
+                  {(
+                    [
+                      { v: "income" as const, icon: "📈", label: t.income },
+                      { v: "expense" as const, icon: "📉", label: t.expense },
+                    ] as const
+                  ).map(({ v, icon, label }) => {
+                    const on = formData.record_type === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({ ...prev, record_type: v }))
+                        }
+                        style={{
+                          flex: 1,
+                          padding: "14px 12px",
+                          borderRadius: 14,
+                          border: on
+                            ? v === "income"
+                              ? "2px solid rgba(52, 211, 153, 0.9)"
+                              : "2px solid rgba(251, 113, 133, 0.95)"
+                            : "1px solid rgba(255,255,255,0.14)",
+                          background: on
+                            ? v === "income"
+                              ? "rgba(16, 185, 129, 0.2)"
+                              : "rgba(244, 63, 94, 0.18)"
+                            : "rgba(255,255,255,0.04)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: "0.95rem",
+                          cursor: "pointer",
+                          transition: "border 0.15s ease, background 0.15s ease",
+                          boxShadow: on
+                            ? v === "income"
+                              ? "0 0 20px rgba(52,211,153,0.15)"
+                              : "0 0 20px rgba(251,113,133,0.12)"
+                            : "none",
+                        }}
+                      >
+                        {icon} {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {(() => {
+                  const lab = {
+                    display: "block" as const,
+                    marginBottom: "6px",
+                    color: "rgba(255, 255, 255, 0.85)",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                  };
+                  const sel = {
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(255, 255, 255, 0.25)",
+                    background: "rgba(7, 23, 53, 0.65)",
+                    color: "white",
+                    fontSize: "0.95rem",
+                  };
+                  const inp = {
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255, 255, 255, 0.1)",
+                    color: "white",
+                    fontSize: "0.95rem",
+                  };
+                  const secTitle = (text: string) => (
+                    <div
+                      style={{
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase" as const,
+                        color: "rgba(147, 197, 253, 0.85)",
+                        margin: "18px 0 10px",
+                      }}
+                    >
+                      {text}
+                    </div>
+                  );
+                  const mainSec =
+                    language === "zh"
+                      ? "主要信息"
+                      : language === "my"
+                        ? "အဓိက"
+                        : "Main";
+                  const linkSec =
+                    language === "zh"
+                      ? "关联（可选）"
+                      : language === "my"
+                        ? "ချိတ်ဆက်မှု"
+                        : "Links (optional)";
+                  const settleSec =
+                    language === "zh"
+                      ? "状态与支付"
+                      : language === "my"
+                        ? "အခြေအနေ နှင့် ပေးချေမှု"
+                        : "Status & payment";
+                  return (
+                    <>
+                      {secTitle(mainSec)}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: isMobile
+                            ? "1fr"
+                            : "1fr 1fr",
+                          gap: 14,
+                        }}
+                      >
+                        <div style={{ gridColumn: isMobile ? "1" : "1 / -1" }}>
+                          <label style={lab}>{t.amount} *</label>
+                          <input
+                            ref={financeRecordAmountRef}
+                            type="number"
+                            inputMode="decimal"
+                            value={formData.amount}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                amount: e.target.value,
+                              }))
+                            }
+                            required
+                            min="0"
+                            step="0.01"
+                            placeholder={
+                              language === "zh" ? "如：5000" : "e.g. 5000"
+                            }
+                            style={{
+                              ...inp,
+                              fontSize: "1.2rem",
+                              fontWeight: 700,
+                              padding: "14px 16px",
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={lab}>{t.currency}</label>
+                          <select
+                            value={formData.currency}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                currency: e.target.value,
+                              }))
+                            }
+                            style={sel}
+                          >
+                            {currencyOptions.map((option) => (
+                              <option
+                                key={option}
+                                value={option}
+                                style={{ color: "#000" }}
+                              >
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={lab}>{t.category} *</label>
+                          <select
+                            value={formData.category}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                category: e.target.value,
+                              }))
+                            }
+                            required
+                            style={sel}
+                          >
+                            {categoryOptions.map((option) => (
+                              <option
+                                key={option}
+                                value={option}
+                                style={{ color: "#000" }}
+                              >
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ gridColumn: isMobile ? "1" : "1 / -1" }}>
+                          <label style={lab}>{t.recordDate} *</label>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 10,
+                              alignItems: "stretch",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <input
+                              type="date"
+                              value={formData.record_date}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  record_date: e.target.value,
+                                }))
+                              }
+                              required
+                              style={{ ...inp, flex: "1 1 200px", minWidth: 0 }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  record_date: getLocalDateYYYYMMDD(),
+                                }))
+                              }
+                              style={{
+                                padding: "0 16px",
+                                borderRadius: 10,
+                                border: "1px solid rgba(125, 211, 252, 0.45)",
+                                background: "rgba(56, 189, 248, 0.12)",
+                                color: "#e0f2fe",
+                                fontWeight: 700,
+                                fontSize: "0.88rem",
+                                cursor: "pointer",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {language === "zh"
+                                ? "今日"
+                                : language === "my"
+                                  ? "ယနေ့"
+                                  : "Today"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {secTitle(linkSec)}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: isMobile
+                            ? "1fr"
+                            : "1fr 1fr",
+                          gap: 14,
+                        }}
+                      >
+                        <div>
+                          <label style={lab}>
+                            {t.orderId}{" "}
+                            <span
+                              style={{
+                                fontWeight: 400,
+                                opacity: 0.65,
+                                fontSize: "0.78rem",
+                              }}
+                            >
+                              (
+                              {language === "zh"
+                                ? "可选"
+                                : language === "my"
+                                  ? "မဖြစ်မနေမဟုတ်"
+                                  : "Optional"}
+                              )
+                            </span>
+                          </label>
+                          <input
+                            value={formData.order_id}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                order_id: e.target.value,
+                              }))
+                            }
+                            placeholder={
+                              language === "zh"
+                                ? "如：MDY20250928121501"
+                                : "e.g. MDY20250928121501"
+                            }
+                            style={inp}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div>
+                          <label style={lab}>
+                            {t.courierId}{" "}
+                            <span
+                              style={{
+                                fontWeight: 400,
+                                opacity: 0.65,
+                                fontSize: "0.78rem",
+                              }}
+                            >
+                              (
+                              {language === "zh"
+                                ? "可选"
+                                : language === "my"
+                                  ? "မဖြစ်မနေမဟုတ်"
+                                  : "Optional"}
+                              )
+                            </span>
+                          </label>
+                          <input
+                            value={formData.courier_id}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                courier_id: e.target.value,
+                              }))
+                            }
+                            placeholder={
+                              language === "zh" ? "如：COU001" : "e.g. COU001"
+                            }
+                            style={inp}
+                            autoComplete="off"
+                          />
+                        </div>
+                      </div>
+
+                      {secTitle(settleSec)}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: isMobile
+                            ? "1fr"
+                            : "1fr 1fr",
+                          gap: 14,
+                        }}
+                      >
+                        <div>
+                          <label style={lab}>{t.status}</label>
+                          <select
+                            value={formData.status}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                status: e.target
+                                  .value as FinanceRecord["status"],
+                              }))
+                            }
+                            style={sel}
+                          >
+                            <option value="pending" style={{ color: "#000" }}>
+                              {t.pending}
+                            </option>
+                            <option value="completed" style={{ color: "#000" }}>
+                              {t.completed}
+                            </option>
+                            <option value="cancelled" style={{ color: "#000" }}>
+                              {t.cancelled}
+                            </option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={lab}>{t.paymentMethod}</label>
+                          <select
+                            value={formData.payment_method}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                payment_method: e.target.value,
+                              }))
+                            }
+                            style={sel}
+                          >
+                            {paymentOptions.map((option) => (
+                              <option
+                                key={option.value}
+                                value={option.value}
+                                style={{ color: "#000" }}
+                              >
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ gridColumn: isMobile ? "1" : "1 / -1" }}>
+                          <label style={lab}>
+                            {language === "zh"
+                              ? "参考号 (可选)"
+                              : language === "my"
+                                ? "ကိုးကားချက်နံပါတ် (မဖြစ်မနေမဟုတ်)"
+                                : "Reference (optional)"}
+                          </label>
+                          <input
+                            value={formData.reference}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                reference: e.target.value,
+                              }))
+                            }
+                            placeholder={t.refPlaceholder}
+                            style={inp}
+                            autoComplete="off"
+                          />
+                        </div>
+                      </div>
+
+                      <label
+                        style={{
+                          ...lab,
+                          marginTop: 14,
+                        }}
+                      >
+                        {t.notes}
+                      </label>
+                      <textarea
+                        value={formData.notes}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            notes: e.target.value,
+                          }))
+                        }
+                        rows={3}
+                        style={{
+                          ...inp,
+                          resize: "vertical" as const,
+                          minHeight: 88,
+                        }}
+                      />
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div
+                style={{
+                  flexShrink: 0,
+                  padding: "14px 20px 18px",
+                  borderTop: "1px solid rgba(255,255,255,0.1)",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 12,
+                  background: "rgba(0,0,0,0.2)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={closeFinanceRecordForm}
+                  style={{
+                    padding: "12px 22px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255, 255, 255, 0.28)",
+                    background: "rgba(255, 255, 255, 0.06)",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  style={{
+                    padding: "12px 26px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: isProcessing
+                      ? "rgba(59, 130, 246, 0.45)"
+                      : "linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)",
+                    color: "#fff",
+                    fontWeight: 800,
+                    cursor: isProcessing ? "not-allowed" : "pointer",
+                    fontSize: "0.95rem",
+                    boxShadow: isProcessing
+                      ? "none"
+                      : "0 10px 28px rgba(37, 99, 235, 0.35)",
+                    opacity: isProcessing ? 0.75 : 1,
+                  }}
+                >
+                  {isProcessing
+                    ? t.loading
+                    : editingRecord
+                      ? t.saveChanges
+                      : t.createRecord}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -26,7 +26,6 @@ import { packageService, deliveryStoreService, supabase } from '../services/supa
 import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import { CameraView } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
@@ -38,6 +37,7 @@ import {
 import { getPackingModalModel } from '../utils/parseOrderPackingItems';
 import { openMapsToAddress } from '../utils/openMapsNavigation';
 import { getOrdererIdentityDisplay } from '../utils/ordererIdentity';
+import { locationService } from '../services/locationService';
 
 const { width } = Dimensions.get('window');
 
@@ -373,10 +373,10 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         return;
       }
 
-      // 2. 🚀 电子围栏距离检查
-      const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      if (currentLoc && pkg.receiver_latitude && pkg.receiver_longitude) {
-        const { latitude, longitude } = currentLoc.coords;
+      // 2. 🚀 电子围栏距离检查（须先经 locationPermissionGate，避免系统弹窗无前置披露）
+      const coords = await locationService.getCurrentLocation(language);
+      if (coords && pkg.receiver_latitude && pkg.receiver_longitude) {
+        const { latitude, longitude } = coords;
         const R = 6371e3; // meters
         const p1 = latitude * Math.PI/180;
         const p2 = pkg.receiver_latitude * Math.PI/180;
@@ -430,8 +430,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       // 获取当前位置
       let locationData = undefined;
       try {
-        const { locationService } = require('../services/locationService');
-        const loc = await locationService.getCurrentLocation();
+        const loc = await locationService.getCurrentLocation(language);
         if (loc) locationData = { latitude: loc.latitude, longitude: loc.longitude };
       } catch (e) {}
 
@@ -485,14 +484,13 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         !isPickupFlowStatus(normalizePackageStatusZh(pkg.status)) &&
         !isStoreCode
       ) {
-        const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        if (currentLoc && pkg.receiver_latitude && pkg.receiver_longitude) {
-          // ... 距离计算 ...
+        const scanCoords = await locationService.getCurrentLocation(language);
+        if (scanCoords && pkg.receiver_latitude && pkg.receiver_longitude) {
           const R = 6371e3;
-          const p1 = currentLoc.coords.latitude * Math.PI/180;
+          const p1 = scanCoords.latitude * Math.PI/180;
           const p2 = pkg.receiver_latitude * Math.PI/180;
-          const dp = (pkg.receiver_latitude - currentLoc.coords.latitude) * Math.PI/180;
-          const dl = (pkg.receiver_longitude - currentLoc.coords.longitude) * Math.PI/180;
+          const dp = (pkg.receiver_latitude - scanCoords.latitude) * Math.PI/180;
+          const dl = (pkg.receiver_longitude - scanCoords.longitude) * Math.PI/180;
           const a = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
           const dist = R * c;

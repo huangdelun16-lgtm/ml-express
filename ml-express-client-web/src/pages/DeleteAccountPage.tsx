@@ -5,7 +5,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const DeleteAccountPage: React.FC = () => {
   const navigate = useNavigate();
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, t: dict } = useLanguage();
+  const t = dict.deleteAccount;
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   // 从本地存储加载用户信息

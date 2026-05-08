@@ -102,6 +102,20 @@ async function saveLocationToSupabase(latitude: number, longitude: number, isMov
 
 export const locationService = {
   /**
+   * 单次读取当前坐标（经显著披露 + Android 全屏预检后再请求系统权限）
+   */
+  async getCurrentLocation(languageHint?: string): Promise<{ latitude: number; longitude: number } | null> {
+    try {
+      const { status } = await requestForegroundPermissionsIfDisclosed(languageHint);
+      if (status !== 'granted') return null;
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * 启动后台位置追踪
    */
   async startBackgroundTracking() {

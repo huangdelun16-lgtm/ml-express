@@ -1,4 +1,5 @@
 const baseConfig = require('./app.json');
+const { withInfoPlist } = require('expo/config-plugins');
 
 /** 兜底：避免 iOS 原生层报 NSLocation*UsageDescription 缺失（旧 prebuild / 合并异常） */
 const IOS_LOCATION_PLIST_FALLBACK = {
@@ -16,6 +17,24 @@ const BLOCK_MEDIA_READ = [
   'android.permission.READ_MEDIA_VIDEO',
   'android.permission.READ_MEDIA_AUDIO',
 ];
+
+/** 在 prebuild 阶段强制写入 Info.plist（仅靠 expo.ios.infoPlist 有时不会进最终原生工程） */
+function withForceIosLocationUsageDescriptions(config) {
+  const copy = IOS_LOCATION_PLIST_FALLBACK;
+  return withInfoPlist(config, (c) => {
+    const plist = c.modResults;
+    const pick = (k) => {
+      const v = plist[k];
+      return typeof v === 'string' && v.trim() !== '' ? v : copy[k];
+    };
+    plist.NSLocationWhenInUseUsageDescription = pick('NSLocationWhenInUseUsageDescription');
+    plist.NSLocationAlwaysAndWhenInUseUsageDescription = pick(
+      'NSLocationAlwaysAndWhenInUseUsageDescription',
+    );
+    plist.NSLocationAlwaysUsageDescription = pick('NSLocationAlwaysUsageDescription');
+    return c;
+  });
+}
 
 /**
  * 敏感配置仅从环境变量注入（本地复制 .env.example → .env；EAS：Project secrets + EXPO_PUBLIC_*）
@@ -38,6 +57,9 @@ module.exports = ({ config }) => {
   const plugins = [...(expoConfig.plugins || [])];
   if (!plugins.some((p) => p === '@sentry/react-native/expo' || (Array.isArray(p) && p[0] === '@sentry/react-native/expo'))) {
     plugins.push('@sentry/react-native/expo');
+  }
+  if (!plugins.some((p) => p === withForceIosLocationUsageDescriptions)) {
+    plugins.push(withForceIosLocationUsageDescriptions);
   }
 
   const baseInfoPlist = expoConfig.ios?.infoPlist || {};
