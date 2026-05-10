@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { deliveryStoreService, DeliveryStore, reviewService, merchantService, bannerService, Banner } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import LoggerService from '../services/LoggerService';
 
 const CityMallPage: React.FC = () => {
@@ -347,96 +348,65 @@ const CityMallPage: React.FC = () => {
       return statusA.isOpen ? -1 : 1; // 营业中的排前面
     });
 
-  // 🚀 首页同款背景渐变
-  const homeBackground = 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)';
+  const storeIconBackdrop = 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)';
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: homeBackground,
-      backgroundAttachment: 'fixed'
-    }}>
-      {/* 顶部导航与 Header 区域 */}
-      <div style={{ 
-        padding: '1rem 2rem 0',
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-        paddingBottom: '3rem'
-      }}>
-        <NavigationBar 
-          language={language}
-          onLanguageChange={setLanguage}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          onShowRegisterModal={(isLoginMode) => {
-            navigate('/', { state: { showModal: true, isLoginMode } });
-          }}
-        />
-        
-        <div style={{ 
-          maxWidth: '1200px', 
-          margin: '2rem auto 0',
-          textAlign: 'center',
-          color: 'white'
-        }}>
-          <h1 style={{ 
-            fontSize: '3.5rem', 
-            marginBottom: '0.5rem', 
-            fontWeight: '900',
-            textShadow: '2px 4px 8px rgba(0,0,0,0.2)',
-            letterSpacing: '2px'
-          }}>{t.mall.title}</h1>
-          <p style={{ 
-            fontSize: '1.2rem', 
-            opacity: 0.9, 
-            marginBottom: '2.5rem',
-            fontWeight: '600',
-            textShadow: '1px 2px 4px rgba(0,0,0,0.1)'
-          }}>{t.mall.subtitle}</p>
-          
-          <div style={{ 
-            maxWidth: '700px', 
-            margin: '0 auto',
-            position: 'relative',
-            zIndex: 10
-          }}>
-            <div style={{
-              display: 'flex',
-              background: 'rgba(255, 255, 255, 0.95)',
-              borderRadius: '20px',
-              padding: '6px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-              border: '1px solid rgba(255,255,255,0.5)'
-            }}>
-              <div style={{
-                padding: '0 1.5rem',
+    <ClientInteriorShell ambient="mall">
+      <NavigationBar
+        variant="landing"
+        language={language}
+        onLanguageChange={setLanguage}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onShowRegisterModal={(isLoginMode) => {
+          navigate('/', { state: { showModal: true, isLoginMode } });
+        }}
+      />
+
+      <div className="client-page-title-wrap" style={{ marginTop: 'clamp(0.75rem, 2vw, 1.5rem)' }}>
+        <div className="client-page-accent-bar" />
+        <h1 className="client-page-title">{t.mall.title}</h1>
+        <p className="client-page-subtitle">{t.mall.subtitle}</p>
+
+        <div style={{ maxWidth: '700px', margin: '1.75rem auto 0', position: 'relative', zIndex: 10 }}>
+          <div
+            className="client-glass-panel"
+            style={{ display: 'flex', alignItems: 'stretch', padding: '6px', borderRadius: '1.25rem' }}
+          >
+            <div
+              style={{
+                padding: '0 1.25rem',
                 display: 'flex',
                 alignItems: 'center',
-                color: '#64748b',
-                fontSize: '1.5rem'
-              }}>🔍</div>
-              <input
-                type="text"
-                placeholder={uiT.searchPlaceholder}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: '1.2rem 0',
-                  border: 'none',
-                  fontSize: '1.1rem',
-                  outline: 'none',
-                  color: '#1e293b',
-                  background: 'transparent',
-                  fontWeight: '500'
-                }}
-              />
+                color: 'rgba(148, 163, 184, 0.95)',
+                fontSize: '1.35rem',
+              }}
+            >
+              🔍
             </div>
-            {searchingProducts && (
-              <div style={{ color: 'white', marginTop: '10px', fontSize: '0.9rem' }}>正在搜索商品...</div>
-            )}
+            <input
+              type="text"
+              placeholder={uiT.searchPlaceholder}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '1.05rem 0.5rem 1.05rem 0',
+                border: 'none',
+                fontSize: '1.05rem',
+                outline: 'none',
+                color: '#0f172a',
+                background: 'rgba(248, 250, 252, 0.96)',
+                fontWeight: '500',
+                borderRadius: '14px',
+              }}
+            />
           </div>
+          {searchingProducts && (
+            <div style={{ color: 'rgba(226,232,240,0.92)', marginTop: '10px', fontSize: '0.9rem', textAlign: 'center' }}>
+              正在搜索商品...
+            </div>
+          )}
         </div>
       </div>
 
@@ -925,7 +895,7 @@ const CityMallPage: React.FC = () => {
                           width: '80px', 
                           height: '80px', 
                           borderRadius: '24px', 
-                          background: homeBackground, 
+                          background: storeIconBackdrop,
                           display: 'flex', 
                           justifyContent: 'center', 
                           alignItems: 'center',
@@ -1241,7 +1211,7 @@ const CityMallPage: React.FC = () => {
           background: transparent;
         }
       `}</style>
-    </div>
+    </ClientInteriorShell>
   );
 };
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 
 const CartPage: React.FC = () => {
   const navigate = useNavigate();
@@ -31,92 +32,105 @@ const CartPage: React.FC = () => {
     navigate('/', { state: { selectedProducts: cartItems } });
   };
 
-  // 🚀 首页同款背景渐变
-  const homeBackground = 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)';
-
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: homeBackground,
-      backgroundAttachment: 'fixed'
-    }}>
-      <div style={{ 
-        padding: '1rem 2rem 0',
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-        paddingBottom: '2rem'
-      }}>
-        <NavigationBar 
-          language={language}
-          onLanguageChange={setLanguage}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          onShowRegisterModal={(isLoginMode) => {
-            navigate('/', { state: { showModal: true, isLoginMode } });
-          }}
-        />
-        
-        <div style={{ maxWidth: '1000px', margin: '2rem auto 0', color: 'white', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '3rem', fontWeight: '900', textShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>{t.cart.title}</h1>
-          <p style={{ fontSize: '1.1rem', opacity: 0.9, fontWeight: '600' }}>
-            {cartItems.length} {t.cart.items}
-          </p>
-        </div>
+    <ClientInteriorShell ambient="cart">
+      <NavigationBar
+        variant="landing"
+        language={language}
+        onLanguageChange={setLanguage}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onShowRegisterModal={(isLoginMode) => {
+          navigate('/', { state: { showModal: true, isLoginMode } });
+        }}
+      />
+
+      <div className="client-page-title-wrap" style={{ marginTop: 'clamp(0.75rem, 2vw, 1.5rem)' }}>
+        <div className="client-page-accent-bar" />
+        <h1 className="client-page-title">{t.cart.title}</h1>
+        <p className="client-page-subtitle">
+          {cartItems.length} {t.cart.items}
+        </p>
       </div>
-      
-      <div style={{ maxWidth: '1100px', margin: '3rem auto 6rem', padding: '0 1rem', position: 'relative', zIndex: 20 }}>
+
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 0.25rem', position: 'relative', zIndex: 20 }}>
         {cartItems.length === 0 ? (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '8rem 2rem', 
-            background: 'rgba(255, 255, 255, 0.95)', 
-            borderRadius: '40px', 
-            boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid white'
-          }}>
-            <div style={{ fontSize: '7rem', marginBottom: '2rem' }}>🛒</div>
-            <h2 style={{ color: '#1e293b', fontSize: '2rem', marginBottom: '1rem', fontWeight: '900' }}>{t.cart.empty}</h2>
-            <p style={{ color: '#64748b', fontSize: '1.2rem', marginBottom: '3rem', fontWeight: '500' }}>快去商场选购您喜欢的商品吧！</p>
-            <button 
+          <div
+            className="client-glass-panel"
+            style={{
+              textAlign: 'center',
+              padding: 'clamp(3.5rem, 10vw, 6rem) 1.5rem',
+              marginTop: '1rem',
+            }}
+          >
+            <div style={{ fontSize: 'clamp(3.5rem, 12vw, 5rem)', marginBottom: '1.5rem', filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.35))' }}>🛒</div>
+            <h2 style={{ color: '#f8fafc', fontSize: 'clamp(1.5rem, 4vw, 2rem)', marginBottom: '0.75rem', fontWeight: 800 }}>{t.cart.empty}</h2>
+            <p style={{ color: 'rgba(226, 232, 240, 0.78)', fontSize: '1.05rem', marginBottom: '2.25rem', fontWeight: 500, maxWidth: '28rem', marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.55 }}>
+              {language === 'zh' ? '快去商场选购您喜欢的商品吧！' : language === 'my' ? 'ဈေးဝယ်စင်တာမှ ပစ္စည်းများရွေးချယ်လိုက်ပါ။' : 'Browse the city mall and add items you love.'}
+            </p>
+            <button
+              type="button"
               onClick={() => navigate('/mall')}
-              style={{ 
-                background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', 
-                color: 'white', 
-                border: 'none', 
-                padding: '1.2rem 3rem', 
-                borderRadius: '20px', 
-                fontSize: '1.2rem', 
-                fontWeight: '900', 
+              style={{
+                background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '1rem 2.5rem',
+                borderRadius: '999px',
+                fontSize: '1.05rem',
+                fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: '0 15px 30px rgba(37, 99, 235, 0.3)',
-                transition: 'all 0.3s ease'
+                boxShadow: '0 16px 40px rgba(56, 189, 248, 0.35)',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
               }}
-              onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-              onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 20px 48px rgba(99, 102, 241, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 16px 40px rgba(56, 189, 248, 0.35)';
+              }}
             >
               🚀 {t.cart.backToMall}
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
-            {/* 商品列表 */}
-            <div style={{ 
-              background: 'rgba(255, 255, 255, 0.95)', 
-              borderRadius: '28px', 
-              padding: '1.5rem', 
-              boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
-              border: '1px solid white',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem' }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a' }}>商品清单</h2>
-                <button 
+          <div className="client-cart-grid">
+            <div className="client-glass-panel" style={{ padding: 'clamp(1.1rem, 3vw, 1.5rem)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1.25rem',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  paddingBottom: '1rem',
+                }}
+              >
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
+                  {language === 'zh' ? '商品清单' : language === 'my' ? 'ပစ္စည်းစာရင်း' : 'Items'}
+                </h2>
+                <button
+                  type="button"
                   onClick={clearCart}
-                  style={{ background: '#fee2e2', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '800', padding: '0.5rem 1rem', borderRadius: '10px', transition: 'all 0.2s ease' }}
-                  onMouseOver={(e) => e.currentTarget.style.background = '#fecaca'}
-                  onMouseOut={(e) => e.currentTarget.style.background = '#fee2e2'}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(248, 113, 113, 0.35)',
+                    color: '#fecaca',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '10px',
+                    transition: 'background 0.2s ease',
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.28)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                  }}
                 >
                   🗑️ {t.cart.clear}
                 </button>
@@ -124,16 +138,16 @@ const CartPage: React.FC = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {cartItems.map((item: any) => (
-                  <div 
+                  <div
                     key={item.id}
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      padding: '0.8rem', 
-                      background: 'white',
-                      borderRadius: '18px',
-                      border: '1px solid #f1f5f9',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.02)'
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '0.85rem',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      borderRadius: '16px',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
                     }}
                   >
                     <div
@@ -147,123 +161,213 @@ const CartPage: React.FC = () => {
                       }}
                       title={t.cart.openDetailHint}
                     >
-                      <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#f8fafc', overflow: 'hidden', marginRight: '1rem', border: '1px solid #f1f5f9', flexShrink: 0 }}>
+                      <div
+                        style={{
+                          width: '60px',
+                          height: '60px',
+                          borderRadius: '12px',
+                          background: 'rgba(15, 23, 42, 0.5)',
+                          overflow: 'hidden',
+                          marginRight: '1rem',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          flexShrink: 0,
+                        }}
+                      >
                         {item.image_url && !item.image_url.startsWith('file://') ? (
                           <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.8rem', background: '#eff6ff' }}>📦</div>
+                          <div
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              fontSize: '1.8rem',
+                              background: 'rgba(56, 189, 248, 0.12)',
+                            }}
+                          >
+                            📦
+                          </div>
                         )}
                       </div>
-                      
+
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <h3 style={{ fontWeight: '900', fontSize: '1rem', marginBottom: '0.2rem', color: '#0f172a' }}>{item.name}</h3>
-                        <p style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: '800' }}>{item.price.toLocaleString()} MMK</p>
+                        <h3 style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '0.2rem', color: '#f8fafc' }}>{item.name}</h3>
+                        <p style={{ color: '#4ade80', fontSize: '0.9rem', fontWeight: 700 }}>{item.price.toLocaleString()} MMK</p>
                         {item.customer_remark ? (
-                          <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0.35rem 0 0', fontWeight: 600, lineHeight: 1.4 }}>
+                          <p style={{ color: 'rgba(203, 213, 225, 0.9)', fontSize: '0.8rem', margin: '0.35rem 0 0', fontWeight: 600, lineHeight: 1.4 }}>
                             {t.cart.remark}：{item.customer_remark}
                           </p>
                         ) : null}
                         {item.store_id ? (
-                          <p style={{ color: '#3b82f6', fontSize: '0.75rem', margin: '0.35rem 0 0', fontWeight: 700 }}>{t.cart.openDetailHint} →</p>
+                          <p style={{ color: '#7dd3fc', fontSize: '0.75rem', margin: '0.35rem 0 0', fontWeight: 700 }}>{t.cart.openDetailHint} →</p>
                         ) : null}
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexShrink: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '12px', padding: '0.2rem' }}>
-                        <button 
+                      <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(15, 23, 42, 0.55)', borderRadius: '12px', padding: '0.2rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, item.quantity - 1); }}
-                          style={{ width: '24px', height: '24px', borderRadius: '8px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontWeight: 'bold', color: '#1e40af', fontSize: '0.9rem' }}
-                        >-</button>
-                        <span style={{ margin: '0 0.6rem', fontWeight: '900', width: '18px', textAlign: 'center', fontSize: '0.9rem', color: '#0f172a' }}>{item.quantity}</span>
-                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateQuantity(item.id, item.quantity - 1);
+                          }}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: 'rgba(255,255,255,0.08)',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            color: '#e2e8f0',
+                            fontSize: '0.95rem',
+                          }}
+                        >
+                          -
+                        </button>
+                        <span style={{ margin: '0 0.55rem', fontWeight: 800, width: '20px', textAlign: 'center', fontSize: '0.9rem', color: '#f8fafc' }}>{item.quantity}</span>
+                        <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, item.quantity + 1); }}
-                          style={{ width: '24px', height: '24px', borderRadius: '8px', border: 'none', background: 'white', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontWeight: 'bold', color: '#1e40af', fontSize: '0.9rem' }}
-                        >+</button>
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateQuantity(item.id, item.quantity + 1);
+                          }}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: 'rgba(255,255,255,0.08)',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            color: '#e2e8f0',
+                            fontSize: '0.95rem',
+                          }}
+                        >
+                          +
+                        </button>
                       </div>
-                      <button 
+                      <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
-                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem', transition: 'all 0.2s ease', padding: '0.3rem' }}
-                        onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
-                        onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
-                      >×</button>
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFromCart(item.id);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'rgba(148, 163, 184, 0.85)',
+                          cursor: 'pointer',
+                          fontSize: '1.35rem',
+                          transition: 'color 0.2s ease',
+                          padding: '0.3rem',
+                          lineHeight: 1,
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.color = '#f87171';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.color = 'rgba(148, 163, 184, 0.85)';
+                        }}
+                      >
+                        ×
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* 结算卡片 */}
-            <div style={{ height: 'fit-content', position: window.innerWidth < 1024 ? 'static' : 'sticky', top: '2rem' }}>
-              <div style={{ 
-                background: 'rgba(255, 255, 255, 0.95)', 
-                borderRadius: '28px', 
-                padding: '1.8rem', 
-                boxShadow: '0 25px 50px rgba(0,0,0,0.1)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid white'
-              }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '900', marginBottom: '1.5rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <span style={{ fontSize: '1.5rem' }}>📋</span> 结算详情
+            <div className="client-cart-summary">
+              <div className="client-glass-panel" style={{ padding: '1.75rem' }}>
+                <h2
+                  style={{
+                    fontSize: '1.15rem',
+                    fontWeight: 800,
+                    marginBottom: '1.35rem',
+                    color: '#f8fafc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.55rem',
+                  }}
+                >
+                  <span style={{ fontSize: '1.35rem' }}>📋</span>{' '}
+                  {language === 'zh' ? '结算详情' : language === 'my' ? 'ငွေရှင်းပြီး' : 'Summary'}
                 </h2>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', color: '#64748b', fontWeight: '600' }}>
-                    <span>商品总数</span>
-                    <span>{cartItems.length} 件</span>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: 'rgba(226, 232, 240, 0.82)', fontWeight: 600 }}>
+                    <span>{language === 'zh' ? '商品总数' : language === 'my' ? 'အရေအတွက်' : 'Line items'}</span>
+                    <span>
+                      {cartItems.length} {language === 'zh' ? '件' : language === 'my' ? 'ခု' : ''}
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 0', borderTop: '2px dashed #e2e8f0', borderBottom: '2px dashed #e2e8f0' }}>
-                    <span style={{ fontSize: '1.1rem', fontWeight: '900', color: '#0f172a' }}>{t.cart.total}</span>
-                    <span style={{ fontWeight: '900', color: '#10b981', fontSize: '1.5rem' }}>{cartTotal.toLocaleString()} MMK</span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      padding: '1rem 0',
+                      borderTop: '1px dashed rgba(255, 255, 255, 0.15)',
+                      borderBottom: '1px dashed rgba(255, 255, 255, 0.15)',
+                    }}
+                  >
+                    <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#e2e8f0' }}>{t.cart.total}</span>
+                    <span style={{ fontWeight: 800, color: '#4ade80', fontSize: '1.45rem' }}>{cartTotal.toLocaleString()} MMK</span>
                   </div>
                 </div>
 
-                <button 
+                <button
+                  type="button"
                   onClick={handleCheckout}
-                  style={{ 
-                    width: '100%', 
-                    padding: '1.2rem', 
-                    borderRadius: '18px', 
-                    border: 'none', 
-                    background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)', 
-                    color: 'white', 
-                    fontWeight: '900', 
-                    fontSize: '1.1rem',
+                  style={{
+                    width: '100%',
+                    padding: '1.05rem',
+                    borderRadius: '999px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
+                    color: 'white',
+                    fontWeight: 800,
+                    fontSize: '1.05rem',
                     cursor: 'pointer',
-                    boxShadow: '0 12px 24px rgba(37, 99, 235, 0.3)',
-                    transition: 'all 0.3s ease',
-                    marginBottom: '1rem'
+                    boxShadow: '0 14px 36px rgba(99, 102, 241, 0.35)',
+                    transition: 'transform 0.2s ease',
+                    marginBottom: '0.85rem',
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
-                  onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
                 >
                   🚀 {t.cart.checkout}
                 </button>
-                
-                <button 
+
+                <button
+                  type="button"
                   onClick={() => navigate('/mall')}
-                  style={{ 
-                    width: '100%', 
-                    padding: '1rem', 
-                    borderRadius: '16px', 
-                    border: '2px solid #e2e8f0', 
-                    background: 'white', 
-                    color: '#475569', 
-                    fontWeight: '800',
+                  style={{
+                    width: '100%',
+                    padding: '0.95rem',
+                    borderRadius: '999px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    color: 'rgba(248, 250, 252, 0.9)',
+                    fontWeight: 700,
                     cursor: 'pointer',
                     fontSize: '0.9rem',
-                    transition: 'all 0.2s ease'
+                    transition: 'background 0.2s ease, border-color 0.2s ease',
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.background = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.28)';
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'white';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                   }}
                 >
                   🏪 {t.cart.backToMall}
@@ -277,16 +381,17 @@ const CartPage: React.FC = () => {
       <style>{`
         ::-webkit-scrollbar {
           height: 8px;
+          width: 8px;
         }
         ::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.3);
+          background: rgba(255, 255, 255, 0.22);
           border-radius: 10px;
         }
         ::-webkit-scrollbar-track {
           background: transparent;
         }
       `}</style>
-    </div>
+    </ClientInteriorShell>
   );
 };
 

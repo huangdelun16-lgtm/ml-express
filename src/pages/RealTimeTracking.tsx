@@ -24,6 +24,23 @@ const TRACKING_SETTING_KEYS = [
   'tracking.webhook_push_enabled',
 ] as const;
 
+/** 实时跟踪包裹卡片：客户下单时选择的配送速度 / 预约时间（与 packages 表字段一致） */
+function adminDeliveryOptionLine(pkg: Package): string {
+  const speed = (pkg.delivery_speed || '').trim();
+  const sched = (pkg.scheduled_delivery_time || '').trim();
+  const desc = pkg.description || '';
+  if (!speed && !sched && desc) {
+    const m = desc.match(
+      /\[(?:配送选项|Delivery Option|ပို့ဆောင်မှု\s*ရွေးချယ်မှု)\s*[:：]\s*(.+?)\]/,
+    );
+    if (m?.[1]) return m[1].trim();
+  }
+  const bits: string[] = [];
+  if (speed) bits.push(speed);
+  if (sched) bits.push(`指定时间 ${sched}`);
+  return bits.length > 0 ? bits.join(' · ') : '—';
+}
+
 type MapThemeSetting = 'dark' | 'light' | 'satellite';
 
 /** 暗色地图样式（与系统设置「地图主题 → 暗色」对应） */
@@ -78,6 +95,11 @@ const RealTimeTracking: React.FC = () => {
 
     return couriers
       .filter(c => c.status !== 'offline')
+      .filter(c => {
+        const la = c.latitude != null ? Number(c.latitude) : NaN;
+        const lo = c.longitude != null ? Number(c.longitude) : NaN;
+        return Number.isFinite(la) && Number.isFinite(lo);
+      })
       .map(courier => {
         const distance = calculateDistance(
           pkg.sender_latitude || 0,
@@ -101,6 +123,9 @@ const RealTimeTracking: React.FC = () => {
   const [regionalRiderCount, setRegionalRiderCount] = useState(0);
   const [onlineRiderCount, setOnlineRiderCount] = useState(0);
   const [selectedCourier, setSelectedCourier] = useState<CourierWithLocation | null>(null);
+  /** 选中骑手后，地图是否持续中心对准其最新坐标（由实时推送或轮询更新） */
+  const [followSelectedCourierOnMap, setFollowSelectedCourierOnMap] = useState(false);
+  const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [abnormalPackages, setAbnormalPackages] = useState<Package[]>([]); // 🚨 新增：异常包裹状态
@@ -504,21 +529,33 @@ const RealTimeTracking: React.FC = () => {
             }
           }
 
+          const latRaw = location?.latitude;
+          const lngRaw = location?.longitude;
+          const lat =
+            latRaw !== null && latRaw !== undefined && latRaw !== ''
+              ? Number(latRaw)
+              : NaN;
+          const lng =
+            lngRaw !== null && lngRaw !== undefined && lngRaw !== ''
+              ? Number(lngRaw)
+              : NaN;
+          const hasValidGps = Number.isFinite(lat) && Number.isFinite(lng);
+
           return {
             id: courierRt?.id || acc.id,
             name: acc.employee_name,
             phone: acc.phone,
             employee_id: acc.employee_id,
-            // 使用位置信息，如果没有则使用该城市中心点的随机偏移
-            latitude: location?.latitude || (myanmarCities[selectedCity].lat + (Math.random() - 0.5) * 0.02),
-            longitude: location?.longitude || (myanmarCities[selectedCity].lng + (Math.random() - 0.5) * 0.02),
+            // 仅使用实际上报的 GPS；无定位时不生成随机点，避免地图上出现假位置
+            latitude: hasValidGps ? lat : undefined,
+            longitude: hasValidGps ? lng : undefined,
             status: displayStatus,
             currentPackages: currentPackages,
             todayDeliveries: courierRt?.total_deliveries || 0,
-            batteryLevel: location?.battery_level || 100,
-            signal_strength: location?.signal_strength || 100, // 🚀 映射信号强度
+            batteryLevel: location?.battery_level ?? 100,
+            signal_strength: location?.signal_strength ?? 100, // 🚀 映射信号强度
             vehicle_type: acc.position === '骑手队长' ? 'car' : 'motorcycle',
-            location_updated_at: location?.updated_at || courierRt?.last_active || acc.last_login
+            location_updated_at: location?.updated_at || location?.last_update || courierRt?.last_active || acc.last_login
           } as any;
         });
 
@@ -531,6 +568,104 @@ const RealTimeTracking: React.FC = () => {
       setOnlineRiderCount(0);
     }
   };
+
+  /** Supabase Realtime：`courier_locations` 行级更新立即反映到地图，不等待轮询 */
+  const mergeRealtimeCourierLocation = useCallback(
+    (row: Record<string, unknown> & { deleted?: boolean }) => {
+      if (!row || typeof row !== 'object') return;
+      if (row.deleted) {
+        const cid = row.courier_id as string | undefined;
+        if (!cid) return;
+        setCouriers(prev =>
+          prev.map(c =>
+            c.id === cid ? { ...c, latitude: undefined, longitude: undefined } : c
+          )
+        );
+        setSelectedCourier(prev =>
+          prev?.id === cid ? { ...prev, latitude: undefined, longitude: undefined } : prev
+        );
+        return;
+      }
+      const cid = row.courier_id as string | undefined;
+      if (!cid) return;
+      const lat = Number(row.latitude);
+      const lng = Number(row.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      const batteryRaw = row.battery_level;
+      const sigRaw = row.signal_strength;
+      const ts = (row.last_update || row.updated_at) as string | undefined;
+
+      setCouriers(prev =>
+        prev.map(c => {
+          if (c.id !== cid) return c;
+          const next: CourierWithLocation = { ...c, latitude: lat, longitude: lng };
+          if (batteryRaw !== undefined && batteryRaw !== null && String(batteryRaw) !== '') {
+            const b = Number(batteryRaw);
+            if (Number.isFinite(b)) next.batteryLevel = b;
+          }
+          if (sigRaw !== undefined && sigRaw !== null && String(sigRaw) !== '') {
+            const s = Number(sigRaw);
+            if (Number.isFinite(s)) next.signal_strength = s;
+          }
+          if (ts) (next as CourierWithLocation & { location_updated_at?: string }).location_updated_at = ts;
+          return next;
+        })
+      );
+
+      setSelectedCourier(prev => {
+        if (!prev || prev.id !== cid) return prev;
+        const next: CourierWithLocation = { ...prev, latitude: lat, longitude: lng };
+        if (batteryRaw !== undefined && batteryRaw !== null && String(batteryRaw) !== '') {
+          const b = Number(batteryRaw);
+          if (Number.isFinite(b)) next.batteryLevel = b;
+        }
+        if (sigRaw !== undefined && sigRaw !== null && String(sigRaw) !== '') {
+          const s = Number(sigRaw);
+          if (Number.isFinite(s)) next.signal_strength = s;
+        }
+        if (ts) (next as CourierWithLocation & { location_updated_at?: string }).location_updated_at = ts;
+        return next;
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-realtime-courier-locations')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'courier_locations' },
+        payload => {
+          if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as { courier_id?: string };
+            if (oldRow?.courier_id) {
+              mergeRealtimeCourierLocation({ courier_id: oldRow.courier_id, deleted: true });
+            }
+          } else {
+            mergeRealtimeCourierLocation((payload.new || {}) as Record<string, unknown>);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [mergeRealtimeCourierLocation]);
+
+  /** 选中骑手并勾选「跟随」后，地图中心随实时位置移动 */
+  useEffect(() => {
+    if (!followSelectedCourierOnMap || !selectedCourier?.id) return;
+    const c = couriers.find(x => x.id === selectedCourier.id);
+    if (c?.latitude == null || c?.longitude == null) return;
+    const lat = Number(c.latitude);
+    const lng = Number(c.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const pos = { lat, lng };
+    mapRef.current?.panTo(pos);
+    setMapCenter(pos);
+  }, [couriers, followSelectedCourierOnMap, selectedCourier?.id]);
 
   const parseSettingRaw = (raw: unknown): unknown => {
     if (raw && typeof raw === 'object' && raw !== null && 'value' in raw) {
@@ -1019,6 +1154,21 @@ const RealTimeTracking: React.FC = () => {
               <span aria-hidden>🗺️</span>
               快递员实时位置
             </h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                border: '1px solid #93c5fd',
+                borderRadius: '10px',
+                padding: '0.45rem 0.95rem',
+                fontSize: '0.78rem',
+                color: '#1e40af',
+                fontWeight: 800,
+                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.1)',
+              }}
+            >
+              ⚡ GPS 实时推送
+            </div>
             <div
               style={{
                 background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
@@ -1042,6 +1192,7 @@ const RealTimeTracking: React.FC = () => {
                       ? 'POL'
                       : ''}{' '}
               骑手账号: {regionalRiderCount}
+            </div>
             </div>
           </div>
           
@@ -1168,6 +1319,9 @@ const RealTimeTracking: React.FC = () => {
                   center={mapCenter}
                   zoom={13}
                   options={googleMapOptions}
+                  onLoad={map => {
+                    mapRef.current = map;
+                  }}
                 >
                   {/* 显示快递员位置 */}
                   {couriers
@@ -1176,7 +1330,7 @@ const RealTimeTracking: React.FC = () => {
                       const isAbnormal = abnormalCouriers.some(ac => ac.id === courier.id);
                       return (
                         <Marker
-                          key={courier.id}
+                          key={`courier-${courier.id}-${String(courier.latitude)}-${String(courier.longitude)}`}
                           position={{ lat: courier.latitude!, lng: courier.longitude! }}
                           icon={{
                             url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
@@ -1189,7 +1343,10 @@ const RealTimeTracking: React.FC = () => {
                             scaledSize: new window.google.maps.Size(40, 40),
                             anchor: new window.google.maps.Point(20, 20)
                           }}
-                          onClick={() => setSelectedCourier(courier)}
+                          onClick={() => {
+                            setFollowSelectedCourierOnMap(false);
+                            setSelectedCourier(courier);
+                          }}
                         />
                       );
                     })}
@@ -1359,13 +1516,48 @@ const RealTimeTracking: React.FC = () => {
                   {selectedCourier && selectedCourier.latitude && selectedCourier.longitude && (
                     <InfoWindow
                       position={{ lat: selectedCourier.latitude, lng: selectedCourier.longitude }}
-                      onCloseClick={() => setSelectedCourier(null)}
+                      onCloseClick={() => {
+                        setSelectedCourier(null);
+                        setFollowSelectedCourierOnMap(false);
+                      }}
                     >
                       <div style={{ padding: '0.5rem', minWidth: '250px' }}>
                         <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937', borderBottom: '2px solid #e5e7eb', paddingBottom: '0.5rem' }}>
                           {selectedCourier.name}
                         </h3>
                         <div style={{ marginBottom: '0.5rem' }}>
+                          <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                            <strong>📍 GPS:</strong>{' '}
+                            {Number(selectedCourier.latitude).toFixed(6)}, {Number(selectedCourier.longitude).toFixed(6)}
+                          </p>
+                          {(selectedCourier as CourierWithLocation & { location_updated_at?: string }).location_updated_at && (
+                            <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                              <strong>🕐 上报时间:</strong>{' '}
+                              {new Date(
+                                (selectedCourier as CourierWithLocation & { location_updated_at?: string }).location_updated_at!
+                              ).toLocaleString()}
+                            </p>
+                          )}
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.45rem',
+                              marginTop: '0.5rem',
+                              fontSize: '0.85rem',
+                              color: '#1e3a8a',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              userSelect: 'none',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={followSelectedCourierOnMap}
+                              onChange={e => setFollowSelectedCourierOnMap(e.target.checked)}
+                            />
+                            地图居中跟随此骑手（实时）
+                          </label>
                           <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
                             <strong>📱 电话:</strong> 
                             <a 
@@ -1816,6 +2008,10 @@ const RealTimeTracking: React.FC = () => {
                     <p style={{ margin: '0.3rem 0' }}>
                       📦 类型: {pkg.package_type} ({pkg.weight})
                     </p>
+                    <p style={{ margin: '0.3rem 0' }}>
+                      <strong style={{ color: '#1d4ed8' }}>🕒 配送选项:</strong>{' '}
+                      {adminDeliveryOptionLine(pkg)}
+                    </p>
                     {pkg.delivery_distance && (
                       <p style={{ margin: '0.3rem 0' }}>
                         🚗 距离: {pkg.delivery_distance} km
@@ -2147,6 +2343,11 @@ const RealTimeTracking: React.FC = () => {
                           <strong>⏰ 取件时间:</strong> {pkg.pickup_time}
                         </p>
                       )}
+
+                      <p style={{ margin: '0.3rem 0' }}>
+                        <strong style={{ color: '#1d4ed8' }}>🕒 配送选项:</strong>{' '}
+                        {adminDeliveryOptionLine(pkg)}
+                      </p>
 
                       <p style={{ margin: '0.3rem 0' }}>
                         <strong>💰 跑腿费:</strong> {pkg.price}

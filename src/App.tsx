@@ -15,6 +15,7 @@ import RealTimeTracking from './pages/RealTimeTracking';
 import RechargeManagement from './pages/RechargeManagement';
 import AdminReportsPage from './pages/AdminReportsPage';
 import CourierPerformancePage from './pages/CourierPerformancePage';
+import MerchantReconciliationExportPage from './pages/MerchantReconciliationExportPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AbnormalAlertManager from './components/AbnormalAlertManager';
@@ -169,6 +170,14 @@ function App() {
                   element={
                     <ProtectedRoute requiredRoles={['admin', 'manager', 'operator', 'finance']} permissionId="courier_performance">
                       <CourierPerformancePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="merchant-reconciliation"
+                  element={
+                    <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="merchant_reconciliation">
+                      <MerchantReconciliationExportPage />
                     </ProtectedRoute>
                   }
                 />

@@ -18,6 +18,7 @@ const MODULE_ROUTES: Record<string, string> = {
   supervision: '/admin/supervision',
   reports: '/admin/reports',
   courier_performance: '/admin/courier-performance',
+  merchant_reconciliation: '/admin/merchant-reconciliation',
 };
 
 function isModulePathActive(pathname: string, moduleId: string): boolean {
@@ -313,6 +314,17 @@ const AdminShellLayout: React.FC = () => {
         roles: ['admin', 'manager', 'operator', 'finance'],
       },
       {
+        id: 'merchant_reconciliation',
+        title:
+          language === 'zh'
+            ? '商家对账'
+            : language === 'en'
+              ? 'Merchant reconciliation'
+              : 'ကုန်သည်စာရင်း',
+        icon: '📋',
+        roles: ['admin', 'manager', 'finance'],
+      },
+      {
         id: 'settings',
         title: language === 'zh' ? '系统设置' : language === 'en' ? 'System Settings' : 'စနစ်ချိန်ညှိမှု',
         icon: '⚙️',
@@ -460,7 +472,7 @@ const AdminShellLayout: React.FC = () => {
 
       <aside
         style={{
-          width: isMobile ? 'min(256px, 82vw)' : 200,
+          width: isMobile ? 'min(256px, 82vw)' : 96,
           flexShrink: 0,
           background: 'rgba(12, 38, 68, 0.52)',
           backdropFilter: 'blur(24px)',
@@ -528,12 +540,18 @@ const AdminShellLayout: React.FC = () => {
                 }}
                 style={{
                   display: 'flex',
+                  flexDirection: isMobile ? 'row' : 'column',
                   alignItems: 'center',
-                  gap: 8,
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '6px 8px',
+                  justifyContent: 'center',
+                  gap: isMobile ? 8 : 2,
+                  width: isMobile ? '100%' : 80,
+                  height: isMobile ? 'auto' : 35,
+                  minHeight: isMobile ? 44 : undefined,
+                  textAlign: isMobile ? 'left' : 'center',
+                  padding: isMobile ? '6px 8px' : '2px 4px',
                   marginBottom: 4,
+                  marginLeft: isMobile ? 0 : 'auto',
+                  marginRight: isMobile ? 0 : 'auto',
                   borderRadius: 9,
                   border: active
                     ? '1px solid rgba(255, 255, 255, 0.35)'
@@ -551,13 +569,14 @@ const AdminShellLayout: React.FC = () => {
                   animation: pulseNav && !active ? 'pulse-alert 2.2s infinite' : undefined,
                   boxSizing: 'border-box',
                   boxShadow: active ? 'inset 0 0 0 1px rgba(255,255,255,0.12)' : undefined,
+                  position: 'relative',
                 }}
               >
                 <span
                   aria-hidden
                   style={{
-                    fontSize: '1.05rem',
-                    width: 26,
+                    fontSize: isMobile ? '1.05rem' : '0.88rem',
+                    width: isMobile ? 26 : 18,
                     textAlign: 'center',
                     lineHeight: 1,
                     flexShrink: 0,
@@ -565,15 +584,30 @@ const AdminShellLayout: React.FC = () => {
                 >
                   {card.icon}
                 </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={
+                    isMobile
+                      ? { flex: 1, minWidth: 0 }
+                      : {
+                          width: 70,
+                          height: 15,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }
+                  }
+                >
                   <div
                     style={{
                       fontWeight: 700,
-                      fontSize: '0.8rem',
-                      lineHeight: 1.25,
+                      fontSize: isMobile ? '0.8rem' : '0.62rem',
+                      lineHeight: isMobile ? 1.25 : '15px',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
+                      width: isMobile ? undefined : 70,
+                      height: isMobile ? undefined : 15,
+                      textAlign: isMobile ? 'left' : 'center',
                     }}
                   >
                     {card.title}
@@ -581,12 +615,15 @@ const AdminShellLayout: React.FC = () => {
                 </div>
                 <div
                   style={{
+                    position: isMobile ? 'static' : 'absolute',
+                    top: isMobile ? undefined : 1,
+                    right: isMobile ? undefined : 2,
                     flexShrink: 0,
                     display: 'flex',
-                    flexDirection: 'column',
+                    flexDirection: isMobile ? 'column' : 'row',
                     alignItems: 'flex-end',
                     gap: 2,
-                    minHeight: 18,
+                    minHeight: isMobile ? 18 : 0,
                   }}
                 >
                   {showRechargeBadge && (

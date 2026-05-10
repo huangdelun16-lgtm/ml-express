@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import QRCode from 'qrcode';
 import LoggerService from '../services/LoggerService';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   getDismissedReviewOrderIdsWeb,
@@ -1995,25 +1996,10 @@ const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* 背景装饰 */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%)',
-        pointerEvents: 'none'
-      }} />
-
+    <ClientInteriorShell>
       {/* 导航栏 */}
       <NavigationBar
+        variant="landing"
         language={language}
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
@@ -2033,20 +2019,14 @@ const ProfilePage: React.FC = () => {
         margin: '0 auto'
       }}>
         {/* 页面标题 */}
-        <div style={{
-          textAlign: 'left',
+        <div className="client-page-title-wrap client-page-title-wrap--left" style={{
           marginBottom: '2rem',
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
           transition: 'all 0.6s ease'
         }}>
-          <h1 style={{
-            color: 'white',
-            fontSize: '1.75rem',
-            marginBottom: '0.5rem',
-            fontWeight: '700',
-            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
+          <div className="client-page-accent-bar client-page-accent-bar--left" />
+          <h1 className="client-page-title client-page-title--sm">
             {t.title}
           </h1>
         </div>
@@ -6830,7 +6810,7 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </ClientInteriorShell>
   );
 };
 

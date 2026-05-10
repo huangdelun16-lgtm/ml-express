@@ -298,6 +298,7 @@ const AccountManagement: React.FC = () => {
     { id: 'supervision', name: '操作审计', icon: '📜' },
     { id: 'reports', name: '报表导出', icon: '📈' },
     { id: 'courier_performance', name: '骑手绩效', icon: '🚴' },
+    { id: 'merchant_reconciliation', name: '商家对账', icon: '📋' },
   ];
 
   const togglePermission = (permId: string) => {

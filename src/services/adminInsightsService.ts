@@ -149,7 +149,8 @@ export type RiderStatRow = {
 export async function fetchRiderPerformanceBetween(startIso: string, endIso: string): Promise<RiderStatRow[]> {
   const [pkgs, couriersRes, alertsRes] = await Promise.all([
     fetchPackagesBetween(startIso, endIso),
-    supabase.from('couriers').select('id,name,credit_score,last_active'),
+    // 勿选不存在的列（会触发 PostgREST 400）；credit_score 若已加列可改回显式字段
+    supabase.from('couriers').select('id,name,last_active'),
     supabase
       .from('delivery_alerts')
       .select('courier_id')
@@ -193,7 +194,7 @@ export async function fetchRiderPerformanceBetween(startIso: string, endIso: str
       inProgress: agg[name].inProgress,
       pendingPickup: agg[name].pendingPickup,
       alertCount: id ? alertById[id] || 0 : 0,
-      creditScore: meta?.credit_score ?? null,
+      creditScore: null,
       lastActive: meta?.last_active ?? null,
     };
   });

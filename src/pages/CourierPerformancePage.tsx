@@ -281,15 +281,33 @@ const CourierPerformancePage: React.FC = () => {
           noSalary: '本时间范围内没有重叠的工资结算周期，可扩大日期范围或在财务管理中核对工资单',
         };
 
+  const thBg = 'rgb(15, 23, 42)';
+
   const thStyle: React.CSSProperties = {
-    padding: isMobile ? '10px 8px' : '12px 14px',
-    fontSize: isMobile ? 12 : 13,
-    fontWeight: 700,
+    padding: isMobile ? '12px 10px' : '14px 16px',
+    fontSize: isMobile ? 13 : 14,
+    fontWeight: 600,
+    letterSpacing: '0.01em',
+    lineHeight: 1.45,
     cursor: 'pointer',
     userSelect: 'none',
     whiteSpace: 'nowrap',
-    color: 'rgba(255,255,255,0.95)',
-    borderBottom: '2px solid rgba(255,255,255,0.18)',
+    color: 'rgba(255,255,255,0.96)',
+    borderBottom: '2px solid rgba(255,255,255,0.2)',
+    verticalAlign: 'middle',
+    textAlign: 'left',
+    backgroundColor: thBg,
+    position: 'sticky',
+    top: 0,
+    zIndex: 2,
+    WebkitFontSmoothing: 'antialiased',
+    MozOsxFontSmoothing: 'grayscale',
+    textRendering: 'optimizeLegibility',
+  };
+
+  const thStyleNum: React.CSSProperties = {
+    ...thStyle,
+    textAlign: 'right',
   };
 
   return (
@@ -299,8 +317,11 @@ const CourierPerformancePage: React.FC = () => {
         background: 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 38%, #2c5282 70%, #3b6fb8 100%)',
         padding: isMobile ? '14px 12px 96px' : '24px 20px 96px',
         color: '#fff',
-        fontFamily: "'Segoe UI', 'PingFang SC', system-ui, sans-serif",
+        fontFamily:
+          "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', system-ui, sans-serif",
         boxSizing: 'border-box',
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
       }}
     >
       <div style={{ maxWidth: 1320, margin: '0 auto' }}>
@@ -524,34 +545,41 @@ const CourierPerformancePage: React.FC = () => {
             </div>
           )}
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 640 : 880 }}>
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'separate',
+                borderSpacing: 0,
+                minWidth: isMobile ? 640 : 880,
+              }}
+            >
               <thead>
-                <tr style={{ background: 'rgba(15, 23, 42, 0.92)', position: 'sticky', top: 0, zIndex: 1 }}>
+                <tr>
                   <th style={thStyle} onClick={() => toggleSort('name')}>
                     {t.name}
-                    {sortMark('name')}
+                    <span style={{ marginLeft: 4, opacity: 0.9 }}>{sortMark('name')}</span>
                   </th>
-                  <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => toggleSort('delivered')}>
+                  <th style={thStyleNum} onClick={() => toggleSort('delivered')}>
                     {t.del}
-                    {sortMark('delivered')}
+                    <span style={{ marginLeft: 4, opacity: 0.9 }}>{sortMark('delivered')}</span>
                   </th>
-                  <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => toggleSort('throughput')}>
+                  <th style={thStyleNum} onClick={() => toggleSort('throughput')}>
                     {t.active}
-                    {sortMark('throughput')}
+                    <span style={{ marginLeft: 4, opacity: 0.9 }}>{sortMark('throughput')}</span>
                   </th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>{t.prog}</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>{t.pend}</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => toggleSort('alerts')}>
+                  <th style={thStyleNum}>{t.prog}</th>
+                  <th style={thStyleNum}>{t.pend}</th>
+                  <th style={thStyleNum} onClick={() => toggleSort('alerts')}>
                     {t.alerts}
-                    {sortMark('alerts')}
+                    <span style={{ marginLeft: 4, opacity: 0.9 }}>{sortMark('alerts')}</span>
                   </th>
-                  <th style={{ ...thStyle, textAlign: 'right' }} onClick={() => toggleSort('credit')}>
+                  <th style={thStyleNum} onClick={() => toggleSort('credit')}>
                     {t.score}
-                    {sortMark('credit')}
+                    <span style={{ marginLeft: 4, opacity: 0.9 }}>{sortMark('credit')}</span>
                   </th>
                   <th style={thStyle} onClick={() => toggleSort('last')}>
                     {t.last}
-                    {sortMark('last')}
+                    <span style={{ marginLeft: 4, opacity: 0.9 }}>{sortMark('last')}</span>
                   </th>
                 </tr>
               </thead>
