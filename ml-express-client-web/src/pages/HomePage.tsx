@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, Suspense, lazy } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { packageService, supabase, userService, testConnection, systemSettingsService, tutorialService, Tutorial } from '../services/supabase';
@@ -7,12 +7,36 @@ import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import Logo from '../components/Logo';
 import OrderModal from '../components/home/OrderModal';
 import LoginRegisterModal from '../components/home/LoginRegisterModal';
 import { MYANMAR_CITIES, CityKey, DEFAULT_CITY_KEY, DEFAULT_CITY_CENTER } from '../constants/cities';
 import { deriveInitialOrderStatus } from '../utils/orderSubmitHelpers';
+import '../styles/homeLanding.css';
 // import { getNearestCityKey } from '../utils/locationUtils';
+
+const LandingServicesChunk = lazy(() => import('./ServicesPage'));
+const LandingTrackingChunk = lazy(() => import('./TrackingPage'));
+const LandingContactChunk = lazy(() => import('./ContactPage'));
+
+function LandingEmbedFallback() {
+  return (
+    <div
+      style={{
+        minHeight: '36vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'rgba(248, 250, 252, 0.55)',
+        fontWeight: 600,
+        fontSize: '1rem',
+      }}
+    >
+      Loading…
+    </div>
+  );
+}
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
@@ -120,6 +144,18 @@ const HomePage: React.FC = () => {
       // 清除 state，防止刷新时再次弹出
       window.history.replaceState({}, document.title);
     }
+  }, [location.state]);
+
+  // 旧链接 /services 等重定向至首页并滚动到对应板块
+  useLayoutEffect(() => {
+    const st = location.state as { landingScrollTo?: string } | null;
+    const id = st?.landingScrollTo;
+    if (!id) return;
+    window.history.replaceState({}, document.title);
+    const t = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+    return () => clearTimeout(t);
   }, [location.state]);
 
   // 🚀 新增：处理从购物车跳转过来的订单请求
@@ -347,7 +383,12 @@ const HomePage: React.FC = () => {
   const [countdown, setCountdown] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [sentCode, setSentCode] = useState('');
-  
+  /** 首页底部继续下滑 → 平滑进入「服务」板块（单页滚动，不再跳转路由） */
+  const servicesSnapFiredRef = useRef(false);
+  const servicesBottomSentinelRef = useRef<HTMLDivElement | null>(null);
+  const landingServicesSectionRef = useRef<HTMLElement | null>(null);
+  const [mountLandingEmbeds, setMountLandingEmbeds] = useState(false);
+
   // 系统价格设置
   const [pricingSettings, setPricingSettings] = useState({
     baseFee: 1500,
@@ -366,6 +407,43 @@ const HomePage: React.FC = () => {
     loadPricingSettings();
     loadUserFromStorage();
     loadTutorials(); // 🚀 新增：组件加载时获取教学内容
+  }, []);
+
+  useEffect(() => {
+    const idle = (cb: () => void) =>
+      typeof window !== 'undefined' && 'requestIdleCallback' in window
+        ? (window as Window & { requestIdleCallback: (c: () => void) => number }).requestIdleCallback(cb)
+        : setTimeout(cb, 250);
+    const id = idle(() => {
+      void import('./ServicesPage');
+      void import('./ContactPage');
+      void import('./TrackingPage');
+    });
+    return () => {
+      if (typeof window !== 'undefined' && 'cancelIdleCallback' in window && typeof id === 'number') {
+        (window as Window & { cancelIdleCallback: (i: number) => void }).cancelIdleCallback(id);
+      } else {
+        clearTimeout(id as ReturnType<typeof setTimeout>);
+      }
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = landingServicesSectionRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setMountLandingEmbeds(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setMountLandingEmbeds(true);
+        }
+      },
+      { root: null, rootMargin: '420px 0px 520px 0px', threshold: 0 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
   // 🚀 新增：从数据库获取教学内容
@@ -409,6 +487,95 @@ const HomePage: React.FC = () => {
     }
   }, [countdown]);
 
+  const gatewayModalsOpen =
+    showOrderForm ||
+    showTutorialModal ||
+    showMapModal ||
+    showOrderSuccessModal ||
+    showTimePickerModal ||
+    showRegisterModal;
+
+  // 打开任一则取消「滑到底进入下一板块」的触发防抖复位
+  useEffect(() => {
+    if (!gatewayModalsOpen) return;
+    servicesSnapFiredRef.current = false;
+  }, [gatewayModalsOpen]);
+
+  // 首页英雄区末尾哨兵进入视口（或在其附近继续向下拨轮）→ 平滑滚到「服务」板块
+  useLayoutEffect(() => {
+    const prefersReduce =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const readScrollMetrics = () => {
+      const s = document.scrollingElement ?? document.documentElement;
+      return {
+        scrollTop: s.scrollTop,
+        scrollHeight: s.scrollHeight,
+        clientHeight: s.clientHeight,
+      };
+    };
+
+    const snapToServices = () => {
+      if (servicesSnapFiredRef.current || gatewayModalsOpen) return;
+      const { scrollHeight, clientHeight } = readScrollMetrics();
+      if (scrollHeight <= clientHeight + 6) return;
+      servicesSnapFiredRef.current = true;
+      document.getElementById('landing-services')?.scrollIntoView({
+        behavior: prefersReduce ? 'auto' : 'smooth',
+        block: 'start',
+      });
+      window.setTimeout(() => {
+        servicesSnapFiredRef.current = false;
+      }, 900);
+    };
+
+    const sentinel = servicesBottomSentinelRef.current;
+    let io: IntersectionObserver | null = null;
+    if (sentinel && typeof IntersectionObserver !== 'undefined') {
+      io = new IntersectionObserver(
+        (entries) => {
+          const hit = entries.some((en) => en.isIntersecting && en.intersectionRatio > 0);
+          if (!hit || gatewayModalsOpen) return;
+          const { scrollHeight, clientHeight } = readScrollMetrics();
+          if (scrollHeight <= clientHeight + 6) return;
+          snapToServices();
+        },
+        { root: null, threshold: 0.01, rootMargin: '0px 0px 48px 0px' }
+      );
+      io.observe(sentinel);
+    }
+
+    const onScroll = () => {
+      if (gatewayModalsOpen) return;
+      const { scrollTop, scrollHeight } = readScrollMetrics();
+      if (scrollTop < scrollHeight * 0.18) {
+        servicesSnapFiredRef.current = false;
+      }
+    };
+
+    const onWheelIntent = (e: WheelEvent) => {
+      if (gatewayModalsOpen || servicesSnapFiredRef.current) return;
+      if (e.deltaY <= 8) return;
+      const sentinelEl = servicesBottomSentinelRef.current;
+      if (!sentinelEl) return;
+      const r = sentinelEl.getBoundingClientRect();
+      const vh = window.innerHeight;
+      if (r.top < vh + 24 && r.bottom > -48) {
+        const { scrollHeight, clientHeight } = readScrollMetrics();
+        if (scrollHeight <= clientHeight + 6) return;
+        snapToServices();
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('wheel', onWheelIntent, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('wheel', onWheelIntent);
+      io?.disconnect();
+    };
+  }, [gatewayModalsOpen]);
 
   // 从本地存储加载用户信息（客户端仅会员；商家会话由 App 层统一清除）
   const loadUserFromStorage = () => {
@@ -1076,6 +1243,16 @@ const HomePage: React.FC = () => {
   }, [showLanguageDropdown]);
 
   const handleNavigation = (path: string) => {
+    const land: Record<string, string> = {
+      '/services': 'landing-services',
+      '/tracking': 'landing-tracking',
+      '/contact': 'landing-contact',
+    };
+    const sectionId = land[path];
+    if (sectionId) {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     setIsVisible(false);
     setTimeout(() => {
       navigate(path);
@@ -1988,40 +2165,17 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="homepage" style={{ 
-      fontFamily: 'var(--font-family-base)', 
-      lineHeight: 'var(--line-height-normal)',
-      minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      position: 'relative',
-      overflow: 'hidden',
-      padding: window.innerWidth < 768 ? '12px' : '20px'
-    }}>
-      {/* 背景装饰 */}
-      <div style={{
-        position: 'absolute',
-        top: '5%',
-        right: '5%',
-        width: '200px',
-        height: '200px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(40px)',
-        zIndex: 1
-      }}></div>
-              <div style={{
-                position: 'absolute',
-        bottom: '5%',
-        left: '5%',
-        width: '150px',
-        height: '150px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(30px)',
-        zIndex: 1
-      }}></div>
-      
+    <div
+      className="homepage home-landing"
+      style={{
+        fontFamily: 'var(--font-family-base)',
+        lineHeight: 'var(--line-height-normal)',
+      }}
+    >
+      <div className="home-landing__ambient" aria-hidden />
+      <div className="home-landing__content">
       <NavigationBar
+        variant="landing"
         language={language}
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
@@ -2033,342 +2187,147 @@ const HomePage: React.FC = () => {
       />
 
 
-      <HomeBanner />
+      <div className="home-banner-shell">
+        <HomeBanner />
+      </div>
 
-      {/* 英雄区域 */}
-      <section id="home" style={{
-        position: 'relative',
-        zIndex: 5,
-        background: 'transparent',
-                color: 'white',
-        padding: 0,
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-        transition: 'all 0.6s ease-in-out',
-        textAlign: 'center',
-        minHeight: 'calc(100vh - 120px)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden'
-      }}>
-        {/* 动态背景装饰 */}
-        <div style={{
-          position: 'absolute',
-          top: '10%',
-          right: '5%',
-          width: '300px',
-          height: '300px',
-          background: 'rgba(255,255,255,0.15)',
-          borderRadius: '50%',
-          filter: 'blur(50px)',
-          animation: 'float 6s ease-in-out infinite',
-        }}></div>
-        <div style={{
-          position: 'absolute',
-          bottom: '15%',
-          left: '8%',
-          width: '250px',
-          height: '250px',
-          background: 'rgba(255,255,255,0.1)',
-          borderRadius: '50%',
-          filter: 'blur(40px)',
-          animation: 'float 8s ease-in-out infinite reverse',
-        }}></div>
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '400px',
-          height: '400px',
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: '50%',
-          filter: 'blur(80px)',
-          animation: 'pulse 10s ease-in-out infinite',
-        }}></div>
-        
-        {/* 粒子效果 */}
-        {[...Array(20)].map((_, i) => (
-          <div key={i} style={{
-            position: 'absolute',
-            width: '4px',
-            height: '4px',
-            background: 'rgba(255,255,255,0.6)',
-            borderRadius: '50%',
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            animation: `sparkle ${3 + Math.random() * 4}s ease-in-out infinite`,
-            animationDelay: `${Math.random() * 2}s`
-          }}></div>
-        ))}
-        
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          {/* 主标题区域 */}
-          <div style={{
-            marginBottom: '3rem',
-            animation: 'fadeInUp 1s ease-out'
-          }}>
-          <Logo size="large" />
-          <h1 style={{ 
-              fontSize: window.innerWidth < 768 ? '2.5rem' : '4rem', 
-              marginBottom: '1.5rem',
-              fontWeight: '800',
-              textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
-              background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              letterSpacing: '-1px',
-              lineHeight: '1.1',
-            marginTop: '1rem'
-          }}>
-            {t.hero.title}
-          </h1>
+      <section
+        id="home"
+        className={`home-hero home-landing-snap-section${isVisible ? ' home-hero--visible' : ''}`}
+      >
+        <div className="home-hero__glow home-hero__glow--a" aria-hidden />
+        <div className="home-hero__glow home-hero__glow--b" aria-hidden />
+        <div className="home-hero__inner">
+          <div className="home-hero__logo">
+            <Logo size="large" />
           </div>
+          <p className="home-hero__eyebrow">
+            <span className="home-hero__eyebrow-dot" aria-hidden />
+            MARKET LINK EXPRESS
+          </p>
+          <h1 className="home-hero__title">{t.hero.title}</h1>
+          <p className="home-hero__subtitle">{t.hero.subtitle}</p>
 
-          {/* CTA按钮区域 */}
-          <div style={{
-            display: 'flex',
-            gap: '1.5rem',
-            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            animation: 'fadeInUp 1s ease-out 0.3s both'
-          }}>
-          <button
-            onClick={handleOrderButtonClick}
-            style={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                color: '#1e293b',
-                border: '2px solid rgba(255,255,255,0.3)',
-                padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
-                borderRadius: '60px',
-              cursor: 'pointer',
-                fontWeight: '700',
-                fontSize: window.innerWidth < 768 ? '1.1rem' : '1.3rem',
-                boxShadow: '0 15px 35px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)',
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                textTransform: 'uppercase',
-                letterSpacing: '1.5px',
-                position: 'relative',
-                overflow: 'hidden'
-            }}
-            onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-5px) scale(1.05)';
-                e.currentTarget.style.boxShadow = '0 20px 45px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4)';
-                e.currentTarget.style.background = 'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)';
-            }}
-            onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.boxShadow = '0 15px 35px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)';
-                e.currentTarget.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)';
-            }}
-          >
-              <span style={{ position: 'relative', zIndex: 1 }}>
-            {t.hero.cta}
-              </span>
-          </button>
-            
+          <div className="home-hero__actions">
             <button
-              onClick={() => handleNavigation('/tracking')}
-              style={{
-                background: 'rgba(255,255,255,0.2)',
-                color: 'white',
-                border: '2px solid rgba(255,255,255,0.4)',
-                padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
-                borderRadius: '60px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                textTransform: 'uppercase',
-                letterSpacing: '1px'
-            }}
-            onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
-                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
-            }}
-            onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
-            }}
+              type="button"
+              className="home-hero__btn home-hero__btn--primary"
+              onClick={handleOrderButtonClick}
             >
-              📦 {t.ui.packageTracking}
+              <span className="home-hero__btn-icon" aria-hidden>
+                ➜
+              </span>
+              {t.hero.cta}
             </button>
-
-            {/* 同城商场和购物车入口（合伙店铺账号在管理端处理，客户端不展示商场入口） */}
+            <button
+              type="button"
+              className="home-hero__btn home-hero__btn--ghost"
+              onClick={() => handleNavigation('/tracking')}
+            >
+              <span className="home-hero__btn-icon" aria-hidden>
+                📦
+              </span>
+              {t.ui.packageTracking}
+            </button>
             {(!currentUser || currentUser?.user_type !== 'partner') ? (
               <>
                 <button
+                  type="button"
+                  className="home-hero__btn home-hero__btn--ghost"
                   onClick={() => handleNavigation('/mall')}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255, 255, 255, 0.4)',
-                    padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
-                    borderRadius: '60px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                    backdropFilter: 'blur(10px)',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-                  }}
                 >
-                  🛍️ {t.hero.mall}
+                  <span className="home-hero__btn-icon" aria-hidden>
+                    🛍️
+                  </span>
+                  {t.hero.mall}
                 </button>
-
                 <button
+                  type="button"
+                  className="home-hero__btn home-hero__btn--ghost"
                   onClick={() => handleNavigation('/cart')}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255, 255, 255, 0.4)',
-                    padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
-                    borderRadius: '60px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                    backdropFilter: 'blur(10px)',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-                  }}
                 >
-                  🛒 {t.hero.cart}
+                  <span className="home-hero__btn-icon" aria-hidden>
+                    🛒
+                  </span>
+                  {t.hero.cart}
                 </button>
-
                 <button
+                  type="button"
+                  className="home-hero__btn home-hero__btn--ghost"
                   onClick={() => setShowTutorialModal(true)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255, 255, 255, 0.4)',
-                    padding: window.innerWidth < 768 ? '1.2rem 2.5rem' : '1.5rem 3rem',
-                    borderRadius: '60px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
-                    backdropFilter: 'blur(10px)',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-                  }}
                 >
-                  📖 {t.tutorial?.button || (language === 'zh' ? '使用教学' : 'Tutorial')}
+                  <span className="home-hero__btn-icon" aria-hidden>
+                    📖
+                  </span>
+                  {t.tutorial?.button || (language === 'zh' ? '使用教学' : 'Tutorial')}
                 </button>
               </>
             ) : null}
-            </div>
-
-          {/* 特色标签 */}
-        <div style={{
-            marginTop: '3rem',
-                    display: 'flex',
-            gap: '1rem',
-            flexWrap: 'wrap',
-                    justifyContent: 'center',
-            animation: 'fadeInUp 1s ease-out 0.6s both'
-          }}>
-            {[`⚡ ${t.ui.lightningDelivery}`, `🛡️ ${t.ui.secureReliable}`, `📱 ${t.ui.smartService}`, `💎 ${t.ui.transparentPricing}`].map((tag: string, index: number) => (
-              <div key={index} style={{
-                background: 'rgba(255,255,255,0.15)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                padding: '0.8rem 1.5rem',
-                borderRadius: '25px',
-                fontSize: '0.9rem',
-                fontWeight: '500',
-                color: 'white',
-                textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-                {tag}
           </div>
-            ))}
-            </div>
+
+          <div className="home-hero__trust">
+            {[`⚡ ${t.ui.lightningDelivery}`, `🛡️ ${t.ui.secureReliable}`, `📱 ${t.ui.smartService}`, `💎 ${t.ui.transparentPricing}`].map((tag: string, index: number) => {
+              const [emoji, ...restParts] = tag.split(' ');
+              return (
+                <div key={index} className="home-hero__pill">
+                  <span className="home-hero__pill-emoji">{emoji}</span>
+                  <span>{restParts.join(' ')}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
+      </section>
+      <div
+        ref={servicesBottomSentinelRef}
+        className="home-services-bottom-sentinel"
+        aria-hidden
+      />
+      </div>
+
+      <section
+        ref={landingServicesSectionRef}
+        id="landing-services"
+        className="home-landing-snap-section home-landing-embed-wrap"
+      >
+        <ClientInteriorShell>
+          {mountLandingEmbeds ? (
+            <Suspense fallback={<LandingEmbedFallback />}>
+              <LandingServicesChunk embedInLanding />
+            </Suspense>
+          ) : (
+            <div style={{ minHeight: '55vh' }} aria-hidden />
+          )}
+        </ClientInteriorShell>
+      </section>
+
+      <section id="landing-tracking" className="home-landing-snap-section home-landing-embed-wrap">
+        <ClientInteriorShell>
+          {mountLandingEmbeds ? (
+            <Suspense fallback={<LandingEmbedFallback />}>
+              <LandingTrackingChunk embedInLanding />
+            </Suspense>
+          ) : (
+            <div style={{ minHeight: '55vh' }} aria-hidden />
+          )}
+        </ClientInteriorShell>
+      </section>
+
+      <section id="landing-contact" className="home-landing-snap-section home-landing-embed-wrap">
+        <ClientInteriorShell>
+          {mountLandingEmbeds ? (
+            <Suspense fallback={<LandingEmbedFallback />}>
+              <LandingContactChunk embedInLanding />
+            </Suspense>
+          ) : (
+            <div style={{ minHeight: '55vh' }} aria-hidden />
+          )}
+        </ClientInteriorShell>
       </section>
 
 
 
 
-
-      {/* CSS动画样式 */}
-      <style>
-        {`
-          @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(5deg); }
-          }
-          
-          @keyframes pulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
-            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
-          }
-          
-          @keyframes sparkle {
-            0%, 100% { opacity: 0; transform: scale(0.5); }
-            50% { opacity: 1; transform: scale(1); }
-          }
-          
-          @keyframes fadeInUp {
-            from {
-              opacity: 0;
-              transform: translateY(30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-        `}
-      </style>
 
       {/* 订单表单模态窗口 */}
       <OrderModal

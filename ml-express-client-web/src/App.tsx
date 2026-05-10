@@ -6,9 +6,6 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { CartProvider } from './contexts/CartContext';
 import './App.css';
 
-const ServicesPage = lazy(() => import('./pages/ServicesPage'));
-const TrackingPage = lazy(() => import('./pages/TrackingPage'));
-const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -123,9 +120,18 @@ function App() {
                   <Route path="/" element={<HomePage />} />
                   {/* 商家端曾误部署到本域名时常见 /login；认证回调或书签也可能指向此处 */}
                   <Route path="/login" element={<Navigate to="/" replace />} />
-                  <Route path="/services" element={<ServicesPage />} />
-                  <Route path="/tracking" element={<TrackingPage />} />
-                  <Route path="/contact" element={<ContactPage />} />
+                  <Route
+                    path="/services"
+                    element={<Navigate to="/" replace state={{ landingScrollTo: 'landing-services' }} />}
+                  />
+                  <Route
+                    path="/tracking"
+                    element={<Navigate to="/" replace state={{ landingScrollTo: 'landing-tracking' }} />}
+                  />
+                  <Route
+                    path="/contact"
+                    element={<Navigate to="/" replace state={{ landingScrollTo: 'landing-contact' }} />}
+                  />
                   <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                   <Route path="/terms-of-service" element={<TermsOfServicePage />} />
                   <Route path="/profile" element={<ProfilePage />} />

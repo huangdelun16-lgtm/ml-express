@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline } from '@react-google-maps/api';
 import { packageService, supabase } from '../services/supabase';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   ACTIVE_PACKAGE_STATUSES,
@@ -31,7 +32,9 @@ function parseReceiverLatLng(pkg: { receiver_latitude?: number | null; receiver_
   return { lat, lng };
 }
 
-const TrackingPage: React.FC = () => {
+type TrackingPageProps = { embedInLanding?: boolean };
+
+const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   
@@ -417,52 +420,20 @@ const TrackingPage: React.FC = () => {
     }
   };
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      position: 'relative',
-      overflow: 'hidden',
-      padding: window.innerWidth < 768 ? '12px' : '20px'
-    }}>
-      {/* 背景装饰 */}
-      <div style={{
-        position: 'absolute',
-        top: '5%',
-        right: '5%',
-        width: '200px',
-        height: '200px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(40px)',
-        zIndex: 1
-      }}></div>
-      <div style={{
-        position: 'absolute',
-        bottom: '5%',
-        left: '5%',
-        width: '150px',
-        height: '150px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(30px)',
-        zIndex: 1
-      }}></div>
-
-      {/* 导航栏 */}
+  const inner = (
+    <>
+      {!embedInLanding && (
       <NavigationBar
+        variant="landing"
         language={language}
         onLanguageChange={handleLanguageChange}
         currentUser={currentUser}
         onLogout={handleLogout}
         onShowRegisterModal={(isLoginMode) => {
           navigate('/', { state: { showModal: true, isLoginMode } });
-        }} 
-        
+        }}
       />
-      {/* 搜索区域 */}
-
-      {/* 主要内容区域 */}
+      )}
       <div style={{
         position: 'relative',
         zIndex: 5,
@@ -472,24 +443,12 @@ const TrackingPage: React.FC = () => {
         color: 'white'
       }}>
         {/* 页面标题 */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{
-            fontSize: window.innerWidth < 768 ? '2rem' : '3rem',
-            marginBottom: '0.5rem',
-            fontWeight: '800',
-            textShadow: '2px 2px 8px rgba(0,0,0,0.3)',
-            letterSpacing: '-1px'
-          }}>
+        <div className="client-page-title-wrap" style={{ marginBottom: '2rem' }}>
+          <div className="client-page-accent-bar" />
+          <h1 className="client-page-title">
             {t.tracking.title}
           </h1>
-          <p style={{
-            fontSize: '1.1rem',
-            color: 'rgba(255,255,255,0.9)',
-            maxWidth: '600px',
-            margin: '0 auto',
-            lineHeight: '1.6',
-            fontWeight: '300'
-          }}>
+          <p className="client-page-subtitle">
             {t.tracking.realTimeTracking}
           </p>
         </div>
@@ -990,8 +949,14 @@ const TrackingPage: React.FC = () => {
           }
         `}
       </style>
-    </div>
+    </>
   );
+
+  if (embedInLanding) {
+    return inner;
+  }
+
+  return <ClientInteriorShell>{inner}</ClientInteriorShell>;
 };
 
 export default TrackingPage;

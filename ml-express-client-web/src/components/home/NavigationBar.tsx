@@ -9,6 +9,8 @@ interface NavigationBarProps {
   currentUser: any;
   onLogout: () => void;
   onShowRegisterModal: (isLoginMode: boolean) => void;
+  /** 首页专用：毛玻璃悬浮导航条 */
+  variant?: 'default' | 'landing';
 }
 
 const NavigationBar: React.FC<NavigationBarProps> = ({
@@ -16,7 +18,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   onLanguageChange,
   currentUser,
   onLogout,
-  onShowRegisterModal
+  onShowRegisterModal,
+  variant = 'default'
 }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -24,6 +27,21 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
   const handleNavigation = (path: string) => {
+    const landingSectionMap: Record<string, string> = {
+      '/services': 'landing-services',
+      '/tracking': 'landing-tracking',
+      '/contact': 'landing-contact',
+    };
+    const sectionId = landingSectionMap[path];
+    if (sectionId) {
+      if (location.pathname === '/') {
+        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      navigate(path);
+      return;
+    }
+
     if (path === '/') {
       if (location.pathname === '/') {
         // 如果已经在首页，滚动到顶部/home
@@ -52,25 +70,9 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
     }
   };
 
-  return (
-    <nav style={{
-      position: 'relative',
-      zIndex: 9999,
-      pointerEvents: 'auto',
-      background: 'transparent',
-      color: 'white',
-      padding: 0,
-      marginBottom: window.innerWidth < 768 ? '24px' : '40px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      boxShadow: 'none',
-      gap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
-      flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
-      rowGap: 'var(--spacing-3)'
-    }}>
+  const navInner = (
+    <>
       <Logo size="small" />
-      
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
@@ -414,6 +416,53 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           </div>
         </div>
       </div>
+    </>
+  );
+
+  return variant === 'landing' ? (
+    <div className="home-nav-wrap home-nav-wrap--landing">
+      <nav
+        className="home-nav home-nav--landing"
+        style={{
+          position: 'relative',
+          zIndex: 9999,
+          pointerEvents: 'auto',
+          background: 'transparent',
+          color: 'white',
+          padding: 0,
+          marginBottom: 0,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: 'none',
+          gap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
+          flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
+          rowGap: 'var(--spacing-3)'
+        }}
+      >
+        {navInner}
+      </nav>
+    </div>
+  ) : (
+    <nav
+      style={{
+        position: 'relative',
+        zIndex: 9999,
+        pointerEvents: 'auto',
+        background: 'transparent',
+        color: 'white',
+        padding: 0,
+        marginBottom: window.innerWidth < 768 ? '24px' : '40px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        boxShadow: 'none',
+        gap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
+        flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
+        rowGap: 'var(--spacing-3)'
+      }}
+    >
+      {navInner}
     </nav>
   );
 };

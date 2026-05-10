@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import { useLanguage } from '../contexts/LanguageContext';
 
 /** 构建期注入：在 .env / Netlify 中配置各应用商店链接，未设置则不显示对应按钮 */
@@ -16,7 +17,9 @@ function getPublicStoreEnv() {
   };
 }
 
-const ContactPage: React.FC = () => {
+type ContactPageProps = { embedInLanding?: boolean };
+
+const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const [isVisible, setIsVisible] = useState(false);
@@ -54,9 +57,8 @@ const ContactPage: React.FC = () => {
     localStorage.setItem('ml-express-language', newLanguage);
   };
 
-  return (
-    <>
-      <style>{`
+  const shimmerStyle = (
+    <style>{`
         @keyframes shimmer {
           0% {
             transform: translateX(-100%) translateY(-100%) rotate(45deg);
@@ -66,50 +68,9 @@ const ContactPage: React.FC = () => {
           }
         }
       `}</style>
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        position: 'relative',
-        overflow: 'hidden',
-        padding: window.innerWidth < 768 ? '12px' : '20px'
-      }}>
-        {/* 背景装饰 */}
-        <div style={{
-          position: 'absolute',
-          top: '5%',
-          right: '5%',
-          width: '200px',
-          height: '200px',
-          background: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: '50%',
-          filter: 'blur(40px)',
-          zIndex: 1
-        }}></div>
-        <div style={{
-          position: 'absolute',
-          bottom: '5%',
-          left: '5%',
-          width: '150px',
-          height: '150px',
-          background: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: '50%',
-          filter: 'blur(30px)',
-          zIndex: 1
-        }}></div>
+  );
 
-        {/* 导航栏 */}
-        <NavigationBar
-          language={language}
-          onLanguageChange={handleLanguageChange}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          onShowRegisterModal={(isLoginMode) => {
-          navigate('/', { state: { showModal: true, isLoginMode } });
-        }} 
-          
-        />
-
-        {/* 主要内容区域 */}
+  const mainSection = (
         <section style={{
           position: 'relative',
           zIndex: 5,
@@ -119,25 +80,12 @@ const ContactPage: React.FC = () => {
           color: 'white'
         }}>
           {/* 页面标题 */}
-          <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
-            <h1 style={{
-              fontSize: window.innerWidth < 768 ? '2.5rem' : '3.5rem',
-              color: 'white',
-              marginBottom: '1rem',
-              fontWeight: '800',
-              textShadow: '2px 2px 8px rgba(0,0,0,0.3)',
-              letterSpacing: '-1px'
-            }}>
+          <div className="client-page-title-wrap" style={{ marginBottom: '3rem' }}>
+            <div className="client-page-accent-bar" />
+            <h1 className="client-page-title">
               {t.contact.title}
             </h1>
-            <p style={{
-              fontSize: '1.2rem',
-              color: 'rgba(255,255,255,0.9)',
-              maxWidth: '600px',
-              margin: '0 auto',
-              lineHeight: '1.6',
-              fontWeight: '300'
-            }}>
+            <p className="client-page-subtitle">
               {t.contact.subtitle}
             </p>
           </div>
@@ -611,7 +559,33 @@ const ContactPage: React.FC = () => {
             </p>
           </div>
         </section>
-      </div>
+  );
+
+  if (embedInLanding) {
+    return (
+      <>
+        {shimmerStyle}
+        {mainSection}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {shimmerStyle}
+      <ClientInteriorShell>
+        <NavigationBar
+          variant="landing"
+          language={language}
+          onLanguageChange={handleLanguageChange}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onShowRegisterModal={(isLoginMode) => {
+            navigate('/', { state: { showModal: true, isLoginMode } });
+          }}
+        />
+        {mainSection}
+      </ClientInteriorShell>
     </>
   );
 };

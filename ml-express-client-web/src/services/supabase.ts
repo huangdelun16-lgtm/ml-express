@@ -1550,18 +1550,17 @@ export const testConnection = async (): Promise<boolean> => {
 /** 与 Admin 广告管理「余额充值 QR」、App 端共用 */
 export const CLIENT_RECHARGE_QR_SETTING_KEY = 'client.recharge_qr_urls';
 
-const RECHARGE_QR_PUBLIC_BASE = 'https://market-link-express.com';
-
+/** 充值 QR 默认图：用当前站点根路径，避免自定义域名 DNS 未就绪时仍指向不可解析的域名 */
 export const RECHARGE_QR_AMOUNT_TIERS = [10000, 50000, 100000, 300000, 500000, 1000000] as const;
 
 export function getDefaultRechargeQrUrlMap(): Record<number, string> {
   return {
-    10000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_10000.png`,
-    50000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_50000.png`,
-    100000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_100000.png`,
-    300000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_300000.png`,
-    500000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_500000.png`,
-    1000000: `${RECHARGE_QR_PUBLIC_BASE}/kbz_qr_1000000.png`,
+    10000: '/kbz_qr_10000.png',
+    50000: '/kbz_qr_50000.png',
+    100000: '/kbz_qr_100000.png',
+    300000: '/kbz_qr_300000.png',
+    500000: '/kbz_qr_500000.png',
+    1000000: '/kbz_qr_1000000.png',
   };
 }
 

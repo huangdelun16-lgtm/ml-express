@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import LoggerService from '../services/LoggerService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import { useLanguage } from '../contexts/LanguageContext';
 
-const ServicesPage: React.FC = () => {
+type ServicesPageProps = { embedInLanding?: boolean };
+
+const ServicesPage: React.FC<ServicesPageProps> = ({ embedInLanding }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromHomeScroll =
+    !embedInLanding && Boolean((location.state as { fromHomeScroll?: boolean } | null)?.fromHomeScroll);
   const { language, setLanguage, t } = useLanguage();
   const [isVisible, setIsVisible] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
@@ -60,91 +66,28 @@ const ServicesPage: React.FC = () => {
     };
   }, [showLanguageDropdown]);
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      padding: window.innerWidth < 768 ? '12px' : '20px',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* 背景装饰 */}
-      <div style={{
-        position: 'absolute',
-        top: '-10%',
-        right: '-10%',
-        width: '500px',
-        height: '500px',
-        background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)',
-        borderRadius: '50%',
-        zIndex: 1
-      }}></div>
-      <div style={{
-        position: 'absolute',
-        bottom: '-10%',
-        left: '-10%',
-        width: '400px',
-        height: '400px',
-        background: 'radial-gradient(circle, rgba(66,153,225,0.2) 0%, transparent 70%)',
-        borderRadius: '50%',
-        zIndex: 1
-      }}></div>
-
-      {/* 导航栏 */}
-      <NavigationBar
-        language={language}
-        onLanguageChange={handleLanguageChange}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        onShowRegisterModal={(isLoginMode) => {
-          navigate('/', { state: { showModal: true, isLoginMode } });
-        }}
-        
-      />
-
-      {/* 主要内容区域 */}
+  const mainSection = (
       <section style={{
         position: 'relative',
         zIndex: 5,
         opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-        transition: 'all 0.6s ease-in-out',
+        transform: isVisible
+          ? 'translateY(0) scale(1)'
+          : fromHomeScroll
+            ? 'translateY(28px) scale(0.97)'
+            : 'translateY(30px)',
+        transition: fromHomeScroll
+          ? 'opacity 0.88s cubic-bezier(0.22, 1, 0.36, 1), transform 0.88s cubic-bezier(0.22, 1, 0.36, 1)'
+          : 'all 0.6s ease-in-out',
         color: 'white'
       }}>
         {/* 页面标题 */}
-        <div style={{ 
-          textAlign: 'center', 
-          marginBottom: '5rem',
-          marginTop: '2rem'
-        }}>
-          <h1 style={{
-            fontSize: window.innerWidth < 768 ? '2.8rem' : '4.5rem',
-            color: 'white',
-            marginBottom: '1.5rem',
-            fontWeight: '900',
-            textShadow: '0 10px 20px rgba(0,0,0,0.2)',
-            letterSpacing: '-2px',
-            lineHeight: '1.1'
-          }}>
+        <div className="client-page-title-wrap" style={{ marginTop: '2rem', marginBottom: '3.5rem' }}>
+          <div className="client-page-accent-bar" />
+          <h1 className="client-page-title">
             {t.features.title}
           </h1>
-          <div style={{
-            width: '80px',
-            height: '6px',
-            background: 'white',
-            margin: '0 auto 2rem',
-            borderRadius: '3px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-          }}></div>
-          <p style={{
-            fontSize: window.innerWidth < 768 ? '1.1rem' : '1.4rem',
-            color: 'rgba(255,255,255,0.95)',
-            maxWidth: '700px',
-            margin: '0 auto',
-            lineHeight: '1.6',
-            fontWeight: '500',
-            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
+          <p className="client-page-subtitle">
             {t.features.subtitle}
           </p>
         </div>
@@ -156,7 +99,7 @@ const ServicesPage: React.FC = () => {
           gap: '2rem',
           maxWidth: '1200px',
           margin: '0 auto',
-          padding: '0 1rem'
+          padding: '0 1rem 3rem'
         }}
         >
           {[
@@ -376,7 +319,26 @@ const ServicesPage: React.FC = () => {
           ))}
         </div>
       </section>
-    </div>
+  );
+
+  if (embedInLanding) {
+    return mainSection;
+  }
+
+  return (
+    <ClientInteriorShell>
+      <NavigationBar
+        variant="landing"
+        language={language}
+        onLanguageChange={handleLanguageChange}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onShowRegisterModal={(isLoginMode) => {
+          navigate('/', { state: { showModal: true, isLoginMode } });
+        }}
+      />
+      {mainSection}
+    </ClientInteriorShell>
   );
 };
 

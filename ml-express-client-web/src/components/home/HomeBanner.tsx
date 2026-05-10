@@ -64,13 +64,12 @@ const HomeBanner = () => {
   }
 
   return (
-    <div style={{
+    <div className="home-banner-root" style={{
       position: 'relative',
       zIndex: 5,
-      marginBottom: '40px',
-      padding: '0 16px',
-      maxWidth: '1200px',
-      margin: '0 auto 40px auto',
+      padding: 0,
+      maxWidth: 'none',
+      margin: '0 auto',
       width: '100%'
     }}>
       <div
@@ -81,8 +80,9 @@ const HomeBanner = () => {
           scrollSnapType: 'x mandatory',
           scrollBehavior: 'smooth',
           width: '100%',
-          borderRadius: '16px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          borderRadius: '20px',
+          boxShadow: '0 24px 48px rgba(0,0,0,0.28)',
+          border: '1px solid rgba(255,255,255,0.14)',
           position: 'relative',
           cursor: 'grab',
           WebkitOverflowScrolling: 'touch' as any,
@@ -204,7 +204,14 @@ const HomeBanner = () => {
               onMouseDown={() => setIsBannerPaused(true)}
               onMouseUp={() => setIsBannerPaused(false)}
               onMouseLeave={() => setIsBannerPaused(false)}
-              onClick={() => window.open('https://www.market-link-express.com', '_blank')}
+              onClick={() => {
+                const el = document.getElementById('landing-tracking');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                  window.open(typeof window !== 'undefined' ? window.location.origin : '/', '_blank', 'noopener,noreferrer');
+                }
+              }}
             >
               <div style={{
                 width: '100%',

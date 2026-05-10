@@ -16,9 +16,9 @@ export async function sendEmailVerificationCode(
 ): Promise<VerificationResult> {
   try {
     // 客户端版本：调用 Netlify Function 发送验证码
-    const functionUrl = process.env.NODE_ENV === 'production' 
-      ? '/.netlify/functions/send-email-code'
-      : 'https://market-link-express.com/.netlify/functions/send-email-code';
+    const functionUrl =
+      (process.env.REACT_APP_EMAIL_FUNCTION_URL || '').trim() ||
+      '/.netlify/functions/send-email-code';
     
     const response = await fetch(functionUrl, {
       method: 'POST',
