@@ -3279,6 +3279,7 @@ export type ImportMetricDraftDbRow = {
   second_account: string;
   third_handler: string;
   third_account: string;
+  lic_order_code: string;
   created_by: string;
 };
 
@@ -3302,7 +3303,27 @@ export type ImportMetricDraftDbWrite = {
   second_account: string;
   third_handler: string;
   third_account: string;
+  lic_order_code: string;
 };
+
+/** 将 Postgres DATE / TIMESTAMPTZ / 字符串规范为 YYYY-MM-DD（供表单与 Excel 使用） */
+function normalizePgDateToYmd(v: string | null | undefined): string {
+  if (v == null) return '';
+  const raw = String(v).trim();
+  if (!raw) return '';
+  const m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) {
+    const [, y, mo, da] = m;
+    return `${y}-${mo.padStart(2, '0')}-${da.padStart(2, '0')}`;
+  }
+  const isoDay = raw.slice(0, 10);
+  const d = new Date(`${isoDay}T12:00:00`);
+  if (!Number.isFinite(d.getTime())) return '';
+  const y = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${month}-${day}`;
+}
 
 /** 映射为前端草稿结构（与 ImportMetricDraftsPage 约定字段一致） */
 export function dbRowToImportMetricDraftClient(r: ImportMetricDraftDbRow): {
@@ -3327,30 +3348,32 @@ export function dbRowToImportMetricDraftClient(r: ImportMetricDraftDbRow): {
   secondAccount: string;
   thirdHandler: string;
   thirdAccount: string;
+  licOrderCode: string;
 } {
   const lines = Array.isArray(r.line_items) ? r.line_items : [];
   return {
     id: r.id,
     savedAt: r.updated_at,
-    startDate: r.start_date ? String(r.start_date).slice(0, 10) : '',
+    startDate: normalizePgDateToYmd(r.start_date),
     customerName: r.customer_name ?? '',
     registerNo: r.register_no ?? '',
     portOfDischarge: r.port_of_discharge ?? '',
     lineItems: lines,
-    edDate: r.ed_date ? String(r.ed_date).slice(0, 10) : '',
+    edDate: normalizePgDateToYmd(r.ed_date),
     totalCharges: r.total_charges ?? '',
     depositFirst: r.deposit_first ?? '',
     depositSecond: r.deposit_second ?? '',
     depositThird: r.deposit_third ?? '',
-    depositFirstPaidOn: r.deposit_first_paid_on ? String(r.deposit_first_paid_on).slice(0, 10) : '',
-    depositSecondPaidOn: r.deposit_second_paid_on ? String(r.deposit_second_paid_on).slice(0, 10) : '',
-    depositThirdPaidOn: r.deposit_third_paid_on ? String(r.deposit_third_paid_on).slice(0, 10) : '',
+    depositFirstPaidOn: normalizePgDateToYmd(r.deposit_first_paid_on),
+    depositSecondPaidOn: normalizePgDateToYmd(r.deposit_second_paid_on),
+    depositThirdPaidOn: normalizePgDateToYmd(r.deposit_third_paid_on),
     firstHandler: r.first_handler ?? '',
     firstAccount: r.first_account ?? '',
     secondHandler: r.second_handler ?? '',
     secondAccount: r.second_account ?? '',
     thirdHandler: r.third_handler ?? '',
     thirdAccount: r.third_account ?? '',
+    licOrderCode: r.lic_order_code?.trim() ? String(r.lic_order_code).trim() : '',
   };
 }
 
@@ -3366,17 +3389,24 @@ function stripDepositPaidDatesFromWrite<T extends ImportMetricDraftDbWrite>(
   return rest;
 }
 
-/** PostgREST / Postgres：表上尚未添加对应列时常见此类报错（含 400） */
-function isLikelyMissingDepositPaidDateColumnsError(err: { message?: string; details?: string } | null): boolean {
+/** PostgREST / Postgres：仅当表里确实不存在对应列（未执行 migration）时才剥离三期付款日期并重试。 */
+function isLikelyMissingDepositPaidDateColumnsError(err: { message?: string; details?: string; code?: string } | null): boolean {
+  const code = String(err?.code ?? '').trim();
   const m = `${err?.message || ''} ${err?.details || ''}`.toLowerCase();
-  if (!m.trim()) return false;
-  return (
-    m.includes('deposit_first_paid_on') ||
-    m.includes('deposit_second_paid_on') ||
-    m.includes('deposit_third_paid_on') ||
-    (m.includes('column') && m.includes('does not exist')) ||
-    m.includes('schema cache')
-  );
+  if (!m.trim() && !code) return false;
+
+  // 列已加入 DB 但 API schema cache 未刷新：不能剥离字段后“成功”，否则付款日期永远不会写入
+  if (m.includes('schema cache')) return false;
+  if (m.includes('pgrst204')) return false;
+
+  // PostgreSQL undefined_column
+  if (code === '42703') return true;
+  if (m.includes('42703')) return true;
+  if (m.includes('undefined_column')) return true;
+
+  if (m.includes('does not exist') && m.includes('column')) return true;
+
+  return false;
 }
 
 export type ImportMetricDraftUpdateResult =
@@ -3390,6 +3420,24 @@ export type ImportMetricDraftInsertResult =
   | { ok: false; message: string };
 
 export const importMetricDraftService = {
+  async getById(id: string): Promise<ImportMetricDraftDbRow | null> {
+    try {
+      const { data, error } = await supabase
+        .from('import_metric_drafts')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) {
+        console.error('import_metric_drafts getById 失败:', error);
+        return null;
+      }
+      return (data as ImportMetricDraftDbRow | null) ?? null;
+    } catch (err) {
+      console.error('import_metric_drafts getById 异常:', err);
+      return null;
+    }
+  },
+
   async listAll(): Promise<ImportMetricDraftDbRow[]> {
     try {
       const { data, error } = await supabase
@@ -3404,6 +3452,31 @@ export const importMetricDraftService = {
     } catch (err) {
       console.error('import_metric_drafts 列表异常:', err);
       return [];
+    }
+  },
+
+  /** 下一个 LIC-#### 序号（扫描已有 lic_order_code，取最大 +1） */
+  async nextLicOrderCode(): Promise<string> {
+    try {
+      const { data, error } = await supabase
+        .from('import_metric_drafts')
+        .select('lic_order_code')
+        .like('lic_order_code', 'LIC-%');
+      if (error) {
+        console.error('nextLicOrderCode 查询失败:', error);
+        return 'LIC-0001';
+      }
+      let max = 0;
+      for (const row of (data || []) as { lic_order_code?: string }[]) {
+        const code = String(row.lic_order_code ?? '').trim();
+        const m = code.match(/^LIC-(\d+)$/i);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      }
+      const next = max + 1;
+      return `LIC-${String(next).padStart(4, '0')}`;
+    } catch (err) {
+      console.error('nextLicOrderCode 异常:', err);
+      return 'LIC-0001';
     }
   },
 
@@ -3482,6 +3555,90 @@ export const importMetricDraftService = {
       return true;
     } catch (err) {
       console.error('import_metric_drafts 删除异常:', err);
+      return false;
+    }
+  },
+};
+
+export type PersonalLedgerRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  owner_username: string;
+  entry_date: string;
+  kind: 'income' | 'expense';
+  amount: string | number;
+  currency: string;
+  category: string;
+  note: string;
+};
+
+export type PersonalLedgerInsert = {
+  owner_username: string;
+  entry_date: string;
+  kind: 'income' | 'expense';
+  amount: number;
+  currency: string;
+  category: string;
+  note: string;
+};
+
+export const personalLedgerService = {
+  async listForOwner(ownerUsername: string): Promise<PersonalLedgerRow[]> {
+    try {
+      const { data, error } = await supabase
+        .from('personal_ledger_entries')
+        .select('*')
+        .eq('owner_username', ownerUsername)
+        .order('entry_date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.error('personal_ledger_entries 列表失败:', error);
+        throw error;
+      }
+      return (data || []) as PersonalLedgerRow[];
+    } catch (err) {
+      console.error('personal_ledger_entries 列表异常:', err);
+      throw err;
+    }
+  },
+
+  async insert(payload: PersonalLedgerInsert): Promise<boolean> {
+    try {
+      const updated_at = new Date().toISOString();
+      const { error } = await supabase.from('personal_ledger_entries').insert([
+        {
+          owner_username: payload.owner_username,
+          entry_date: payload.entry_date,
+          kind: payload.kind,
+          amount: payload.amount,
+          currency: payload.currency,
+          category: payload.category,
+          note: payload.note,
+          updated_at,
+        },
+      ]);
+      if (error) {
+        console.error('personal_ledger_entries 插入失败:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('personal_ledger_entries 插入异常:', err);
+      return false;
+    }
+  },
+
+  async remove(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('personal_ledger_entries').delete().eq('id', id);
+      if (error) {
+        console.error('personal_ledger_entries 删除失败:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('personal_ledger_entries 删除异常:', err);
       return false;
     }
   },

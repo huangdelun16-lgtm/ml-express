@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Workbook } from 'exceljs';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -108,6 +108,8 @@ export type ImportMetricDraftSaved = {
   secondAccount: string;
   thirdHandler: string;
   thirdAccount: string;
+  /** 订单编码（LIC-####），入库后不可改 */
+  licOrderCode: string;
 };
 
 function isUuid(id: string): boolean {
@@ -135,6 +137,7 @@ function draftToDbWrite(d: ImportMetricDraftSaved): ImportMetricDraftDbWrite {
     second_account: d.secondAccount,
     third_handler: d.thirdHandler,
     third_account: d.thirdAccount,
+    lic_order_code: d.licOrderCode?.trim() ? d.licOrderCode.trim() : '',
   };
 }
 
@@ -209,6 +212,17 @@ function formatDisplayDate(isoDate: string, locale = 'zh-CN'): string {
   return Number.isFinite(d.getTime()) ? d.toLocaleDateString(locale) : isoDate;
 }
 
+/** 新建/编辑进口指标草稿弹窗内统一展示：日/月/两位年（dd/mm/yy） */
+function formatDraftModalDate(isoDate: string): string {
+  if (!isoDate?.trim()) return '—';
+  const d = new Date(`${isoDate.trim()}T12:00:00`);
+  if (!Number.isFinite(d.getTime())) return isoDate.trim();
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}/${yy}`;
+}
+
 function sanitizeFilenamePart(s: string): string {
   const x = (s || 'draft').replace(/[/\\?*:[\]"<>|]/g, '_').replace(/\s+/g, '_').slice(0, 80);
   return x || 'draft';
@@ -258,8 +272,9 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
 
   const reg = d.registerNo?.trim() || '—';
   const regFile = d.registerNo?.trim() || 'NO_REG';
+  const orderNo = d.licOrderCode?.trim() || '—';
 
-  ws.mergeCells(1, 1, 1, 11);
+  ws.mergeCells(1, 1, 1, 12);
   const titleCell = ws.getCell(1, 1);
   titleCell.value = '进口指标 · 商品明细';
   titleCell.font = { name: 'Calibri', size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -267,15 +282,15 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
   titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
   ws.getRow(1).height = 40;
 
-  ws.mergeCells(2, 1, 2, 11);
+  ws.mergeCells(2, 1, 2, 12);
   const sub = ws.getCell(2, 1);
-  sub.value = `REGISTER NO.  ${reg}    |    客户 / Customer: ${d.customerName?.trim() || '—'}    |    卸货港: ${d.portOfDischarge?.trim() || '—'}`;
+  sub.value = `REGISTER NO.  ${reg}    |    订单号 / Order no. (LIC): ${orderNo}    |    客户 / Customer: ${d.customerName?.trim() || '—'}    |    卸货港: ${d.portOfDischarge?.trim() || '—'}`;
   sub.font = { name: 'Calibri', size: 11, color: { argb: 'FF1E293B' } };
   sub.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
   sub.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
   ws.getRow(2).height = 30;
 
-  ws.mergeCells(3, 1, 3, 11);
+  ws.mergeCells(3, 1, 3, 12);
   const hint = ws.getCell(3, 1);
   hint.value = `导出时间 · Generated: ${new Date().toLocaleString('zh-CN', { hour12: false })}  ·  共 ${d.lineItems.length} 条商品行`;
   hint.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF64748B' } };
@@ -284,6 +299,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
 
   const headers = [
     'REGISTER NO.',
+    '订单号 · ORDER NO. · LIC',
     'H.S CODE',
     'CARGO DESCRIPTION',
     'MYANMAR DESCRIPTION',
@@ -313,8 +329,10 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
     const qty = parseNumberLoose(li.quantity);
     const lineValue = Number.isFinite(price * qty) ? price * qty : 0;
 
+    const licCell = d.licOrderCode?.trim() || '—';
     const strCols: string[] = [
       reg,
+      licCell,
       li.hsCode,
       li.cargoDesc,
       li.myanmarDesc,
@@ -327,10 +345,17 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
     strCols.forEach((val, j) => {
       const cell = row.getCell(j + 1);
       cell.value = val ?? '';
-      cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
+      const isOrderCol = j === 1;
+      const orderHighlight = isOrderCol && val && val !== '—';
+      cell.font = {
+        name: 'Calibri',
+        size: 11,
+        bold: !!orderHighlight,
+        color: { argb: orderHighlight ? 'FFDC2626' : 'FF0F172A' },
+      };
       cell.alignment = {
         vertical: 'middle',
-        horizontal: j === 2 || j === 3 ? 'left' : 'center',
+        horizontal: j === 3 || j === 4 ? 'left' : 'center',
         wrapText: true,
       };
       cell.fill = {
@@ -341,7 +366,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
       cell.border = XL_BORDER;
     });
 
-    const valueCell = row.getCell(9);
+    const valueCell = row.getCell(10);
     valueCell.value = lineValue;
     valueCell.numFmt = excelLineValueNumFmt(li.currency);
     valueCell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
@@ -353,7 +378,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
     };
     valueCell.border = XL_BORDER;
 
-    const imgHsCell = row.getCell(10);
+    const imgHsCell = row.getCell(11);
     imgHsCell.value =
       li.hsImageDataUrl?.startsWith('data:image/') ? '' : li.hsImageName || '';
     imgHsCell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
@@ -365,7 +390,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
     };
     imgHsCell.border = XL_BORDER;
 
-    const imgPkgCell = row.getCell(11);
+    const imgPkgCell = row.getCell(12);
     imgPkgCell.value =
       li.packageImageDataUrl?.startsWith('data:image/') ? '' : li.packageImageName || '';
     imgPkgCell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
@@ -382,7 +407,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
         const { base64, extension } = await dataUrlToExcelEmbeddedPng(li.hsImageDataUrl);
         const imageId = wb.addImage({ base64, extension });
         ws.addImage(imageId, {
-          tl: { col: 9, row: 4 + i },
+          tl: { col: 10, row: 4 + i },
           ext: { width: HS_ATTACHMENT_THUMB_PX, height: HS_ATTACHMENT_THUMB_PX },
           editAs: 'absolute',
         });
@@ -396,7 +421,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
         const { base64, extension } = await dataUrlToExcelEmbeddedPng(li.packageImageDataUrl);
         const imageId = wb.addImage({ base64, extension });
         ws.addImage(imageId, {
-          tl: { col: 10, row: 4 + i },
+          tl: { col: 11, row: 4 + i },
           ext: { width: HS_ATTACHMENT_THUMB_PX, height: HS_ATTACHMENT_THUMB_PX },
           editAs: 'absolute',
         });
@@ -412,6 +437,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
 
   ws.columns = [
     { width: 15 },
+    { width: 16 },
     { width: 13 },
     { width: 34 },
     { width: 34 },
@@ -469,7 +495,7 @@ async function exportDraftPermitSummaryExcel(d: ImportMetricDraftSaved, dateLoca
     r += 1;
   };
 
-  const addPair = (label: string, value: string) => {
+  const addPair = (label: string, value: string, valueStyle?: { bold?: boolean; colorArgb?: string }) => {
     const row = ws.getRow(r);
     const c1 = row.getCell(1);
     const c2 = row.getCell(2);
@@ -477,7 +503,12 @@ async function exportDraftPermitSummaryExcel(d: ImportMetricDraftSaved, dateLoca
     c2.value = value;
     c1.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FF334155' } };
     c1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-    c2.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
+    c2.font = {
+      name: 'Calibri',
+      size: 11,
+      bold: valueStyle?.bold ?? false,
+      color: { argb: valueStyle?.colorArgb ?? 'FF0F172A' },
+    };
     c1.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
     c2.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
     c1.border = XL_BORDER;
@@ -489,6 +520,11 @@ async function exportDraftPermitSummaryExcel(d: ImportMetricDraftSaved, dateLoca
 
   addSection('基本信息 · General');
   addPair('REGISTER NO.', reg);
+  addPair(
+    '订单号 · 订单编码 / Order code (LIC)',
+    d.licOrderCode?.trim() || '—',
+    d.licOrderCode?.trim() ? { bold: true, colorArgb: 'FFDC2626' } : undefined,
+  );
   addPair('START DATE', formatDisplayDate(d.startDate, dateLocale));
   addPair('ED DATE', formatDisplayDate(d.edDate, dateLocale));
   addPair('客户 / Customer', d.customerName?.trim() || '—');
@@ -723,6 +759,98 @@ const inputBase: React.CSSProperties = {
   transition: 'border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
 };
 
+/** 草稿弹窗内：单价/数量/行计等小字段的统一的标签与控件高度 */
+const lineMetricsLabelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.07em',
+  textTransform: 'uppercase',
+  marginBottom: 8,
+  color: 'rgba(148, 163, 184, 0.95)',
+};
+
+const lineMetricsInputStyle: React.CSSProperties = {
+  ...inputBase,
+  minHeight: 44,
+  height: 44,
+  padding: '10px 12px',
+};
+
+const lineMetricsShellStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 12,
+  padding: '16px 16px 18px',
+  borderRadius: 14,
+  background: 'linear-gradient(165deg, rgba(15, 23, 42, 0.58) 0%, rgba(15, 23, 42, 0.35) 100%)',
+  border: '1px solid rgba(56, 189, 248, 0.16)',
+  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+  alignItems: 'start',
+};
+
+/** 随正文高度自动伸长的描述框（按换行/字数测量 scrollHeight） */
+const AutoHeightTextarea: React.FC<{
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  minHeightPx?: number;
+  maxHeightPx?: number;
+  lineHeight?: number;
+}> = ({
+  value,
+  onChange,
+  placeholder,
+  minHeightPx = 76,
+  maxHeightPx = 420,
+  lineHeight = 1.5,
+}) => {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const syncHeight = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = '0px';
+    const sh = el.scrollHeight;
+    const h = Math.min(Math.max(sh, minHeightPx), maxHeightPx);
+    el.style.height = `${h}px`;
+    el.style.overflowY = sh > maxHeightPx ? 'auto' : 'hidden';
+  }, [minHeightPx, maxHeightPx]);
+
+  useLayoutEffect(() => {
+    syncHeight();
+  }, [value, syncHeight]);
+
+  useEffect(() => {
+    const el = ref.current;
+    const obsRoot = el?.parentElement;
+    if (!el || !obsRoot || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => syncHeight());
+    ro.observe(obsRoot);
+    return () => ro.disconnect();
+  }, [syncHeight]);
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      rows={1}
+      style={{
+        ...inputBase,
+        minHeight: minHeightPx,
+        maxHeight: maxHeightPx,
+        lineHeight,
+        resize: 'none',
+        overflow: 'hidden',
+        display: 'block',
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
+    />
+  );
+};
+
 const dateInputModalStyle: React.CSSProperties = {
   ...inputBase,
   colorScheme: 'dark',
@@ -796,6 +924,15 @@ const readonlyFieldBox: React.CSSProperties = {
   wordBreak: 'break-word',
 };
 
+const readonlyMetricsCell: React.CSSProperties = {
+  ...readonlyFieldBox,
+  minHeight: 44,
+  height: 44,
+  display: 'flex',
+  alignItems: 'center',
+  padding: '10px 12px',
+};
+
 function myanmarMultiRestSnippet(lines: SavedLineItem[]): string {
   const firstMy = lines.map((l) => l.myanmarDesc.trim()).find(Boolean);
   const firstCargo = lines.map((l) => l.cargoDesc.trim()).find(Boolean);
@@ -821,26 +958,32 @@ const ImportMetricLineItemsPreviewModal: React.FC<LineItemsPreviewModalProps> = 
 }) => {
   if (!open || !draft) return null;
   const lines = draft.lineItems?.length ? draft.lineItems : [];
-  const { goodsTotalLabel, unitTotalsSummary } = computeGoodsTotalLabelAndUnits(lines);
 
   const title =
     language === 'en' ? 'Line items' : language === 'my' ? 'ကုန်ပစ္စည်း အသေးစိတ်' : '商品明细';
-  const sectionTitle =
-    language === 'en'
-      ? 'Line items · HS / Cargo / Pricing'
-      : language === 'my'
-        ? 'HS / ကုန် / စျေးနှုန်း'
-        : '商品明细 · HS / Cargo / 计价';
+  const licDisplay = draft.licOrderCode?.trim() || '—';
   const sub =
     language === 'en'
       ? `Register: ${draft.registerNo?.trim() || '—'} · Customer: ${draft.customerName?.trim() || '—'}`
       : language === 'my'
         ? `${draft.registerNo?.trim() || '—'} · ${draft.customerName?.trim() || '—'}`
         : `REGISTER NO. ${draft.registerNo?.trim() || '—'} · 客户 ${draft.customerName?.trim() || '—'}`;
+  const orderNoLine =
+    language === 'en'
+      ? `Order no. · order code (LIC): ${licDisplay}`
+      : language === 'my'
+        ? `အော်ဒါနံပါတ် · order code (LIC): ${licDisplay}`
+        : `订单号 · 订单编码（LIC）：${licDisplay}`;
   const closeLbl = language === 'en' ? 'Close' : language === 'my' ? 'ပိတ်ရန်' : '关闭';
-  const totalAmtLbl =
-    language === 'en' ? 'TOTAL AMOUNT' : language === 'my' ? 'ကုန်ပစ္စည်း စုစုပေါင်း' : 'TOTAL AMOUNT · 商品金额合计';
-  const qtySumTitle = language === 'en' ? 'Qty by unit' : language === 'my' ? 'ယူနစ်အလိုက်' : '按 Unit 汇总数量';
+  const colName =
+    language === 'en' ? 'Product' : language === 'my' ? 'ကုန်ပစ္စည်းအမည်' : '商品名称';
+  const colUnit = language === 'en' ? 'Unit' : language === 'my' ? 'ယူနစ်' : '单位';
+  const colPrice = language === 'en' ? 'Price' : language === 'my' ? 'စျေးနှုန်း' : '价格';
+  const colCur = language === 'en' ? 'Cur.' : language === 'my' ? 'ငွေကြေး' : '币种';
+  const colQty = language === 'en' ? 'Qty' : language === 'my' ? 'အရေအတွက်' : '数量';
+
+  const lineName = (row: SavedLineItem) =>
+    row.cargoDesc?.trim() || row.myanmarDesc?.trim() || '—';
 
   return (
     <div
@@ -854,13 +997,13 @@ const ImportMetricLineItemsPreviewModal: React.FC<LineItemsPreviewModalProps> = 
         position: 'fixed',
         inset: 0,
         zIndex: 1250,
-        background: 'rgba(2, 8, 23, 0.78)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'rgba(2, 8, 23, 0.72)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: isMobile ? '12px 10px 32px' : '28px 20px 40px',
+        padding: isMobile ? '12px 10px 28px' : '48px 14px 32px',
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
       }}
@@ -869,13 +1012,13 @@ const ImportMetricLineItemsPreviewModal: React.FC<LineItemsPreviewModalProps> = 
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: 880,
-          marginTop: isMobile ? 4 : 12,
-          marginBottom: 24,
-          background: 'linear-gradient(168deg, #0c1222 0%, #131d32 38%, #162045 72%, #1a1f3a 100%)',
-          borderRadius: 20,
+          maxWidth: isMobile ? '100%' : 520,
+          marginTop: isMobile ? 0 : 8,
+          marginBottom: 12,
+          background: 'linear-gradient(165deg, #0f172a 0%, #131c2e 100%)',
+          borderRadius: 14,
           border: '1px solid rgba(96, 165, 250, 0.22)',
-          boxShadow: '0 28px 90px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.05) inset',
+          boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)',
           color: '#f8fafc',
           fontFamily:
             "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif",
@@ -884,10 +1027,9 @@ const ImportMetricLineItemsPreviewModal: React.FC<LineItemsPreviewModalProps> = 
       >
         <header
           style={{
-            padding: '18px 22px 14px',
-            borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
+            padding: '12px 40px 10px 14px',
+            borderBottom: '1px solid rgba(148, 163, 184, 0.15)',
             position: 'relative',
-            background: 'linear-gradient(90deg, rgba(37, 99, 235, 0.1) 0%, transparent 50%)',
           }}
         >
           <button
@@ -896,16 +1038,16 @@ const ImportMetricLineItemsPreviewModal: React.FC<LineItemsPreviewModalProps> = 
             aria-label={closeLbl}
             style={{
               position: 'absolute',
-              top: 12,
-              right: 12,
-              width: 38,
-              height: 38,
-              borderRadius: 11,
+              top: 8,
+              right: 8,
+              width: 32,
+              height: 32,
+              borderRadius: 8,
               border: '1px solid rgba(148, 163, 184, 0.28)',
               background: 'rgba(15, 23, 42, 0.55)',
               color: '#e2e8f0',
               cursor: 'pointer',
-              fontSize: 20,
+              fontSize: 18,
               lineHeight: 1,
               display: 'flex',
               alignItems: 'center',
@@ -918,228 +1060,158 @@ const ImportMetricLineItemsPreviewModal: React.FC<LineItemsPreviewModalProps> = 
             id="line-items-preview-title"
             style={{
               margin: 0,
-              fontSize: isMobile ? '1.15rem' : '1.35rem',
+              fontSize: isMobile ? '1.02rem' : '1.08rem',
               fontWeight: 800,
-              letterSpacing: '-0.02em',
-              background: 'linear-gradient(92deg, #f8fafc 0%, #bae6fd 100%)',
-              WebkitBackgroundClip: 'text',
-              backgroundClip: 'text',
-              color: 'transparent',
+              color: '#f1f5f9',
             }}
           >
             {title}
           </h2>
-          <p style={{ margin: '10px 44px 0 0', fontSize: 12, lineHeight: 1.6, color: 'rgba(226, 232, 240, 0.82)' }}>
+          <p style={{ margin: '6px 0 0', fontSize: 11, lineHeight: 1.5, color: 'rgba(226, 232, 240, 0.72)' }}>
             {sub}
+          </p>
+          <p
+            style={{
+              margin: '6px 0 0',
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: 'rgba(186, 230, 253, 0.88)',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            }}
+          >
+            {orderNoLine}
           </p>
         </header>
 
         <div
           style={{
-            padding: '16px 22px 22px',
-            maxHeight: isMobile ? 'none' : 'calc(100vh - 150px)',
-            overflowY: isMobile ? 'visible' : 'auto',
+            padding: '10px 12px 14px',
+            maxHeight: isMobile ? 'none' : 'min(70vh, 420px)',
+            overflowY: 'auto',
           }}
         >
-          <ModalSection style={{ marginBottom: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
-              <span style={{ color: '#60a5fa', marginRight: 8 }}>2</span>
-              {sectionTitle}
-            </div>
-
-            {lines.map((row, idx) => {
-              const curLabel = CURRENCIES.find((c) => c.value === row.currency)?.label ?? row.currency;
-              return (
-                <div
-                  key={`prev-${idx}`}
-                  style={{
-                    background: 'linear-gradient(165deg, rgba(15, 23, 42, 0.72) 0%, rgba(15, 23, 42, 0.42) 100%)',
-                    border: '1px solid rgba(56, 189, 248, 0.14)',
-                    borderRadius: 12,
-                    padding: '14px 14px 12px',
-                    marginBottom: idx < lines.length - 1 ? 12 : 0,
-                  }}
-                >
-                  <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 13 }}>
-                    {language === 'en'
-                      ? `Item ${idx + 1} / ${lines.length}`
-                      : language === 'my'
-                        ? `${idx + 1} / ${lines.length}`
-                        : `商品 ${idx + 1} / 共 ${lines.length} 条`}
-                  </div>
-
-                  <div style={{ marginBottom: 10 }}>
-                    <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>
-                      H.S CODE（10 位）
-                    </span>
-                    <div style={{ ...readonlyFieldBox, minHeight: 42 }}>{row.hsCode?.trim() || '—'}</div>
-                    <span style={{ display: 'block', fontSize: 11, marginTop: 8, opacity: 0.85 }}>HS 证照图</span>
-                    {row.hsImageDataUrl ? (
-                      <div style={{ marginTop: 8 }}>
-                        {row.hsImageName ? (
-                          <span style={{ fontSize: 11, opacity: 0.75, display: 'block' }}>{row.hsImageName}</span>
-                        ) : null}
-                        <img
-                          src={row.hsImageDataUrl}
-                          alt=""
-                          style={{
-                            display: 'block',
-                            marginTop: 6,
-                            maxWidth: HS_ATTACHMENT_THUMB_PX,
-                            maxHeight: HS_ATTACHMENT_THUMB_PX,
-                            objectFit: 'contain',
-                            borderRadius: 10,
-                            border: '1px solid rgba(148, 163, 184, 0.35)',
-                          }}
-                        />
-                      </div>
-                    ) : row.hsImageName ? (
-                      <span style={{ fontSize: 11, opacity: 0.7, marginTop: 6, display: 'block' }}>{row.hsImageName}</span>
-                    ) : null}
-                    <span style={{ display: 'block', fontSize: 11, marginTop: 10, opacity: 0.85 }}>PACKAGE 包装图</span>
-                    {row.packageImageDataUrl ? (
-                      <div style={{ marginTop: 8 }}>
-                        {row.packageImageName ? (
-                          <span style={{ fontSize: 11, opacity: 0.75, display: 'block' }}>{row.packageImageName}</span>
-                        ) : null}
-                        <img
-                          src={row.packageImageDataUrl}
-                          alt=""
-                          style={{
-                            display: 'block',
-                            marginTop: 6,
-                            maxWidth: HS_ATTACHMENT_THUMB_PX,
-                            maxHeight: HS_ATTACHMENT_THUMB_PX,
-                            objectFit: 'contain',
-                            borderRadius: 10,
-                            border: '1px solid rgba(45, 212, 191, 0.35)',
-                          }}
-                        />
-                      </div>
-                    ) : row.packageImageName ? (
-                      <span style={{ fontSize: 11, opacity: 0.7, marginTop: 6, display: 'block' }}>{row.packageImageName}</span>
-                    ) : null}
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-                      gap: 10,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div>
-                      <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>
-                        货物描述 · Cargo Description
-                      </span>
-                      <div style={{ ...readonlyFieldBox, minHeight: 72 }}>{row.cargoDesc?.trim() || '—'}</div>
-                    </div>
-                    <div>
-                      <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>
-                        Myanmar Description
-                      </span>
-                      <div style={{ ...readonlyFieldBox, minHeight: 72 }}>{row.myanmarDesc?.trim() || '—'}</div>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, minmax(0, 1fr))',
-                      gap: 10,
-                      alignItems: 'end',
-                    }}
-                  >
-                    <div>
-                      <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Unit code</span>
-                      <div style={{ ...readonlyFieldBox, minHeight: 42 }}>{row.unitCode?.trim() || '—'}</div>
-                    </div>
-                    <div>
-                      <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Set Price · 单价</span>
-                      <div style={{ ...readonlyFieldBox, minHeight: 42 }}>{row.unitPrice?.trim() || '—'}</div>
-                    </div>
-                    <div>
-                      <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Currency</span>
-                      <div style={{ ...readonlyFieldBox, minHeight: 42 }}>{curLabel}</div>
-                    </div>
-                    <div>
-                      <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Quantity · 数量</span>
-                      <div style={{ ...readonlyFieldBox, minHeight: 42 }}>{row.quantity?.trim() || '—'}</div>
-                    </div>
-                    <div>
-                      <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Line Total</span>
-                      <div
-                        style={{
-                          ...readonlyFieldBox,
-                          minHeight: 42,
-                          display: 'flex',
-                          alignItems: 'center',
-                          fontWeight: 600,
-                          color: '#93c5fd',
-                        }}
-                      >
-                        {formatLineTotal(row.currency, parseNumberLoose(row.unitPrice), parseNumberLoose(row.quantity))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div
+          <div style={{ overflowX: 'auto' }}>
+            <table
               style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-                marginTop: 14,
-                paddingTop: 12,
-                borderTop: '1px solid rgba(148, 163, 184, 0.2)',
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: 12,
+                minWidth: isMobile ? 400 : 0,
               }}
             >
-              <div>
-                <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>{totalAmtLbl}</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#93c5fd' }}>{goodsTotalLabel}</div>
-              </div>
-              <div
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 10,
-                  background: 'rgba(30, 41, 59, 0.8)',
-                  border: '1px solid rgba(148, 163, 184, 0.3)',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  maxWidth: isMobile ? '100%' : 420,
-                  textAlign: isMobile ? 'left' : 'right',
-                  lineHeight: 1.45,
-                  wordBreak: 'break-word',
-                }}
-                title={qtySumTitle}
-              >
-                {unitTotalsSummary}
-              </div>
-            </div>
-
-            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={onClose}
-                style={{
-                  padding: '10px 22px',
-                  borderRadius: 12,
-                  border: '1px solid rgba(148, 163, 184, 0.4)',
-                  background: 'rgba(37, 99, 235, 0.25)',
-                  color: '#e2e8f0',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                {closeLbl}
-              </button>
-            </div>
-          </ModalSection>
+              <thead>
+                <tr style={{ background: 'rgba(30, 41, 59, 0.92)' }}>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '8px 10px',
+                      fontWeight: 700,
+                      borderBottom: '1px solid rgba(148,163,184,0.2)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {colName}
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '8px 8px',
+                      fontWeight: 700,
+                      borderBottom: '1px solid rgba(148,163,184,0.2)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {colUnit}
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'right',
+                      padding: '8px 8px',
+                      fontWeight: 700,
+                      borderBottom: '1px solid rgba(148,163,184,0.2)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {colPrice}
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '8px 8px',
+                      fontWeight: 700,
+                      borderBottom: '1px solid rgba(148,163,184,0.2)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {colCur}
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'right',
+                      padding: '8px 10px',
+                      fontWeight: 700,
+                      borderBottom: '1px solid rgba(148,163,184,0.2)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {colQty}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((row, idx) => {
+                  const curLabel = CURRENCIES.find((c) => c.value === row.currency)?.label ?? row.currency;
+                  return (
+                    <tr
+                      key={`prev-${idx}`}
+                      style={{
+                        borderBottom: '1px solid rgba(148,163,184,0.1)',
+                        background: idx % 2 === 0 ? 'rgba(15, 23, 42, 0.25)' : 'transparent',
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: '8px 10px',
+                          verticalAlign: 'top',
+                          maxWidth: 200,
+                          wordBreak: 'break-word',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {lineName(row)}
+                      </td>
+                      <td style={{ padding: '8px 8px', whiteSpace: 'nowrap', verticalAlign: 'top' }}>
+                        {row.unitCode?.trim() || '—'}
+                      </td>
+                      <td
+                        style={{
+                          padding: '8px 8px',
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                          verticalAlign: 'top',
+                        }}
+                      >
+                        {row.unitPrice?.trim() || '—'}
+                      </td>
+                      <td style={{ padding: '8px 8px', whiteSpace: 'nowrap', verticalAlign: 'top' }}>
+                        {curLabel}
+                      </td>
+                      <td
+                        style={{
+                          padding: '8px 10px',
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                          verticalAlign: 'top',
+                        }}
+                      >
+                        {row.quantity?.trim() || '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -1173,9 +1245,14 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
   const [secondAccount, setSecondAccount] = useState('');
   const [thirdHandler, setThirdHandler] = useState('');
   const [thirdAccount, setThirdAccount] = useState('');
+  const [licOrderCode, setLicOrderCode] = useState('');
+
+  const licCodeLocked = useMemo(
+    () => isUuid(initialDraft?.id ?? '') && Boolean(initialDraft?.licOrderCode?.trim()),
+    [initialDraft?.id, initialDraft?.licOrderCode],
+  );
 
   const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
-
   const setLineField = useCallback((id: string, patch: Partial<LineItem>) => {
     setLineItems((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }, []);
@@ -1216,15 +1293,14 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
   const tc = parseNumberLoose(totalCharges);
   const balanceMmk = tc - (d1 + d2 + d3);
 
-  const dateLocaleForm = language === 'en' ? 'en-US' : language === 'my' ? 'my-MM' : 'zh-CN';
   const payDateLabel =
     language === 'en' ? 'Payment date' : language === 'my' ? 'ငွေပေးချေသည့်နေ့' : '付款日期';
   const payDateSub =
     language === 'en'
-      ? 'When this instalment was paid (calendar)'
+      ? 'When this instalment was paid (dd/mm/yy)'
       : language === 'my'
-        ? 'ပေးချေသည့်ရက်စွဲ'
-        : '实际付款日（公历：年-月-日）';
+        ? 'ပေးချေသည့်ရက်စွဲ (dd/mm/yy)'
+        : '实际付款日（日/月/年，dd/mm/yy）';
   const fullPaySub =
     language === 'en'
       ? 'Balance / licence — final payment'
@@ -1252,6 +1328,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
     setSecondAccount('');
     setThirdHandler('');
     setThirdAccount('');
+    setLicOrderCode('');
   }, []);
 
   useEffect(() => {
@@ -1276,10 +1353,30 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
       setSecondAccount(initialDraft.secondAccount || '');
       setThirdHandler(initialDraft.thirdHandler || '');
       setThirdAccount(initialDraft.thirdAccount || '');
+      setLicOrderCode(initialDraft.licOrderCode?.trim() ?? '');
     } else {
       resetForm();
     }
-  }, [open, initialDraft?.id, resetForm]);
+  }, [open, initialDraft?.id, initialDraft?.licOrderCode, resetForm]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (licCodeLocked) return;
+    const name = customerName.trim();
+    if (!name) {
+      setLicOrderCode('');
+      return;
+    }
+    if (licOrderCode.trim()) return;
+    let cancelled = false;
+    void (async () => {
+      const next = await importMetricDraftService.nextLicOrderCode();
+      if (!cancelled) setLicOrderCode(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, licCodeLocked, customerName, licOrderCode]);
 
   useEffect(() => {
     if (!open) return;
@@ -1303,6 +1400,13 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
   }, [open]);
 
   const handleSaveDraft = async () => {
+    let finalLic = licCodeLocked
+      ? (initialDraft?.licOrderCode ?? '').trim()
+      : licOrderCode.trim();
+    if (!licCodeLocked && customerName.trim() && !finalLic) {
+      finalLic = await importMetricDraftService.nextLicOrderCode();
+      setLicOrderCode(finalLic);
+    }
     const payload: ImportMetricDraftSaved = {
       id: initialDraft?.id ?? `imd_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       savedAt: initialDraft?.savedAt ?? new Date().toISOString(),
@@ -1351,6 +1455,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
       secondAccount,
       thirdHandler,
       thirdAccount,
+      licOrderCode: finalLic,
     };
     const saveErr =
       language === 'en'
@@ -1401,6 +1506,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
     >
       <div
         id="import-metric-draft-modal-root"
+        lang="en-GB"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
@@ -1477,19 +1583,32 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
           <ModalSection>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>生效起始 · Start Date</div>
             <p style={{ margin: '0 0 14px', fontSize: 12, opacity: 0.82, lineHeight: 1.55 }}>
-              批文或指标开始生效的日期与客户名称；填写后再填写下方注册号与商品明细。
+              批文或指标开始生效的日期与客户名称；填写后再填写下方注册号与商品明细。订单编码在填写客户名称后自动生成，保存草稿后不可更改。
             </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-              <label style={{ flex: '1 1 160px', minWidth: 0 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'minmax(150px, 1fr) minmax(200px, 2fr) auto',
+                gap: 12,
+                alignItems: 'end',
+              }}
+            >
+              <label style={{ minWidth: 0, display: 'block' }}>
                 <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>Start Date</span>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  style={inputBase}
+                  style={{ ...inputBase, ...dateInputModalStyle }}
                 />
+                {startDate.trim() ? (
+                  <div style={{ fontSize: 11, opacity: 0.78, marginTop: 8, color: '#bae6fd' }}>
+                    {language === 'en' ? 'Selected: ' : language === 'my' ? 'ရွေးချယ်: ' : '已选 · '}
+                    {formatDraftModalDate(startDate.trim())}
+                  </div>
+                ) : null}
               </label>
-              <label style={{ flex: '2 1 240px', minWidth: 0 }}>
+              <label style={{ minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>客户名称 · Customer Name</span>
                 <input
                   type="text"
@@ -1499,6 +1618,60 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                   style={inputBase}
                 />
               </label>
+              <div style={{ minWidth: 0, paddingBottom: isMobile ? 0 : 2 }}>
+                <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>
+                  订单编码 · Order code
+                </span>
+                <div
+                  title={
+                    licCodeLocked
+                      ? language === 'en'
+                        ? 'Locked after save'
+                        : '保存后已固定'
+                      : language === 'en'
+                        ? 'Auto-assigned; locked after save'
+                        : '自动生成，保存后不可修改'
+                  }
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    minHeight: 42,
+                    justifyContent: 'center',
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    background: 'rgba(15, 23, 42, 0.72)',
+                    border: '1px solid rgba(96, 165, 250, 0.22)',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                      fontSize: 15,
+                      fontWeight: 800,
+                      letterSpacing: '0.04em',
+                      color: licOrderCode.trim() ? '#f87171' : 'rgba(148, 163, 184, 0.65)',
+                    }}
+                  >
+                    {licOrderCode.trim() || 'LIC-'}
+                  </span>
+                  <span style={{ fontSize: 10, opacity: 0.68, lineHeight: 1.35 }}>
+                    {licCodeLocked
+                      ? language === 'en'
+                        ? 'Locked'
+                        : language === 'my'
+                          ? 'ချုပ်ထား'
+                          : '已固定，不可修改'
+                      : language === 'en'
+                        ? 'Auto; locked after «Save draft»'
+                        : language === 'my'
+                          ? 'သိမ်းပြီးမှ အတည်ပြု'
+                          : customerName.trim()
+                            ? '保存草稿后不可再改'
+                            : '填写客户名后自动生成'}
+                  </span>
+                </div>
+              </div>
             </div>
           </ModalSection>
 
@@ -1839,45 +2012,57 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <label style={{ display: 'block' }}>
-                    <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>货物描述 · Cargo Description</span>
-                    <textarea
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : '3fr 1fr',
+                    gap: 10,
+                    marginBottom: 12,
+                    alignItems: 'stretch',
+                  }}
+                >
+                  <label style={{ display: 'block', minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 8, opacity: 0.9 }}>
+                      货物描述 · Cargo Description
+                    </span>
+                    <AutoHeightTextarea
                       value={row.cargoDesc}
                       onChange={(e) => setLineField(row.id, { cargoDesc: e.target.value })}
                       placeholder={'Cargo Name & Brand\nPower · Weight · Size'}
-                      rows={3}
-                      style={{ ...inputBase, minHeight: 72, resize: 'vertical' }}
+                      minHeightPx={88}
+                      maxHeightPx={440}
+                      lineHeight={1.5}
                     />
                   </label>
-                  <label style={{ display: 'block' }}>
-                    <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>Myanmar Description</span>
-                    <textarea
+                  <label style={{ display: 'block', minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 12, marginBottom: 8, opacity: 0.85 }}>Myanmar Description</span>
+                    <AutoHeightTextarea
                       value={row.myanmarDesc}
                       onChange={(e) => setLineField(row.id, { myanmarDesc: e.target.value })}
                       placeholder="မြန်မာဘာသာဖြင့် ဖော်ပြပါ"
-                      rows={3}
-                      style={{ ...inputBase, minHeight: 72, resize: 'vertical' }}
+                      minHeightPx={88}
+                      maxHeightPx={440}
+                      lineHeight={1.45}
                     />
                   </label>
                 </div>
 
                 <div
                   style={{
-                    display: 'grid',
+                    ...lineMetricsShellStyle,
                     gridTemplateColumns: isMobile
-                      ? '1fr 1fr'
-                      : 'minmax(72px,0.75fr) minmax(0,1fr) minmax(100px,0.9fr) minmax(0,1fr) minmax(88px,0.85fr)',
-                    gap: 10,
-                    alignItems: 'end',
+                      ? 'repeat(2, minmax(0, 1fr))'
+                      : 'minmax(96px, 0.95fr) minmax(108px, 1.2fr) minmax(118px, 1.05fr) minmax(100px, 1.1fr) minmax(132px, 1.35fr)',
+                    columnGap: isMobile ? 10 : 14,
+                    rowGap: isMobile ? 12 : 0,
                   }}
                 >
-                  <label style={{ display: 'block' }}>
-                    <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Unit code</span>
+                  <label style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={lineMetricsLabelStyle}>Unit code</span>
                     <select
                       value={row.unitCode}
                       onChange={(e) => setLineField(row.id, { unitCode: e.target.value })}
-                      style={{ ...inputBase, cursor: 'pointer' }}
+                      style={{ ...lineMetricsInputStyle, cursor: 'pointer' }}
                     >
                       {!isKnownUnit(row.unitCode) && row.unitCode ? (
                         <option value={row.unitCode}>{row.unitCode}</option>
@@ -1889,23 +2074,23 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                       ))}
                     </select>
                   </label>
-                  <label style={{ display: 'block' }}>
-                    <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Set Price · 单价</span>
+                  <label style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={lineMetricsLabelStyle}>Set price · 单价</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={row.unitPrice}
                       onChange={(e) => setLineField(row.id, { unitPrice: e.target.value })}
                       placeholder="例如 0.6"
-                      style={inputBase}
+                      style={{ ...lineMetricsInputStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                     />
                   </label>
-                  <label style={{ display: 'block' }}>
-                    <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Currency</span>
+                  <label style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={lineMetricsLabelStyle}>Currency</span>
                     <select
                       value={row.currency}
                       onChange={(e) => setLineField(row.id, { currency: e.target.value })}
-                      style={{ ...inputBase, cursor: 'pointer' }}
+                      style={{ ...lineMetricsInputStyle, cursor: 'pointer' }}
                     >
                       {CURRENCIES.map((c) => (
                         <option key={c.value} value={c.value}>
@@ -1914,26 +2099,38 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                       ))}
                     </select>
                   </label>
-                  <label style={{ display: 'block' }}>
-                    <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Quantity · 数量</span>
+                  <label style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={lineMetricsLabelStyle}>Quantity · 数量</span>
                     <input
                       type="text"
                       inputMode="decimal"
                       value={row.quantity}
                       onChange={(e) => setLineField(row.id, { quantity: e.target.value })}
                       placeholder="整数 (大额可用)"
-                      style={inputBase}
+                      style={{ ...lineMetricsInputStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                     />
                   </label>
-                  <label style={{ display: 'block' }}>
-                    <span style={{ display: 'block', fontSize: 11, marginBottom: 6, opacity: 0.85 }}>Line Total</span>
+                  <label
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minWidth: 0,
+                      gridColumn: isMobile ? '1 / -1' : undefined,
+                    }}
+                  >
+                    <span style={lineMetricsLabelStyle}>Line total</span>
                     <div
                       style={{
-                        ...inputBase,
-                        opacity: 0.95,
+                        ...lineMetricsInputStyle,
+                        opacity: 0.98,
                         display: 'flex',
                         alignItems: 'center',
-                        minHeight: 42,
+                        justifyContent: 'flex-end',
+                        fontWeight: 700,
+                        fontVariantNumeric: 'tabular-nums',
+                        color: '#7dd3fc',
+                        background: 'rgba(30, 58, 95, 0.55)',
+                        border: '1px solid rgba(56, 189, 248, 0.28)',
                       }}
                     >
                       {formatLineTotal(row.currency, parseNumberLoose(row.unitPrice), parseNumberLoose(row.quantity))}
@@ -1994,7 +2191,18 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
             <p style={{ margin: '0 0 12px', fontSize: 12, opacity: 0.82 }}>指标或许可证相关截止日期。</p>
             <label style={{ display: 'block', maxWidth: 220 }}>
               <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.85 }}>ED date</span>
-              <input type="date" value={edDate} onChange={(e) => setEdDate(e.target.value)} style={inputBase} />
+              <input
+                type="date"
+                value={edDate}
+                onChange={(e) => setEdDate(e.target.value)}
+                style={{ ...inputBase, ...dateInputModalStyle }}
+              />
+              {edDate.trim() ? (
+                <div style={{ fontSize: 11, opacity: 0.78, marginTop: 8, color: '#bae6fd' }}>
+                  {language === 'en' ? 'Selected: ' : language === 'my' ? 'ရွေးချယ်: ' : '已选 · '}
+                  {formatDraftModalDate(edDate.trim())}
+                </div>
+              ) : null}
             </label>
           </ModalSection>
 
@@ -2006,7 +2214,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
             </div>
             <p style={{ margin: '0 0 14px', fontSize: 12, opacity: 0.82, lineHeight: 1.55 }}>
               以下三项均为缅币金额；右侧填写 Total Charges For License（总额），底部余额 = Total Charges − 三期合计。每一期可单独记录
-              <strong style={{ color: '#93c5fd' }}> 付款日期（年-月-日）</strong>
+              <strong style={{ color: '#93c5fd' }}> 付款日期（日/月/年）</strong>
               。金额 &gt; 0 时显示「汇款 / 收款账号」便于对账。
             </p>
             <div style={{ marginBottom: 14 }}>
@@ -2067,7 +2275,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                   {depositFirstPaidOn.trim() ? (
                     <div style={{ fontSize: 11, opacity: 0.78, marginTop: 8, color: '#bae6fd' }}>
                       {language === 'en' ? 'Selected: ' : language === 'my' ? 'ရွေးချယ်: ' : '已选日期 · '}
-                      {formatDisplayDate(depositFirstPaidOn.trim(), dateLocaleForm)}
+                      {formatDraftModalDate(depositFirstPaidOn.trim())}
                     </div>
                   ) : null}
                 </label>
@@ -2129,7 +2337,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                   {depositSecondPaidOn.trim() ? (
                     <div style={{ fontSize: 11, opacity: 0.78, marginTop: 8, color: '#ddd6fe' }}>
                       {language === 'en' ? 'Selected: ' : language === 'my' ? 'ရွေးချယ်: ' : '已选日期 · '}
-                      {formatDisplayDate(depositSecondPaidOn.trim(), dateLocaleForm)}
+                      {formatDraftModalDate(depositSecondPaidOn.trim())}
                     </div>
                   ) : null}
                 </label>
@@ -2195,7 +2403,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                   {depositThirdPaidOn.trim() ? (
                     <div style={{ fontSize: 11, opacity: 0.78, marginTop: 8, color: '#a7f3d0' }}>
                       {language === 'en' ? 'Selected: ' : language === 'my' ? 'ရွေးချယ်: ' : '已选日期 · '}
-                      {formatDisplayDate(depositThirdPaidOn.trim(), dateLocaleForm)}
+                      {formatDraftModalDate(depositThirdPaidOn.trim())}
                     </div>
                   ) : null}
                 </label>
@@ -2404,6 +2612,7 @@ const ImportMetricDraftsPage: React.FC = () => {
           back: 'Dashboard',
           empty: 'No records yet. Click «New draft».',
           colRegister: 'REGISTER NO.',
+          colOrderNo: 'Order no. · order code',
           colStart: 'START DATE',
           colEd: 'ED DATE',
           colCustomer: 'Customer',
@@ -2430,6 +2639,7 @@ const ImportMetricDraftsPage: React.FC = () => {
             back: 'ဒါဘုတ်',
             empty: 'မှတ်တမ်းမရှိပါ။ «မူကြမ်းအသစ်» ကိုနှိပ်ပါ။',
             colRegister: 'REGISTER NO.',
+            colOrderNo: 'အော်ဒါနံပါတ် · order code',
             colStart: 'START DATE',
             colEd: 'ED DATE',
             colCustomer: 'ဖောက်သည်',
@@ -2454,6 +2664,7 @@ const ImportMetricDraftsPage: React.FC = () => {
             back: '控制台',
             empty: '暂无记录，请点击「新建草稿」。',
             colRegister: 'REGISTER NO.',
+            colOrderNo: '订单号 · 订单编码 / order code',
             colStart: 'START DATE',
             colEd: 'ED DATE',
             colCustomer: '客户名称',
@@ -2614,7 +2825,7 @@ const ImportMetricDraftsPage: React.FC = () => {
             <table
               style={{
                 width: '100%',
-                minWidth: 1120,
+                minWidth: 1220,
                 borderCollapse: 'collapse',
                 fontSize: 13,
               }}
@@ -2623,6 +2834,7 @@ const ImportMetricDraftsPage: React.FC = () => {
                 <tr style={{ background: 'rgba(30, 41, 59, 0.85)', borderBottom: '1px solid rgba(148, 163, 184, 0.25)' }}>
                   {[
                     t.colRegister,
+                    t.colOrderNo,
                     t.colStart,
                     t.colEd,
                     t.colCustomer,
@@ -2632,7 +2844,11 @@ const ImportMetricDraftsPage: React.FC = () => {
                     t.colAmt,
                     t.colActions,
                   ].map((label) => {
-                    const compact = label === t.colRegister || label === t.colStart || label === t.colEd;
+                    const compact =
+                      label === t.colRegister ||
+                      label === t.colOrderNo ||
+                      label === t.colStart ||
+                      label === t.colEd;
                     return (
                     <th
                       key={label}
@@ -2656,7 +2872,7 @@ const ImportMetricDraftsPage: React.FC = () => {
                 {savedDrafts.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       style={{
                         padding: '52px 20px',
                         textAlign: 'center',
@@ -2681,6 +2897,20 @@ const ImportMetricDraftsPage: React.FC = () => {
                         }}
                       >
                         <td style={{ padding: '12px 16px', color: '#e2e8f0' }}>{regDisplay}</td>
+                        <td
+                          style={{
+                            padding: '12px 16px',
+                            color: d.licOrderCode?.trim() ? '#f87171' : 'rgba(148, 163, 184, 0.75)',
+                            whiteSpace: 'nowrap',
+                            fontFamily:
+                              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            letterSpacing: d.licOrderCode?.trim() ? '0.04em' : 'normal',
+                          }}
+                        >
+                          {d.licOrderCode?.trim() || '—'}
+                        </td>
                         <td style={{ padding: '12px 16px', color: '#e2e8f0', whiteSpace: 'nowrap' }}>
                           {formatDisplayDate(d.startDate, dateLocale)}
                         </td>
@@ -2797,16 +3027,27 @@ const ImportMetricDraftsPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                void exportDraftPermitSummaryExcel(d, dateLocale).catch((err) => {
-                                  console.error(err);
-                                  window.alert(
-                                    language === 'en'
-                                      ? 'Excel export failed. Please try again.'
-                                      : language === 'my'
-                                        ? 'Excel တင်ပို့မရပါ။'
-                                        : 'Excel 导出失败，请重试。',
-                                  );
-                                });
+                                void (async () => {
+                                  try {
+                                    let draftForExport: ImportMetricDraftSaved = d;
+                                    if (isUuid(d.id)) {
+                                      const row = await importMetricDraftService.getById(d.id);
+                                      if (row) {
+                                        draftForExport = importMetricDbRowToSaved(row);
+                                      }
+                                    }
+                                    await exportDraftPermitSummaryExcel(draftForExport, dateLocale);
+                                  } catch (err) {
+                                    console.error(err);
+                                    window.alert(
+                                      language === 'en'
+                                        ? 'Excel export failed. Please try again.'
+                                        : language === 'my'
+                                          ? 'Excel တင်ပို့မရပါ။'
+                                          : 'Excel 导出失败，请重试。',
+                                    );
+                                  }
+                                })();
                               }}
                               style={{
                                 padding: '6px 10px',
