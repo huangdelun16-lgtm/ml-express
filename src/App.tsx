@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AdminLogin from './pages/AdminLogin';
 import DeliveryAlerts from './pages/DeliveryAlerts';
 import AdminDashboardHome from './pages/AdminDashboardHome';
@@ -16,13 +16,30 @@ import RechargeManagement from './pages/RechargeManagement';
 import AdminReportsPage from './pages/AdminReportsPage';
 import CourierPerformancePage from './pages/CourierPerformancePage';
 import MerchantReconciliationExportPage from './pages/MerchantReconciliationExportPage';
+import ImportMetricDraftsPage from './pages/ImportMetricDraftsPage';
+import ImportPriceListPage from './pages/ImportPriceListPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AbnormalAlertManager from './components/AbnormalAlertManager';
 import { AdminTodoProvider } from './contexts/AdminTodoContext';
 import AdminTodoBar, { AdminBottomSpacer } from './components/AdminTodoBar';
 import AdminGlobalSearch from './components/AdminGlobalSearch';
-import AdminShellLayout from './layouts/AdminShellLayout';
+import AdminShellLayout, { STANDALONE_IMPORT_ADMIN_PATHS } from './layouts/AdminShellLayout';
+
+const standaloneImportPaths = STANDALONE_IMPORT_ADMIN_PATHS as readonly string[];
+
+/** 指标/商品价格独立全屏页：不叠放全局搜索与底部待办条 */
+const AdminFloatingChrome: React.FC = () => {
+  const { pathname } = useLocation();
+  if (standaloneImportPaths.includes(pathname)) return null;
+  return (
+    <>
+      <AdminGlobalSearch />
+      <AdminBottomSpacer />
+      <AdminTodoBar />
+    </>
+  );
+};
 
 function App() {
   return (
@@ -181,11 +198,25 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="metric-management"
+                  element={
+                    <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="metric_management">
+                      <ImportMetricDraftsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="product-price"
+                  element={
+                    <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="product_price">
+                      <ImportPriceListPage />
+                    </ProtectedRoute>
+                  }
+                />
               </Route>
             </Routes>
-            <AdminGlobalSearch />
-            <AdminBottomSpacer />
-            <AdminTodoBar />
+            <AdminFloatingChrome />
           </div>
         </AdminTodoProvider>
       </Router>

@@ -5,6 +5,12 @@ import { adminAccountService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
 
+/** 全屏独立模块：不使用通用后台侧栏/顶栏，由页面自带布局 */
+export const STANDALONE_IMPORT_ADMIN_PATHS = [
+  '/admin/metric-management',
+  '/admin/product-price',
+] as const;
+
 const MODULE_ROUTES: Record<string, string> = {
   city_packages: '/admin/city-packages',
   users: '/admin/users',
@@ -19,6 +25,8 @@ const MODULE_ROUTES: Record<string, string> = {
   reports: '/admin/reports',
   courier_performance: '/admin/courier-performance',
   merchant_reconciliation: '/admin/merchant-reconciliation',
+  metric_management: '/admin/metric-management',
+  product_price: '/admin/product-price',
 };
 
 function isModulePathActive(pathname: string, moduleId: string): boolean {
@@ -238,7 +246,6 @@ const AdminShellLayout: React.FC = () => {
   type NavCard = {
     id: string;
     title: string;
-    icon: string;
     roles: ('admin' | 'manager' | 'operator' | 'finance')[];
   };
 
@@ -247,70 +254,59 @@ const AdminShellLayout: React.FC = () => {
       {
         id: 'city_packages',
         title: language === 'zh' ? '同城订单' : language === 'en' ? 'City Orders' : 'မြို့တွင်းအော်ဒါများ',
-        icon: '📦',
         roles: ['admin', 'manager', 'operator', 'finance'],
       },
       {
         id: 'users',
         title: language === 'zh' ? '用户管理' : language === 'en' ? 'User Management' : 'အသုံးပြုသူစီမံခန့်ခွဲမှု',
-        icon: '👥',
         roles: ['admin', 'manager'],
       },
       {
         id: 'merchant_stores',
         title: language === 'zh' ? '商家管理' : language === 'en' ? 'MERCHANTS' : 'ကုန်သည်စီမံခန့်ခွဲမှု',
-        icon: '🏪',
         roles: ['admin', 'manager'],
       },
       {
         id: 'finance',
         title: language === 'zh' ? '财务管理' : language === 'en' ? 'Finance Management' : 'ဘဏ္ဍာရေးစီမံခန့်ခွဲမှု',
-        icon: '💰',
         roles: ['admin', 'manager', 'finance'],
       },
       {
         id: 'tracking',
         title:
           language === 'zh' ? '实时跟踪' : language === 'en' ? 'Real-time Tracking' : 'အချိန်နှင့်တစ်ပြေးညီခြေရာခံမှု',
-        icon: '📍',
         roles: ['admin', 'manager', 'operator', 'finance'],
       },
       {
         id: 'delivery_alerts',
         title:
           language === 'zh' ? '配送警报' : language === 'en' ? 'Delivery Alerts' : 'ပို့ဆောင်ရေးသတိပေးချက်များ',
-        icon: '🚨',
         roles: ['admin', 'manager', 'finance'],
       },
       {
         id: 'banners',
         title: language === 'zh' ? '页面管理' : language === 'en' ? 'Page Management' : 'စာမျက်နှာစီမံခန့်ခွဲမှု',
-        icon: '🖼️',
         roles: ['admin', 'manager'],
       },
       {
         id: 'recharges',
         title:
           language === 'zh' ? '充值管理' : language === 'en' ? 'Recharge Management' : 'ငွေဖြည့်သွင်းမှုစီမံခန့်ခွဲမှု',
-        icon: '💳',
         roles: ['admin', 'finance'],
       },
       {
         id: 'supervision',
         title: language === 'zh' ? '操作审计' : language === 'en' ? 'Audit log' : 'စစ်ဆေးမှုတဏ္ဍာ',
-        icon: '📜',
         roles: ['admin', 'manager', 'finance'],
       },
       {
         id: 'reports',
         title: language === 'zh' ? '报表导出' : language === 'en' ? 'Reports' : 'အစီရင်ခံစာ',
-        icon: '📈',
         roles: ['admin', 'manager', 'finance'],
       },
       {
         id: 'courier_performance',
         title: language === 'zh' ? '骑手绩效' : language === 'en' ? 'Rider KPI' : 'ကောင်ရီယာစွမ်းဆောင်',
-        icon: '🚴',
         roles: ['admin', 'manager', 'operator', 'finance'],
       },
       {
@@ -321,14 +317,28 @@ const AdminShellLayout: React.FC = () => {
             : language === 'en'
               ? 'Merchant reconciliation'
               : 'ကုန်သည်စာရင်း',
-        icon: '📋',
         roles: ['admin', 'manager', 'finance'],
       },
       {
         id: 'settings',
         title: language === 'zh' ? '系统设置' : language === 'en' ? 'System Settings' : 'စနစ်ချိန်ညှိမှု',
-        icon: '⚙️',
         roles: ['admin'],
+      },
+      {
+        id: 'metric_management',
+        title:
+          language === 'zh'
+            ? '指标管理'
+            : language === 'en'
+              ? 'Metric management'
+              : 'မီတྲိစီမံခန့်ခွဲမှု',
+        roles: ['admin', 'manager', 'finance'],
+      },
+      {
+        id: 'product_price',
+        title:
+          language === 'zh' ? '商品价格' : language === 'en' ? 'Product prices' : 'ကုန်စျေးနှုန်း',
+        roles: ['admin', 'manager', 'finance'],
       },
     ],
     [language],
@@ -414,6 +424,11 @@ const AdminShellLayout: React.FC = () => {
   };
 
   const pathname = location.pathname;
+  const isStandaloneImportModule = (STANDALONE_IMPORT_ADMIN_PATHS as readonly string[]).includes(pathname);
+
+  if (isStandaloneImportModule) {
+    return <Outlet />;
+  }
 
   return (
     <div
@@ -472,7 +487,7 @@ const AdminShellLayout: React.FC = () => {
 
       <aside
         style={{
-          width: isMobile ? 'min(256px, 82vw)' : 96,
+          width: isMobile ? 'min(256px, 82vw)' : 108,
           flexShrink: 0,
           background: 'rgba(12, 38, 68, 0.52)',
           backdropFilter: 'blur(24px)',
@@ -543,12 +558,12 @@ const AdminShellLayout: React.FC = () => {
                   flexDirection: isMobile ? 'row' : 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: isMobile ? 8 : 2,
-                  width: isMobile ? '100%' : 80,
-                  height: isMobile ? 'auto' : 35,
-                  minHeight: isMobile ? 44 : undefined,
+                  gap: 0,
+                  width: isMobile ? '100%' : 100,
+                  minHeight: isMobile ? 48 : 46,
+                  height: isMobile ? 'auto' : undefined,
                   textAlign: isMobile ? 'left' : 'center',
-                  padding: isMobile ? '6px 8px' : '2px 4px',
+                  padding: isMobile ? '9px 10px' : '8px 6px',
                   marginBottom: 4,
                   marginLeft: isMobile ? 0 : 'auto',
                   marginRight: isMobile ? 0 : 'auto',
@@ -572,25 +587,12 @@ const AdminShellLayout: React.FC = () => {
                   position: 'relative',
                 }}
               >
-                <span
-                  aria-hidden
-                  style={{
-                    fontSize: isMobile ? '1.05rem' : '0.88rem',
-                    width: isMobile ? 26 : 18,
-                    textAlign: 'center',
-                    lineHeight: 1,
-                    flexShrink: 0,
-                  }}
-                >
-                  {card.icon}
-                </span>
                 <div
                   style={
                     isMobile
                       ? { flex: 1, minWidth: 0 }
                       : {
-                          width: 70,
-                          height: 15,
+                          width: '100%',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -600,13 +602,13 @@ const AdminShellLayout: React.FC = () => {
                   <div
                     style={{
                       fontWeight: 700,
-                      fontSize: isMobile ? '0.8rem' : '0.62rem',
-                      lineHeight: isMobile ? 1.25 : '15px',
+                      fontSize: isMobile ? '0.92rem' : '0.74rem',
+                      lineHeight: isMobile ? 1.25 : 1.2,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      width: isMobile ? undefined : 70,
-                      height: isMobile ? undefined : 15,
+                      width: isMobile ? undefined : '100%',
+                      height: isMobile ? undefined : undefined,
                       textAlign: isMobile ? 'left' : 'center',
                     }}
                   >

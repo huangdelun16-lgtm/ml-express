@@ -6,10 +6,13 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ 错误：Supabase 环境变量未配置！');
-  console.error('请在 Netlify Dashboard 中配置：');
+  console.error('本地开发：复制仓库根目录的 .env.example 为 .env.local，填写下面两项后重新执行 npm start');
+  console.error('线上构建：在 Netlify（或你的 CI）Environment variables 中配置：');
   console.error('  - REACT_APP_SUPABASE_URL');
   console.error('  - REACT_APP_SUPABASE_ANON_KEY');
-  throw new Error('REACT_APP_SUPABASE_URL 和 REACT_APP_SUPABASE_ANON_KEY 环境变量必须配置！');
+  throw new Error(
+    '缺少 REACT_APP_SUPABASE_URL / REACT_APP_SUPABASE_ANON_KEY。本地请使用 .env.local，详见控制台说明与 .env.example。'
+  );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
@@ -3250,4 +3253,236 @@ export const rechargeService = {
       return false;
     }
   }
+};
+
+/** 进口指标草稿表 import_metric_drafts（与 migration 20260509120000 一致） */
+export type ImportMetricDraftDbRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  register_no: string;
+  start_date: string | null;
+  customer_name: string;
+  port_of_discharge: string;
+  ed_date: string | null;
+  line_items: unknown;
+  total_charges: string;
+  deposit_first: string;
+  deposit_second: string;
+  deposit_third: string;
+  deposit_first_paid_on: string | null;
+  deposit_second_paid_on: string | null;
+  deposit_third_paid_on: string | null;
+  first_handler: string;
+  first_account: string;
+  second_handler: string;
+  second_account: string;
+  third_handler: string;
+  third_account: string;
+  created_by: string;
+};
+
+export type ImportMetricDraftDbWrite = {
+  register_no: string;
+  start_date: string | null;
+  customer_name: string;
+  port_of_discharge: string;
+  ed_date: string | null;
+  line_items: unknown;
+  total_charges: string;
+  deposit_first: string;
+  deposit_second: string;
+  deposit_third: string;
+  deposit_first_paid_on: string | null;
+  deposit_second_paid_on: string | null;
+  deposit_third_paid_on: string | null;
+  first_handler: string;
+  first_account: string;
+  second_handler: string;
+  second_account: string;
+  third_handler: string;
+  third_account: string;
+};
+
+/** 映射为前端草稿结构（与 ImportMetricDraftsPage 约定字段一致） */
+export function dbRowToImportMetricDraftClient(r: ImportMetricDraftDbRow): {
+  id: string;
+  savedAt: string;
+  startDate: string;
+  customerName: string;
+  registerNo: string;
+  portOfDischarge: string;
+  lineItems: unknown;
+  edDate: string;
+  totalCharges: string;
+  depositFirst: string;
+  depositSecond: string;
+  depositThird: string;
+  depositFirstPaidOn: string;
+  depositSecondPaidOn: string;
+  depositThirdPaidOn: string;
+  firstHandler: string;
+  firstAccount: string;
+  secondHandler: string;
+  secondAccount: string;
+  thirdHandler: string;
+  thirdAccount: string;
+} {
+  const lines = Array.isArray(r.line_items) ? r.line_items : [];
+  return {
+    id: r.id,
+    savedAt: r.updated_at,
+    startDate: r.start_date ? String(r.start_date).slice(0, 10) : '',
+    customerName: r.customer_name ?? '',
+    registerNo: r.register_no ?? '',
+    portOfDischarge: r.port_of_discharge ?? '',
+    lineItems: lines,
+    edDate: r.ed_date ? String(r.ed_date).slice(0, 10) : '',
+    totalCharges: r.total_charges ?? '',
+    depositFirst: r.deposit_first ?? '',
+    depositSecond: r.deposit_second ?? '',
+    depositThird: r.deposit_third ?? '',
+    depositFirstPaidOn: r.deposit_first_paid_on ? String(r.deposit_first_paid_on).slice(0, 10) : '',
+    depositSecondPaidOn: r.deposit_second_paid_on ? String(r.deposit_second_paid_on).slice(0, 10) : '',
+    depositThirdPaidOn: r.deposit_third_paid_on ? String(r.deposit_third_paid_on).slice(0, 10) : '',
+    firstHandler: r.first_handler ?? '',
+    firstAccount: r.first_account ?? '',
+    secondHandler: r.second_handler ?? '',
+    secondAccount: r.second_account ?? '',
+    thirdHandler: r.third_handler ?? '',
+    thirdAccount: r.third_account ?? '',
+  };
+}
+
+function stripDepositPaidDatesFromWrite<T extends ImportMetricDraftDbWrite>(
+  w: T,
+): Omit<T, 'deposit_first_paid_on' | 'deposit_second_paid_on' | 'deposit_third_paid_on'> {
+  const {
+    deposit_first_paid_on: _a,
+    deposit_second_paid_on: _b,
+    deposit_third_paid_on: _c,
+    ...rest
+  } = w;
+  return rest;
+}
+
+/** PostgREST / Postgres：表上尚未添加对应列时常见此类报错（含 400） */
+function isLikelyMissingDepositPaidDateColumnsError(err: { message?: string; details?: string } | null): boolean {
+  const m = `${err?.message || ''} ${err?.details || ''}`.toLowerCase();
+  if (!m.trim()) return false;
+  return (
+    m.includes('deposit_first_paid_on') ||
+    m.includes('deposit_second_paid_on') ||
+    m.includes('deposit_third_paid_on') ||
+    (m.includes('column') && m.includes('does not exist')) ||
+    m.includes('schema cache')
+  );
+}
+
+export type ImportMetricDraftUpdateResult =
+  | { ok: true }
+  | { ok: true; warningCode: 'missing_deposit_date_columns' }
+  | { ok: false; message: string };
+
+export type ImportMetricDraftInsertResult =
+  | { ok: true; row: ImportMetricDraftDbRow }
+  | { ok: true; row: ImportMetricDraftDbRow; warningCode: 'missing_deposit_date_columns' }
+  | { ok: false; message: string };
+
+export const importMetricDraftService = {
+  async listAll(): Promise<ImportMetricDraftDbRow[]> {
+    try {
+      const { data, error } = await supabase
+        .from('import_metric_drafts')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      if (error) {
+        console.error('import_metric_drafts 列表失败:', error);
+        return [];
+      }
+      return (data || []) as ImportMetricDraftDbRow[];
+    } catch (err) {
+      console.error('import_metric_drafts 列表异常:', err);
+      return [];
+    }
+  },
+
+  async insert(
+    payload: ImportMetricDraftDbWrite & { created_by: string },
+  ): Promise<ImportMetricDraftInsertResult> {
+    try {
+      const updated_at = new Date().toISOString();
+      const rowPayload = { ...payload, updated_at };
+      let { data, error } = await supabase.from('import_metric_drafts').insert([rowPayload]).select().single();
+      if (error && isLikelyMissingDepositPaidDateColumnsError(error)) {
+        const stripped = stripDepositPaidDatesFromWrite(payload);
+        const retried = await supabase
+          .from('import_metric_drafts')
+          .insert([{ ...stripped, updated_at }])
+          .select()
+          .single();
+        data = retried.data;
+        error = retried.error;
+        if (!error && data) {
+          console.warn(
+            'import_metric_drafts: 已写入（未含三期付款日期列）。请在 Supabase 执行 migration 20260509134500_import_metric_deposit_paid_dates.sql',
+          );
+          return { ok: true, row: data as ImportMetricDraftDbRow, warningCode: 'missing_deposit_date_columns' };
+        }
+      }
+      if (error) {
+        console.error('import_metric_drafts 插入失败:', error);
+        const msg = [error.message, error.details].filter(Boolean).join(' · ') || 'insert failed';
+        return { ok: false, message: msg };
+      }
+      return { ok: true, row: data as ImportMetricDraftDbRow };
+    } catch (err) {
+      console.error('import_metric_drafts 插入异常:', err);
+      return { ok: false, message: err instanceof Error ? err.message : 'insert exception' };
+    }
+  },
+
+  async update(id: string, payload: ImportMetricDraftDbWrite): Promise<ImportMetricDraftUpdateResult> {
+    try {
+      const updated_at = new Date().toISOString();
+      let { error } = await supabase.from('import_metric_drafts').update({ ...payload, updated_at }).eq('id', id);
+      if (error && isLikelyMissingDepositPaidDateColumnsError(error)) {
+        const stripped = stripDepositPaidDatesFromWrite(payload);
+        const retried = await supabase
+          .from('import_metric_drafts')
+          .update({ ...stripped, updated_at })
+          .eq('id', id);
+        error = retried.error;
+        if (!error) {
+          console.warn(
+            'import_metric_drafts: 已更新（未含三期付款日期列）。请在 Supabase 执行 migration 20260509134500_import_metric_deposit_paid_dates.sql',
+          );
+          return { ok: true, warningCode: 'missing_deposit_date_columns' };
+        }
+      }
+      if (error) {
+        console.error('import_metric_drafts 更新失败:', error);
+        const msg = [error.message, error.details].filter(Boolean).join(' · ') || 'update failed';
+        return { ok: false, message: msg };
+      }
+      return { ok: true };
+    } catch (err) {
+      console.error('import_metric_drafts 更新异常:', err);
+      return { ok: false, message: err instanceof Error ? err.message : 'update exception' };
+    }
+  },
+
+  async remove(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('import_metric_drafts').delete().eq('id', id);
+      if (error) {
+        console.error('import_metric_drafts 删除失败:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('import_metric_drafts 删除异常:', err);
+      return false;
+    }
+  },
 };
