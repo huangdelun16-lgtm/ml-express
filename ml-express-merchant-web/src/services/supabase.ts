@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import LoggerService from './LoggerService';
+import { getProductItemFeeMmkForPackage } from '../utils/parseMerchantProductFee';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -702,7 +703,84 @@ export const packageService = {
       LoggerService.error(`获取店铺 ${storeId} 包裹失败:`, err);
       return [];
     }
-  }
+  },
+
+  /** 营收统计（已送达商品费，对齐商家 App HomeScreen） */
+  async getRevenueStats(userId: string, storeName?: string) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      yearStart.setHours(0, 0, 0, 0);
+
+      const buildQuery = (startDate?: Date, endDate?: Date) => {
+        let query = supabase
+          .from('packages')
+          .select('cod_amount, description')
+          .eq('status', '已送达');
+        const conditions = [`delivery_store_id.eq.${userId}`];
+        if (storeName) conditions.push(`sender_name.eq.${storeName}`);
+        query = query.or(conditions.join(','));
+        if (startDate) query = query.gte('created_at', startDate.toISOString());
+        if (endDate) query = query.lt('created_at', endDate.toISOString());
+        return query;
+      };
+
+      const sumItemFee = (
+        data: { cod_amount?: number | null; description?: string | null }[] | null,
+      ) =>
+        (data || []).reduce((sum, p) => sum + getProductItemFeeMmkForPackage(p), 0);
+
+      const countRows = (
+        data: { cod_amount?: number | null; description?: string | null }[] | null,
+      ) => (data || []).length;
+
+      const fetchItemFee = async (start?: Date, end?: Date) => {
+        const { data, error } = await buildQuery(start, end);
+        if (error) throw error;
+        return sumItemFee(data);
+      };
+
+      const fetchCount = async (start?: Date, end?: Date) => {
+        const { data, error } = await buildQuery(start, end);
+        if (error) throw error;
+        return countRows(data);
+      };
+
+      const [
+        todayRevenue,
+        yesterdayRevenue,
+        revenueOneYear,
+        todayOrderCount,
+        yesterdayOrderCount,
+      ] = await Promise.all([
+        fetchItemFee(today, new Date()),
+        fetchItemFee(yesterday, today),
+        fetchItemFee(yearStart, undefined),
+        fetchCount(today, new Date()),
+        fetchCount(yesterday, today),
+      ]);
+
+      return {
+        todayOrderCount,
+        yesterdayOrderCount,
+        todayRevenue,
+        yesterdayRevenue,
+        revenueOneYear,
+      };
+    } catch (error) {
+      LoggerService.error('获取营收统计失败:', error);
+      return {
+        todayOrderCount: 0,
+        yesterdayOrderCount: 0,
+        todayRevenue: 0,
+        yesterdayRevenue: 0,
+        revenueOneYear: 0,
+      };
+    }
+  },
 };
 
 // 广告服务

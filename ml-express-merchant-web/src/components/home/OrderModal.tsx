@@ -1,4 +1,14 @@
-import React, { useState, type CSSProperties } from 'react';
+import React, { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import OrderWizardProgress from './OrderWizardProgress';
+import {
+  WIZARD_LAST_STEP,
+  getWizardCopy,
+  getWizardStepLabels,
+  validateAddressStep,
+  validateDeliveryStep,
+  validatePackageStep,
+  type OrderWizardStepIndex,
+} from './orderModalWizard';
 import Logo from '../Logo';
 
 /** 创建订单弹窗：统一视觉（与客户端 Web 对齐） */
@@ -118,6 +128,8 @@ interface OrderModalProps {
   setOrderWeight: (v: string) => void;
   handleCancelOrder?: () => void; // 🚀 新增：取消订单处理
   // 🚀 优化：坐标自动选择相关
+  selectedSenderLocation?: { lat: number; lng: number } | null;
+  selectedReceiverLocation?: { lat: number; lng: number } | null;
   setSelectedSenderLocation?: (loc: {lat: number, lng: number} | null) => void;
   setSelectedReceiverLocation?: (loc: {lat: number, lng: number} | null) => void;
   // 🚀 新增：商家选货相关
@@ -175,6 +187,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
   orderWeight,
   setOrderWeight,
   handleCancelOrder = () => setShowOrderForm(false),
+  selectedSenderLocation = null,
+  selectedReceiverLocation = null,
   setSelectedSenderLocation = () => {},
   setSelectedReceiverLocation = () => {},
   merchantProducts = [],
@@ -193,6 +207,36 @@ const OrderModal: React.FC<OrderModalProps> = ({
   merchantStore = null
 }) => {
   const isMerchant = currentUser?.user_type === 'merchant';
+  const [wizardStep, setWizardStep] = useState<OrderWizardStepIndex>(0);
+  const wizardCopy = getWizardCopy(language);
+  const wizardLabels = getWizardStepLabels(language);
+  const goToStep = useCallback((step: OrderWizardStepIndex) => setWizardStep(step), []);
+  useEffect(() => { if (showOrderForm) goToStep(0); }, [showOrderForm, goToStep]);
+  const handleWizardBack = () => { if (wizardStep > 0) goToStep((wizardStep - 1) as OrderWizardStepIndex); };
+  const handleWizardNext = () => {
+    if (wizardStep === 0) {
+      const err = validateAddressStep({
+        senderName, senderPhone, senderAddress: senderAddressText,
+        receiverName, receiverPhone, receiverAddress: receiverAddressText,
+        senderLocation: selectedSenderLocation, receiverLocation: selectedReceiverLocation,
+      }, wizardCopy);
+      if (err) { window.alert(err); return; }
+    }
+    if (wizardStep === 1) {
+      const err = validatePackageStep(showWeightInput, orderWeight, wizardCopy);
+      if (err) { window.alert(err); return; }
+    }
+    if (wizardStep === 2) {
+      const err = validateDeliveryStep(selectedDeliverySpeed, scheduledDeliveryTime, t.ui.scheduledDelivery, wizardCopy);
+      if (err) { window.alert(err); return; }
+    }
+    if (wizardStep < WIZARD_LAST_STEP) goToStep((wizardStep + 1) as OrderWizardStepIndex);
+  };
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (wizardStep !== WIZARD_LAST_STEP) { handleWizardNext(); return; }
+    handleOrderSubmit(e);
+  };
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
   const [showProductSelector, setShowProductSelector] = useState(false); // 🚀 新增：商品选择器显示状态
@@ -284,7 +328,19 @@ const OrderModal: React.FC<OrderModalProps> = ({
           </div>
         )}
         
-        <form onSubmit={handleOrderSubmit}>
+        <form onSubmit={handleFormSubmit}>
+        <OrderWizardProgress currentStep={wizardStep} labels={wizardLabels} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+          <button type="button" onClick={handleWizardBack} disabled={wizardStep === 0} style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(15,23,42,0.35)', color: '#e2e8f0', fontWeight: 700, cursor: wizardStep === 0 ? 'not-allowed' : 'pointer', opacity: wizardStep === 0 ? 0.4 : 1 }}>← {wizardCopy.back}</button>
+          <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem', fontWeight: 800 }}>{wizardStep + 1} / {WIZARD_LAST_STEP + 1}</span>
+          {wizardStep < WIZARD_LAST_STEP ? (
+            <button type="button" onClick={handleWizardNext} style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}>{wizardCopy.next} →</button>
+          ) : (
+            <button type="submit" style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>{t.order.submit}</button>
+          )}
+        </div>
+
+          {wizardStep === 0 && (<>
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={BLOCK_TITLE}>{t.order.sender}</h3>
             <input
@@ -552,8 +608,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
               </button>
             </div>
           </div>
+          </>)}
 
-          <div style={{ marginBottom: '1.5rem' }}>
+          {wizardStep === 1 && (<div style={{ marginBottom: '1.5rem' }}>
             <h3 style={BLOCK_TITLE}>
               📦 {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
             </h3>
@@ -956,6 +1013,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
               </div>
             )}
 
+            </div>)}
+
+          {wizardStep === 2 && (<div style={{ marginBottom: '1.5rem' }}>
             {/* 速度部分 */}
             <h3 style={BLOCK_TITLE}>{t.ui.speed || '速度'}</h3>
             
@@ -1166,8 +1226,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
             }}>
               ***{t.ui.packageInfoMismatch}***
             </div>
-          </div>
+          </div>)}
 
+          {wizardStep === 3 && (<>
           {/* 💰 价格估算部分 */}
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={SECTION_HEADING}>
@@ -1476,7 +1537,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
             </div>
           </div>
 
-          <div
+          </>)}
+
+          {wizardStep === WIZARD_LAST_STEP && (<div
             style={{
               ...FORM_ACTIONS_ROW,
               flexDirection: window.innerWidth < 768 ? 'column' : 'row',
@@ -1543,7 +1606,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 )}
               </div>
             </button>
-          </div>
+          </div>)}
         </form>
       </div>
 

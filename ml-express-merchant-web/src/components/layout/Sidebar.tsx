@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useMerchantOrdersOptional } from "../../contexts/MerchantOrderContext";
 
-const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({
-  currentUser,
-  onLogout,
-}) => {
+const Sidebar: React.FC<{
+  currentUser: any;
+  onLogout: () => void;
+  onNavigate?: () => void;
+}> = ({ currentUser, onLogout, onNavigate }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language, setLanguage } = useLanguage();
+  const merchantOrders = useMerchantOrdersOptional();
+  const pendingBadge = merchantOrders?.pendingCount ?? 0;
   const [isAccountExpanded, setIsAccountExpanded] = useState(false);
   const [isOrdersExpanded, setIsOrdersExpanded] = useState(false);
 
@@ -152,6 +156,7 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({
   ];
 
   const handleMenuClick = (id: string) => {
+    onNavigate?.();
     if (id === "place-order") {
       // 🚀 如果不在首页，先跳转到首页再触发
       if (location.pathname !== "/") {
@@ -212,7 +217,7 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({
   };
 
   return (
-    <div style={sidebarStyle}>
+    <div style={sidebarStyle} className="merchant-sidebar-inner">
       {/* 🚀 已根据要求删除 Sidebar 顶部的 Logo 和名称 */}
 
       <div style={menuContainerStyle}>
@@ -298,6 +303,27 @@ const Sidebar: React.FC<{ currentUser: any; onLogout: () => void }> = ({
                   <span style={{ fontWeight: isActive ? "800" : "500" }}>
                     {item.label}
                   </span>
+                  {item.id === "/orders" && pendingBadge > 0 ? (
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        minWidth: "22px",
+                        height: "22px",
+                        padding: "0 6px",
+                        borderRadius: "999px",
+                        background: "#ef4444",
+                        color: "#fff",
+                        fontSize: "0.72rem",
+                        fontWeight: 800,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 0 12px rgba(239,68,68,0.45)",
+                      }}
+                    >
+                      {pendingBadge > 99 ? "99+" : pendingBadge}
+                    </span>
+                  ) : null}
                 </div>
                 {hasSubMenu && (
                   <span

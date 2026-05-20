@@ -30,6 +30,10 @@ import NavigationBar from "../components/home/NavigationBar";
 import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
 import OrderQRCode from "../components/profile/OrderQRCode";
+import MerchantDashboardOrderPanel from "../components/dashboard/MerchantDashboardOrderPanel";
+import MerchantRevenuePanel from "../components/dashboard/MerchantRevenuePanel";
+import { useMerchantOrdersOptional } from "../contexts/MerchantOrderContext";
+import { MERCHANT_ORDERS_REFRESH } from "../utils/merchantOrderEvents";
 import { getPackingModalModel } from "../utils/parseOrderPackingItems";
 
 // 注入样式
@@ -251,6 +255,7 @@ const TimeWheelPicker: React.FC<{
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { language, setLanguage, t: allT } = useLanguage();
+  const merchantOrdersCtx = useMerchantOrdersOptional();
   const t = allT.profile;
   const [isVisible, setIsVisible] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
@@ -2092,6 +2097,12 @@ const ProfilePage: React.FC = () => {
     loadUserPackages();
   }, [loadUserPackages]);
 
+  useEffect(() => {
+    const onRefresh = () => loadUserPackages();
+    window.addEventListener(MERCHANT_ORDERS_REFRESH, onRefresh);
+    return () => window.removeEventListener(MERCHANT_ORDERS_REFRESH, onRefresh);
+  }, [loadUserPackages]);
+
   // 2. 如果是商家，加载相关统计、商品和评价
   useEffect(() => {
     if (isPartnerStore) {
@@ -2111,74 +2122,14 @@ const ProfilePage: React.FC = () => {
     }
   }, [isPartnerStore, loadStoreReviews]);
 
-  // 🚀 新增：商家订单实时监控逻辑
   useEffect(() => {
-    if (!isPartnerStore || !currentUser?.id) return;
-
-    // 每 15 秒轮询一次新订单
-    const timer = setInterval(async () => {
-      try {
-        const storeId = currentUser.store_id || currentUser.id;
-        
-        // 🚀 修正：仅查询该商家的“待确认”订单（从商城进来的新订单）
-        const { count, error } = await supabase
-          .from("packages")
-          .select("id", { count: "exact" })
-          .eq("delivery_store_id", storeId)
-          .eq("status", "待确认");
-
-        if (!error && count !== null) {
-          setPendingMerchantOrdersCount(count);
-
-          // 🚀 核心优化：检测到有待接单订单时，自动开启语音提醒功能
-          if (count > 0 && !isVoiceEnabled) {
-            console.log("🚨 检测到待确认订单，自动开启语音提醒状态");
-            setIsVoiceEnabled(true);
-          }
-
-          // 🚀 播报逻辑
-          if (count > 0 && isVoiceEnabled) {
-            const now = Date.now();
-            
-            // 情况1：有新订单进来（数量增加）
-            if (count > lastBroadcastCountRef.current) {
-              console.log("🚨 检测到新待确认订单!", count);
-              speakNotification("你有新的订单 请接单");
-              // 🚀 核心：自动刷新包裹列表，让新订单“弹出来”显示在卡片里
-              loadUserPackages();
-            } 
-            // 情况2：仍然有待确认订单，且距离上次播报超过 60 秒
-            else if (now - lastVoiceTimeRef.current >= 60000) {
-              console.log("📢 60秒周期性播报提醒...");
-              speakNotification("你有新的订单 请接单");
-            }
-          } 
-          // 🚀 核心逻辑：假如没有了 “待确认” 状态的订单，且之前是开启状态，则语音播报功能自动关闭
-          else if (count === 0 && isVoiceEnabled) {
-            console.log("✅ 所有订单已处理，自动关闭语音提醒");
-            setIsVoiceEnabled(false);
-            speakNotification(
-              language === "zh"
-                ? "订单已全部接单 语音提醒已关闭"
-                : "All orders accepted, voice alert disabled",
-            );
-          }
-          
-          lastBroadcastCountRef.current = count;
-        }
-      } catch (err) {
-        console.error("监控商家订单失败:", err);
-      }
-    }, 15000);
-
-    return () => clearInterval(timer);
-  }, [
-    isPartnerStore,
-    currentUser?.id,
-    isVoiceEnabled,
-    language,
-    loadUserPackages,
-  ]);
+    if (!merchantOrdersCtx) return;
+    setPendingMerchantOrdersCount(merchantOrdersCtx.pendingCount);
+    if (merchantOrdersCtx.pendingCount > 0 && !isVoiceEnabled) {
+      setIsVoiceEnabled(true);
+      merchantOrdersCtx.setIsVoiceEnabled(true);
+    }
+  }, [merchantOrdersCtx?.pendingCount, isVoiceEnabled, merchantOrdersCtx]);
 
   // 查看代收款订单
   const handleViewCODOrders = async (settled?: boolean) => {
@@ -2811,15 +2762,13 @@ const ProfilePage: React.FC = () => {
       );
       
       if (success) {
-        // 🚀 核心优化：接单成功后自动打印小票
         handlePrintReceipt(pkgToAccept);
-        
+        merchantOrdersCtx?.removePendingOrder(pkgToAccept.id);
         alert(
           language === "zh"
             ? "接单成功！小票已自动打印，请开始打包商品。"
             : "Order accepted! Receipt printed, please start packing.",
         );
-        // 刷新本地数据
         const updatedPackage = { ...pkgToAccept, status: "打包中" };
         if (!targetPkg) setSelectedPackage(updatedPackage);
         setUserPackages((prev) =>
@@ -4050,9 +3999,7 @@ const ProfilePage: React.FC = () => {
                 position: "relative",
                 overflow: "hidden",
               }}
-              onClick={() => {
-                setShowPendingAcceptListModal(true);
-              }}
+              onClick={() => navigate("/orders?status=待确认")}
               onMouseOver={(e) => {
                 e.currentTarget.style.transform =
                   "translateY(-5px) scale(1.02)";
@@ -4118,7 +4065,7 @@ const ProfilePage: React.FC = () => {
                 cursor: "pointer",
                 boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
               }}
-              onClick={() => setShowPackingListModal(true)}
+              onClick={() => navigate("/orders?status=打包中")}
               onMouseOver={(e) => {
                 e.currentTarget.style.transform = "translateY(-5px)";
                 e.currentTarget.style.boxShadow =
@@ -4373,6 +4320,14 @@ const ProfilePage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {isPartnerStore && (
+            <MerchantRevenuePanel
+              language={language}
+              storeId={currentUser?.store_id || currentUser?.id}
+              storeName={currentUser?.name || storeInfo?.store_name}
+            />
+          )}
 
           {/* 代收款统计卡片 - 仅合伙店铺显示 */}
           {isPartnerStore && storeInfo && (
@@ -5521,657 +5476,12 @@ const ProfilePage: React.FC = () => {
           )}
         </div>
 
-        {/* 包裹列表 */}
-      <div
-        style={{
-          background: "rgba(255, 255, 255, 0.15)",
-          backdropFilter: "blur(20px)",
-          borderRadius: "24px",
-          padding: "1.5rem",
-          border: "1px solid rgba(255, 255, 255, 0.3)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-          opacity: isVisible ? 1 : 0,
-          transform: isVisible ? "translateY(0)" : "translateY(20px)",
-          transition: "all 0.6s ease 0.4s",
-        }}
-      >
-        <h2
-          id="packages-section"
-          style={{
-            color: "#ffffff",
-            fontSize: "1.5rem",
-            marginBottom: "1.5rem",
-            borderBottom: "2px solid rgba(255,255,255,0.3)",
-            paddingBottom: "0.5rem",
-          }}
-        >
-            {t.packages}
-          </h2>
+        <MerchantDashboardOrderPanel
+          language={language}
+          orderStats={orderStats}
+          isPartnerStore={isPartnerStore}
+        />
 
-          {loading ? (
-          <div style={{ textAlign: "center", padding: "3rem", color: "white" }}>
-            <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>⏳</div>
-            <div>
-              {language === "zh"
-                ? "加载中..."
-                : language === "en"
-                  ? "Loading..."
-                  : "ဖွင့်နေသည်..."}
-            </div>
-            </div>
-          ) : userPackages.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "3rem", color: "white" }}>
-            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📦</div>
-            <div style={{ fontSize: "1.2rem" }}>{t.noPackages}</div>
-            </div>
-          ) : (
-            <>
-            <div
-              style={{
-                display: "grid",
-                gap: "1rem",
-              }}
-            >
-                {userPackages
-                .slice(
-                  (currentPage - 1) * packagesPerPage,
-                  currentPage * packagesPerPage,
-                )
-                  .map((pkg: any) => (
-                <div
-                  key={pkg.id}
-                  style={{
-                      background: "rgba(255, 255, 255, 0.1)",
-                      borderRadius: "12px",
-                      padding: "1.5rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                      transition: "all 0.3s ease",
-                  }}
-                  onMouseOver={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.15)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.1)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                  }}
-                >
-                  {/* 顶部：订单号、创建时间、价格、包裹类型 - 一行显示 */}
-                    <div
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: "1rem",
-                        alignItems: "center",
-                        marginBottom: "1rem",
-                        paddingBottom: "1rem",
-                        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-                      }}
-                    >
-                    {/* 订单号 */}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.5rem",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "rgba(255,255,255,0.8)",
-                            fontSize: "0.85rem",
-                          }}
-                        >
-                        {t.packageId}:
-                      </span>
-                        <span
-                          style={{
-                            color: "white",
-                            fontSize: "0.95rem",
-                            fontWeight: "bold",
-                          }}
-                        >
-                        {pkg.id}
-                      </span>
-                    </div>
-
-                    {/* 分隔符 */}
-                      <span
-                        style={{
-                          color: "rgba(255,255,255,0.3)",
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        |
-                      </span>
-
-                    {/* 创建时间 */}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.5rem",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "rgba(255,255,255,0.8)",
-                            fontSize: "0.85rem",
-                          }}
-                        >
-                        {t.createTime}:
-                      </span>
-                        <span style={{ color: "white", fontSize: "0.95rem" }}>
-                          {pkg.create_time || pkg.created_at || "-"}
-                      </span>
-                    </div>
-
-                    {/* 分隔符 */}
-                      <span
-                        style={{
-                          color: "rgba(255,255,255,0.3)",
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        |
-                      </span>
-
-                    {/* 价格 */}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.5rem",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "rgba(255,255,255,0.8)",
-                            fontSize: "0.85rem",
-                          }}
-                        >
-                        {t.price}:
-                      </span>
-                        <span
-                          style={{
-                            color: "white",
-                            fontSize: "0.95rem",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {pkg.price
-                            ? `${pkg.price.replace("MMK", "").trim()} MMK`
-                            : "-"}
-                      </span>
-                    </div>
-
-                    {/* 分隔符 */}
-                      <span
-                        style={{
-                          color: "rgba(255,255,255,0.3)",
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        |
-                      </span>
-
-                    {/* 包裹类型 */}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.5rem",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "rgba(255,255,255,0.8)",
-                            fontSize: "0.85rem",
-                          }}
-                        >
-                          {language === "zh"
-                            ? "包裹类型"
-                            : language === "en"
-                              ? "Package Type"
-                              : "ပက်ကေ့ဂျ်အမျိုးအစား"}
-                          :
-                      </span>
-                        <span style={{ color: "white", fontSize: "0.95rem" }}>
-                          {pkg.package_type || "-"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 状态和支付方式按钮 */}
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "0.5rem",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        marginBottom: "1rem",
-                      }}
-                    >
-                    {/* 状态按钮 */}
-                      <div
-                        style={{
-                          background: getStatusColor(
-                            pkg.status === "待收款" ? "待取件" : pkg.status,
-                          ),
-                          color: "white",
-                          padding: "0.4rem 0.9rem",
-                          borderRadius: "24px",
-                          fontSize: "0.85rem",
-                          fontWeight: "bold",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {pkg.status === "待收款"
-                          ? getStatusText(pkg.status)
-                          : pkg.status}
-                    </div>
-                    
-                    {/* 支付方式按钮 */}
-                    {pkg.payment_method && (
-                        <div
-                          style={{
-                            background: getPaymentMethodColor(
-                              pkg.payment_method,
-                            ),
-                            color: "white",
-                        border: `1px solid ${getPaymentMethodBorderColor(pkg.payment_method)}`,
-                            padding: "0.4rem 0.9rem",
-                            borderRadius: "24px",
-                            fontSize: "0.85rem",
-                            fontWeight: "bold",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                        {getPaymentMethodText(pkg.payment_method)}
-                      </div>
-                    )}
-
-                    {/* 🚀 新增：商品费用 - 仅限 VIP/普通账号显示 */}
-                      {!isPartnerStore &&
-                        (() => {
-                          const itemMatch = pkg.description?.match(
-                            /\[(?:商品费用（仅余额支付）|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)): (.*?) MMK\]/,
-                          );
-                      if (itemMatch && itemMatch[1]) {
-                        return (
-                              <div
-                                style={{
-                                  background: "rgba(251, 191, 36, 0.2)",
-                                  color: "#fbbf24",
-                                  border: "1px solid rgba(251, 191, 36, 0.3)",
-                                  padding: "0.4rem 0.9rem",
-                                  borderRadius: "24px",
-                                  fontSize: "0.85rem",
-                                  fontWeight: "bold",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                🛍️{" "}
-                                {language === "zh"
-                                  ? "商品费用"
-                                  : language === "en"
-                                    ? "Item Cost"
-                                    : "ကုန်ပစ္စည်းဖိုး"}
-                                : {itemMatch[1]} MMK (
-                                {language === "zh"
-                                  ? "余额支付"
-                                  : language === "en"
-                                    ? "Balance"
-                                    : "လက်ကျန်ငွေ"}
-                                )
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {/* 🚀 修正：代收款 - 仅限商家账号显示 */}
-                    {isPartnerStore && pkg.cod_amount > 0 ? (
-                        <div
-                          style={{
-                            background: "rgba(239, 68, 68, 0.2)",
-                            color: "#fca5a5",
-                            border: "1px solid rgba(239, 68, 68, 0.3)",
-                            padding: "0.4rem 0.9rem",
-                            borderRadius: "24px",
-                            fontSize: "0.85rem",
-                            fontWeight: "bold",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                        💰 {t.cod}: {pkg.cod_amount.toLocaleString()} MMK
-                      </div>
-                    ) : null}
-                  </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "1rem",
-                        justifyContent: "center",
-                        marginTop: "1rem",
-                      }}
-                    >
-                    <button
-                      onClick={() => {
-                        setSelectedPackage(pkg);
-                        setShowPackageDetailModal(true);
-                      }}
-                      style={{
-                          background: "rgba(59, 130, 246, 0.25)",
-                          color: "white",
-                          border: "1px solid rgba(59, 130, 246, 0.4)",
-                          padding: "0.5rem 1.5rem",
-                          borderRadius: "8px",
-                          cursor: "pointer",
-                          fontSize: "0.9rem",
-                          fontWeight: "bold",
-                          transition: "all 0.3s ease",
-                        flex: 1,
-                          maxWidth: "150px",
-                      }}
-                      onMouseOver={(e) => {
-                          e.currentTarget.style.background =
-                            "rgba(59, 130, 246, 0.4)";
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                      }}
-                      onMouseOut={(e) => {
-                          e.currentTarget.style.background =
-                            "rgba(59, 130, 246, 0.25)";
-                          e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      {t.viewDetails}
-                    </button>
-
-                    {/* 🚀 新增：评价订单按钮 - 仅限已完成/已送达订单 且 未评价过 */}
-                      {!isPartnerStore &&
-                        (pkg.status === "已送达" || pkg.status === "已完成") &&
-                        !reviewedOrderIds.has(pkg.id) && (
-                      <button
-                        onClick={() => handleOpenReviewModal(pkg)}
-                        style={{
-                              background:
-                                "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                              color: "white",
-                              border: "none",
-                              padding: "0.5rem 1.5rem",
-                              borderRadius: "8px",
-                              cursor: "pointer",
-                              fontSize: "0.9rem",
-                              fontWeight: "bold",
-                              transition: "all 0.3s ease",
-                          flex: 1,
-                              maxWidth: "150px",
-                              boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
-                        }}
-                        onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-2px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 6px 15px rgba(245, 158, 11, 0.4)";
-                        }}
-                        onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow =
-                                "0 4px 12px rgba(245, 158, 11, 0.3)";
-                            }}
-                          >
-                            ⭐{" "}
-                            {language === "zh"
-                              ? "评价订单"
-                              : language === "en"
-                                ? "Rate Order"
-                                : "မှတ်ချက်ပေးရန်"}
-                      </button>
-                    )}
-
-                    {/* 🚀 新增：打包中状态显示“开始打包”按钮 */}
-                      {isPartnerStore && pkg.status === "打包中" && (
-                      <button
-                        onClick={() => handleStartPacking(pkg)}
-                        style={{
-                            background:
-                              "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                            color: "white",
-                            border: "none",
-                            padding: "0.5rem 1.5rem",
-                            borderRadius: "8px",
-                            cursor: "pointer",
-                            fontSize: "0.9rem",
-                            fontWeight: "900",
-                            transition: "all 0.3s ease",
-                          flex: 1,
-                            maxWidth: "150px",
-                            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-                        }}
-                        onMouseOver={(e) => {
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                            e.currentTarget.style.boxShadow =
-                              "0 6px 15px rgba(16, 185, 129, 0.4)";
-                        }}
-                        onMouseOut={(e) => {
-                            e.currentTarget.style.transform = "translateY(0)";
-                            e.currentTarget.style.boxShadow =
-                              "0 4px 12px rgba(16, 185, 129, 0.3)";
-                          }}
-                        >
-                          📦{" "}
-                          {language === "zh"
-                            ? "开始打包"
-                            : language === "en"
-                              ? "Start Packing"
-                              : "ထုပ်ပိုးရန်စတင်ပါ"}
-                      </button>
-                    )}
-
-                    {/* 🚀 新增：中转站重新发货按钮 */}
-                      {isPartnerStore &&
-                        storeInfo?.store_type === "transit_station" &&
-                        pkg.status === "已送达" &&
-                        pkg.description?.includes("[异常转送中转站]") && (
-                      <button
-                        onClick={() => handleReshipOrder(pkg)}
-                        style={{
-                              background:
-                                "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                              color: "white",
-                              border: "none",
-                              padding: "0.5rem 1.5rem",
-                              borderRadius: "8px",
-                              cursor: "pointer",
-                              fontSize: "0.9rem",
-                              fontWeight: "900",
-                              transition: "all 0.3s ease",
-                          flex: 1,
-                              maxWidth: "150px",
-                              boxShadow: "0 4px 12px rgba(217, 119, 6, 0.3)",
-                        }}
-                        onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-2px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 6px 15px rgba(217, 119, 6, 0.4)";
-                        }}
-                        onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow =
-                                "0 4px 12px rgba(217, 119, 6, 0.3)";
-                            }}
-                          >
-                            🚀{" "}
-                            {language === "zh"
-                              ? "重新发货"
-                              : language === "en"
-                                ? "Re-ship"
-                                : "ပြန်လည်ပို့ဆောင်ပါ"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              </div>
-
-            {/* 分页控件 - 指挥中心风格 */}
-              {userPackages.length > packagesPerPage && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  marginTop: "2.5rem",
-                  padding: "1rem",
-                  background: "rgba(255, 255, 255, 0.03)",
-                  borderRadius: "24px",
-                  border: "1px solid rgba(255, 255, 255, 0.05)",
-                  alignSelf: "center",
-                }}
-              >
-                  <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(1, prev - 1))
-                  }
-                    disabled={currentPage === 1}
-                    style={{
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "white",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    width: "40px",
-                    height: "40px",
-                    borderRadius: "12px",
-                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s ease",
-                    opacity: currentPage === 1 ? 0.3 : 1,
-                  }}
-                >
-                  <span style={{ fontSize: "1.2rem" }}>‹</span>
-                  </button>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "0.5rem",
-                    alignItems: "center",
-                  }}
-                >
-                  {Array.from(
-                    {
-                      length: Math.ceil(userPackages.length / packagesPerPage),
-                    },
-                    (_, i) => i + 1,
-                  ).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        style={{
-                        background:
-                          currentPage === page ? "#3b82f6" : "transparent",
-                        color: "white",
-                        border:
-                          currentPage === page
-                            ? "none"
-                            : "1px solid rgba(255, 255, 255, 0.1)",
-                        width: "36px",
-                        height: "36px",
-                        borderRadius: "10px",
-                        cursor: "pointer",
-                        fontSize: "0.9rem",
-                        fontWeight: "800",
-                        transition: "all 0.2s ease",
-                        boxShadow:
-                          currentPage === page
-                            ? "0 4px 12px rgba(59, 130, 246, 0.4)"
-                            : "none",
-                        }}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                  onClick={() =>
-                    setCurrentPage((prev) =>
-                      Math.min(
-                        Math.ceil(userPackages.length / packagesPerPage),
-                        prev + 1,
-                      ),
-                    )
-                  }
-                  disabled={
-                    currentPage ===
-                    Math.ceil(userPackages.length / packagesPerPage)
-                  }
-                  style={{
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "white",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    width: "40px",
-                    height: "40px",
-                    borderRadius: "12px",
-                    cursor:
-                      currentPage ===
-                      Math.ceil(userPackages.length / packagesPerPage)
-                        ? "not-allowed"
-                        : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s ease",
-                    opacity:
-                      currentPage ===
-                      Math.ceil(userPackages.length / packagesPerPage)
-                        ? 0.3
-                        : 1,
-                  }}
-                >
-                  <span style={{ fontSize: "1.2rem" }}>›</span>
-                  </button>
-                </div>
-              )}
-
-              {/* 显示当前页信息 */}
-            <div
-              style={{
-                textAlign: "center",
-                marginTop: "1rem",
-                color: "rgba(255, 255, 255, 0.8)",
-                fontSize: "0.9rem",
-              }}
-            >
-              {language === "zh"
-                  ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} 条，共 ${userPackages.length} 条`
-                : language === "en"
-                  ? `Showing ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} of ${userPackages.length}`
-                  : (currentPage - 1) * packagesPerPage +
-                    1 +
-                    "-" +
-                    Math.min(
-                      currentPage * packagesPerPage,
-                      userPackages.length,
-                    ) +
-                    " ကို ပြသထားသည်၊ စုစုပေါင်း " +
-                    userPackages.length}
-              </div>
-            </>
-          )}
-        </div>
       {showPackageDetailModal && selectedPackage && (
         <div
           style={{
@@ -11922,6 +11232,8 @@ const ProfilePage: React.FC = () => {
         setSelectedPackageType={setSelectedPackageType}
         orderWeight={orderWeight}
         setOrderWeight={setOrderWeight}
+        selectedSenderLocation={selectedSenderLocation}
+        selectedReceiverLocation={selectedReceiverLocation}
         setSelectedSenderLocation={setSelectedSenderLocation}
         setSelectedReceiverLocation={setSelectedReceiverLocation}
         merchantProducts={products}

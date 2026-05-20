@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Sidebar from './Sidebar';
+import MerchantOrderShell from './MerchantOrderShell';
+import '../../styles/merchantShell.css';
 
 interface MerchantLayoutProps {
   children: React.ReactNode;
@@ -8,37 +10,38 @@ interface MerchantLayoutProps {
 }
 
 const MerchantLayout: React.FC<MerchantLayoutProps> = ({ children, currentUser, onLogout }) => {
+  const storeId = currentUser?.store_id || currentUser?.id || '';
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div style={layoutStyle}>
-      <Sidebar currentUser={currentUser} onLogout={onLogout} />
-      <main style={mainContentStyle}>
-        <div style={innerContainerStyle}>
-          {children}
+    <MerchantOrderShell storeId={storeId}>
+      <div className="merchant-shell">
+        <button
+          type="button"
+          className="merchant-shell__menu-btn"
+          aria-label="Menu"
+          onClick={() => setSidebarOpen((o) => !o)}
+        >
+          ☰
+        </button>
+        <div
+          className={`merchant-shell__backdrop${sidebarOpen ? ' merchant-shell__backdrop--open' : ''}`}
+          aria-hidden={!sidebarOpen}
+          onClick={() => setSidebarOpen(false)}
+        />
+        <div className={`merchant-shell__sidebar${sidebarOpen ? ' merchant-shell__sidebar--open' : ''}`}>
+          <Sidebar
+            currentUser={currentUser}
+            onLogout={onLogout}
+            onNavigate={() => setSidebarOpen(false)}
+          />
         </div>
-      </main>
-    </div>
+        <main className="merchant-shell__main">
+          <div className="merchant-shell__inner">{children}</div>
+        </main>
+      </div>
+    </MerchantOrderShell>
   );
-};
-
-const layoutStyle: React.CSSProperties = {
-  display: 'flex',
-  minHeight: '100vh',
-  background: '#0a0f1e', // 极致深蓝黑，更具高级感
-  color: 'white',
-};
-
-const mainContentStyle: React.CSSProperties = {
-  flex: 1,
-  marginLeft: '260px', // 避开固定的侧边栏
-  padding: '3.5rem 3rem', // 增加顶部间距，彻底拉开与侧边栏品牌名的距离
-  minHeight: '100vh',
-  background: 'radial-gradient(circle at top right, rgba(59, 130, 246, 0.05) 0%, transparent 40%)',
-};
-
-const innerContainerStyle: React.CSSProperties = {
-  maxWidth: '1400px',
-  margin: '0 auto',
-  animation: 'fadeIn 0.5s ease-out',
 };
 
 export default MerchantLayout;

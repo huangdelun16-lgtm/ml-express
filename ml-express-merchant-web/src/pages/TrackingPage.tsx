@@ -18,6 +18,8 @@ import NavigationBar from "../components/home/NavigationBar";
 import { useLanguage } from "../contexts/LanguageContext";
 import QRCode from "qrcode";
 import { getPackingModalModel } from "../utils/parseOrderPackingItems";
+import { useMerchantOrdersOptional } from "../contexts/MerchantOrderContext";
+import { MERCHANT_ORDERS_REFRESH } from "../utils/merchantOrderEvents";
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
 const GOOGLE_MAPS_LIBRARIES: any = ["places"];
@@ -39,6 +41,7 @@ const TrackingPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language, setLanguage, t: allT } = useLanguage();
+  const merchantOrdersCtx = useMerchantOrdersOptional();
   const t = allT.profile;
   
   const { isLoaded: isMapLoaded } = useJsApiLoader({
@@ -162,6 +165,14 @@ const TrackingPage: React.FC = () => {
     }
     setCurrentPage(1);
   }, [activeOrders, statusFilter]);
+
+  useEffect(() => {
+    const onRefresh = () => {
+      if (currentUser) loadActiveOrders(currentUser);
+    };
+    window.addEventListener(MERCHANT_ORDERS_REFRESH, onRefresh);
+    return () => window.removeEventListener(MERCHANT_ORDERS_REFRESH, onRefresh);
+  }, [currentUser, loadActiveOrders]);
 
   const handleLogout = () => {
     localStorage.removeItem("ml-express-customer");
@@ -365,6 +376,7 @@ const TrackingPage: React.FC = () => {
       );
       if (success) {
         handlePrintReceipt(pkgToAccept);
+        merchantOrdersCtx?.removePendingOrder(pkgToAccept.id);
         alert(
           language === "zh"
             ? "接单成功！小票已自动打印，请开始打包商品。"
