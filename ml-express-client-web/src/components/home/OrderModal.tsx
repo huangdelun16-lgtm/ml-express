@@ -1,5 +1,14 @@
-import React, { useState, useEffect, type CSSProperties } from 'react';
-import Logo from '../Logo';
+import React, { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import OrderWizardProgress from './OrderWizardProgress';
+import {
+  WIZARD_LAST_STEP,
+  getWizardCopy,
+  getWizardStepLabels,
+  validateAddressStep,
+  validateDeliveryStep,
+  validatePackageStep,
+  type OrderWizardStepIndex,
+} from './orderModalWizard';
 
 /** 创建订单弹窗：与商家端 Web 统一视觉 */
 const MODAL_OVERLAY: CSSProperties = {
@@ -24,15 +33,107 @@ const MODAL_PANEL: CSSProperties = {
   width: `min(100%, ${ORDER_MODAL_WIDTH_PX}px)`,
   height: `min(${ORDER_MODAL_HEIGHT_PX}px, calc(100vh - 24px))`,
   maxHeight: `min(${ORDER_MODAL_HEIGHT_PX}px, calc(100vh - 24px))`,
-  overflow: 'auto',
-  WebkitOverflowScrolling: 'touch',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
   boxSizing: 'border-box',
-  padding: 'clamp(1.25rem, 4vw, 2rem)',
+  padding: 0,
   borderRadius: 20,
-  background: 'linear-gradient(165deg, #1e293b 0%, #0f172a 42%, #172554 100%)',
+  background: 'linear-gradient(180deg, #0f172a 0%, #1e3a8a 38%, #334155 100%)',
   border: '1px solid rgba(255, 255, 255, 0.12)',
   boxShadow:
     '0 25px 50px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.06) inset, 0 1px 0 rgba(255,255,255,0.08) inset',
+};
+
+const MODAL_CHROME: CSSProperties = {
+  flexShrink: 0,
+  position: 'relative',
+  padding: 'clamp(1rem, 3vw, 1.35rem) clamp(1.1rem, 3.5vw, 1.5rem) 0.75rem',
+  paddingRight: 'clamp(2.75rem, 6vw, 3.25rem)',
+  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+};
+
+const MODAL_CLOSE_BTN: CSSProperties = {
+  position: 'absolute',
+  top: 'clamp(0.65rem, 2vw, 0.85rem)',
+  right: 'clamp(0.65rem, 2vw, 0.85rem)',
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  border: '1px solid rgba(255, 255, 255, 0.28)',
+  background: 'rgba(15, 23, 42, 0.55)',
+  color: '#f8fafc',
+  fontSize: '1.35rem',
+  lineHeight: 1,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 5,
+  padding: 0,
+};
+
+const MODAL_BODY: CSSProperties = {
+  flex: 1,
+  overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
+  padding: 'clamp(0.85rem, 3vw, 1.15rem) clamp(1.1rem, 3.5vw, 1.5rem) clamp(1.25rem, 4vw, 1.5rem)',
+};
+
+const SECTION_CARD: CSSProperties = {
+  background: '#ffffff',
+  borderRadius: 16,
+  padding: '1rem 1.05rem',
+  marginBottom: '1rem',
+  boxShadow: '0 12px 28px rgba(15, 23, 42, 0.18)',
+  border: '1px solid rgba(226, 232, 240, 0.9)',
+};
+
+const SECTION_CARD_TITLE: CSSProperties = {
+  color: '#1e293b',
+  fontSize: '1rem',
+  fontWeight: 700,
+  marginBottom: '0.85rem',
+  letterSpacing: '0.02em',
+};
+
+const WIZARD_ACTION_BAR: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  marginBottom: 4,
+};
+
+const WIZARD_BTN_BACK: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid rgba(255, 255, 255, 0.22)',
+  background: 'rgba(15, 23, 42, 0.35)',
+  color: '#e2e8f0',
+  fontWeight: 700,
+  fontSize: '0.88rem',
+  cursor: 'pointer',
+};
+
+const WIZARD_BTN_PRIMARY: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  padding: '10px 16px',
+  borderRadius: 12,
+  border: 'none',
+  background: 'linear-gradient(90deg, #3b82f6, #2563eb)',
+  color: '#fff',
+  fontWeight: 800,
+  fontSize: '0.92rem',
+  cursor: 'pointer',
+  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+  minWidth: 108,
 };
 
 const MODAL_HEADING: CSSProperties = {
@@ -120,6 +221,9 @@ interface OrderModalProps {
   // 🚀 优化：坐标自动选择相关
   setSelectedSenderLocation?: (loc: {lat: number, lng: number} | null) => void;
   setSelectedReceiverLocation?: (loc: {lat: number, lng: number} | null) => void;
+  selectedSenderLocation?: { lat: number; lng: number } | null;
+  selectedReceiverLocation?: { lat: number; lng: number } | null;
+  onWizardStepChange?: (step: OrderWizardStepIndex) => void;
   cartTotal?: number;
   hasCOD?: boolean;
   setHasCOD?: (val: boolean) => void;
@@ -170,6 +274,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
   handleCancelOrder = () => setShowOrderForm(false),
   setSelectedSenderLocation = () => {},
   setSelectedReceiverLocation = () => {},
+  selectedSenderLocation = null,
+  selectedReceiverLocation = null,
+  onWizardStepChange,
   cartTotal = 0,
   hasCOD = true,
   setHasCOD = () => {},
@@ -182,6 +289,18 @@ const OrderModal: React.FC<OrderModalProps> = ({
 }) => {
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
+  const [wizardStep, setWizardStep] = useState<OrderWizardStepIndex>(0);
+
+  const wizardCopy = getWizardCopy(language);
+  const wizardLabels = getWizardStepLabels(language);
+
+  const goToStep = useCallback(
+    (step: OrderWizardStepIndex) => {
+      setWizardStep(step);
+      onWizardStepChange?.(step);
+    },
+    [onWizardStepChange]
+  );
 
   // 价格估算内跑腿费仅现金：若此前为「余额」则纠偏（余额按键已禁用，不可点）
   useEffect(() => {
@@ -189,6 +308,69 @@ const OrderModal: React.FC<OrderModalProps> = ({
       setPaymentMethod("cash");
     }
   }, [showOrderForm, paymentMethod, setPaymentMethod]);
+
+  useEffect(() => {
+    if (showOrderForm) {
+      goToStep(0);
+    }
+  }, [showOrderForm, goToStep]);
+
+  const handleWizardBack = () => {
+    if (wizardStep > 0) goToStep((wizardStep - 1) as OrderWizardStepIndex);
+  };
+
+  const handleWizardNext = () => {
+    if (wizardStep === 0) {
+      const err = validateAddressStep(
+        {
+          senderName,
+          senderPhone,
+          senderAddress: senderAddressText,
+          receiverName,
+          receiverPhone,
+          receiverAddress: receiverAddressText,
+          senderLocation: selectedSenderLocation,
+          receiverLocation: selectedReceiverLocation,
+        },
+        wizardCopy
+      );
+      if (err) {
+        window.alert(err);
+        return;
+      }
+    }
+    if (wizardStep === 1) {
+      const err = validatePackageStep(showWeightInput, orderWeight, wizardCopy);
+      if (err) {
+        window.alert(err);
+        return;
+      }
+    }
+    if (wizardStep === 2) {
+      const err = validateDeliveryStep(
+        selectedDeliverySpeed,
+        scheduledDeliveryTime,
+        t.ui.scheduledDelivery,
+        wizardCopy
+      );
+      if (err) {
+        window.alert(err);
+        return;
+      }
+    }
+    if (wizardStep < WIZARD_LAST_STEP) {
+      goToStep((wizardStep + 1) as OrderWizardStepIndex);
+    }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (wizardStep !== WIZARD_LAST_STEP) {
+      handleWizardNext();
+      return;
+    }
+    handleOrderSubmit(e);
+  };
 
   if (!showOrderForm) return null;
 
@@ -208,26 +390,99 @@ const OrderModal: React.FC<OrderModalProps> = ({
     { value: 'Eco Way', label: t.ui.waySideDeliveryOption, icon: '🌿' },
   ];
 
+  const orderTitle =
+    language === 'zh' ? '立即下单' : language === 'en' ? 'Place Order' : 'အမှာစာတင်';
+
   return (
     <div style={MODAL_OVERLAY}>
       <div style={MODAL_PANEL}>
-        <div
-          style={{
-            textAlign: 'center',
-            marginBottom: '1.25rem',
-            paddingBottom: '1rem',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
-          }}
-        >
-          <Logo size="medium" />
-        </div>
-        <h2 style={MODAL_HEADING}>
-          {t.order.title}
-        </h2>
+        <div style={MODAL_CHROME}>
+          <button
+            type="button"
+            style={MODAL_CLOSE_BTN}
+            onClick={handleCancelOrder}
+            aria-label={
+              language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်မည်'
+            }
+            title={
+              language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်မည်'
+            }
+          >
+            ×
+          </button>
+          <h2 style={{ ...MODAL_HEADING, marginBottom: '0.35rem' }}>{orderTitle}</h2>
+          <p
+            style={{
+              textAlign: 'center',
+              margin: '0 0 0.65rem',
+              color: 'rgba(255, 255, 255, 0.88)',
+              fontSize: '0.92rem',
+            }}
+          >
+            {wizardCopy.subtitle}
+          </p>
+          <div
+            style={{
+              height: 3,
+              width: 40,
+              background: '#fbbf24',
+              borderRadius: 2,
+              margin: '0 auto 1rem',
+            }}
+          />
 
-        {/* 🚀 新增：身份识别标签 (对齐 App) */}
+          <OrderWizardProgress currentStep={wizardStep} labels={wizardLabels} />
+
+          <div style={WIZARD_ACTION_BAR}>
+            <div style={{ flex: 1, minWidth: 72 }}>
+              {wizardStep > 0 ? (
+                <button type="button" style={WIZARD_BTN_BACK} onClick={handleWizardBack}>
+                  ← {wizardCopy.back}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  style={{ ...WIZARD_BTN_BACK, visibility: 'hidden' }}
+                  tabIndex={-1}
+                  aria-hidden
+                >
+                  ←
+                </button>
+              )}
+            </div>
+            <span
+              style={{
+                color: 'rgba(255,255,255,0.75)',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+              }}
+            >
+              {wizardStep + 1} / {WIZARD_LAST_STEP + 1}
+            </span>
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+              {wizardStep < WIZARD_LAST_STEP ? (
+                <button type="button" style={WIZARD_BTN_PRIMARY} onClick={handleWizardNext}>
+                  {wizardCopy.next} →
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  form="client-order-wizard-form"
+                  style={WIZARD_BTN_PRIMARY}
+                >
+                  🚚 {t.order.submit}
+                  {isCalculated
+                    ? ` · ${Math.round(calculatedPriceDetail).toLocaleString()} MMK`
+                    : ''}
+                </button>
+              )}
+            </div>
+          </div>
+
+        {/* 🚀 身份识别标签 (对齐 App) */}
         {currentUser && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.85rem', gap: '10px' }}>
             {(currentUser.balance > 0 || currentUser.user_type === 'vip') ? (
               <div style={{ 
                 background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', 
@@ -261,10 +516,13 @@ const OrderModal: React.FC<OrderModalProps> = ({
             )}
           </div>
         )}
-        
-        <form onSubmit={handleOrderSubmit}>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={BLOCK_TITLE}>{t.order.sender}</h3>
+        </div>
+
+        <form id="client-order-wizard-form" onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div style={MODAL_BODY}>
+          {wizardStep === 0 && (
+          <div style={SECTION_CARD}>
+            <h3 style={SECTION_CARD_TITLE}>{t.order.sender}</h3>
             <input
               type="text"
               name="senderName"
@@ -400,9 +658,11 @@ const OrderModal: React.FC<OrderModalProps> = ({
               </button>
             </div>
           </div>
+          )}
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={BLOCK_TITLE}>{t.order.receiver}</h3>
+          {wizardStep === 0 && (
+          <div style={SECTION_CARD}>
+            <h3 style={SECTION_CARD_TITLE}>{t.order.receiver}</h3>
             <input
               type="text"
               name="receiverName"
@@ -530,10 +790,12 @@ const OrderModal: React.FC<OrderModalProps> = ({
               </button>
             </div>
           </div>
+          )}
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={BLOCK_TITLE}>
-              📦 {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
+          {wizardStep === 1 && (
+          <div style={SECTION_CARD}>
+            <h3 style={SECTION_CARD_TITLE}>
+              📦 {language === 'zh' ? '包裹信息' : language === 'en' ? 'Package' : 'ပါဆယ်အချက်အလက်'}
             </h3>
 
             {/* 自定义包裹类型：选择「顺路递（24小时内）」配送时固定为顺路递 */}
@@ -667,7 +929,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 background: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: '8px',
                 borderLeft: '4px solid #f59e0b',
-                color: 'white',
+                color: '#334155',
                 fontSize: '0.85rem',
                 lineHeight: '1.4'
               }}>
@@ -680,7 +942,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
             
             {showWeightInput && (
               <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
-                <label style={{ color: 'white', fontSize: '0.9rem', marginBottom: '0.2rem', display: 'block' }}>
+                <label style={{ color: '#334155', fontSize: '0.9rem', marginBottom: '0.2rem', display: 'block' }}>
                   {language === 'zh' ? '包裹重量 (kg)' : language === 'en' ? 'Weight (kg)' : 'အလေးချိန် (kg)'}
                 </label>
                 <input
@@ -718,7 +980,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
             {/* 🚀 新增：物品描述 (对齐 App) */}
             <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
-              <label style={{ color: 'white', fontSize: '0.9rem', marginBottom: '0.2rem', display: 'block' }}>
+              <label style={{ color: '#334155', fontSize: '0.9rem', marginBottom: '0.2rem', display: 'block' }}>
                 📝 {language === 'zh' ? '物品描述' : language === 'en' ? 'Description' : 'ပစ္စည်းဖော်ပြချက်'}
               </label>
               <textarea
@@ -796,9 +1058,12 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 </div>
               </div>
             )}
+          </div>
+          )}
 
-            {/* 配送选项（顺路递在定时达之下，与 App 一致） */}
-            <h3 style={BLOCK_TITLE}>{t.ui.deliveryOptions || t.ui.speed || '配送选项'}</h3>
+          {wizardStep === 2 && (
+          <div style={SECTION_CARD}>
+            <h3 style={SECTION_CARD_TITLE}>{t.ui.deliveryOptions || t.ui.speed || '配送选项'}</h3>
             
             <div style={{ position: 'relative', marginBottom: 'var(--spacing-2)' }}>
               <input type="hidden" name="deliverySpeed" value={selectedDeliverySpeed} required />
@@ -901,7 +1166,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                   <label style={{ 
                     fontWeight: 'bold', 
-                    color: 'white',
+                    color: '#1e293b',
                     fontSize: 'var(--font-size-base)'
                   }}>
                     {language === 'zh' ? '代收款 (COD)' : language === 'en' ? 'Collection Amount (COD)' : 'ငွေကောက်ခံရန် (COD)'}
@@ -1009,10 +1274,11 @@ const OrderModal: React.FC<OrderModalProps> = ({
               ***{t.ui.packageInfoMismatch}***
             </div>
           </div>
+          )}
 
-          {/* 💰 价格估算部分 */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={SECTION_HEADING}>
+          {wizardStep === 3 && (
+          <div style={{ marginBottom: '1rem' }}>
+            <h3 style={{ ...SECTION_HEADING, marginBottom: '0.75rem' }}>
               💰 {language === 'zh' ? '价格估算' : language === 'en' ? 'Price Estimate' : 'စျေးနှုန်းခန့်မှန်းခြင်း'}
             </h3>
             
@@ -1223,74 +1489,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
               )}
             </div>
           </div>
+          )}
 
-          <div
-            style={{
-              ...FORM_ACTIONS_ROW,
-              flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleCancelOrder}
-              style={{
-                flex: window.innerWidth < 768 ? 'none' : 1,
-                minWidth: 0,
-                background: 'rgba(255,255,255,0.1)',
-                color: 'rgba(248,250,252,0.95)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                padding: '0.9rem 1.25rem',
-                borderRadius: 12,
-                cursor: 'pointer',
-                fontWeight: 700,
-                width: window.innerWidth < 768 ? '100%' : 'auto',
-                transition: 'background 0.2s ease, border-color 0.2s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
-              }}
-            >
-              {t.order.cancel}
-            </button>
-            <button
-              type="submit"
-              style={{
-                flex: window.innerWidth < 768 ? 'none' : 1.2,
-                minWidth: 0,
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 55%, #1e40af 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '0.9rem 1.25rem',
-                borderRadius: 12,
-                cursor: 'pointer',
-                fontWeight: 800,
-                width: window.innerWidth < 768 ? '100%' : 'auto',
-                boxShadow: '0 8px 24px rgba(37, 99, 235, 0.45), 0 1px 0 rgba(255,255,255,0.15) inset',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 12px 28px rgba(37, 99, 235, 0.5), 0 1px 0 rgba(255,255,255,0.2) inset';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.45), 0 1px 0 rgba(255,255,255,0.15) inset';
-              }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span>{t.order.submit}</span>
-                {isCalculated && (
-                  <span style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '0.2rem' }}>
-                    {calculatedPriceDetail} MMK
-                  </span>
-                )}
-              </div>
-            </button>
           </div>
         </form>
       </div>

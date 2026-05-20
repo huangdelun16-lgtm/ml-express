@@ -4,18 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import { useLanguage } from '../contexts/LanguageContext';
-
-/** 构建期注入：在 .env / Netlify 中配置各应用商店链接，未设置则不显示对应按钮 */
-function getPublicStoreEnv() {
-  return {
-    clientIos: (process.env.REACT_APP_CLIENT_APP_IOS_URL || '').trim(),
-    clientAndroid: (process.env.REACT_APP_CLIENT_APP_ANDROID_URL || '').trim(),
-    merchantIos: (process.env.REACT_APP_MERCHANT_APP_IOS_URL || '').trim(),
-    merchantAndroid: (process.env.REACT_APP_MERCHANT_APP_ANDROID_URL || '').trim(),
-    riderIos: (process.env.REACT_APP_RIDER_APP_IOS_URL || '').trim(),
-    riderAndroid: (process.env.REACT_APP_RIDER_APP_ANDROID_URL || '').trim(),
-  };
-}
+import { getPublicStoreUrls } from '../constants/appStoreUrls';
 
 type ContactPageProps = { embedInLanding?: boolean };
 
@@ -24,7 +13,7 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
   const { language, setLanguage, t } = useLanguage();
   const [isVisible, setIsVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const storeEnv = useMemo(() => getPublicStoreEnv(), []);
+  const storeEnv = useMemo(() => getPublicStoreUrls(), []);
 
   useEffect(() => {
     setIsVisible(true);
@@ -151,10 +140,10 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
                       : 'ပို့ဆောင်သူအက်ပ်',
                 value:
                   language === 'zh'
-                    ? '接单与配送；目前可在 App Store 下载（若提供 Google Play 链接将显示第二枚按钮）。'
+                    ? '接单与配送；请从下方 App Store 或 Google Play 安装官方骑手端。'
                     : language === 'en'
-                      ? 'Tasks & delivery. Available on the App Store; Google Play appears if configured.'
-                      : 'လုပ်ငန်းစဉ်နှင့် ပို့ဆောင်မှု — App Store မှ ဒေါင်းလုဒ်လုပ်နိုင်သည်။',
+                      ? 'Tasks & delivery. Install the official courier app from App Store or Google Play below.'
+                      : 'လုပ်ငန်းစဉ်နှင့် ပို့ဆောင်မှု — App Store သို့မဟုတ် Google Play မှ တရားဝင်ထည့်သွင်းပါ။',
                 color: '#3182ce',
                 bgGradient: 'linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)',
                 iconBg: 'linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)',

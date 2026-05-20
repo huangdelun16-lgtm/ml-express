@@ -2371,6 +2371,8 @@ const HomePage: React.FC = () => {
         // 🚀 优化：坐标自动选择相关
         setSelectedSenderLocation={setSelectedSenderLocation}
         setSelectedReceiverLocation={setSelectedReceiverLocation}
+        selectedSenderLocation={selectedSenderLocation}
+        selectedReceiverLocation={selectedReceiverLocation}
         cartTotal={cartTotal}
         hasCOD={hasCOD}
         setHasCOD={setHasCOD}

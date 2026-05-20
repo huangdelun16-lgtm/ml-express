@@ -502,7 +502,7 @@ const translations: any = {
       }
     },
     order: {
-      title: '创建订单',
+      title: '立即下单',
       sender: '寄件人信息',
       receiver: '收件人信息',
       package: '速度',
@@ -1097,7 +1097,7 @@ const translations: any = {
       }
     },
     order: {
-      title: 'Create Order',
+      title: 'Place Order',
       sender: 'Sender Information',
       receiver: 'Receiver Information',
       package: 'Speed',
