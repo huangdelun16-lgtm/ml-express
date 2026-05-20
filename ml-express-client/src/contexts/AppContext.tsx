@@ -5,6 +5,7 @@ import { supabase } from '../services/supabase';
 import * as Speech from 'expo-speech';
 import { Vibration, Platform, Alert } from 'react-native';
 import * as KeepAwake from 'expo-keep-awake';
+import { APP_CONFIG } from '../config/constants';
 
 type Language = 'zh' | 'en' | 'my';
 interface AppContextType {
@@ -145,6 +146,9 @@ export function AppProvider({ children }: AppProviderProps) {
       if (savedDarkMode) {
         setIsDarkModeState(savedDarkMode === 'true');
       }
+
+      const guestFlag = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.IS_GUEST);
+      setIsGuest(guestFlag === 'true');
 
       const currentUserStr = await AsyncStorage.getItem('currentUser');
       const savedSessionId = await AsyncStorage.getItem('currentSessionId');

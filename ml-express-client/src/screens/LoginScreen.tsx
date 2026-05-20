@@ -9,9 +9,10 @@ import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import LanguageSelector from '../components/LanguageSelector';
 import { feedbackService } from '../services/FeedbackService';
+import { enterGuestMode, clearGuestMode } from '../utils/guestSession';
 
 export default function LoginScreen({ navigation }: any) {
-  const { language, refreshSession } = useApp();
+  const { language, refreshSession, setIsGuest } = useApp();
   const { showLoading, hideLoading } = useLoading();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +39,8 @@ export default function LoginScreen({ navigation }: any) {
       languageChinese: '中文',
       languageEnglish: 'English',
       languageBurmese: 'မြန်မာ',
+      browseGuest: '暂不登录，先逛逛',
+      browseGuestHint: '可浏览商城与追踪订单，下单需登录',
     },
     en: {
       welcome: 'Welcome Back',
@@ -58,6 +61,8 @@ export default function LoginScreen({ navigation }: any) {
       languageChinese: '中文',
       languageEnglish: 'English',
       languageBurmese: 'မြန်မာ',
+      browseGuest: 'Browse without signing in',
+      browseGuestHint: 'Browse the mall and track orders; sign in to place orders',
     },
     my: {
       welcome: 'ပြန်လည်ကြိုဆိုပါတယ်',
@@ -78,10 +83,22 @@ export default function LoginScreen({ navigation }: any) {
       languageChinese: '中文',
       languageEnglish: 'English',
       languageBurmese: 'မြန်မာ',
+      browseGuest: 'မဝင်ဘဲ အရင်လှည့်ကြည့်မည်',
+      browseGuestHint: 'ဈေးဝယ်စင်တာနှင့် အော်ဒါခြေရာခံနိုင်သည်၊ အော်ဒါတင်ရန် ဝင်ရောက်ရမည်',
     },
   };
 
   const currentT = t[language];
+
+  const handleBrowseAsGuest = async () => {
+    try {
+      await enterGuestMode(setIsGuest);
+      navigation.replace('Main');
+    } catch (error) {
+      LoggerService.error('进入访客模式失败:', error);
+      feedbackService.error(currentT.loginFailed);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -109,6 +126,7 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('userPhone', result.data.phone);
         await AsyncStorage.setItem('userType', 'customer');
         await AsyncStorage.setItem('currentSessionId', newSessionId);
+        await clearGuestMode(setIsGuest);
 
         await refreshSession();
 
@@ -223,6 +241,17 @@ export default function LoginScreen({ navigation }: any) {
               ) : (
                 <Text style={styles.loginButtonText}>{currentT.loginButton}</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.guestButton}
+              onPress={handleBrowseAsGuest}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={currentT.browseGuest}
+            >
+              <Text style={styles.guestButtonText}>{currentT.browseGuest}</Text>
+              <Text style={styles.guestButtonHint}>{currentT.browseGuestHint}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -394,6 +423,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  guestButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#93c5fd',
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+  },
+  guestButtonText: {
+    color: '#1d4ed8',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  guestButtonHint: {
+    marginTop: 4,
+    color: '#64748b',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   registerLink: {
     marginTop: 20,

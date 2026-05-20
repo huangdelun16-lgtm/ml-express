@@ -7,11 +7,26 @@ import Skeleton, { GridSkeleton, ListItemSkeleton } from '../components/Skeleton
 import { Ionicons } from '@expo/vector-icons';
 import { deliveryStoreService, merchantService, reviewService, bannerService, Banner } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
-import { theme } from '../config/theme';
 import BackToHomeButton from '../components/BackToHomeButton';
 import LoggerService from '../services/LoggerService';
 
 const { width } = Dimensions.get('window');
+
+/** 商户类型 → 图标区渐变（高级感点缀） */
+const STORE_TYPE_GRADIENT: Record<string, [string, string]> = {
+  restaurant: ['#f59e0b', '#ea580c'],
+  tea_shop: ['#14b8a6', '#0d9488'],
+  drinks_snacks: ['#f472b6', '#db2777'],
+  grocery: ['#22c55e', '#16a34a'],
+  supermarket: ['#3b82f6', '#4f46e5'],
+  breakfast: ['#fb923c', '#f97316'],
+  cake_shop: ['#ec4899', '#be185d'],
+  flower_shop: ['#a855f7', '#7c3aed'],
+  clothing_store: ['#6366f1', '#4338ca'],
+  hardware_store: ['#64748b', '#475569'],
+  transit_station: ['#0ea5e9', '#0284c7'],
+};
+const DEFAULT_STORE_GRADIENT: [string, string] = ['#38bdf8', '#6366f1'];
 
 interface DeliveryStore {
   id: string;
@@ -26,76 +41,198 @@ interface DeliveryStore {
   vacation_dates?: string[];
 }
 
+const AllMerchantsSectionHeader = React.memo(({ title, count, language }: { title: string; count: number; language: string }) => {
+  const kicker =
+    language === 'zh' ? '精选商户' : language === 'en' ? 'Curated stores' : 'ရွေးချယ်ထားသော ဆိုင်များ';
+  return (
+    <View style={styles.allMerchantsHeader}>
+      <View style={styles.allMerchantsTitleRow}>
+        <LinearGradient
+          colors={['#fcd34d', '#f59e0b', 'rgba(245,158,11,0.2)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.allMerchantsAccentBar}
+        />
+        <View style={styles.allMerchantsTitleBlock}>
+          <Text style={styles.allMerchantsKicker}>{kicker}</Text>
+          <View style={styles.allMerchantsTitleLine}>
+            <Text style={styles.allMerchantsTitleText}>{title}</Text>
+            {count > 0 ? (
+              <View style={styles.allMerchantsCountPill}>
+                <Text style={styles.allMerchantsCountText}>{count}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
+      <LinearGradient
+        colors={['rgba(251,191,36,0.45)', 'rgba(148,163,184,0.12)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.allMerchantsDivider}
+      />
+    </View>
+  );
+});
+
 // 🚀 优化：使用 React.memo 包装组件，减少不必要的重绘
 const StoreCard = React.memo(({ item, status, language, t, productMatches, stats, onVisit, onShowReviews }: any) => {
   const matchedProducts = productMatches[item.id] || [];
-  
+  const statusLabel = status.isOpen
+    ? t.openNow
+    : status.reason === 'closed_today'
+      ? t.closedToday
+      : status.reason === 'vacation'
+        ? (language === 'zh' ? '预设休假' : 'Vacation')
+        : t.closedNow;
+  const iconGradient = STORE_TYPE_GRADIENT[item.store_type] || DEFAULT_STORE_GRADIENT;
+
   return (
     <TouchableOpacity
-      style={[styles.storeCard, !status.isOpen && { opacity: 0.7 }]}
+      style={[styles.storeCardOuter, !status.isOpen && styles.storeCardOuterClosed]}
       onPress={() => onVisit(item, status)}
-      activeOpacity={status.isOpen ? 0.7 : 1}
+      activeOpacity={status.isOpen ? 0.82 : 1}
     >
-      <View style={styles.storeHeader}>
-        <View style={[styles.storeIconContainer, !status.isOpen && { backgroundColor: '#f1f5f9' }]}>
-          <Text style={[styles.storeIcon, !status.isOpen && { opacity: 0.5 }]}>
-            {getStoreIcon(item.store_type)}
-          </Text>
-        </View>
-        <View style={styles.storeMainInfo}>
-          <Text style={[styles.storeName, !status.isOpen && { color: '#64748b' }]}>
-            {item.store_name}
-          </Text>
-          {matchedProducts.length > 0 && (
-            <Text style={styles.matchText} numberOfLines={2}>
-              {t.productMatches}: {matchedProducts.join(', ')}
-            </Text>
-          )}
-          <View style={styles.tagContainer}>
-            <View style={styles.typeTag}>
-              <Text style={styles.typeTagText}>{getStoreTypeLabel(item.store_type, language)}</Text>
+      <LinearGradient
+        colors={
+          status.isOpen
+            ? ['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.06)', 'rgba(148,163,184,0.14)']
+            : ['rgba(148,163,184,0.18)', 'rgba(100,116,139,0.08)']
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.storeCardBorder}
+      >
+        <View style={styles.storeCardInner}>
+          {status.isOpen ? (
+            <LinearGradient
+              colors={['rgba(251,191,36,0.55)', 'rgba(59,130,246,0.35)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.storeCardTopGlow}
+            />
+          ) : null}
+
+          <View style={styles.storeHeader}>
+            <LinearGradient
+              colors={status.isOpen ? iconGradient : ['#64748b', '#475569']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.storeIconRing}
+            >
+              <View style={styles.storeIconContainer}>
+                <Text style={[styles.storeIcon, !status.isOpen && { opacity: 0.5 }]}>
+                  {getStoreIcon(item.store_type)}
+                </Text>
+              </View>
+            </LinearGradient>
+
+            <View style={styles.storeMainInfo}>
+              <View style={styles.storeTitleRow}>
+                <Text style={[styles.storeName, !status.isOpen && styles.storeNameClosed]} numberOfLines={1}>
+                  {item.store_name}
+                </Text>
+                <View
+                  style={[
+                    styles.statusPill,
+                    status.isOpen ? styles.statusPillOpen : styles.statusPillClosed,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.statusDot,
+                      { backgroundColor: status.isOpen ? '#4ade80' : '#f87171' },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      { color: status.isOpen ? '#bbf7d0' : '#fecaca' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {statusLabel}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.tagMetaRow}>
+                <View style={styles.typeTag}>
+                  <Text style={styles.typeTagText} numberOfLines={1}>
+                    {getStoreTypeLabel(item.store_type, language)}
+                  </Text>
+                </View>
+                {stats && stats.count > 0 ? (
+                  <TouchableOpacity
+                    style={styles.reviewStatsInline}
+                    onPress={() => onShowReviews(item)}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  >
+                    <Text style={styles.starsTextCompact}>
+                      {'★'.repeat(Math.round(stats.average))}
+                      <Text style={styles.starsTextDim}>
+                        {'★'.repeat(5 - Math.round(stats.average))}
+                      </Text>
+                    </Text>
+                    <Text style={styles.reviewCountTextCompact}>
+                      {stats.average}
+                      <Text style={styles.reviewCountSep}> · </Text>
+                      {stats.count}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {matchedProducts.length > 0 ? (
+                <View style={styles.matchChip}>
+                  <Ionicons name="sparkles" size={11} color="#fcd34d" />
+                  <Text style={styles.matchText} numberOfLines={1}>
+                    {matchedProducts.join(' · ')}
+                  </Text>
+                </View>
+              ) : null}
             </View>
-            <View style={[styles.statusTag, { backgroundColor: status.isOpen ? '#dcfce7' : '#fee2e2' }]}>
-              <Text style={[styles.statusTagText, { color: status.isOpen ? '#15803d' : '#ef4444' }]}>
-                {status.isOpen ? t.openNow : (status.reason === 'closed_today' ? t.closedToday : (status.reason === 'vacation' ? (language === 'zh' ? '预设休假' : 'Vacation') : t.closedNow))}
+          </View>
+
+          <View style={[styles.storeDetails, !status.isOpen && styles.storeDetailsMuted]}>
+            <View style={styles.detailItem}>
+              <View style={styles.detailIconWrap}>
+                <Ionicons name="time-outline" size={12} color="#93c5fd" />
+              </View>
+              <Text style={styles.detailText} numberOfLines={1}>
+                {item.operating_hours || '09:00 - 21:00'}
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <View style={styles.detailIconWrap}>
+                <Ionicons name="location-outline" size={12} color="#93c5fd" />
+              </View>
+              <Text style={styles.detailText} numberOfLines={1}>
+                {item.address}
               </Text>
             </View>
           </View>
-          
-          {stats && stats.count > 0 && (
-            <TouchableOpacity style={styles.reviewStatsContainer} onPress={() => onShowReviews(item)}>
-              <View style={styles.starsRow}>
-                <Text style={styles.starsText}>
-                  {'★'.repeat(Math.round(stats.average))}
-                  <Text style={{ color: 'rgba(255,255,255,0.2)' }}>
-                    {'★'.repeat(5 - Math.round(stats.average))}
-                  </Text>
-                </Text>
+
+          <View style={styles.cardFooter}>
+            {status.isOpen ? (
+              <LinearGradient
+                colors={['rgba(59,130,246,0.35)', 'rgba(99,102,241,0.22)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.visitCta}
+              >
+                <Text style={styles.visitText}>{t.visitStore}</Text>
+                <Ionicons name="arrow-forward" size={14} color="#e0f2fe" />
+              </LinearGradient>
+            ) : (
+              <View style={[styles.visitCta, styles.visitCtaDisabled]}>
+                <Ionicons name="lock-closed-outline" size={13} color="#94a3b8" />
+                <Text style={[styles.visitText, styles.visitTextDisabled]}>{t.closedToday}</Text>
               </View>
-              <Text style={styles.reviewCountText}>
-                {stats.average} ({stats.count} {t.reviews})
-              </Text>
-            </TouchableOpacity>
-          )}
+            )}
+          </View>
         </View>
-      </View>
-
-      <View style={[styles.storeDetails, !status.isOpen && { opacity: 0.6 }]}>
-        <View style={styles.detailItem}>
-          <Ionicons name="time-outline" size={16} color="#64748b" />
-          <Text style={styles.detailText}>{t.operatingHours}: {item.operating_hours || '09:00 - 21:00'}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="location-outline" size={16} color="#64748b" />
-          <Text style={styles.detailText} numberOfLines={1}>{item.address}</Text>
-        </View>
-      </View>
-
-      <View style={styles.cardFooter}>
-        <Text style={[styles.visitText, { color: status.isOpen ? '#2563eb' : '#94a3b8' }]}>
-          {status.isOpen ? t.visitStore : t.closedToday} {status.isOpen ? '→' : '🔒'}
-        </Text>
-      </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 });
@@ -725,7 +862,13 @@ export default function CityMallScreen({ navigation }: any) {
           </View>
         );
       case 'all_title':
-        return <Text style={[styles.sectionTitle, { marginLeft: 20, marginTop: 10, marginBottom: 15 }]}>🏪 {t.allMerchants}</Text>;
+        return (
+          <AllMerchantsSectionHeader
+            title={t.allMerchants}
+            count={filteredStores.length}
+            language={language}
+          />
+        );
       case 'store':
         return (
           <StoreCard 
@@ -800,15 +943,17 @@ export default function CityMallScreen({ navigation }: any) {
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
           ListFooterComponent={loadingMore ? <ActivityIndicator color="#fff" style={{ marginVertical: 20 }} /> : null}
-          ListEmptyComponent={!loading && (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconCircle}><Ionicons name={searchMode === 'stores' ? "business-outline" : "cube-outline"} size={60} color="rgba(255,255,255,0.2)" /></View>
-              <Text style={styles.emptyText}>{searchMode === 'stores' ? t.noStores : t.noProducts}</Text>
-              <Text style={styles.emptySubtext}>
-                {searchMode === 'stores' ? (language === 'zh' ? '请尝试切换到其他地区看看' : 'Try switching to another region') : (language === 'zh' ? '换个关键词搜搜看吧' : 'Try another keyword')}
-              </Text>
-            </View>
-          )}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconCircle}><Ionicons name={searchMode === 'stores' ? "business-outline" : "cube-outline"} size={60} color="rgba(255,255,255,0.2)" /></View>
+                <Text style={styles.emptyText}>{searchMode === 'stores' ? t.noStores : t.noProducts}</Text>
+                <Text style={styles.emptySubtext}>
+                  {searchMode === 'stores' ? (language === 'zh' ? '请尝试切换到其他地区看看' : 'Try switching to another region') : (language === 'zh' ? '换个关键词搜搜看吧' : 'Try another keyword')}
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
 
@@ -962,6 +1107,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     width: 65,
+  },
+  categoryItemActive: {
+    transform: [{ translateY: -1 }],
   },
   categoryIconCircle: {
     width: 50,
@@ -1169,103 +1317,295 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 40,
   },
-  storeCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 20,
+  allMerchantsHeader: {
     marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  allMerchantsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 12,
+  },
+  allMerchantsAccentBar: {
+    width: 3,
+    borderRadius: 4,
+    minHeight: 44,
+  },
+  allMerchantsTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  allMerchantsKicker: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: 'rgba(251, 191, 36, 0.85)',
+    marginBottom: 4,
+  },
+  allMerchantsTitleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  allMerchantsTitleText: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#f8fafc',
+    letterSpacing: 0.2,
+  },
+  allMerchantsCountPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 5,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  allMerchantsCountText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#e2e8f0',
+    fontVariant: ['tabular-nums'],
+  },
+  allMerchantsDivider: {
+    height: 1,
+    marginTop: 12,
+    borderRadius: 1,
+  },
+  storeCardOuter: {
+    marginBottom: 12,
+    marginHorizontal: 20,
+    borderRadius: 18,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  storeCardOuterClosed: {
+    opacity: 0.78,
+    shadowOpacity: 0.15,
+    elevation: 2,
+  },
+  storeCardBorder: {
+    borderRadius: 18,
+    padding: 1,
+  },
+  storeCardInner: {
+    borderRadius: 17,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    overflow: 'hidden',
+  },
+  storeCardTopGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
   },
   storeHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  storeIconRing: {
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    padding: 1.5,
+    marginRight: 12,
   },
   storeIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    flex: 1,
+    borderRadius: 14.5,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
   },
   storeIcon: {
-    fontSize: 30,
+    fontSize: 24,
   },
   storeMainInfo: {
     flex: 1,
+    minWidth: 0,
   },
-  matchText: {
-    fontSize: 12,
-    color: '#fbbf24',
-    marginTop: 2,
-    marginBottom: 6,
-  },
-  storeName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginBottom: 6,
-  },
-  tagContainer: {
+  storeTitleRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 7,
+  },
+  tagMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  typeTag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  reviewStatsInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
     borderRadius: 8,
+    backgroundColor: 'rgba(251, 191, 36, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.12)',
   },
-  typeTagText: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.7)',
+  starsTextCompact: {
+    color: '#fbbf24',
+    fontSize: 10,
+    letterSpacing: 0.3,
+  },
+  starsTextDim: {
+    color: 'rgba(251, 191, 36, 0.22)',
+  },
+  reviewCountTextCompact: {
+    color: 'rgba(226, 232, 240, 0.75)',
+    fontSize: 10,
     fontWeight: '700',
   },
-  statusTag: {
-    paddingHorizontal: 10,
+  reviewCountSep: {
+    color: 'rgba(148, 163, 184, 0.6)',
+    fontWeight: '500',
+  },
+  matchChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(251, 191, 36, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.14)',
+  },
+  matchText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#fde68a',
+    lineHeight: 15,
+    fontWeight: '600',
+  },
+  storeName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#f8fafc',
+    letterSpacing: -0.3,
+  },
+  storeNameClosed: {
+    color: '#94a3b8',
+  },
+  typeTag: {
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
+    maxWidth: '58%',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  statusTagText: {
-    fontSize: 11,
+  typeTagText: {
+    fontSize: 10,
+    color: 'rgba(226, 232, 240, 0.82)',
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    flexShrink: 0,
+    maxWidth: '48%',
+    borderWidth: 1,
+  },
+  statusPillOpen: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderColor: 'rgba(74, 222, 128, 0.28)',
+  },
+  statusPillClosed: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(248, 113, 113, 0.22)',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusPillText: {
+    fontSize: 10,
     fontWeight: '800',
+    letterSpacing: 0.15,
   },
   storeDetails: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
-    paddingTop: 16,
-    gap: 10,
+    marginTop: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    gap: 7,
+  },
+  storeDetailsMuted: {
+    opacity: 0.65,
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+  },
+  detailIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   detailText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 12,
+    color: 'rgba(226, 232, 240, 0.68)',
     flex: 1,
     fontWeight: '500',
+    lineHeight: 16,
   },
   cardFooter: {
-    marginTop: 16,
-    alignItems: 'flex-end',
+    marginTop: 12,
+  },
+  visitCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.25)',
+  },
+  visitCtaDisabled: {
+    backgroundColor: 'rgba(51, 65, 85, 0.45)',
+    borderColor: 'rgba(148, 163, 184, 0.15)',
   },
   visitText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.35,
+    color: '#e0f2fe',
+  },
+  visitTextDisabled: {
+    color: '#94a3b8',
+    fontWeight: '700',
   },
   sectionContainer: {
     marginBottom: 20,
@@ -1339,25 +1679,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.4)',
     fontSize: 10,
     fontWeight: 'bold',
-  },
-  reviewStatsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-  },
-  starsRow: {
-    flexDirection: 'row',
-  },
-  starsText: {
-    color: '#fbbf24',
-    fontSize: 14,
-    letterSpacing: 1,
-  },
-  reviewCountText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

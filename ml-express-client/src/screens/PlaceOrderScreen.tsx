@@ -32,7 +32,7 @@ import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView, ScaleInView } from '../components/Animations';
 import { PackageIcon, LocationIcon, MapIcon, MoneyIcon, ClockIcon, DeliveryIcon } from '../components/Icon';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
-import BackToHomeButton from '../components/BackToHomeButton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorService } from '../services/ErrorService';
 import { feedbackService } from '../services/FeedbackService';
 import { analytics } from '../services/AnalyticsService';
@@ -44,6 +44,8 @@ import PackageInfo from '../components/placeOrder/PackageInfo';
 import DeliveryOptions from '../components/placeOrder/DeliveryOptions';
 import PriceCalculation from '../components/placeOrder/PriceCalculation';
 import MapModal from '../components/placeOrder/MapModal';
+import OrderWizardProgress, { OrderWizardStepIndex } from '../components/placeOrder/OrderWizardProgress';
+import { promptGuestLogin } from '../utils/guestSession';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -54,8 +56,11 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 
 import Toast from '../components/Toast';
 
+const WIZARD_LAST_STEP: OrderWizardStepIndex = 3;
+
 export default function PlaceOrderScreen({ navigation, route }: any) {
   const { language } = useApp();
+  const insets = useSafeAreaInsets();
   const { showLoading, hideLoading } = useLoading();
   const { clearCart } = useCart();
   const styles = useLanguageStyles(baseStyles);
@@ -70,6 +75,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     deducted: boolean;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [wizardStep, setWizardStep] = useState<OrderWizardStepIndex>(0);
 
   // 处理从其他页面（如商品详情/购物车）传来的预选商品
   useEffect(() => {
@@ -410,6 +416,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     zh: {
       title: '立即下单',
       subtitle: '请填写订单信息',
+      wizardSteps: ['地址', '包裹', '配送', '确认'],
+      wizardNext: '下一步',
+      wizardBack: '上一步',
+      guestLoginToSubmit: '登录后即可提交订单',
       senderInfo: '寄件人信息',
       useMyInfo: '使用我的信息',
       senderName: '寄件人姓名',
@@ -532,6 +542,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     en: {
       title: 'Place Order',
       subtitle: 'Please fill in order information',
+      wizardSteps: ['Address', 'Package', 'Delivery', 'Confirm'],
+      wizardNext: 'Next',
+      wizardBack: 'Back',
+      guestLoginToSubmit: 'Sign in to submit your order',
       senderInfo: 'Sender Information',
       useMyInfo: 'Use my info',
       senderName: 'Sender Name',
@@ -654,6 +668,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     my: {
       title: 'အမှာစာတင်',
       subtitle: 'အမှာစာအချက်အလက်ဖြည့်ပါ',
+      wizardSteps: ['လိပ်စာ', 'ပါဆယ်', 'ပို့ဆောင်', 'အတည်ပြု'],
+      wizardNext: 'ရှေ့သို့',
+      wizardBack: 'နောက်သို့',
+      guestLoginToSubmit: 'အော်ဒါတင်ရန် ဝင်ရောက်ပါ',
       senderInfo: 'ပေးပို့သူအချက်အလက်',
       useMyInfo: 'ကျွန်ုပ်၏အချက်အလက်သုံးမည်',
       senderName: 'ပေးပို့သူအမည်',
@@ -774,6 +792,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   };
 
   const currentT = t[language];
+  const wizardStepLabels: string[] =
+    (currentT as { wizardSteps?: string[] }).wizardSteps ?? ['地址', '包裹', '配送', '确认'];
 
   // 生成可用时间段 (09:00 - 18:00, 30分钟间隔)
   const timeSlots = useMemo(() => {
@@ -1598,8 +1618,94 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     return lastResult;
   };
 
+  const validateAddressStep = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    let isValid = true;
+    const fieldsToValidate = [
+      { field: 'senderName', value: senderName },
+      { field: 'senderPhone', value: senderPhone },
+      { field: 'senderAddress', value: senderAddress },
+      { field: 'receiverName', value: receiverName },
+      { field: 'receiverPhone', value: receiverPhone },
+      { field: 'receiverAddress', value: receiverAddress },
+    ];
+    fieldsToValidate.forEach(({ field, value }) => {
+      const error = validateField(field, value);
+      if (error) {
+        newErrors[field] = error;
+        isValid = false;
+      }
+    });
+    setErrors(newErrors);
+    setTouched(fieldsToValidate.reduce((acc, { field }) => ({ ...acc, [field]: true }), {}));
+    if (!isValid) {
+      feedbackService.error(currentT.fillRequired);
+      return false;
+    }
+    if (!senderCoordinates || !receiverCoordinates) {
+      feedbackService.warning(
+        language === 'zh'
+          ? '请在地图中选择寄件与收件精确位置'
+          : language === 'en'
+            ? 'Please pick sender and receiver locations on the map'
+            : 'ပို့သူနှင့် လက်ခံသူ လိပ်စာကို မြေပွင့်တွင် ရွေးချယ်ပါ'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const validatePackageStep = (): boolean => {
+    if (showWeightInput && !weight) {
+      feedbackService.warning(
+        language === 'zh' ? '请填写包裹重量' : language === 'en' ? 'Please enter package weight' : 'ပါဆယ်အလေးချိန် ထည့်ပါ'
+      );
+      return false;
+    }
+    const parsedWeight = Number(weight);
+    if (showWeightInput && (!Number.isFinite(parsedWeight) || parsedWeight <= 0)) {
+      feedbackService.warning(
+        language === 'zh' ? '请输入有效包裹重量' : language === 'en' ? 'Please enter valid weight' : 'အလေးချိန်မှန်ကန်စွာ ထည့်ပါ'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const validateDeliveryStep = (): boolean => {
+    if (deliverySpeed === '定时达' && !scheduledTime) {
+      feedbackService.warning(
+        language === 'zh' ? '请填写指定送达时间' : language === 'en' ? 'Please set scheduled delivery time' : 'ပို့ဆောင်မည့်အချိန် ရွေးချယ်ပါ'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleWizardNext = () => {
+    if (wizardStep === 0 && !validateAddressStep()) return;
+    if (wizardStep === 1 && !validatePackageStep()) return;
+    if (wizardStep === 2) {
+      if (!validateDeliveryStep()) return;
+      void calculatePrice({ silent: true });
+    }
+    if (wizardStep < WIZARD_LAST_STEP) {
+      setWizardStep((s) => (s + 1) as OrderWizardStepIndex);
+    }
+  };
+
+  const handleWizardBack = () => {
+    if (wizardStep > 0) {
+      setWizardStep((s) => (s - 1) as OrderWizardStepIndex);
+    }
+  };
+
   // 提交订单
   const handleSubmitOrder = async () => {
+    if (isGuest) {
+      promptGuestLogin(navigation, language);
+      return;
+    }
     if (isSubmitting) {
       feedbackService.warning(language === 'zh' ? '订单提交中，请勿重复点击' : language === 'en' ? 'Submitting, please do not tap again' : 'အော်ဒါတင်နေပါသည်၊ ထပ်မနှိပ်ပါနှင့်');
       return;
@@ -1947,6 +2053,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         setQrOrderId(orderId);
         setQrOrderPrice(isCalculated ? calculatedPrice : price);
         setShowQRCodeModal(true);
+        setWizardStep(0);
         // 不再显示Alert，因为二维码模态框已经包含了成功信息
         // Alert.alert(
         //   currentT.orderSuccess,
@@ -2112,8 +2219,11 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     }
   };
 
-  // 重置表单
+  // 重置表单（下单成功或关闭二维码后回到第 1 步「地址」）
   const resetForm = () => {
+    setWizardStep(0);
+    setErrors({});
+    setTouched({});
     setReceiverName('');
     setReceiverPhone('');
     setReceiverAddress('');
@@ -2187,7 +2297,78 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     // 注意：切换回开启时，useEffect 会自动触发 updateCODAndDescription 重新计算金额
   };
 
-  // Force re-bundle
+  const renderWizardActionBar = () => (
+    <View style={wizardStyles.actionBar}>
+      <View style={wizardStyles.actionBarSide}>
+        {wizardStep > 0 ? (
+          <TouchableOpacity
+            style={wizardStyles.actionBack}
+            onPress={handleWizardBack}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={(currentT as { wizardBack?: string }).wizardBack}
+          >
+            <Ionicons name="chevron-back" size={18} color="#e2e8f0" />
+            <Text style={wizardStyles.backBtnText}>
+              {(currentT as { wizardBack?: string }).wizardBack ?? '上一步'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={wizardStyles.actionSidePlaceholder} />
+        )}
+      </View>
+
+      <Text style={wizardStyles.stepIndicator}>
+        {wizardStep + 1} / {WIZARD_LAST_STEP + 1}
+      </Text>
+
+      <View style={[wizardStyles.actionBarSide, wizardStyles.actionBarSideEnd]}>
+        {wizardStep < WIZARD_LAST_STEP ? (
+          <TouchableOpacity
+            style={wizardStyles.actionPrimaryBtn}
+            onPress={handleWizardNext}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={(currentT as { wizardNext?: string }).wizardNext}
+          >
+            <LinearGradient
+              colors={['#3b82f6', '#2563eb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={wizardStyles.actionPrimaryGradient}
+            >
+              <Text style={wizardStyles.nextBtnText}>
+                {(currentT as { wizardNext?: string }).wizardNext ?? '下一步'}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={wizardStyles.actionPrimaryBtn}
+            onPress={handleSubmitOrder}
+            activeOpacity={0.8}
+            disabled={isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel={currentT.submitOrder}
+          >
+            <LinearGradient
+              colors={['#3b82f6', '#2563eb', '#1d4ed8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={wizardStyles.actionPrimaryGradient}
+            >
+              <DeliveryIcon size={20} color="#ffffff" />
+              <Text style={wizardStyles.nextBtnText} numberOfLines={1}>
+                {isSubmitting ? currentT.creating : currentT.submitOrder}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       {/* 优化背景视觉效果 */}
@@ -2219,23 +2400,60 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         zIndex: 0
       }} />
 
+      <View
+        style={[
+          wizardStyles.topChrome,
+          { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 12 : 8) },
+        ]}
+      >
+        <View style={[styles.header, { marginBottom: 8, paddingTop: 0 }]}>
+          <Text style={[styles.headerTitle, { color: '#ffffff', fontSize: 32, fontWeight: '800' }]}>{currentT.title}</Text>
+          <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
+          <Text style={[styles.headerSubtitle, { color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }]}>{currentT.subtitle}</Text>
+        </View>
+
+        <OrderWizardProgress
+          currentStep={wizardStep}
+          labels={wizardStepLabels}
+          language={language}
+        />
+
+        {renderWizardActionBar()}
+      </View>
+
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}
       >
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: 20 }]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingHorizontal: 16,
+              paddingTop: 8,
+              paddingBottom: Math.max(insets.bottom, 16) + 24,
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.header, { marginBottom: 10 }]}>
-            <Text style={[styles.headerTitle, { color: '#ffffff', fontSize: 32, fontWeight: '800' }]}>{currentT.title}</Text>
-            <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
-            <Text style={[styles.headerSubtitle, { color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }]}>{currentT.subtitle}</Text>
-          </View>
+          {isGuest && (
+            <View style={wizardStyles.guestBanner}>
+              <Text style={wizardStyles.guestBannerText}>
+                {(currentT as { guestLoginToSubmit?: string }).guestLoginToSubmit}
+              </Text>
+              <TouchableOpacity onPress={() => promptGuestLogin(navigation, language)}>
+                <Text style={wizardStyles.guestBannerLink}>
+                  {language === 'zh' ? '去登录' : language === 'en' ? 'Sign in' : 'ဝင်ရောက်မည်'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-          {/* 寄件人表单 */}
+          {wizardStep === 0 && (
+          <>
           <SenderForm
             language={language as any}
             styles={styles}
@@ -2275,7 +2493,11 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onOpenAddressBook={() => openAddressBook('receiver')}
             onBlur={handleFieldBlur}
           />
+          </>
+          )}
 
+          {wizardStep === 1 && (
+          <>
           {/* 🚀 新增：商家商品选择卡片 (仅限 MERCHANTS 账号，放在收件人后) */}
           {currentUser?.user_type === 'merchant' && (
             <FadeInView delay={250}>
@@ -2442,8 +2664,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
               </View>
             </FadeInView>
           )}
+          </>
+          )}
 
-          {/* 配送选项 */}
+          {wizardStep === 2 && (
           <DeliveryOptions
             styles={styles}
             currentT={currentT}
@@ -2452,8 +2676,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onDeliverySpeedChange={handleDeliverySpeedChange}
             onScheduleTimeClick={() => setShowTimePicker(true)}
           />
+          )}
 
-          {/* 价格计算 */}
+          {wizardStep === 3 && (
           <PriceCalculation
             language={language as any}
             styles={styles}
@@ -2472,30 +2697,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             cartTotal={currentUser?.user_type === 'merchant' ? 0 : cartTotal}
             isMerchant={currentUser?.user_type === 'merchant'}
           />
-
-          {/* 提交按钮 */}
-          <ScaleInView delay={450}>
-            <TouchableOpacity
-              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-              onPress={handleSubmitOrder}
-              activeOpacity={0.8}
-              disabled={isSubmitting}
-            >
-              <LinearGradient
-                colors={['#3b82f6', '#2563eb', '#1d4ed8']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.submitGradient}
-              >
-                <DeliveryIcon size={24} color="#ffffff" />
-                <Text style={styles.submitText}>
-                  {isSubmitting ? currentT.creating : currentT.submitOrder}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </ScaleInView>
-          
-          <View style={{ height: 40 }} />
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -3804,7 +4006,7 @@ const baseStyles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    flexGrow: 1,
   },
   modalOverlay: {
     flex: 1,
@@ -4017,5 +4219,102 @@ const baseStyles = StyleSheet.create({
   },
   codToggleLabelActive: {
     color: '#3b82f6',
+  },
+});
+
+const wizardStyles = StyleSheet.create({
+  guestBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(251, 191, 36, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.45)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  guestBannerText: {
+    flex: 1,
+    color: '#fde68a',
+    fontSize: 13,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  guestBannerLink: {
+    color: '#fbbf24',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  topChrome: {
+    paddingHorizontal: 16,
+    zIndex: 2,
+    backgroundColor: 'transparent',
+  },
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    gap: 8,
+  },
+  actionBarSide: {
+    flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  actionBarSideEnd: {
+    alignItems: 'flex-end',
+  },
+  actionSidePlaceholder: {
+    width: 72,
+    height: 44,
+  },
+  stepIndicator: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    minWidth: 44,
+  },
+  actionBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    gap: 2,
+  },
+  backBtnText: {
+    color: '#e2e8f0',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  actionPrimaryBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    minWidth: 108,
+    maxWidth: '100%',
+    elevation: 4,
+  },
+  actionPrimaryGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  nextBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    flexShrink: 1,
   },
 });

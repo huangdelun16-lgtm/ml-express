@@ -10,6 +10,7 @@ import TutorialModal from '../components/TutorialModal';
 import { Ionicons } from '@expo/vector-icons';
 import { packageService, bannerService, Banner } from '../services/supabase';
 import { errorService } from '../services/ErrorService';
+import { isGuestMode, promptGuestLogin } from '../utils/guestSession';
 import { theme } from '../config/theme';
 import { APP_CONFIG } from '../config/constants';
 import { analytics, EventType } from '../services/AnalyticsService';
@@ -21,6 +22,84 @@ const HOTLINE_NUMBERS = [
   { display: '(+95) 09941118588', tel: '+959941118588' },
   { display: '(+95) 09941118688', tel: '+959941118688' },
 ];
+
+const HERO_GRADIENT: [string, string, ...string[]] = ['#0b1220', '#0f2744', '#1e3a8a', '#312e81'];
+const QUICK_ACTION_WIDTH = (width - 56) / 2;
+
+const HomeSectionHeader = React.memo(
+  ({
+    kicker,
+    title,
+    actionLabel,
+    onAction,
+    dark,
+  }: {
+    kicker?: string;
+    title: string;
+    actionLabel?: string;
+    onAction?: () => void;
+    dark?: boolean;
+  }) => (
+    <View style={styles.sectionHeaderWrap}>
+      <LinearGradient
+        colors={['#fbbf24', '#f59e0b', 'rgba(245,158,11,0.15)']}
+        style={styles.sectionHeaderAccent}
+      />
+      <View style={styles.sectionHeaderTextCol}>
+        {kicker ? (
+          <Text style={[styles.sectionKicker, dark && styles.sectionKickerDark]}>{kicker}</Text>
+        ) : null}
+        <Text style={[styles.sectionTitle, dark && styles.darkText]}>{title}</Text>
+      </View>
+      {actionLabel && onAction ? (
+        <TouchableOpacity onPress={onAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={styles.viewAllButton}>{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  ),
+);
+
+const QuickActionTile = React.memo(
+  ({
+    colors,
+    icon,
+    label,
+    onPress,
+    accessibilityLabel,
+    accessibilityHint,
+  }: {
+    colors: [string, string, ...string[]];
+    icon: string;
+    label: string;
+    onPress: () => void;
+    accessibilityLabel: string;
+    accessibilityHint?: string;
+  }) => (
+    <TouchableOpacity
+      style={styles.quickActionOuter}
+      onPress={onPress}
+      activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+    >
+      <LinearGradient
+        colors={['rgba(255,255,255,0.42)', 'rgba(255,255,255,0.1)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.quickActionBorderGr}
+      >
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickActionGradient}>
+          <View style={styles.quickActionIconGlass}>
+            <Text style={styles.quickActionIcon}>{icon}</Text>
+          </View>
+          <Text style={styles.quickActionText}>{label}</Text>
+        </LinearGradient>
+      </LinearGradient>
+    </TouchableOpacity>
+  ),
+);
 
 interface OrderStats {
   total: number;
@@ -398,6 +477,10 @@ export default function HomeScreen({ navigation }: any) {
 
   // 导航处理（带加载效果）
   const handleNavigateWithLoading = async (screen: string, message: string) => {
+    if (screen === 'MyOrders' && (await isGuestMode())) {
+      promptGuestLogin(navigation, language);
+      return;
+    }
     showLoading(message);
     await new Promise(resolve => setTimeout(resolve, 300));
     hideLoading();
@@ -470,83 +553,88 @@ export default function HomeScreen({ navigation }: any) {
         {/* Hero Section with Web Background */}
         <Animated.View style={{ opacity: headerOpacity, transform: [{ scale: headerScale }] }}>
           <LinearGradient
-            colors={['#b0d3e8', '#a2c3d6', '#93b4c5', '#86a4b4', '#7895a3']}
+            colors={HERO_GRADIENT}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.headerBackground}
           >
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={{ alignItems: 'center' }}>
+            <View style={styles.heroOrbTop} />
+            <View style={styles.heroOrbBottom} />
+            <LinearGradient
+              colors={['rgba(251,191,36,0.35)', 'rgba(59,130,246,0.2)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.heroTopShine}
+            />
+
+            <LinearGradient
+              colors={['#fcd34d', '#f59e0b', '#ea580c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.logoRing}
+            >
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require('../../assets/logo.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              </View>
+            </LinearGradient>
+
+            <View style={styles.brandTitleBlock}>
               <Text style={styles.title}>MARKET LINK</Text>
-              <Text style={[styles.title, { 
-                fontStyle: 'italic', 
-                fontSize: 20, 
-                color: '#f59e0b', // 金色
-                marginTop: -4,
-                textShadowColor: 'rgba(0,0,0,0.2)',
-                textShadowOffset: {width: 1, height: 1},
-                textShadowRadius: 2
-              }]}>EXPRESS</Text>
-              
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 8 }}>
-                {/* 左侧装饰线 - 短中长 */}
-                <View style={{ flexDirection: 'column', alignItems: 'flex-end', marginRight: 8, gap: 2 }}>
-                  <View style={{ width: 6, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
-                  <View style={{ width: 12, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
-                  <View style={{ width: 24, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
-                </View>
-                
-                <Text style={[styles.subtitle, { marginBottom: 0, fontSize: 10, fontWeight: 'bold', letterSpacing: 1, fontStyle: 'italic' }]}>DELIVERY SERVICES</Text>
-                
-                {/* 右侧装饰线 - 长中短 */}
-                <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginLeft: 8, gap: 2 }}>
-                  <View style={{ width: 24, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
-                  <View style={{ width: 12, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
-                  <View style={{ width: 6, height: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' }} />
-                </View>
+              <Text style={styles.titleAccent}>EXPRESS</Text>
+              <View style={styles.brandTaglineRow}>
+                <View style={styles.brandTaglineLine} />
+                <Text style={styles.brandTagline}>DELIVERY SERVICES</Text>
+                <View style={styles.brandTaglineLine} />
               </View>
             </View>
-            
-            {/* 用户欢迎信息与使用教学 */}
+
             <View style={styles.welcomeSection}>
               <View style={styles.welcomeContainer} accessibilityRole="header">
                 <Text style={styles.welcomeText}>
-                  {userName ? `${currentT.welcomeBack}, ${userName}!` : 
-                   isGuest ? `${currentT.welcome}, ${currentT.guest}!` : currentT.welcome}
+                  {userName
+                    ? `${currentT.welcomeBack}, ${userName}!`
+                    : isGuest
+                      ? `${currentT.welcome}, ${currentT.guest}!`
+                      : currentT.welcome}
                 </Text>
               </View>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.tutorialFullWidth}
                 onPress={() => setShowTutorialModal(true)}
-                activeOpacity={0.8}
+                activeOpacity={0.88}
               >
                 <LinearGradient
-                  colors={['rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0.7)']}
+                  colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.06)']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.tutorialGradient}
                 >
                   <View style={styles.tutorialLeft}>
-                    <View style={styles.tutorialIconBg}>
-                      <Text style={{fontSize: 18}}>📖</Text>
-                    </View>
+                    <LinearGradient
+                      colors={['rgba(59,130,246,0.45)', 'rgba(99,102,241,0.35)']}
+                      style={styles.tutorialIconBg}
+                    >
+                      <Ionicons name="book-outline" size={20} color="#e0f2fe" />
+                    </LinearGradient>
                     <View>
                       <Text style={styles.tutorialMainText}>{currentT.howToUse}</Text>
                       <Text style={styles.tutorialSubText}>
-                        {language === 'zh' ? '新手上路 · 图文详解' : 
-                         language === 'en' ? 'Quick Start Guide' : 
-                         'အသုံးပြုပုံ အဆင့်ဆင့်လမ်းညွှန်'}
+                        {language === 'zh'
+                          ? '新手上路 · 图文详解'
+                          : language === 'en'
+                            ? 'Quick Start Guide'
+                            : 'အသုံးပြုပုံ အဆင့်ဆင့်လမ်းညွှန်'}
                       </Text>
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#3b82f6" />
+                  <View style={styles.tutorialChevronWrap}>
+                    <Ionicons name="chevron-forward" size={18} color="#bfdbfe" />
+                  </View>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -791,156 +879,81 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Quick Action Cards - 6 Cards in Grid */}
+        {/* Quick Action Cards */}
         <View style={styles.quickActionsContainer}>
+          <HomeSectionHeader
+            kicker={
+              language === 'zh' ? '快捷入口' : language === 'en' ? 'Quick access' : 'အမြန်ဝင်ရောက်မှု'
+            }
+            title={language === 'zh' ? '常用服务' : language === 'en' ? 'Services' : 'ဝန်ဆောင်မှုများ'}
+            dark={isDarkMode}
+          />
           <View style={styles.quickActionsGrid}>
-            {/* 1. Place Order */}
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('PlaceOrder', currentT.placeOrder + '...')}
-              activeOpacity={0.7}
-              accessibilityRole="button"
+            <QuickActionTile
+              colors={['#f59e0b', '#c2410c']}
+              icon="📦"
+              label={currentT.placeOrder}
+              onPress={() => handleNavigateWithLoading('PlaceOrder', `${currentT.placeOrder}...`)}
               accessibilityLabel={currentT.placeOrder}
               accessibilityHint="跳转到下单页面"
-            >
-              <LinearGradient
-                colors={['#f59e0b', '#d97706']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickActionGradient}
-              >
-                <View style={styles.quickActionIconContainer}>
-                  <Text style={styles.quickActionIcon}>📦</Text>
-                </View>
-                <Text style={styles.quickActionText}>{currentT.placeOrder}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* 2. City Mall */}
+            />
             {(isGuest || userType === 'customer' || userType === 'vip') && (
-              <TouchableOpacity
-                style={styles.quickActionCard}
+              <QuickActionTile
+                colors={['#3b82f6', '#312e81']}
+                icon="🏪"
+                label={currentT.cityMall}
                 onPress={() => navigation.navigate('CityMall')}
-                activeOpacity={0.7}
-                accessibilityRole="button"
                 accessibilityLabel={currentT.cityMall}
-              >
-                <LinearGradient
-                  colors={['#3b82f6', '#1d4ed8']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.quickActionGradient}
-                >
-                  <View style={styles.quickActionIconContainer}>
-                    <Text style={styles.quickActionIcon}>🏪</Text>
-                  </View>
-                  <Text style={styles.quickActionText}>{currentT.cityMall}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              />
             )}
-
-            {/* 3. My Orders */}
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('MyOrders', currentT.myOrders + '...')}
-              activeOpacity={0.7}
-              accessibilityRole="button"
+            <QuickActionTile
+              colors={['#8b5cf6', '#6d28d9']}
+              icon="📋"
+              label={currentT.myOrders}
+              onPress={() => handleNavigateWithLoading('MyOrders', `${currentT.myOrders}...`)}
               accessibilityLabel={currentT.myOrders}
               accessibilityHint="查看我的订单列表"
-            >
-              <LinearGradient
-                colors={['#8b5cf6', '#7c3aed']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickActionGradient}
-              >
-                <View style={styles.quickActionIconContainer}>
-                  <Text style={styles.quickActionIcon}>📋</Text>
-                </View>
-                <Text style={styles.quickActionText}>{currentT.myOrders}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* 4. Shopping Cart */}
+            />
             {(isGuest || userType === 'customer' || userType === 'vip') && (
-              <TouchableOpacity
-                style={styles.quickActionCard}
+              <QuickActionTile
+                colors={['#fbbf24', '#d97706']}
+                icon="🛒"
+                label={currentT.shoppingCart}
                 onPress={() => navigation.navigate('Cart')}
-                activeOpacity={0.7}
-                accessibilityRole="button"
                 accessibilityLabel={currentT.shoppingCart}
-              >
-                <LinearGradient
-                  colors={['#fbbf24', '#f59e0b']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.quickActionGradient}
-                >
-                  <View style={styles.quickActionIconContainer}>
-                    <Text style={styles.quickActionIcon}>🛒</Text>
-                  </View>
-                  <Text style={styles.quickActionText}>{currentT.shoppingCart}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              />
             )}
-
-            {/* 5. Track Order */}
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('TrackOrder', currentT.trackOrder + '...')}
-              activeOpacity={0.7}
-              accessibilityRole="button"
+            <QuickActionTile
+              colors={['#38bdf8', '#2563eb']}
+              icon="🔍"
+              label={currentT.trackOrder}
+              onPress={() => handleNavigateWithLoading('TrackOrder', `${currentT.trackOrder}...`)}
               accessibilityLabel={currentT.trackOrder}
               accessibilityHint="跳转到订单追踪页面"
-            >
-              <LinearGradient
-                colors={['#3b82f6', '#2563eb']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickActionGradient}
-              >
-                <View style={styles.quickActionIconContainer}>
-                  <Text style={styles.quickActionIcon}>🔍</Text>
-                </View>
-                <Text style={styles.quickActionText}>{currentT.trackOrder}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* 6. Profile */}
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleNavigateWithLoading('Profile', currentT.profile + '...')}
-              activeOpacity={0.7}
-              accessibilityRole="button"
+            />
+            <QuickActionTile
+              colors={['#34d399', '#059669']}
+              icon="👤"
+              label={currentT.profile}
+              onPress={() => handleNavigateWithLoading('Profile', `${currentT.profile}...`)}
               accessibilityLabel={currentT.profile}
               accessibilityHint="查看个人中心"
-            >
-              <LinearGradient
-                colors={['#10b981', '#059669']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickActionGradient}
-              >
-                <View style={styles.quickActionIconContainer}>
-                  <Text style={styles.quickActionIcon}>👤</Text>
-                </View>
-                <Text style={styles.quickActionText}>{currentT.profile}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            />
           </View>
         </View>
 
         {/* 最近订单 */}
         {!isGuest && userId && (
           <View style={styles.recentOrdersContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{currentT.recentOrders}</Text>
-              {recentOrders.length > 0 && (
-                <TouchableOpacity onPress={() => navigation.navigate('MyOrders')}>
-                  <Text style={styles.viewAllButton}>{currentT.viewAll} →</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <HomeSectionHeader
+              kicker={
+                language === 'zh' ? '我的物流' : language === 'en' ? 'Your orders' : 'သင်၏အော်ဒါများ'
+              }
+              title={currentT.recentOrders}
+              actionLabel={recentOrders.length > 0 ? `${currentT.viewAll} →` : undefined}
+              onAction={recentOrders.length > 0 ? () => navigation.navigate('MyOrders') : undefined}
+              dark={isDarkMode}
+            />
 
             {loadingRecentOrders ? (
               <>
@@ -971,7 +984,7 @@ export default function HomeScreen({ navigation }: any) {
               recentOrders.map((order) => (
                 <TouchableOpacity
                   key={order.id}
-                  style={styles.orderCard}
+                  style={[styles.orderCard, isDarkMode && styles.darkCard]}
                   onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
                   activeOpacity={0.7}
                   accessibilityRole="button"
@@ -1024,7 +1037,13 @@ export default function HomeScreen({ navigation }: any) {
 
         {/* Services Section */}
         <View style={styles.servicesSection}>
-          <Text style={styles.sectionTitle}>{currentT.services}</Text>
+          <HomeSectionHeader
+            kicker={
+              language === 'zh' ? '品质保障' : language === 'en' ? 'Our promise' : 'ကတိပေးချက်'
+            }
+            title={currentT.services}
+            dark={isDarkMode}
+          />
           <View style={styles.servicesGrid}>
             <View style={styles.serviceCard}>
               <LinearGradient
@@ -1098,12 +1117,20 @@ export default function HomeScreen({ navigation }: any) {
 
         {/* Why Choose Us Section */}
         <View style={styles.whyChooseUsSection}>
-          <Text style={styles.sectionTitle}>{currentT.features}</Text>
-          <View style={styles.whyChooseUsCard}>
+          <HomeSectionHeader
+            kicker={
+              language === 'zh' ? '值得信赖' : language === 'en' ? 'Why us' : 'ဘာကြောင့် ကျွန်ုပ်တို့'
+            }
+            title={currentT.features}
+            dark={isDarkMode}
+          />
+          <View style={[styles.whyChooseUsCard, isDarkMode && styles.darkCard]}>
             {[currentT.feature1, currentT.feature2, currentT.feature3, currentT.feature4].map((feature, index) => (
               <View key={index} style={styles.featureItem}>
-                <Text style={styles.featureIcon}>✓</Text>
-                <Text style={styles.featureText}>{feature}</Text>
+                <View style={styles.featureIconWrap}>
+                  <Text style={styles.featureIcon}>✓</Text>
+                </View>
+                <Text style={[styles.featureText, isDarkMode && styles.darkText]}>{feature}</Text>
               </View>
             ))}
           </View>
@@ -1111,7 +1138,13 @@ export default function HomeScreen({ navigation }: any) {
 
         {/* Contact Section */}
         <View style={styles.contactSection}>
-          <Text style={styles.sectionTitle}>{currentT.contact}</Text>
+          <HomeSectionHeader
+            kicker={
+              language === 'zh' ? '随时联系' : language === 'en' ? 'Reach us' : 'ဆက်သွယ်ရန်'
+            }
+            title={currentT.contact}
+            dark={isDarkMode}
+          />
           <View style={styles.contactGrid}>
             <TouchableOpacity
               style={styles.contactCard}
@@ -1186,44 +1219,107 @@ export default function HomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#eef2f7',
   },
   content: {
     flex: 1,
   },
   headerBackground: {
-    paddingTop: 50,
-    paddingBottom: 30,
+    paddingTop: Platform.OS === 'ios' ? 56 : 44,
+    paddingBottom: 28,
     paddingHorizontal: 20,
     alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  heroOrbTop: {
+    position: 'absolute',
+    top: -80,
+    right: -60,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(59, 130, 246, 0.22)',
+  },
+  heroOrbBottom: {
+    position: 'absolute',
+    bottom: -40,
+    left: -50,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+  },
+  heroTopShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
+  logoRing: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    padding: 2,
+    marginBottom: 14,
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 10,
   },
   logoContainer: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#ffffff',
-    padding: 2,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    flex: 1,
+    borderRadius: 36,
+    backgroundColor: '#0f172a',
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   logo: {
     width: '100%',
     height: '100%',
   },
+  brandTitleBlock: {
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#f8fafc',
     textAlign: 'center',
-    marginBottom: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    letterSpacing: 1.2,
+  },
+  titleAccent: {
+    fontSize: 22,
+    fontStyle: 'italic',
+    fontWeight: '800',
+    color: '#fbbf24',
+    marginTop: -2,
+    letterSpacing: 0.8,
+    textShadowColor: 'rgba(0,0,0,0.35)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    letterSpacing: 1,
+    textShadowRadius: 6,
+  },
+  brandTaglineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 10,
+  },
+  brandTaglineLine: {
+    width: 28,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  brandTagline: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    color: 'rgba(226, 232, 240, 0.85)',
+    fontStyle: 'italic',
   },
   subtitle: {
     fontSize: 14,
@@ -1232,16 +1328,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   welcomeContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginTop: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    marginTop: 4,
   },
   welcomeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#f1f5f9',
+    letterSpacing: 0.2,
   },
   welcomeSection: {
     width: '100%',
@@ -1251,20 +1350,17 @@ const styles = StyleSheet.create({
   },
   tutorialFullWidth: {
     width: '100%',
-    borderRadius: 18,
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
   },
   tutorialGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   tutorialLeft: {
     flexDirection: 'row',
@@ -1272,22 +1368,29 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tutorialIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  tutorialChevronWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tutorialMainText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#1e3a8a',
+    color: '#f8fafc',
   },
   tutorialSubText: {
     fontSize: 11,
-    color: '#64748b',
-    marginTop: 2,
+    color: 'rgba(226, 232, 240, 0.72)',
+    marginTop: 3,
     fontWeight: '500',
   },
   bannerContainer: {
@@ -1306,10 +1409,12 @@ const styles = StyleSheet.create({
   bannerCard: {
     width: '100%',
     height: 240,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     ...theme.shadows.medium,
-    elevation: 10,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   bannerGradient: {
     flex: 1,
@@ -1486,47 +1591,88 @@ const styles = StyleSheet.create({
   },
   quickActionsContainer: {
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 22,
+  },
+  sectionHeaderWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    gap: 10,
+  },
+  sectionHeaderAccent: {
+    width: 3,
+    height: 36,
+    borderRadius: 3,
+  },
+  sectionHeaderTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sectionKicker: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: '#b45309',
+    marginBottom: 3,
+    textTransform: 'uppercase',
+  },
+  sectionKickerDark: {
+    color: '#fbbf24',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 12,
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: -0.2,
   },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
   },
-  quickActionCard: {
-    width: (width - 56) / 2,
-    height: 120,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+  quickActionOuter: {
+    width: QUICK_ACTION_WIDTH,
+    height: 118,
+    borderRadius: 18,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  quickActionBorderGr: {
+    flex: 1,
+    borderRadius: 18,
+    padding: 1.5,
   },
   quickActionGradient: {
-    padding: 20,
+    flex: 1,
+    borderRadius: 16.5,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     alignItems: 'center',
-    height: '100%',
     justifyContent: 'center',
   },
-  quickActionIconContainer: {
-    marginBottom: 12,
+  quickActionIconGlass: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
   quickActionIcon: {
-    fontSize: 36,
+    fontSize: 26,
   },
   quickActionText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '800',
     color: '#ffffff',
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   recentOrdersContainer: {
     paddingHorizontal: 20,
@@ -1540,27 +1686,28 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
     borderWidth: 1,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
   viewAllButton: {
-    fontSize: 14,
-    color: '#3b82f6',
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#2563eb',
+    fontWeight: '700',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   noOrdersCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 32,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.18)',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
   },
   noOrdersIcon: {
     fontSize: 58,
@@ -1599,13 +1746,15 @@ const styles = StyleSheet.create({
   },
   orderCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.16)',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
     elevation: 3,
   },
   orderHeader: {
@@ -1657,14 +1806,16 @@ const styles = StyleSheet.create({
   guestPromptCard: {
     marginHorizontal: 20,
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 32,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.18)',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
     marginBottom: 24,
   },
   guestPromptIcon: {
@@ -1707,11 +1858,13 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   serviceGradient: {
     padding: 24,
@@ -1740,26 +1893,37 @@ const styles = StyleSheet.create({
   },
   whyChooseUsCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    borderRadius: 18,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.16)',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
     elevation: 3,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+  },
+  featureIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   featureIcon: {
-    fontSize: 18,
-    color: '#10b981',
-    marginRight: 12,
-    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '800',
   },
   featureText: {
     fontSize: 15,
@@ -1778,11 +1942,13 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   contactGradient: {
     padding: 24,
@@ -1859,7 +2025,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#cbd5e1',
   },
   bannerIndicatorDotActive: {
-    backgroundColor: '#3b82f6',
-    width: 20,
+    backgroundColor: '#2563eb',
+    width: 22,
+    borderRadius: 4,
   },
 });

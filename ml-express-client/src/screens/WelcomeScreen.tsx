@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { welcomeScreenService, WelcomeScreen as WelcomeScreenData } from '../services/supabase';
+import { APP_CONFIG } from '../config/constants';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
@@ -74,7 +75,8 @@ export default function WelcomeScreen({ navigation }: any) {
   const navigateToNextScreen = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
-      if (userId) {
+      const guestMode = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.IS_GUEST);
+      if (userId || guestMode === 'true') {
         navigation.replace('Main');
       } else {
         navigation.replace('Login');

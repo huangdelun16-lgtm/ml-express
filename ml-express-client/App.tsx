@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
@@ -434,13 +435,15 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <AppProvider>
-        <CartProvider>
-          <LoadingProvider>
-            <AppContent onLayoutRootView={onLayoutRootView} />
-          </LoadingProvider>
-        </CartProvider>
-      </AppProvider>
+      <SafeAreaProvider>
+        <AppProvider>
+          <CartProvider>
+            <LoadingProvider>
+              <AppContent onLayoutRootView={onLayoutRootView} />
+            </LoadingProvider>
+          </CartProvider>
+        </AppProvider>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }
