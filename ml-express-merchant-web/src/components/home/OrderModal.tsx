@@ -38,11 +38,32 @@ const MODAL_PANEL: CSSProperties = {
   WebkitOverflowScrolling: 'touch',
   boxSizing: 'border-box',
   padding: 'clamp(1.25rem, 4vw, 2rem)',
+  paddingTop: 'clamp(1.5rem, 4vw, 2.25rem)',
   borderRadius: 20,
   background: 'linear-gradient(165deg, #1e293b 0%, #0f172a 42%, #172554 100%)',
   border: '1px solid rgba(255, 255, 255, 0.12)',
   boxShadow:
     '0 25px 50px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.06) inset, 0 1px 0 rgba(255,255,255,0.08) inset',
+};
+
+const MODAL_CLOSE_BTN: CSSProperties = {
+  position: 'absolute',
+  top: 'clamp(0.65rem, 2vw, 0.85rem)',
+  right: 'clamp(0.65rem, 2vw, 0.85rem)',
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  border: '1px solid rgba(255, 255, 255, 0.28)',
+  background: 'rgba(15, 23, 42, 0.55)',
+  color: '#f8fafc',
+  fontSize: '1.35rem',
+  lineHeight: 1,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 5,
+  padding: 0,
 };
 
 const MODAL_HEADING: CSSProperties = {
@@ -262,6 +283,19 @@ const OrderModal: React.FC<OrderModalProps> = ({
   return (
     <div style={MODAL_OVERLAY}>
       <div style={MODAL_PANEL}>
+        <button
+          type="button"
+          style={MODAL_CLOSE_BTN}
+          onClick={handleCancelOrder}
+          aria-label={
+            language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်မည်'
+          }
+          title={
+            language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်မည်'
+          }
+        >
+          ×
+        </button>
         <div
           style={{
             textAlign: 'center',

@@ -19,238 +19,39 @@ import {
   userService,
   systemSettingsService,
 } from "../services/supabase";
-import { jsPDF } from "jspdf";
-import "jspdf-autotable";
-import * as XLSX from "xlsx";
 import QRCode from "qrcode";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api"; // 🚀 新增
 import LoggerService from "../services/LoggerService";
-import Logo from "../components/Logo";
 import NavigationBar from "../components/home/NavigationBar";
 import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
 import OrderQRCode from "../components/profile/OrderQRCode";
+import TimeWheelPicker from "../components/profile/TimeWheelPicker";
+import MerchantProfileHero from "../components/profile/MerchantProfileHero";
 import MerchantDashboardOrderPanel from "../components/dashboard/MerchantDashboardOrderPanel";
 import MerchantRevenuePanel from "../components/dashboard/MerchantRevenuePanel";
 import { useMerchantOrdersOptional } from "../contexts/MerchantOrderContext";
 import { MERCHANT_ORDERS_REFRESH } from "../utils/merchantOrderEvents";
-import { getPackingModalModel } from "../utils/parseOrderPackingItems";
+import {
+  computeMerchantOrderStats,
+  getMerchantOrderStatusColor,
+  getMerchantOrderStatusLabel,
+  getMerchantPaymentMethodBorderColor,
+  getMerchantPaymentMethodColor,
+  getMerchantPaymentMethodText,
+  type MerchantLanguage,
+} from "../constants/merchantOrderStatus";
+import { exportMerchantStatement } from "../services/exportMerchantStatement";
+import { useMerchantPackageModals } from "../hooks/useMerchantPackageModals";
+import MerchantPackageDetailModal from "../components/orders/MerchantPackageDetailModal";
+import MerchantPackingModal from "../components/orders/MerchantPackingModal";
+import MerchantExportStatementModal from "../components/profile/MerchantExportStatementModal";
+import MerchantRechargeModals from "../components/profile/MerchantRechargeModals";
+import MerchantScheduledTimePickerModal from "../components/profile/MerchantScheduledTimePickerModal";
+import "../styles/merchantProfilePage.css";
+import "../components/orders/merchantOrderModals.css";
 
-// 注入样式
-if (typeof document !== "undefined") {
-  const style = document.createElement("style");
-  style.textContent = `
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-    .spinner {
-      animation: spin 1s linear infinite;
-    }
-    .merchant-stat-grid > * {
-      min-width: 0;
-    }
-    .merchant-stat-grid .stat-label {
-      line-height: 1.3;
-      overflow-wrap: break-word;
-      word-break: break-word;
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-// 🚀 新增：高级滚动时间选择器组件
-const TimeWheelPicker: React.FC<{ 
-  value: string;
-  onChange: (val: string) => void;
-  label: string;
-  icon: string;
-}> = ({ value, onChange, label, icon }) => {
-  const parts = (value || "09:00").split(":");
-  const hour = parts[0] || "09";
-  const minute = parts[1] || "00";
-  
-  const handleHourChange = (newHour: string) => {
-    onChange(`${newHour.padStart(2, "0")}:${minute}`);
-  };
-  
-  const handleMinuteChange = (newMinute: string) => {
-    onChange(`${hour}:${newMinute.padStart(2, "0")}`);
-  };
-
-  return (
-    <div
-      style={{
-        background: "rgba(255, 255, 255, 0.05)",
-        padding: "1.5rem",
-        borderRadius: "24px",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "1.2rem",
-      flex: 1,
-        minWidth: "200px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          color: "rgba(255,255,255,0.7)",
-          fontSize: "0.9rem",
-          fontWeight: "800",
-          textTransform: "uppercase",
-        }}
-      >
-        <span style={{ fontSize: "1.2rem" }}>{icon}</span> {label}
-      </div>
-      
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "1.5rem",
-          padding: "15px",
-          background: "rgba(0,0,0,0.3)",
-          borderRadius: "24px",
-          border: "1px solid rgba(255,255,255,0.05)",
-          boxShadow: "inset 0 2px 10px rgba(0,0,0,0.2)",
-        }}
-      >
-        {/* 小时滚轮 */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "5px",
-          }}
-        >
-          <button 
-            onClick={() => handleHourChange(String((parseInt(hour) + 1) % 24))}
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "none",
-              width: "40px",
-              height: "30px",
-              borderRadius: "8px",
-              color: "white",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ▲
-          </button>
-          <div
-            style={{
-              fontSize: "2.2rem",
-              fontWeight: "900",
-              color: "white",
-              fontFamily: "monospace",
-              padding: "5px 10px",
-            }}
-          >
-            {hour.padStart(2, "0")}
-          </div>
-          <button 
-            onClick={() =>
-              handleHourChange(String((parseInt(hour) - 1 + 24) % 24))
-            }
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "none",
-              width: "40px",
-              height: "30px",
-              borderRadius: "8px",
-              color: "white",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ▼
-          </button>
-        </div>
-
-        <div
-          style={{
-            fontSize: "1.8rem",
-            fontWeight: "900",
-            color: "#fbbf24",
-            marginTop: "2px",
-          }}
-        >
-          :
-        </div>
-
-        {/* 分钟滚轮 */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "5px",
-          }}
-        >
-          <button 
-            onClick={() =>
-              handleMinuteChange(String((parseInt(minute) + 5) % 60))
-            }
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "none",
-              width: "40px",
-              height: "30px",
-              borderRadius: "8px",
-              color: "white",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ▲
-          </button>
-          <div
-            style={{
-              fontSize: "2.2rem",
-              fontWeight: "900",
-              color: "white",
-              fontFamily: "monospace",
-              padding: "5px 10px",
-            }}
-          >
-            {minute.padStart(2, "0")}
-          </div>
-          <button 
-            onClick={() =>
-              handleMinuteChange(String((parseInt(minute) - 5 + 60) % 60))
-            }
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "none",
-              width: "40px",
-              height: "30px",
-              borderRadius: "8px",
-              color: "white",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ▼
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+const GOOGLE_MAPS_LIBRARIES: ("places")[] = ["places"];
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -276,17 +77,13 @@ const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [packagesPerPage] = useState(5); // 每页显示5个包裹
-  const [selectedPackage, setSelectedPackage] = useState<any>(null); // 选中的包裹详情
-  const [showPackageDetailModal, setShowPackageDetailModal] = useState(false); // 显示包裹详情模态框
+  const [selectedPackage, setSelectedPackage] = useState<any>(null); // 寄件码等仍使用
   const [showPickupCodeModal, setShowPickupCodeModal] = useState(false); // 显示寄件码模态框
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>(""); // 二维码数据URL
   const [isPartnerStore, setIsPartnerStore] = useState(false); // 是否是合伙店铺账户
-  const [showPackingModal, setShowPackingModal] = useState(false); // 🚀 新增：显示打包模态框
-  const [showPackingListModal, setShowPackingListModal] = useState(false); // 🚀 新增：显示待打包订单列表模态框
+  const [showPackingListModal, setShowPackingListModal] = useState(false);
   const [showPendingAcceptListModal, setShowPendingAcceptListModal] =
-    useState(false); // 🚀 新增：显示待接单订单列表模态框
-  const [packingOrderData, setPackingOrderData] = useState<any>(null); // 🚀 新增：打包订单数据
-  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({}); // 🚀 新增：打包清单选中项
+    useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false); // 显示密码修改模态框
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -317,7 +114,7 @@ const ProfilePage: React.FC = () => {
   const googleMapsApiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
   const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
     googleMapsApiKey,
-    libraries: ["places"] as any[],
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
   // 🚀 新增：导出对账单状态
@@ -1225,6 +1022,19 @@ const ProfilePage: React.FC = () => {
     currentUser?.store_id,
     isPartnerStore,
   ]);
+
+  const packageModals = useMerchantPackageModals({
+    language: language as MerchantLanguage,
+    productPriceMap,
+    isPartnerStore,
+    onRefresh: loadUserPackages,
+    onPackageStatusChange: (packageId, status) => {
+      setUserPackages((prev) =>
+        prev.map((p) => (p.id === packageId ? { ...p, status } : p)),
+      );
+    },
+    removePendingOrder: (id) => merchantOrdersCtx?.removePendingOrder(id),
+  });
 
   useEffect(() => {
     setIsVisible(true);
@@ -2318,183 +2128,48 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  // 🚀 新增：导出对账单逻辑
   const handleExportStatement = async () => {
     if (!currentUser?.id || !isPartnerStore) return;
-    
+    setIsExporting(true);
     try {
-      setIsExporting(true);
-      
-      console.log("📡 开始查询订单数据...", {
-        store_id: currentUser.store_id || currentUser.id,
-        start: exportStartDate,
-        end: exportEndDate,
+      const result = await exportMerchantStatement({
+        storeId: currentUser.store_id || currentUser.id,
+        storeName: storeInfo?.store_name,
+        email: storeInfo?.email || currentUser?.email,
+        startDate: exportStartDate,
+        endDate: exportEndDate,
+        format: exportFormat,
+        method: exportMethod,
+        language: language as MerchantLanguage,
       });
-
-      // 1. 获取该日期范围内的订单数据
-      const { data: orders, error } = await supabase
-        .from("packages")
-        .select("*")
-        .eq("delivery_store_id", currentUser.store_id || currentUser.id)
-        .gte("created_at", `${exportStartDate}T00:00:00.000Z`)
-        .lte("created_at", `${exportEndDate}T23:59:59.999Z`)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("❌ 数据库查询失败:", error);
-        throw error;
-      }
-
-      console.log(`✅ 获取到 ${orders?.length || 0} 条订单`);
-
-      if (!orders || orders.length === 0) {
+      if (result.noOrders) {
         alert(
-          language === "zh"
-            ? "所选日期范围内没有订单数据"
-            : "No orders found in the selected date range",
+          language === 'zh'
+            ? '所选日期范围内没有订单数据'
+            : 'No orders found in the selected date range',
         );
-        setIsExporting(false);
         return;
       }
-
-      // 2. 准备导出数据
-      const fileName = `Statement_${storeInfo?.store_name || "Merchant"}_${exportStartDate}_to_${exportEndDate}`;
-      
-      if (exportFormat === "excel") {
-        // 生成 Excel
-        console.log("📄 正在生成 Excel...");
-        const worksheetData = orders.map((pkg) => ({
-          订单号: pkg.id,
-          下单时间: new Date(pkg.created_at).toLocaleString(),
-          寄件人: pkg.sender_name,
-          收件人: pkg.receiver_name,
-          状态: pkg.status,
-          跑腿费: pkg.price,
-          代收金额: pkg.cod_amount || 0,
-          支付方式: pkg.payment_method === "cash" ? "现金" : "余额",
-          结算状态: pkg.cod_settled ? "已结算" : "待结算",
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(worksheetData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Orders");
-        
-        if (exportMethod === "download") {
-          console.log("⬇️ 正在下载 Excel...");
-          XLSX.writeFile(wb, `${fileName}.xlsx`);
-          setIsExporting(false);
-          setShowExportModal(false);
-        } else {
-          // 发送邮件需要 Base64
-          console.log("📧 正在准备邮件发送 (Excel)...");
-          const wbout = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-          const base64Data = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${wbout}`;
-          await sendStatementByEmail(base64Data, `${fileName}.xlsx`);
-        }
-      } else {
-        // 生成 PDF
-        console.log("📄 正在尝试生成 PDF...");
-        try {
-          const doc = new jsPDF();
-          
-          // 添加标题
-          doc.setFontSize(18);
-          // 🚀 核心修复：jsPDF 默认不支持中文/缅文。如果 store_name 包含这些字符，doc.text 可能会报错。
-          // 我们尝试使用拼音或占位符，并强烈建议用户使用 Excel 格式。
-          const displayStoreName = (
-            storeInfo?.store_name || "Merchant"
-          ).replace(/[^\x00-\x7F]/g, "*");
-          doc.text(`Statement: ${displayStoreName}`, 14, 20);
-          
-          doc.setFontSize(12);
-          doc.text(`Period: ${exportStartDate} to ${exportEndDate}`, 14, 30);
-          
-          // 准备表格数据 - 全部转为 ASCII 兼容字符
-          const tableColumn = [
-            "ID",
-            "Date",
-            "Receiver",
-            "Status",
-            "Price",
-            "COD",
-            "Settled",
-          ];
-          const tableRows = orders.map((pkg) => [
-            pkg.id.slice(-8), 
-            new Date(pkg.created_at).toLocaleDateString(),
-            (pkg.receiver_name || "").replace(/[^\x00-\x7F]/g, "*"),
-            (pkg.status || "").replace(/[^\x00-\x7F]/g, "*"),
-            pkg.price,
-            pkg.cod_amount || 0,
-            pkg.cod_settled ? "Yes" : "No",
-          ]);
-
-          console.log("📊 正在调用 autoTable...");
-          (doc as any).autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            startY: 40,
-            theme: "grid",
-            styles: { fontSize: 8, font: "helvetica" },
-          });
-
-          if (exportMethod === "download") {
-            console.log("⬇️ 正在执行 PDF 下载保存...");
-            doc.save(`${fileName}.pdf`);
-            setIsExporting(false);
-            setShowExportModal(false);
-          } else {
-            console.log("📧 正在准备 PDF 邮件数据...");
-            const pdfBase64 = doc.output("datauristring");
-            await sendStatementByEmail(pdfBase64, `${fileName}.pdf`);
-          }
-        } catch (pdfErr) {
-          console.error("❌ PDF 生成过程崩溃:", pdfErr);
+      if (!result.ok) {
+        if (result.error === 'pdf_unicode') {
           alert(
-            language === "zh"
-              ? "PDF 格式暂不支持中文/缅文，请选择 Excel (XLSX) 格式导出。"
-              : "PDF format currently does not support Unicode. Please use Excel (XLSX) instead.",
+            language === 'zh'
+              ? 'PDF 格式暂不支持中文/缅文，请选择 Excel (XLSX) 格式导出。'
+              : 'PDF format does not support Unicode. Please use Excel.',
           );
-          setIsExporting(false);
+        } else {
+          alert(language === 'zh' ? '导出失败，请检查网络重试' : 'Export failed');
         }
+        return;
       }
-    } catch (error) {
-      LoggerService.error("导出对账单失败:", error);
-      alert("导出失败，请检查网络重试");
-      setIsExporting(false);
-    }
-  };
-
-  const sendStatementByEmail = async (fileData: string, fileName: string) => {
-    try {
-      const response = await fetch("/.netlify/functions/send-statement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: storeInfo?.email || currentUser?.email,
-          storeName: storeInfo?.store_name,
-          startDate: exportStartDate,
-          endDate: exportEndDate,
-          fileData,
-          fileName,
-          format: exportFormat,
-          language,
-        }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
+      if (exportMethod === 'email') {
         alert(
-          language === "zh"
-            ? "✅ 对账单已成功发送到您的邮箱"
-            : "✅ Statement has been sent to your email",
+          language === 'zh'
+            ? '✅ 对账单已成功发送到您的邮箱'
+            : '✅ Statement has been sent to your email',
         );
-        setShowExportModal(false);
-      } else {
-        throw new Error(result.error);
       }
-    } catch (error: any) {
-      alert(`发送失败: ${error.message}`);
+      setShowExportModal(false);
     } finally {
       setIsExporting(false);
     }
@@ -2593,324 +2268,6 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  // 🚀 新增：商家接单功能
-  // 🚀 新增：自动打印小票功能
-  const handlePrintReceipt = async (orderData: any) => {
-    if (!orderData) return;
-    
-    try {
-      const qrDataUrl = await QRCode.toDataURL(orderData.id, {
-        margin: 1,
-        width: 180,
-      });
-      
-      // 解析商品信息
-      const itemsMatch = orderData.description?.match(
-        /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/,
-      );
-      const productItems = itemsMatch ? itemsMatch[1].split(", ") : [];
-      const parsedItems = productItems.map((item: string) => {
-        const match = item.match(/^(.+?)\s*x(\d+)$/i);
-        if (!match) return { label: item, qty: 1, price: undefined };
-        const name = match[1].trim();
-        const qty = Number(match[2]) || 1;
-        const unitPrice = productPriceMap[name];
-        return {
-          label: name,
-          qty,
-          price: unitPrice ? unitPrice * qty : undefined,
-        };
-      });
-
-      const itemPayMatch = orderData.description?.match(
-        /\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/,
-      );
-      const itemCost = itemPayMatch?.[1]
-        ? parseFloat(itemPayMatch[1].replace(/,/g, ""))
-        : 0;
-      const deliveryFee = parseFloat(
-        orderData.price?.replace(/[^0-9.]/g, "") || "0",
-      );
-      const computedItemTotal = parsedItems.reduce(
-        (sum: number, item: any) => sum + (item.price || 0),
-        0,
-      );
-      const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
-      const totalFee = deliveryFee + finalItemTotal;
-      const paymentText =
-        orderData.payment_method === "cash"
-          ? language === "zh"
-            ? "现金支付"
-            : "Cash"
-          : language === "zh"
-            ? "余额支付"
-            : "Balance";
-      const orderIdShort = `#${orderData.id.slice(-5)}`;
-
-      const html = `
-        <html>
-          <head>
-            <style>
-              body { font-family: sans-serif; padding: 20px; color: #111827; width: 300px; margin: 0 auto; line-height: 1.4; }
-              .title { text-align: center; font-size: 20px; font-weight: 900; margin-bottom: 5px; }
-              .subtitle { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 15px; }
-              .section { border-top: 1px dashed #d1d5db; padding: 10px 0; margin-top: 5px; }
-              .row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 12px; align-items: flex-start; }
-              .label { color: #6b7280; min-width: 50px; }
-              .value { font-weight: 600; text-align: right; flex: 1; margin-left: 10px; }
-              .item-row { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
-              .total-row { font-size: 15px; font-weight: 900; border-top: 1px solid #000; margin-top: 10px; padding-top: 8px; }
-              .qr-box { text-align: center; margin: 15px 0; }
-              .qr-box img { width: 140px; height: 140px; }
-              .footer-note { text-align: center; font-size: 10px; color: #9ca3af; margin-top: 20px; font-style: italic; }
-            </style>
-          </head>
-          <body>
-            <div class="title">MARKET LINK EXPRESS</div>
-            <div class="subtitle">订单号 ${orderIdShort}</div>
-            
-            <div class="qr-box">
-              <img src="${qrDataUrl}" />
-              <div style="font-size: 11px; font-weight: bold; margin-top: 5px;">取件码: ${orderData.id}</div>
-            </div>
-
-            <div class="section">
-              <div class="row"><span class="label">商家:</span><span class="value">${orderData.sender_name || "-"}</span></div>
-              <div class="row"><span class="label">电话:</span><span class="value">${orderData.sender_phone || "-"}</span></div>
-              <div class="row"><span class="label">地址:</span><span class="value">${orderData.sender_address || "-"}</span></div>
-            </div>
-
-            <div class="section">
-              <div class="row"><span class="label">客户:</span><span class="value">${orderData.receiver_name || "-"}</span></div>
-              <div class="row"><span class="label">电话:</span><span class="value">${orderData.receiver_phone || "-"}</span></div>
-              <div class="row"><span class="label">地址:</span><span class="value">${orderData.receiver_address || "-"}</span></div>
-            </div>
-
-            <div class="section">
-              <div class="row"><span class="label">支付:</span><span class="value">${paymentText}</span></div>
-              ${parsedItems
-                .map(
-                  (item: any) => `
-                <div class="item-row">
-                  <span>• ${item.label} x${item.qty}</span>
-                  <span>${item.price ? `${item.price.toLocaleString()} MMK` : "-"}</span>
-                </div>
-              `,
-                )
-                .join("")}
-              <div class="row"><span class="label">跑腿费:</span><span class="value">${deliveryFee.toLocaleString()} MMK</span></div>
-              <div class="row total-row"><span>合计:</span><span>${totalFee.toLocaleString()} MMK</span></div>
-            </div>
-
-            <div class="footer-note">请保留此票据用于对账，感谢使用！</div>
-          </body>
-        </html>
-      `;
-
-      // 🚀 Web 端静默打印逻辑
-      const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "none";
-      document.body.appendChild(iframe);
-      
-      const doc = iframe.contentWindow?.document || iframe.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write(html);
-        doc.close();
-        
-        // 等待图片加载完成再打印
-        setTimeout(() => {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-          // 打印后移除 iframe
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-          }, 1000);
-        }, 500);
-      }
-    } catch (error) {
-      LoggerService.error("生成小票失败:", error);
-    }
-  };
-
-  const handleAcceptOrder = async (targetPkg?: any) => {
-    const pkgToAccept = targetPkg || selectedPackage;
-    if (!pkgToAccept?.id) return;
-    
-    try {
-      setLoading(true);
-      
-      // 检查当前状态是否是待确认
-      if (pkgToAccept.status !== "待确认") {
-        alert(
-          language === "zh"
-            ? "该订单状态已变更，无法接单"
-            : "Order status has changed, cannot accept",
-        );
-        return;
-      }
-
-      // 更新状态为“打包中”
-      const success = await packageService.updatePackageStatus(
-        pkgToAccept.id,
-        "打包中",
-      );
-      
-      if (success) {
-        handlePrintReceipt(pkgToAccept);
-        merchantOrdersCtx?.removePendingOrder(pkgToAccept.id);
-        alert(
-          language === "zh"
-            ? "接单成功！小票已自动打印，请开始打包商品。"
-            : "Order accepted! Receipt printed, please start packing.",
-        );
-        const updatedPackage = { ...pkgToAccept, status: "打包中" };
-        if (!targetPkg) setSelectedPackage(updatedPackage);
-        setUserPackages((prev) =>
-          prev.map((p) => (p.id === pkgToAccept.id ? updatedPackage : p)),
-        );
-      } else {
-        throw new Error("Update failed");
-      }
-    } catch (error) {
-      LoggerService.error("接单失败:", error);
-      alert(
-        language === "zh"
-          ? "接单失败，请重试"
-          : "Accept failed, please try again",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🚀 新增：商家取消订单功能（商品卖完时）
-  const handleCancelOrder = async (pkg: any) => {
-    if (!pkg?.id) return;
-    
-    const confirmMsg =
-      language === "zh"
-        ? "确定要取消此订单吗？（此操作不可逆，通常用于商品已售罄的情况）"
-        : language === "en"
-          ? "Are you sure you want to cancel this order? (This action is irreversible, typically used when items are sold out)"
-          : "ဤအော်ဒါကို ပယ်ဖျက်ရန် သေချာပါသလား? (ပစ္စည်းပြတ်လပ်သွားသောအခါတွင် အသုံးပြုရန်)";
-      
-    if (!window.confirm(confirmMsg)) return;
-
-    try {
-      setLoading(true);
-      
-      // 更新状态为“已取消”
-      const success = await packageService.updatePackageStatus(
-        pkg.id,
-        "已取消",
-      );
-      
-      if (success) {
-        alert(
-          language === "zh"
-            ? "订单已成功取消"
-            : language === "en"
-              ? "Order cancelled successfully"
-              : "အော်ဒါကို ပယ်ဖျက်ပြီးပါပြီ",
-        );
-        // 刷新本地数据
-        const updatedPackage = { ...pkg, status: "已取消" };
-        setUserPackages((prev) =>
-          prev.map((p) => (p.id === pkg.id ? updatedPackage : p)),
-        );
-      } else {
-        throw new Error("Cancel failed");
-      }
-    } catch (error) {
-      LoggerService.error("取消订单失败:", error);
-      alert(
-        language === "zh"
-          ? "操作失败，请重试"
-          : "Operation failed, please try again",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🚀 新增：开始打包功能
-  const handleStartPacking = (pkg: any) => {
-    setPackingOrderData(pkg);
-    setCheckedItems({});
-    setShowPackingModal(true);
-    setShowPackageDetailModal(false);
-  };
-
-  const packingModalModel = useMemo(() => {
-    if (!packingOrderData) return null;
-    return getPackingModalModel(
-      packingOrderData.description,
-      productPriceMap,
-    );
-  }, [packingOrderData, productPriceMap]);
-
-  // 🚀 新增：切换打包项勾选状态
-  const toggleItem = (itemId: string) => {
-    setCheckedItems((prev) => ({
-      ...prev,
-      [itemId]: !prev[itemId],
-    }));
-  };
-
-  // 🚀 新增：完成打包逻辑
-  const handleCompletePacking = async () => {
-    if (!packingOrderData) return;
-
-    try {
-      setLoading(true);
-      
-      // 确定新的状态：如果已支付（如 VIP 余额支付）则进入待取件，否则进入待收款
-      // 实际上对于商家，统称为“待取件”或“待收款”，我们这里统一逻辑
-      const isPaid =
-        packingOrderData.payment_method === "balance" ||
-        packingOrderData.payment_status === "paid";
-      const nextStatus = isPaid ? "待取件" : "待收款";
-
-      const success = await packageService.updatePackageStatus(
-        packingOrderData.id,
-        nextStatus,
-      );
-      
-      if (success) {
-        alert(
-          language === "zh"
-            ? "打包完成！快递员将很快上门取件。"
-            : "Packing complete! Courier will arrive soon.",
-        );
-        setShowPackingModal(false);
-        setPackingOrderData(null);
-        // 刷新本地列表
-        setUserPackages((prev) =>
-          prev.map((p) =>
-            p.id === packingOrderData.id ? { ...p, status: nextStatus } : p,
-          ),
-        );
-      } else {
-        throw new Error("Status update failed");
-      }
-    } catch (error) {
-      LoggerService.error("打包完成更新失败:", error);
-      alert(
-        language === "zh"
-          ? "提交失败，请重试"
-          : "Submission failed, please try again",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // 语言切换函数
   const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage);
@@ -2978,119 +2335,15 @@ const ProfilePage: React.FC = () => {
     );
   };
 
-  // 获取状态颜色
-  const getStatusColor = (status: string) => {
-    const statusMap: { [key: string]: string } = {
-      待确认: "#fbbf24", // 🚀 琥珀色
-      打包中: "#10b981", // 🚀 绿色
-      待取件: "#f59e0b",
-      已取件: "#3b82f6",
-      运输中: "#8b5cf6",
-      已送达: "#10b981",
-      待收款: "#ef4444",
-      已取消: "#94a3b8", // 🚀 灰色
-      已完成: "#6b7280",
-    };
-    return statusMap[status] || "#6b7280";
-  };
-
-  // 获取状态文本
-  const getStatusText = (status: string) => {
-    if (status === "待收款")
-      return language === "zh"
-        ? "待取件"
-        : language === "en"
-          ? "Pending Pickup"
-          : "ကောက်ယူရန်စောင့်ဆိုင်းနေသည်";
-    if (status === "待确认")
-      return language === "zh"
-        ? "待接单"
-        : language === "en"
-          ? "Pending Accept"
-          : "လက်ခံရန်စောင့်ဆိုင်းနေသည်";
-    if (status === "打包中")
-      return language === "zh"
-        ? "打包中"
-        : language === "en"
-          ? "Packing"
-          : "ထုပ်ပိုးနေသည်";
-    if (status === "已取消")
-      return language === "zh"
-        ? "已取消"
-        : language === "en"
-          ? "Cancelled"
-          : "ပယ်ဖျက်လိုက်သည်";
-    return status;
-  };
-
-  // 获取支付方式文本
-  const getPaymentMethodText = (paymentMethod?: string) => {
-    if (paymentMethod === "qr") {
-      return language === "zh"
-        ? "转账"
-        : language === "en"
-          ? "Transfer"
-          : "ငွေလွှဲ";
-    } else if (paymentMethod === "cash") {
-      return language === "zh"
-        ? "现金支付"
-        : language === "en"
-          ? "Cash"
-          : "ငွေသား";
-    } else if (paymentMethod === "balance") {
-      return language === "zh"
-        ? "余额支付"
-        : language === "en"
-          ? "Balance"
-          : "လက်ကျန်ငွေဖြင့် ပေးချေခြင်း";
-    }
-    return language === "zh"
-      ? "未知"
-      : language === "en"
-        ? "Unknown"
-        : "မသိရှိရ";
-  };
-
-  // 获取支付方式颜色
-  const getPaymentMethodColor = (paymentMethod?: string) => {
-    if (paymentMethod === "qr") {
-      return "rgba(34, 197, 94, 0.3)"; // 绿色
-    } else if (paymentMethod === "cash") {
-      return "rgba(251, 191, 36, 0.3)"; // 黄色
-    } else if (paymentMethod === "balance") {
-      return "rgba(59, 130, 246, 0.3)"; // 蓝色
-    }
-    return "rgba(156, 163, 175, 0.3)"; // 灰色
-  };
-
-  // 获取支付方式边框颜色
-  const getPaymentMethodBorderColor = (paymentMethod?: string) => {
-    if (paymentMethod === "qr") {
-      return "rgba(34, 197, 94, 0.5)";
-    } else if (paymentMethod === "cash") {
-      return "rgba(251, 191, 36, 0.5)";
-    } else if (paymentMethod === "balance") {
-      return "rgba(59, 130, 246, 0.5)";
-    }
-    return "rgba(156, 163, 175, 0.5)";
-  };
-
-  // 计算订单统计
-  const orderStats = {
-    total: userPackages.length,
-    pendingConfirmation: userPackages.filter((pkg) => pkg.status === "待确认")
-      .length, // 🚀 待确认
-    packing: userPackages.filter((pkg) => pkg.status === "打包中").length, // 🚀 打包中
-    pendingPickup: userPackages.filter(
-      (pkg) => pkg.status === "待取件" || pkg.status === "待收款",
-    ).length,
-    inTransit: userPackages.filter(
-      (pkg) => pkg.status === "运输中" || pkg.status === "已取件",
-    ).length,
-    completed: userPackages.filter(
-      (pkg) => pkg.status === "已送达" || pkg.status === "已完成",
-    ).length,
-  };
+  const lang = language as MerchantLanguage;
+  const getStatusColor = getMerchantOrderStatusColor;
+  const getStatusText = (status: string) =>
+    getMerchantOrderStatusLabel(status, lang);
+  const getPaymentMethodText = (paymentMethod?: string) =>
+    getMerchantPaymentMethodText(paymentMethod, lang);
+  const getPaymentMethodColor = getMerchantPaymentMethodColor;
+  const getPaymentMethodBorderColor = getMerchantPaymentMethodBorderColor;
+  const orderStats = computeMerchantOrderStats(userPackages);
 
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
@@ -3231,79 +2484,37 @@ const ProfilePage: React.FC = () => {
     <>
       {/* 主要内容区域 */}
       <div
+        className="merchant-profile-page"
         style={{
           position: "relative",
-        zIndex: 5,
+          zIndex: 5,
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? "translateY(0)" : "translateY(20px)",
           transition: "all 0.6s ease",
+          width: "100%",
         }}
       >
-        {/* 页面标题 */}
-        <div
-          style={{
-            textAlign: "center", // 🚀 移动到页面中间
-            marginBottom: "2rem",
-            marginTop: "1.5rem",
-          opacity: isVisible ? 1 : 0,
-            transform: isVisible ? "translateY(0)" : "translateY(-20px)",
-            transition: "all 0.6s ease",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <div
-            style={{
-              marginBottom: "1rem",
-              transform: "scale(1.3)",
-              filter: "drop-shadow(0 15px 30px rgba(0,0,0,0.4))",
-              transition: "all 0.5s ease",
-            }}
-          >
-            <Logo size="medium" />
-          </div>
-          <h2
-            style={{
-              color: "rgba(255,255,255,0.9)",
-              fontSize: "1.25rem",
-              marginBottom: "0.5rem",
-              fontWeight: "800",
-              letterSpacing: "3px",
-              textTransform: "uppercase",
-              textShadow: "0 2px 4px rgba(0,0,0,0.3)",
-            }}
-          >
-            {t.title}
-          </h2>
-          <p
-            style={{
-              color: "rgba(255,255,255,0.5)",
-              fontSize: "0.85rem",
-              fontWeight: "600",
-            }}
-          >
-            {language === "zh"
+        <MerchantProfileHero
+          title={t.title}
+          subtitle={
+            language === "zh"
               ? "欢迎回来，这里是您的经营实时看板"
               : language === "en"
-                ? "Welcome back, here is your real-time business dashboard"
-                : "ပြန်လည်ကြိုဆိုပါတယ်၊ ဤသည်မှာ သင်၏ အချိန်နှင့်တပြေးညီ လုပ်ငန်းစောင့်ကြည့်စနစ်ဖြစ်ပါသည်"}
-          </p>
-        </div>
+                ? "Welcome back — your real-time business dashboard"
+                : "ပြန်လည်ကြိုဆိုပါတယ် — အချိန်နှင့်တပြေးညီ လုပ်ငန်းစောင့်ကြည့်မှု"
+          }
+          pendingConfirmation={orderStats.pendingConfirmation}
+          isPartnerStore={isPartnerStore}
+          visible={isVisible}
+          language={lang}
+        />
 
-        {/* 用户信息卡片 - 参考客户端app样式 */}
         <div
+          className="merchant-profile-account-card"
           style={{
-            background: "rgba(255, 255, 255, 0.1)",
-            backdropFilter: "blur(12px)",
-            borderRadius: "24px",
-            padding: "1.5rem",
-            marginBottom: "2rem",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-          opacity: isVisible ? 1 : 0,
-            transform: isVisible ? "translateY(0)" : "translateY(20px)",
-            transition: "all 0.6s ease 0.2s",
+            opacity: isVisible ? 1 : 0,
+            transform: isVisible ? "translateY(0)" : "translateY(16px)",
+            transition: "opacity 0.55s ease 0.12s, transform 0.55s ease 0.12s",
           }}
         >
           {/* 用户头像和基本信息 */}
@@ -3317,10 +2528,14 @@ const ProfilePage: React.FC = () => {
               borderBottom: "1px solid rgba(255,255,255,0.15)",
             }}
           >
-            {/* 头像 */}
-            
-            {/* 用户基本信息 */}
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p className="merchant-profile-account-card__platform-tag">
+                {language === "zh"
+                  ? "官方配送服务平台"
+                  : language === "en"
+                    ? "Official delivery platform"
+                    : "တရားဝင် ပို့ဆောင်ရေးဝန်ဆောင်မှု"}
+              </p>
               <div
                 style={{
                   display: "flex",
@@ -3941,9 +3156,10 @@ const ProfilePage: React.FC = () => {
               border: "1px solid rgba(59, 130, 246, 0.2)",
               textAlign: "center",
               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "default",
+              cursor: "pointer",
               boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
             }}
+            onClick={() => navigate("/orders")}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = "translateY(-5px)";
               e.currentTarget.style.boxShadow =
@@ -4119,9 +3335,10 @@ const ProfilePage: React.FC = () => {
               border: "1px solid rgba(245, 158, 11, 0.2)",
               textAlign: "center",
               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "default",
+              cursor: "pointer",
               boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
             }}
+            onClick={() => navigate("/orders?status=待取件")}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = "translateY(-5px)";
               e.currentTarget.style.boxShadow =
@@ -4170,9 +3387,10 @@ const ProfilePage: React.FC = () => {
               border: "1px solid rgba(139, 92, 246, 0.2)",
               textAlign: "center",
               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "default",
+              cursor: "pointer",
               boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
             }}
+            onClick={() => navigate("/orders?status=运输中")}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = "translateY(-5px)";
               e.currentTarget.style.boxShadow =
@@ -4221,9 +3439,10 @@ const ProfilePage: React.FC = () => {
               border: "1px solid rgba(16, 185, 129, 0.2)",
               textAlign: "center",
               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "default",
+              cursor: "pointer",
               boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
             }}
+            onClick={() => navigate("/orders?status=已完成")}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = "translateY(-5px)";
               e.currentTarget.style.boxShadow =
@@ -5482,7 +4701,25 @@ const ProfilePage: React.FC = () => {
           isPartnerStore={isPartnerStore}
         />
 
-      {showPackageDetailModal && selectedPackage && (
+      <MerchantPackageDetailModal
+        open={packageModals.showPackageDetailModal}
+        pkg={packageModals.selectedPackage}
+        language={lang}
+        productPriceMap={productPriceMap}
+        isPartnerStore={isPartnerStore}
+        actionLoading={packageModals.actionLoading}
+        title={t.packageDetails}
+        closeLabel={t.close}
+        packageIdLabel={t.packageId}
+        getStatusColor={getStatusColor}
+        getStatusText={getStatusText}
+        getPaymentMethodText={getPaymentMethodText}
+        onClose={packageModals.closePackageDetail}
+        onAccept={packageModals.handleAcceptOrder}
+        onStartPacking={packageModals.handleStartPacking}
+      />
+
+      {showPackingListModal && (
         <div
           style={{
             position: "fixed",
@@ -5490,642 +4727,26 @@ const ProfilePage: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-            background: "rgba(0, 0, 0, 0.7)",
-            backdropFilter: "blur(5px)",
-          zIndex: 1000,
+            background: "rgba(15, 23, 42, 0.8)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: "2rem",
+          zIndex: 30000,
+            backdropFilter: "blur(10px)",
         }}
-        onClick={() => setShowPackageDetailModal(false)}
+        onClick={() => setShowPackingListModal(false)}
         >
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.15)",
-              backdropFilter: "blur(20px)",
-              borderRadius: "24px",
-              padding: "1.5rem",
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-              maxWidth: "800px",
-              width: "100%",
-              maxHeight: "90vh",
-              overflowY: "auto",
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1.5rem",
-                borderBottom: "2px solid rgba(255,255,255,0.3)",
-                paddingBottom: "1rem",
-              }}
-            >
-              <h2
-                style={{
-                  color: "white",
-                  fontSize: "1.5rem",
-                  margin: 0,
-                }}
-              >
-                {t.packageDetails}
-              </h2>
-              <button
-                onClick={() => setShowPackageDetailModal(false)}
-                style={{
-                  background: "rgba(255, 255, 255, 0.2)",
-                  color: "white",
-                  border: "1px solid rgba(255, 255, 255, 0.3)",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  fontSize: "1rem",
-                  fontWeight: "bold",
-                }}
-              >
-                {t.close}
-              </button>
-            </div>
-
-            <div style={{ display: "grid", gap: "1.5rem" }}>
-              {/* 🚀 统一后的订单详情内容 (参考待接单列表风格) */}
-              {(() => {
-                // 解析商品信息
-                const itemsMatch = selectedPackage.description?.match(
-                  /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/,
-                );
-                const productItems = itemsMatch
-                  ? itemsMatch[1].split(", ")
-                  : [];
-                const parsedItems = productItems.map((item: string) => {
-                  const match = item.match(/^(.+?)\s*x(\d+)$/i);
-                  if (!match) return { label: item, qty: 1 };
-                  const name = match[1].trim();
-                  const qty = Number(match[2]) || 1;
-                  const unitPrice = productPriceMap[name];
-                  return {
-                    label: name,
-                    qty,
-                    price: unitPrice ? unitPrice * qty : undefined,
-                  };
-                });
-
-                  return (
-                  <>
-                    {/* 订单 ID 和 二维码区域 */}
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        background: "rgba(255,255,255,0.03)",
-                        padding: "1.5rem",
-                        borderRadius: "24px",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                      }}
-                    >
-                    <div>
-                        <div
-                          style={{
-                            color: "rgba(255, 255, 255, 0.5)",
-                            fontSize: "0.85rem",
-                            marginBottom: "4px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {t.packageId}
-                      </div>
-                        <div
-                          style={{
-                            color: "#fbbf24",
-                            fontSize: "1.6rem",
-                            fontWeight: "900",
-                          }}
-                        >
-                          #{selectedPackage.id}
-                    </div>
-                        <div
-                          style={{
-                            color: "rgba(255, 255, 255, 0.7)",
-                            fontSize: "0.9rem",
-                            marginTop: "8px",
-                          }}
-                        >
-                          📅{" "}
-                          {selectedPackage.create_time ||
-                            selectedPackage.created_at ||
-                            "-"}
-                    </div>
-                        <div style={{ marginTop: "1rem" }}>
-                          <div
-                            style={{
-                              display: "inline-block",
-                              background: getStatusColor(
-                                selectedPackage.status === "待收款"
-                                  ? "待取件"
-                                  : selectedPackage.status,
-                              ),
-                              color: "white",
-                              padding: "0.5rem 1.2rem",
-                              borderRadius: "24px",
-                              fontSize: "0.9rem",
-                              fontWeight: "900",
-                            }}
-                          >
-                            {selectedPackage.status === "待收款"
-                              ? getStatusText(selectedPackage.status)
-                              : selectedPackage.status}
-                </div>
-                    </div>
-                  </div>
-                      <div
-                        style={{
-                          background: "white",
-                          padding: "10px",
-                          borderRadius: "16px",
-                          boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
-                        }}
-                      >
-                        <OrderQRCode orderId={selectedPackage.id} />
-                    </div>
-                  </div>
-
-                    {/* 信息网格 */}
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          window.innerWidth < 768 ? "1fr" : "1fr 1fr",
-                        gap: "1.5rem",
-                      }}
-                    >
-                      {/* 商家信息 */}
-                      <div
-                        style={{
-                          background: "rgba(255,255,255,0.03)",
-                          padding: "1.5rem",
-                          borderRadius: "24px",
-                          border: "1px solid rgba(255,255,255,0.05)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: "#3b82f6",
-                            fontSize: "0.8rem",
-                            fontWeight: "900",
-                            marginBottom: "12px",
-                            textTransform: "uppercase",
-                            letterSpacing: "1px",
-                          }}
-                        >
-                          商家信息
-                    </div>
-                        <div
-                          style={{
-                            color: "white",
-                            fontWeight: "800",
-                            fontSize: "1.1rem",
-                          }}
-                        >
-                          {selectedPackage.sender_name}
-                  </div>
-                        <div
-                          style={{
-                            color: "rgba(255,255,255,0.6)",
-                            fontSize: "0.95rem",
-                            marginTop: "6px",
-                          }}
-                        >
-                          {selectedPackage.sender_phone}
-                </div>
-                        <div
-                          style={{
-                            color: "rgba(255,255,255,0.5)",
-                            fontSize: "0.9rem",
-                            marginTop: "6px",
-                            lineHeight: "1.4",
-                          }}
-                        >
-                          {selectedPackage.sender_address}
-              </div>
-                    </div>
-                      {/* 客户信息 */}
-                      <div
-                        style={{
-                          background: "rgba(255,255,255,0.03)",
-                          padding: "1.5rem",
-                          borderRadius: "24px",
-                          border: "1px solid rgba(255,255,255,0.05)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: "#fbbf24",
-                            fontSize: "0.8rem",
-                            fontWeight: "900",
-                            marginBottom: "12px",
-                            textTransform: "uppercase",
-                            letterSpacing: "1px",
-                          }}
-                        >
-                          客户信息
-                </div>
-                        <div
-                          style={{
-                            color: "white",
-                            fontWeight: "800",
-                            fontSize: "1.1rem",
-                          }}
-                        >
-                          {selectedPackage.receiver_name}
-                    </div>
-                        <div
-                          style={{
-                            color: "rgba(255,255,255,0.6)",
-                            fontSize: "0.95rem",
-                            marginTop: "6px",
-                          }}
-                        >
-                          {selectedPackage.receiver_phone}
-                  </div>
-                        <div
-                          style={{
-                            color: "rgba(255,255,255,0.5)",
-                            fontSize: "0.9rem",
-                            marginTop: "6px",
-                            lineHeight: "1.4",
-                          }}
-                        >
-                          {selectedPackage.receiver_address}
-                    </div>
-                  </div>
-                    </div>
-
-                    {/* 商品清单 */}
-                    <div
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        padding: "1.5rem",
-                        borderRadius: "24px",
-                        border: "1px solid rgba(255,255,255,0.05)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#10b981",
-                          fontSize: "0.8rem",
-                          fontWeight: "900",
-                          marginBottom: "15px",
-                          textTransform: "uppercase",
-                          letterSpacing: "1px",
-                        }}
-                      >
-                        商品清单
-                  </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "10px",
-                        }}
-                      >
-                        {parsedItems.map((item: any, idx: number) => (
-                          <div
-                            key={idx}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              color: "white",
-                              fontSize: "1rem",
-                            }}
-                          >
-                            <span style={{ fontWeight: "600" }}>
-                              • {item.label}
-                            </span>
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: "15px",
-                                alignItems: "center",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  color: "rgba(255,255,255,0.4)",
-                                  fontSize: "0.9rem",
-                                }}
-                              >
-                                x{item.qty}
-                              </span>
-                              {item.price && (
-                                <span
-                                  style={{
-                                    fontWeight: "800",
-                                    color: "#10b981",
-                                  }}
-                                >
-                                  {item.price.toLocaleString()} MMK
-                                </span>
-                              )}
-                </div>
-                          </div>
-                        ))}
-              </div>
-
-                      <div
-                        style={{
-                          marginTop: "1.5rem",
-                          paddingTop: "1.5rem",
-                          borderTop: "1px dashed rgba(255,255,255,0.1)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "10px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{
-                              color: "rgba(255,255,255,0.5)",
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            支付方式
-                          </span>
-                          <span style={{ color: "white", fontWeight: "700" }}>
-                            {getPaymentMethodText(
-                              selectedPackage.payment_method,
-                            )}
-                          </span>
-                  </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{
-                              color: "rgba(255,255,255,0.5)",
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            跑腿费用
-                          </span>
-                          <span style={{ color: "white", fontWeight: "700" }}>
-                            {selectedPackage.price}
-                          </span>
-                </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginTop: "5px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              color: "white",
-                              fontWeight: "900",
-                              fontSize: "1.1rem",
-                            }}
-                          >
-                            合计金额
-                          </span>
-                          <span
-                            style={{
-                              color: "#fbbf24",
-                              fontWeight: "950",
-                              fontSize: "1.5rem",
-                            }}
-                          >
-                            {(() => {
-                              const deliveryFee = parseFloat(
-                                selectedPackage.price?.replace(
-                                  /[^0-9.]/g,
-                                  "",
-                                ) || "0",
-                              );
-                              const itemPayMatch =
-                                selectedPackage.description?.match(
-                                  /\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/,
-                                );
-                              const itemCost = itemPayMatch?.[1]
-                                ? parseFloat(itemPayMatch[1].replace(/,/g, ""))
-                                : 0;
-                              const computedItemTotal = parsedItems.reduce(
-                                (sum: number, item: any) =>
-                                  sum + (item.price || 0),
-                                0,
-                              );
-                              const finalItemTotal =
-                                itemCost > 0 ? itemCost : computedItemTotal;
-                              return (
-                                deliveryFee + finalItemTotal
-                              ).toLocaleString();
-                            })()}{" "}
-                            MMK
-                          </span>
-                  </div>
-                  </div>
-                </div>
-
-                    {/* 客户备注 */}
-                    {selectedPackage.notes && (
-                      <div
-                        style={{
-                          background: "rgba(251, 191, 36, 0.1)",
-                          padding: "1.25rem",
-                          borderRadius: "20px",
-                          border: "1px solid rgba(251, 191, 36, 0.2)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: "#fbbf24",
-                            fontSize: "0.8rem",
-                            fontWeight: "900",
-                            marginBottom: "6px",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          💡 客户备注
-                      </div>
-                        <div
-                          style={{
-                            color: "white",
-                            fontSize: "1rem",
-                            lineHeight: "1.5",
-                            fontWeight: "500",
-                          }}
-                        >
-                          {selectedPackage.notes}
-                    </div>
-                      </div>
-                )}
-                  </>
-                );
-              })()}
-              </div>
-
-              {/* 🚀 新增：商家接单/开始打包功能按钮 */}
-              {isPartnerStore && (
-                <>
-                {selectedPackage.status === "待确认" && (
-                    <button
-                      onClick={handleAcceptOrder}
-                      disabled={loading}
-                      style={{
-                      background:
-                        "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                      color: "white",
-                      border: "none",
-                      padding: "1rem 2rem",
-                      borderRadius: "12px",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      fontSize: "1.1rem",
-                      fontWeight: "900",
-                      transition: "all 0.3s ease",
-                      width: "100%",
-                      boxShadow: "0 8px 20px rgba(16, 185, 129, 0.3)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "10px",
-                      marginBottom: "0.5rem",
-                      }}
-                    >
-                      {loading ? (
-                      <div
-                        className="spinner"
-                        style={{
-                          width: "20px",
-                          height: "20px",
-                          border: "3px solid rgba(255,255,255,0.3)",
-                          borderTop: "3px solid white",
-                          borderRadius: "50%",
-                          animation: "spin 1s linear infinite",
-                        }}
-                      ></div>
-                    ) : (
-                      <>
-                        ✅{" "}
-                        {language === "zh"
-                          ? "立即接单"
-                          : language === "en"
-                            ? "Accept Order"
-                            : "အော်ဒါလက်ခံရန်"}
-                      </>
-                      )}
-                    </button>
-                  )}
-
-                {selectedPackage.status === "打包中" && (
-                    <button
-                      onClick={() => handleStartPacking(selectedPackage)}
-                      disabled={loading}
-                      style={{
-                      background:
-                        "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                      color: "white",
-                      border: "none",
-                      padding: "1rem 2rem",
-                      borderRadius: "12px",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      fontSize: "1.1rem",
-                      fontWeight: "900",
-                      transition: "all 0.3s ease",
-                      width: "100%",
-                      boxShadow: "0 8px 20px rgba(16, 185, 129, 0.3)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "10px",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    <>
-                      📦{" "}
-                      {language === "zh"
-                        ? "开始打包"
-                        : language === "en"
-                          ? "Start Packing"
-                          : "ထုပ်ပိုးရန်စတင်ပါ"}
-                    </>
-                    </button>
-                  )}
-                </>
-              )}
-
-              {/* 关闭按钮 */}
-              <button
-                onClick={() => setShowPackageDetailModal(false)}
-                style={{
-                background: "rgba(59, 130, 246, 0.5)",
-                color: "white",
-                border: "1px solid rgba(59, 130, 246, 0.7)",
-                padding: "0.75rem 2rem",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontSize: "1rem",
-                fontWeight: "bold",
-                transition: "all 0.3s ease",
-                width: "100%",
-                }}
-                onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(59, 130, 246, 0.7)";
-                }}
-                onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(59, 130, 246, 0.5)";
-                }}
-              >
-                {t.close}
-              </button>
-          </div>
-        </div>
-      )}
-
-      {/* 寄件码模态框 */}
-      {showPickupCodeModal && selectedPackage && (
-        <div
-          style={{
-            position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-            background: "rgba(0, 0, 0, 0.8)",
-            backdropFilter: "blur(5px)",
-          zIndex: 1001,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "2rem",
-        }}
-        onClick={closePickupCodeModal}
-        >
-          <div
-            style={{
-              background: "linear-gradient(135deg, #2c5282 0%, #3182ce 100%)",
-              borderRadius: "15px",
-              padding: "25px",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              maxWidth: "500px",
-              width: "100%",
-              maxHeight: "90vh",
-              overflow: "auto",
-              textAlign: "center",
+              background: "rgba(30, 41, 59, 0.95)",
+              padding: "2.5rem",
+              borderRadius: "32px",
+              maxWidth: "700px",
+              width: "95%",
+              maxHeight: "85vh",
+              overflow: "hidden",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
               display: "flex",
               flexDirection: "column",
           }}
@@ -6136,296 +4757,717 @@ const ProfilePage: React.FC = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "25px",
+                marginBottom: "2rem",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                paddingBottom: "1.5rem",
               }}
             >
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: "1.5rem",
-                  fontWeight: 600,
-                  color: "white",
-                }}
-              >
-                📱 {t.pickupCode}
-              </h2>
-              <button
-                onClick={closePickupCodeModal}
-                style={{
-                  background: "rgba(255, 255, 255, 0.1)",
-                  color: "white",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  padding: "8px 16px",
-                  borderRadius: "24px",
-                  cursor: "pointer",
-                  fontSize: "0.9rem",
-                  transition: "all 0.3s ease",
-                }}
-              >
-                ✕ {t.close}
-              </button>
-            </div>
-
-            <div
-              style={{
-                background: "rgba(255, 255, 255, 0.1)",
-                padding: "20px",
-                borderRadius: "15px",
-                marginBottom: "20px",
-              }}
-            >
-              <h3
-                style={{
-                  color: "white",
-                  margin: "0 0 15px 0",
-                  fontSize: "1.1rem",
-                }}
-              >
-                📦{" "}
-                {language === "zh"
-                  ? "包裹信息"
-                  : language === "en"
-                    ? "Package Information"
-                    : "ပက်ကေ့ဂျ်အချက်အလက်"}
-              </h3>
               <div
-                style={{
-                  color: "rgba(255,255,255,0.9)",
-                  fontSize: "0.9rem",
-                  marginBottom: "15px",
-                }}
-              >
-                <p style={{ margin: "5px 0" }}>
-                  <strong>
-                    {language === "zh"
-                      ? "包裹编号"
-                      : language === "en"
-                        ? "Package ID"
-                        : "ပက်ကေ့ဂျ်နံပါတ်"}
-                    :
-                  </strong>{" "}
-                  {selectedPackage.id}
-                </p>
-                <p style={{ margin: "5px 0" }}>
-                  <strong>
-                    {language === "zh"
-                      ? "包裹类型"
-                      : language === "en"
-                        ? "Package Type"
-                        : "ပက်ကေ့ဂျ်အမျိုးအစား"}
-                    :
-                  </strong>{" "}
-                  {selectedPackage.package_type || "-"}
-                </p>
-                <p style={{ margin: "5px 0" }}>
-                  <strong>{t.sender}:</strong>{" "}
-                  {selectedPackage.sender_name || "-"}
-                </p>
-                <p style={{ margin: "5px 0" }}>
-                  <strong>{t.receiver}:</strong>{" "}
-                  {selectedPackage.receiver_name || "-"}
-                </p>
-              </div>
-              
-              <div
-                style={{
-                  background: "white",
-                  padding: "25px",
-                  borderRadius: "15px",
-                  marginBottom: "20px",
-                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                  border: "2px solid rgba(255, 255, 255, 0.2)",
-                  position: "relative",
-                }}
+                style={{ display: "flex", alignItems: "center", gap: "1rem" }}
               >
                 <div
                   style={{
-                    position: "absolute",
-                    top: "10px",
-                    right: "10px",
-                    background: "rgba(0, 0, 0, 0.1)",
-                    color: "#666",
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                    fontSize: "0.7rem",
-                    fontWeight: "500",
+                    width: "48px",
+                    height: "48px",
+                    background:
+                      "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    borderRadius: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1.5rem",
                   }}
                 >
-                  {selectedPackage.id}
+                  📦
                 </div>
-                
-                {qrCodeDataUrl ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "10px",
-                    }}
-                  >
-                    <img 
-                      src={qrCodeDataUrl} 
-                      alt={t.pickupCode}
-                      style={{
-                        width: "220px",
-                        height: "220px",
-                        borderRadius: "8px",
-                        boxShadow: "0 2px 10px rgba(0, 0, 0, 0.1)",
-                      }}
-                    />
-                    <p
-                      style={{
-                        color: "#666",
-                        fontSize: "0.8rem",
-                      margin: 0,
-                        textAlign: "center",
-                      }}
-                    >
-                      {language === "zh"
-                        ? "扫描此二维码完成取件"
-                        : language === "en"
-                          ? "Scan this QR code to complete pickup"
-                          : "ဤ QR code ကို စကင်န်ဖတ်၍ ကောက်ယူမှု ပြီးစီးပါ"}
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      width: "220px",
-                      height: "220px",
-                      background:
-                        "linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      margin: "0 auto",
-                      borderRadius: "8px",
-                      border: "2px dashed #ccc",
-                    }}
-                  >
-                    <div style={{ textAlign: "center" }}>
-                      <div
-                        style={{
-                          fontSize: "2rem",
-                          marginBottom: "10px",
-                        }}
-                      >
-                        ⏳
-                      </div>
-                      <p
-                        style={{ color: "#666", margin: 0, fontSize: "0.9rem" }}
-                      >
-                        {language === "zh"
-                          ? "生成中..."
-                          : language === "en"
-                            ? "Generating..."
-                            : "ထုတ်လုပ်နေသည်..."}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <h2
+                  style={{
+                    color: "white",
+                  margin: 0,
+                    fontSize: "1.75rem",
+                    fontWeight: "800",
+                  }}
+                >
+                  {language === "zh"
+                    ? "待打包订单"
+                    : language === "en"
+                      ? "Orders to Pack"
+                      : "ထုပ်ပိုးရန်ကျန်သောအော်ဒါများ"}
+                </h2>
               </div>
-              
-              <div
+              <button
+                onClick={() => setShowPackingListModal(false)}
                 style={{
-                  background: "rgba(255, 255, 255, 0.05)",
-                  padding: "15px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  background: "rgba(255, 255, 255, 0.1)",
+                  color: "white",
+                  border: "none",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "12px",
+                  cursor: "pointer",
+                  fontSize: "1.2rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                <h4
-                  style={{
-                    color: "#A5C7FF",
-                    margin: "0 0 10px 0",
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  💡{" "}
-                  {language === "zh"
-                    ? "使用说明"
-                    : language === "en"
-                      ? "Instructions"
-                      : "အသုံးပြုမှုညွှန်ကြားချက်"}
-                </h4>
-                <ul
-                  style={{
-                    color: "rgba(255,255,255,0.9)",
-                    fontSize: "0.85rem",
-                    textAlign: "left",
-                  margin: 0,
-                    paddingLeft: "20px",
-                    lineHeight: "1.6",
-                  }}
-                >
-                  <li>
+                ✕
+              </button>
+            </div>
+            
+            <div style={{ overflowY: "auto", flex: 1, paddingRight: "0.5rem" }}>
+              {userPackages.filter((pkg) => pkg.status === "打包中").length >
+              0 ? (
+                userPackages
+                  .filter((pkg) => pkg.status === "打包中")
+                  .map((pkg: any) => (
+                  <div
+                    key={pkg.id}
+                    style={{
+                        padding: "1.5rem",
+                        marginBottom: "1rem",
+                        background: "rgba(255, 255, 255, 0.05)",
+                        borderRadius: "24px",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "1rem",
+                        transition: "all 0.3s ease",
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                        <div
+                          style={{
+                            color: "rgba(255, 255, 255, 0.5)",
+                            fontSize: "0.85rem",
+                            marginBottom: "4px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                        {t.packageId}
+                      </div>
+                        <div
+                          style={{
+                            color: "white",
+                            fontSize: "1.1rem",
+                            fontWeight: "800",
+                            marginBottom: "8px",
+                          }}
+                        >
+                        {pkg.id}
+                      </div>
+                        <div style={{ display: "flex", gap: "15px" }}>
+                          <div
+                            style={{
+                              color: "rgba(255, 255, 255, 0.7)",
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            📅 {pkg.create_time || pkg.created_at || "-"}
+                        </div>
+                        {pkg.cod_amount > 0 && (
+                            <div
+                              style={{
+                                color: "#fca5a5",
+                                fontSize: "0.9rem",
+                                fontWeight: "bold",
+                              }}
+                            >
+                            💰 {pkg.cod_amount.toLocaleString()} MMK
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowPackingListModal(false);
+                        packageModals.handleStartPacking(pkg);
+                      }}
+                      style={{
+                          padding: "12px 24px",
+                          background:
+                            "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "12px",
+                          fontWeight: "800",
+                          fontSize: "0.9rem",
+                          cursor: "pointer",
+                          boxShadow: "0 8px 15px rgba(16, 185, 129, 0.3)",
+                          transition: "all 0.3s ease",
+                          whiteSpace: "nowrap",
+                        }}
+                        onMouseOver={(e) =>
+                          (e.currentTarget.style.transform = "translateY(-2px)")
+                        }
+                        onMouseOut={(e) =>
+                          (e.currentTarget.style.transform = "translateY(0)")
+                        }
+                      >
+                        📦{" "}
+                        {language === "zh"
+                          ? "开始打包"
+                          : language === "en"
+                            ? "Start Packing"
+                            : "ထုပ်ပိုးရန်စတင်ပါ"}
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
+                  <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>
+                    ✨
+                  </div>
+                  <div
+                    style={{
+                      color: "rgba(255, 255, 255, 0.5)",
+                      fontSize: "1.2rem",
+                      fontWeight: "700",
+                    }}
+                  >
                     {language === "zh"
-                      ? "配送员扫描此二维码完成取件"
+                      ? "暂无待打包订单"
                       : language === "en"
-                        ? "Courier scans this QR code to complete pickup"
-                        : "ပို့ဆောင်သူသည် ဤ QR code ကို စကင်န်ဖတ်၍ ကောက်ယူမှု ပြီးစီးပါ"}
-                  </li>
-                  <li>
-                    {language === "zh"
-                      ? "您也可以保存二维码图片备用"
-                      : language === "en"
-                        ? "You can also save the QR code image as backup"
-                        : "သင်သည် QR code ပုံကို သိမ်းဆည်းထားနိုင်သည်"}
-                  </li>
-                </ul>
-              </div>
+                        ? "No orders to pack"
+                        : "ထုပ်ပိုးရန်အော်ဒါမရှိပါ"}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div
               style={{
-                display: "flex",
-                gap: "10px",
-                justifyContent: "center",
+                marginTop: "2rem",
+                borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+                paddingTop: "1.5rem",
               }}
             >
               <button
-                onClick={saveQRCode}
-                disabled={!qrCodeDataUrl}
+                onClick={() => setShowPackingListModal(false)}
                 style={{
-                  background: qrCodeDataUrl
-                    ? "rgba(255, 255, 255, 0.2)"
-                    : "rgba(255, 255, 255, 0.1)",
+                  width: "100%",
+                  padding: "14px",
+                  background: "rgba(255, 255, 255, 0.1)",
                   color: "white",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  cursor: qrCodeDataUrl ? "pointer" : "not-allowed",
-                  fontSize: "0.9rem",
-                  fontWeight: "bold",
+                  border: "none",
+                  borderRadius: "16px",
+                  fontSize: "1rem",
+                  fontWeight: "700",
+                  cursor: "pointer",
                   transition: "all 0.3s ease",
-                  opacity: qrCodeDataUrl ? 1 : 0.5,
                 }}
-                onMouseOver={(e) => {
-                  if (qrCodeDataUrl) {
-                    e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.3)";
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (qrCodeDataUrl) {
-                    e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.2)";
-                  }
-                }}
+                onMouseOver={(e) =>
+                  (e.currentTarget.style.background =
+                    "rgba(255, 255, 255, 0.15)")
+                }
+                onMouseOut={(e) =>
+                  (e.currentTarget.style.background =
+                    "rgba(255, 255, 255, 0.1)")
+                }
               >
-                💾{" "}
-                {language === "zh"
-                  ? "保存二维码"
-                  : language === "en"
-                    ? "Save QR Code"
-                    : "QR code သိမ်းဆည်းရန်"}
+                {t.close}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 密码修改模态框 */}
+      {/* 🚀 新增：待接单订单列表模态框 */}
+      {isPartnerStore && showPendingAcceptListModal && (
+        <div
+          style={{
+            position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+            background: "rgba(15, 23, 42, 0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          zIndex: 30000,
+            backdropFilter: "blur(10px)",
+        }}
+        onClick={() => setShowPendingAcceptListModal(false)}
+        >
+          <div
+            style={{
+              background: "rgba(30, 41, 59, 0.95)",
+              padding: "2.5rem",
+              borderRadius: "32px",
+              maxWidth: "700px",
+              width: "95%",
+              maxHeight: "85vh",
+              overflow: "hidden",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              display: "flex",
+              flexDirection: "column",
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "2rem",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                paddingBottom: "1.5rem",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "1rem" }}
+              >
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    background:
+                      "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                    borderRadius: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1.5rem",
+                  }}
+                >
+                  🔔
+                </div>
+                <h2
+                  style={{
+                    color: "white",
+                  margin: 0,
+                    fontSize: "1.75rem",
+                    fontWeight: "800",
+                  }}
+                >
+                  {language === "zh"
+                    ? "待接单订单"
+                    : language === "en"
+                      ? "Pending Accept"
+                      : "လက်ခံရန်စောင့်ဆိုင်းနေသည်"}
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowPendingAcceptListModal(false)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.1)",
+                  color: "white",
+                  border: "none",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "12px",
+                  cursor: "pointer",
+                  fontSize: "1.2rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div style={{ overflowY: "auto", flex: 1, paddingRight: "0.5rem" }}>
+              {userPackages.filter((pkg) => pkg.status === "待确认").length >
+              0 ? (
+                userPackages
+                  .filter((pkg) => pkg.status === "待确认")
+                  .map((pkg: any) => {
+                  // 解析商品信息
+                    const itemsMatch = pkg.description?.match(
+                      /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/,
+                    );
+                    const productItems = itemsMatch
+                      ? itemsMatch[1].split(", ")
+                      : [];
+                  const parsedItems = productItems.map((item: string) => {
+                    const match = item.match(/^(.+?)\s*x(\d+)$/i);
+                    if (!match) return { label: item, qty: 1 };
+                      return {
+                        label: match[1].trim(),
+                        qty: Number(match[2]) || 1,
+                      };
+                  });
+
+                  return (
+                    <div
+                      key={pkg.id}
+                      style={{
+                          padding: "1.5rem",
+                          marginBottom: "2rem",
+                          background: "rgba(255, 255, 255, 0.05)",
+                          borderRadius: "28px",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "1.5rem",
+                          transition: "all 0.3s ease",
+                      }}
+                    >
+                      {/* 订单 ID 和 二维码区域 */}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                          }}
+                        >
+                        <div>
+                            <div
+                              style={{
+                                color: "rgba(255, 255, 255, 0.5)",
+                                fontSize: "0.85rem",
+                                marginBottom: "4px",
+                                fontWeight: "bold",
+                              }}
+                            >
+                            {t.packageId}
+                          </div>
+                            <div
+                              style={{
+                                color: "#fbbf24",
+                                fontSize: "1.4rem",
+                                fontWeight: "900",
+                              }}
+                            >
+                            #{pkg.id}
+                          </div>
+                            <div
+                              style={{
+                                color: "rgba(255, 255, 255, 0.7)",
+                                fontSize: "0.9rem",
+                                marginTop: "8px",
+                              }}
+                            >
+                              📅 {pkg.create_time || pkg.created_at || "-"}
+                          </div>
+                        </div>
+                          <div
+                            style={{
+                              background: "white",
+                              padding: "10px",
+                              borderRadius: "16px",
+                            }}
+                          >
+                          <OrderQRCode orderId={pkg.id} />
+                        </div>
+                      </div>
+
+                      {/* 信息网格 */}
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "1.5rem",
+                          }}
+                        >
+                        {/* 商家信息 */}
+                          <div
+                            style={{
+                              background: "rgba(255,255,255,0.03)",
+                              padding: "1.2rem",
+                              borderRadius: "18px",
+                              border: "1px solid rgba(255,255,255,0.05)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: "#3b82f6",
+                                fontSize: "0.8rem",
+                                fontWeight: "900",
+                                marginBottom: "8px",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              商家信息
+                            </div>
+                            <div
+                              style={{
+                                color: "white",
+                                fontWeight: "700",
+                                fontSize: "1rem",
+                              }}
+                            >
+                              {pkg.sender_name}
+                            </div>
+                            <div
+                              style={{
+                                color: "rgba(255,255,255,0.6)",
+                                fontSize: "0.9rem",
+                                marginTop: "4px",
+                              }}
+                            >
+                              {pkg.sender_phone}
+                            </div>
+                            <div
+                              style={{
+                                color: "rgba(255,255,255,0.6)",
+                                fontSize: "0.85rem",
+                                marginTop: "4px",
+                              }}
+                            >
+                              {pkg.sender_address}
+                            </div>
+                        </div>
+                        {/* 客户信息 */}
+                          <div
+                            style={{
+                              background: "rgba(255,255,255,0.03)",
+                              padding: "1.2rem",
+                              borderRadius: "18px",
+                              border: "1px solid rgba(255,255,255,0.05)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: "#fbbf24",
+                                fontSize: "0.8rem",
+                                fontWeight: "900",
+                                marginBottom: "8px",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              客户信息
+                            </div>
+                            <div
+                              style={{
+                                color: "white",
+                                fontWeight: "700",
+                                fontSize: "1rem",
+                              }}
+                            >
+                              {pkg.receiver_name}
+                            </div>
+                            <div
+                              style={{
+                                color: "rgba(255,255,255,0.6)",
+                                fontSize: "0.9rem",
+                                marginTop: "4px",
+                              }}
+                            >
+                              {pkg.receiver_phone}
+                            </div>
+                            <div
+                              style={{
+                                color: "rgba(255,255,255,0.6)",
+                                fontSize: "0.85rem",
+                                marginTop: "4px",
+                              }}
+                            >
+                              {pkg.receiver_address}
+                            </div>
+                        </div>
+                      </div>
+
+                      {/* 商品清单 */}
+                        <div
+                          style={{
+                            background: "rgba(255,255,255,0.03)",
+                            padding: "1.2rem",
+                            borderRadius: "18px",
+                            border: "1px solid rgba(255,255,255,0.05)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              color: "#10b981",
+                              fontSize: "0.8rem",
+                              fontWeight: "900",
+                              marginBottom: "12px",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            商品清单
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "8px",
+                            }}
+                          >
+                          {parsedItems.map((item: any, idx: number) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  color: "white",
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                              <span>• {item.label}</span>
+                                <span style={{ fontWeight: "900" }}>
+                                  x{item.qty}
+                                </span>
+                            </div>
+                          ))}
+                        </div>
+                          <div
+                            style={{
+                              marginTop: "12px",
+                              paddingTop: "12px",
+                              borderTop: "1px dashed rgba(255,255,255,0.1)",
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: "rgba(255,255,255,0.5)",
+                                fontSize: "0.9rem",
+                              }}
+                            >
+                              支付方式:{" "}
+                              {pkg.payment_method === "cash"
+                                ? "现金支付"
+                                : "余额支付"}
+                            </span>
+                            <span
+                              style={{
+                                color: "#10b981",
+                                fontWeight: "900",
+                                fontSize: "1.1rem",
+                              }}
+                            >
+                              {pkg.price
+                                ? `${pkg.price.replace("MMK", "").trim()} MMK`
+                                : "-"}
+                            </span>
+                        </div>
+                      </div>
+
+                      {/* 客户备注 */}
+                      {pkg.notes && (
+                          <div
+                            style={{
+                              background: "rgba(251, 191, 36, 0.1)",
+                              padding: "1rem",
+                              borderRadius: "18px",
+                              border: "1px solid rgba(251, 191, 36, 0.2)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: "#fbbf24",
+                                fontSize: "0.8rem",
+                                fontWeight: "900",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              💡 客户备注
+                            </div>
+                            <div
+                              style={{ color: "white", fontSize: "0.95rem" }}
+                            >
+                              {pkg.notes}
+                            </div>
+                        </div>
+                      )}
+
+                      {/* 操作按钮 */}
+                        <div style={{ display: "flex", gap: "1rem" }}>
+                        <button
+                          onClick={() => packageModals.handleCancelOrder(pkg)}
+                          style={{
+                            flex: 1,
+                              padding: "1rem",
+                              background: "rgba(239, 68, 68, 0.15)",
+                              color: "#fca5a5",
+                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              borderRadius: "16px",
+                              fontWeight: "800",
+                              cursor: "pointer",
+                              transition: "all 0.3s ease",
+                          }}
+                        >
+                          ✕ 拒绝接单
+                        </button>
+                        <button
+                          onClick={() => packageModals.handleAcceptOrder(pkg)}
+                          style={{
+                            flex: 2,
+                              padding: "1rem",
+                              background:
+                                "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "16px",
+                              fontWeight: "900",
+                              fontSize: "1.1rem",
+                              cursor: "pointer",
+                              boxShadow: "0 8px 20px rgba(245, 158, 11, 0.3)",
+                              transition: "all 0.3s ease",
+                          }}
+                        >
+                          🤝 立即接单 (自动打单)
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
+                  <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>
+                    ✨
+                  </div>
+                  <div
+                    style={{
+                      color: "rgba(255, 255, 255, 0.5)",
+                      fontSize: "1.2rem",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {language === "zh"
+                      ? "暂无待接单订单"
+                      : language === "en"
+                        ? "No pending orders"
+                        : "လက်ခံရန်အော်ဒါမရှိပါ"}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                marginTop: "2rem",
+                borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+                paddingTop: "1.5rem",
+              }}
+            >
+              <button
+                onClick={() => setShowPendingAcceptListModal(false)}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  background: "rgba(255, 255, 255, 0.1)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "16px",
+                  fontSize: "1rem",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                }}
+                onMouseOver={(e) =>
+                  (e.currentTarget.style.background =
+                    "rgba(255, 255, 255, 0.15)")
+                }
+                onMouseOut={(e) =>
+                  (e.currentTarget.style.background =
+                    "rgba(255, 255, 255, 0.1)")
+                }
+              >
+                {t.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPasswordModal && (
         <div
           style={{
@@ -6777,6 +5819,7 @@ const ProfilePage: React.FC = () => {
       )}
 
       {/* 代收款订单列表模态框 */}
+
       {showCODOrdersModal && (
         <div
           style={{
@@ -8259,1239 +7302,7 @@ const ProfilePage: React.FC = () => {
       )}
 
       {/* 🚀 新增：待打包订单列表模态框 */}
-      {showPackingListModal && (
-        <div
-          style={{
-            position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-            background: "rgba(15, 23, 42, 0.8)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          zIndex: 30000,
-            backdropFilter: "blur(10px)",
-        }}
-        onClick={() => setShowPackingListModal(false)}
-        >
-          <div
-            style={{
-              background: "rgba(30, 41, 59, 0.95)",
-              padding: "2.5rem",
-              borderRadius: "32px",
-              maxWidth: "700px",
-              width: "95%",
-              maxHeight: "85vh",
-              overflow: "hidden",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              display: "flex",
-              flexDirection: "column",
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "2rem",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-                paddingBottom: "1.5rem",
-              }}
-            >
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "1rem" }}
-              >
-                <div
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    background:
-                      "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                    borderRadius: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.5rem",
-                  }}
-                >
-                  📦
-                </div>
-                <h2
-                  style={{
-                    color: "white",
-                  margin: 0,
-                    fontSize: "1.75rem",
-                    fontWeight: "800",
-                  }}
-                >
-                  {language === "zh"
-                    ? "待打包订单"
-                    : language === "en"
-                      ? "Orders to Pack"
-                      : "ထုပ်ပိုးရန်ကျန်သောအော်ဒါများ"}
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowPackingListModal(false)}
-                style={{
-                  background: "rgba(255, 255, 255, 0.1)",
-                  color: "white",
-                  border: "none",
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "12px",
-                  cursor: "pointer",
-                  fontSize: "1.2rem",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div style={{ overflowY: "auto", flex: 1, paddingRight: "0.5rem" }}>
-              {userPackages.filter((pkg) => pkg.status === "打包中").length >
-              0 ? (
-                userPackages
-                  .filter((pkg) => pkg.status === "打包中")
-                  .map((pkg: any) => (
-                  <div
-                    key={pkg.id}
-                    style={{
-                        padding: "1.5rem",
-                        marginBottom: "1rem",
-                        background: "rgba(255, 255, 255, 0.05)",
-                        borderRadius: "24px",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: "1rem",
-                        transition: "all 0.3s ease",
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                        <div
-                          style={{
-                            color: "rgba(255, 255, 255, 0.5)",
-                            fontSize: "0.85rem",
-                            marginBottom: "4px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                        {t.packageId}
-                      </div>
-                        <div
-                          style={{
-                            color: "white",
-                            fontSize: "1.1rem",
-                            fontWeight: "800",
-                            marginBottom: "8px",
-                          }}
-                        >
-                        {pkg.id}
-                      </div>
-                        <div style={{ display: "flex", gap: "15px" }}>
-                          <div
-                            style={{
-                              color: "rgba(255, 255, 255, 0.7)",
-                              fontSize: "0.9rem",
-                            }}
-                          >
-                            📅 {pkg.create_time || pkg.created_at || "-"}
-                        </div>
-                        {pkg.cod_amount > 0 && (
-                            <div
-                              style={{
-                                color: "#fca5a5",
-                                fontSize: "0.9rem",
-                                fontWeight: "bold",
-                              }}
-                            >
-                            💰 {pkg.cod_amount.toLocaleString()} MMK
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setShowPackingListModal(false);
-                        handleStartPacking(pkg);
-                      }}
-                      style={{
-                          padding: "12px 24px",
-                          background:
-                            "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "12px",
-                          fontWeight: "800",
-                          fontSize: "0.9rem",
-                          cursor: "pointer",
-                          boxShadow: "0 8px 15px rgba(16, 185, 129, 0.3)",
-                          transition: "all 0.3s ease",
-                          whiteSpace: "nowrap",
-                        }}
-                        onMouseOver={(e) =>
-                          (e.currentTarget.style.transform = "translateY(-2px)")
-                        }
-                        onMouseOut={(e) =>
-                          (e.currentTarget.style.transform = "translateY(0)")
-                        }
-                      >
-                        📦{" "}
-                        {language === "zh"
-                          ? "开始打包"
-                          : language === "en"
-                            ? "Start Packing"
-                            : "ထုပ်ပိုးရန်စတင်ပါ"}
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
-                  <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>
-                    ✨
-                  </div>
-                  <div
-                    style={{
-                      color: "rgba(255, 255, 255, 0.5)",
-                      fontSize: "1.2rem",
-                      fontWeight: "700",
-                    }}
-                  >
-                    {language === "zh"
-                      ? "暂无待打包订单"
-                      : language === "en"
-                        ? "No orders to pack"
-                        : "ထုပ်ပိုးရန်အော်ဒါမရှိပါ"}
-                  </div>
-                </div>
-              )}
-            </div>
 
-            <div
-              style={{
-                marginTop: "2rem",
-                borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-                paddingTop: "1.5rem",
-              }}
-            >
-              <button
-                onClick={() => setShowPackingListModal(false)}
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "16px",
-                  fontSize: "1rem",
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                }}
-                onMouseOver={(e) =>
-                  (e.currentTarget.style.background =
-                    "rgba(255, 255, 255, 0.15)")
-                }
-                onMouseOut={(e) =>
-                  (e.currentTarget.style.background =
-                    "rgba(255, 255, 255, 0.1)")
-                }
-              >
-                {t.close}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 🚀 新增：待接单订单列表模态框 */}
-      {isPartnerStore && showPendingAcceptListModal && (
-        <div
-          style={{
-            position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-            background: "rgba(15, 23, 42, 0.8)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          zIndex: 30000,
-            backdropFilter: "blur(10px)",
-        }}
-        onClick={() => setShowPendingAcceptListModal(false)}
-        >
-          <div
-            style={{
-              background: "rgba(30, 41, 59, 0.95)",
-              padding: "2.5rem",
-              borderRadius: "32px",
-              maxWidth: "700px",
-              width: "95%",
-              maxHeight: "85vh",
-              overflow: "hidden",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              display: "flex",
-              flexDirection: "column",
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "2rem",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-                paddingBottom: "1.5rem",
-              }}
-            >
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "1rem" }}
-              >
-                <div
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    background:
-                      "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                    borderRadius: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.5rem",
-                  }}
-                >
-                  🔔
-                </div>
-                <h2
-                  style={{
-                    color: "white",
-                  margin: 0,
-                    fontSize: "1.75rem",
-                    fontWeight: "800",
-                  }}
-                >
-                  {language === "zh"
-                    ? "待接单订单"
-                    : language === "en"
-                      ? "Pending Accept"
-                      : "လက်ခံရန်စောင့်ဆိုင်းနေသည်"}
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowPendingAcceptListModal(false)}
-                style={{
-                  background: "rgba(255, 255, 255, 0.1)",
-                  color: "white",
-                  border: "none",
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "12px",
-                  cursor: "pointer",
-                  fontSize: "1.2rem",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div style={{ overflowY: "auto", flex: 1, paddingRight: "0.5rem" }}>
-              {userPackages.filter((pkg) => pkg.status === "待确认").length >
-              0 ? (
-                userPackages
-                  .filter((pkg) => pkg.status === "待确认")
-                  .map((pkg: any) => {
-                  // 解析商品信息
-                    const itemsMatch = pkg.description?.match(
-                      /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/,
-                    );
-                    const productItems = itemsMatch
-                      ? itemsMatch[1].split(", ")
-                      : [];
-                  const parsedItems = productItems.map((item: string) => {
-                    const match = item.match(/^(.+?)\s*x(\d+)$/i);
-                    if (!match) return { label: item, qty: 1 };
-                      return {
-                        label: match[1].trim(),
-                        qty: Number(match[2]) || 1,
-                      };
-                  });
-
-                  return (
-                    <div
-                      key={pkg.id}
-                      style={{
-                          padding: "1.5rem",
-                          marginBottom: "2rem",
-                          background: "rgba(255, 255, 255, 0.05)",
-                          borderRadius: "28px",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "1.5rem",
-                          transition: "all 0.3s ease",
-                      }}
-                    >
-                      {/* 订单 ID 和 二维码区域 */}
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                          }}
-                        >
-                        <div>
-                            <div
-                              style={{
-                                color: "rgba(255, 255, 255, 0.5)",
-                                fontSize: "0.85rem",
-                                marginBottom: "4px",
-                                fontWeight: "bold",
-                              }}
-                            >
-                            {t.packageId}
-                          </div>
-                            <div
-                              style={{
-                                color: "#fbbf24",
-                                fontSize: "1.4rem",
-                                fontWeight: "900",
-                              }}
-                            >
-                            #{pkg.id}
-                          </div>
-                            <div
-                              style={{
-                                color: "rgba(255, 255, 255, 0.7)",
-                                fontSize: "0.9rem",
-                                marginTop: "8px",
-                              }}
-                            >
-                              📅 {pkg.create_time || pkg.created_at || "-"}
-                          </div>
-                        </div>
-                          <div
-                            style={{
-                              background: "white",
-                              padding: "10px",
-                              borderRadius: "16px",
-                            }}
-                          >
-                          <OrderQRCode orderId={pkg.id} />
-                        </div>
-                      </div>
-
-                      {/* 信息网格 */}
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: "1.5rem",
-                          }}
-                        >
-                        {/* 商家信息 */}
-                          <div
-                            style={{
-                              background: "rgba(255,255,255,0.03)",
-                              padding: "1.2rem",
-                              borderRadius: "18px",
-                              border: "1px solid rgba(255,255,255,0.05)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                color: "#3b82f6",
-                                fontSize: "0.8rem",
-                                fontWeight: "900",
-                                marginBottom: "8px",
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              商家信息
-                            </div>
-                            <div
-                              style={{
-                                color: "white",
-                                fontWeight: "700",
-                                fontSize: "1rem",
-                              }}
-                            >
-                              {pkg.sender_name}
-                            </div>
-                            <div
-                              style={{
-                                color: "rgba(255,255,255,0.6)",
-                                fontSize: "0.9rem",
-                                marginTop: "4px",
-                              }}
-                            >
-                              {pkg.sender_phone}
-                            </div>
-                            <div
-                              style={{
-                                color: "rgba(255,255,255,0.6)",
-                                fontSize: "0.85rem",
-                                marginTop: "4px",
-                              }}
-                            >
-                              {pkg.sender_address}
-                            </div>
-                        </div>
-                        {/* 客户信息 */}
-                          <div
-                            style={{
-                              background: "rgba(255,255,255,0.03)",
-                              padding: "1.2rem",
-                              borderRadius: "18px",
-                              border: "1px solid rgba(255,255,255,0.05)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                color: "#fbbf24",
-                                fontSize: "0.8rem",
-                                fontWeight: "900",
-                                marginBottom: "8px",
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              客户信息
-                            </div>
-                            <div
-                              style={{
-                                color: "white",
-                                fontWeight: "700",
-                                fontSize: "1rem",
-                              }}
-                            >
-                              {pkg.receiver_name}
-                            </div>
-                            <div
-                              style={{
-                                color: "rgba(255,255,255,0.6)",
-                                fontSize: "0.9rem",
-                                marginTop: "4px",
-                              }}
-                            >
-                              {pkg.receiver_phone}
-                            </div>
-                            <div
-                              style={{
-                                color: "rgba(255,255,255,0.6)",
-                                fontSize: "0.85rem",
-                                marginTop: "4px",
-                              }}
-                            >
-                              {pkg.receiver_address}
-                            </div>
-                        </div>
-                      </div>
-
-                      {/* 商品清单 */}
-                        <div
-                          style={{
-                            background: "rgba(255,255,255,0.03)",
-                            padding: "1.2rem",
-                            borderRadius: "18px",
-                            border: "1px solid rgba(255,255,255,0.05)",
-                          }}
-                        >
-                          <div
-                            style={{
-                              color: "#10b981",
-                              fontSize: "0.8rem",
-                              fontWeight: "900",
-                              marginBottom: "12px",
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            商品清单
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "8px",
-                            }}
-                          >
-                          {parsedItems.map((item: any, idx: number) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  color: "white",
-                                  fontSize: "0.95rem",
-                                }}
-                              >
-                              <span>• {item.label}</span>
-                                <span style={{ fontWeight: "900" }}>
-                                  x{item.qty}
-                                </span>
-                            </div>
-                          ))}
-                        </div>
-                          <div
-                            style={{
-                              marginTop: "12px",
-                              paddingTop: "12px",
-                              borderTop: "1px dashed rgba(255,255,255,0.1)",
-                              display: "flex",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <span
-                              style={{
-                                color: "rgba(255,255,255,0.5)",
-                                fontSize: "0.9rem",
-                              }}
-                            >
-                              支付方式:{" "}
-                              {pkg.payment_method === "cash"
-                                ? "现金支付"
-                                : "余额支付"}
-                            </span>
-                            <span
-                              style={{
-                                color: "#10b981",
-                                fontWeight: "900",
-                                fontSize: "1.1rem",
-                              }}
-                            >
-                              {pkg.price
-                                ? `${pkg.price.replace("MMK", "").trim()} MMK`
-                                : "-"}
-                            </span>
-                        </div>
-                      </div>
-
-                      {/* 客户备注 */}
-                      {pkg.notes && (
-                          <div
-                            style={{
-                              background: "rgba(251, 191, 36, 0.1)",
-                              padding: "1rem",
-                              borderRadius: "18px",
-                              border: "1px solid rgba(251, 191, 36, 0.2)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                color: "#fbbf24",
-                                fontSize: "0.8rem",
-                                fontWeight: "900",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              💡 客户备注
-                            </div>
-                            <div
-                              style={{ color: "white", fontSize: "0.95rem" }}
-                            >
-                              {pkg.notes}
-                            </div>
-                        </div>
-                      )}
-
-                      {/* 操作按钮 */}
-                        <div style={{ display: "flex", gap: "1rem" }}>
-                        <button
-                          onClick={() => handleCancelOrder(pkg)}
-                          style={{
-                            flex: 1,
-                              padding: "1rem",
-                              background: "rgba(239, 68, 68, 0.15)",
-                              color: "#fca5a5",
-                              border: "1px solid rgba(239, 68, 68, 0.3)",
-                              borderRadius: "16px",
-                              fontWeight: "800",
-                              cursor: "pointer",
-                              transition: "all 0.3s ease",
-                          }}
-                        >
-                          ✕ 拒绝接单
-                        </button>
-                        <button
-                          onClick={() => handleAcceptOrder(pkg)}
-                          style={{
-                            flex: 2,
-                              padding: "1rem",
-                              background:
-                                "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "16px",
-                              fontWeight: "900",
-                              fontSize: "1.1rem",
-                              cursor: "pointer",
-                              boxShadow: "0 8px 20px rgba(245, 158, 11, 0.3)",
-                              transition: "all 0.3s ease",
-                          }}
-                        >
-                          🤝 立即接单 (自动打单)
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
-                  <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>
-                    ✨
-                  </div>
-                  <div
-                    style={{
-                      color: "rgba(255, 255, 255, 0.5)",
-                      fontSize: "1.2rem",
-                      fontWeight: "700",
-                    }}
-                  >
-                    {language === "zh"
-                      ? "暂无待接单订单"
-                      : language === "en"
-                        ? "No pending orders"
-                        : "လက်ခံရန်အော်ဒါမရှိပါ"}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                marginTop: "2rem",
-                borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-                paddingTop: "1.5rem",
-              }}
-            >
-              <button
-                onClick={() => setShowPendingAcceptListModal(false)}
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "16px",
-                  fontSize: "1rem",
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                }}
-                onMouseOver={(e) =>
-                  (e.currentTarget.style.background =
-                    "rgba(255, 255, 255, 0.15)")
-                }
-                onMouseOut={(e) =>
-                  (e.currentTarget.style.background =
-                    "rgba(255, 255, 255, 0.1)")
-                }
-              >
-                {t.close}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 🚀 新增：打包模态框 (PackingModal) */}
-      {showPackingModal && packingOrderData && (
-        <div
-          style={{
-            position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-            background: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(10px)",
-          zIndex: 30000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-        }}
-        onClick={() => !loading && setShowPackingModal(false)}
-        >
-          <div
-            style={{
-              background: "white",
-              borderRadius: "35px",
-              width: "100%",
-              maxWidth: "500px",
-              maxHeight: "90vh",
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-              position: "relative",
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            {/* 打包窗口页眉 */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                padding: "2.5rem 2rem",
-                textAlign: "center",
-                position: "relative",
-              }}
-            >
-              <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>📦</div>
-              <h2
-                style={{
-                  color: "white",
-                  fontSize: "2rem",
-                  fontWeight: "950",
-                  margin: 0,
-                }}
-              >
-                {language === "zh"
-                  ? "订单打包中"
-                  : language === "en"
-                    ? "Order Packing"
-                    : "အော်ဒါထုပ်ပိုးနေသည်"}
-              </h2>
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.8)",
-                  fontSize: "1rem",
-                  marginTop: "0.5rem",
-                  fontWeight: "600",
-                }}
-              >
-                {t.packageId}: {packingOrderData.id}
-              </p>
-              {!loading && (
-                <button 
-                  onClick={() => setShowPackingModal(false)}
-                  style={{
-                    position: "absolute",
-                    top: "20px",
-                    right: "20px",
-                    background: "rgba(0,0,0,0.2)",
-                    border: "none",
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "18px",
-                    color: "white",
-                    cursor: "pointer",
-                    fontSize: "1.2rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            <div style={{ flex: 1, overflowY: "auto", padding: "2rem" }}>
-              {/* 商品清单 */}
-              <div style={{ marginBottom: "2rem" }}>
-                <h3
-                  style={{
-                    color: "#1e293b",
-                    fontSize: "1.2rem",
-                    fontWeight: "900",
-                    marginBottom: "1.5rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  📋{" "}
-                  {language === "zh"
-                    ? "核对商品清单"
-                    : language === "en"
-                      ? "Checklist"
-                      : "ပစ္စည်းစာရင်းစစ်ဆေးရန်"}
-                </h3>
-                
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "1rem",
-                  }}
-                >
-                  {packingModalModel && packingModalModel.lineCount === 0 ? (
-                    <div
-                      style={{
-                        padding: "1.5rem",
-                        textAlign: "center",
-                        background: "#f8fafc",
-                        borderRadius: "24px",
-                        border: "2px dashed #e2e8f0",
-                      }}
-                    >
-                      <p style={{ color: "#64748b", fontWeight: "600" }}>
-                        {language === "zh"
-                          ? "暂无详细商品清单，请核对包裹内容"
-                          : language === "en"
-                            ? "No detailed list, please check package content"
-                            : "အသေးစိတ် စာရင်းမရှိသေးပါ၊ ထုပ်ပိုးမှုကို စစ်ဆေးပါ"}
-                      </p>
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "12px",
-                          marginTop: "1rem",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checkedItems["default"]}
-                          onChange={() => toggleItem("default")}
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            cursor: "pointer",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "1.1rem",
-                            fontWeight: "800",
-                            color: "#1e293b",
-                          }}
-                        >
-                          {language === "zh"
-                            ? "确认商品已备齐"
-                            : language === "en"
-                              ? "Confirm all items ready"
-                              : "ပစ္စည်းအားလုံး ပြင်ဆင်ပြီးပါပြီ"}
-                        </span>
-                      </label>
-                    </div>
-                  ) : (
-                    <>
-                      {packingModalModel && (
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "28px 1fr minmax(36px, auto) minmax(64px, auto) minmax(76px, auto)",
-                            gap: "6px",
-                            alignItems: "center",
-                            padding: "0 0.35rem 0.35rem",
-                            color: "#64748b",
-                            fontSize: "0.72rem",
-                            fontWeight: "800",
-                          }}
-                        >
-                          <span />
-                          <span>
-                            {language === "zh"
-                              ? "商品"
-                              : language === "en"
-                                ? "Item"
-                                : "ပစ္စည်း"}
-                          </span>
-                          <span style={{ textAlign: "right" }}>
-                            {language === "zh"
-                              ? "数量"
-                              : language === "en"
-                                ? "Qty"
-                                : "အရေ.အတွက်"}
-                          </span>
-                          <span style={{ textAlign: "right" }}>
-                            {language === "zh"
-                              ? "单价"
-                              : language === "en"
-                                ? "Unit"
-                                : "တစ်ခုဈေး"}
-                          </span>
-                          <span style={{ textAlign: "right" }}>
-                            {language === "zh"
-                              ? "小计"
-                              : language === "en"
-                                ? "Subtotal"
-                                : "စုစုပေါင်း"}
-                          </span>
-                        </div>
-                      )}
-                      {packingModalModel?.rows.map((row, index: number) => (
-                        <div
-                          key={`${row.name}-${index}`}
-                          onClick={() => toggleItem(`item-${index}`)}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "28px 1fr minmax(36px, auto) minmax(64px, auto) minmax(76px, auto)",
-                            gap: "6px",
-                            alignItems: "center",
-                            padding: "1rem 0.75rem",
-                            background: checkedItems[`item-${index}`]
-                              ? "rgba(16, 185, 129, 0.05)"
-                              : "#f8fafc",
-                            borderRadius: "18px",
-                            border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#f1f5f9"}`,
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "8px",
-                              border: `2px solid ${checkedItems[`item-${index}`] ? "#10b981" : "#cbd5e1"}`,
-                              backgroundColor: checkedItems[`item-${index}`]
-                                ? "#10b981"
-                                : "transparent",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "white",
-                              fontSize: "1rem",
-                            }}
-                          >
-                            {checkedItems[`item-${index}`] && "✓"}
-                          </div>
-                          <span
-                            style={{
-                              fontSize: "0.95rem",
-                              fontWeight: "700",
-                              color: checkedItems[`item-${index}`]
-                                ? "#64748b"
-                                : "#1e293b",
-                              textDecoration: checkedItems[`item-${index}`]
-                                ? "line-through"
-                                : "none",
-                              lineHeight: 1.35,
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {row.name}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "0.95rem",
-                              fontWeight: "700",
-                              textAlign: "right",
-                              color: checkedItems[`item-${index}`]
-                                ? "#94a3b8"
-                                : "#334155",
-                            }}
-                          >
-                            {row.qty}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "0.85rem",
-                              fontWeight: "600",
-                              textAlign: "right",
-                              color: checkedItems[`item-${index}`]
-                                ? "#94a3b8"
-                                : "#475569",
-                            }}
-                          >
-                            {row.unitPrice != null
-                              ? `${row.unitPrice.toLocaleString()}`
-                              : "—"}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "0.9rem",
-                              fontWeight: "800",
-                              textAlign: "right",
-                              color: checkedItems[`item-${index}`]
-                                ? "#94a3b8"
-                                : "#0f172a",
-                            }}
-                          >
-                            {row.lineTotal != null
-                              ? `${row.lineTotal.toLocaleString()}`
-                              : "—"}
-                          </span>
-                        </div>
-                      ))}
-                      {packingModalModel &&
-                        packingModalModel.summaryTotal != null && (
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              padding: "1rem 0.75rem",
-                              marginTop: "0.25rem",
-                              background: "#ecfdf5",
-                              borderRadius: "16px",
-                              border: "1px solid #a7f3d0",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontWeight: "900",
-                                color: "#065f46",
-                                fontSize: "0.95rem",
-                              }}
-                            >
-                              {language === "zh"
-                                ? "商品合计（MMK）"
-                                : language === "en"
-                                  ? "Items total (MMK)"
-                                  : "ပစ္စည်းစုစုပေါင်း (MMK)"}
-                            </span>
-                            <span
-                              style={{
-                                fontWeight: "950",
-                                color: "#047857",
-                                fontSize: "1.05rem",
-                              }}
-                            >
-                              {packingModalModel.summaryTotal.toLocaleString()}
-                            </span>
-                          </div>
-                        )}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* 订单备注（去掉系统自动标签后的纯文本） */}
-              {packingModalModel?.customerNote ? (
-                  <div
-                    style={{
-                      background: "#fffbeb",
-                      padding: "1.5rem",
-                      borderRadius: "24px",
-                      border: "1px solid #fde68a",
-                      marginBottom: "2rem",
-                    }}
-                  >
-                    <h4
-                      style={{
-                        color: "#92400e",
-                        margin: "0 0 0.5rem 0",
-                        fontSize: "0.95rem",
-                        fontWeight: "900",
-                      }}
-                    >
-                      💡{" "}
-                      {language === "zh"
-                        ? "客户备注"
-                        : language === "en"
-                          ? "Customer Note"
-                          : "ဖောက်သည်မှတ်ချက်"}
-                    </h4>
-                    <p
-                      style={{
-                        color: "#b45309",
-                        margin: 0,
-                        fontSize: "1rem",
-                        fontWeight: "600",
-                      }}
-                    >
-                      {packingModalModel.customerNote}
-                    </p>
-                </div>
-              ) : null}
-            </div>
-
-            {/* 底部操作栏 */}
-            <div
-              style={{
-                padding: "1.5rem",
-                background: "#f8fafc",
-                borderTop: "1px solid #f1f5f9",
-              }}
-            >
-              <button
-                onClick={handleCompletePacking}
-                disabled={
-                  loading ||
-                  (() => {
-                    if (!packingModalModel) return true;
-                    if (packingModalModel.lineCount === 0)
-                      return !checkedItems["default"];
-                    return packingModalModel.rows.some(
-                      (_row, index: number) => !checkedItems[`item-${index}`],
-                    );
-                  })()
-                }
-                style={{
-                  width: "100%",
-                  padding: "1.2rem",
-                  borderRadius: "24px",
-                  background:
-                    "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                  color: "white",
-                  border: "none",
-                  fontSize: "1.2rem",
-                  fontWeight: "950",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  boxShadow: "0 10px 25px rgba(16, 185, 129, 0.3)",
-                  transition: "all 0.3s ease",
-                  opacity: (() => {
-                    if (!packingModalModel) return 0.6;
-                    const allChecked =
-                      packingModalModel.lineCount === 0
-                        ? checkedItems["default"]
-                        : !packingModalModel.rows.some(
-                            (_row, index: number) =>
-                              !checkedItems[`item-${index}`],
-                          );
-                    return allChecked && !loading ? 1 : 0.6;
-                  })(),
-                }}
-              >
-                {loading ? (
-                  <div
-                    className="spinner"
-                    style={{
-                      width: "24px",
-                      height: "24px",
-                      border: "3px solid rgba(255,255,255,0.3)",
-                      borderTop: "3px solid white",
-                      borderRadius: "50%",
-                      margin: "0 auto",
-                      animation: "spin 1s linear infinite",
-                    }}
-                  ></div>
-                ) : language === "zh" ? (
-                  "确认打包完成"
-                ) : language === "en" ? (
-                  "Confirm Packing Done"
-                ) : (
-                  "ထုပ်ပိုးပြီးကြောင်း အတည်ပြုပါ"
-                )}
-              </button>
-              <p
-                style={{
-                  textAlign: "center",
-                  color: "#94a3b8",
-                  fontSize: "0.85rem",
-                  marginTop: "1rem",
-                  fontWeight: "600",
-                }}
-              >
-                {language === "zh"
-                  ? "请确保所有商品已备齐并打包好"
-                  : "Please ensure all items are packed securely"}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* 🚀 新增：店铺评价管理模态框 (ReviewsModal) */}
       {showReviewsModal && (
         <div
           style={{
@@ -9955,552 +7766,7 @@ const ProfilePage: React.FC = () => {
       )}
 
       {/* 🚀 新增：客户提交评价模态框 (ReviewSubmitModal) */}
-      {showReviewSubmitModal && reviewOrder && (
-        <div
-          style={{
-            position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-            background: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(10px)",
-          zIndex: 30000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-        }}
-        onClick={() => !isSubmittingReview && setShowReviewSubmitModal(false)}
-        >
-          <div
-            style={{
-              background: "white",
-              borderRadius: "35px",
-              width: "100%",
-              maxWidth: "500px",
-              maxHeight: "90vh",
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-              position: "relative",
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            {/* 页眉 */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                padding: "1.5rem",
-                textAlign: "center",
-                position: "relative",
-              }}
-            >
-              <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>⭐</div>
-              <h2
-                style={{
-                  color: "white",
-                  fontSize: "1.75rem",
-                  fontWeight: "950",
-                  margin: 0,
-                }}
-              >
-                {language === "zh" ? "评价您的订单" : "Rate Your Order"}
-              </h2>
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.8)",
-                  fontSize: "0.9rem",
-                  marginTop: "0.5rem",
-                }}
-              >
-                {t.packageId}: {reviewOrder.id}
-              </p>
-              {!isSubmittingReview && (
-                <button 
-                  onClick={() => setShowReviewSubmitModal(false)}
-                  style={{
-                    position: "absolute",
-                    top: "20px",
-                    right: "20px",
-                    background: "rgba(0,0,0,0.1)",
-                    border: "none",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    color: "white",
-                    cursor: "pointer",
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
 
-            <div style={{ flex: 1, overflowY: "auto", padding: "2rem" }}>
-              {/* 星级评分 */}
-              <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-                <div
-                  style={{
-                    color: "#475569",
-                    fontSize: "1rem",
-                    fontWeight: "700",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  {language === "zh" ? "总体满意度" : "Overall Satisfaction"}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    gap: "10px",
-                  }}
-                >
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <span 
-                      key={star}
-                      onClick={() => setReviewRating(star)}
-                      style={{ 
-                        fontSize: "1.75rem",
-                        cursor: "pointer",
-                        color: star <= reviewRating ? "#fbbf24" : "#e2e8f0",
-                        transition: "transform 0.2s ease",
-                        transform:
-                          star <= reviewRating ? "scale(1.1)" : "scale(1)",
-                      }}
-                    >
-                      ★
-                    </span>
-                  ))}
-                </div>
-                <div
-                  style={{
-                    color: "#fbbf24",
-                    fontSize: "0.9rem",
-                    fontWeight: "800",
-                    marginTop: "0.5rem",
-                  }}
-                >
-                  {reviewRating === 5
-                    ? language === "zh"
-                      ? "非常满意"
-                      : "Excellent"
-                    : reviewRating === 4
-                      ? language === "zh"
-                        ? "满意"
-                        : "Good"
-                      : reviewRating === 3
-                        ? language === "zh"
-                          ? "一般"
-                          : "Average"
-                        : reviewRating === 2
-                          ? language === "zh"
-                            ? "不满意"
-                            : "Poor"
-                          : language === "zh"
-                            ? "非常不满意"
-                            : "Very Poor"}
-                </div>
-              </div>
-
-              {/* 评价文字 */}
-              <div style={{ marginBottom: "2rem" }}>
-                <label
-                  style={{
-                    color: "#1e293b",
-                    fontSize: "1rem",
-                    fontWeight: "800",
-                    display: "block",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  {language === "zh" ? "您的评价" : "Your Review"}
-                </label>
-                <textarea
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder={
-                    language === "zh"
-                      ? "写下您的真实评价，帮助我们做得更好..."
-                      : "Share your experience..."
-                  }
-                  style={{ 
-                    width: "100%",
-                    minHeight: "120px",
-                    background: "#f8fafc",
-                    border: "2px solid #f1f5f9",
-                    borderRadius: "24px",
-                    padding: "1rem",
-                    color: "#1e293b",
-                    fontSize: "1rem",
-                    outline: "none",
-                    resize: "none",
-                  }}
-                />
-              </div>
-
-              {/* 图片上传 */}
-              <div style={{ marginBottom: "1rem" }}>
-                <label
-                  style={{
-                    color: "#1e293b",
-                    fontSize: "1rem",
-                    fontWeight: "800",
-                    display: "block",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  {language === "zh"
-                    ? "上传照片 (选填)"
-                    : "Upload Photos (Optional)"}
-                </label>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  {reviewImages.map((img, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        position: "relative",
-                        width: "80px",
-                        height: "80px",
-                      }}
-                    >
-                      <img
-                        src={img}
-                        alt="Preview"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          borderRadius: "12px",
-                          objectFit: "cover",
-                        }}
-                      />
-                      <button 
-                        onClick={() => handleRemoveReviewImage(index)}
-                        style={{
-                          position: "absolute",
-                          top: "-5px",
-                          right: "-5px",
-                          background: "#ef4444",
-                          color: "white",
-                          border: "none",
-                          width: "20px",
-                          height: "20px",
-                          borderRadius: "50%",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "12px",
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {reviewImages.length < 6 && (
-                    <div 
-                      onClick={() =>
-                        !isUploadingReviewImage &&
-                        reviewImageInputRef.current?.click()
-                      }
-                      style={{ 
-                        width: "80px",
-                        height: "80px",
-                        border: "2px dashed #cbd5e1",
-                        borderRadius: "12px",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        background: "#f8fafc",
-                      }}
-                    >
-                      {isUploadingReviewImage ? (
-                        <div
-                          className="spinner"
-                          style={{
-                            width: "20px",
-                            height: "20px",
-                            border: "2px solid #cbd5e1",
-                            borderTop: "2px solid #fbbf24",
-                            borderRadius: "50%",
-                          }}
-                        ></div>
-                      ) : (
-                        <>
-                          <span
-                            style={{ fontSize: "1.5rem", color: "#94a3b8" }}
-                          >
-                            +
-                          </span>
-                          <span
-                            style={{ fontSize: "0.7rem", color: "#94a3b8" }}
-                          >
-                            照片
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <input 
-                  type="file" 
-                  multiple 
-                  accept="image/*" 
-                  ref={reviewImageInputRef} 
-                  onChange={handleReviewImageUpload} 
-                  style={{ display: "none" }}
-                />
-              </div>
-            </div>
-
-            {/* 底部按钮 */}
-            <div style={{ padding: "1.5rem", borderTop: "1px solid #f1f5f9" }}>
-              <button
-                onClick={handleSubmitReview}
-                disabled={isSubmittingReview || !reviewComment.trim()}
-                style={{
-                  width: "100%",
-                  padding: "1.2rem",
-                  borderRadius: "24px",
-                  background:
-                    isSubmittingReview || !reviewComment.trim()
-                      ? "#cbd5e1"
-                      : "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                  color: "white",
-                  border: "none",
-                  fontSize: "1.2rem",
-                  fontWeight: "950",
-                  cursor:
-                    isSubmittingReview || !reviewComment.trim()
-                      ? "not-allowed"
-                      : "pointer",
-                  boxShadow:
-                    isSubmittingReview || !reviewComment.trim()
-                      ? "none"
-                      : "0 10px 25px rgba(245, 158, 11, 0.3)",
-                  transition: "all 0.3s ease",
-                }}
-              >
-                {isSubmittingReview ? (
-                  <div
-                    className="spinner"
-                    style={{
-                      width: "24px",
-                      height: "24px",
-                      border: "3px solid rgba(255,255,255,0.3)",
-                      borderTop: "3px solid white",
-                      borderRadius: "50%",
-                      margin: "0 auto",
-                      animation: "spin 1s linear infinite",
-                    }}
-                  ></div>
-                ) : language === "zh" ? (
-                  "提交评价"
-                ) : (
-                  "Submit Review"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 🚀 新增：休假计划管理模态框 */}
-      {showVacationModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(15, 23, 42, 0.85)",
-            backdropFilter: "blur(10px)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 30000,
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-              borderRadius: "32px",
-              width: "100%",
-              maxWidth: "500px",
-              padding: "30px",
-              border: "1px solid rgba(255,255,255,0.1)",
-              boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "25px",
-              }}
-            >
-              <h3
-                style={{
-                  color: "white",
-                  fontSize: "1.5rem",
-                  fontWeight: "900",
-                  margin: 0,
-                }}
-              >
-                📅 {language === "zh" ? "预设休假计划" : "Vacation Planning"}
-              </h3>
-              <button
-                onClick={() => setShowVacationModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: "1.5rem",
-                  cursor: "pointer",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ marginBottom: "20px" }}>
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.6)",
-                  fontSize: "0.9rem",
-                  marginBottom: "15px",
-                }}
-              >
-                添加休假日期，系统将在这些日期自动设为歇业状态。
-              </p>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <input 
-                  type="date" 
-                  value={tempVacationDate}
-                  onChange={(e) => setTempVacationDate(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: "12px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    background: "rgba(0,0,0,0.2)",
-                    color: "white",
-                    outline: "none",
-                  }}
-                />
-                <button 
-                  onClick={handleAddVacationDate}
-                  style={{
-                    background: "#3b82f6",
-                    color: "white",
-                    border: "none",
-                    padding: "0 20px",
-                    borderRadius: "12px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                  }}
-                >
-                  添加
-                </button>
-              </div>
-            </div>
-
-            <div
-              style={{
-                maxHeight: "200px",
-                overflowY: "auto",
-                marginBottom: "25px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-              }}
-            >
-              {businessStatus.vacation_dates.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "20px",
-                    color: "rgba(255,255,255,0.2)",
-                    border: "1px dashed rgba(255,255,255,0.1)",
-                    borderRadius: "15px",
-                  }}
-                >
-                  暂无休假计划
-                </div>
-              ) : (
-                businessStatus.vacation_dates.map((date) => (
-                  <div
-                    key={date}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      background: "rgba(255,255,255,0.05)",
-                      padding: "10px 15px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.05)",
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: "white",
-                        fontWeight: "bold",
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {date}
-                    </span>
-                    <button
-                      onClick={() => handleRemoveVacationDate(date)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#ef4444",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                      }}
-                    >
-                      移除
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <button
-              onClick={() => {
-                handleUpdateStoreStatus({
-                  vacation_dates: businessStatus.vacation_dates,
-                });
-                setShowVacationModal(false);
-              }}
-              style={{
-                width: "100%",
-                padding: "15px",
-                borderRadius: "15px",
-                background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
-                color: "white",
-                border: "none",
-                fontWeight: "900",
-                fontSize: "1.1rem",
-                cursor: "pointer",
-                boxShadow: "0 10px 20px rgba(30, 64, 175, 0.3)",
-              }}
-            >
-              保存计划 💾
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 🚀 新增：编辑个人资料模态框 */}
       {showEditProfileModal && (
         <div
           style={{
@@ -10888,313 +8154,7 @@ const ProfilePage: React.FC = () => {
       )}
 
       {/* 🚀 新增：导出对账单模态框 (ExportStatementModal) */}
-      {showExportModal && (
-        <div
-          style={{
-            position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-            background: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(10px)",
-          zIndex: 30000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-        }}
-        onClick={() => !isExporting && setShowExportModal(false)}
-        >
-          <div
-            style={{
-              background: "#1e293b",
-              borderRadius: "35px",
-              width: "100%",
-              maxWidth: "500px",
-              overflow: "hidden",
-              boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              position: "relative",
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            {/* 页眉 */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                padding: "1.5rem",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>📊</div>
-              <h2
-                style={{
-                  color: "white",
-                  fontSize: "1.75rem",
-                  fontWeight: "950",
-                  margin: 0,
-                }}
-              >
-                {language === "zh" ? "导出结算对账单" : "Export Statement"}
-              </h2>
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.8)",
-                  fontSize: "0.9rem",
-                  marginTop: "0.5rem",
-                }}
-              >
-                {language === "zh"
-                  ? "选择日期范围和导出方式"
-                  : "Select date range and method"}
-              </p>
-            </div>
 
-            <div style={{ padding: "2rem" }}>
-              {/* 日期选择 */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "1rem",
-                  marginBottom: "2rem",
-                }}
-              >
-                <div>
-                  <label
-                    style={{
-                      color: "rgba(255,255,255,0.5)",
-                      fontSize: "0.8rem",
-                      fontWeight: "700",
-                      display: "block",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    {language === "zh" ? "开始日期" : "Start Date"}
-                  </label>
-                  <input 
-                    type="date" 
-                    value={exportStartDate}
-                    onChange={(e) => setExportStartDate(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: "rgba(0,0,0,0.2)",
-                      color: "white",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      color: "rgba(255,255,255,0.5)",
-                      fontSize: "0.8rem",
-                      fontWeight: "700",
-                      display: "block",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    {language === "zh" ? "结束日期" : "End Date"}
-                  </label>
-                  <input 
-                    type="date" 
-                    value={exportEndDate}
-                    onChange={(e) => setExportEndDate(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: "rgba(0,0,0,0.2)",
-                      color: "white",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* 格式选择 */}
-              <div style={{ marginBottom: "2rem" }}>
-                <label
-                  style={{
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: "0.8rem",
-                    fontWeight: "700",
-                    display: "block",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  {language === "zh" ? "文件格式" : "File Format"}
-                </label>
-                <div style={{ display: "flex", gap: "1rem" }}>
-                  <button 
-                    onClick={() => setExportFormat("pdf")}
-                    style={{
-                      flex: 1,
-                      padding: "12px",
-                      borderRadius: "12px",
-                      background:
-                        exportFormat === "pdf"
-                          ? "#6366f1"
-                          : "rgba(255,255,255,0.05)",
-                      color: "white",
-                      border: "none",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s",
-                    }}
-                  >
-                    PDF
-                  </button>
-                  <button 
-                    onClick={() => setExportFormat("excel")}
-                    style={{
-                      flex: 1,
-                      padding: "12px",
-                      borderRadius: "12px",
-                      background:
-                        exportFormat === "excel"
-                          ? "#6366f1"
-                          : "rgba(255,255,255,0.05)",
-                      color: "white",
-                      border: "none",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s",
-                    }}
-                  >
-                    Excel (XLSX)
-                  </button>
-                </div>
-              </div>
-
-              {/* 导出方式 */}
-              <div style={{ marginBottom: "2.5rem" }}>
-                <label
-                  style={{
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: "0.8rem",
-                    fontWeight: "700",
-                    display: "block",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  {language === "zh" ? "导出方式" : "Export Method"}
-                </label>
-                <div style={{ display: "flex", gap: "1rem" }}>
-                  <button 
-                    onClick={() => setExportMethod("download")}
-                    style={{
-                      flex: 1,
-                      padding: "12px",
-                      borderRadius: "12px",
-                      background:
-                        exportMethod === "download"
-                          ? "#10b981"
-                          : "rgba(255,255,255,0.05)",
-                      color: "white",
-                      border: "none",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s",
-                    }}
-                  >
-                    ⬇️ {language === "zh" ? "直接下载" : "Download"}
-                  </button>
-                  <button 
-                    onClick={() => setExportMethod("email")}
-                    style={{
-                      flex: 1,
-                      padding: "12px",
-                      borderRadius: "12px",
-                      background:
-                        exportMethod === "email"
-                          ? "#10b981"
-                          : "rgba(255,255,255,0.05)",
-                      color: "white",
-                      border: "none",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s",
-                    }}
-                  >
-                    📧 {language === "zh" ? "发送至邮箱" : "Send to Email"}
-                  </button>
-                </div>
-                {exportMethod === "email" && (
-                  <p
-                    style={{
-                      color: "rgba(255,255,255,0.4)",
-                      fontSize: "0.8rem",
-                      marginTop: "0.8rem",
-                      textAlign: "center",
-                    }}
-                  >
-                    {language === "zh"
-                      ? `将发送至: ${storeInfo?.email || currentUser?.email}`
-                      : `Will send to: ${storeInfo?.email || currentUser?.email}`}
-                  </p>
-                )}
-              </div>
-
-              {/* 提交按钮 */}
-              <button
-                onClick={handleExportStatement}
-                disabled={isExporting}
-                style={{
-                  width: "100%",
-                  padding: "1.25rem",
-                  borderRadius: "18px",
-                  background:
-                    "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                  color: "white",
-                  border: "none",
-                  fontSize: "1.1rem",
-                  fontWeight: "900",
-                  cursor: isExporting ? "not-allowed" : "pointer",
-                  boxShadow: "0 10px 25px rgba(79, 70, 229, 0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "10px",
-                }}
-              >
-                {isExporting ? (
-                  <>
-                    <div
-                      className="spinner"
-                      style={{
-                        width: "24px",
-                        height: "24px",
-                        border: "3px solid rgba(255,255,255,0.3)",
-                        borderTop: "3px solid white",
-                        borderRadius: "50%",
-                        animation: "spin 1s linear infinite",
-                      }}
-                    ></div>
-                    <span>
-                      {language === "zh" ? "正在生成..." : "Generating..."}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>🚀</span>
-                    <span>
-                      {language === "zh"
-                        ? "立即执行导出"
-                        : "Generate & Export Now"}
-                    </span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* 🚀 新增：立即下单模态框 */}
       <OrderModal
         showOrderForm={showOrderForm}
@@ -11249,6 +8209,16 @@ const ProfilePage: React.FC = () => {
         productPaymentMethod={productPaymentMethod}
         setProductPaymentMethod={setProductPaymentMethod}
         merchantStore={storeInfo}
+      />
+
+      <MerchantScheduledTimePickerModal
+        open={showTimePickerModal}
+        language={language}
+        ui={allT.ui}
+        scheduledDeliveryTime={scheduledDeliveryTime}
+        onClose={() => setShowTimePickerModal(false)}
+        onConfirm={setScheduledDeliveryTime}
+        onCancelWithoutTime={() => setSelectedDeliverySpeed("")}
       />
 
       {/* 🚀 新增：地图选择模态框 */}
@@ -11819,6 +8789,57 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 🚀 新增：打包模态框 (PackingModal) */}
+      <MerchantPackingModal
+        open={packageModals.showPackingModal}
+        order={packageModals.packingOrderData}
+        language={lang}
+        packageIdLabel={t.packageId}
+        model={packageModals.packingModalModel}
+        checkedItems={packageModals.checkedItems}
+        actionLoading={packageModals.actionLoading}
+        canComplete={packageModals.isPackingCompleteEnabled}
+        onClose={packageModals.closePackingModal}
+        onToggleItem={packageModals.togglePackingItem}
+        onComplete={packageModals.handleCompletePacking}
+      />
+
+      <MerchantRechargeModals
+        language={lang}
+        showRechargeModal={showRechargeModal}
+        showPaymentQRModal={showPaymentQRModal}
+        rechargeAmount={rechargeAmount}
+        selectedRechargeAmount={selectedRechargeAmount}
+        rechargeProofPreview={rechargeProofPreview}
+        loading={loading}
+        fileInputRef={fileInputRef}
+        onCloseRecharge={() => setShowRechargeModal(false)}
+        onClosePayment={() => setShowPaymentQRModal(false)}
+        onSelectAmount={setRechargeAmount}
+        onNextStep={handleOpenPaymentQR}
+        onSaveQR={handleSaveQRCode}
+        onFileChange={handleFileChange}
+        onConfirmRecharge={handleConfirmRecharge}
+      />
+
+      <MerchantExportStatementModal
+        open={showExportModal}
+        language={lang}
+        isExporting={isExporting}
+        startDate={exportStartDate}
+        endDate={exportEndDate}
+        format={exportFormat}
+        method={exportMethod}
+        recipientEmail={storeInfo?.email || currentUser?.email}
+        onClose={() => setShowExportModal(false)}
+        onStartDateChange={setExportStartDate}
+        onEndDateChange={setExportEndDate}
+        onFormatChange={setExportFormat}
+        onMethodChange={setExportMethod}
+        onExport={handleExportStatement}
+      />
+
     </>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { MERCHANT_ORDER_STATUS } from '../../constants/merchantOrderStatus';
 import { useNavigate } from 'react-router-dom';
 import { useMerchantOrdersOptional } from '../../contexts/MerchantOrderContext';
 
@@ -72,7 +73,7 @@ const MerchantDashboardOrderPanel: React.FC<Props> = ({
             key: 'pending',
             label: copy.pending,
             count: pendingRealtime,
-            status: '待确认',
+            status: MERCHANT_ORDER_STATUS.PENDING_CONFIRM,
             highlight: pendingRealtime > 0,
           },
           {

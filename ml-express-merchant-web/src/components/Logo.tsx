@@ -2,16 +2,26 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface LogoProps {
-  size?: 'small' | 'medium' | 'large';
+  size?: 'small' | 'compact' | 'medium' | 'large';
   paddingRight?: string;
+  /** 为 false 时不响应点击（用于账户页品牌展示） */
+  clickable?: boolean;
 }
 
 const Logo: React.FC<LogoProps> = ({
   size = 'medium',
-  paddingRight = '0px'
+  paddingRight = '0px',
+  clickable = true,
 }) => {
   const navigate = useNavigate();
-  const logoSize = size === 'small' ? '80px' : size === 'large' ? '160px' : '120px';
+  const logoSize =
+    size === 'small'
+      ? '80px'
+      : size === 'compact'
+        ? '64px'
+        : size === 'large'
+          ? '160px'
+          : '120px';
   
   return (
     <div 
@@ -19,13 +29,25 @@ const Logo: React.FC<LogoProps> = ({
         display: 'flex', 
         alignItems: 'center', 
         gap: '10px',
-        cursor: 'pointer',
+        cursor: clickable ? 'pointer' : 'default',
         transition: 'opacity 0.3s ease',
         paddingRight
       }}
-      onClick={() => navigate('/')}
-      onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
-      onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+      onClick={clickable ? () => navigate('/') : undefined}
+      onMouseOver={
+        clickable
+          ? (e) => {
+              e.currentTarget.style.opacity = '0.8';
+            }
+          : undefined
+      }
+      onMouseOut={
+        clickable
+          ? (e) => {
+              e.currentTarget.style.opacity = '1';
+            }
+          : undefined
+      }
     >
       {/* LOGO图片 */}
       <img 
@@ -42,7 +64,14 @@ const Logo: React.FC<LogoProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
         <span style={{
           color: 'white',
-          fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '4rem' : '2.2rem',
+          fontSize:
+            size === 'small'
+              ? '1.6rem'
+              : size === 'compact'
+                ? '1.45rem'
+                : size === 'large'
+                  ? '4rem'
+                  : '2.2rem',
           fontWeight: '900',
           textShadow: '0 4px 8px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.2)',
           background: 'linear-gradient(135deg, #ffffff 0%, #e6f2ff 50%, #b3d9ff 100%)',
@@ -69,9 +98,17 @@ const Logo: React.FC<LogoProps> = ({
           display: 'flex',
           alignItems: 'center',
           fontStyle: 'italic',
-          fontSize: size === 'small' ? '0.5rem' : size === 'large' ? '0.9rem' : '0.7rem',
+          fontSize:
+            size === 'small'
+              ? '0.5rem'
+              : size === 'compact'
+                ? '0.62rem'
+                : size === 'large'
+                  ? '0.9rem'
+                  : '0.7rem',
           fontWeight: '600',
-          letterSpacing: size === 'small' ? '2px' : '4px',
+          letterSpacing:
+            size === 'small' ? '2px' : size === 'compact' ? '3px' : '4px',
           textTransform: 'uppercase',
           color: 'rgba(255, 255, 255, 0.9)',
           textShadow: '0 2px 4px rgba(0,0,0,0.3)',

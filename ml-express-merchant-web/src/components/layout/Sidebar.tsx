@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useMerchantOrdersOptional } from "../../contexts/MerchantOrderContext";
+import { MERCHANT_ORDER_STATUS } from "../../constants/merchantOrderStatus";
 
 const Sidebar: React.FC<{
   currentUser: any;
@@ -94,7 +95,7 @@ const Sidebar: React.FC<{
       icon: "📦",
     },
     {
-      id: "待确认",
+      id: MERCHANT_ORDER_STATUS.PENDING_CONFIRM,
       label:
         language === "zh"
           ? "待接单"
@@ -454,12 +455,12 @@ const sidebarStyle: React.CSSProperties = {
   borderRight: "1px solid rgba(255,255,255,0.05)",
   display: "flex",
   flexDirection: "column",
-  position: "fixed",
-  left: 0,
+  position: "sticky",
   top: 0,
-  zIndex: 1000,
-  overflowY: "auto", // 🚀 开启垂直滚动
-  scrollbarWidth: "none", // Firefox 隐藏滚动条
+  alignSelf: "flex-start",
+  zIndex: 100,
+  overflowY: "auto",
+  scrollbarWidth: "none",
 };
 
 const menuContainerStyle: React.CSSProperties = {

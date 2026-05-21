@@ -1,22 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
-import ProfilePage from './pages/ProfilePage';
-import StoreProductsPage from './pages/StoreProductsPage';
-import TrackingPage from './pages/TrackingPage';
 import MerchantLayout from './components/layout/MerchantLayout';
 import { LanguageProvider } from './contexts/LanguageContext';
 import './App.css';
 
-// 认证检查组件
-const ProtectedRoute = ({ children, currentUser, onLogout }: { children: React.ReactNode, currentUser: any, onLogout: () => void }) => {
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const StoreProductsPage = lazy(() => import('./pages/StoreProductsPage'));
+const TrackingPage = lazy(() => import('./pages/TrackingPage'));
+
+function RouteFallback() {
+  return (
+    <div
+      className="merchant-route-fallback"
+      style={{
+        minHeight: '40vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'rgba(203, 213, 225, 0.85)',
+        fontSize: '1rem',
+        fontWeight: 600,
+      }}
+    >
+      Loading…
+    </div>
+  );
+}
+
+const ProtectedRoute = ({
+  children,
+  currentUser,
+  onLogout,
+}: {
+  children: React.ReactNode;
+  currentUser: any;
+  onLogout: () => void;
+}) => {
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return (
     <MerchantLayout currentUser={currentUser} onLogout={onLogout}>
-      {children}
+      <Suspense fallback={<RouteFallback />}>{children}</Suspense>
     </MerchantLayout>
   );
 };
@@ -44,7 +71,22 @@ function App() {
     setCurrentUser(user);
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#0a0f1e',
+          color: 'rgba(203, 213, 225, 0.85)',
+        }}
+      >
+        Loading…
+      </div>
+    );
+  }
 
   return (
     <LanguageProvider>
@@ -52,25 +94,33 @@ function App() {
         <div className="App" style={{ minHeight: '100vh', background: '#0a0f1e' }}>
           <Routes>
             <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-            
-            {/* 商家管理核心路由 - 统一包装在 MerchantLayout 中 */}
-            <Route path="/" element={
-              <ProtectedRoute currentUser={currentUser} onLogout={handleLogout}>
-                <ProfilePage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/products" element={
-              <ProtectedRoute currentUser={currentUser} onLogout={handleLogout}>
-                <StoreProductsPage />
-              </ProtectedRoute>
-            } />
 
-            <Route path="/orders" element={
-              <ProtectedRoute currentUser={currentUser} onLogout={handleLogout}>
-                <TrackingPage />
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute currentUser={currentUser} onLogout={handleLogout}>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/products"
+              element={
+                <ProtectedRoute currentUser={currentUser} onLogout={handleLogout}>
+                  <StoreProductsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute currentUser={currentUser} onLogout={handleLogout}>
+                  <TrackingPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
