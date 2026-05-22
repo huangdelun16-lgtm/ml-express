@@ -1110,20 +1110,78 @@ export const deliveryStoreService = {
   },
 
   async updateStoreInfo(storeId: string, updates: Partial<DeliveryStore>) {
-    try {
+    const allowedKeys = [
+      'store_name',
+      'phone',
+      'email',
+      'address',
+      'operating_hours',
+      'is_closed_today',
+      'vacation_dates',
+      'password',
+    ] as const;
+
+    const payload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    for (const key of allowedKeys) {
+      const value = updates[key as keyof DeliveryStore];
+      if (value !== undefined) {
+        payload[key] = value;
+      }
+    }
+
+    if (Object.keys(payload).length <= 1) {
+      return {
+        success: false,
+        error: new Error('No valid fields to update'),
+      };
+    }
+
+    const runUpdate = async (body: Record<string, unknown>) => {
       const { data, error } = await supabase
         .from('delivery_stores')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
+        .update(body)
         .eq('id', storeId)
-        .select()
-        .single();
+        .select('*');
 
       if (error) throw error;
+      if (!data?.length) {
+        throw new Error('STORE_UPDATE_NO_ROWS');
+      }
+      return data[0] as DeliveryStore;
+    };
+
+    try {
+      const data = await runUpdate(payload);
       return { success: true, data };
     } catch (error: any) {
+      const message = String(error?.message || error?.details || '');
+      const missingOptionalColumn =
+        message.includes('is_closed_today') ||
+        message.includes('vacation_dates') ||
+        error?.code === '42703';
+
+      if (
+        missingOptionalColumn &&
+        (payload.is_closed_today !== undefined ||
+          payload.vacation_dates !== undefined)
+      ) {
+        const fallback = { ...payload };
+        delete fallback.is_closed_today;
+        delete fallback.vacation_dates;
+        try {
+          const data = await runUpdate(fallback);
+          LoggerService.warn(
+            'delivery_stores 缺少 is_closed_today/vacation_dates 列，已仅保存营业时间',
+          );
+          return { success: true, data, partial: true as const };
+        } catch (fallbackError: any) {
+          LoggerService.error('更新商店信息失败(降级后仍失败):', fallbackError);
+          return { success: false, error: fallbackError };
+        }
+      }
+
       LoggerService.error('更新商店信息失败:', error);
       return { success: false, error };
     }

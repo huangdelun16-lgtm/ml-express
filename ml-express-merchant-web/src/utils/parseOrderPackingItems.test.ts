@@ -52,5 +52,15 @@ describe("parseOrderPackingItems", () => {
     expect(m.lineCount).toBe(1);
     expect(m.customerNote).toBe("note");
     expect(m.summaryTotal).toBe(500);
+    expect(m.totalQty).toBe(2);
+  });
+
+  it("getPackingModalModel sums totalQty across rows", () => {
+    const m = getPackingModalModel(
+      "[已选商品: 苹果 x2, 香蕉 x1][余额支付: 9,000 MMK]",
+      { 苹果: 3000, 香蕉: 2000 },
+    );
+    expect(m.totalQty).toBe(3);
+    expect(m.computedLineSum).toBe(8000);
   });
 });

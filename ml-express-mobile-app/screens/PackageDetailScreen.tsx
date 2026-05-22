@@ -38,6 +38,11 @@ import { getPackingModalModel } from '../utils/parseOrderPackingItems';
 import { openMapsToAddress } from '../utils/openMapsNavigation';
 import { getOrdererIdentityDisplay } from '../utils/ordererIdentity';
 import { locationService } from '../services/locationService';
+import {
+  getCourierScheduledDeliveryDisplay,
+  getDeliverySpeedShortLabel,
+  isScheduledDeliverySpeed,
+} from '../utils/courierScheduledDelivery';
 
 const { width } = Dimensions.get('window');
 
@@ -619,6 +624,59 @@ export default function PackageDetailScreen({ route, navigation }: any) {
             <Text style={styles.infoLabel}>{language === 'zh' ? '重量' : 'Weight'}</Text>
             <Text style={styles.infoValue}>{pkg.weight}kg</Text>
           </View>
+
+          {pkg.delivery_speed ? (
+            <View style={styles.infoLine}>
+              <Text style={styles.infoLabel}>
+                {language === 'zh' ? '配送选项' : language === 'en' ? 'Delivery option' : 'ပို့ဆောင်မှု ရွေးချယ်မှု'}
+              </Text>
+              <Text style={[styles.infoValue, { flex: 1, flexWrap: 'wrap' }]}>
+                {getDeliverySpeedShortLabel(pkg.delivery_speed)}
+              </Text>
+            </View>
+          ) : null}
+
+          {isScheduledDeliverySpeed(pkg.delivery_speed) ? (
+            <View
+              style={[
+                styles.infoLine,
+                {
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                  borderRadius: 12,
+                  padding: 14,
+                  borderLeftWidth: 4,
+                  borderLeftColor: '#f59e0b',
+                  marginBottom: 8,
+                },
+              ]}
+            >
+              <Text style={[styles.infoLabel, { color: '#fde68a', marginBottom: 8 }]}>
+                ⏰{' '}
+                {language === 'zh'
+                  ? '客户要求送达时间（日期与时间）'
+                  : language === 'en'
+                    ? 'Customer requested delivery (date & time)'
+                    : 'ဖောက်သည်သတ်မှတ်ချိန်'}
+              </Text>
+              <Text
+                style={[
+                  styles.infoValue,
+                  { fontSize: 18, fontWeight: '900', color: '#fff', lineHeight: 24 },
+                ]}
+                selectable
+              >
+                {getCourierScheduledDeliveryDisplay(pkg) ||
+                  (language === 'zh'
+                    ? '未同步到订单，请联系站长或查看后台'
+                    : language === 'en'
+                      ? 'Not on order — contact support'
+                      : '—')}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.glassDivider} />
           <Text style={styles.sectionTitle}>💰 {language === 'zh' ? '费用信息' : 'Price Information'}</Text>
           <View style={styles.infoLine}>

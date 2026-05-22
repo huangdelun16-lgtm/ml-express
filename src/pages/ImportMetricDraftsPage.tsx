@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Workbook } from 'exceljs';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
@@ -9,6 +9,8 @@ import {
   type ImportMetricDraftDbRow,
   type ImportMetricDraftDbWrite,
 } from '../services/supabase';
+import ImportPriceListPage from './ImportPriceListPage';
+import PersonalExpensePage from './PersonalExpensePage';
 
 const CURRENCIES = [
   { value: 'USD', label: '美金 USD' },
@@ -110,6 +112,8 @@ export type ImportMetricDraftSaved = {
   thirdAccount: string;
   /** 订单编码（LIC-####），入库后不可改 */
   licOrderCode: string;
+  /** 商品明细 Group（整单，不在各商品卡片内） */
+  cargoGroup: string;
 };
 
 function isUuid(id: string): boolean {
@@ -138,6 +142,7 @@ function draftToDbWrite(d: ImportMetricDraftSaved): ImportMetricDraftDbWrite {
     third_handler: d.thirdHandler,
     third_account: d.thirdAccount,
     lic_order_code: d.licOrderCode?.trim() ? d.licOrderCode.trim() : '',
+    cargo_group: d.cargoGroup?.trim() ?? '',
   };
 }
 
@@ -274,7 +279,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
   const regFile = d.registerNo?.trim() || 'NO_REG';
   const orderNo = d.licOrderCode?.trim() || '—';
 
-  ws.mergeCells(1, 1, 1, 12);
+  ws.mergeCells(1, 1, 1, 13);
   const titleCell = ws.getCell(1, 1);
   titleCell.value = '进口指标 · 商品明细';
   titleCell.font = { name: 'Calibri', size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -282,7 +287,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
   titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
   ws.getRow(1).height = 40;
 
-  ws.mergeCells(2, 1, 2, 12);
+  ws.mergeCells(2, 1, 2, 13);
   const sub = ws.getCell(2, 1);
   sub.value = `REGISTER NO.  ${reg}    |    订单号 / Order no. (LIC): ${orderNo}    |    客户 / Customer: ${d.customerName?.trim() || '—'}    |    卸货港: ${d.portOfDischarge?.trim() || '—'}`;
   sub.font = { name: 'Calibri', size: 11, color: { argb: 'FF1E293B' } };
@@ -290,16 +295,18 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
   sub.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
   ws.getRow(2).height = 30;
 
-  ws.mergeCells(3, 1, 3, 12);
+  ws.mergeCells(3, 1, 3, 13);
   const hint = ws.getCell(3, 1);
   hint.value = `导出时间 · Generated: ${new Date().toLocaleString('zh-CN', { hour12: false })}  ·  共 ${d.lineItems.length} 条商品行`;
   hint.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF64748B' } };
   hint.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
   ws.getRow(3).height = 24;
 
+  const groupVal = d.cargoGroup?.trim() || '—';
   const headers = [
     'REGISTER NO.',
     '订单号 · ORDER NO. · LIC',
+    'GROUP',
     'H.S CODE',
     'CARGO DESCRIPTION',
     'MYANMAR DESCRIPTION',
@@ -333,6 +340,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
     const strCols: string[] = [
       reg,
       licCell,
+      groupVal,
       li.hsCode,
       li.cargoDesc,
       li.myanmarDesc,
@@ -355,7 +363,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
       };
       cell.alignment = {
         vertical: 'middle',
-        horizontal: j === 3 || j === 4 ? 'left' : 'center',
+        horizontal: j === 4 || j === 5 ? 'left' : 'center',
         wrapText: true,
       };
       cell.fill = {
@@ -366,7 +374,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
       cell.border = XL_BORDER;
     });
 
-    const valueCell = row.getCell(10);
+    const valueCell = row.getCell(11);
     valueCell.value = lineValue;
     valueCell.numFmt = excelLineValueNumFmt(li.currency);
     valueCell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
@@ -378,7 +386,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
     };
     valueCell.border = XL_BORDER;
 
-    const imgHsCell = row.getCell(11);
+    const imgHsCell = row.getCell(12);
     imgHsCell.value =
       li.hsImageDataUrl?.startsWith('data:image/') ? '' : li.hsImageName || '';
     imgHsCell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
@@ -390,7 +398,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
     };
     imgHsCell.border = XL_BORDER;
 
-    const imgPkgCell = row.getCell(12);
+    const imgPkgCell = row.getCell(13);
     imgPkgCell.value =
       li.packageImageDataUrl?.startsWith('data:image/') ? '' : li.packageImageName || '';
     imgPkgCell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
@@ -407,7 +415,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
         const { base64, extension } = await dataUrlToExcelEmbeddedPng(li.hsImageDataUrl);
         const imageId = wb.addImage({ base64, extension });
         ws.addImage(imageId, {
-          tl: { col: 10, row: 4 + i },
+          tl: { col: 11, row: 4 + i },
           ext: { width: HS_ATTACHMENT_THUMB_PX, height: HS_ATTACHMENT_THUMB_PX },
           editAs: 'absolute',
         });
@@ -421,7 +429,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
         const { base64, extension } = await dataUrlToExcelEmbeddedPng(li.packageImageDataUrl);
         const imageId = wb.addImage({ base64, extension });
         ws.addImage(imageId, {
-          tl: { col: 11, row: 4 + i },
+          tl: { col: 12, row: 4 + i },
           ext: { width: HS_ATTACHMENT_THUMB_PX, height: HS_ATTACHMENT_THUMB_PX },
           editAs: 'absolute',
         });
@@ -438,6 +446,7 @@ async function exportDraftLineItemsExcel(d: ImportMetricDraftSaved): Promise<voi
   ws.columns = [
     { width: 15 },
     { width: 16 },
+    { width: 12 },
     { width: 13 },
     { width: 34 },
     { width: 34 },
@@ -937,9 +946,13 @@ function myanmarMultiRestSnippet(lines: SavedLineItem[]): string {
   const firstMy = lines.map((l) => l.myanmarDesc.trim()).find(Boolean);
   const firstCargo = lines.map((l) => l.cargoDesc.trim()).find(Boolean);
   const snippet = (firstMy || firstCargo || '').replace(/\s+/g, ' ');
-  const short = snippet.length > 36 ? `${snippet.slice(0, 36)}…` : snippet;
+  const short = snippet.length > 44 ? `${snippet.slice(0, 44)}…` : snippet;
   return short;
 }
+
+/** 缅文摘要展示用字体栈（系统无对应字体时降级无衬线） */
+const MYANMAR_SNIPPET_FONT =
+  "'Noto Sans Myanmar', 'Myanmar Text', Pyidaungsu, 'Padauk', 'Myanmar3', 'Noto Sans', 'PingFang SC', system-ui, sans-serif";
 
 type LineItemsPreviewModalProps = {
   open: boolean;
@@ -1246,6 +1259,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
   const [thirdHandler, setThirdHandler] = useState('');
   const [thirdAccount, setThirdAccount] = useState('');
   const [licOrderCode, setLicOrderCode] = useState('');
+  const [cargoGroup, setCargoGroup] = useState('');
 
   const licCodeLocked = useMemo(
     () => isUuid(initialDraft?.id ?? '') && Boolean(initialDraft?.licOrderCode?.trim()),
@@ -1329,6 +1343,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
     setThirdHandler('');
     setThirdAccount('');
     setLicOrderCode('');
+    setCargoGroup('');
   }, []);
 
   useEffect(() => {
@@ -1338,6 +1353,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
       setCustomerName(initialDraft.customerName || '');
       setRegisterNo(initialDraft.registerNo || '');
       setPortOfDischarge(initialDraft.portOfDischarge || '');
+      setCargoGroup(initialDraft.cargoGroup || '');
       setLineItems(savedLinesToFormLineItems(initialDraft));
       setEdDate(initialDraft.edDate || todayIso());
       setTotalCharges(digitsOnlyToCommaMmk(initialDraft.totalCharges || ''));
@@ -1456,6 +1472,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
       thirdHandler,
       thirdAccount,
       licOrderCode: finalLic,
+      cargoGroup: cargoGroup.trim(),
     };
     const saveErr =
       language === 'en'
@@ -1727,10 +1744,10 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
                   <span style={{ color: '#60a5fa', marginRight: 8 }}>2</span>
-                  商品明细 · HS / Cargo / 计价（合一）
+                  商品明细
                 </div>
                 <p style={{ margin: 0, fontSize: 12, opacity: 0.82, lineHeight: 1.55, maxWidth: 520 }}>
-                  每笔批文可有多个商品；每张卡片独立填写编码、描述与金额。当前 {lineItems.length} 条，可自行增减。
+                  每笔批文可有多个商品；每张卡片填写 HS、描述与金额。Group 为整单分组，不随「添加商品」复制。当前 {lineItems.length} 条。
                 </p>
               </div>
               <button
@@ -1752,6 +1769,28 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                 + 添加商品
               </button>
             </div>
+
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 14,
+                padding: '12px 14px',
+                borderRadius: 12,
+                border: '1px solid rgba(251, 191, 36, 0.28)',
+                background: 'rgba(251, 191, 36, 0.06)',
+              }}
+            >
+              <span style={{ display: 'block', fontSize: 12, marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>
+                Group
+              </span>
+              <input
+                type="text"
+                value={cargoGroup}
+                onChange={(e) => setCargoGroup(e.target.value)}
+                placeholder="整单分组，例如 A / B / 批次号（导出 Excel 时写入 GROUP 列）"
+                style={{ ...inputBase, width: '100%' }}
+              />
+            </label>
 
             {lineItems.map((row, idx) => (
               <div
@@ -2500,12 +2539,16 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
   );
 };
 
+type MetricHubPanel = null | 'prices' | 'personal';
+
 /** 进口指标批文草稿台账（列表 Supabase import_metric_drafts） */
 const ImportMetricDraftsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
   const { isMobile } = useResponsive();
   const [draftModalOpen, setDraftModalOpen] = useState(false);
+  const [hubPanelOpen, setHubPanelOpen] = useState<MetricHubPanel>(null);
   const [editingDraft, setEditingDraft] = useState<ImportMetricDraftSaved | null>(null);
   const [lineItemsPreviewDraft, setLineItemsPreviewDraft] = useState<ImportMetricDraftSaved | null>(null);
   const [savedDrafts, setSavedDrafts] = useState<ImportMetricDraftSaved[]>([]);
@@ -2518,6 +2561,26 @@ const ImportMetricDraftsPage: React.FC = () => {
   useEffect(() => {
     void reloadDrafts();
   }, [reloadDrafts]);
+
+  useEffect(() => {
+    const openPrice = searchParams.get('openPrice') === '1';
+    const openPersonal = searchParams.get('openPersonal') === '1';
+    if (!openPrice && !openPersonal) return;
+    setHubPanelOpen(openPersonal ? 'personal' : 'prices');
+    const next = new URLSearchParams(searchParams);
+    next.delete('openPrice');
+    next.delete('openPersonal');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (hubPanelOpen == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setHubPanelOpen(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hubPanelOpen]);
 
   useEffect(() => {
     const id = 'import-metric-drafts-table-scroll-style';
@@ -2605,6 +2668,10 @@ const ImportMetricDraftsPage: React.FC = () => {
     language === 'en'
       ? {
           kicker: 'ML Express · Admin',
+          hubTitle: 'Metric management',
+          draftsTabBtn: '📑 Import metric drafts',
+          pricesTabBtn: '💲 Product prices',
+          personalTabBtn: '🧾 Personal expenses',
           title: 'Import metric drafts',
           subtitle:
             'Draft permit ledger: includes customer name; each entry can list multiple line items, each with HS, description and valuation on one card. Saved lines roll up to the «Import price list». The «Myanmar Description» / count column is clickable (shows «1 item» or «N items» plus a short excerpt) to open Cargo details.',
@@ -2612,7 +2679,7 @@ const ImportMetricDraftsPage: React.FC = () => {
           back: 'Dashboard',
           empty: 'No records yet. Click «New draft».',
           colRegister: 'REGISTER NO.',
-          colOrderNo: 'Order no. · order code',
+          colOrderNo: 'ORDER CODE',
           colStart: 'START DATE',
           colEd: 'ED DATE',
           colCustomer: 'Customer',
@@ -2632,6 +2699,10 @@ const ImportMetricDraftsPage: React.FC = () => {
       : language === 'my'
         ? {
             kicker: 'ML Express · Admin',
+            hubTitle: 'မီတြခစီမံခန့်ခွဲမှု',
+            draftsTabBtn: '📑 သွင်းကုန် မီတြိ မူကြမ်း',
+            pricesTabBtn: '💲 ကုန်စျေးနှုန်း',
+            personalTabBtn: '🧾 ကိုယ်ပိုင်ကုန်ကျစရိတ်',
             title: 'သွင်းကုန် မီတြိခြင်းမူကြမ်း',
             subtitle:
               'ခွင့်ပြုချက်မူကြမ်း — ဖောက်သည်အမည်ပါသည်။ တစ်မှုတွင် ကုန်ပစ္စည်း များစွာ မှတ်တမ်းတင်နိုင်ပြီး HS၊ ဖော်ပြချက် နှင့် တန်ဖိုး။ သိမ်းပြီးပါက 「သွင်းကုန်စျေးနှုန်းဇယား」 သို့ စုသည်။',
@@ -2639,7 +2710,7 @@ const ImportMetricDraftsPage: React.FC = () => {
             back: 'ဒါဘုတ်',
             empty: 'မှတ်တမ်းမရှိပါ။ «မူကြမ်းအသစ်» ကိုနှိပ်ပါ။',
             colRegister: 'REGISTER NO.',
-            colOrderNo: 'အော်ဒါနံပါတ် · order code',
+            colOrderNo: 'ORDER CODE',
             colStart: 'START DATE',
             colEd: 'ED DATE',
             colCustomer: 'ဖောက်သည်',
@@ -2657,6 +2728,10 @@ const ImportMetricDraftsPage: React.FC = () => {
           }
         : {
             kicker: 'ML Express · Admin',
+            hubTitle: '指标管理',
+            draftsTabBtn: '📑 进口指标草稿',
+            pricesTabBtn: '💲 商品价格',
+            personalTabBtn: '🧾 个人开销',
             title: '进口指标草稿',
             subtitle:
               '批文草稿台账：含客户名称；单笔可登记多条商品，每条在一张卡片内完成 HS、描述与计价。保存后的明细会汇总到「进口价格表」。列表「Myanmar Description」列可点击，显示「共 N 项」标签（含 N=1）及摘要后查看 Cargo 明细。',
@@ -2664,7 +2739,7 @@ const ImportMetricDraftsPage: React.FC = () => {
             back: '控制台',
             empty: '暂无记录，请点击「新建草稿」。',
             colRegister: 'REGISTER NO.',
-            colOrderNo: '订单号 · 订单编码 / order code',
+            colOrderNo: 'ORDER CODE',
             colStart: 'START DATE',
             colEd: 'ED DATE',
             colCustomer: '客户名称',
@@ -2682,6 +2757,10 @@ const ImportMetricDraftsPage: React.FC = () => {
           };
 
   const dateLocale = language === 'en' ? 'en-US' : language === 'my' ? 'my-MM' : 'zh-CN';
+
+  const draftsTabSelected = hubPanelOpen === null;
+  const pricesTabSelected = hubPanelOpen === 'prices';
+  const personalTabSelected = hubPanelOpen === 'personal';
 
   return (
     <div
@@ -2714,6 +2793,49 @@ const ImportMetricDraftsPage: React.FC = () => {
         language={language}
       />
 
+      {hubPanelOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            background: 'rgba(15, 23, 42, 0.78)',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            padding: isMobile ? '10px' : '22px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setHubPanelOpen(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={hubPanelOpen === 'prices' ? t.pricesTabBtn : t.personalTabBtn}
+            style={{
+              maxWidth: hubPanelOpen === 'personal' ? 1180 : 1340,
+              margin: '0 auto',
+              background:
+                hubPanelOpen === 'personal'
+                  ? 'linear-gradient(165deg, #0a0f1c 0%, #0f172a 28%, #172554 55%, #1e1b4b 100%)'
+                  : 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 40%, #1a1740 100%)',
+              borderRadius: 16,
+              border: '1px solid rgba(148, 163, 184, 0.22)',
+              boxShadow: '0 28px 90px rgba(0,0,0,0.5)',
+              position: 'relative',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {hubPanelOpen === 'prices' ? (
+              <ImportPriceListPage variant="embedded" onCloseEmbedded={() => setHubPanelOpen(null)} />
+            ) : (
+              <PersonalExpensePage variant="embedded" onCloseEmbedded={() => setHubPanelOpen(null)} />
+            )}
+          </div>
+        </div>
+      ) : null}
+
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <header
           style={{
@@ -2737,9 +2859,92 @@ const ImportMetricDraftsPage: React.FC = () => {
             >
               {t.kicker}
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? '1.45rem' : '1.85rem', fontWeight: 800 }}>
-              📑 {t.title}
-            </h1>
+            <h2
+              style={{
+                margin: '4px 0 0',
+                fontSize: isMobile ? '1.2rem' : '1.35rem',
+                fontWeight: 800,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              {t.hubTitle}
+            </h2>
+            <div
+              role="tablist"
+              aria-label={t.hubTitle}
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 10,
+                marginTop: 14,
+                marginBottom: 2,
+                alignItems: 'center',
+              }}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={draftsTabSelected}
+                onClick={() => setHubPanelOpen(null)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 12,
+                  border: draftsTabSelected ? 'none' : '1px solid rgba(255,255,255,0.22)',
+                  background: draftsTabSelected
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                    : 'rgba(255,255,255,0.06)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: draftsTabSelected ? 700 : 600,
+                  fontSize: 13,
+                  boxShadow: draftsTabSelected ? '0 6px 18px rgba(37, 99, 235, 0.3)' : 'none',
+                }}
+              >
+                {t.draftsTabBtn}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pricesTabSelected}
+                onClick={() => setHubPanelOpen('prices')}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 12,
+                  border: pricesTabSelected ? 'none' : '1px solid rgba(255,255,255,0.22)',
+                  background: pricesTabSelected
+                    ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+                    : 'rgba(255,255,255,0.06)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: pricesTabSelected ? 700 : 600,
+                  fontSize: 13,
+                  boxShadow: pricesTabSelected ? '0 6px 18px rgba(79, 70, 229, 0.32)' : 'none',
+                }}
+              >
+                {t.pricesTabBtn}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={personalTabSelected}
+                onClick={() => setHubPanelOpen('personal')}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 12,
+                  border: personalTabSelected ? 'none' : '1px solid rgba(255,255,255,0.22)',
+                  background: personalTabSelected
+                    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                    : 'rgba(255,255,255,0.06)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: personalTabSelected ? 700 : 600,
+                  fontSize: 13,
+                  boxShadow: personalTabSelected ? '0 6px 18px rgba(4, 120, 87, 0.35)' : 'none',
+                }}
+              >
+                {t.personalTabBtn}
+              </button>
+            </div>
             <p
               style={{
                 margin: '12px 0 0',
@@ -2921,11 +3126,13 @@ const ImportMetricDraftsPage: React.FC = () => {
                         <td style={{ padding: '12px 16px', color: '#e2e8f0' }}>{d.portOfDischarge?.trim() || '—'}</td>
                         <td
                           style={{
-                            padding: '12px 16px',
+                            padding: '12px 14px',
                             color: '#cbd5e1',
-                            maxWidth: 240,
-                            lineHeight: 1.45,
+                            maxWidth: 300,
+                            minWidth: 148,
+                            lineHeight: 1.5,
                             wordBreak: 'break-word',
+                            verticalAlign: 'top',
                           }}
                         >
                           {(() => {
@@ -2933,31 +3140,116 @@ const ImportMetricDraftsPage: React.FC = () => {
                             const n = lines.length;
                             if (!n) return '—';
                             const rest = myanmarMultiRestSnippet(lines);
-                            const countLabel =
-                              language === 'en' ? `${n} item${n > 1 ? 's' : ''}` : language === 'my' ? `${n} ခု` : `共 ${n} 项`;
+                            const countBadge =
+                              language === 'en' ? (
+                                <>
+                                  <span
+                                    style={{
+                                      fontVariantNumeric: 'tabular-nums',
+                                      fontWeight: 900,
+                                      color: '#fef08a',
+                                    }}
+                                  >
+                                    {n}
+                                  </span>
+                                  <span style={{ marginLeft: 5, opacity: 0.92 }}>
+                                    {n > 1 ? 'items' : 'item'}
+                                  </span>
+                                </>
+                              ) : language === 'my' ? (
+                                <>
+                                  <span
+                                    style={{
+                                      fontVariantNumeric: 'tabular-nums',
+                                      fontWeight: 900,
+                                      color: '#fef08a',
+                                      marginRight: 4,
+                                    }}
+                                  >
+                                    {n}
+                                  </span>
+                                  <span style={{ opacity: 0.92 }}>ခု</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span style={{ opacity: 0.88 }}>共</span>
+                                  <span
+                                    style={{
+                                      display: 'inline-block',
+                                      margin: '0 5px',
+                                      minWidth: '1.15em',
+                                      textAlign: 'center',
+                                      fontVariantNumeric: 'tabular-nums',
+                                      fontWeight: 900,
+                                      fontSize: '1.08em',
+                                      color: '#fef9c3',
+                                      textShadow: '0 0 14px rgba(253, 224, 71, 0.35)',
+                                    }}
+                                  >
+                                    {n}
+                                  </span>
+                                  <span style={{ opacity: 0.88 }}>项</span>
+                                </>
+                              );
                             return (
-                              <span style={{ display: 'inline', lineHeight: 1.55 }}>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'stretch',
+                                  gap: 10,
+                                }}
+                              >
                                 <button
                                   type="button"
                                   onClick={() => setLineItemsPreviewDraft(d)}
+                                  title={
+                                    language === 'en'
+                                      ? 'Open line items'
+                                      : language === 'my'
+                                        ? 'ကုန်ပစ္စည်းစာရင်းဖွင့်ရန်'
+                                        : '查看商品明细'
+                                  }
                                   style={{
-                                    verticalAlign: 'baseline',
-                                    marginRight: 2,
-                                    padding: '3px 10px',
-                                    borderRadius: 8,
-                                    border: '1px solid rgba(96, 165, 250, 0.55)',
-                                    background: 'rgba(37, 99, 235, 0.3)',
-                                    color: '#bfdbfe',
+                                    alignSelf: 'flex-start',
+                                    padding: '6px 16px',
+                                    borderRadius: 999,
+                                    border: '1px solid rgba(125, 211, 252, 0.48)',
+                                    background:
+                                      'linear-gradient(155deg, rgba(37, 99, 235, 0.5) 0%, rgba(8, 145, 178, 0.38) 100%)',
+                                    color: '#e0f2fe',
                                     cursor: 'pointer',
                                     fontSize: 12,
-                                    fontWeight: 700,
-                                    lineHeight: 1.3,
+                                    fontWeight: 800,
+                                    letterSpacing: language === 'zh' ? '0.04em' : '0.02em',
+                                    lineHeight: 1.35,
+                                    boxShadow: '0 2px 14px rgba(37, 99, 235, 0.28), inset 0 1px 0 rgba(255,255,255,0.12)',
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
-                                  {countLabel}
+                                  {countBadge}
                                 </button>
-                                {rest ? <span style={{ opacity: 0.9 }}> · {rest}</span> : null}
-                              </span>
+                                {rest ? (
+                                  <span
+                                    style={{
+                                      display: 'block',
+                                      fontFamily: MYANMAR_SNIPPET_FONT,
+                                      fontSize: 13,
+                                      lineHeight: 1.75,
+                                      color: 'rgba(254, 243, 199, 0.96)',
+                                      padding: '9px 12px',
+                                      borderRadius: 11,
+                                      background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.82) 0%, rgba(15, 23, 42, 0.75) 100%)',
+                                      border: '1px solid rgba(251, 191, 36, 0.22)',
+                                      borderLeft: '3px solid rgba(251, 191, 36, 0.75)',
+                                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
+                                    {rest}
+                                  </span>
+                                ) : null}
+                              </div>
                             );
                           })()}
                         </td>

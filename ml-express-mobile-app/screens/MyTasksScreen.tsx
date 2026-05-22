@@ -31,6 +31,7 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
+import { locationService } from '../services/locationService';
 import { geofenceService } from '../services/geofenceService';
 import { DeviceHealthShield } from '../components/DeviceHealthShield';
 import {
@@ -540,14 +541,14 @@ const MyTasksScreen: React.FC = () => {
         return;
       }
 
-      // 2. 🚀 距离检查
-      const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      // 2. 🚀 距离检查 (经 locationService，确保有披露)
+      const coords = await locationService.getCurrentLocation(language);
       const { data: pkgData } = await supabase.from('packages').select('receiver_latitude, receiver_longitude').eq('id', selectedPackage.id).single();
       
-      if (currentLoc && pkgData?.receiver_latitude) {
+      if (coords && pkgData?.receiver_latitude) {
         const dist = calculateDistance(
-          currentLoc.coords.latitude,
-          currentLoc.coords.longitude,
+          coords.latitude,
+          coords.longitude,
           pkgData.receiver_latitude,
           pkgData.receiver_longitude
         );
@@ -593,11 +594,11 @@ const MyTasksScreen: React.FC = () => {
     try {
       setReporting(true);
       
-      // 获取当前位置
+      // 获取当前位置 (经 locationService，确保有披露)
       let locationData = undefined;
       try {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        if (loc) locationData = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+        const coords = await locationService.getCurrentLocation(language);
+        if (coords) locationData = { latitude: coords.latitude, longitude: coords.longitude };
       } catch (e) {}
 
       const success = await packageService.reportAnomaly({
@@ -652,20 +653,20 @@ const MyTasksScreen: React.FC = () => {
         return;
       }
 
-      // 2. 🚀 距离检查 (如果是送达操作且不是扫码送达中转站)
+      // 2. 🚀 距离检查 (如果是送达操作且不是扫码送达中转站) (经 locationService，确保有披露)
       const isStoreCode = data.startsWith('STORE_');
       if (
         selectedPackage &&
         !isPickupFlowStatus(normalizePackageStatusZh(selectedPackage.status)) &&
         !isStoreCode
       ) {
-        const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const coords = await locationService.getCurrentLocation(language);
         const { data: pkgData } = await supabase.from('packages').select('receiver_latitude, receiver_longitude').eq('id', selectedPackage.id).single();
         
-        if (currentLoc && pkgData?.receiver_latitude) {
+        if (coords && pkgData?.receiver_latitude) {
           const dist = calculateDistance(
-            currentLoc.coords.latitude,
-            currentLoc.coords.longitude,
+            coords.latitude,
+            coords.longitude,
             pkgData.receiver_latitude,
             pkgData.receiver_longitude
           );

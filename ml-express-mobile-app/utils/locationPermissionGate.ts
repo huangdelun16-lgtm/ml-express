@@ -29,21 +29,20 @@ function normLang(language?: string): Lang {
 /** Google Play：系统位置弹窗前须应用内显著说明 + 用户主动确认（全屏 Modal，不用系统 Alert） */
 const FG = {
   zh: {
-    title: '即将申请位置权限',
-    body: '为在地图上显示您与订单路线、计算导航与距离、以及向平台上报配送进度，本应用需要访问此设备的位置信息。\n\n点击下方「继续」后，系统将弹出官方权限对话框，请在对话框中选择允许方式。若您拒绝，仍可使用不依赖自动定位的功能。',
+    title: '📍 位置权限说明',
+    body: '为在地图上显示您与订单路线、计算导航与距离、以及向平台上报配送进度，本应用需要访问此设备的位置信息。\n\n点击下方「继续」后，系统将弹出官方权限对话框，请选择「使用应用时允许」。若您拒绝，仍可使用不依赖自动定位的功能。',
     cont: '继续',
     cancel: '取消',
   },
   en: {
-    title: 'Location permission next',
-    body: 'To show you and orders on the map, support turn‑by‑turn context, and report delivery progress to dispatch, this app needs access to this device’s location.\n\nTap Continue to open the system permission dialog and choose an option. If you deny, you can still use features that do not rely on automatic location.',
+    title: '📍 Location Permission',
+    body: 'To show you and orders on the map, support turn‑by‑turn context, and report delivery progress to dispatch, this app needs access to this device’s location.\n\nTap "Continue" to open the system permission dialog and select "While using the app". If you deny, you can still use features that do not rely on automatic location.',
     cont: 'Continue',
     cancel: 'Cancel',
   },
   my: {
-    title: 'တည်နေရာခွင့်ပြုချက် တောင်းမည်',
-    body:
-      'မြေပုံ၊ လမ်းညွှန်နှင့် ပို့ဆောင်ရေးအခြေအနေ အပ်ဒိတ်အတွက် ဤစက်မှ တည်နေရာကို ရယူရန် လိုအပ်ပါသည်။ ဆက်လက်ကိုနှိပ်ပြီးနောက် စနစ်မှ ခွင့်ပြုချက် ပေါ်လာမည်။ ငြင်းဆန်ပါက တည်နေရာ အလိုအလျောက် မလိုအပ်သော လုပ်ဆောင်ချက်များကို ဆက်လက်သုံးနိုင်ပါသည်။',
+    title: '📍 တည်နေရာခွင့်ပြုချက်',
+    body: 'မြေပုံပေါ်တွင် သင့်တည်နေရာနှင့် အော်ဒါလမ်းကြောင်းများကို ပြသရန်၊ လမ်းညွှန်ချက်များနှင့် အကွာအဝေးကို တွက်ချက်ရန်၊ နှင့် ပို့ဆောင်မှုအခြေအနေကို ပလက်ဖောင်းသို့ တင်ပြရန်အတွက် ဤစက်၏ တည်နေရာအချက်အလက် လိုအပ်ပါသည်။\n\n"ဆက်လက်" ကိုနှိပ်ပြီး စနစ်မှ ခွင့်ပြုချက်တောင်းခံသည့်အခါ "အက်ပ်ကို အသုံးပြုနေစဉ်" ကို ရွေးချယ်ပါ။',
     cont: 'ဆက်လက်',
     cancel: 'ပယ်ဖျက်',
   },
@@ -51,23 +50,22 @@ const FG = {
 
 const BG = {
   zh: {
-    title: '即将申请后台 / 始终位置权限',
-    body: '接下来系统可能询问「始终允许」或在应用未打开时访问位置。\n\n若您同意：即便应用处于后台、未使用或关闭状态，我们仍可能收集位置信息，用于向客户与平台同步实时配送轨迹、派单与安全相关功能。点击下方「继续」后将出现系统对话框。\n\n若您拒绝，后台持续轨迹与部分派单能力可能受限。',
-    cont: '继续',
-    cancel: '取消',
+    title: '📍 后台位置权限说明',
+    body: '为了确保您在切换到后台或锁屏时，系统仍能为您精准派单并记录配送路径，我们需要您开启“始终允许”位置权限。\n\n点击下方「继续」后将打开系统设置，请在位置权限中选择「始终允许」。',
+    cont: '去设置',
+    cancel: '暂时不需要',
   },
   en: {
-    title: 'Background location next',
-    body: 'The system may next ask for “All the time” / location access while you are not using the app.\n\nIf you allow: we may collect location when the app is in the background, closed, or not in active use—to share live delivery progress with customers and dispatch, and for safety-related features. Tap Continue to see the system dialog.\n\nIf you deny, continuous background tracking and some dispatch features may be limited.',
-    cont: 'Continue',
-    cancel: 'Cancel',
+    title: '📍 Background Location',
+    body: 'To ensure accurate task assignment and route tracking when the app is in the background or screen is locked, we need "Allow all the time" location access.\n\nTap "Go to Settings" and select "Allow all the time" in the system permission page.',
+    cont: 'Go to Settings',
+    cancel: 'Not Now',
   },
   my: {
-    title: 'နောက်ခံ တည်နေရာခွင့်ပြုချက်',
-    body:
-      'အက်ပ်ကို မသုံးနေချိန်တွင်လည်း တည်နေရာခွင့်ပြုချက် တောင်းနိုင်ပါသည်။ သဘောတူပါက နောက်ခံတွင် လမ်းကြောင်းနှင့် ဖြန့်ပိုးသူ သိစေရေးအတွက် တည်နေရာ စုဆောင်းနိုင်ပါသည်။ ဆက်လက်နှိပ်ပြီး စနစ် ခွင့်ပြုချက် ရွေးချယ်ပါ။',
-    cont: 'ဆက်လက်',
-    cancel: 'ပယ်ဖျက်',
+    title: '📍 နောက်ခံတည်နေရာခွင့်ပြုချက်',
+    body: 'အက်ပ်ကို နောက်ခံတွင်ထားရှိစဉ် သို့မဟုတ် ဖုန်းပိတ်ထားစဉ်အတွင်း တိကျသော အော်ဒါပေးပို့မှုနှင့် လမ်းကြောင်းမှတ်တမ်းများအတွက် "အမြဲခွင့်ပြုရန်" တည်နေရာခွင့်ပြုချက် လိုအပ်ပါသည်။\n\n"ဆက်တင်သို့သွားရန်" ကိုနှိပ်ပြီး စနစ်ခွင့်ပြုချက်တွင် "အမြဲခွင့်ပြုရန်" ကို ရွေးချယ်ပါ။',
+    cont: 'ဆက်တင်သို့သွားရန်',
+    cancel: 'ယခု မလိုအပ်သေးပါ',
   },
 };
 

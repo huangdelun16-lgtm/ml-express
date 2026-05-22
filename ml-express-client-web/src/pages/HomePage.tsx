@@ -8,7 +8,6 @@ import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
 import NavigationBar from '../components/home/NavigationBar';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
-import Logo from '../components/Logo';
 import OrderModal from '../components/home/OrderModal';
 import LoginRegisterModal from '../components/home/LoginRegisterModal';
 import { MYANMAR_CITIES, CityKey, DEFAULT_CITY_KEY, DEFAULT_CITY_CENTER } from '../constants/cities';
@@ -118,6 +117,7 @@ const HomePage: React.FC = () => {
   const [activeTutorialStep, setActiveTutorialStep] = useState<number | null>(null); // 🚀 优化：当前选中的教学步骤
   const [tutorials, setTutorials] = useState<Tutorial[]>([]); // 🚀 新增：从数据库获取的教学步骤
   const [trackingNumber] = useState('');
+  const [heroTrackingInput, setHeroTrackingInput] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [trackingResult, setTrackingResult] = useState<any>(null);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -1259,6 +1259,22 @@ const HomePage: React.FC = () => {
     }, 300);
   };
 
+  const handleHeroTrack = () => {
+    handleNavigation('/tracking');
+    if (heroTrackingInput.trim()) {
+      window.setTimeout(() => {
+        const input = document.querySelector<HTMLInputElement>(
+          '#landing-tracking input[type="text"], #landing-tracking input:not([type="hidden"])'
+        );
+        if (input) {
+          input.value = heroTrackingInput.trim();
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.focus();
+        }
+      }, 450);
+    }
+  };
+
   // 生成二维码
   const generateQRCode = async (orderId: string) => {
     try {
@@ -2172,7 +2188,13 @@ const HomePage: React.FC = () => {
         lineHeight: 'var(--line-height-normal)',
       }}
     >
-      <div className="home-landing__ambient" aria-hidden />
+      <div className="home-landing__ambient" aria-hidden>
+        <div className="home-landing__ambient-grid" />
+        <div className="home-landing__ambient-noise" />
+        <div className="home-landing__orb home-landing__orb--sky" />
+        <div className="home-landing__orb home-landing__orb--violet" />
+        <div className="home-landing__orb home-landing__orb--amber" />
+      </div>
       <div className="home-landing__content">
       <NavigationBar
         variant="landing"
@@ -2199,7 +2221,16 @@ const HomePage: React.FC = () => {
         <div className="home-hero__glow home-hero__glow--b" aria-hidden />
         <div className="home-hero__inner">
           <div className="home-hero__logo">
-            <Logo size="large" />
+            <div className="home-hero__logo-ring">
+              <div className="home-hero__logo-inner">
+                <img src="/logo.png" alt="MARKET LINK EXPRESS" width={96} height={96} />
+              </div>
+            </div>
+          </div>
+          <div className="home-hero__brand-tagline" aria-hidden>
+            <span className="home-hero__brand-tagline-line" />
+            DELIVERY SERVICES
+            <span className="home-hero__brand-tagline-line" />
           </div>
           <p className="home-hero__eyebrow">
             <span className="home-hero__eyebrow-dot" aria-hidden />
@@ -2207,6 +2238,41 @@ const HomePage: React.FC = () => {
           </p>
           <h1 className="home-hero__title">{t.hero.title}</h1>
           <p className="home-hero__subtitle">{t.hero.subtitle}</p>
+
+          {Array.isArray((t.hero as { stats?: { value: string; label: string }[] }).stats) &&
+          (t.hero as { stats: { value: string; label: string }[] }).stats.length > 0 ? (
+            <div className="home-hero__stats" role="list">
+              {(t.hero as { stats: { value: string; label: string }[] }).stats.map((stat, index) => (
+                <div key={index} className="home-hero__stat" role="listitem">
+                  <span className="home-hero__stat-value">{stat.value}</span>
+                  <span className="home-hero__stat-label">{stat.label}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <form
+            className="home-hero__track"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleHeroTrack();
+            }}
+          >
+            <span className="home-hero__track-icon" aria-hidden>
+              📦
+            </span>
+            <input
+              type="text"
+              className="home-hero__track-input"
+              value={heroTrackingInput}
+              onChange={(e) => setHeroTrackingInput(e.target.value)}
+              placeholder={(t.hero as { trackPlaceholder?: string }).trackPlaceholder}
+              aria-label={(t.hero as { trackPlaceholder?: string }).trackPlaceholder}
+            />
+            <button type="submit" className="home-hero__track-btn">
+              {(t.hero as { trackBtn?: string }).trackBtn || t.ui.packageTracking}
+            </button>
+          </form>
 
           <div className="home-hero__actions">
             <button
@@ -2276,8 +2342,14 @@ const HomePage: React.FC = () => {
               );
             })}
           </div>
+
+          <p className="home-hero__scroll-hint">
+            {(t.hero as { scrollHint?: string }).scrollHint}
+            <span className="home-hero__scroll-hint-chevron" aria-hidden />
+          </p>
         </div>
       </section>
+      <div className="home-section-divider" aria-hidden />
       <div
         ref={servicesBottomSentinelRef}
         className="home-services-bottom-sentinel"

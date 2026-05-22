@@ -301,6 +301,7 @@ const AccountManagement: React.FC = () => {
     { id: 'merchant_reconciliation', name: '商家对账', icon: '📋' },
     { id: 'metric_management', name: '指标管理', icon: '📑' },
     { id: 'product_price', name: '商品价格', icon: '💲' },
+    { id: 'personal_expenses', name: '个人开销', icon: '🧾' },
   ];
 
   const togglePermission = (permId: string) => {

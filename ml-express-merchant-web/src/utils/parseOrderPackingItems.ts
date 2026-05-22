@@ -106,10 +106,14 @@ export function getPackingModalModel(
     nameToPrice,
   );
   const customerNote = stripAutoTagsFromOrderDescription(description);
+  const totalQty = rows.reduce((sum, r) => sum + r.qty, 0);
+  const computedLineSum = rows.reduce((sum, r) => sum + (r.lineTotal ?? 0), 0);
   return {
     rows,
     declaredItemTotal,
     summaryTotal,
+    totalQty,
+    computedLineSum: computedLineSum > 0 ? computedLineSum : null,
     customerNote,
     lineCount: rows.length,
   };

@@ -36,9 +36,15 @@ type VerifyOk = {
 let lastVerifySuccess: {
   expires: number;
   rolesKey: string;
-  permissionId?: string;
+  permissionKey?: string;
   result: VerifyOk;
 } | null = null;
+
+function normalizePermissionKey(permissionId?: string | string[]): string | undefined {
+  if (permissionId == null) return undefined;
+  const arr = (Array.isArray(permissionId) ? permissionId : [permissionId]).filter(Boolean).sort();
+  return arr.length ? arr.join(',') : undefined;
+}
 
 /**
  * 使用 HMAC-SHA256 生成安全的 Token 签名
@@ -268,7 +274,10 @@ export async function clearToken(): Promise<void> {
  * 验证 Token（调用服务端验证）
  * Token 现在通过 httpOnly Cookie 自动发送
  */
-export async function verifyToken(requiredRoles: string[] = [], permissionId?: string): Promise<{
+export async function verifyToken(
+  requiredRoles: string[] = [],
+  permissionId?: string | string[],
+): Promise<{
   valid: boolean;
   user?: { username: string; role: string; name: string; region?: string; permissions?: string[] };
   error?: string;
@@ -276,11 +285,12 @@ export async function verifyToken(requiredRoles: string[] = [], permissionId?: s
   try {
     const now = Date.now();
     const rolesKey = [...requiredRoles].sort().join(',');
+    const permissionKeyVal = normalizePermissionKey(permissionId);
     if (
       lastVerifySuccess &&
       lastVerifySuccess.expires > now &&
       lastVerifySuccess.rolesKey === rolesKey &&
-      lastVerifySuccess.permissionId === permissionId &&
+      lastVerifySuccess.permissionKey === permissionKeyVal &&
       lastVerifySuccess.result.valid
     ) {
       return lastVerifySuccess.result;
@@ -296,6 +306,13 @@ export async function verifyToken(requiredRoles: string[] = [], permissionId?: s
       bodyToken = undefined;
     }
 
+    const permissionIds =
+      permissionId == null
+        ? undefined
+        : Array.isArray(permissionId)
+          ? permissionId.filter(Boolean)
+          : [permissionId];
+
     const response = await fetch('/.netlify/functions/verify-admin', {
       method: 'POST',
       headers: {
@@ -305,7 +322,7 @@ export async function verifyToken(requiredRoles: string[] = [], permissionId?: s
       body: JSON.stringify({
         action: 'verify',
         requiredRoles,
-        permissionId,
+        ...(permissionIds?.length ? { permissionIds } : {}),
         token: bodyToken,
       }),
     });
@@ -316,7 +333,7 @@ export async function verifyToken(requiredRoles: string[] = [], permissionId?: s
       lastVerifySuccess = {
         expires: now + VERIFY_CACHE_MS,
         rolesKey,
-        permissionId,
+        permissionKey: permissionKeyVal,
         result: { valid: true, user: result.user },
       };
       try {

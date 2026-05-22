@@ -19,7 +19,7 @@ import {
   Platform,
   Animated,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { requestForegroundPermissionsIfDisclosed, requestBackgroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import * as ImagePicker from 'expo-image-picker';
@@ -41,7 +41,13 @@ import {
 } from '../utils/packageStatusNormalize';
 import { MAP_STYLE_LOGISTICS_PRO } from '../utils/mapStyles';
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
+import { PACKAGE_STATUS } from '../constants/packageStatus';
 import { getOrdererIdentityDisplay } from '../utils/ordererIdentity';
+import {
+  getCourierScheduledDeliveryDisplay,
+  getDeliverySpeedShortLabel,
+  isScheduledDeliverySpeed,
+} from '../utils/courierScheduledDelivery';
 
 const { width, height } = Dimensions.get('window');
 
@@ -280,13 +286,27 @@ export default function MapScreen({ navigation }: any) {
     }
   }, [language]);
 
-  const getMarkerIcon = useCallback((speed?: string) => speed === '急送达' ? '⚡' : (speed === '定时达' ? '⏰' : '📦'), []);
+  /** 配送中（Delivering）：已在送往收件人途中，路线预览不显示取货点 */
+  const routePreviewOmitsPickup = useCallback(
+    (pkg: PackageWithExtras) => {
+      const s = resolvePackageStatus(pkg, statusOverrides[pkg.id]);
+      return s === PACKAGE_STATUS.IN_TRANSIT;
+    },
+    [resolvePackageStatus, statusOverrides],
+  );
+
+  const getMarkerIcon = useCallback((speed?: string) => {
+    if (!speed) return '📦';
+    if (speed.includes('急送达') || speed === '急送达') return '⚡';
+    if (isScheduledDeliverySpeed(speed)) return '⏰';
+    return '📦';
+  }, []);
 
   const calculateETA = useCallback((dist: number | null | undefined, speed?: string): { hours: number; minutes: number; displayText: string } | null => {
     if (!dist || dist <= 0) return null;
     let avg = 30;
-    if (speed === '急送达') avg = 40;
-    else if (speed === '定时达') avg = 25;
+    if (speed?.includes('急送达') || speed === '急送达') avg = 40;
+    else if (isScheduledDeliverySpeed(speed)) avg = 25;
     const h = dist / avg;
     const hours = Math.floor(h);
     const minutes = Math.round((h - hours) * 60);
@@ -1230,7 +1250,7 @@ export default function MapScreen({ navigation }: any) {
     const origin = `${location.latitude},${location.longitude}`;
     const allCoords: string[] = [];
     optimizedPackagesWithCoords.forEach(p => { 
-      if (p.pickupCoords) allCoords.push(`${p.pickupCoords.lat},${p.pickupCoords.lng}`); 
+      if (!routePreviewOmitsPickup(p) && p.pickupCoords) allCoords.push(`${p.pickupCoords.lat},${p.pickupCoords.lng}`); 
       if (p.deliveryCoords) allCoords.push(`${p.deliveryCoords.lat},${p.deliveryCoords.lng}`); 
     });
     if (allCoords.length === 0) return;
@@ -1239,13 +1259,13 @@ export default function MapScreen({ navigation }: any) {
     const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&waypoints=${waypoints}&travelmode=driving`;
     await Linking.openURL(url);
     setShowMapPreview(false);
-  }, [location, optimizedPackagesWithCoords]);
+  }, [location, optimizedPackagesWithCoords, routePreviewOmitsPickup]);
 
   const calculateRouteDistance = useCallback((packagesList: PackageWithExtras[], start: { lat: number; lng: number }): number => {
     let total = 0;
     let current = start;
     packagesList.forEach(p => {
-      if (p.pickupCoords) {
+      if (!routePreviewOmitsPickup(p) && p.pickupCoords) {
         total += calculateDistanceKm(current.lat, current.lng, p.pickupCoords.lat, p.pickupCoords.lng);
         current = p.pickupCoords;
       }
@@ -1255,10 +1275,10 @@ export default function MapScreen({ navigation }: any) {
       }
     });
     return total;
-  }, []);
+  }, [routePreviewOmitsPickup]);
 
   const optimizeDeliveryRoute = useCallback(async (packagesList: PackageWithExtras[], strategy: 'shortest' | 'fastest' | 'priority' = 'shortest'): Promise<PackageWithExtras[]> => {
-    if (!location || packagesList.length <= 1) return packagesList;
+    if (!location) return packagesList;
     try {
       const packagesWithCoords = await Promise.all(packagesList.map(async (pkg) => {
           const pickupCoords = await getPickupCoordinates(pkg);
@@ -1267,9 +1287,14 @@ export default function MapScreen({ navigation }: any) {
         const deliveryDistance = (pickupCoords && deliveryCoords) ? calculateDistanceKm(pickupCoords.lat, pickupCoords.lng, deliveryCoords.lat, deliveryCoords.lng) : null;
         const totalDistance = (pickupDistance || 0) + (deliveryDistance || 0);
         let priorityScore = totalDistance || 999;
-        if (pkg.delivery_speed === '急送达') priorityScore *= 0.5;
+        if (pkg.delivery_speed?.includes('急送达') || pkg.delivery_speed === '急送达') priorityScore *= 0.5;
         return { ...pkg, pickupCoords: pickupCoords || undefined, deliveryCoords: deliveryCoords || undefined, totalDistance, priorityScore };
       }));
+
+      if (packagesWithCoords.length <= 1) {
+        return packagesWithCoords;
+      }
+
       let sorted = [...packagesWithCoords];
       if (strategy === 'shortest') sorted.sort((a, b) => (a.totalDistance ?? 999) - (b.totalDistance ?? 999));
       else sorted.sort((a, b) => a.priorityScore - b.priorityScore);
@@ -1336,22 +1361,32 @@ export default function MapScreen({ navigation }: any) {
     };
   }, [isFocused, loadPackages]);
 
+  /** 路线预览：当前位置 →（若非配送中则取货 →）送货 */
+  const routePreviewLineCoordinates = useMemo(() => {
+    if (!showMapPreview || !location || optimizedPackagesWithCoords.length === 0) return [];
+    const pts: { latitude: number; longitude: number }[] = [
+      { latitude: location.latitude, longitude: location.longitude },
+    ];
+    optimizedPackagesWithCoords.forEach((p) => {
+      if (!routePreviewOmitsPickup(p) && p.pickupCoords) {
+        pts.push({ latitude: Number(p.pickupCoords.lat), longitude: Number(p.pickupCoords.lng) });
+      }
+      if (p.deliveryCoords) {
+        pts.push({ latitude: Number(p.deliveryCoords.lat), longitude: Number(p.deliveryCoords.lng) });
+      }
+    });
+    return pts.length >= 2 ? pts : [];
+  }, [showMapPreview, location, optimizedPackagesWithCoords, routePreviewOmitsPickup]);
+
   // 当弹窗打开时，自动调整地图缩放以显示所有点
   useEffect(() => {
-    if (showMapPreview && optimizedPackagesWithCoords.length > 0 && mapRef.current) {
-      const coords = optimizedPackagesWithCoords.flatMap(p => {
-        const points = [];
-        if (p.pickupCoords) points.push({ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng });
-        if (p.deliveryCoords) points.push({ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng });
-        return points;
-      });
-      
-      if (location) {
-        coords.push({ latitude: location.latitude, longitude: location.longitude });
-      }
+    if (showMapPreview && routePreviewLineCoordinates.length > 0 && mapRef.current) {
+      const coords = routePreviewLineCoordinates.map((c) => ({
+        latitude: c.latitude,
+        longitude: c.longitude,
+      }));
 
       if (coords.length > 0) {
-        // 延迟一点确保地图加载完成
         setTimeout(() => {
           mapRef.current?.fitToCoordinates(coords, {
             edgePadding: { top: 50, right: 50, bottom: 350, left: 50 },
@@ -1360,7 +1395,7 @@ export default function MapScreen({ navigation }: any) {
         }, 500);
       }
     }
-  }, [showMapPreview, optimizedPackagesWithCoords, location]);
+  }, [showMapPreview, routePreviewLineCoordinates]);
 
   // 6. 渲染辅助
   const renderPackageItem = useCallback(({ item, index }: { item: PackageWithExtras; index: number }) => {
@@ -1388,12 +1423,28 @@ export default function MapScreen({ navigation }: any) {
           <View style={styles.cardHeader}>
             <View style={styles.idGroup}>
               <Text style={styles.packageId}>#{item.id.slice(-6)}</Text>
-            {item.delivery_speed && (
-              <View style={styles.speedBadge}>
-                  <Text style={styles.speedIcon}>{getMarkerIcon(item.delivery_speed)}</Text>
-                <Text style={styles.speedText}>{item.delivery_speed}</Text>
-              </View>
-            )}
+              {item.delivery_speed ? (
+                <View style={styles.speedBadgeColumn}>
+                  <View style={styles.speedBadge}>
+                    <Text style={styles.speedIcon}>{getMarkerIcon(item.delivery_speed)}</Text>
+                    <Text style={styles.speedText} numberOfLines={3}>
+                      {getDeliverySpeedShortLabel(item.delivery_speed)}
+                    </Text>
+                  </View>
+                  {isScheduledDeliverySpeed(item.delivery_speed) ? (
+                    <Text style={styles.scheduledTimeUnderBadge} numberOfLines={4} selectable>
+                      ⏰{' '}
+                      {language === 'zh'
+                        ? '要求送达：'
+                        : language === 'en'
+                          ? 'Due: '
+                          : 'သတ်မှတ်ချိန်'}{' '}
+                      {getCourierScheduledDeliveryDisplay(item) ||
+                        (language === 'zh' ? '—' : language === 'en' ? '—' : '—')}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
               {orderer.kind !== 'Unknown' && (
                 <View style={[styles.identityBadge, { backgroundColor: orderer.badgeColor }]}>
                   <Text style={styles.identityText}>{orderer.shortLabel}</Text>
@@ -1658,7 +1709,12 @@ export default function MapScreen({ navigation }: any) {
       filtered = filtered.filter(p => p.id.toLowerCase().includes(q) || (p.receiver_name && p.receiver_name.toLowerCase().includes(q)) || (p.sender_name && p.sender_name.toLowerCase().includes(q)));
     }
     if (statusFilter !== '全部') filtered = filtered.filter(p => p.status === statusFilter);
-    if (speedFilter !== '全部') filtered = filtered.filter(p => p.delivery_speed === speedFilter);
+    if (speedFilter !== '全部') {
+      filtered = filtered.filter((p) => {
+        if (speedFilter === '定时达') return isScheduledDeliverySpeed(p.delivery_speed);
+        return p.delivery_speed === speedFilter;
+      });
+    }
     return filtered;
   }, [packages, searchQuery, statusFilter, speedFilter, completedPackageIds]);
 
@@ -1844,46 +1900,96 @@ export default function MapScreen({ navigation }: any) {
                   longitudeDelta: 0.05 
                 }}
               >
+                {routePreviewLineCoordinates.length >= 2 ? (
+                  <Polyline
+                    coordinates={routePreviewLineCoordinates}
+                    strokeColor="rgba(99, 102, 241, 0.92)"
+                    strokeWidth={5}
+                    lineCap="round"
+                    lineJoin="round"
+                    zIndex={1}
+                  />
+                ) : null}
+
                 {location && (
                 <Marker
                     coordinate={{ latitude: location.latitude, longitude: location.longitude }} 
-                    title={language === 'zh' ? '当前位置' : 'My Location'}
+                    title={language === 'zh' ? '当前位置' : language === 'en' ? 'My location' : 'ကျွန်ုပ် တည်နေရာ'}
                     tracksViewChanges={false}
+                    zIndex={100}
                 >
-                  <View style={styles.courierMarker}>
+                  <View style={styles.courierMarker} collapsable={false}>
                       <Text style={styles.courierMarkerText}>🛵</Text>
                   </View>
                 </Marker>
                 )}
                 
-                {optimizedPackagesWithCoords.map((p, i) => (
+                {optimizedPackagesWithCoords.map((p, i) => {
+                  const pickupLabel = `P${i + 1}`;
+                  const deliveryLabel = `D${i + 1}`;
+                  const omitPickup = routePreviewOmitsPickup(p);
+                  const pu =
+                    !omitPickup &&
+                    p.pickupCoords &&
+                    Number.isFinite(Number(p.pickupCoords.lat)) &&
+                    Number.isFinite(Number(p.pickupCoords.lng))
+                      ? {
+                          latitude: Number(p.pickupCoords.lat),
+                          longitude: Number(p.pickupCoords.lng),
+                        }
+                      : null;
+                  const del =
+                    p.deliveryCoords &&
+                    Number.isFinite(Number(p.deliveryCoords.lat)) &&
+                    Number.isFinite(Number(p.deliveryCoords.lng))
+                      ? {
+                          latitude: Number(p.deliveryCoords.lat),
+                          longitude: Number(p.deliveryCoords.lng),
+                        }
+                      : null;
+                  return (
                   <React.Fragment key={`${p.id}-${i}`}>
-                    {p.pickupCoords && (
+                    {pu ? (
                     <Marker
-                        coordinate={{ latitude: p.pickupCoords.lat, longitude: p.pickupCoords.lng }}
-                        title={`${language === 'zh' ? '取货点' : 'Pickup'} P${i + 1}`}
-                        description={p.sender_address}
-                        tracksViewChanges={false}
+                        coordinate={pu}
+                        title={pickupLabel}
+                        description={p.sender_address || undefined}
+                        anchor={{ x: 0.5, y: 1 }}
+                        zIndex={2000 + i * 2}
+                        tracksViewChanges
                     >
-                      <View style={styles.pickupMarker}>
-                          <Text style={styles.pickupMarkerText}>P{i + 1}</Text>
+                      <View style={styles.routePreviewMarkerAnchor} collapsable={false}>
+                        <View style={styles.routePreviewPickupPill}>
+                          <Text style={styles.routePreviewPillText} numberOfLines={1}>
+                            {pickupLabel}
+                          </Text>
+                        </View>
+                        <View style={styles.routePreviewPickupDot} />
                       </View>
                     </Marker>
-                    )}
-                    {p.deliveryCoords && (
+                    ) : null}
+                    {del ? (
                     <Marker
-                        coordinate={{ latitude: p.deliveryCoords.lat, longitude: p.deliveryCoords.lng }}
-                        title={`${language === 'zh' ? '送货点' : 'Delivery'} D${i + 1}`}
-                        description={p.receiver_address}
-                        tracksViewChanges={false}
+                        coordinate={del}
+                        title={deliveryLabel}
+                        description={p.receiver_address || undefined}
+                        anchor={{ x: 0.5, y: 1 }}
+                        zIndex={2001 + i * 2}
+                        tracksViewChanges
                     >
-                      <View style={styles.packageMarker}>
-                          <Text style={styles.pickupMarkerText}>D{i + 1}</Text>
+                      <View style={styles.routePreviewMarkerAnchor} collapsable={false}>
+                        <View style={styles.routePreviewDeliveryPill}>
+                          <Text style={styles.routePreviewPillText} numberOfLines={1}>
+                            {deliveryLabel}
+                          </Text>
+                        </View>
+                        <View style={styles.routePreviewDeliveryDot} />
                       </View>
                     </Marker>
-                    )}
+                    ) : null}
                   </React.Fragment>
-                ))}
+                  );
+                })}
               </MapView>
               </View>
             ) : (
@@ -1919,6 +2025,14 @@ export default function MapScreen({ navigation }: any) {
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={{ fontWeight: '600' }}>{p.receiver_name}</Text>
                         <Text style={{ fontSize: 11, color: '#64748b' }} numberOfLines={1}>{p.receiver_address}</Text>
+                        {isScheduledDeliverySpeed(p.delivery_speed) ? (
+                          <Text style={{ fontSize: 10, color: '#b45309', fontWeight: '800', marginTop: 4 }} numberOfLines={2}>
+                            ⏰{' '}
+                            {language === 'zh' ? '要求送达：' : language === 'en' ? 'Due: ' : 'သတ်မှတ်ချိန်'}{' '}
+                            {getCourierScheduledDeliveryDisplay(p) ||
+                              (language === 'zh' ? '—' : language === 'en' ? '—' : '—')}
+                          </Text>
+                        ) : null}
                   </View>
                       <View style={[styles.statusDot, { backgroundColor: getStatusColor(p.status) }]} />
                     </View>
@@ -1945,6 +2059,24 @@ export default function MapScreen({ navigation }: any) {
                 <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
+            {currentPackageForDelivery && isScheduledDeliverySpeed(currentPackageForDelivery.delivery_speed) ? (
+              <View style={styles.scheduledDeliveryModalStrip}>
+                <Ionicons name="time-outline" size={18} color="#92400e" style={{ marginRight: 8 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.scheduledDeliveryModalStripLabel}>
+                    {language === 'zh'
+                      ? '客户要求送达'
+                      : language === 'en'
+                        ? 'Customer requested delivery'
+                        : 'ဖောက်သည်သတ်မှတ်ချိန်'}
+                  </Text>
+                  <Text style={styles.scheduledDeliveryModalStripValue} selectable>
+                    {getCourierScheduledDeliveryDisplay(currentPackageForDelivery) ||
+                      (language === 'zh' ? '—' : '—')}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             <View style={[styles.modalBody, { flexDirection: 'row', gap: 12, flexWrap: 'wrap' }]}>
               {currentPackageForDelivery &&
               isPickupFlowStatus(
@@ -2307,8 +2439,21 @@ const styles = StyleSheet.create({
   },
   idGroup: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10
+    alignItems: 'flex-start',
+    gap: 10,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  speedBadgeColumn: {
+    flexShrink: 1,
+    maxWidth: '56%',
+  },
+  scheduledTimeUnderBadge: {
+    marginTop: 5,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#b45309',
+    lineHeight: 15,
   },
   packageId: { fontSize: 15, fontWeight: '800', color: '#1e293b' },
   speedBadge: { 
@@ -2511,6 +2656,58 @@ const styles = StyleSheet.create({
     elevation: 4
   },
   pickupMarkerText: { color: '#fff', fontWeight: '900', fontSize: 13 },
+  routePreviewMarkerAnchor: {
+    alignItems: 'center',
+  },
+  routePreviewPickupPill: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#fff',
+    maxWidth: width * 0.42,
+    marginBottom: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  routePreviewDeliveryPill: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#fff',
+    maxWidth: width * 0.42,
+    marginBottom: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  routePreviewPillText: {
+    color: '#fff',
+    fontWeight: '900',
+    fontSize: 11,
+  },
+  routePreviewPickupDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#f59e0b',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  routePreviewDeliveryDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#2563eb',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
   routeListContainer: { 
     position: 'absolute', 
     bottom: 0, 
@@ -2607,6 +2804,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '800',
+  },
+  scheduledDeliveryModalStrip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fffbeb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fde68a',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  scheduledDeliveryModalStripLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400e',
+    marginBottom: 2,
+  },
+  scheduledDeliveryModalStripValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#78350f',
   },
   merchantCodBanner: {
     flexDirection: 'row',

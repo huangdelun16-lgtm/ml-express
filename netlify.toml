@@ -51,6 +51,10 @@
 [build.processing.skip]
   paths = ["*.md", "*.html", "test-*", "diagnose-*"]
 
+# 骑手送达证明图：每天 UTC 04:00 清理超过 7 天的 delivery_photos
+[functions."cleanup-delivery-photos"]
+  schedule = "0 4 * * *"
+
 # 环境变量
 # 注意：敏感信息（如 Supabase 密钥）应在 Netlify Dashboard 中配置
 # Dashboard 中的环境变量优先级高于此文件中的配置

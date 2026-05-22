@@ -3280,6 +3280,7 @@ export type ImportMetricDraftDbRow = {
   third_handler: string;
   third_account: string;
   lic_order_code: string;
+  cargo_group: string;
   created_by: string;
 };
 
@@ -3304,6 +3305,8 @@ export type ImportMetricDraftDbWrite = {
   third_handler: string;
   third_account: string;
   lic_order_code: string;
+  /** 未执行 migration 时可省略 */
+  cargo_group?: string;
 };
 
 /** 将 Postgres DATE / TIMESTAMPTZ / 字符串规范为 YYYY-MM-DD（供表单与 Excel 使用） */
@@ -3349,6 +3352,7 @@ export function dbRowToImportMetricDraftClient(r: ImportMetricDraftDbRow): {
   thirdHandler: string;
   thirdAccount: string;
   licOrderCode: string;
+  cargoGroup: string;
 } {
   const lines = Array.isArray(r.line_items) ? r.line_items : [];
   return {
@@ -3374,7 +3378,15 @@ export function dbRowToImportMetricDraftClient(r: ImportMetricDraftDbRow): {
     thirdHandler: r.third_handler ?? '',
     thirdAccount: r.third_account ?? '',
     licOrderCode: r.lic_order_code?.trim() ? String(r.lic_order_code).trim() : '',
+    cargoGroup: r.cargo_group?.trim() ? String(r.cargo_group).trim() : '',
   };
+}
+
+function stripCargoGroupFromWrite<T extends { cargo_group?: string }>(
+  w: T,
+): Omit<T, 'cargo_group'> {
+  const { cargo_group: _g, ...rest } = w;
+  return rest;
 }
 
 function stripDepositPaidDatesFromWrite<T extends ImportMetricDraftDbWrite>(
@@ -3503,6 +3515,38 @@ export const importMetricDraftService = {
           return { ok: true, row: data as ImportMetricDraftDbRow, warningCode: 'missing_deposit_date_columns' };
         }
       }
+      if (error && isLikelyMissingDepositPaidDateColumnsError(error)) {
+        const stripped = stripCargoGroupFromWrite(payload);
+        const retried = await supabase
+          .from('import_metric_drafts')
+          .insert([{ ...stripped, updated_at }])
+          .select()
+          .single();
+        data = retried.data;
+        error = retried.error;
+        if (!error && data) {
+          console.warn(
+            'import_metric_drafts: 已写入（未含 cargo_group 列）。请在 Supabase 执行 migration 20260519130000_import_metric_drafts_cargo_group.sql',
+          );
+          return { ok: true, row: data as ImportMetricDraftDbRow };
+        }
+      }
+      if (error && isLikelyMissingDepositPaidDateColumnsError(error)) {
+        const stripped = stripCargoGroupFromWrite(stripDepositPaidDatesFromWrite(payload));
+        const retried = await supabase
+          .from('import_metric_drafts')
+          .insert([{ ...stripped, updated_at }])
+          .select()
+          .single();
+        data = retried.data;
+        error = retried.error;
+        if (!error && data) {
+          console.warn(
+            'import_metric_drafts: 已写入（未含 cargo_group / 付款日期列）。请执行相关 migration',
+          );
+          return { ok: true, row: data as ImportMetricDraftDbRow };
+        }
+      }
       if (error) {
         console.error('import_metric_drafts 插入失败:', error);
         const msg = [error.message, error.details].filter(Boolean).join(' · ') || 'insert failed';
@@ -3531,6 +3575,34 @@ export const importMetricDraftService = {
             'import_metric_drafts: 已更新（未含三期付款日期列）。请在 Supabase 执行 migration 20260509134500_import_metric_deposit_paid_dates.sql',
           );
           return { ok: true, warningCode: 'missing_deposit_date_columns' };
+        }
+      }
+      if (error && isLikelyMissingDepositPaidDateColumnsError(error)) {
+        const stripped = stripCargoGroupFromWrite(payload);
+        const retried = await supabase
+          .from('import_metric_drafts')
+          .update({ ...stripped, updated_at })
+          .eq('id', id);
+        error = retried.error;
+        if (!error) {
+          console.warn(
+            'import_metric_drafts: 已更新（未含 cargo_group 列）。请在 Supabase 执行 migration 20260519130000_import_metric_drafts_cargo_group.sql',
+          );
+          return { ok: true };
+        }
+      }
+      if (error && isLikelyMissingDepositPaidDateColumnsError(error)) {
+        const stripped = stripCargoGroupFromWrite(stripDepositPaidDatesFromWrite(payload));
+        const retried = await supabase
+          .from('import_metric_drafts')
+          .update({ ...stripped, updated_at })
+          .eq('id', id);
+        error = retried.error;
+        if (!error) {
+          console.warn(
+            'import_metric_drafts: 已更新（未含 cargo_group / 付款日期列）。请执行相关 migration',
+          );
+          return { ok: true };
         }
       }
       if (error) {
@@ -3583,6 +3655,15 @@ export type PersonalLedgerInsert = {
   note: string;
 };
 
+export type PersonalLedgerUpdate = {
+  entry_date: string;
+  kind: 'income' | 'expense';
+  amount: number;
+  currency: string;
+  category: string;
+  note: string;
+};
+
 export const personalLedgerService = {
   async listForOwner(ownerUsername: string): Promise<PersonalLedgerRow[]> {
     try {
@@ -3625,6 +3706,33 @@ export const personalLedgerService = {
       return true;
     } catch (err) {
       console.error('personal_ledger_entries 插入异常:', err);
+      return false;
+    }
+  },
+
+  async update(id: string, ownerUsername: string, payload: PersonalLedgerUpdate): Promise<boolean> {
+    try {
+      const updated_at = new Date().toISOString();
+      const { error } = await supabase
+        .from('personal_ledger_entries')
+        .update({
+          entry_date: payload.entry_date,
+          kind: payload.kind,
+          amount: payload.amount,
+          currency: payload.currency,
+          category: payload.category,
+          note: payload.note,
+          updated_at,
+        })
+        .eq('id', id)
+        .eq('owner_username', ownerUsername.trim());
+      if (error) {
+        console.error('personal_ledger_entries 更新失败:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('personal_ledger_entries 更新异常:', err);
       return false;
     }
   },

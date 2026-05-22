@@ -9617,8 +9617,8 @@ const FinanceManagement: React.FC = () => {
                                           : "无"}
                                       </div>
                                     )}
-                                    <div
-                                      style={{
+                                          <div
+                                            style={{
                                         background: "rgba(148, 163, 184, 0.25)",
                                         color: "#e2e8f0",
                                         padding: "4px 12px",
@@ -9637,21 +9637,21 @@ const FinanceManagement: React.FC = () => {
                                       <div
                                         style={{
                                           background: "rgba(16, 185, 129, 0.2)",
-                                          color: "#10b981",
-                                          padding: "4px 12px",
-                                          borderRadius: "6px",
-                                          fontSize: "0.85rem",
-                                          fontWeight: "bold",
-                                          whiteSpace: "nowrap",
-                                          marginTop: "4px",
-                                        }}
-                                      >
+                                              color: "#10b981",
+                                              padding: "4px 12px",
+                                              borderRadius: "6px",
+                                              fontSize: "0.85rem",
+                                              fontWeight: "bold",
+                                              whiteSpace: "nowrap",
+                                              marginTop: "4px",
+                                            }}
+                                          >
                                         余额/平台支付:{" "}
                                         {getCashDetailPlatformLineTotal(
                                           pkg,
                                         ).toLocaleString()}{" "}
                                         MMK
-                                      </div>
+                                          </div>
                                     )}
                                   </div>
                                 </div>
@@ -10871,7 +10871,7 @@ const FinanceManagement: React.FC = () => {
             )}
             {showMerchantSettledModal && merchantCodModalKind === "settled_all" && (
               <div
-                style={{
+                    style={{
                   padding: "0 24px 12px",
                   color: "rgba(255,255,255,0.72)",
                   fontSize: "0.84rem",
@@ -10884,14 +10884,14 @@ const FinanceManagement: React.FC = () => {
                   : language === "my"
                     ? "ဖော်ပြထားသော နှစ်ကာလတွင် ရှင်းလင်းချိန် (cod_settled_at) အတိုင်း"
                     : "Same count as the card: orders with settlement time (cod_settled_at) in the current year, newest first—aligned with merchant web."}
-              </div>
+                </div>
             )}
 
             {showMerchantSettledModal &&
               (merchantCodModalKind === "uncleared" ||
                 merchantCodModalKind === "settled_all") && (
                 <div
-                  style={{
+                    style={{
                     padding: "12px 24px 0",
                     display: "flex",
                     flexWrap: "wrap",
@@ -11222,9 +11222,9 @@ const FinanceManagement: React.FC = () => {
                           : language === "my"
                             ? "စစ်ထုတ်ချက်နှင့် ကိုက်ညီသော အော်ဒါ မရှိပါ"
                             : "No orders match your filter"}
-                      </div>
                     </div>
-                  )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -11757,7 +11757,7 @@ const FinanceManagement: React.FC = () => {
                       ? "Esc — ပိတ်ရန်"
                       : "Press Esc to close. Amount is focused for new records."}
                 </p>
-              </div>
+    </div>
               <button
                 type="button"
                 onClick={closeFinanceRecordForm}

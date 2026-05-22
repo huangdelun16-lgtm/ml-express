@@ -17,7 +17,6 @@ import AdminReportsPage from './pages/AdminReportsPage';
 import CourierPerformancePage from './pages/CourierPerformancePage';
 import MerchantReconciliationExportPage from './pages/MerchantReconciliationExportPage';
 import ImportMetricDraftsPage from './pages/ImportMetricDraftsPage';
-import ImportPriceListPage from './pages/ImportPriceListPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AbnormalAlertManager from './components/AbnormalAlertManager';
@@ -28,7 +27,7 @@ import AdminShellLayout, { STANDALONE_IMPORT_ADMIN_PATHS } from './layouts/Admin
 
 const standaloneImportPaths = STANDALONE_IMPORT_ADMIN_PATHS as readonly string[];
 
-/** 指标/商品价格独立全屏页：不叠放全局搜索与底部待办条 */
+/** 指标管理全屏页：不叠放全局搜索与底部待办条 */
 const AdminFloatingChrome: React.FC = () => {
   const { pathname } = useLocation();
   if (standaloneImportPaths.includes(pathname)) return null;
@@ -201,7 +200,10 @@ function App() {
                 <Route
                   path="metric-management"
                   element={
-                    <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="metric_management">
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'finance']}
+                      permissionId={['metric_management', 'product_price', 'personal_expenses']}
+                    >
                       <ImportMetricDraftsPage />
                     </ProtectedRoute>
                   }
@@ -209,8 +211,22 @@ function App() {
                 <Route
                   path="product-price"
                   element={
-                    <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="product_price">
-                      <ImportPriceListPage />
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'finance']}
+                      permissionId={['product_price', 'metric_management']}
+                    >
+                      <Navigate to="/admin/metric-management?openPrice=1" replace />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="personal-expenses"
+                  element={
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'finance']}
+                      permissionId={['personal_expenses', 'metric_management']}
+                    >
+                      <Navigate to="/admin/metric-management?openPersonal=1" replace />
                     </ProtectedRoute>
                   }
                 />

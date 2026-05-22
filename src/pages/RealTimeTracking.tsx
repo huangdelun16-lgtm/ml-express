@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, HeatmapLayer, TrafficLayer } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api';
+import '../styles/adminRealTimeTracking.css';
 import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore, adminAccountService, auditLogService, systemSettingsService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -53,6 +54,10 @@ const GOOGLE_MAP_DARK_STYLES = [
   { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#1d2c4d' }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
 ] as const;
+
+function packageCodAmount(pkg: Package): number {
+  return Number(pkg.cod_amount || 0);
+}
 
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
@@ -147,7 +152,7 @@ const RealTimeTracking: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
   // 选项卡和快递店相关状态
-  const [activeTab, setActiveTab] = useState<'packages' | 'stores'>('packages');
+  const [sidebarTab, setSidebarTab] = useState<'pending' | 'assigned'>('pending');
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
   
@@ -952,304 +957,210 @@ const RealTimeTracking: React.FC = () => {
     });
   };
 
-  return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      padding: '2rem'
-    }}>
-      {/* 顶部导航 */}
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: '15px',
-        padding: '1.5rem',
-        marginBottom: '2rem',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button
-            onClick={() => navigate('/admin')}
-            style={{
-              background: '#6366f1',
-              color: 'white',
-              border: 'none',
-              padding: '0.8rem 1.5rem',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '1rem'
-            }}
+  const cityFilteredPackages = useMemo(
+    () => filterPackagesByCity(packages),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterPackagesByCity 依赖 selectedCity / 领区
+    [packages, selectedCity, isRegionalUser, currentRegionPrefix],
+  );
+
+  const pendingPackages = useMemo(
+    () => cityFilteredPackages.filter((p) => p.status === '待取件' || p.status === '待收款'),
+    [cityFilteredPackages],
+  );
+
+  const assignedPackages = useMemo(
+    () => cityFilteredPackages.filter((p) => p.status === '已取件' || p.status === '配送中'),
+    [cityFilteredPackages],
+  );
+
+  const busyRiderCount = useMemo(
+    () => couriers.filter((c) => c.status === 'busy').length,
+    [couriers],
+  );
+
+  const offlineRiderCount = useMemo(
+    () => couriers.filter((c) => c.status === 'offline').length,
+    [couriers],
+  );
+
+  const regionLabel = isRegionalUser
+    ? `${currentRegionPrefix} 专区`
+    : selectedCity === 'yangon'
+      ? 'YGN 仰光'
+      : selectedCity === 'mandalay'
+        ? 'MDY 曼德勒'
+        : selectedCity === 'pyinoolwin'
+          ? 'POL 彬乌伦'
+          : myanmarCities[selectedCity]?.name || selectedCity;
+
+  const refreshAll = () => {
+    loadPackages();
+    loadCouriers();
+    loadStores();
+  };
+
+  const renderPackageIdentityBadges = (pkg: Package) => {
+    const identityMatch = pkg.description?.match(
+      /\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/,
+    );
+    const identity = identityMatch ? identityMatch[1] : '';
+    const isMerchant = identity === '商家' || identity === 'MERCHANTS';
+    const isVIP = identity === 'VIP';
+
+    return (
+      <>
+        {identity && (
+          <span
+            className={`rt-tracking__badge ${
+              isMerchant ? 'rt-tracking__badge--merchant' : isVIP ? 'rt-tracking__badge--vip' : 'rt-tracking__badge--member'
+            }`}
           >
-            ← 返回后台
-          </button>
+            {isMerchant ? '商家' : isVIP ? 'VIP' : identity}
+          </span>
+        )}
+        <span
+          className={`rt-tracking__badge ${
+            (pkg as Package & { payment_method?: string }).payment_method === 'balance'
+              ? 'rt-tracking__badge--balance'
+              : 'rt-tracking__badge--cash'
+          }`}
+        >
+          跑腿费: {(pkg as Package & { payment_method?: string }).payment_method === 'balance' ? '余额' : '现金'}
+        </span>
+        {packageCodAmount(pkg) > 0 && (
+          <span className="rt-tracking__badge rt-tracking__badge--cod">
+            COD代收款 {packageCodAmount(pkg).toLocaleString()} MMK
+          </span>
+        )}
+        {isVIP &&
+          (() => {
+            const balanceMatch = pkg.description?.match(
+              /\[(?:余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/,
+            );
+            if (balanceMatch?.[1]) {
+              return (
+                <span className="rt-tracking__badge rt-tracking__badge--balance">
+                  商品费余额 {balanceMatch[1]} MMK
+                </span>
+              );
+            }
+            return null;
+          })()}
+      </>
+    );
+  };
+
+  const focusPackageOnMap = (
+    pkg: Package,
+    type: 'pickup' | 'delivery',
+    e?: React.MouseEvent,
+  ) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    const lat = type === 'pickup' ? pkg.sender_latitude : pkg.receiver_latitude;
+    const lng = type === 'pickup' ? pkg.sender_longitude : pkg.receiver_longitude;
+    if (lat == null || lng == null) return;
+    const coords = { lat, lng };
+    setSelectedLocationPoint({ packageId: pkg.id, type, coordinates: coords });
+    setMapCenter(coords);
+    setSelectedCourier(null);
+  };
+
+  return (
+    <div className="rt-tracking">
+      <header className="rt-tracking__toolbar">
+        <div className="rt-tracking__heading">
+          <h1 className="rt-tracking__title">
+            {language === 'zh' ? '实时跟踪' : language === 'en' ? 'Real-time Tracking' : 'အချိန်နှင့်တစ်ပြေးညီခြေရာခံမှု'}
+          </h1>
+          <span className="rt-tracking__subtitle">
+            {language === 'zh'
+              ? `骑手 ${regionalRiderCount} · 上次刷新 ${lastRefreshTime}`
+              : `Riders ${regionalRiderCount} · Updated ${lastRefreshTime}`}
+          </span>
         </div>
-        <div style={{ 
-          display: 'flex', 
-          gap: '1rem', 
-          alignItems: 'center', 
-          flexWrap: 'wrap',
-          background: 'rgba(255, 255, 255, 0.9)',
-          padding: '0.75rem 1.25rem',
-          borderRadius: '16px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          flex: 1
-        }}>
-          {/* 左侧：统计信息组 */}
-          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
-            {/* 骑手统计 */}
-            <div style={{ display: 'flex', gap: '0.4rem', background: '#f8fafc', padding: '0.3rem 0.6rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <div title="在线" style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> {onlineRiderCount}
-              </div>
-              <div title="忙碌" style={{ color: '#f59e0b', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }} /> {couriers.filter(c => c.status === 'busy').length}
-              </div>
-              <div title="离线" style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#94a3b8' }} /> {couriers.filter(c => c.status === 'offline').length}
-              </div>
+
+        <div className="rt-tracking__stats">
+          <span className="rt-tracking__chip rt-tracking__chip--online" title="在线">
+            <span className="rt-tracking__chip-dot" aria-hidden />
+            {onlineRiderCount}
+          </span>
+          <span className="rt-tracking__chip rt-tracking__chip--busy" title="忙碌">
+            <span className="rt-tracking__chip-dot" aria-hidden />
+            {busyRiderCount}
+          </span>
+          <span className="rt-tracking__chip rt-tracking__chip--offline" title="离线">
+            <span className="rt-tracking__chip-dot" aria-hidden />
+            {offlineRiderCount}
+          </span>
+          <span className="rt-tracking__chip rt-tracking__chip--pending">
+            待分配 {pendingPackages.length}
+          </span>
+          <span className="rt-tracking__chip rt-tracking__chip--delivering">
+            配送中 {assignedPackages.length}
+          </span>
+        </div>
+
+        <div className="rt-tracking__actions">
+          <button
+            type="button"
+            className={`rt-tracking__region${isRegionalUser ? ' rt-tracking__region--locked' : ''}`}
+            onClick={() => !isRegionalUser && navigate('/admin/settings')}
+          >
+            📍 {regionLabel}
+          </button>
+
+          <div className="rt-tracking__refresh" title={`上次更新: ${lastRefreshTime}`}>
+            <div>
+              <div className="rt-tracking__refresh-label">AUTO {trackingRefreshSec}s</div>
+              <div className="rt-tracking__refresh-count">{nextRefreshCountdown}s</div>
             </div>
-
-            <div style={{ width: '1px', height: '20px', background: '#e2e8f0' }} />
-
-            {/* 包裹统计 */}
-            <div style={{ display: 'flex', gap: '0.6rem' }}>
-              <div style={{ background: '#fef2f2', color: '#dc2626', padding: '0.3rem 0.7rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '800', border: '1px solid #fee2e2' }}>
-                ⌛ 待分配: {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length}
-              </div>
-              <div style={{ background: '#eff6ff', color: '#2563eb', padding: '0.3rem 0.7rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '800', border: '1px solid #dbeafe' }}>
-                🚚 配送中: {filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length}
-              </div>
-            </div>
-          </div>
-
-          {/* 右侧：控制组件组 */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
-            {/* 区域按钮 */}
-            <div 
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '10px',
-                fontWeight: 'bold',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-                cursor: isRegionalUser ? 'default' : 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onClick={() => !isRegionalUser && navigate('/admin/settings')}
-            >
-              <span>📍 {isRegionalUser ? `${currentRegionPrefix} 专区` : myanmarCities[selectedCity].name}</span>
-            </div>
-
-            {/* 刷新卡片（间隔与系统设置「定位刷新间隔」一致） */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              background: 'white',
-              padding: '0.4rem 0.8rem',
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: '1.1' }}>
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: '700' }}>AUTO {trackingRefreshSec}s</span>
-                <span style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: '850', fontFamily: 'monospace' }}>{nextRefreshCountdown}s</span>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setNextRefreshCountdown(1)}
-                style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', transition: 'transform 0.3s' }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'rotate(180deg)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'rotate(0deg)'; }}
-                title={`上次更新: ${lastRefreshTime}`}
-              >🔄</button>
-            </div>
-
-            <div
-              title="与「系统设置中心 → 实时跟踪」保存的配置一致"
-              style={{
-                fontSize: '0.72rem',
-                color: '#475569',
-                background: '#f1f5f9',
-                padding: '6px 10px',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0',
-                maxWidth: '280px',
-                lineHeight: 1.35,
-              }}
-            >
-              地图 {mapThemeSetting === 'dark' ? '暗色' : mapThemeSetting === 'light' ? '浅色' : '卫星'} · 路线预测 {routePredictionEnabled ? '开' : '关'} · Webhook {webhookPushEnabled ? '开' : '关'}
-            </div>
-
             <button
               type="button"
-              onClick={() => navigate('/admin/settings', { state: { activeTab: 'tracking' as const } })}
-              style={{
-                background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontSize: '0.8rem',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
-              }}
+              className="rt-tracking__icon-btn"
+              onClick={() => setNextRefreshCountdown(1)}
+              aria-label="立即刷新"
             >
-              ⚙️ 实时跟踪设置
+              🔄
             </button>
           </div>
-        </div>
-      </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.15fr) minmax(360px, 1fr)',
-          gap: isMobile ? '1.25rem' : '1.75rem',
-        }}
-      >
-        {/* 左侧：地图 */}
-        <div
-          style={{
-            background: 'linear-gradient(165deg, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: '18px',
-            padding: '1.2rem 1.35rem',
-            boxShadow:
-              '0 14px 44px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(148, 163, 184, 0.14)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1rem',
-              flexWrap: 'wrap',
-              gap: '0.65rem',
-            }}
+          <button
+            type="button"
+            className="rt-tracking__settings-btn"
+            onClick={() => navigate('/admin/settings', { state: { activeTab: 'tracking' as const } })}
           >
-            <h2
-              style={{
-                margin: 0,
-                color: '#0f172a',
-                fontSize: '1.08rem',
-                fontWeight: 800,
-                letterSpacing: '-0.02em',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-              }}
-            >
+            ⚙️ 设置
+          </button>
+        </div>
+      </header>
+
+      <div className="rt-tracking__grid">
+        <section className="rt-tracking__panel">
+          <div className="rt-tracking__panel-head">
+            <h2 className="rt-tracking__panel-title">
               <span aria-hidden>🗺️</span>
-              快递员实时位置
+              骑手与订单位置
             </h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                border: '1px solid #93c5fd',
-                borderRadius: '10px',
-                padding: '0.45rem 0.95rem',
-                fontSize: '0.78rem',
-                color: '#1e40af',
-                fontWeight: 800,
-                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.1)',
-              }}
-            >
-              ⚡ GPS 实时推送
-            </div>
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                border: '1px solid #86efac',
-                borderRadius: '10px',
-                padding: '0.45rem 0.95rem',
-                fontSize: '0.78rem',
-                color: '#065f46',
-                fontWeight: 800,
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)',
-              }}
-            >
-              ✅{' '}
-              {isRegionalUser
-                ? currentRegionPrefix
-                : selectedCity === 'yangon'
-                  ? 'YGN'
-                  : selectedCity === 'mandalay'
-                    ? 'MDY'
-                    : selectedCity === 'pyinoolwin'
-                      ? 'POL'
-                      : ''}{' '}
-              骑手账号: {regionalRiderCount}
-            </div>
-            </div>
+            <span className="rt-tracking__panel-meta">
+              {regionLabel} · 骑手 {regionalRiderCount}
+            </span>
           </div>
-          
+
           {couriers.length === 0 && (
-            <div style={{ 
-              background: '#fef3c7', 
-              border: '1px solid #fde68a', 
-              borderRadius: '8px', 
-              padding: '1rem', 
-              marginBottom: '1rem',
-              textAlign: 'center'
-            }}>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>⚠️ 暂无快递员数据</p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#78350f' }}>
-                请前往 <strong>「快递员管理」</strong> 页面添加快递员，或从账号系统导入骑手账号
-              </p>
+            <div className="rt-tracking__warn">
+              暂无快递员数据，请前往「用户管理」添加快递员账号
             </div>
           )}
-          
-          <div style={{ 
-            width: '100%', 
-            height: '600px', 
-            borderRadius: '14px', 
-            overflow: 'hidden',
-            border: '1px solid #e2e8f0',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85), 0 2px 12px rgba(15, 23, 42, 0.06)',
-            position: 'relative'
-          }}>
-            <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }}>
+
+          <div className="rt-tracking__map-wrap">
+            <div className="rt-tracking__map">
               {/* 城市选择器 - 仅非领区限制用户（如 admin）显示 */}
               {!isRegionalUser && (
-                <div style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  zIndex: 1000,
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
-                  backdropFilter: 'blur(10px)'
-                }}>
+                <div className="rt-tracking__map-city">
                   <select
                     value={selectedCity}
                     onChange={(e) => handleCityChange(e.target.value)}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '2px solid #e5e7eb',
-                      background: 'white',
-                      color: '#1f2937',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      minWidth: '150px',
-                      outline: 'none'
-                    }}
                   >
                     {Object.entries(myanmarCities).map(([key, city]) => (
                       <option key={key} value={key}>
@@ -1670,808 +1581,174 @@ const RealTimeTracking: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* 右侧：包裹管理 */}
-        <div
-          style={{
-            background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
-            borderRadius: '18px',
-            padding: '1.2rem 1.35rem',
-            boxShadow:
-              '0 14px 44px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(148, 163, 184, 0.14)',
-            maxHeight: 'min(820px, 88vh)',
-            overflow: 'auto',
-            minWidth: 0,
-          }}
-        >
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '1rem'
-          }}>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button
-                onClick={() => setActiveTab('packages')}
-                style={{
-                  background: activeTab === 'packages' 
-                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' 
-                    : 'transparent',
-                  color: activeTab === 'packages' ? 'white' : '#6b7280',
-                  border: '2px solid',
-                  borderColor: activeTab === 'packages' ? '#3b82f6' : '#e5e7eb',
-                  padding: '0.5rem 1.5rem',
-                  borderRadius: '8px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                📦 包裹管理
-              </button>
-              <button
-                onClick={() => setActiveTab('stores')}
-                style={{
-                  background: activeTab === 'stores' 
-                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                    : 'transparent',
-                  color: activeTab === 'stores' ? 'white' : '#6b7280',
-                  border: '2px solid',
-                  borderColor: activeTab === 'stores' ? '#10b981' : '#e5e7eb',
-                  padding: '0.5rem 1.5rem',
-                  borderRadius: '8px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                🏪 合伙店铺
+        <section className="rt-tracking__panel rt-tracking__sidebar">
+          <div className="rt-tracking__tabs">
+            <button
+              type="button"
+              className={`rt-tracking__tab${sidebarTab === 'pending' ? ' rt-tracking__tab--active-pending' : ''}`}
+              onClick={() => setSidebarTab('pending')}
+            >
+              ⏳ 待分配 ({pendingPackages.length})
+            </button>
+            <button
+              type="button"
+              className={`rt-tracking__tab${sidebarTab === 'assigned' ? ' rt-tracking__tab--active-assigned' : ''}`}
+              onClick={() => setSidebarTab('assigned')}
+            >
+              🚚 配送中 ({assignedPackages.length})
+            </button>
+          </div>
+
+          <div className="rt-tracking__list">
+            <div className="rt-tracking__list-toolbar">
+              <button type="button" className="rt-tracking__list-refresh" onClick={refreshAll}>
+                🔄 刷新列表
               </button>
             </div>
-          </div>
-          
-          {/* 根据选项卡显示不同内容 */}
-          {activeTab === 'packages' ? (
-            <>
-              {/* 待分配包裹 */}
-              <div style={{ marginBottom: '2rem' }}>
-                <div
-                  style={{
-                    background: 'linear-gradient(135deg, #fffbeb 0%, #fff7ed 55%, #fffdfb 100%)',
-                    border: '1px solid #fcd34d',
-                    borderRadius: '14px',
-                    padding: '1rem 1.2rem',
-                    marginBottom: '1rem',
-                    boxShadow: '0 6px 22px rgba(217, 119, 6, 0.12)',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '0.6rem',
-                    }}
-                  >
-                    <h3
-                      style={{
-                        color: '#9a3412',
-                        margin: 0,
-                        fontSize: '1.05rem',
-                        fontWeight: 900,
-                        letterSpacing: '-0.02em',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                      }}
-                    >
-                      <span aria-hidden>⏳</span>
-                      待分配包裹 (
-                      {
-                        filterPackagesByCity(packages).filter(
-                          (p) => p.status === '待取件' || p.status === '待收款',
-                        ).length
-                      }
-                      )
-                    </h3>
-                    <button
-                      onClick={() => {
-                        loadPackages();
-                        loadCouriers();
-                        loadStores();
-                      }}
-                      style={{
-                        background: 'rgba(59, 130, 246, 0.12)',
-                        color: '#1d4ed8',
-                        border: '1px solid rgba(59, 130, 246, 0.28)',
-                        padding: '0.45rem 0.95rem',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        fontSize: '0.82rem',
-                        fontWeight: 800,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.08)',
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)')
-                      }
-                      onMouseOut={(e) =>
-                        (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.12)')
-                      }
-                    >
-                      🔄 刷新
-                    </button>
-                  </div>
-                </div>
 
-          {filterPackagesByCity(packages).filter(p => p.status === '待取件' || p.status === '待收款').length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '3rem',
-              color: '#9ca3af'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
-              <p>当前没有待分配的包裹</p>
-            </div>
-          ) : (
-            filterPackagesByCity(packages)
-              .filter(p => p.status === '待取件' || p.status === '待收款')
-              .map(pkg => (
-                <div
-                  key={pkg.id}
-                  style={{
-                    background:
-                      pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                        ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
-                        : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                    padding: '1.1rem 1.3rem',
-                    borderRadius: '12px',
-                    marginBottom: '0.85rem',
-                    border:
-                      pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配'
-                        ? '1px solid #4ade80'
-                        : '1px solid #7dd3fc',
-                    boxShadow: '0 4px 14px rgba(15, 23, 42, 0.06)',
-                    opacity:
-                      pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? 0.92 : 1,
-                  }}
-                >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '0.5rem',
-                    flexWrap: 'wrap',
-                    gap: '0.5rem'
-                  }}>
-                    <strong style={{ color: '#0369a1' }}>{pkg.id}</strong>
-                    {/* 下单身份标识 */}
-                    {(() => {
-                      const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
-                      const identity = identityMatch ? identityMatch[1] : '';
-                      const isMerchant = identity === '商家' || identity === 'MERCHANTS';
-                      const isVIP = identity === 'VIP';
-                      const isMember = identity === '会员' || identity === 'Member' || identity === '普通用户' || (!isMerchant && !isVIP);
-
-                      return (
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          {identity && (
-                            <span style={{
-                              background: isMerchant ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
-                              color: isMerchant ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.7rem',
-                              fontWeight: 'bold',
-                              border: `1px solid ${isMerchant ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
-                            }}>
-                              {isMerchant ? '👤 商家' : (isVIP ? '💎 VIP' : `👤 ${identity}`)}
-                            </span>
-                          )}
-
-                          {/* 跑腿费支付方式 */}
-                          <span style={{
-                            background: (pkg as any).payment_method === 'balance' ? '#dcfce7' : '#fef3c7',
-                            color: (pkg as any).payment_method === 'balance' ? '#166534' : '#92400e',
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: '5px',
-                            fontSize: '0.7rem',
-                            fontWeight: 'bold',
-                            border: `1px solid ${(pkg as any).payment_method === 'balance' ? '#bbf7d0' : '#fde68a'}`
-                          }}>
-                            跑腿费: {(pkg as any).payment_method === 'balance' ? '💳 余额' : '💵 现金'}
-                          </span>
-
-                          {/* 商品费显示逻辑 */}
-                          {isMerchant && Number(pkg.cod_amount || 0) > 0 && (
-                            <span style={{
-                              background: '#fee2e2',
-                              color: '#b91c1c',
-                              border: '1px solid #fecaca',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.7rem',
-                              fontWeight: 'bold'
-                            }}>
-                              💰 COD代收款: {Number(pkg.cod_amount).toLocaleString()} MMK
-                            </span>
-                          )}
-
-                          {isVIP && (() => {
-                            const balanceMatch = pkg.description?.match(/\[(?:余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
-                            if (balanceMatch && balanceMatch[1]) {
-                              return (
-                                <span style={{
-                                  background: '#dcfce7',
-                                  color: '#166534',
-                                  border: '1px solid #bbf7d0',
-                                  padding: '0.2rem 0.6rem',
-                                  borderRadius: '5px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 'bold'
-                                }}>
-                                  💳 余额支付 (商品费): {balanceMatch[1]} MMK
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>                                                                           
-                    <p style={{ margin: '0.3rem 0' }}>
-                      📍 从: {pkg.sender_address}
-                      {pkg.sender_latitude && pkg.sender_longitude && (
-                        <span 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!pkg.sender_latitude || !pkg.sender_longitude) return;
-                            const coords = { lat: pkg.sender_latitude, lng: pkg.sender_longitude };
-                            setSelectedLocationPoint({
-                              packageId: pkg.id,
-                              type: 'pickup',
-                              coordinates: coords
-                            });
-                            setMapCenter(coords);
-                            setSelectedCourier(null);
-                          }}
-                          style={{ 
-                            color: '#3b82f6', 
-                            fontSize: '0.8rem', 
-                            marginLeft: '0.5rem',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                            fontWeight: 'bold',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#2563eb';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#3b82f6';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
-                        </span>
-                      )}
-                    </p>
-                    <p style={{ margin: '0.3rem 0' }}>
-                      📍 到: {pkg.receiver_address}
-                      {pkg.receiver_latitude && pkg.receiver_longitude && (
-                        <span 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!pkg.receiver_latitude || !pkg.receiver_longitude) return;
-                            const coords = { lat: pkg.receiver_latitude, lng: pkg.receiver_longitude };
-                            setSelectedLocationPoint({
-                              packageId: pkg.id,
-                              type: 'delivery',
-                              coordinates: coords
-                            });
-                            setMapCenter(coords);
-                            setSelectedCourier(null);
-                          }}
-                          style={{ 
-                            color: '#ef4444', 
-                            fontSize: '0.8rem', 
-                            marginLeft: '0.5rem',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                            fontWeight: 'bold',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#dc2626';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#ef4444';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                        >
-                          ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
-                        </span>
-                      )}
-                    </p>
-                    <p style={{ margin: '0.3rem 0' }}>
-                      📦 类型: {pkg.package_type} ({pkg.weight})
-                    </p>
-                    <p style={{ margin: '0.3rem 0' }}>
-                      <strong style={{ color: '#1d4ed8' }}>🕒 配送选项:</strong>{' '}
-                      {adminDeliveryOptionLine(pkg)}
-                    </p>
-                    {pkg.delivery_distance && (
-                      <p style={{ margin: '0.3rem 0' }}>
-                        🚗 距离: {pkg.delivery_distance} km
-                      </p>
-                    )}
-                    {pkg.price && (
-                    <p style={{ margin: '0.3rem 0' }}>
-                      💰 跑腿费: {pkg.price}
-                    </p>
-                    )}
-                    {/* 🚀 新增：从描述中解析“平台支付”并显示 */}
-                    {(() => {
-                      const payMatch = pkg.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
-                      if (payMatch && payMatch[1]) {
-                        return (
-                          <p style={{ margin: '0.3rem 0', fontWeight: 'bold', color: '#10b981' }}>
-                            💵 平台支付: {payMatch[1]} MMK
-                          </p>
-                        );
-                      }
-                      return null;
-                    })()}
-                    {(() => {
-                      const isStoreMatch = stores.some(store => 
-                        store.store_name === pkg.sender_name || 
-                        (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
-                      );
-                      const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                      
-                      if (isMERCHANTS) {
-                        const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                        const codVal = Number(pkg.cod_amount || 0);
-                        const totalVal = priceVal + codVal;
-                        return (
-                          <p style={{ margin: '0.3rem 0', fontWeight: 'bold', color: '#b45309' }}>
-                            💰 总金额: {totalVal.toLocaleString()} MMK
-                          </p>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '0.5rem',
-                    marginTop: '1rem'
-                  }}>
-                    {/* 如果包裹已分配给骑手（有courier且不为'未分配'和'待分配'），显示状态信息而不是分配按钮 */}
-                    {pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配' ? (
-                      <div style={{
-                        flex: 1,
-                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                        color: '#92400e',
-                        border: '2px solid #f59e0b',
-                        padding: '0.6rem',
-                        borderRadius: '8px',
-                        fontWeight: 'bold',
-                        fontSize: '0.9rem',
-                        textAlign: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        ✅ 已分配给: {pkg.courier}
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => autoAssignPackage(pkg)}
-                          disabled={isAssigning}
-                          style={{
-                            flex: 1,
-                            background: isAssigning 
-                              ? 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'
-                              : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.6rem',
-                            borderRadius: '8px',
-                            cursor: isAssigning ? 'not-allowed' : 'pointer',
-                            fontWeight: 'bold',
-                            fontSize: '0.9rem',
-                            opacity: isAssigning ? 0.7 : 1
-                          }}
-                        >
-                          {isAssigning ? '⏳ 分配中...' : '🤖 自动分配'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedPackage(pkg);
-                            setShowAssignModal(true);
-                          }}
-                          style={{
-                            flex: 1,
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.6rem',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            fontSize: '0.9rem'
-                          }}
-                        >
-                          👤 手动分配
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))
-          )}
-          </div>
-          
-          {/* 已分配包裹 */}
-          <div>
-            <h3 style={{ color: '#059669', marginBottom: '1rem', fontSize: '1.1rem' }}>
-              ✅ 已分配包裹 ({filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length})
-            </h3>
-            
-            {filterPackagesByCity(packages).filter(p => p.status === '已取件' || p.status === '配送中').length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '2rem',
-                color: '#9ca3af'
-              }}>
-                <div style={{ fontSize: isMobile ? '1.5rem' : '2rem', marginBottom: '0.5rem' }}>📦</div>
-                <p>暂无已分配包裹</p>
-              </div>
-            ) : (
-              filterPackagesByCity(packages)
-                .filter(p => p.status === '已取件' || p.status === '配送中')
-                .map(pkg => (
-                  <div
-                    key={pkg.id}
-                    style={{
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      padding: '1rem',
-                      borderRadius: '10px',
-                      marginBottom: '1rem',
-                      border: '2px solid #bbf7d0'
-                    }}
-                  >
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '0.5rem',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem'
-                    }}>
-                      <strong style={{ color: '#166534' }}>{pkg.id}</strong>
-                      {(() => {
-                        const identityMatch = pkg.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
-                        const identity = identityMatch ? identityMatch[1] : '';
-                        const isMerchant = identity === '商家' || identity === 'MERCHANTS';
-                        const isVIP = identity === 'VIP';
-
-                        return (
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                            {identity && (
-                              <span style={{
-                                background: isMerchant ? '#dbeafe' : (isVIP ? '#fef3c7' : '#f3f4f6'),
-                                color: isMerchant ? '#1e40af' : (isVIP ? '#92400e' : '#6b7280'),
-                                padding: '0.2rem 0.6rem',
-                                borderRadius: '5px',
-                                fontSize: '0.7rem',
-                                fontWeight: 'bold',
-                                border: `1px solid ${isMerchant ? '#bfdbfe' : (isVIP ? '#fde68a' : '#e5e7eb')}`
-                              }}>
-                                {isMerchant ? '👤 商家' : (isVIP ? '💎 VIP' : `👤 ${identity}`)}
-                              </span>
-                            )}
-
-                            {/* 跑腿费支付方式 */}
-                            <span style={{
-                              background: (pkg as any).payment_method === 'balance' ? '#dcfce7' : '#fef3c7',
-                              color: (pkg as any).payment_method === 'balance' ? '#166534' : '#92400e',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.7rem',
-                              fontWeight: 'bold',
-                              border: `1px solid ${(pkg as any).payment_method === 'balance' ? '#bbf7d0' : '#fde68a'}`
-                            }}>
-                              跑腿费: {(pkg as any).payment_method === 'balance' ? '💳 余额' : '💵 现金'}
-                            </span>
-
-                            {/* 商品费显示逻辑 */}
-                            {isMerchant && Number(pkg.cod_amount || 0) > 0 && (
-                              <span style={{
-                                background: '#fee2e2',
-                                color: '#b91c1c',
-                                border: '1px solid #fecaca',
-                                padding: '0.2rem 0.6rem',
-                                borderRadius: '5px',
-                                fontSize: '0.7rem',
-                                fontWeight: 'bold'
-                              }}>
-                                💰 COD代收款: {Number(pkg.cod_amount).toLocaleString()} MMK
-                              </span>
-                            )}
-
-                            {isVIP && (() => {
-                              const balanceMatch = pkg.description?.match(/\[(?:余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
-                              if (balanceMatch && balanceMatch[1]) {
-                                return (
-                                  <span style={{
-                                    background: '#dcfce7',
-                                    color: '#166534',
-                                    border: '1px solid #bbf7d0',
-                                    padding: '0.2rem 0.6rem',
-                                    borderRadius: '5px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 'bold'
-                                  }}>
-                                    💳 余额支付 (商品费): {balanceMatch[1]} MMK
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
-                            
-                            <span style={{
-                              background: pkg.status === '已取件' ? '#fef3c7' : '#dbeafe',
-                              color: pkg.status === '已取件' ? '#92400e' : '#1e40af',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '5px',
-                              fontSize: '0.8rem',
-                              fontWeight: 'bold'
-                            }}>
-                              {pkg.status === '待收款' ? '待取件' : pkg.status}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>📤 寄件人:</strong> {pkg.sender_name} ({pkg.sender_phone})
-                      </p>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>📥 收件人:</strong> {pkg.receiver_name} ({pkg.receiver_phone})
-                      </p>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>📍 从:</strong> {pkg.sender_address}
-                        {pkg.sender_latitude && pkg.sender_longitude && (
-                          <span 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (!pkg.sender_latitude || !pkg.sender_longitude) return;
-                              const coords = { lat: pkg.sender_latitude, lng: pkg.sender_longitude };
-                              setSelectedLocationPoint({
-                                packageId: pkg.id,
-                                type: 'pickup',
-                                coordinates: coords
-                              });
-                              setMapCenter(coords);
-                              setSelectedCourier(null);
-                            }}
-                            style={{ 
-                              color: '#3b82f6', 
-                              fontSize: '0.8rem', 
-                              marginLeft: '0.5rem',
-                              cursor: 'pointer',
-                              textDecoration: 'underline',
-                              fontWeight: 'bold',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#2563eb';
-                              e.currentTarget.style.transform = 'scale(1.05)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#3b82f6';
-                              e.currentTarget.style.transform = 'scale(1)';
-                            }}
-                          >
-                            ({pkg.sender_latitude.toFixed(6)}, {pkg.sender_longitude.toFixed(6)})
-                          </span>
-                        )}
-                      </p>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>📍 到:</strong> {pkg.receiver_address}
-                        {pkg.receiver_latitude && pkg.receiver_longitude && (
-                          <span 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (!pkg.receiver_latitude || !pkg.receiver_longitude) return;
-                              const coords = { lat: pkg.receiver_latitude, lng: pkg.receiver_longitude };
-                              setSelectedLocationPoint({
-                                packageId: pkg.id,
-                                type: 'delivery',
-                                coordinates: coords
-                              });
-                              setMapCenter(coords);
-                              setSelectedCourier(null);
-                            }}
-                            style={{ 
-                              color: '#ef4444', 
-                              fontSize: '0.8rem', 
-                              marginLeft: '0.5rem',
-                              cursor: 'pointer',
-                              textDecoration: 'underline',
-                              fontWeight: 'bold',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#dc2626';
-                              e.currentTarget.style.transform = 'scale(1.05)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#ef4444';
-                              e.currentTarget.style.transform = 'scale(1)';
-                            }}
-                          >
-                            ({pkg.receiver_latitude.toFixed(6)}, {pkg.receiver_longitude.toFixed(6)})
-                          </span>
-                        )}
-                      </p>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>🚚 骑手:</strong> <span style={{ color: '#059669', fontWeight: 'bold' }}>{pkg.courier || '未分配'}</span>
-                      </p>
-                      {pkg.pickup_time && (
-                        <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#6b7280' }}>
-                          <strong>⏰ 取件时间:</strong> {pkg.pickup_time}
-                        </p>
-                      )}
-
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong style={{ color: '#1d4ed8' }}>🕒 配送选项:</strong>{' '}
-                        {adminDeliveryOptionLine(pkg)}
-                      </p>
-
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>💰 跑腿费:</strong> {pkg.price}
-                      </p>
-                      {(() => {
-                        const isStoreMatch = stores.some(store => 
-                          store.store_name === pkg.sender_name || 
-                          (pkg.sender_name && pkg.sender_name.startsWith(store.store_name))
-                        );
-                        const isMERCHANTS = !!pkg.delivery_store_id || isStoreMatch;
-                        
-                        if (isMERCHANTS) {
-                          const priceVal = parseFloat(pkg.price?.replace(/[^\d.]/g, '') || '0');
-                          const codVal = Number(pkg.cod_amount || 0);
-                          const totalVal = priceVal + codVal;
-                          return (
-                            <p style={{ margin: '0.3rem 0', fontWeight: 'bold', color: '#b45309' }}>
-                              <strong>💰 总金额:</strong> {totalVal.toLocaleString()} MMK
-                            </p>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  </div>
-                ))
-            )}
-          </div>
-            </>
-          ) : (
-            // 快递店管理内容
-            <div>
-              <h3 style={{ color: '#10b981', marginBottom: '1rem', fontSize: '1.1rem' }}>
-                🏪 合伙店铺列表 ({stores.length})
-              </h3>
-              
-              {loadingStores ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
-                  <p>加载中...</p>
-                </div>
-              ) : stores.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏪</div>
-                  <p>暂无合伙店铺</p>
-                  <p style={{ fontSize: '0.9rem', marginTop: '0.5rem', color: '#6b7280' }}>
-                    请前往独立页面添加合伙店铺
-                  </p>
+            {sidebarTab === 'pending' ? (
+              pendingPackages.length === 0 ? (
+                <div className="rt-tracking__empty">
+                  <div className="rt-tracking__empty-icon">✅</div>
+                  <p>当前没有待分配包裹</p>
                 </div>
               ) : (
-                stores.map(store => (
-                  <div
-                    key={store.id}
-                    style={{
-                      background: store.status === 'active' 
-                        ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' 
-                        : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                      padding: '1rem',
-                      borderRadius: '10px',
-                      marginBottom: '1rem',
-                      border: store.status === 'active' 
-                        ? '2px solid #86efac' 
-                        : '2px solid #fcd34d'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <div>
-                        <strong style={{ color: store.status === 'active' ? '#166534' : '#92400e' }}>
-                          {store.store_name}
-                        </strong>
-                        <span style={{
-                          background: store.status === 'active' ? '#dcfce7' : '#fef3c7',
-                          color: store.status === 'active' ? '#166534' : '#92400e',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '5px',
-                          fontSize: '0.8rem',
-                          fontWeight: 'bold',
-                          marginLeft: '0.5rem'
-                        }}>
-                          {store.store_type === 'restaurant' ? '🍽️ 餐厅' : 
-                           store.store_type === 'tea_shop' ? '🍵 茶铺' : 
-                           store.store_type === 'drinks_snacks' ? '🥤 饮料和小吃' : 
-                           store.store_type === 'grocery' ? '🛒 杂货店' : 
-                           store.store_type === 'transit_station' ? '🚚 中转站' : 
-                           store.store_type}
-                        </span>
+                pendingPackages.map((pkg) => {
+                  const isLocked =
+                    !!pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配';
+                  return (
+                    <article
+                      key={pkg.id}
+                      className={`rt-tracking__pkg rt-tracking__pkg--pending${
+                        isLocked ? ' rt-tracking__pkg--locked' : ''
+                      }`}
+                    >
+                      <div className="rt-tracking__pkg-head">
+                        <span className="rt-tracking__pkg-id">{pkg.id}</span>
+                        <div className="rt-tracking__badges">{renderPackageIdentityBadges(pkg)}</div>
                       </div>
-                      <span style={{
-                        background: store.status === 'active' ? '#10b981' : '#f59e0b',
-                        color: 'white',
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '5px',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {store.status === 'active' ? '✅ 营业中' : store.status === 'inactive' ? '⏸️ 暂停' : '🔧 维护中'}
+                      <div className="rt-tracking__pkg-body">
+                        <p>
+                          从 {pkg.sender_address}
+                          {pkg.sender_latitude != null && pkg.sender_longitude != null && (
+                            <span
+                              className="rt-tracking__coord rt-tracking__coord--pickup"
+                              onClick={(e) => focusPackageOnMap(pkg, 'pickup', e)}
+                            >
+                              定位
+                            </span>
+                          )}
+                        </p>
+                        <p>
+                          到 {pkg.receiver_address}
+                          {pkg.receiver_latitude != null && pkg.receiver_longitude != null && (
+                            <span
+                              className="rt-tracking__coord rt-tracking__coord--delivery"
+                              onClick={(e) => focusPackageOnMap(pkg, 'delivery', e)}
+                            >
+                              定位
+                            </span>
+                          )}
+                        </p>
+                        <p>
+                          {pkg.package_type} · {pkg.weight}
+                          {pkg.delivery_distance ? ` · ${pkg.delivery_distance} km` : ''}
+                        </p>
+                        <p>
+                          <strong>配送选项:</strong> {adminDeliveryOptionLine(pkg)}
+                        </p>
+                        {pkg.price && <p>跑腿费 {pkg.price}</p>}
+                        {packageCodAmount(pkg) > 0 && (
+                          <p className="rt-tracking__pkg-cod">
+                            <strong>COD代收款:</strong> {packageCodAmount(pkg).toLocaleString()} MMK
+                          </p>
+                        )}
+                      </div>
+                      <div className="rt-tracking__pkg-actions">
+                        {isLocked ? (
+                          <div className="rt-tracking__assigned-banner">已分配给 {pkg.courier}</div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className={`rt-tracking__btn rt-tracking__btn--auto${
+                                isAssigning ? ' rt-tracking__btn--disabled' : ''
+                              }`}
+                              disabled={isAssigning}
+                              onClick={() => autoAssignPackage(pkg)}
+                            >
+                              {isAssigning ? '分配中…' : '自动分配'}
+                            </button>
+                            <button
+                              type="button"
+                              className="rt-tracking__btn rt-tracking__btn--manual"
+                              onClick={() => {
+                                setSelectedPackage(pkg);
+                                setShowAssignModal(true);
+                              }}
+                            >
+                              手动分配
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })
+              )
+            ) : assignedPackages.length === 0 ? (
+              <div className="rt-tracking__empty">
+                <div className="rt-tracking__empty-icon">📦</div>
+                <p>暂无配送中包裹</p>
+              </div>
+            ) : (
+              assignedPackages.map((pkg) => (
+                <article key={pkg.id} className="rt-tracking__pkg rt-tracking__pkg--assigned">
+                  <div className="rt-tracking__pkg-head">
+                    <span className="rt-tracking__pkg-id">{pkg.id}</span>
+                    <div className="rt-tracking__badges">
+                      {renderPackageIdentityBadges(pkg)}
+                      <span className="rt-tracking__badge rt-tracking__badge--status">
+                        {pkg.status === '待收款' ? '待取件' : pkg.status}
                       </span>
                     </div>
-                    
-                    <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6' }}>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>📍 地址:</strong> {store.address}
-                      </p>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>📞 电话:</strong> {store.phone}
-                      </p>
-                      <p style={{ margin: '0.3rem 0' }}>
-                        <strong>👤 店长:</strong> {store.manager_name} ({store.manager_phone})
-                      </p>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#059669' }}>
-                        📍 坐标: ({store.latitude.toFixed(6)}, {store.longitude.toFixed(6)})
-                      </p>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.8rem', color: '#6b7280' }}>
-                        ⏰ 营业时间: {store.operating_hours} | 
-                        📦 容量: {store.capacity} | 
-                        🎯 服务半径: {store.service_area_radius}km
-                      </p>
-                    </div>
                   </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+                  <div className="rt-tracking__pkg-body">
+                    <p>
+                      {pkg.sender_name} → {pkg.receiver_name}
+                    </p>
+                    <p>
+                      到 {pkg.receiver_address}
+                      {pkg.receiver_latitude != null && pkg.receiver_longitude != null && (
+                        <span
+                          className="rt-tracking__coord rt-tracking__coord--delivery"
+                          onClick={(e) => focusPackageOnMap(pkg, 'delivery', e)}
+                        >
+                          定位
+                        </span>
+                      )}
+                    </p>
+                    <p>
+                      骑手 <strong>{pkg.courier || '未分配'}</strong>
+                      {pkg.pickup_time ? ` · 取件 ${pkg.pickup_time}` : ''}
+                    </p>
+                    <p>
+                      <strong>配送选项:</strong> {adminDeliveryOptionLine(pkg)}
+                      {pkg.price ? ` · 跑腿费 ${pkg.price}` : ''}
+                    </p>
+                    {packageCodAmount(pkg) > 0 && (
+                      <p className="rt-tracking__pkg-cod">
+                        <strong>COD代收款:</strong> {packageCodAmount(pkg).toLocaleString()} MMK
+                      </p>
+                    )}
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
       </div>
 
       {/* 手动分配模态框 */}

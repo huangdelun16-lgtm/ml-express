@@ -123,11 +123,17 @@ export const locationService = {
       if (!(await hasAcceptedLocationDisclosure())) {
         return false;
       }
-      // 1. 检查前台权限（Android 上经 locationPermissionGate 在系统弹窗前展示说明）
-      const { status: foregroundStatus } = await requestForegroundPermissionsIfDisclosed();
-      if (foregroundStatus !== 'granted') {
-        console.warn('未获得前台位置权限');
-        return false;
+      
+      // 1. 检查前台权限
+      const existingFg = await Location.getForegroundPermissionsAsync();
+      if (existingFg.status !== 'granted') {
+        const { status: foregroundStatus } = await requestForegroundPermissionsIfDisclosed();
+        if (foregroundStatus !== 'granted') {
+          console.warn('未获得前台位置权限');
+          return false;
+        }
+        // 增加小延迟，避免连续弹窗
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
 
       // 2. 检查后台权限

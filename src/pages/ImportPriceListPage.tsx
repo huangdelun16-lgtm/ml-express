@@ -88,11 +88,21 @@ function parsedToFlatRows(parsed: ParsedLicenceLine[]): FlatRow[] {
   }));
 }
 
-const ImportPriceListPage: React.FC = () => {
+export type ImportPriceListPageProps = {
+  /** page：独立路由全屏；embedded：在指标管理弹层内展示 */
+  variant?: 'page' | 'embedded';
+  onCloseEmbedded?: () => void;
+};
+
+const ImportPriceListPage: React.FC<ImportPriceListPageProps> = ({
+  variant = 'page',
+  onCloseEmbedded,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
   const { isMobile } = useResponsive();
+  const isEmbedded = variant === 'embedded';
   const [cargoFilter, setCargoFilter] = useState('');
   const [dbDrafts, setDbDrafts] = useState<ImportMetricDraftSaved[]>([]);
   const [licenceRows, setLicenceRows] = useState<FlatRow[]>([]);
@@ -111,7 +121,7 @@ const ImportPriceListPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [location.key, location.pathname]);
+  }, [location.key, location.pathname, isEmbedded]);
 
   const t =
     language === 'en'
@@ -141,6 +151,7 @@ const ImportPriceListPage: React.FC = () => {
           empty:
             'No data. Save drafts with line items under «Import metric drafts», or use «Upload & parse licence» for IMPORT LICENCE.',
           back: 'Dashboard',
+          close: 'Close',
           footerNote:
             'Blank product lines are omitted from draft summaries. Parsing quality depends on layout and clarity—please verify. Duplicate Register No. will show «already uploaded» and will not be written twice.',
         }
@@ -168,6 +179,7 @@ const ImportPriceListPage: React.FC = () => {
             colSrc: 'ရင်းမြစ် / နောက်ဆုံးပြင်',
             empty: 'ဒေတာမရှိပါ။ မူကြမ်းသို့ မှတ်တမ်းသိမ်းပါ။',
             back: 'ဒါဘုတ်',
+            close: 'ပိတ်မည်',
             footerNote:
               'အလွတ်ကြမ်းများမပါ။ ခွဲခြမ်းမှုကို လူသားစိစစ်ရန် လိုအပ်သည်။ Register No. တူပါက ထပ်မရေးပါ။',
           }
@@ -196,6 +208,7 @@ const ImportPriceListPage: React.FC = () => {
             empty:
               '暂无数据。请在「进口指标草稿」保存含明细的记录，或使用「上传证照解析」导入 IMPORT LICENCE。',
             back: '控制台',
+            close: '关闭',
             footerNote:
               '说明：完全空白的商品行不会出现在草稿汇总中；证照解析依赖版式与清晰度，识别后请人工核对。若解析出的 Register No. 与表中已有记录相同，将提示「此单已上传」且不会重复写入。',
           };
@@ -248,9 +261,17 @@ const ImportPriceListPage: React.FC = () => {
   return (
     <div
       style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 40%, #1a1740 100%)',
-        padding: isMobile ? '14px 12px 96px' : '24px 20px 96px',
+        minHeight: isEmbedded ? undefined : '100vh',
+        background: isEmbedded
+          ? 'transparent'
+          : 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 40%, #1a1740 100%)',
+        padding: isEmbedded
+          ? isMobile
+            ? '8px 10px 20px'
+            : '12px 16px 24px'
+          : isMobile
+            ? '14px 12px 96px'
+            : '24px 20px 96px',
         color: '#f8fafc',
         fontFamily:
           "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif",
@@ -293,7 +314,7 @@ const ImportPriceListPage: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => navigate('/admin/dashboard')}
+              onClick={() => (isEmbedded ? onCloseEmbedded?.() : navigate('/admin/dashboard'))}
               style={{
                 padding: '10px 18px',
                 borderRadius: 12,
@@ -305,7 +326,7 @@ const ImportPriceListPage: React.FC = () => {
                 fontSize: 14,
               }}
             >
-              ← {t.back}
+              {isEmbedded ? `✕ ${t.close}` : `← ${t.back}`}
             </button>
           </div>
         </header>

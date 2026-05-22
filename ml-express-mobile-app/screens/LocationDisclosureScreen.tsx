@@ -30,21 +30,21 @@ export default function LocationDisclosureScreen({ navigation, route }: Props) {
   const copy = {
     zh: {
       title: '位置信息使用说明',
-      body: `为了向您分派附近订单、在地图中提供导航、记录配送路线并在配送过程中向平台更新您的实时位置，\n\n我们需要使用您设备的精确或大致位置（由您在系统弹窗中的选择决定）。\n\n若您作为骑手并开启「始终」或后台定位：为派单、路线记录与向平台上报实时位置，本应用可能在本应用被关闭、您未使用本应用时仍收集位置信息。\n\n若您之后再开启相关系统权限，我们会按步骤提示。我们不会在未说明的用途下使用位置数据。您可拒绝，仍可使用不依赖自动定位的其它功能。`,
+      body: `为了向您分派附近订单、在地图中提供导航、记录配送路线并在配送过程中向平台更新您的实时位置，我们需要使用您设备的精确或大致位置。\n\n【后台定位说明】：作为骑手，本应用需要收集位置数据以开启“派单”、“配送路线记录”及“实时位置分享”功能，即便在应用被关闭或未在使用时也是如此。\n\n若您之后开启相关系统权限，我们会按步骤提示。我们不会在未说明的用途下使用位置数据。您可拒绝，仍可使用不依赖自动定位的其它功能。`,
       agree: '同意并继续',
       skip: '暂不使用位置',
     },
     en: {
       title: 'How we use your location',
-      body: `To assign nearby work, show turn‑by‑turn context on the map, keep a record of the delivery path, and share your real‑time position with dispatch when you are working,\n\nthis app may collect approximate and precise location of this device, depending on the option you pick in the system dialog.\n\nIf you allow “All the time” or background/always location (typical for riders): this app collects location data to enable dispatch, route history, and live position updates to the platform even when the app is closed or not in use. Additional prompts may follow when the system requests background access.\n\nWe do not use location for unlisted purposes. You can decline and still use features that do not need automatic location.`,
+      body: `To assign nearby work, show turn‑by‑turn context on the map, keep a record of the delivery path, and share your real‑time position with dispatch, we need access to your device’s location.\n\n[Background Location]: As a rider, this app collects location data to enable "Dispatch", "Route History", and "Live Position Sharing" even when the app is closed or not in use.\n\nWe do not use location for unlisted purposes. You can decline and still use features that do not need automatic location.`,
       agree: 'Agree & continue',
       skip: 'Not now',
     },
     my: {
       title: 'တည်နေရာသုံးစွဲမှု',
-      body: `အနီအနားအလုပ်ခေါ်ခြင်း၊ GPS မြေပုံအညွှန်း၊ အပ်ပလီကေးရှင်းမှ ပို့ဆောင်မှုမှတ်တမ်း နှင့် ဖြန့်ပေးသူရှိစဉ် တည်နေရာ အစီအစဉ် တို့ အတွက်ကြောင့်\n\nအတိအကျ သို့ အကျဉ်းချုပ် တည်နေရာ လိုအပ်နိုင်ပါသည်။\n\nနောင် နောက်ခံ/အမြဲခွင့် ရွေးပါက ဖြန့်ပေးပြီးနောက် မှတ်တင် ဆက်လက်ပြုလုပ်ပါမည်။\n\nအသုံးပြုမှုကို ငြင်းဆန့်နိုင်ပြီး တည်နေရာ မထောက်ပံ့သော လုပ်ငန်းများကို ဆက်လက်သုံးနိုင်သည်။`,
+      body: `အနီးအနားရှိ အော်ဒါများခွဲဝေပေးရန်၊ မြေပုံပေါ်တွင် လမ်းညွှန်ပြသရန်၊ ပို့ဆောင်မှုလမ်းကြောင်းများကို မှတ်တမ်းတင်ရန်နှင့် ပို့ဆောင်နေစဉ်အတွင်း သင့်တည်နေရာကို အချိန်နှင့်တပြေးညီ အပ်ဒိတ်လုပ်ရန် သင့်စက်၏ တည်နေရာကို အသုံးပြုရန် လိုအပ်ပါသည်။\n\n[နောက်ခံတည်နေရာ]: စာပို့သမားတစ်ဦးအနေဖြင့်၊ ဤအက်ပ်ကို ပိတ်ထားချိန် သို့မဟုတ် အသုံးမပြုချိန်တွင်ပင် "အော်ဒါခွဲဝေမှု"၊ "လမ်းကြောင်းမှတ်တမ်း" နှင့် "တိုက်ရိုက်တည်နေရာမျှဝေမှု" တို့ကို လုပ်ဆောင်နိုင်ရန် တည်နေရာဒေတာကို စုဆောင်းရန် လိုအပ်ပါသည်။\n\nတည်နေရာဒေတာကို ဖော်ပြမထားသော အခြားကိစ္စများအတွက် အသုံးမပြုပါ။ ငြင်းဆိုနိုင်ပြီး တည်နေရာမလိုအပ်သော အခြားလုပ်ဆောင်ချက်များကို ဆက်လက်သုံးနိုင်ပါသည်။`,
       agree: 'သဘောတူ၍ ဆက်ရန်',
-      skip: 'ယခု မလိုအပ်',
+      skip: 'ယခု မလိုအပ်သေးပါ',
     },
   };
 
@@ -62,27 +62,26 @@ export default function LocationDisclosureScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       await setLocationDisclosureAccepted();
-      // Android：在系统对话框前再经全屏 Modal（与 gate 一致），满足 Play「显著披露紧挨运行时权限」
+      
+      // 1. 请求前台权限 (Android 会经 locationPermissionGate 显示全屏说明)
       const { status: fg } = await requestForegroundPermissionsIfDisclosed(language);
-      if (fg !== 'granted') {
-        // 用户拒绝系统权限：仍进入主页（与原先行为一致）
-      } else {
-        const courierId = await AsyncStorage.getItem('currentCourierId');
-        const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
-        if (courierId && onlinePref !== 'false') {
-          try {
-            await locationService.startBackgroundTracking();
-          } catch (e) {
-            console.warn('startBackgroundTracking after disclosure:', e);
-          }
+      
+      if (fg === 'granted') {
+        // 2. 增加小延迟，确保系统前台权限对话框完全消失后再请求后台
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 3. 检查并请求后台权限
+        const { status: bgExisting } = await Location.getBackgroundPermissionsAsync();
+        if (bgExisting !== 'granted') {
+          await requestBackgroundPermissionsIfDisclosed(language);
         }
       }
     } catch (e) {
       console.warn('LocationDisclosure onAgree:', e);
     } finally {
       setLoading(false);
+      finishToMain();
     }
-    finishToMain();
   };
 
   const onSkip = () => {

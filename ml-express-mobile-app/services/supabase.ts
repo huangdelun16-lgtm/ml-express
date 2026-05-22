@@ -1583,6 +1583,7 @@ export const deliveryPhotoService = {
       }
 
       console.log('✅ 配送照片保存成功，URL已生成');
+      // 服务端保留 7 天：Supabase cleanup_expired_delivery_photos + Netlify cleanup-delivery-photos 定时任务
       return true;
     } catch (err) {
       console.error('保存配送照片异常:', err);

@@ -6,10 +6,24 @@ import { useResponsive } from '../hooks/useResponsive';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
 
 /** 全屏独立模块：不使用通用后台侧栏/顶栏，由页面自带布局 */
-export const STANDALONE_IMPORT_ADMIN_PATHS = [
-  '/admin/metric-management',
-  '/admin/product-price',
-] as const;
+export const STANDALONE_IMPORT_ADMIN_PATHS = ['/admin/metric-management'] as const;
+
+const MODULE_ICONS: Record<string, string> = {
+  city_packages: '📦',
+  users: '👥',
+  merchant_stores: '🏪',
+  finance: '💰',
+  tracking: '📍',
+  delivery_alerts: '🚨',
+  banners: '🖼️',
+  recharges: '💳',
+  supervision: '📋',
+  reports: '📊',
+  courier_performance: '🛵',
+  merchant_reconciliation: '🧾',
+  settings: '⚙️',
+  metric_management: '📑',
+};
 
 const MODULE_ROUTES: Record<string, string> = {
   city_packages: '/admin/city-packages',
@@ -26,7 +40,6 @@ const MODULE_ROUTES: Record<string, string> = {
   courier_performance: '/admin/courier-performance',
   merchant_reconciliation: '/admin/merchant-reconciliation',
   metric_management: '/admin/metric-management',
-  product_price: '/admin/product-price',
 };
 
 function isModulePathActive(pathname: string, moduleId: string): boolean {
@@ -60,6 +73,12 @@ const AdminShellLayout: React.FC = () => {
         70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
         100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
       }
+      .admin-shell-nav::-webkit-scrollbar { width: 5px; }
+      .admin-shell-nav::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.22);
+        border-radius: 999px;
+      }
+      .admin-shell-nav::-webkit-scrollbar-track { background: transparent; }
     `;
     document.head.appendChild(style);
     return () => {
@@ -171,6 +190,7 @@ const AdminShellLayout: React.FC = () => {
 
   const [showUserEditModal, setShowUserEditModal] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [hoveredNavId, setHoveredNavId] = useState<string | null>(null);
   const { isMobile } = useResponsive();
   const [userEditFormData, setUserEditFormData] = useState({
     username: '',
@@ -334,12 +354,6 @@ const AdminShellLayout: React.FC = () => {
               : 'မီတྲိစီမံခန့်ခွဲမှု',
         roles: ['admin', 'manager', 'finance'],
       },
-      {
-        id: 'product_price',
-        title:
-          language === 'zh' ? '商品价格' : language === 'en' ? 'Product prices' : 'ကုန်စျေးနှုန်း',
-        roles: ['admin', 'manager', 'finance'],
-      },
     ],
     [language],
   );
@@ -487,16 +501,17 @@ const AdminShellLayout: React.FC = () => {
 
       <aside
         style={{
-          width: isMobile ? 'min(256px, 82vw)' : 108,
+          width: isMobile ? 'min(280px, 86vw)' : 118,
           flexShrink: 0,
-          background: 'rgba(12, 38, 68, 0.52)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          borderRight: '1px solid rgba(255, 255, 255, 0.12)',
+          background:
+            'linear-gradient(180deg, rgba(8, 28, 52, 0.78) 0%, rgba(12, 38, 68, 0.62) 48%, rgba(10, 32, 58, 0.72) 100%)',
+          backdropFilter: 'blur(28px) saturate(1.15)',
+          WebkitBackdropFilter: 'blur(28px) saturate(1.15)',
+          borderRight: '1px solid rgba(255, 255, 255, 0.14)',
           display: 'flex',
           flexDirection: 'column',
-          padding: isMobile ? '10px 8px' : '10px 8px',
-          paddingBottom: 12,
+          padding: isMobile ? '12px 10px' : '12px 9px',
+          paddingBottom: 14,
           zIndex: isMobile ? 160 : 1,
           position: isMobile ? 'fixed' : 'relative',
           left: isMobile ? 0 : undefined,
@@ -506,31 +521,82 @@ const AdminShellLayout: React.FC = () => {
           alignSelf: isMobile ? undefined : 'stretch',
           transform: isMobile ? (mobileNavOpen ? 'translateX(0)' : 'translateX(-105%)') : undefined,
           transition: isMobile ? 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
-          boxShadow: isMobile && mobileNavOpen ? '8px 0 32px rgba(0, 0, 0, 0.22)' : undefined,
+          boxShadow: isMobile && mobileNavOpen
+            ? '8px 0 40px rgba(0, 0, 0, 0.28), inset -1px 0 0 rgba(255,255,255,0.08)'
+            : 'inset -1px 0 0 rgba(255, 255, 255, 0.06), 4px 0 24px rgba(0, 20, 40, 0.12)',
           maxHeight: isMobile ? '100vh' : undefined,
         }}
       >
         <div
           style={{
-            fontSize: '0.6rem',
-            fontWeight: 700,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'rgba(255, 255, 255, 0.42)',
-            marginBottom: 6,
-            paddingLeft: 4,
-            paddingTop: 0,
+            marginBottom: 10,
+            padding: isMobile ? '4px 6px 8px' : '2px 4px 8px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
-          {language === 'zh' ? '功能菜单' : language === 'en' ? 'Modules' : 'မီနူး'}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              marginBottom: 4,
+            }}
+          >
+            <span
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 7,
+                background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.35), rgba(59, 130, 246, 0.35))',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.72rem',
+                flexShrink: 0,
+              }}
+              aria-hidden
+            >
+              ☰
+            </span>
+            <span
+              style={{
+                fontSize: isMobile ? '0.72rem' : '0.62rem',
+                fontWeight: 800,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'rgba(255, 255, 255, 0.88)',
+              }}
+            >
+              {language === 'zh' ? '功能菜单' : language === 'en' ? 'Modules' : 'မီနူး'}
+            </span>
+          </div>
+          <div
+            style={{
+              fontSize: '0.58rem',
+              color: 'rgba(255, 255, 255, 0.45)',
+              paddingLeft: 2,
+              lineHeight: 1.35,
+            }}
+          >
+            {language === 'zh'
+              ? `${cardData.length} 个模块`
+              : language === 'en'
+                ? `${cardData.length} modules`
+                : `${cardData.length} ခု`}
+          </div>
         </div>
         <nav
+          className="admin-shell-nav"
           style={{
             flex: 1,
             overflowY: 'auto',
             marginRight: -2,
             paddingRight: 2,
-            paddingBottom: 4,
+            paddingBottom: 6,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 5,
           }}
         >
           {cardData.map((card) => {
@@ -543,12 +609,38 @@ const AdminShellLayout: React.FC = () => {
             const showAlertBadge = card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0;
             const active = isModulePathActive(pathname, card.id);
             const targetPath = MODULE_ROUTES[card.id];
+            const outlineMenuCard = card.id === 'metric_management';
+            const hovered = hoveredNavId === card.id;
+            const navBorder = active
+              ? outlineMenuCard
+                ? '1px solid rgba(125, 211, 252, 0.65)'
+                : '1px solid rgba(255, 255, 255, 0.38)'
+              : pulseNav
+                ? `1px solid ${card.id === 'delivery_alerts' ? 'rgba(248, 113, 113, 0.55)' : 'rgba(96, 165, 250, 0.5)'}`
+                : outlineMenuCard
+                  ? '1px solid rgba(56, 189, 248, 0.55)'
+                  : hovered
+                    ? '1px solid rgba(255, 255, 255, 0.22)'
+                    : '1px solid rgba(255, 255, 255, 0.09)';
+            const navBg = active
+              ? 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)'
+              : pulseNav
+                ? 'linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)'
+                : hovered
+                  ? 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)'
+                  : 'linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)';
+            const moduleIcon = MODULE_ICONS[card.id] ?? '•';
+            const hasBadge =
+              showProductBadge || showRechargeBadge || showAssignBadge || showAlertBadge;
 
             return (
               <button
                 key={card.id}
                 type="button"
                 aria-label={card.title}
+                aria-current={active ? 'page' : undefined}
+                onMouseEnter={() => setHoveredNavId(card.id)}
+                onMouseLeave={() => setHoveredNavId(null)}
                 onClick={() => {
                   if (targetPath) navigate(targetPath);
                   if (isMobile) setMobileNavOpen(false);
@@ -556,60 +648,80 @@ const AdminShellLayout: React.FC = () => {
                 style={{
                   display: 'flex',
                   flexDirection: isMobile ? 'row' : 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0,
-                  width: isMobile ? '100%' : 100,
-                  minHeight: isMobile ? 48 : 46,
-                  height: isMobile ? 'auto' : undefined,
+                  alignItems: isMobile ? 'center' : 'center',
+                  justifyContent: isMobile ? 'flex-start' : 'center',
+                  gap: isMobile ? 10 : 4,
+                  width: isMobile ? '100%' : '100%',
+                  minHeight: isMobile ? 52 : 54,
                   textAlign: isMobile ? 'left' : 'center',
-                  padding: isMobile ? '9px 10px' : '8px 6px',
-                  marginBottom: 4,
-                  marginLeft: isMobile ? 0 : 'auto',
-                  marginRight: isMobile ? 0 : 'auto',
-                  borderRadius: 9,
-                  border: active
-                    ? '1px solid rgba(255, 255, 255, 0.35)'
-                    : pulseNav
-                      ? `1px solid ${card.id === 'delivery_alerts' ? 'rgba(220,38,38,0.45)' : 'rgba(52,152,219,0.45)'}`
-                      : '1px solid rgba(255, 255, 255, 0.08)',
-                  background: active
-                    ? 'rgba(255, 255, 255, 0.16)'
-                    : pulseNav
-                      ? 'rgba(255, 255, 255, 0.11)'
-                      : 'rgba(255, 255, 255, 0.05)',
+                  padding: isMobile ? '10px 12px' : '8px 6px 7px',
+                  marginLeft: isMobile ? 0 : 0,
+                  marginRight: isMobile ? 0 : 0,
+                  borderRadius: 11,
+                  border: navBorder,
+                  background: navBg,
                   color: 'white',
                   cursor: 'pointer',
-                  transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
+                  transition:
+                    'background 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease',
                   animation: pulseNav && !active ? 'pulse-alert 2.2s infinite' : undefined,
                   boxSizing: 'border-box',
-                  boxShadow: active ? 'inset 0 0 0 1px rgba(255,255,255,0.12)' : undefined,
+                  boxShadow: active
+                    ? '0 4px 14px rgba(0, 30, 60, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)'
+                    : hovered
+                      ? '0 3px 10px rgba(0, 24, 48, 0.15)'
+                      : '0 1px 2px rgba(0, 20, 40, 0.08)',
                   position: 'relative',
+                  transform: hovered && !active ? 'translateY(-1px)' : undefined,
+                  overflow: 'hidden',
                 }}
               >
+                {active && (
+                  <span
+                    aria-hidden
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 6,
+                      bottom: 6,
+                      width: 3,
+                      borderRadius: '0 4px 4px 0',
+                      background: 'linear-gradient(180deg, #fbbf24, #3b82f6)',
+                      boxShadow: '0 0 8px rgba(251, 191, 36, 0.45)',
+                    }}
+                  />
+                )}
+                <span
+                  aria-hidden
+                  style={{
+                    fontSize: isMobile ? '1.15rem' : '1.05rem',
+                    lineHeight: 1,
+                    flexShrink: 0,
+                    filter: active ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.25))' : undefined,
+                  }}
+                >
+                  {moduleIcon}
+                </span>
                 <div
                   style={
                     isMobile
-                      ? { flex: 1, minWidth: 0 }
-                      : {
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }
+                      ? { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }
+                      : { width: '100%', minWidth: 0 }
                   }
                 >
                   <div
                     style={{
-                      fontWeight: 700,
-                      fontSize: isMobile ? '0.92rem' : '0.74rem',
-                      lineHeight: isMobile ? 1.25 : 1.2,
-                      whiteSpace: 'nowrap',
+                      fontWeight: active ? 800 : 700,
+                      fontSize: isMobile ? '0.9rem' : '0.7rem',
+                      lineHeight: isMobile ? 1.3 : 1.25,
+                      whiteSpace: isMobile ? 'nowrap' : 'normal',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      width: isMobile ? undefined : '100%',
-                      height: isMobile ? undefined : undefined,
+                      display: isMobile ? 'block' : '-webkit-box',
+                      WebkitLineClamp: isMobile ? 1 : 2,
+                      WebkitBoxOrient: 'vertical',
                       textAlign: isMobile ? 'left' : 'center',
+                      color: active ? '#fff' : 'rgba(255, 255, 255, 0.92)',
                     }}
                   >
                     {card.title}
@@ -618,26 +730,31 @@ const AdminShellLayout: React.FC = () => {
                 <div
                   style={{
                     position: isMobile ? 'static' : 'absolute',
-                    top: isMobile ? undefined : 1,
-                    right: isMobile ? undefined : 2,
+                    top: isMobile ? undefined : 5,
+                    right: isMobile ? undefined : 5,
                     flexShrink: 0,
                     display: 'flex',
-                    flexDirection: isMobile ? 'column' : 'row',
-                    alignItems: 'flex-end',
-                    gap: 2,
-                    minHeight: isMobile ? 18 : 0,
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    justifyContent: isMobile ? 'flex-end' : 'flex-end',
+                    gap: 3,
+                    maxWidth: isMobile ? undefined : 52,
+                    minHeight: hasBadge ? (isMobile ? 18 : 14) : 0,
                   }}
                 >
                   {showRechargeBadge && (
                     <span
                       style={{
-                        background: '#e74c3c',
+                        background: 'linear-gradient(135deg, #ef4444, #dc2626)',
                         color: 'white',
-                        fontSize: '0.6rem',
+                        fontSize: '0.58rem',
                         fontWeight: 800,
-                        padding: '1px 6px',
+                        padding: '2px 6px',
                         borderRadius: 999,
-                        lineHeight: 1.35,
+                        lineHeight: 1.2,
+                        boxShadow: '0 1px 4px rgba(220, 38, 38, 0.45)',
+                        border: '1px solid rgba(255,255,255,0.25)',
                       }}
                     >
                       {pendingRechargeCount}
@@ -646,13 +763,15 @@ const AdminShellLayout: React.FC = () => {
                   {showAssignBadge && (
                     <span
                       style={{
-                        background: '#3498db',
+                        background: 'linear-gradient(135deg, #38bdf8, #2563eb)',
                         color: 'white',
-                        fontSize: '0.6rem',
+                        fontSize: '0.58rem',
                         fontWeight: 800,
-                        padding: '1px 6px',
+                        padding: '2px 6px',
                         borderRadius: 999,
-                        lineHeight: 1.35,
+                        lineHeight: 1.2,
+                        boxShadow: '0 1px 4px rgba(37, 99, 235, 0.4)',
+                        border: '1px solid rgba(255,255,255,0.25)',
                       }}
                     >
                       {pendingAssignmentCount}
@@ -661,13 +780,15 @@ const AdminShellLayout: React.FC = () => {
                   {showAlertBadge && (
                     <span
                       style={{
-                        background: '#dc2626',
+                        background: 'linear-gradient(135deg, #f87171, #b91c1c)',
                         color: 'white',
-                        fontSize: '0.6rem',
+                        fontSize: '0.58rem',
                         fontWeight: 800,
-                        padding: '1px 6px',
+                        padding: '2px 6px',
                         borderRadius: 999,
-                        lineHeight: 1.35,
+                        lineHeight: 1.2,
+                        boxShadow: '0 1px 4px rgba(185, 28, 28, 0.45)',
+                        border: '1px solid rgba(255,255,255,0.25)',
                       }}
                     >
                       {pendingDeliveryAlertsCount}
@@ -676,13 +797,15 @@ const AdminShellLayout: React.FC = () => {
                   {showProductBadge && (
                     <span
                       style={{
-                        background: '#f59e0b',
+                        background: 'linear-gradient(135deg, #fbbf24, #d97706)',
                         color: 'white',
-                        fontSize: '0.6rem',
+                        fontSize: '0.58rem',
                         fontWeight: 800,
-                        padding: '1px 6px',
+                        padding: '2px 6px',
                         borderRadius: 999,
-                        lineHeight: 1.35,
+                        lineHeight: 1.2,
+                        boxShadow: '0 1px 4px rgba(217, 119, 6, 0.4)',
+                        border: '1px solid rgba(255,255,255,0.25)',
                       }}
                     >
                       {pendingProductReviewCount}

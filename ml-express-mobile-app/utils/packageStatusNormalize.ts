@@ -15,6 +15,7 @@ export function normalizePackageStatusZh(status?: string | null): string {
 
   if (t === PACKAGE_STATUS_EN.DELIVERED) return PACKAGE_STATUS.DELIVERED;
   if (t === PACKAGE_STATUS_EN.CANCELLED) return PACKAGE_STATUS.CANCELLED;
+  if (t === "Delivering" || /^delivering$/i.test(t)) return PACKAGE_STATUS.IN_TRANSIT;
 
   if (t.includes("已送达")) return PACKAGE_STATUS.DELIVERED;
   if (t.includes("已取消")) return PACKAGE_STATUS.CANCELLED;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Logo from '../Logo';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -25,6 +25,22 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!showLanguageDropdown && !userMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      const el = e.target as Element;
+      if (showLanguageDropdown && !el.closest('[data-language-dropdown]')) {
+        setShowLanguageDropdown(false);
+      }
+      if (userMenuOpen && !el.closest('[data-user-menu]')) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showLanguageDropdown, userMenuOpen]);
 
   const handleNavigation = (path: string) => {
     const landingSectionMap: Record<string, string> = {
@@ -199,69 +215,162 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         }}>
           {/* 注册/登录按钮（放在语言选择器左侧） */}
           {currentUser ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: 'rgba(72, 187, 120, 0.2)',
-              border: '2px solid rgba(72, 187, 120, 0.5)',
-              padding: '0.5rem 1rem',
-              borderRadius: '10px',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <button
-                onClick={() => navigate('/profile')}
-                style={{
-                  background: 'rgba(59, 130, 246, 0.3)',
-                  color: 'white',
-                  border: '1px solid rgba(59, 130, 246, 0.5)',
-                  padding: '0.3rem 0.8rem',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem',
-                  fontWeight: 'bold',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
-                }}
-              >
-                {language === 'zh' ? '我的账户' : language === 'en' ? 'My Account' : 'ကျွန်ုပ်၏အကောင့်'}
-              </button>
-              <span style={{ 
-                color: 'white',
-                fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem',
-                fontWeight: 'bold'
-              }}>
-                {language === 'zh' ? `欢迎，${currentUser.name}` : 
-                 language === 'en' ? `Welcome, ${currentUser.name}` : 
-                 'ကြိုဆိုပါတယ်, ' + currentUser.name}
-              </span>
-              <button
-                onClick={onLogout}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: '1px solid rgba(255, 255, 255, 0.4)',
-                  padding: '0.3rem 0.8rem',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem',
-                  fontWeight: 'bold',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                }}
-              >
-                {language === 'zh' ? '退出' : language === 'en' ? 'Logout' : 'ထွက်'}
-              </button>
+            <div style={{ position: 'relative' }} data-user-menu>
+              {(() => {
+                const rawName = String(currentUser.name || '').trim() || '?';
+                const initial = rawName.charAt(0).toUpperCase();
+                const nameMaxW = window.innerWidth < 640 ? 72 : 112;
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowLanguageDropdown(false);
+                        setUserMenuOpen((o) => !o);
+                      }}
+                      aria-expanded={userMenuOpen}
+                      aria-haspopup="menu"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.2rem 0.45rem 0.2rem 0.2rem',
+                        borderRadius: '999px',
+                        border: '1px solid rgba(255, 255, 255, 0.22)',
+                        background: 'rgba(15, 23, 42, 0.45)',
+                        backdropFilter: 'blur(12px)',
+                        color: 'white',
+                        cursor: 'pointer',
+                        minHeight: '36px',
+                        maxWidth: `min(100%, ${nameMaxW + 52}px)`,
+                        transition: 'border-color 0.2s, background 0.2s',
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.35)';
+                        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.62)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)';
+                        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.45)';
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          flexShrink: 0,
+                          background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
+                          color: 'white',
+                          boxShadow: '0 1px 8px rgba(0,0,0,0.25)',
+                        }}
+                        aria-hidden
+                      >
+                        {initial}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: window.innerWidth < 768 ? '0.78rem' : '0.82rem',
+                          fontWeight: 600,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flex: '1 1 auto',
+                          minWidth: 0,
+                          textAlign: 'left',
+                        }}
+                        title={rawName}
+                      >
+                        {rawName}
+                      </span>
+                      <span style={{ fontSize: '0.55rem', opacity: 0.85, flexShrink: 0 }} aria-hidden>
+                        ▼
+                      </span>
+                    </button>
+                    {userMenuOpen && (
+                      <div
+                        role="menu"
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          marginTop: 6,
+                          minWidth: 168,
+                          background: 'rgba(15, 23, 42, 0.96)',
+                          backdropFilter: 'blur(12px)',
+                          border: '1px solid rgba(255, 255, 255, 0.14)',
+                          borderRadius: 10,
+                          padding: 4,
+                          zIndex: 1000,
+                          boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                        }}
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            navigate('/profile');
+                          }}
+                          style={{
+                            width: '100%',
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'white',
+                            padding: '0.5rem 0.65rem',
+                            borderRadius: 8,
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          {language === 'zh' ? '我的账户' : language === 'en' ? 'My Account' : 'ကျွန်ုပ်၏အကောင့်'}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            onLogout();
+                          }}
+                          style={{
+                            width: '100%',
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'rgba(252, 165, 165, 0.98)',
+                            padding: '0.5rem 0.65rem',
+                            borderRadius: 8,
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = 'rgba(248, 113, 113, 0.12)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          {language === 'zh' ? '退出登录' : language === 'en' ? 'Log out' : 'ထွက်ရန်'}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <div style={{
@@ -334,7 +443,11 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           {/* 语言选择器（放在用户卡片右侧） */}
           <div style={{ position: 'relative' }} data-language-dropdown>
             <button
-              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+              type="button"
+              onClick={() => {
+                setUserMenuOpen(false);
+                setShowLanguageDropdown(!showLanguageDropdown);
+              }}
               style={{
                 background: 'rgba(255,255,255,0.1)',
                 color: 'white',

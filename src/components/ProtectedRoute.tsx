@@ -6,7 +6,8 @@ import { logger } from '../utils/logger';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRoles?: ('admin' | 'manager' | 'operator' | 'finance')[];
-  permissionId?: string; // 新增：特有权限 ID
+  /** 满足任一即可（在服务端校验，与 requiredRoles 逻辑一致） */
+  permissionId?: string | string[];
 }
 
 /**
@@ -24,11 +25,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const [isChecking, setIsChecking] = useState(true);
   const [error, setError] = useState<string>('');
 
+  const permissionDep =
+    permissionId == null
+      ? ''
+      : typeof permissionId === 'string'
+        ? permissionId
+        : [...permissionId].sort().join(',');
+
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // 调用服务端验证 Token（Token 通过 httpOnly Cookie 自动发送）
-        // 传递 requiredRoles 和 permissionId
+        // 传递 requiredRoles 与 permissionId（可为多项，满足任一）
         const result = await verifyToken(requiredRoles, permissionId);
         
         if (result.valid) {
@@ -48,7 +55,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     };
 
     checkAuthStatus();
-  }, [requiredRoles, permissionId]);
+  }, [requiredRoles, permissionDep]);
 
   // 正在检查权限时显示加载状态
   if (isChecking) {

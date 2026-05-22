@@ -714,17 +714,39 @@ const ProfilePage: React.FC = () => {
   };
 
   // 🚀 新增：更新店铺营业状态
+  const resolveStoreId = useCallback(() => {
+    return storeInfo?.id ?? currentUser?.store_id ?? currentUser?.id ?? null;
+  }, [storeInfo?.id, currentUser?.store_id, currentUser?.id]);
+
+  const applyStoreBusinessStatus = useCallback((store: Partial<DeliveryStore>) => {
+    setBusinessStatus({
+      is_closed_today: store.is_closed_today ?? false,
+      operating_hours: store.operating_hours || "09:00 - 21:00",
+      vacation_dates: store.vacation_dates || [],
+    });
+  }, []);
+
   const handleUpdateStoreStatus = async (updates: Partial<DeliveryStore>) => {
-    if (!storeInfo?.id) return;
+    const storeId = resolveStoreId();
+    if (!storeId) {
+      alert(
+        language === "zh"
+          ? "无法获取店铺信息，请重新登录后再试"
+          : "Store not found. Please log in again.",
+      );
+      return;
+    }
     setIsSavingStatus(true);
     try {
-      const result = await deliveryStoreService.updateStoreInfo(
-        storeInfo.id,
-        updates,
-      );
-      if (result.success) {
+      const result = await deliveryStoreService.updateStoreInfo(storeId, {
+        operating_hours: updates.operating_hours ?? businessStatus.operating_hours,
+        is_closed_today:
+          updates.is_closed_today ?? businessStatus.is_closed_today,
+        vacation_dates: updates.vacation_dates ?? businessStatus.vacation_dates,
+      });
+      if (result.success && result.data) {
         setStoreInfo((prev: any) => ({ ...prev, ...result.data }));
-        // 🚀 优化：根据状态显示不同的通知
+        applyStoreBusinessStatus(result.data);
         if (updates.vacation_dates !== undefined) {
           alert(
             language === "zh"
@@ -755,7 +777,15 @@ const ProfilePage: React.FC = () => {
           );
         }
       } else {
-        alert(language === "zh" ? "❌ 保存失败" : "❌ Save failed");
+        const errMsg =
+          (result.error as { message?: string })?.message ||
+          (typeof result.error === "string" ? result.error : "");
+        LoggerService.error("保存营业状态失败:", result.error);
+        alert(
+          language === "zh"
+            ? `❌ 保存失败${errMsg ? `：${errMsg}` : ""}`
+            : `❌ Save failed${errMsg ? `: ${errMsg}` : ""}`,
+        );
       }
     } catch (error) {
       LoggerService.error("更新营业状态失败:", error);
@@ -932,24 +962,36 @@ const ProfilePage: React.FC = () => {
         setIsPartnerStore(true);
         
         // 如果是合伙店铺，加载店铺信息
-        if (isPartner && (user.store_code || user.store_id)) {
+        if (isPartner && (user.store_code || user.store_id || user.id)) {
           try {
-            let query = supabase.from("delivery_stores").select("*");
+            let store: DeliveryStore | null = null;
 
-            // 🚀 优化：根据可用标识符构建查询，避免空的 .or() 导致 400 错误
-            if (user.store_code && user.store_id) {
-              query = query.or(
-                `store_code.eq.${user.store_code},id.eq.${user.store_id}`,
-              );
-            } else if (user.store_code) {
-              query = query.eq("store_code", user.store_code);
-            } else if (user.store_id) {
-              query = query.eq("id", user.store_id);
+            if (user.id) {
+              store = await deliveryStoreService.getStoreById(user.id);
             }
 
-            const { data: store, error } = await query.maybeSingle();
-            
-            if (!error && store) {
+            if (!store) {
+              let query = supabase.from("delivery_stores").select("*");
+
+              if (user.store_code && user.store_id) {
+                query = query.or(
+                  `store_code.eq.${user.store_code},id.eq.${user.store_id}`,
+                );
+              } else if (user.store_code) {
+                query = query.eq("store_code", user.store_code);
+              } else if (user.store_id) {
+                query = query.eq("id", user.store_id);
+              } else if (user.id) {
+                query = query.eq("id", user.id);
+              }
+
+              const { data, error } = await query.maybeSingle();
+              if (!error && data) {
+                store = data as DeliveryStore;
+              }
+            }
+
+            if (store) {
               setStoreInfo(store);
               setBusinessStatus({
                 is_closed_today: store.is_closed_today || false,
@@ -2495,14 +2537,6 @@ const ProfilePage: React.FC = () => {
         }}
       >
         <MerchantProfileHero
-          title={t.title}
-          subtitle={
-            language === "zh"
-              ? "欢迎回来，这里是您的经营实时看板"
-              : language === "en"
-                ? "Welcome back — your real-time business dashboard"
-                : "ပြန်လည်ကြိုဆိုပါတယ် — အချိန်နှင့်တပြေးညီ လုပ်ငန်းစောင့်ကြည့်မှု"
-          }
           pendingConfirmation={orderStats.pendingConfirmation}
           isPartnerStore={isPartnerStore}
           visible={isVisible}

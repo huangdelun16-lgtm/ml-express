@@ -458,7 +458,7 @@ const UserRow = ({
             ✏️ 编辑资料
           </button>
           <button
-            onClick={() => updateUserStatus(user.id, user.status === 'active' ? 'inactive' : 'active')}
+            onClick={() => updateUserStatus(user, user.status === 'active' ? 'inactive' : 'active')}
             style={{
               background: user.status === 'active' ? 'rgba(243, 156, 18, 0.2)' : 'rgba(39, 174, 96, 0.2)',
               color: user.status === 'active' ? '#f39c12' : '#2ecc71',
@@ -477,7 +477,7 @@ const UserRow = ({
             {user.status === 'active' ? '🚫 停用账户' : '✅ 启用账户'}
           </button>
           <button
-            onClick={() => updateUserStatus(user.id, 'suspended')}
+            onClick={() => updateUserStatus(user, 'suspended')}
             style={{
               background: 'rgba(231, 76, 60, 0.15)',
               color: '#e74c3c',
@@ -496,16 +496,18 @@ const UserRow = ({
             ⚠️ 暂停服务
           </button>
           <button
-            onClick={() => handleDeleteUser(user.id)}
+            type="button"
+            onClick={() => handleDeleteUser(user)}
             style={{
               marginLeft: 'auto',
-              background: 'transparent',
-              color: 'rgba(255,255,255,0.4)',
-              border: 'none',
-              padding: '10px',
+              background: 'rgba(231, 76, 60, 0.15)',
+              color: '#fecaca',
+              border: '1px solid rgba(231, 76, 60, 0.45)',
+              padding: '10px 16px',
               borderRadius: '10px',
               cursor: 'pointer',
               fontSize: '0.85rem',
+              fontWeight: '700',
               transition: 'all 0.3s ease'
             }}
           >
@@ -1093,25 +1095,54 @@ const UserManagement: React.FC = () => {
     setSelectedUsers(newSelected);
   };
 
-  // 批量删除处理
+  // 批量删除：按用户类型分别删除 users 或 admin_accounts
   const handleBatchDelete = async () => {
     if (selectedUsers.size === 0) return;
-    
+
     if (!window.confirm(`确定要删除选中的 ${selectedUsers.size} 个用户吗？此操作不可恢复！`)) return;
 
     try {
       setIsBatchDeleting(true);
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .in('id', Array.from(selectedUsers));
+      const idList = Array.from(selectedUsers);
+      const targets = idList.map((id) => users.find((u) => u.id === id)).filter((u): u is User => Boolean(u));
 
-      if (error) {
-        console.error('批量删除失败:', error);
-        window.alert('批量删除失败，请重试');
+      let failures = 0;
+      const errors: string[] = [];
+
+      for (const u of targets) {
+        if (u.user_type === 'admin') {
+          const del =
+            String(u.id).startsWith('ADM-') && String(u.id).length > 4
+              ? await supabase.from('admin_accounts').delete().eq('employee_id', String(u.id).slice(4)).select('id')
+              : await supabase.from('admin_accounts').delete().eq('id', u.id).select('id');
+          if (del.error) {
+            failures++;
+            errors.push(`${u.name}: ${del.error.message}`);
+          } else if (!del.data?.length) {
+            failures++;
+            errors.push(`${u.name}: 未找到后台账号记录`);
+          }
+        } else {
+          await supabase.from('recharge_requests').delete().eq('user_id', u.id);
+          const { error, data } = await supabase.from('users').delete().eq('id', u.id).select('id');
+          if (error) {
+            failures++;
+            errors.push(`${u.name}: ${error.message}`);
+          } else if (!data?.length) {
+            failures++;
+            errors.push(`${u.name}: 未找到 users 记录`);
+          }
+        }
+      }
+
+      await loadUsers();
+      setSelectedUsers(new Set());
+
+      if (failures > 0) {
+        window.alert(
+          `完成部分删除。失败 ${failures} 条（可能受数据库外键或其它关联限制）。\n\n` + errors.slice(0, 5).join('\n'),
+        );
       } else {
-        await loadUsers();
-        setSelectedUsers(new Set());
         window.alert('批量删除成功');
       }
     } catch (error) {
@@ -1397,6 +1428,13 @@ const UserManagement: React.FC = () => {
     e.preventDefault();
     if (!editingUser) return;
 
+    if (editingUser.user_type === 'admin') {
+      window.alert(
+        '当前条目为后台「员工/管理员」账号，数据保存在「账户管理」中。\n\n请前往：控制台 → 系统设置 → 账户管理 进行修改。',
+      );
+      return;
+    }
+
     // 🚀 优化：清理更新数据，只发送数据库支持且必要的字段
     // 排除前端本地计算的字段 (如 registration_date, last_login, total_orders 等)
     const updateData: any = {
@@ -1441,22 +1479,66 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm('确定要删除这个用户吗？')) return;
+  const handleDeleteUser = async (user: User) => {
+    if (!window.confirm(`确定要删除用户「${user.name}」吗？此操作不可恢复。`)) return;
     try {
-      const { error } = await supabase.from('users').delete().eq('id', userId);
-      if (!error) await loadUsers();
-    } catch (error) {
-      console.error('删除用户异常');
+      if (user.user_type === 'admin') {
+        const del =
+          String(user.id).startsWith('ADM-') && String(user.id).length > 4
+            ? await supabase.from('admin_accounts').delete().eq('employee_id', String(user.id).slice(4)).select('id')
+            : await supabase.from('admin_accounts').delete().eq('id', user.id).select('id');
+        if (del.error) {
+          window.alert(`删除管理员失败：${del.error.message}${del.error.hint ? '\n提示：' + del.error.hint : ''}`);
+          return;
+        }
+        if (!del.data?.length) {
+          window.alert('未删除任何记录：未在「账户管理」中找到对应后台账号。');
+          return;
+        }
+      } else {
+        await supabase.from('recharge_requests').delete().eq('user_id', user.id);
+        const { error, data } = await supabase.from('users').delete().eq('id', user.id).select('id');
+        if (error) {
+          window.alert(
+            `删除失败：${error.message}${error.details ? '\n' + error.details : ''}${error.hint ? '\n提示：' + error.hint : ''}`,
+          );
+          return;
+        }
+        if (!data?.length) {
+          window.alert('未删除任何记录：该用户可能已不存在，或数据在非 users 表中。');
+          return;
+        }
+      }
+      await loadUsers();
+      window.alert('删除成功');
+    } catch (error: unknown) {
+      console.error('删除用户异常:', error);
+      window.alert(error instanceof Error ? error.message : '删除异常');
     }
   };
 
-  const updateUserStatus = async (userId: string, newStatus: any) => {
+  const updateUserStatus = async (user: User, newStatus: 'active' | 'inactive' | 'suspended') => {
     try {
-      const { error } = await supabase.from('users').update({ status: newStatus }).eq('id', userId);
-      if (!error) await loadUsers();
+      if (user.user_type === 'admin') {
+        const up =
+          String(user.id).startsWith('ADM-') && String(user.id).length > 4
+            ? await supabase.from('admin_accounts').update({ status: newStatus }).eq('employee_id', String(user.id).slice(4))
+            : await supabase.from('admin_accounts').update({ status: newStatus }).eq('id', user.id);
+        if (up.error) {
+          window.alert('更新状态失败：' + up.error.message);
+          return;
+        }
+      } else {
+        const { error } = await supabase.from('users').update({ status: newStatus }).eq('id', user.id);
+        if (error) {
+          window.alert('更新状态失败：' + error.message);
+          return;
+        }
+      }
+      await loadUsers();
     } catch (error) {
-      console.error('更新状态异常');
+      console.error('更新状态异常', error);
+      window.alert('更新状态异常');
     }
   };
 
@@ -1759,7 +1841,28 @@ const UserManagement: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)', padding: isMobile ? '10px' : '40px', color: 'white', fontFamily: "'Segoe UI', Roboto, sans-serif" }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(165deg, #0a0f1c 0%, #0f172a 35%, #152f4a 70%, #1a2744 100%)',
+        padding: isMobile ? '14px 12px 48px' : '36px 28px 56px',
+        color: 'white',
+        fontFamily: "'PingFang SC', 'Segoe UI', system-ui, sans-serif",
+        position: 'relative',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          background:
+            'radial-gradient(ellipse 70% 45% at 0% -10%, rgba(59, 130, 246, 0.14), transparent 50%), radial-gradient(ellipse 50% 40% at 100% 100%, rgba(16, 185, 129, 0.08), transparent 45%)',
+          zIndex: 0,
+        }}
+      />
       {/* 🚀 新增全局动画样式 */}
       <style>{`
         @keyframes blink {
@@ -1777,42 +1880,112 @@ const UserManagement: React.FC = () => {
           100% { border-color: rgba(231, 76, 60, 0.4); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
         }
       `}</style>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '36px',
+            flexWrap: 'wrap',
+            gap: '20px',
+            paddingBottom: '24px',
+            borderBottom: '1px solid rgba(148, 163, 184, 0.15)',
+          }}
+        >
           <div>
-            <h1 style={{ fontSize: isMobile ? '2rem' : '2.8rem', fontWeight: 800, margin: 0, letterSpacing: '-1px' }}>用户管理</h1>
-            <p style={{ opacity: 0.7, fontSize: '1.1rem', marginTop: '5px' }}>管理客户、快递员和管理员账户</p>
+            <div
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'rgba(186, 230, 253, 0.85)',
+                marginBottom: '10px',
+              }}
+            >
+              ML EXPRESS · ADMIN
+            </div>
+            <h1
+              style={{
+                fontSize: isMobile ? '1.85rem' : '2.6rem',
+                fontWeight: 800,
+                margin: 0,
+                letterSpacing: '-0.02em',
+                background: 'linear-gradient(100deg, #f8fafc 0%, #93c5fd 50%, #a5b4fc 100%)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent',
+              }}
+            >
+              用户管理
+            </h1>
+            <p style={{ opacity: 0.88, fontSize: '1.05rem', marginTop: '12px', marginBottom: 0, maxWidth: 560, lineHeight: 1.55 }}>
+              管理客户、商户、快递员与管理员；删除与状态已按数据源自动同步到「用户表」或「后台账户表」。
+            </p>
           </div>
-          <button onClick={() => navigate('/admin/dashboard')} style={{ background: 'rgba(255, 255, 255, 0.1)', color: 'white', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '12px 24px', borderRadius: '12px', cursor: 'pointer', fontSize: '1rem', backdropFilter: 'blur(10px)', transition: 'all 0.3s ease' }}>← 返回管理后台</button>
+          <button
+            type="button"
+            onClick={() => navigate('/admin/dashboard')}
+            style={{
+              background: 'rgba(15, 23, 42, 0.55)',
+              color: '#e2e8f0',
+              border: '1px solid rgba(148, 163, 184, 0.35)',
+              padding: '12px 22px',
+              borderRadius: '14px',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              backdropFilter: 'blur(10px)',
+              transition: 'all 0.2s ease',
+              flexShrink: 0,
+            }}
+          >
+            ← 返回管理后台
+          </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
           {['customer_list', 'admin_list', 'merchant_store', 'courier_management', 'recharge_requests'].map(tab => {
             const isRechargeTab = tab === 'recharge_requests';
             const hasPending = Object.keys(pendingRechargeRequests).length > 0;
-            
+
             return (
-              <button 
-                key={tab} 
+              <button
+                type="button"
+                key={tab}
                 onClick={() => {
                   setActiveTab(tab as any);
                   if (isRechargeTab) setHasNewRequest(false);
-                }} 
-                style={{ 
-                  padding: '12px 24px', 
-                  borderRadius: '12px', 
-                  border: isRechargeTab && hasPending ? '2px solid #e74c3c' : 'none', 
-                  background: activeTab === tab ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.2)', 
-                  color: 'white', 
-                  cursor: 'pointer', 
-                  fontWeight: activeTab === tab ? '600' : '400', 
-                  transition: 'all 0.3s ease',
+                }}
+                style={{
+                  padding: '12px 20px',
+                  borderRadius: '14px',
+                  border:
+                    isRechargeTab && hasPending
+                      ? '2px solid #f87171'
+                      : activeTab === tab
+                        ? '1px solid rgba(96, 165, 250, 0.55)'
+                        : '1px solid rgba(148, 163, 184, 0.2)',
+                  background:
+                    activeTab === tab
+                      ? 'linear-gradient(145deg, rgba(37, 99, 235, 0.35) 0%, rgba(30, 41, 59, 0.9) 100%)'
+                      : 'rgba(15, 23, 42, 0.55)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: activeTab === tab ? '700' : '500',
+                  transition: 'all 0.2s ease',
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: isRechargeTab && hasPending ? '0 0 15px rgba(231, 76, 60, 0.3)' : 'none',
-                  animation: isRechargeTab && hasPending ? 'pulse-border 2s infinite' : 'none'
+                  boxShadow:
+                    isRechargeTab && hasPending
+                      ? '0 0 20px rgba(248, 113, 113, 0.25)'
+                      : activeTab === tab
+                        ? '0 8px 24px rgba(0, 0, 0, 0.22)'
+                        : 'none',
+                  animation: isRechargeTab && hasPending ? 'pulse-border 2s infinite' : 'none',
                 }}
               >
                 {isRechargeTab && hasPending && (

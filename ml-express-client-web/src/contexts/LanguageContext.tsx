@@ -37,7 +37,15 @@ const translations: any = {
       subtitle: '快速、安全、可靠的同城快递服务',
       cta: '立即下单',
       mall: '同城商场',
-      cart: '购物车'
+      cart: '购物车',
+      trackPlaceholder: '输入运单号，一键查询物流',
+      trackBtn: '查询',
+      stats: [
+        { value: '5 分钟', label: '极速接单' },
+        { value: '实时', label: 'GPS 追踪' },
+        { value: '全城', label: '覆盖配送' },
+      ],
+      scrollHint: '向下滑动探索更多服务',
     },
     features: {
       title: '服务特色',
@@ -632,7 +640,15 @@ const translations: any = {
       subtitle: 'Fast, Safe, and Reliable Same-Day Delivery Service',
       cta: 'Order Now',
       mall: 'City Mall',
-      cart: 'Cart'
+      cart: 'Cart',
+      trackPlaceholder: 'Enter tracking number',
+      trackBtn: 'Track',
+      stats: [
+        { value: '5 min', label: 'Fast pickup' },
+        { value: 'Live', label: 'GPS tracking' },
+        { value: 'City-wide', label: 'Coverage' },
+      ],
+      scrollHint: 'Scroll down for more',
     },
     features: {
       title: 'Service Features',
@@ -1227,7 +1243,15 @@ const translations: any = {
       subtitle: 'မြန်ဆန်၊ လုံခြုံ၊ ယုံကြည်စိတ်ချရသော မြို့တွင်းပို့ဆောင်ရေး',
       cta: 'အော်ဒါတင်မည်',
       mall: 'စျေးဝယ်စင်တာ',
-      cart: 'စျေးဝယ်လှည်း'
+      cart: 'စျေးဝယ်လှည်း',
+      trackPlaceholder: 'ပို့ဆောင်မှုနံပါတ် ထည့်ပါ',
+      trackBtn: 'ရှာဖွေ',
+      stats: [
+        { value: '၅ မိနစ်', label: 'မြန်ဆန်စွာ လက်ခံ' },
+        { value: 'တိုက်ရိုက်', label: 'GPS ခြေရာခံ' },
+        { value: 'မြို့တစ်ဝန်း', label: 'ပို့ဆောင်မှု' },
+      ],
+      scrollHint: 'အောက်သို့ ဆွဲချ၍ ဆက်လက်ကြည့်ရှုပါ',
     },
     features: {
       title: 'ထူခြားသော၀န်ဆောင်မှုများ',

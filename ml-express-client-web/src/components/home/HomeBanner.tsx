@@ -57,63 +57,31 @@ const HomeBanner = () => {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+      <div
+        className="home-banner-shell"
+        style={{
+          minHeight: 'clamp(220px, 32vw, 300px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'rgba(148, 163, 184, 0.7)',
+          fontWeight: 600,
+        }}
+      >
         Loading…
       </div>
     );
   }
 
   return (
-    <div className="home-banner-root" style={{
-      position: 'relative',
-      zIndex: 5,
-      padding: 0,
-      maxWidth: 'none',
-      margin: '0 auto',
-      width: '100%'
-    }}>
-      <div
-        ref={bannerScrollRef}
-        style={{
-          display: 'flex',
-          overflowX: 'auto',
-          scrollSnapType: 'x mandatory',
-          scrollBehavior: 'smooth',
-          width: '100%',
-          borderRadius: '20px',
-          boxShadow: '0 24px 48px rgba(0,0,0,0.28)',
-          border: '1px solid rgba(255,255,255,0.14)',
-          position: 'relative',
-          cursor: 'grab',
-          WebkitOverflowScrolling: 'touch' as any,
-        }}
-        onMouseDown={(e) => {
-          const element = e.currentTarget;
-          element.style.cursor = 'grabbing';
-        }}
-        onMouseUp={(e) => {
-          const element = e.currentTarget;
-          element.style.cursor = 'grab';
-        }}
-        onMouseLeave={(e) => {
-          const element = e.currentTarget;
-          element.style.cursor = 'grab';
-        }}
-      >
+    <div className="home-banner-root">
+      <div ref={bannerScrollRef} className="home-banner-carousel">
         {banners.length > 0 ? (
           banners.map((banner, index) => (
             <div
               key={banner.id || index}
-              style={{
-                minWidth: '100%',
-                scrollSnapAlign: 'start',
-                height: '280px',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                position: 'relative',
-                cursor: 'pointer',
-                userSelect: 'none'
-              }}
+              className="home-banner-slide"
+              style={{ cursor: 'pointer' }}
               onMouseDown={() => setIsBannerPaused(true)}
               onMouseUp={() => setIsBannerPaused(false)}
               onMouseLeave={() => setIsBannerPaused(false)}
@@ -191,16 +159,8 @@ const HomeBanner = () => {
           <>
             {/* 第一张卡片：地图追踪 */}
             <div
-              style={{
-                minWidth: '100%',
-                scrollSnapAlign: 'start',
-                height: '280px',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                position: 'relative',
-                cursor: 'pointer',
-                userSelect: 'none'
-              }}
+              className="home-banner-slide"
+              style={{ cursor: 'pointer' }}
               onMouseDown={() => setIsBannerPaused(true)}
               onMouseUp={() => setIsBannerPaused(false)}
               onMouseLeave={() => setIsBannerPaused(false)}
@@ -344,16 +304,7 @@ const HomeBanner = () => {
 
             {/* 第二张卡片：地址填写 */}
             <div
-              style={{
-                minWidth: '100%',
-                scrollSnapAlign: 'start',
-                height: '280px',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                position: 'relative',
-                cursor: 'pointer',
-                userSelect: 'none'
-              }}
+              className="home-banner-slide"
               onMouseDown={() => setIsBannerPaused(true)}
               onMouseUp={() => setIsBannerPaused(false)}
               onMouseLeave={() => setIsBannerPaused(false)}
@@ -497,28 +448,15 @@ const HomeBanner = () => {
         )}
       </div>
       
-      {/* 轮播指示点 */}
-      <div style={{
-        position: 'absolute',
-        bottom: '15px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        gap: '8px',
-        zIndex: 10
-      }}>
+      <div className="home-banner-dots" role="tablist" aria-label="Banner slides">
         {Array.from({ length: TOTAL_BANNERS }).map((_, index) => (
-          <div
+          <button
+            type="button"
             key={index}
-            style={{
-              width: index === currentBannerIndex ? '24px' : '8px',
-              height: '8px',
-              borderRadius: '4px',
-              backgroundColor: index === currentBannerIndex ? '#3b82f6' : 'rgba(255,255,255,0.4)',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-              transition: 'all 0.3s ease',
-              cursor: 'pointer'
-            }}
+            role="tab"
+            aria-selected={index === currentBannerIndex}
+            aria-label={`Slide ${index + 1}`}
+            className={`home-banner-dot ${index === currentBannerIndex ? 'home-banner-dot--active' : 'home-banner-dot--idle'}`}
             onClick={() => {
               if (bannerScrollRef.current) {
                 bannerScrollRef.current.scrollTo({

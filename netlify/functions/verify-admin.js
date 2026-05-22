@@ -77,10 +77,10 @@ function verifyHMACSignature(data, signature) {
  * 验证管理员 Token
  * @param {string} token - JWT Token 或 Session Token
  * @param {string[]} requiredRoles - 需要的角色列表
- * @param {string} permissionId - 需要的特有权限 ID
+ * @param {string[]} permissionIds - 需要的特有权限 ID（任一命中即可，在角色未满足 requiredRoles 时生效）
  * @returns {Promise<{valid: boolean, user?: object, error?: string}>}
  */
-async function verifyAdminToken(token, requiredRoles = [], permissionId = null) {
+async function verifyAdminToken(token, requiredRoles = [], permissionIds = null) {
   try {
     if (!token) {
       return { valid: false, error: '缺少认证令牌' };
@@ -173,17 +173,21 @@ async function verifyAdminToken(token, requiredRoles = [], permissionId = null) 
     // 获取用户权限列表（保留 null 以区分“未配置”与“配置为空”）
     const userPermissions = Array.isArray(account.permissions) ? account.permissions : null;
 
-    // 检查权限：满足角色要求 OR 拥有特有权限
+    const ids = Array.isArray(permissionIds) ? permissionIds.filter(Boolean) : [];
+
+    // 检查权限：满足角色要求 OR 拥有特有权限（之一）
     let hasAccess = false;
-    
+
     // 1. 角色检查
     if (requiredRoles.length === 0 || requiredRoles.includes(role)) {
       hasAccess = true;
-    } 
-    
-    // 2. 特有权限检查 (如果角色检查没过，看看是否有指定的 permissionId)
-    if (!hasAccess && permissionId && Array.isArray(userPermissions) && userPermissions.includes(permissionId)) {
-      hasAccess = true;
+    }
+
+    // 2. 特有权限检查 (如果角色检查没过，看看是否有任一 permissionId)
+    if (!hasAccess && ids.length && Array.isArray(userPermissions)) {
+      if (ids.some((id) => userPermissions.includes(id))) {
+        hasAccess = true;
+      }
     }
 
     if (!hasAccess) {
@@ -242,7 +246,7 @@ exports.handler = async (event, context) => {
   });
 
   try {
-    const { action, token, requiredRoles, permissionId } = JSON.parse(event.body || '{}');
+    const { action, token, requiredRoles, permissionId, permissionIds } = JSON.parse(event.body || '{}');
 
     if (action === 'verify') {
       // 优先从 Cookie 获取 Token（更安全）
@@ -281,8 +285,13 @@ exports.handler = async (event, context) => {
         };
       }
       
-      // 验证 Token，传入 permissionId
-      const result = await verifyAdminToken(tokenToVerify, requiredRoles || [], permissionId);
+      let permIds = [];
+      if (Array.isArray(permissionIds) && permissionIds.length) {
+        permIds = permissionIds;
+      } else if (permissionId) {
+        permIds = [permissionId];
+      }
+      const result = await verifyAdminToken(tokenToVerify, requiredRoles || [], permIds);
       
       // 如果验证失败，清除 Cookie
       if (!result.valid) {

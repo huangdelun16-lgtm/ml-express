@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import { merchantService, deliveryStoreService, Product, DeliveryStore } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import '../styles/merchantProductsPage.css';
 
 const StoreProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -206,431 +207,371 @@ const StoreProductsPage: React.FC = () => {
     }
   };
 
+  const productStats = useMemo(() => {
+    const onSale = products.filter((p) => p.is_available).length;
+    const pending = products.filter((p) => p.listing_status === 'pending').length;
+    return { total: products.length, onSale, pending };
+  }, [products]);
+
+  const saleLabel =
+    language === 'zh' ? '在售' : language === 'en' ? 'On sale' : 'ရောင်းချ中';
+  const pendingLabel =
+    language === 'zh' ? '待审核' : language === 'en' ? 'Pending' : 'စောင့်ဆိုင်း';
+
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      {/* 🚀 页眉区域 */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: '2.5rem',
-        background: 'rgba(255, 255, 255, 0.03)',
-        padding: '1.5rem 2rem',
-        borderRadius: '24px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(10px)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ 
-            width: '56px', 
-            height: '56px', 
-            borderRadius: '16px', 
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.8rem',
-            boxShadow: '0 10px 20px rgba(5, 150, 105, 0.3)'
-          }}>🏪</div>
-          <div>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: '950', margin: 0, letterSpacing: '-0.5px', color: '#ffffff' }}>
-              {t?.myProducts || '商品管理'}
-            </h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: '4px', fontSize: '0.85rem', fontWeight: '600' }}>
-              {store?.store_name} · {language === 'zh' ? `在线商品 ${products.length} 件` : `${products.length} Products Online`}
+    <div className="merchant-products-page">
+      <header className="merchant-products-hero">
+        <div className="merchant-products-hero__brand">
+          <div className="merchant-products-hero__icon" aria-hidden>
+            🛍️
+          </div>
+          <div className="merchant-products-hero__titles">
+            <h1>{t?.myProducts || '商品管理'}</h1>
+            <p>
+              {store?.store_name || currentUser?.name || '—'}
+              {' · '}
+              {language === 'zh'
+                ? `共 ${productStats.total} 件商品`
+                : `${productStats.total} products`}
             </p>
           </div>
         </div>
-        
-        <button 
-          onClick={handleOpenAddProduct}
-          style={{
-            padding: '12px 24px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            border: 'none',
-            color: 'white',
-            fontWeight: '800',
-            fontSize: '0.95rem',
-            cursor: 'pointer',
-            boxShadow: '0 8px 25px rgba(5, 150, 105, 0.3)',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 12px 30px rgba(5, 150, 105, 0.4)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 8px 25px rgba(5, 150, 105, 0.3)';
-          }}
-        >
-          <span style={{ fontSize: '1.2rem' }}>+</span> {t?.addProduct || '添加商品'}
-        </button>
-      </div>
+
+        <div className="merchant-products-hero__actions">
+          {!loading && productStats.total > 0 ? (
+            <div className="merchant-products-stats">
+              <span className="merchant-products-stat">
+                {language === 'zh' ? '全部' : 'All'} {productStats.total}
+              </span>
+              <span className="merchant-products-stat merchant-products-stat--sale">
+                {saleLabel} {productStats.onSale}
+              </span>
+              {productStats.pending > 0 ? (
+                <span className="merchant-products-stat merchant-products-stat--pending">
+                  {pendingLabel} {productStats.pending}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className="merchant-products-btn-primary"
+            onClick={handleOpenAddProduct}
+          >
+            <span aria-hidden>+</span>
+            {t?.addProduct || '添加商品'}
+          </button>
+        </div>
+      </header>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '10rem 0' }}>
-          <div className="spinner" style={{ 
-            width: '40px', 
-            height: '40px', 
-            border: '4px solid rgba(255,255,255,0.1)', 
-            borderTop: '4px solid #10b981', 
-            borderRadius: '50%', 
-            animation: 'spin 1s linear infinite', 
-            margin: '0 auto' 
-          }}></div>
+        <div className="merchant-products-loading">
+          <div className="merchant-products-loading__spinner" />
+        </div>
+      ) : products.length === 0 ? (
+        <div className="merchant-products-empty">
+          <div className="merchant-products-empty__icon" aria-hidden>
+            🛍️
+          </div>
+          <h3>{t?.noProducts || '暂无商品数据'}</h3>
+          <button
+            type="button"
+            className="merchant-products-btn-primary"
+            onClick={handleOpenAddProduct}
+          >
+            {language === 'zh' ? '立即添加商品' : 'Add your first product'}
+          </button>
         </div>
       ) : (
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', 
-          gap: '2rem' 
-        }}>
+        <div className="merchant-products-grid">
           {products.map((product) => (
-            <div 
-              key={product.id} 
-              style={{ 
-                background: 'rgba(255,255,255,0.05)', 
-                borderRadius: '28px', 
-                border: '1px solid rgba(255,255,255,0.1)', 
-                overflow: 'hidden', 
-                backdropFilter: 'blur(15px)',
-                transition: 'all 0.3s ease',
-                position: 'relative'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                e.currentTarget.style.transform = 'translateY(-8px)';
-                e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              {/* 图片区域 */}
-              <div style={{ width: '100%', aspectRatio: '1', position: 'relative', background: 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <article key={product.id} className="merchant-product-card">
+              <div className="merchant-product-card__media">
                 {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={product.image_url} alt={product.name} loading="lazy" />
                 ) : (
-                  <div style={{ fontSize: '3rem', opacity: 0.2 }}>📦</div>
+                  <span className="merchant-product-card__placeholder" aria-hidden>
+                    📦
+                  </span>
                 )}
-                
-                {/* 悬浮操作：状态切换 */}
-                <div 
-                  onClick={(e) => { e.stopPropagation(); handleToggleAvailability(product); }}
-                  style={{ 
-                    position: 'absolute', 
-                    top: '15px', 
-                    right: '15px', 
-                    background: product.is_available ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)', 
-                    color: 'white', 
-                    padding: '6px 12px', 
-                    borderRadius: '10px', 
-                    fontSize: '0.7rem', 
-                    fontWeight: '900',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    zIndex: 2
+                <button
+                  type="button"
+                  className={`merchant-product-card__badge ${
+                    product.is_available
+                      ? 'merchant-product-card__badge--on'
+                      : 'merchant-product-card__badge--off'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleAvailability(product);
                   }}
                 >
-                  {product.is_available ? 'ON SALE' : 'OFF SHELF'}
-                </div>
-
-                {/* 折扣标签 */}
-                {product.original_price && product.original_price > product.price && (
-                  <div style={{ 
-                    position: 'absolute', 
-                    bottom: '15px', 
-                    left: '15px', 
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
-                    color: 'white', 
-                    padding: '4px 10px', 
-                    borderRadius: '8px', 
-                    fontSize: '0.7rem', 
-                    fontWeight: '900',
-                    boxShadow: '0 4px 10px rgba(239, 68, 68, 0.3)'
-                  }}>
+                  {product.is_available
+                    ? language === 'zh'
+                      ? '在售'
+                      : 'ON'
+                    : language === 'zh'
+                      ? '下架'
+                      : 'OFF'}
+                </button>
+                {product.original_price && product.original_price > product.price ? (
+                  <span className="merchant-product-card__discount">
                     {Math.round((1 - product.price / product.original_price) * 100)}% OFF
-                  </div>
-                )}
+                  </span>
+                ) : null}
               </div>
 
-              {/* 信息区域 */}
-              <div style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: '0 0 0.5rem 0', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className="merchant-product-card__body">
+                <h3 className="merchant-product-card__name" title={product.name}>
                   {product.name}
                 </h3>
-                
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '1rem' }}>
-                  <span style={{ color: '#fbbf24', fontSize: '1.4rem', fontWeight: '950' }}>{product.price.toLocaleString()}</span>
-                  <span style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: '700' }}>MMK</span>
-                  {product.original_price && product.original_price > product.price && (
-                    <span style={{ color: 'rgba(255,255,255,0.2)', textDecoration: 'line-through', fontSize: '0.85rem', marginLeft: '4px' }}>
+
+                <div className="merchant-product-card__price-row">
+                  <span className="merchant-product-card__price">
+                    {product.price.toLocaleString()}
+                  </span>
+                  <span className="merchant-product-card__currency">MMK</span>
+                  {product.original_price && product.original_price > product.price ? (
+                    <span className="merchant-product-card__original">
                       {product.original_price.toLocaleString()}
                     </span>
-                  )}
+                  ) : null}
                 </div>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase' }}>{t?.productStock || '库存'}</span>
-                    <span style={{ color: 'white', fontWeight: '700', fontSize: '0.9rem' }}>
-                      {product.stock === -1 ? (t?.stockInfinite || '无限') : `${product.stock} 件`}
+
+                <div className="merchant-product-card__meta">
+                  <div>
+                    <span className="merchant-product-card__meta-label">
+                      {t?.productStock || '库存'}
+                    </span>
+                    <span className="merchant-product-card__meta-value">
+                      {product.stock === -1
+                        ? t?.stockInfinite || '无限'
+                        : `${product.stock}`}
                     </span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase' }}>{language === 'zh' ? '销量' : 'Sales'}</span>
-                    <span style={{ color: '#10b981', fontWeight: '700', fontSize: '0.9rem', display: 'block' }}>{product.sales_count || 0}</span>
+                    <span className="merchant-product-card__meta-label">
+                      {language === 'zh' ? '销量' : 'Sales'}
+                    </span>
+                    <span className="merchant-product-card__meta-value merchant-product-card__meta-value--sales">
+                      {product.sales_count || 0}
+                    </span>
                   </div>
                 </div>
 
-                {(product.listing_status === 'pending' || product.listing_status === 'rejected') && (
-                  <div style={{
-                    marginBottom: '0.75rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    color: product.listing_status === 'pending' ? '#fbbf24' : '#f87171',
-                  }}>
+                {(product.listing_status === 'pending' ||
+                  product.listing_status === 'rejected') && (
+                  <div
+                    className={`merchant-product-card__status ${
+                      product.listing_status === 'pending'
+                        ? 'merchant-product-card__status--pending'
+                        : 'merchant-product-card__status--rejected'
+                    }`}
+                  >
                     {product.listing_status === 'pending'
-                      ? (language === 'zh' ? '待后台审核' : 'Pending approval')
-                      : (language === 'zh' ? '审核未通过' : 'Rejected')}
+                      ? language === 'zh'
+                        ? '⏳ 待后台审核'
+                        : '⏳ Pending approval'
+                      : language === 'zh'
+                        ? '✕ 审核未通过'
+                        : '✕ Rejected'}
                   </div>
                 )}
 
-                <button 
+                <button
+                  type="button"
+                  className="merchant-product-card__edit"
                   onClick={() => handleOpenEditProduct(product)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '12px',
-                    background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: 'white',
-                    fontWeight: '700',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                  onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
                 >
                   {t?.editProduct || '编辑商品'}
                 </button>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
 
-      {!loading && products.length === 0 && (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '8rem 0', 
-          background: 'rgba(255,255,255,0.02)', 
-          borderRadius: '40px', 
-          border: '2px dashed rgba(255,255,255,0.1)' 
-        }}>
-          <div style={{ fontSize: '5rem', marginBottom: '1.5rem', opacity: 0.2 }}>🛍️</div>
-          <h3 style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.5rem', fontWeight: '700' }}>
-            {t?.noProducts || '暂无商品数据'}
-          </h3>
-          <button 
-            onClick={handleOpenAddProduct}
-            style={{ marginTop: '1.5rem', padding: '12px 30px', borderRadius: '14px', background: '#3b82f6', border: 'none', color: 'white', fontWeight: '800', cursor: 'pointer' }}
-          >
-            立即添加商品
-          </button>
-        </div>
-      )}
-
-      {/* 🚀 添加/编辑商品模态框 */}
       {showAddEditProductModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 30000,
-          padding: '20px'
-        }}>
-          <div style={{
-            backgroundColor: '#1e293b',
-            borderRadius: '32px',
-            padding: '2.5rem',
-            width: '100%',
-            maxWidth: '550px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
-            position: 'relative'
-          }}>
-            <button 
+        <div
+          className="merchant-product-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAddEditProductModal(false);
+          }}
+        >
+          <div className="merchant-product-modal" role="dialog" aria-modal="true">
+            <button
+              type="button"
+              className="merchant-product-modal__close"
               onClick={() => setShowAddEditProductModal(false)}
-              style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >✕</button>
+              aria-label={language === 'zh' ? '关闭' : 'Close'}
+            >
+              ×
+            </button>
 
-            <h3 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '900', margin: '0 0 2rem 0', textAlign: 'center' }}>
+            <h2 className="merchant-product-modal__title">
               {editingProduct ? t?.editProduct : t?.addProduct}
-            </h3>
+            </h2>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* 图片上传 */}
-              <div 
+            <div className="merchant-product-modal__form">
+              <div
+                className="merchant-product-modal__upload"
                 onClick={() => productFileInputRef.current?.click()}
-                style={{
-                  width: '100%',
-                  aspectRatio: '16/9',
-                  background: 'rgba(255,255,255,0.03)',
-                  borderRadius: '24px',
-                  border: '2px dashed rgba(255,255,255,0.1)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  overflow: 'hidden',
-                  position: 'relative'
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    productFileInputRef.current?.click();
+                  }
                 }}
+                role="button"
+                tabIndex={0}
               >
                 {productForm.image_url ? (
-                  <img src={productForm.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={productForm.image_url} alt="" />
                 ) : (
                   <>
-                    <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>📸</div>
-                    <div style={{ color: 'rgba(255,255,255,0.5)', fontWeight: '700' }}>
-                      {isUploading ? (t?.uploading || '上传中...') : (t?.uploadImage || '上传商品图片')}
-                    </div>
+                    <span style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }} aria-hidden>
+                      📸
+                    </span>
+                    <span className="merchant-product-modal__upload-hint">
+                      {isUploading
+                        ? t?.uploading || '上传中...'
+                        : t?.uploadImage || '上传商品图片'}
+                    </span>
                   </>
                 )}
-                <input 
-                  type="file" 
-                  ref={productFileInputRef} 
-                  onChange={handleImageUpload} 
-                  style={{ display: 'none' }} 
+                <input
+                  type="file"
+                  ref={productFileInputRef}
+                  onChange={handleImageUpload}
+                  style={{ display: 'none' }}
                   accept="image/*"
                 />
               </div>
 
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t?.productName} *</label>
-                <input 
+                <label className="merchant-product-modal__label" htmlFor="product-name">
+                  {t?.productName} *
+                </label>
+                <input
+                  id="product-name"
                   type="text"
+                  className="merchant-product-modal__input"
                   value={productForm.name}
-                  onChange={(e) => setProductForm({...productForm, name: e.target.value})}
+                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                   placeholder={language === 'zh' ? '输入商品名称' : 'Product name'}
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
                 />
               </div>
 
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{language === 'zh' ? '商品描述' : 'Description'}</label>
-                <textarea 
+                <label className="merchant-product-modal__label" htmlFor="product-desc">
+                  {language === 'zh' ? '商品描述' : 'Description'}
+                </label>
+                <textarea
+                  id="product-desc"
+                  className="merchant-product-modal__textarea"
                   value={productForm.description}
-                  onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-                  placeholder={language === 'zh' ? "输入商品详情描述..." : "Details..."}
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none', minHeight: '80px', resize: 'none', fontFamily: 'inherit' }}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, description: e.target.value })
+                  }
+                  placeholder={language === 'zh' ? '输入商品详情描述...' : 'Details...'}
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="merchant-product-modal__row">
                 <div>
-                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t?.productPrice} (MMK) *</label>
-                  <input 
+                  <label className="merchant-product-modal__label" htmlFor="product-price">
+                    {t?.productPrice} (MMK) *
+                  </label>
+                  <input
+                    id="product-price"
                     type="number"
+                    className="merchant-product-modal__input"
                     value={productForm.price}
-                    onChange={(e) => setProductForm({...productForm, price: e.target.value})}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                    onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t?.productDiscount} (%)</label>
-                  <input 
+                  <label className="merchant-product-modal__label" htmlFor="product-discount">
+                    {t?.productDiscount} (%)
+                  </label>
+                  <input
+                    id="product-discount"
                     type="number"
+                    className="merchant-product-modal__input"
                     value={productForm.discount_percent}
-                    onChange={(e) => setProductForm({...productForm, discount_percent: e.target.value})}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, discount_percent: e.target.value })
+                    }
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.5rem', display: 'block' }}>{t?.productStock} (-1={t?.stockInfinite})</label>
-                <input 
+                <label className="merchant-product-modal__label" htmlFor="product-stock">
+                  {t?.productStock} (-1={t?.stockInfinite})
+                </label>
+                <input
+                  id="product-stock"
                   type="number"
+                  className="merchant-product-modal__input"
                   value={productForm.stock}
-                  onChange={(e) => setProductForm({...productForm, stock: e.target.value})}
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '12px 16px', color: 'white', outline: 'none' }}
+                  onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px' }}>
-                <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: '700' }}>{t?.isAvailable || '是否上架'}</span>
-                <button 
-                  onClick={() => setProductForm({...productForm, is_available: !productForm.is_available})}
-                  style={{
-                    width: '48px',
-                    height: '24px',
-                    borderRadius: '12px',
-                    backgroundColor: productForm.is_available ? '#10b981' : 'rgba(255,255,255,0.2)',
-                    position: 'relative',
-                    cursor: 'pointer',
-                    border: 'none',
-                    transition: 'all 0.3s ease',
-                    padding: 0
-                  }}
+              <div className="merchant-product-modal__toggle-row">
+                <span className="merchant-product-modal__toggle-label">
+                  {t?.isAvailable || '是否上架'}
+                </span>
+                <button
+                  type="button"
+                  className={`merchant-product-modal__toggle ${
+                    productForm.is_available
+                      ? 'merchant-product-modal__toggle--on'
+                      : 'merchant-product-modal__toggle--off'
+                  }`}
+                  onClick={() =>
+                    setProductForm({ ...productForm, is_available: !productForm.is_available })
+                  }
+                  aria-pressed={productForm.is_available}
                 >
-                  <div style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '9px',
-                    backgroundColor: 'white',
-                    position: 'absolute',
-                    top: '3px',
-                    left: productForm.is_available ? '27px' : '3px',
-                    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                  }} />
+                  <span
+                    className={`merchant-product-modal__toggle-knob ${
+                      productForm.is_available
+                        ? 'merchant-product-modal__toggle-knob--on'
+                        : 'merchant-product-modal__toggle-knob--off'
+                    }`}
+                  />
                 </button>
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                {editingProduct && (
-                  <button 
+              <div className="merchant-product-modal__actions">
+                {editingProduct ? (
+                  <button
+                    type="button"
+                    className="merchant-product-modal__btn-delete"
                     onClick={() => handleDeleteProduct(editingProduct.id)}
                     disabled={isSaving}
-                    style={{ flex: 1, padding: '14px', borderRadius: '16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', fontWeight: '800', cursor: 'pointer' }}
-                  >🗑️ {t?.delete}</button>
-                )}
-                <button 
+                  >
+                    🗑️ {t?.delete}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="merchant-product-modal__btn-save"
                   onClick={handleSaveProduct}
                   disabled={isSaving || isUploading}
-                  style={{ flex: 2, padding: '14px', borderRadius: '16px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', border: 'none', color: 'white', fontWeight: '900', fontSize: '1rem', cursor: (isSaving || isUploading) ? 'not-allowed' : 'pointer', boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)', opacity: (isSaving || isUploading) ? 0.7 : 1 }}
                 >
-                  {isSaving ? '...' : (editingProduct ? `💾 ${t?.save}` : `✨ ${t?.addProduct}`)}
+                  {isSaving
+                    ? '...'
+                    : editingProduct
+                      ? `💾 ${t?.save}`
+                      : `✨ ${t?.addProduct}`}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .spinner { animation: spin 1s linear infinite; }
-      `}</style>
     </div>
   );
 };
