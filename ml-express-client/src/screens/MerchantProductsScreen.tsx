@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -89,11 +89,19 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
+  const detailScrollRef = useRef<ScrollView>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     setToastMessage(message);
     setToastType(type);
     setToastVisible(true);
+  };
+
+  const hasDetailIntroImages = (product: Product | null) =>
+    (product?.detail_image_urls?.length ?? 0) > 0;
+
+  const scrollToDetailIntro = () => {
+    detailScrollRef.current?.scrollToEnd({ animated: true });
   };
 
   const t = {
@@ -129,6 +137,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       description: '商品描述',
       noDescription: '暂无详细描述',
       detailImages: '商品详细介绍',
+      detailIntro: '详细介绍',
       itemRemark: '本商品备注（选填）',
       itemRemarkPlaceholder: '如：少糖、不要辣、口味等',
       itemRemarkMultiHint: '每件可单独备注',
@@ -166,6 +175,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       description: 'Description',
       noDescription: 'No description available',
       detailImages: 'Product details',
+      detailIntro: 'Details',
       itemRemark: 'Note for this item (optional)',
       itemRemarkPlaceholder: 'e.g. less sugar, no spicy',
       itemRemarkMultiHint: 'Add a note per item',
@@ -203,6 +213,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       description: 'ကုန်ပစ္စည်းအကြောင်းအရာ',
       noDescription: 'ဖော်ပြချက်မရှိပါ',
       detailImages: 'Product details',
+      detailIntro: 'Details',
       itemRemark: 'ဤပစ္စည်းအတွက် မှတ်ချက် (ရွေးချယ်နိုင်)',
       itemRemarkPlaceholder: 'ဥပမာ- သကြားနည်း၊ မစပ်ပါ',
       itemRemarkMultiHint: 'တစ်ခုချင်းစီမှတ်ချက်ထည့်နိုင်',
@@ -1136,6 +1147,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             ]}
           >
             <ScrollView
+              ref={detailScrollRef}
               style={styles.detailMainScroll}
               contentContainerStyle={styles.detailMainScrollContent}
               showsVerticalScrollIndicator={false}
@@ -1195,21 +1207,17 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                       {selectedProductDetail?.description || currentT.noDescription}
                     </Text>
                   </View>
+                  {hasDetailIntroImages(selectedProductDetail) ? (
+                    <TouchableOpacity
+                      style={styles.detailIntroBtn}
+                      onPress={scrollToDetailIntro}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="images-outline" size={16} color="#2563eb" />
+                      <Text style={styles.detailIntroBtnText}>{currentT.detailIntro}</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
-
-                {(selectedProductDetail?.detail_image_urls?.length ?? 0) > 0 ? (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>{currentT.detailImages}</Text>
-                    {selectedProductDetail?.detail_image_urls?.map((url, idx) => (
-                      <Image
-                        key={`${url}-${idx}`}
-                        source={{ uri: url }}
-                        style={styles.detailScrollingImage}
-                        resizeMode="cover"
-                      />
-                    ))}
-                  </View>
-                ) : null}
 
                 <View style={styles.detailStockCard}>
                   <Ionicons name="cube-outline" size={20} color="#2563eb" />
@@ -1253,6 +1261,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                     </View>
                   ))}
                 </View>
+
+                {hasDetailIntroImages(selectedProductDetail) ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>{currentT.detailIntro}</Text>
+                    {selectedProductDetail?.detail_image_urls?.map((url, idx) => (
+                      <Image
+                        key={`${url}-${idx}`}
+                        source={{ uri: url }}
+                        style={styles.detailScrollingImage}
+                        resizeMode="cover"
+                      />
+                    ))}
+                  </View>
+                ) : null}
               </View>
             </ScrollView>
 
@@ -2028,6 +2050,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 10,
     backgroundColor: '#e2e8f0',
+  },
+  detailIntroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.35)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(59, 130, 246, 0.06)',
+  },
+  detailIntroBtnText: {
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '800',
   },
   descriptionBox: {
     backgroundColor: '#f8fafc',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
-import { merchantService, deliveryStoreService, Product, DeliveryStore } from '../services/supabase';
+import { merchantService, deliveryStoreService, Product, DeliveryStore, productFormSource, hasPendingProductUpdate } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import '../styles/merchantProductsPage.css';
 
@@ -89,21 +89,22 @@ const StoreProductsPage: React.FC = () => {
 
   const handleOpenEditProduct = (product: Product) => {
     setEditingProduct(product);
+    const src = productFormSource(product);
     
     let discountPercent = '';
-    if (product.original_price && product.original_price > product.price) {
-      discountPercent = Math.round((1 - product.price / product.original_price) * 100).toString();
+    if (src.original_price && src.original_price > src.price) {
+      discountPercent = Math.round((1 - src.price / src.original_price) * 100).toString();
     }
 
     setProductForm({
-      name: product.name,
-      description: product.description || '',
-      price: product.price.toString(),
+      name: src.name,
+      description: src.description || '',
+      price: src.price.toString(),
       discount_percent: discountPercent,
-      stock: product.stock.toString(),
-      image_url: product.image_url || '',
-      detail_image_urls: product.detail_image_urls || [],
-      is_available: product.is_available
+      stock: src.stock.toString(),
+      image_url: src.image_url || '',
+      detail_image_urls: src.detail_image_urls || [],
+      is_available: src.is_available
     });
     setShowDetailImagesPanel((product.detail_image_urls?.length ?? 0) > 0);
     setShowAddEditProductModal(true);
@@ -195,21 +196,26 @@ const StoreProductsPage: React.FC = () => {
         description: productForm.description
       };
 
-      let result;
-      if (editingProduct) {
-        if (editingProduct.listing_status === 'rejected') {
-          productData = { ...productData, listing_status: 'pending' };
-        }
-        result = await merchantService.updateProduct(editingProduct.id, productData as Partial<Product>);
-      } else {
-        result = await merchantService.addProduct(productData as Omit<Product, 'id' | 'created_at' | 'updated_at' | 'sales_count'>);
-      }
+      let result = await merchantService.saveMerchantProduct({
+        mode: editingProduct ? 'edit' : 'create',
+        product: editingProduct ?? null,
+        storeId,
+        draft: productData,
+      });
 
       if (result.success) {
         setShowAddEditProductModal(false);
         await loadStoreData(storeId);
-        if (!editingProduct) {
-          alert(language === 'zh' ? '商品已提交，待后台审核通过后将展示给顾客。' : 'Submitted. Visible to customers after admin approval.');
+        if (!editingProduct || ('pendingReview' in result && result.pendingReview)) {
+          alert(
+            language === 'zh'
+              ? editingProduct
+                ? '修改已提交，待后台审核通过后客户才能看到新内容。'
+                : '商品已提交，待后台审核通过后将展示给顾客。'
+              : editingProduct
+                ? 'Changes submitted. Customers will see updates after admin approval.'
+                : 'Submitted. Visible to customers after admin approval.',
+          );
         }
       } else {
         alert(language === 'zh' ? '保存失败，请重试' : 'Save failed');
@@ -243,10 +249,17 @@ const StoreProductsPage: React.FC = () => {
 
   const handleToggleAvailability = async (product: Product) => {
     try {
-      const result = await merchantService.toggleAvailability(product.id, !product.is_available);
+      const result = await merchantService.toggleAvailability(product);
       if (result.success) {
         const storeId = currentUser?.store_id || currentUser?.id;
         if (storeId) await loadStoreData(storeId);
+        if ('pendingReview' in result && result.pendingReview) {
+          alert(
+            language === 'zh'
+              ? '上下架变更已提交，待后台审核通过后生效。'
+              : 'Availability change submitted for admin approval.',
+          );
+        }
       }
     } catch (error) {
       LoggerService.error('切换状态失败:', error);
@@ -255,7 +268,9 @@ const StoreProductsPage: React.FC = () => {
 
   const productStats = useMemo(() => {
     const onSale = products.filter((p) => p.is_available).length;
-    const pending = products.filter((p) => p.listing_status === 'pending').length;
+    const pending = products.filter(
+      (p) => p.listing_status === 'pending' || hasPendingProductUpdate(p),
+    ).length;
     return { total: products.length, onSale, pending };
   }, [products]);
 
@@ -406,15 +421,22 @@ const StoreProductsPage: React.FC = () => {
                 </div>
 
                 {(product.listing_status === 'pending' ||
-                  product.listing_status === 'rejected') && (
+                  product.listing_status === 'rejected' ||
+                  hasPendingProductUpdate(product)) && (
                   <div
                     className={`merchant-product-card__status ${
-                      product.listing_status === 'pending'
+                      hasPendingProductUpdate(product) && product.listing_status === 'approved'
+                        ? 'merchant-product-card__status--pending'
+                        : product.listing_status === 'pending'
                         ? 'merchant-product-card__status--pending'
                         : 'merchant-product-card__status--rejected'
                     }`}
                   >
-                    {product.listing_status === 'pending'
+                    {hasPendingProductUpdate(product) && product.listing_status === 'approved'
+                      ? language === 'zh'
+                        ? '⏳ 修改待审核'
+                        : '⏳ Edit pending'
+                      : product.listing_status === 'pending'
                       ? language === 'zh'
                         ? '⏳ 待后台审核'
                         : '⏳ Pending approval'

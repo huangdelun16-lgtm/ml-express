@@ -228,8 +228,114 @@ export interface Product {
   is_available: boolean;
   sales_count: number;
   listing_status?: "pending" | "approved" | "rejected" | null;
+  pending_update?: ProductPendingUpdate | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export type ProductPendingUpdate = {
+  name?: string;
+  description?: string;
+  price?: number;
+  original_price?: number | null;
+  image_url?: string;
+  detail_image_urls?: string[];
+  stock?: number;
+  is_available?: boolean;
+  submitted_at?: string;
+};
+
+export function isProductLiveApproved(listingStatus?: string | null): boolean {
+  const s = (listingStatus ?? "approved").trim();
+  return s === "approved" || s === "";
+}
+
+export function hasPendingProductUpdate(product: Pick<Product, "pending_update">): boolean {
+  const pu = product.pending_update;
+  if (!pu || typeof pu !== "object") return false;
+  return Object.keys(pu).some(
+    (k) => k !== "submitted_at" && (pu as Record<string, unknown>)[k] !== undefined,
+  );
+}
+
+export function productFormSource(product: Product): Product {
+  if (isProductLiveApproved(product.listing_status) && hasPendingProductUpdate(product)) {
+    const pu = product.pending_update!;
+    return {
+      ...product,
+      ...pu,
+      original_price: pu.original_price ?? undefined,
+    };
+  }
+  return product;
+}
+
+export function productNeedsAdminReview(
+  product: Pick<Product, "listing_status" | "pending_update">,
+): boolean {
+  const ls = (product.listing_status ?? "pending").trim();
+  return ls === "pending" || hasPendingProductUpdate(product);
+}
+
+/**
+ * 商品上架审核（商家 → Admin → 客户端）
+ *
+ * 1. 新建：listing_status=pending，客户端不可见
+ * 2. 编辑已上架(approved)：改动写入 pending_update，客户端仍读主表旧数据
+ * 3. 编辑待审/被拒：直接写主表，保持 pending，客户端仍不可见
+ * 4. Admin「商家管理」通过：合并 pending_update 或首次上架 → listing_status=approved
+ * 5. 客户端仅 getPublicStoreProducts：listing_status=approved 且 is_available=true
+ */
+export function pickProductReviewSnapshot(product: Product): ProductPendingUpdate {
+  return {
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    original_price: product.original_price ?? null,
+    image_url: product.image_url,
+    detail_image_urls: product.detail_image_urls,
+    stock: product.stock,
+    is_available: product.is_available,
+  };
+}
+
+export function buildPendingUpdateFromProduct(
+  product: Product,
+  changes: Partial<ProductPendingUpdate>,
+): ProductPendingUpdate {
+  const base =
+    isProductLiveApproved(product.listing_status) && hasPendingProductUpdate(product)
+      ? { ...pickProductReviewSnapshot(product), ...product.pending_update! }
+      : pickProductReviewSnapshot(product);
+  return { ...base, ...changes };
+}
+
+export function normalizePendingPayload(
+  raw: Partial<ProductPendingUpdate> & Record<string, unknown>,
+): ProductPendingUpdate {
+  return {
+    name: raw.name as string | undefined,
+    description: raw.description as string | undefined,
+    price: raw.price as number | undefined,
+    original_price: raw.original_price as number | null | undefined,
+    image_url: raw.image_url as string | undefined,
+    detail_image_urls: raw.detail_image_urls as string[] | undefined,
+    stock: raw.stock as number | undefined,
+    is_available: raw.is_available as boolean | undefined,
+  };
+}
+
+export function toDirectProductPatch(snapshot: ProductPendingUpdate): Partial<Product> {
+  return {
+    name: snapshot.name,
+    description: snapshot.description,
+    price: snapshot.price,
+    original_price: snapshot.original_price ?? undefined,
+    image_url: snapshot.image_url,
+    detail_image_urls: snapshot.detail_image_urls,
+    stock: snapshot.stock,
+    is_available: snapshot.is_available,
+  };
 }
 
 // 商品分类接口
@@ -2013,32 +2119,51 @@ export const merchantService = {
     }
   },
 
-  // 添加商品
+  /** 新建商品：始终待审，客户端不可见直至 Admin 通过 */
   async addProduct(
     product: Omit<Product, "id" | "created_at" | "updated_at" | "sales_count">,
   ) {
     try {
-      const { listing_status: _ignored, sales_count: _sc, is_available: _ia, ...rest } = product as Product;
+      const {
+        listing_status: _ls,
+        sales_count: _sc,
+        pending_update: _pu,
+        ...rest
+      } = product as Product;
       const { data, error } = await supabase
         .from("products")
-        .insert([{ ...rest, sales_count: 0, listing_status: "pending" as const, is_available: false }])
+        .insert([
+          {
+            ...rest,
+            sales_count: 0,
+            listing_status: "pending" as const,
+            is_available: false,
+            pending_update: null,
+          },
+        ])
         .select()
         .single();
 
       if (error) throw error;
-      return { success: true, data };
+      return { success: true, data, pendingReview: true as const };
     } catch (error: any) {
       LoggerService.error("添加商品失败:", error);
       return { success: false, error };
     }
   },
 
-  // 更新商品
+  /** 内部直写主表（库存/上下架快捷操作勿直接调用，请用 submitMerchantProductChange） */
   async updateProduct(productId: string, updates: Partial<Product>) {
     try {
+      const { pending_update: _pu, ...safeUpdates } = updates as Partial<Product> & {
+        pending_update?: unknown;
+      };
       const { data, error } = await supabase
         .from("products")
-        .update(updates)
+        .update({
+          ...safeUpdates,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", productId)
         .select()
         .single();
@@ -2049,6 +2174,95 @@ export const merchantService = {
       LoggerService.error("更新商品失败:", error);
       return { success: false, error };
     }
+  },
+
+  /**
+   * 商家侧任意商品资料变更（编辑表单 / 上下架 / 改价等）统一入口。
+   * 已上架 → pending_update；未上架 → 直写主表并保持 pending。
+   */
+  async submitMerchantProductChange(
+    product: Product,
+    changes: Partial<ProductPendingUpdate> & Record<string, unknown>,
+  ) {
+    try {
+      const snapshot = buildPendingUpdateFromProduct(product, normalizePendingPayload(changes));
+
+      if (isProductLiveApproved(product.listing_status)) {
+        const pending_update: ProductPendingUpdate = {
+          ...snapshot,
+          submitted_at: new Date().toISOString(),
+        };
+        const { data, error } = await supabase
+          .from("products")
+          .update({
+            pending_update,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", product.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return { success: true, data, pendingReview: true as const };
+      }
+
+      const payload: Partial<Product> = {
+        ...toDirectProductPatch(snapshot),
+        updated_at: new Date().toISOString(),
+        pending_update: null,
+      };
+      const ls = (product.listing_status ?? "pending").trim();
+      if (ls === "rejected") {
+        payload.listing_status = "pending";
+      }
+      return this.updateProduct(product.id, payload);
+    } catch (error: any) {
+      LoggerService.error("提交商品变更失败:", error);
+      return { success: false, error };
+    }
+  },
+
+  /** @deprecated 请用 saveMerchantProduct 或 submitMerchantProductChange */
+  async submitProductEdit(
+    productId: string,
+    updates: Partial<ProductPendingUpdate> & Record<string, unknown>,
+    listingStatus?: string | null,
+  ) {
+    const { data: row } = await supabase.from("products").select("*").eq("id", productId).single();
+    if (!row) return { success: false, error: { message: "Product not found" } };
+    const product = row as Product;
+    if (listingStatus !== undefined) {
+      product.listing_status = listingStatus as Product["listing_status"];
+    }
+    return this.submitMerchantProductChange(product, updates);
+  },
+
+  /** 添加/编辑商品表单保存 */
+  async saveMerchantProduct(params: {
+    mode: "create" | "edit";
+    product?: Product | null;
+    storeId: string;
+    draft: Partial<ProductPendingUpdate> & Record<string, unknown>;
+  }) {
+    const snapshot = normalizePendingPayload(params.draft);
+    if (params.mode === "create") {
+      return this.addProduct({
+        store_id: params.storeId,
+        ...toDirectProductPatch(snapshot),
+        sales_count: 0,
+      } as Omit<Product, "id" | "created_at" | "updated_at" | "sales_count">);
+    }
+    if (!params.product) {
+      return { success: false, error: { message: "Product required for edit" } };
+    }
+    return this.submitMerchantProductChange(params.product, snapshot);
+  },
+
+  async toggleAvailability(product: Product) {
+    return this.submitMerchantProductChange(product, { is_available: !product.is_available });
+  },
+
+  async updateStock(product: Product, newStock: number) {
+    return this.submitMerchantProductChange(product, { stock: newStock });
   },
 
   // 删除商品
@@ -2065,16 +2279,6 @@ export const merchantService = {
       LoggerService.error("删除商品失败:", error);
       return { success: false, error };
     }
-  },
-
-  // 更新库存
-  async updateStock(productId: string, newStock: number) {
-    return this.updateProduct(productId, { stock: newStock });
-  },
-
-  // 上下架切换
-  async toggleAvailability(productId: string, isAvailable: boolean) {
-    return this.updateProduct(productId, { is_available: isAvailable });
   },
 
   // 上传商品图片

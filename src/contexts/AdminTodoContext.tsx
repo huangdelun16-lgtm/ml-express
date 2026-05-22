@@ -26,14 +26,26 @@ export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
       .select('*', { count: 'exact', head: true })
       .eq('courier', '待分配')
       .in('status', ['待取件', '待收款']),
-    supabase.from('products').select('*', { count: 'exact', head: true }).eq('listing_status', 'pending'),
+    supabase
+      .from('products')
+      .select('id, listing_status, pending_update', { count: 'exact', head: false })
+      .or('listing_status.eq.pending,pending_update.not.is.null'),
   ]);
+
+  const pendingProductRows = productsRes.data ?? [];
+  const pendingProductReview = pendingProductRows.filter(
+    (row) =>
+      (row.listing_status ?? '').trim() === 'pending' ||
+      (row.pending_update != null &&
+        typeof row.pending_update === 'object' &&
+        Object.keys(row.pending_update as object).some((k) => k !== 'submitted_at')),
+  ).length;
 
   return {
     pendingRecharge: rechargeRes.count ?? 0,
     pendingDeliveryAlerts: alertsRes.count ?? 0,
     pendingAssignment: assignRes.count ?? 0,
-    pendingProductReview: productsRes.count ?? 0,
+    pendingProductReview,
   };
 }
 

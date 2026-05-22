@@ -41,11 +41,20 @@ const StoreProductsPage: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'ok' | 'warn' } | null>(null);
 
   const productRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const detailScrollRef = useRef<HTMLDivElement>(null);
+  const detailIntroAnchorRef = useRef<HTMLDivElement>(null);
 
   const showToast = (message: string, type: 'ok' | 'warn' = 'ok') => {
     setToast({ message, type });
     window.setTimeout(() => setToast(null), 2000);
   };
+
+  const scrollToDetailIntro = () => {
+    detailIntroAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const hasDetailIntroImages = (product: Product | null) =>
+    (product?.detail_image_urls?.length ?? 0) > 0;
 
   const loadStoreData = useCallback(async () => {
     if (!storeId) return;
@@ -982,7 +991,7 @@ const StoreProductsPage: React.FC = () => {
               </button>
             </div>
 
-            <div style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', flex: 1 }}>
+            <div ref={detailScrollRef} style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', flex: 1 }}>
               <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>{selectedProductDetail.name}</h2>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: '1rem', flexWrap: 'wrap' }}>
                 <span style={{ color: '#10b981', fontSize: '1.35rem', fontWeight: 900 }}>{selectedProductDetail.price.toLocaleString()} MMK</span>
@@ -1009,40 +1018,27 @@ const StoreProductsPage: React.FC = () => {
                 >
                   {selectedProductDetail.description?.trim() ? selectedProductDetail.description : t.store.noDescription}
                 </div>
-              </div>
-
-              {(selectedProductDetail.detail_image_urls?.length ?? 0) > 0 ? (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontWeight: 800, color: '#334155', marginBottom: 8 }}>
-                    {t.store.detailImages}
-                  </div>
-                  <div
+                {hasDetailIntroImages(selectedProductDetail) ? (
+                  <button
+                    type="button"
+                    onClick={scrollToDetailIntro}
                     style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                      maxHeight: 360,
-                      overflowY: 'auto',
-                      WebkitOverflowScrolling: 'touch',
+                      marginTop: 10,
+                      width: '100%',
+                      padding: '0.6rem 0.85rem',
+                      borderRadius: 12,
+                      border: '1px dashed rgba(59, 130, 246, 0.45)',
+                      background: 'rgba(59, 130, 246, 0.08)',
+                      color: '#2563eb',
+                      fontWeight: 800,
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
                     }}
                   >
-                    {selectedProductDetail.detail_image_urls!.map((url, idx) => (
-                      <img
-                        key={`${url}-${idx}`}
-                        src={url}
-                        alt=""
-                        style={{
-                          width: '100%',
-                          borderRadius: 14,
-                          objectFit: 'cover',
-                          display: 'block',
-                          background: '#e2e8f0',
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+                    {t.store.detailIntro}
+                  </button>
+                ) : null}
+              </div>
 
               <div
                 style={{
@@ -1097,6 +1093,36 @@ const StoreProductsPage: React.FC = () => {
                   </div>
                 ))}
               </div>
+
+              {hasDetailIntroImages(selectedProductDetail) ? (
+                <div ref={detailIntroAnchorRef} style={{ marginBottom: '1rem', scrollMarginTop: 12 }}>
+                  <div style={{ fontWeight: 800, color: '#334155', marginBottom: 8 }}>
+                    {t.store.detailIntro}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    {selectedProductDetail.detail_image_urls!.map((url, idx) => (
+                      <img
+                        key={`${url}-${idx}`}
+                        src={url}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          borderRadius: 14,
+                          objectFit: 'cover',
+                          display: 'block',
+                          background: '#e2e8f0',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div

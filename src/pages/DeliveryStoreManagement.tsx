@@ -134,6 +134,27 @@ function normalizeProductListingStatus(product: { listing_status?: string | null
   return 'pending';
 }
 
+function hasPendingProductUpdate(product: { pending_update?: Record<string, unknown> | null }): boolean {
+  const pu = product.pending_update;
+  if (!pu || typeof pu !== 'object') return false;
+  return Object.keys(pu).some((k) => k !== 'submitted_at' && pu[k] !== undefined);
+}
+
+function productNeedsAdminReview(product: {
+  listing_status?: string | null;
+  pending_update?: Record<string, unknown> | null;
+}): boolean {
+  return normalizeProductListingStatus(product) === 'pending' || hasPendingProductUpdate(product);
+}
+
+/** Admin 审核列表：已上架商品的待审修改用 pending_update 预览 */
+function adminProductDisplay(product: Record<string, unknown>) {
+  if (normalizeProductListingStatus(product as { listing_status?: string | null }) === 'approved' && hasPendingProductUpdate(product as { pending_update?: Record<string, unknown> | null })) {
+    return { ...product, ...(product.pending_update as Record<string, unknown>) };
+  }
+  return product;
+}
+
 const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -683,8 +704,8 @@ const DeliveryStoreManagement: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('store_id')
-        .eq('listing_status', 'pending');
+        .select('store_id, listing_status, pending_update')
+        .or('listing_status.eq.pending,pending_update.not.is.null');
       if (error) {
         setPendingProductReviewCount(0);
         setPendingReviewByStoreId({});
@@ -692,6 +713,7 @@ const DeliveryStoreManagement: React.FC = () => {
       }
       const byId: Record<string, number> = {};
       for (const row of data || []) {
+        if (!productNeedsAdminReview(row)) continue;
         const sid = row.store_id as string | undefined;
         if (!sid) continue;
         byId[sid] = (byId[sid] || 0) + 1;
@@ -727,16 +749,68 @@ const DeliveryStoreManagement: React.FC = () => {
   const updateProductListingStatus = async (productId: string, listing_status: 'approved' | 'rejected') => {
     if (!viewingStoreId) return;
     setProductListingActionId(productId);
+    const product = storeProducts.find((p) => p.id === productId);
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({
-          listing_status,
-          is_available: listing_status === 'approved',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', productId);
-      if (error) throw error;
+      const now = new Date().toISOString();
+      if (listing_status === 'approved') {
+        if (
+          product &&
+          normalizeProductListingStatus(product) === 'approved' &&
+          hasPendingProductUpdate(product)
+        ) {
+          const pu = (product.pending_update || {}) as Record<string, unknown>;
+          const mergePayload: Record<string, unknown> = {
+            pending_update: null,
+            listing_status: 'approved',
+            updated_at: now,
+          };
+          for (const key of [
+            'name',
+            'description',
+            'price',
+            'original_price',
+            'image_url',
+            'detail_image_urls',
+            'stock',
+            'is_available',
+          ] as const) {
+            if (pu[key] !== undefined) mergePayload[key] = pu[key];
+          }
+          const { error } = await supabase.from('products').update(mergePayload).eq('id', productId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('products')
+            .update({
+              listing_status: 'approved',
+              is_available: true,
+              pending_update: null,
+              updated_at: now,
+            })
+            .eq('id', productId);
+          if (error) throw error;
+        }
+      } else if (
+        product &&
+        normalizeProductListingStatus(product) === 'approved' &&
+        hasPendingProductUpdate(product)
+      ) {
+        const { error } = await supabase
+          .from('products')
+          .update({ pending_update: null, updated_at: now })
+          .eq('id', productId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('products')
+          .update({
+            listing_status: 'rejected',
+            is_available: false,
+            updated_at: now,
+          })
+          .eq('id', productId);
+        if (error) throw error;
+      }
       const { data, error: reloadError } = await supabase
         .from('products')
         .select('*')
@@ -759,9 +833,8 @@ const DeliveryStoreManagement: React.FC = () => {
     let approved = 0;
     let rejected = 0;
     storeProducts.forEach((p) => {
-      const ls = normalizeProductListingStatus(p);
-      if (ls === 'pending') pending += 1;
-      else if (ls === 'approved') approved += 1;
+      if (productNeedsAdminReview(p)) pending += 1;
+      else if (normalizeProductListingStatus(p) === 'approved') approved += 1;
       else rejected += 1;
     });
     return { all: storeProducts.length, pending, approved, rejected };
@@ -769,6 +842,14 @@ const DeliveryStoreManagement: React.FC = () => {
 
   const filteredStoreProducts = useMemo(() => {
     if (productListFilter === 'all') return storeProducts;
+    if (productListFilter === 'pending') {
+      return storeProducts.filter((p) => productNeedsAdminReview(p));
+    }
+    if (productListFilter === 'approved') {
+      return storeProducts.filter(
+        (p) => normalizeProductListingStatus(p) === 'approved' && !hasPendingProductUpdate(p),
+      );
+    }
     return storeProducts.filter((p) => normalizeProductListingStatus(p) === productListFilter);
   }, [storeProducts, productListFilter]);
 
@@ -4238,7 +4319,12 @@ const DeliveryStoreManagement: React.FC = () => {
                   gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
                   gap: '20px'
                 }}>
-                  {filteredStoreProducts.map((product) => (
+                  {filteredStoreProducts.map((product) => {
+                    const display = adminProductDisplay(product) as typeof product;
+                    const isEditPending =
+                      normalizeProductListingStatus(product) === 'approved' &&
+                      hasPendingProductUpdate(product);
+                    return (
                     <div key={product.id} style={{
                       background: 'rgba(255, 255, 255, 0.05)',
                       borderRadius: '16px',
@@ -4257,23 +4343,23 @@ const DeliveryStoreManagement: React.FC = () => {
                         justifyContent: 'center',
                         alignItems: 'center'
                       }}>
-                        {product.image_url ? (
-                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {display.image_url ? (
+                          <img src={display.image_url} alt={display.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           <span style={{ fontSize: '2rem' }}>🖼️</span>
                         )}
                       </div>
-                      <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'white' }}>{product.name}</h3>
+                      <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'white' }}>{display.name}</h3>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                        <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.2rem' }}>{product.price.toLocaleString()} MMK</span>
+                        <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.2rem' }}>{display.price.toLocaleString()} MMK</span>
                         <span style={{ 
                           fontSize: '0.8rem', 
                           padding: '2px 8px', 
                           borderRadius: '6px',
-                          background: product.is_available ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                          color: product.is_available ? '#10b981' : '#ef4444'
+                          background: display.is_available ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: display.is_available ? '#10b981' : '#ef4444'
                         }}>
-                          {product.is_available ? '在售' : '下架'}
+                          {display.is_available ? '在售' : '下架'}
                         </span>
                       </div>
                       <div style={{ marginTop: '8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -4281,26 +4367,33 @@ const DeliveryStoreManagement: React.FC = () => {
                           padding: '2px 8px',
                           borderRadius: '6px',
                           background:
-                            normalizeProductListingStatus(product) === 'pending'
+                            productNeedsAdminReview(product)
                               ? 'rgba(245, 158, 11, 0.25)'
                               : normalizeProductListingStatus(product) === 'rejected'
                                 ? 'rgba(239, 68, 68, 0.25)'
                                 : 'rgba(16, 185, 129, 0.2)',
                           color:
-                            normalizeProductListingStatus(product) === 'pending'
+                            productNeedsAdminReview(product)
                               ? '#fbbf24'
                               : normalizeProductListingStatus(product) === 'rejected'
                                 ? '#f87171'
                                 : '#34d399',
                         }}>
-                          {normalizeProductListingStatus(product) === 'pending'
+                          {isEditPending
+                            ? '修改待审'
+                            : normalizeProductListingStatus(product) === 'pending'
                             ? '待审核'
                             : normalizeProductListingStatus(product) === 'rejected'
                               ? '已取消'
                               : '已完成'}
                         </span>
                       </div>
-                      {normalizeProductListingStatus(product) !== 'approved' && (
+                      {isEditPending && (
+                        <div style={{ marginTop: '6px', fontSize: '0.72rem', color: 'rgba(251, 191, 36, 0.85)' }}>
+                          线上仍显示旧内容，通过后更新为客户可见版本
+                        </div>
+                      )}
+                      {productNeedsAdminReview(product) && (
                         <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
                           <button
                             type="button"
@@ -4341,10 +4434,11 @@ const DeliveryStoreManagement: React.FC = () => {
                         </div>
                       )}
                       <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>
-                        库存: {product.stock === -1 ? '无限' : product.stock}
+                        库存: {display.stock === -1 ? '无限' : display.stock}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 )}
                 </>

@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../contexts/AppContext';
 import { useCart } from '../contexts/CartContext';
-import { merchantService, Product, ProductCategory } from '../services/supabase';
+import { merchantService, Product, ProductCategory, productFormSource, hasPendingProductUpdate } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
@@ -329,19 +329,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
   const handleOpenEditProduct = (product: Product) => {
     setEditingProduct(product);
+    const src = productFormSource(product);
     setProductForm({
-      name: product.name,
-      description: product.description || '',
-      price: product.price.toString(),
-      discountPercent: (product.original_price && product.original_price > product.price)
-        ? Math.round((1 - product.price / product.original_price) * 100).toString()
+      name: src.name,
+      description: src.description || '',
+      price: src.price.toString(),
+      discountPercent: (src.original_price && src.original_price > src.price)
+        ? Math.round((1 - src.price / src.original_price) * 100).toString()
         : '',
-      stock: product.stock.toString(),
-      image_url: product.image_url || '',
-      detail_image_urls: product.detail_image_urls || [],
-      is_available: product.is_available,
+      stock: src.stock.toString(),
+      image_url: src.image_url || '',
+      detail_image_urls: src.detail_image_urls || [],
+      is_available: src.is_available,
     });
-    setShowDetailImagesPanel((product.detail_image_urls?.length ?? 0) > 0);
+    setShowDetailImagesPanel((src.detail_image_urls?.length ?? 0) > 0);
     setShowProductModal(true);
   };
 
@@ -408,18 +409,28 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         is_available: productForm.is_available,
       };
 
-      let result;
-      if (editingProduct) {
-        if (editingProduct.listing_status === "rejected") {
-          productData = { ...productData, listing_status: "pending" };
-        }
-        result = await merchantService.updateProduct(editingProduct.id, productData as any);
-      } else {
-        result = await merchantService.addProduct(productData as any);
-      }
+      const result = await merchantService.saveMerchantProduct({
+        mode: editingProduct ? 'edit' : 'create',
+        product: editingProduct ?? null,
+        storeId,
+        draft: productData,
+      });
 
       if (result.success) {
-        showToast(currentT.saveSuccess, 'success');
+        if (!editingProduct || ('pendingReview' in result && result.pendingReview)) {
+          showToast(
+            language === 'zh'
+              ? editingProduct
+                ? '修改已提交，待后台审核通过后客户才能看到新内容'
+                : '商品已提交，待后台审核通过后将展示给顾客'
+              : editingProduct
+                ? 'Changes submitted for admin approval'
+                : 'Submitted for admin approval',
+            'info',
+          );
+        } else {
+          showToast(currentT.saveSuccess, 'success');
+        }
         setShowProductModal(false);
         loadProducts();
       } else {
@@ -485,9 +496,26 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     if (selectedProductIds.size === 0) return;
     setBulkLoading(true);
     try {
+      const productMap = new Map(products.map(p => [p.id, p]));
       const ids = Array.from(selectedProductIds);
-      await Promise.all(ids.map(id => merchantService.updateProduct(id, { is_available: isAvailable })));
-      showToast(currentT.saveSuccess, 'success');
+      const results = await Promise.all(
+        ids.map(id => {
+          const product = productMap.get(id);
+          if (!product) return Promise.resolve(null);
+          return merchantService.submitMerchantProductChange(product, { is_available: isAvailable });
+        }),
+      );
+      const pendingCount = results.filter(r => r && 'pendingReview' in r && r.pendingReview).length;
+      if (pendingCount > 0) {
+        showToast(
+          language === 'zh'
+            ? `${pendingCount} 件商品变更已提交审核`
+            : `${pendingCount} change(s) submitted for approval`,
+          'info',
+        );
+      } else {
+        showToast(currentT.saveSuccess, 'success');
+      }
       setSelectedProductIds(new Set());
       loadProducts();
     } catch (error) {
@@ -507,23 +535,42 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
     setBulkLoading(true);
     try {
+      const productMap = new Map(products.map(p => [p.id, p]));
       const ids = Array.from(selectedProductIds);
+      let results: Awaited<ReturnType<typeof merchantService.submitMerchantProductChange>>[] = [];
       if (bulkModalType === 'price') {
-        await Promise.all(ids.map(id => merchantService.updateProduct(id, { price: numericValue })));
+        results = await Promise.all(
+          ids.map(id => {
+            const product = productMap.get(id);
+            if (!product) return Promise.resolve({ success: false, error: { message: 'not found' } });
+            return merchantService.submitMerchantProductChange(product, { price: numericValue });
+          }),
+        );
       } else {
         if (numericValue <= 0 || numericValue >= 100) {
           showToast(language === 'zh' ? '折扣需在 1-99 之间' : 'Discount must be 1-99', 'warning');
           return;
         }
-        const productMap = new Map(products.map(p => [p.id, p]));
-        await Promise.all(ids.map(id => {
-          const product = productMap.get(id);
-          if (!product) return Promise.resolve(null);
-          const originalPrice = Math.round(product.price / (1 - numericValue / 100));
-          return merchantService.updateProduct(id, { original_price: originalPrice });
-        }));
+        results = await Promise.all(
+          ids.map(id => {
+            const product = productMap.get(id);
+            if (!product) return Promise.resolve({ success: false, error: { message: 'not found' } });
+            const originalPrice = Math.round(product.price / (1 - numericValue / 100));
+            return merchantService.submitMerchantProductChange(product, { original_price: originalPrice });
+          }),
+        );
       }
-      showToast(currentT.saveSuccess, 'success');
+      const pendingCount = results.filter(r => r.success && 'pendingReview' in r && r.pendingReview).length;
+      if (pendingCount > 0) {
+        showToast(
+          language === 'zh'
+            ? `${pendingCount} 件商品变更已提交审核`
+            : `${pendingCount} change(s) submitted for approval`,
+          'info',
+        );
+      } else {
+        showToast(currentT.saveSuccess, 'success');
+      }
       setSelectedProductIds(new Set());
       setBulkModalType(null);
       setBulkValue('');
@@ -537,12 +584,19 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
   const toggleProductStatus = async (product: Product) => {
     try {
-      const success = await merchantService.toggleAvailability(product.id, !product.is_available);
-      if (success) {
-        setProducts(products.map(p => 
-          p.id === product.id ? { ...p, is_available: !p.is_available } : p
-        ));
-        showToast(currentT.saveSuccess, 'success');
+      const result = await merchantService.toggleAvailability(product);
+      if (result.success) {
+        loadProducts();
+        if ('pendingReview' in result && result.pendingReview) {
+          showToast(
+            language === 'zh'
+              ? '上下架变更已提交，待后台审核通过后生效'
+              : 'Availability change submitted for approval',
+            'info',
+          );
+        } else {
+          showToast(currentT.saveSuccess, 'success');
+        }
       }
     } catch (error) {
       showToast('操作失败', 'error');

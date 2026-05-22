@@ -13,6 +13,8 @@ import {
   Product,
   DeliveryStore,
   deliveryStoreService,
+  productFormSource,
+  hasPendingProductUpdate,
   rechargeService,
   reviewService,
   StoreReview,
@@ -581,26 +583,27 @@ const ProfilePage: React.FC = () => {
 
   const handleOpenEditProduct = (product: Product) => {
     setEditingProduct(product);
+    const src = productFormSource(product);
     
     // 计算优惠百分比
     let discountPercent = "";
-    if (product.original_price && product.original_price > product.price) {
+    if (src.original_price && src.original_price > src.price) {
       discountPercent = Math.round(
-        (1 - product.price / product.original_price) * 100,
+        (1 - src.price / src.original_price) * 100,
       ).toString();
     }
 
     setProductForm({
-      name: product.name,
-      description: product.description || "",
-      price: product.price.toString(),
+      name: src.name,
+      description: src.description || "",
+      price: src.price.toString(),
       discount_percent: discountPercent,
-      stock: product.stock.toString(),
-      image_url: product.image_url || "",
-      detail_image_urls: product.detail_image_urls || [],
-      is_available: product.is_available,
+      stock: src.stock.toString(),
+      image_url: src.image_url || "",
+      detail_image_urls: src.detail_image_urls || [],
+      is_available: src.is_available,
     });
-    setShowDetailImagesPanel((product.detail_image_urls?.length ?? 0) > 0);
+    setShowDetailImagesPanel((src.detail_image_urls?.length ?? 0) > 0);
     setShowAddEditProductModal(true);
   };
 
@@ -694,27 +697,25 @@ const ProfilePage: React.FC = () => {
         description: productForm.description,
       };
 
-      let result;
-      if (editingProduct) {
-        if (editingProduct.listing_status === "rejected") {
-          productData = { ...productData, listing_status: "pending" };
-        }
-        result = await merchantService.updateProduct(
-          editingProduct.id,
-          productData as Parameters<typeof merchantService.updateProduct>[1],
-        );
-      } else {
-        result = await merchantService.addProduct(productData as Parameters<typeof merchantService.addProduct>[0]);
-      }
+      const result = await merchantService.saveMerchantProduct({
+        mode: editingProduct ? "edit" : "create",
+        product: editingProduct ?? null,
+        storeId: currentUser.id,
+        draft: productData,
+      });
 
       if (result.success) {
         setShowAddEditProductModal(false);
         await loadProducts();
-        if (!editingProduct) {
+        if (!editingProduct || ("pendingReview" in result && result.pendingReview)) {
           alert(
             language === "zh"
-              ? "商品已提交，待后台审核通过后将展示给顾客。"
-              : "Submitted. Visible to customers after admin approval.",
+              ? editingProduct
+                ? "修改已提交，待后台审核通过后客户才能看到新内容。"
+                : "商品已提交，待后台审核通过后将展示给顾客。"
+              : editingProduct
+                ? "Changes submitted. Customers will see updates after admin approval."
+                : "Submitted. Visible to customers after admin approval.",
           );
         }
       } else {
@@ -747,11 +748,16 @@ const ProfilePage: React.FC = () => {
 
   const toggleProductStatus = async (product: Product) => {
     try {
-      const result = await merchantService.updateProduct(product.id, { 
-        is_available: !product.is_available,
-      });
+      const result = await merchantService.toggleAvailability(product);
       if (result.success) {
         await loadProducts();
+        if ("pendingReview" in result && result.pendingReview) {
+          alert(
+            language === "zh"
+              ? "上下架变更已提交，待后台审核通过后生效。"
+              : "Availability change submitted for admin approval.",
+          );
+        }
       }
     } catch (error) {
       LoggerService.error("更新状态失败:", error);
@@ -6562,19 +6568,28 @@ const ProfilePage: React.FC = () => {
                         </div>
                       </div>
                       {(product.listing_status === "pending" ||
-                        product.listing_status === "rejected") && (
+                        product.listing_status === "rejected" ||
+                        hasPendingProductUpdate(product)) && (
                         <div
                           style={{
                             marginTop: "0.5rem",
                             fontSize: "0.75rem",
                             fontWeight: 800,
                             color:
-                              product.listing_status === "pending"
+                              hasPendingProductUpdate(product) &&
+                              product.listing_status === "approved"
+                                ? "#fbbf24"
+                                : product.listing_status === "pending"
                                 ? "#fbbf24"
                                 : "#f87171",
                           }}
                         >
-                          {product.listing_status === "pending"
+                          {hasPendingProductUpdate(product) &&
+                          product.listing_status === "approved"
+                            ? language === "zh"
+                              ? "修改待审核"
+                              : "Edit pending"
+                            : product.listing_status === "pending"
                             ? language === "zh"
                               ? "待后台审核"
                               : "Pending approval"
