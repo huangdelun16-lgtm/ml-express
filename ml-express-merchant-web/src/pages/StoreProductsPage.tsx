@@ -21,6 +21,7 @@ const StoreProductsPage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const productFileInputRef = useRef<HTMLInputElement>(null);
+  const detailImagesFileInputRef = useRef<HTMLInputElement>(null);
   
   const [productForm, setProductForm] = useState({
     name: '',
@@ -29,8 +30,11 @@ const StoreProductsPage: React.FC = () => {
     discount_percent: '',
     stock: '-1',
     image_url: '',
+    detail_image_urls: [] as string[],
     is_available: true
   });
+  const [showDetailImagesPanel, setShowDetailImagesPanel] = useState(false);
+  const [isUploadingDetailImages, setIsUploadingDetailImages] = useState(false);
 
   const loadStoreData = useCallback(async (storeId: string) => {
     setLoading(true);
@@ -76,8 +80,10 @@ const StoreProductsPage: React.FC = () => {
       discount_percent: '',
       stock: '-1',
       image_url: '',
+      detail_image_urls: [],
       is_available: true
     });
+    setShowDetailImagesPanel(false);
     setShowAddEditProductModal(true);
   };
 
@@ -96,8 +102,10 @@ const StoreProductsPage: React.FC = () => {
       discount_percent: discountPercent,
       stock: product.stock.toString(),
       image_url: product.image_url || '',
+      detail_image_urls: product.detail_image_urls || [],
       is_available: product.is_available
     });
+    setShowDetailImagesPanel((product.detail_image_urls?.length ?? 0) > 0);
     setShowAddEditProductModal(true);
   };
 
@@ -118,6 +126,43 @@ const StoreProductsPage: React.FC = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleDetailImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    const storeId = currentUser?.store_id || currentUser?.id;
+    if (!files?.length || !storeId) return;
+
+    try {
+      setIsUploadingDetailImages(true);
+      const uploadedUrls: string[] = [];
+      for (const file of Array.from(files)) {
+        const url = await merchantService.uploadProductImage(storeId, file);
+        if (url) uploadedUrls.push(url);
+      }
+      if (uploadedUrls.length > 0) {
+        setProductForm((prev) => ({
+          ...prev,
+          detail_image_urls: [...prev.detail_image_urls, ...uploadedUrls],
+        }));
+        setShowDetailImagesPanel(true);
+      }
+    } catch (error) {
+      LoggerService.error('详细介绍图上传失败:', error);
+      alert(language === 'zh' ? '图片上传失败，请重试' : 'Image upload failed');
+    } finally {
+      setIsUploadingDetailImages(false);
+      if (detailImagesFileInputRef.current) {
+        detailImagesFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveDetailImage = (index: number) => {
+    setProductForm((prev) => ({
+      ...prev,
+      detail_image_urls: prev.detail_image_urls.filter((_, i) => i !== index),
+    }));
   };
 
   const handleSaveProduct = async () => {
@@ -145,6 +190,7 @@ const StoreProductsPage: React.FC = () => {
         original_price: originalPrice,
         stock: parseInt(productForm.stock),
         image_url: productForm.image_url,
+        detail_image_urls: productForm.detail_image_urls,
         is_available: productForm.is_available,
         description: productForm.description
       };
@@ -474,6 +520,63 @@ const StoreProductsPage: React.FC = () => {
                   }
                   placeholder={language === 'zh' ? '输入商品详情描述...' : 'Details...'}
                 />
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  className="merchant-product-modal__detail-btn"
+                  onClick={() => setShowDetailImagesPanel((v) => !v)}
+                >
+                  {language === 'zh' ? '商品详细介绍' : 'Scrolling Pictures'}
+                  {productForm.detail_image_urls.length > 0
+                    ? ` (${productForm.detail_image_urls.length})`
+                    : ''}
+                </button>
+                {showDetailImagesPanel ? (
+                  <div className="merchant-product-modal__detail-panel">
+                    <p className="merchant-product-modal__detail-hint">
+                      {language === 'zh'
+                        ? '上传多张介绍图，顾客在商品详情页可纵向滚动浏览'
+                        : 'Upload detail images for vertical scrolling in product view'}
+                    </p>
+                    <div className="merchant-product-modal__detail-scroll">
+                      {productForm.detail_image_urls.map((url, idx) => (
+                        <div key={`${url}-${idx}`} className="merchant-product-modal__detail-thumb">
+                          <img src={url} alt="" />
+                          <button
+                            type="button"
+                            className="merchant-product-modal__detail-remove"
+                            onClick={() => handleRemoveDetailImage(idx)}
+                            aria-label={language === 'zh' ? '删除图片' : 'Remove image'}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className="merchant-product-modal__detail-add"
+                        onClick={() => detailImagesFileInputRef.current?.click()}
+                        disabled={isUploadingDetailImages}
+                      >
+                        {isUploadingDetailImages
+                          ? '...'
+                          : language === 'zh'
+                            ? '+ 添加图片'
+                            : '+ Add'}
+                      </button>
+                    </div>
+                    <input
+                      type="file"
+                      ref={detailImagesFileInputRef}
+                      onChange={handleDetailImagesUpload}
+                      style={{ display: 'none' }}
+                      accept="image/*"
+                      multiple
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <div className="merchant-product-modal__row">

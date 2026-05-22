@@ -1011,6 +1011,39 @@ const StoreProductsPage: React.FC = () => {
                 </div>
               </div>
 
+              {(selectedProductDetail.detail_image_urls?.length ?? 0) > 0 ? (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontWeight: 800, color: '#334155', marginBottom: 8 }}>
+                    {t.store.detailImages}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                      maxHeight: 360,
+                      overflowY: 'auto',
+                      WebkitOverflowScrolling: 'touch',
+                    }}
+                  >
+                    {selectedProductDetail.detail_image_urls!.map((url, idx) => (
+                      <img
+                        key={`${url}-${idx}`}
+                        src={url}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          borderRadius: 14,
+                          objectFit: 'cover',
+                          display: 'block',
+                          background: '#e2e8f0',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div
                 style={{
                   display: 'flex',

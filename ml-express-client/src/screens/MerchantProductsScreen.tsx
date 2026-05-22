@@ -128,6 +128,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: '商品详情',
       description: '商品描述',
       noDescription: '暂无详细描述',
+      detailImages: '商品详细介绍',
       itemRemark: '本商品备注（选填）',
       itemRemarkPlaceholder: '如：少糖、不要辣、口味等',
       itemRemarkMultiHint: '每件可单独备注',
@@ -164,6 +165,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: 'Product Details',
       description: 'Description',
       noDescription: 'No description available',
+      detailImages: 'Product details',
       itemRemark: 'Note for this item (optional)',
       itemRemarkPlaceholder: 'e.g. less sugar, no spicy',
       itemRemarkMultiHint: 'Add a note per item',
@@ -200,6 +202,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: 'ကုန်ပစ္စည်းအသေးစိတ်',
       description: 'ကုန်ပစ္စည်းအကြောင်းအရာ',
       noDescription: 'ဖော်ပြချက်မရှိပါ',
+      detailImages: 'Product details',
       itemRemark: 'ဤပစ္စည်းအတွက် မှတ်ချက် (ရွေးချယ်နိုင်)',
       itemRemarkPlaceholder: 'ဥပမာ- သကြားနည်း၊ မစပ်ပါ',
       itemRemarkMultiHint: 'တစ်ခုချင်းစီမှတ်ချက်ထည့်နိုင်',
@@ -1194,6 +1197,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   </View>
                 </View>
 
+                {(selectedProductDetail?.detail_image_urls?.length ?? 0) > 0 ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>{currentT.detailImages}</Text>
+                    {selectedProductDetail?.detail_image_urls?.map((url, idx) => (
+                      <Image
+                        key={`${url}-${idx}`}
+                        source={{ uri: url }}
+                        style={styles.detailScrollingImage}
+                        resizeMode="cover"
+                      />
+                    ))}
+                  </View>
+                ) : null}
+
                 <View style={styles.detailStockCard}>
                   <Ionicons name="cube-outline" size={20} color="#2563eb" />
                   <Text style={styles.detailStockCardText}>
@@ -2004,6 +2021,13 @@ const styles = StyleSheet.create({
   },
   detailSection: {
     marginBottom: 18,
+  },
+  detailScrollingImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: '#e2e8f0',
   },
   descriptionBox: {
     backgroundColor: '#f8fafc',

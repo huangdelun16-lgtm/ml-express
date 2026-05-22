@@ -222,6 +222,8 @@ export interface Product {
   price: number;
   original_price?: number;
   image_url?: string;
+  /** 商品详细介绍滚动图（纵向浏览） */
+  detail_image_urls?: string[];
   stock: number;
   is_available: boolean;
   sales_count: number;

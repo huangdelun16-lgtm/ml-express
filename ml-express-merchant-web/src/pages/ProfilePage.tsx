@@ -355,10 +355,14 @@ const ProfilePage: React.FC = () => {
     discount_percent: "",
     stock: "-1",
     image_url: "",
+    detail_image_urls: [] as string[],
     is_available: true,
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [showDetailImagesPanel, setShowDetailImagesPanel] = useState(false);
+  const [isUploadingDetailImages, setIsUploadingDetailImages] = useState(false);
   const productFileInputRef = useRef<HTMLInputElement>(null);
+  const detailImagesFileInputRef = useRef<HTMLInputElement>(null);
 
   // 🚀 新增：店铺营业状态临时状态（用于保存前修改）
   const [businessStatus, setBusinessStatus] = useState({
@@ -568,8 +572,10 @@ const ProfilePage: React.FC = () => {
       discount_percent: "",
       stock: "-1",
       image_url: "",
+      detail_image_urls: [],
       is_available: true,
     });
+    setShowDetailImagesPanel(false);
     setShowAddEditProductModal(true);
   };
 
@@ -591,8 +597,10 @@ const ProfilePage: React.FC = () => {
       discount_percent: discountPercent,
       stock: product.stock.toString(),
       image_url: product.image_url || "",
+      detail_image_urls: product.detail_image_urls || [],
       is_available: product.is_available,
     });
+    setShowDetailImagesPanel((product.detail_image_urls?.length ?? 0) > 0);
     setShowAddEditProductModal(true);
   };
 
@@ -615,6 +623,42 @@ const ProfilePage: React.FC = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleDetailImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !currentUser?.id) return;
+
+    try {
+      setIsUploadingDetailImages(true);
+      const uploadedUrls: string[] = [];
+      for (const file of Array.from(files)) {
+        const url = await merchantService.uploadProductImage(currentUser.id, file);
+        if (url) uploadedUrls.push(url);
+      }
+      if (uploadedUrls.length > 0) {
+        setProductForm((prev) => ({
+          ...prev,
+          detail_image_urls: [...prev.detail_image_urls, ...uploadedUrls],
+        }));
+        setShowDetailImagesPanel(true);
+      }
+    } catch (error) {
+      LoggerService.error("详细介绍图上传失败:", error);
+      alert("图片上传失败，请重试");
+    } finally {
+      setIsUploadingDetailImages(false);
+      if (detailImagesFileInputRef.current) {
+        detailImagesFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveDetailImage = (index: number) => {
+    setProductForm((prev) => ({
+      ...prev,
+      detail_image_urls: prev.detail_image_urls.filter((_, i) => i !== index),
+    }));
   };
 
   const handleSaveProduct = async () => {
@@ -645,6 +689,7 @@ const ProfilePage: React.FC = () => {
         original_price: originalPrice,
         stock: parseInt(productForm.stock),
         image_url: productForm.image_url,
+        detail_image_urls: productForm.detail_image_urls,
         is_available: productForm.is_available,
         description: productForm.description,
       };
@@ -6744,6 +6789,132 @@ const ProfilePage: React.FC = () => {
                     fontFamily: "inherit",
                   }}
                 />
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowDetailImagesPanel((v) => !v)}
+                  style={{
+                    width: "100%",
+                    marginTop: "0.25rem",
+                    padding: "0.65rem 1rem",
+                    borderRadius: "12px",
+                    border: "1px dashed rgba(96, 165, 250, 0.45)",
+                    background: "rgba(59, 130, 246, 0.08)",
+                    color: "#93c5fd",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {language === "zh" ? "商品详细介绍" : "Scrolling Pictures"}
+                  {productForm.detail_image_urls.length > 0
+                    ? ` (${productForm.detail_image_urls.length})`
+                    : ""}
+                </button>
+                {showDetailImagesPanel ? (
+                  <div
+                    style={{
+                      marginTop: "0.75rem",
+                      padding: "0.85rem",
+                      borderRadius: "14px",
+                      border: "1px solid rgba(148, 163, 184, 0.18)",
+                      background: "rgba(15, 23, 42, 0.35)",
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: "0 0 0.65rem",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        color: "rgba(203, 213, 225, 0.65)",
+                      }}
+                    >
+                      {language === "zh"
+                        ? "上传多张介绍图，顾客在商品详情页可纵向滚动浏览"
+                        : "Upload detail images for vertical scrolling in product view"}
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.65rem",
+                        overflowX: "auto",
+                        paddingBottom: "0.25rem",
+                      }}
+                    >
+                      {productForm.detail_image_urls.map((url, idx) => (
+                        <div
+                          key={`${url}-${idx}`}
+                          style={{
+                            position: "relative",
+                            flex: "0 0 auto",
+                            width: "88px",
+                            height: "88px",
+                            borderRadius: "12px",
+                            overflow: "hidden",
+                            border: "1px solid rgba(255,255,255,0.12)",
+                          }}
+                        >
+                          <img
+                            src={url}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDetailImage(idx)}
+                            style={{
+                              position: "absolute",
+                              top: 4,
+                              right: 4,
+                              width: 22,
+                              height: 22,
+                              border: "none",
+                              borderRadius: "999px",
+                              background: "rgba(15, 23, 42, 0.78)",
+                              color: "#fca5a5",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => detailImagesFileInputRef.current?.click()}
+                        disabled={isUploadingDetailImages}
+                        style={{
+                          flex: "0 0 auto",
+                          width: "88px",
+                          height: "88px",
+                          borderRadius: "12px",
+                          border: "1px dashed rgba(148, 163, 184, 0.35)",
+                          background: "rgba(255,255,255,0.04)",
+                          color: "rgba(203, 213, 225, 0.75)",
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {isUploadingDetailImages
+                          ? "..."
+                          : language === "zh"
+                            ? "+ 添加图片"
+                            : "+ Add"}
+                      </button>
+                    </div>
+                    <input
+                      type="file"
+                      ref={detailImagesFileInputRef}
+                      onChange={handleDetailImagesUpload}
+                      style={{ display: "none" }}
+                      accept="image/*"
+                      multiple
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <div>

@@ -49,8 +49,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     discountPercent: '',
     stock: '-1',
     image_url: '',
+    detail_image_urls: [] as string[],
     is_available: true,
   });
+  const [showDetailImagesPanel, setShowDetailImagesPanel] = useState(false);
 
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [bulkModalType, setBulkModalType] = useState<'price' | 'discount' | null>(null);
@@ -104,6 +106,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: '商品详情',
       description: '商品描述',
       noDescription: '暂无详细描述',
+      detailImages: '商品详细介绍',
+      detailImagesHint: '上传多张介绍图，顾客在商品详情页可纵向滚动浏览',
+      addDetailImage: '添加图片',
     },
     en: {
       title: 'Products',
@@ -136,6 +141,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: 'Product Details',
       description: 'Description',
       noDescription: 'No description available',
+      detailImages: 'Scrolling Pictures',
+      detailImagesHint: 'Upload detail images for vertical scrolling in product view',
+      addDetailImage: 'Add image',
     },
     my: {
       title: 'ကုန်ပစ္စည်းစီမံခန့်ခွဲမှု',
@@ -168,6 +176,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: 'ကုန်ပစ္စည်းအသေးစိတ်',
       description: 'ကုန်ပစ္စည်းအကြောင်းအရာ',
       noDescription: 'ဖော်ပြချက်မရှိပါ',
+      detailImages: 'Scrolling Pictures',
+      detailImagesHint: 'Upload detail images for vertical scrolling in product view',
+      addDetailImage: 'Add image',
     }
   };
 
@@ -263,6 +274,43 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }
   };
 
+  const pickDetailImages = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('权限提示', '需要相册权限才能上传图片');
+        return;
+      }
+
+      const options: ImagePicker.ImagePickerOptions = {
+        allowsMultipleSelection: true,
+        selectionLimit: 12,
+        quality: 0.7,
+        mediaTypes: ['images'],
+      };
+
+      const result = await ImagePicker.launchImageLibraryAsync(options);
+      if (!result.canceled && result.assets?.length) {
+        const uris = result.assets.map((asset) => asset.uri);
+        setProductForm((prev) => ({
+          ...prev,
+          detail_image_urls: [...prev.detail_image_urls, ...uris],
+        }));
+        setShowDetailImagesPanel(true);
+      }
+    } catch (error) {
+      console.error('Pick detail images error:', error);
+      Alert.alert('错误', '无法打开相册，请检查权限');
+    }
+  };
+
+  const handleRemoveDetailImage = (index: number) => {
+    setProductForm((prev) => ({
+      ...prev,
+      detail_image_urls: prev.detail_image_urls.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
     setProductForm({
@@ -272,8 +320,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       discountPercent: '',
       stock: '-1',
       image_url: '',
+      detail_image_urls: [],
       is_available: true,
     });
+    setShowDetailImagesPanel(false);
     setShowProductModal(true);
   };
 
@@ -288,8 +338,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         : '',
       stock: product.stock.toString(),
       image_url: product.image_url || '',
+      detail_image_urls: product.detail_image_urls || [],
       is_available: product.is_available,
     });
+    setShowDetailImagesPanel((product.detail_image_urls?.length ?? 0) > 0);
     setShowProductModal(true);
   };
 
@@ -330,6 +382,18 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         }
       }
 
+      const finalDetailUrls: string[] = [];
+      for (const uri of productForm.detail_image_urls) {
+        if (uri.startsWith('file://') || uri.startsWith('content://')) {
+          const uploadedUrl = await merchantService.uploadProductImage(storeId, uri);
+          if (uploadedUrl) {
+            finalDetailUrls.push(uploadedUrl);
+          }
+        } else if (uri) {
+          finalDetailUrls.push(uri);
+        }
+      }
+
       let productData: Record<string, unknown> = {
         store_id: storeId,
         name: productForm.name,
@@ -340,6 +404,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           : null,
         stock: parseInt(productForm.stock),
         image_url: finalImageUrl,
+        detail_image_urls: finalDetailUrls,
         is_available: productForm.is_available,
       };
 
@@ -878,6 +943,43 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 />
               </View>
 
+              <TouchableOpacity
+                style={styles.detailImagesBtn}
+                onPress={() => setShowDetailImagesPanel((v) => !v)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="images-outline" size={18} color="#3b82f6" />
+                <Text style={styles.detailImagesBtnText}>
+                  {currentT.detailImages}
+                  {productForm.detail_image_urls.length > 0
+                    ? ` (${productForm.detail_image_urls.length})`
+                    : ''}
+                </Text>
+              </TouchableOpacity>
+
+              {showDetailImagesPanel ? (
+                <View style={styles.detailImagesPanel}>
+                  <Text style={styles.detailImagesHint}>{currentT.detailImagesHint}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detailImagesScroll}>
+                    {productForm.detail_image_urls.map((uri, idx) => (
+                      <View key={`${uri}-${idx}`} style={styles.detailImageThumbWrap}>
+                        <Image source={{ uri }} style={styles.detailImageThumb} />
+                        <TouchableOpacity
+                          style={styles.detailImageRemove}
+                          onPress={() => handleRemoveDetailImage(idx)}
+                        >
+                          <Ionicons name="close" size={14} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    <TouchableOpacity style={styles.detailImageAdd} onPress={pickDetailImages}>
+                      <Ionicons name="add" size={24} color="#64748b" />
+                      <Text style={styles.detailImageAddText}>{currentT.addDetailImage}</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              ) : null}
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{currentT.price} (MMK) *</Text>
                 <TextInput
@@ -1003,6 +1105,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                     </Text>
                   </View>
                 </View>
+
+                {(selectedProductDetail?.detail_image_urls?.length ?? 0) > 0 ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>🖼️ {currentT.detailImages}</Text>
+                    {selectedProductDetail?.detail_image_urls?.map((url, idx) => (
+                      <Image
+                        key={`${url}-${idx}`}
+                        source={{ uri: url }}
+                        style={styles.detailScrollingImage}
+                        resizeMode="cover"
+                      />
+                    ))}
+                  </View>
+                ) : null}
                 
                 <View style={[styles.stockRow, { marginTop: 24, backgroundColor: '#f8fafc', padding: 12, borderRadius: 12 }]}>
                   <Ionicons name="cube-outline" size={18} color="#3b82f6" />
@@ -1396,6 +1512,79 @@ const styles = StyleSheet.create({
   formGroup: {
     marginBottom: 16,
   },
+  detailImagesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.35)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(59, 130, 246, 0.06)',
+  },
+  detailImagesBtnText: {
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  detailImagesPanel: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  detailImagesHint: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  detailImagesScroll: {
+    flexGrow: 0,
+  },
+  detailImageThumbWrap: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  detailImageThumb: {
+    width: 88,
+    height: 88,
+    borderRadius: 12,
+    backgroundColor: '#e2e8f0',
+  },
+  detailImageRemove: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailImageAdd: {
+    width: 88,
+    height: 88,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  detailImageAddText: {
+    marginTop: 4,
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '600',
+  },
   formLabel: {
     fontSize: 14,
     fontWeight: '600',
@@ -1671,6 +1860,13 @@ const styles = StyleSheet.create({
   detailScroll: {
     flex: 1,
     marginBottom: 20,
+  },
+  detailScrollingImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: '#e2e8f0',
   },
   detailSectionTitle: {
     fontSize: 16,
