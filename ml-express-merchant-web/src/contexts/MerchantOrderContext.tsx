@@ -10,6 +10,14 @@ import React, {
 import { supabase } from '../services/supabase';
 import LoggerService from '../services/LoggerService';
 import { broadcastMerchantOrdersRefresh } from '../utils/merchantOrderEvents';
+import {
+  ensureDesktopNotificationPermission,
+  focusMerchantWindow,
+  playNewOrderChime,
+  showNewOrderDesktopNotification,
+  startPendingOrderTitleFlash,
+  stopPendingOrderTitleFlash,
+} from '../utils/merchantOrderDesktopAlert';
 import { useLanguage } from './LanguageContext';
 
 export type MerchantPendingOrder = Record<string, unknown> & {
@@ -77,7 +85,25 @@ export function MerchantOrderProvider({
     } catch {
       /* ignore */
     }
+    if (enabled) {
+      void ensureDesktopNotificationPermission();
+    }
   }, []);
+
+  const notifyNewPendingOrder = useCallback(
+    (count: number) => {
+      if (count <= 0) return;
+      focusMerchantWindow();
+      playNewOrderChime();
+      showNewOrderDesktopNotification(count, language, () => {
+        setShowOrderAlert(true);
+      });
+      if (document.hidden) {
+        startPendingOrderTitleFlash(count, language);
+      }
+    },
+    [language],
+  );
 
   const addPendingOrder = useCallback((order: MerchantPendingOrder) => {
     if (!order?.id || order.status !== '待确认') return;
@@ -87,7 +113,8 @@ export function MerchantOrderProvider({
     });
     setShowOrderAlert(true);
     broadcastMerchantOrdersRefresh();
-  }, []);
+    notifyNewPendingOrder(1);
+  }, [notifyNewPendingOrder]);
 
   const removePendingOrder = useCallback((orderId: string) => {
     setPendingOrders((prev) => {
@@ -180,6 +207,30 @@ export function MerchantOrderProvider({
   }, [storeId, addPendingOrder, removePendingOrder, syncPendingFromServer]);
 
   useEffect(() => {
+    if (pendingOrders.length === 0) {
+      stopPendingOrderTitleFlash();
+      return;
+    }
+    if (document.hidden) {
+      startPendingOrderTitleFlash(pendingOrders.length, language);
+    } else {
+      stopPendingOrderTitleFlash();
+    }
+  }, [pendingOrders.length, language]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!document.hidden) {
+        stopPendingOrderTitleFlash();
+      } else if (pendingOrders.length > 0) {
+        startPendingOrderTitleFlash(pendingOrders.length, language);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [pendingOrders.length, language]);
+
+  useEffect(() => {
     if (!isVoiceEnabled || pendingOrders.length === 0) return;
     const now = Date.now();
     if (now - lastVoiceAtRef.current < 8000) return;
@@ -191,6 +242,12 @@ export function MerchantOrderProvider({
           ? `You have ${pendingOrders.length} new order(s), please accept`
           : `您有 ${pendingOrders.length} 个新订单，请接单`;
     speakMerchantAlert(text, language);
+    if (document.hidden) {
+      playNewOrderChime();
+      showNewOrderDesktopNotification(pendingOrders.length, language, () => {
+        setShowOrderAlert(true);
+      });
+    }
   }, [pendingOrders.length, isVoiceEnabled, language, showOrderAlert]);
 
   const value: MerchantOrderContextValue = {

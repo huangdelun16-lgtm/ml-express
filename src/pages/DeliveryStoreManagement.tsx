@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
 import { supabase, deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
@@ -6,6 +7,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import QRCode from 'qrcode';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
+import '../styles/adminStoreCreateForm.css';
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
@@ -1042,33 +1044,23 @@ const DeliveryStoreManagement: React.FC = () => {
     });
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '12px 16px',
-    borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.2)',
-    background: 'rgba(255, 255, 255, 0.05)',
-    color: 'white',
-    fontSize: '0.95rem',
-    outline: 'none',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease'
+  const closeStoreForm = () => {
+    if (isEditing) {
+      setEditingStore(null);
+      setIsEditing(false);
+    }
+    setShowForm(false);
+    resetForm();
   };
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    marginBottom: '8px',
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: '0.9rem',
-    fontWeight: 600,
-    letterSpacing: '0.5px'
-  };
-
-  // const mapContainerStyle = {
-  //   width: '100%',
-  //   height: '400px',
-  //   borderRadius: '12px'
-  // };
+  useEffect(() => {
+    if (!showForm) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showForm]);
 
   const facilityOptions = [
     { key: 'store', label: '店铺' },
@@ -1128,15 +1120,7 @@ const DeliveryStoreManagement: React.FC = () => {
           <button
             onClick={() => {
               if (showForm) {
-                if (isEditing) {
-                  setEditingStore(null);
-                  setIsEditing(false);
-                  setShowForm(false);
-                  resetForm();
-                } else {
-                  setShowForm(false);
-                  resetForm();
-                }
+                closeStoreForm();
               } else {
                 setShowForm(true);
               }
@@ -1209,413 +1193,302 @@ const DeliveryStoreManagement: React.FC = () => {
       )}
 
       {/* 新增表单 */}
-      {showForm && (
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.08)',
-          borderRadius: '24px',
-          padding: isMobile ? '24px' : '32px',
-          marginBottom: '32px',
-          border: '1px solid rgba(255,255,255,0.2)',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
-          backdropFilter: 'blur(30px)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '16px' }}>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px', color: 'white' }}>
-              <span style={{ fontSize: '1.8rem' }}>📝</span> {isEditing ? '编辑合伙店铺' : '新增合伙店铺'}
-            </h2>
-            {/* 区域选择下拉框 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '6px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>工作区域：</label>
-              <select
-                name="region"
-                value={formData.region}
-                onChange={handleInputChange}
-          style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'rgba(66, 153, 225, 0.2)',
-                  color: '#63b3ed',
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  outline: 'none',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {REGIONS.map(r => (
-                  <option key={r.id} value={r.id} style={{ color: '#000' }}>
-                    {r.name} ({r.prefix})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-              <div>
-                <label style={labelStyle}>店铺名称 *</label>
-                <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  name="store_name"
-                  value={formData.store_name}
-                  onChange={handleInputChange}
-                  placeholder="例: 缅甸中心店"
-                  style={inputStyle}
-                  required
-                />
-                </div>
+      {showForm && createPortal(
+        <div
+          className="store-form-overlay"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeStoreForm();
+          }}
+        >
+          <div className="store-form-modal" role="dialog" aria-modal="true" aria-labelledby="store-form-title">
+            <div className="store-form-modal__head">
+              <div className="store-form-modal__title-wrap">
+                <h2 id="store-form-title" className="store-form-modal__title">
+                  {isEditing ? '编辑合伙店铺' : '新增合伙店铺'}
+                </h2>
+                <p className="store-form-modal__sub">
+                  {isEditing
+                    ? '修改店铺基本信息、联系方式与位置坐标。'
+                    : '填写店铺资料并选择地图位置，店铺代码将随名称与区域自动生成。'}
+                </p>
               </div>
-              <div>
-                <label style={labelStyle}>店铺代码 * (自动生成)</label>
-                <input
-                  type="text"
-                  name="store_code"
-                  value={formData.store_code}
-                  readOnly
-                  style={{
-                    ...inputStyle,
-                    background: 'rgba(72, 187, 120, 0.1)',
-                    border: '1px solid rgba(72, 187, 120, 0.4)',
-                    color: '#48bb78',
-                    fontWeight: 'bold',
-                    cursor: 'not-allowed'
-                  }}
-                  placeholder="填写店铺名称后自动生成"
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>店铺类型 *</label>
-                <div style={{ position: 'relative' }} ref={storeTypeDropdownRef}>
-                  <div
-                    onClick={() => setShowStoreTypeDropdown(!showStoreTypeDropdown)}
-                    style={{
-                      ...inputStyle,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      background: showStoreTypeDropdown ? 'rgba(255, 255, 255, 0.12)' : inputStyle.background,
-                      boxShadow: showStoreTypeDropdown ? '0 0 10px rgba(59, 130, 246, 0.3)' : 'none',
-                      borderColor: showStoreTypeDropdown ? '#3b82f6' : 'rgba(255,255,255,0.2)'
-                    }}
-                    onMouseOver={(e) => {
-                      if (!showStoreTypeDropdown) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (!showStoreTypeDropdown) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                      }
-                    }}
+              <div className="store-form-modal__head-actions">
+                <div className="store-form-modal__region">
+                  <label htmlFor="store-form-region">工作区域</label>
+                  <select
+                    id="store-form-region"
+                    name="region"
+                    value={formData.region}
+                    onChange={handleInputChange}
                   >
-                    <span>{STORE_TYPES.find(t => t.value === formData.store_type)?.label || '选择店铺类型'}</span>
-                    <span style={{ 
-                      transform: showStoreTypeDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.3s ease',
-                      fontSize: '0.8rem',
-                      opacity: 0.7
-                    }}>▼</span>
-                  </div>
-                  
-                  {showStoreTypeDropdown && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 5px)',
-                      left: 0,
-                      right: 0,
-                      backgroundColor: '#1e293b',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                      zIndex: 1000,
-                      maxHeight: '240px', // 约 6 条数据的高度
-                      overflowY: 'auto',
-                      animation: 'fadeIn 0.3s ease'
-                    }}>
-                      {STORE_TYPES.map((type) => (
-                        <div
-                          key={type.value}
-                          onClick={() => {
-                            handleInputChange({ target: { name: 'store_type', value: type.value } } as any);
-                            setShowStoreTypeDropdown(false);
-                          }}
-                          style={{
-                            padding: '12px 16px',
-                            cursor: 'pointer',
-                            color: formData.store_type === type.value ? '#48bb78' : 'white',
-                            backgroundColor: formData.store_type === type.value ? 'rgba(72, 187, 120, 0.1)' : 'transparent',
-                            fontSize: '0.9rem',
-                            transition: 'all 0.2s ease',
-                            borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-                          }}
-                          onMouseOver={(e) => {
-                            if (formData.store_type !== type.value) {
-                              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                            }
-                          }}
-                          onMouseOut={(e) => {
-                            if (formData.store_type !== type.value) {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }
-                          }}
-                        >
-                          {type.label}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    {REGIONS.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.prefix})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-              <div>
-                <label style={labelStyle}>密码 *</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="合伙店铺登录密码"
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>详细地址 *</label>
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  placeholder="详细地址"
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>联系电话 *</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  placeholder="09-XXXXXXXXX"
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>邮箱地址</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="store@company.com"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>店长姓名 *</label>
-                <input
-                  type="text"
-                  name="manager_name"
-                  value={formData.manager_name}
-                  onChange={handleInputChange}
-                  placeholder="店长姓名"
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>店长电话 *</label>
-                <input
-                  type="tel"
-                  name="manager_phone"
-                  value={formData.manager_phone}
-                  onChange={handleInputChange}
-                  placeholder="09-XXXXXXXXX"
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>营业时间 *</label>
-                <input
-                  type="text"
-                  name="operating_hours"
-                  value={formData.operating_hours}
-                  onChange={handleInputChange}
-                  placeholder="例: 08:00-22:00"
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>COD 结清日 *</label>
-                <select
-                  name="cod_settlement_day"
-                  value={formData.cod_settlement_day}
-                  onChange={handleInputChange}
-                  style={inputStyle}
-                  required
-                >
-                  <option value="7" style={{ color: '#000' }}>7天</option>
-                  <option value="10" style={{ color: '#000' }}>10天</option>
-                  <option value="15" style={{ color: '#000' }}>15天</option>
-                  <option value="30" style={{ color: '#000' }}>1个月</option>
-                </select>
-              </div>
-              {!isEditing && (
-              <div>
-                  <label style={labelStyle}>创建合伙时间</label>
-                <input
-                    type="text"
-                    value={new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                    readOnly
-                    style={{
-                      ...inputStyle,
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      cursor: 'not-allowed',
-                      opacity: 0.7
-                    }}
-                />
-              </div>
-              )}
-              <div>
-                <label style={labelStyle}>纬度 *</label>
-                <input
-                  type="number"
-                  name="latitude"
-                  value={formData.latitude}
-                  onChange={handleInputChange}
-                  placeholder="21.9588"
-                  step="0.00000001"
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>经度 *</label>
-                <input
-                  type="number"
-                  name="longitude"
-                  value={formData.longitude}
-                  onChange={handleInputChange}
-                  placeholder="96.0891"
-                  step="0.00000001"
-                  style={inputStyle}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* 设施选择 */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>设施配置</label>
-              <div style={{ display: 'flex', gap: '20px' }}>
-                {facilityOptions.map(facility => (
-                  <label key={facility.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={formData.facilities.includes(facility.key)}
-                      onChange={() => handleFacilityChange(facility.key)}
-                      style={{ accentColor: '#3182ce' }}
-                    />
-                    <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.85rem' }}>
-                      {facility.label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>备注</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleInputChange}
-                placeholder="其他备注信息"
-                rows={2}
-                style={{ ...inputStyle, resize: 'vertical' }}
-              />
-            </div>
-
-            {/* 地图位置选择按钮 */}
-            <div style={{ marginBottom: '24px' }}>
-              <label style={labelStyle}>地图位置选择</label>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
                 <button
                   type="button"
-                  onClick={openMapSelection}
-                  style={{
-                    background: 'linear-gradient(135deg, #4299e1 0%, #3182ce 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 24px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '0.95rem',
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    boxShadow: '0 8px 20px rgba(49, 130, 206, 0.3)',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px)';
-                    e.currentTarget.style.boxShadow = '0 12px 25px rgba(49, 130, 206, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(49, 130, 206, 0.3)';
-                  }}
+                  className="store-form-modal__close"
+                  aria-label="关闭"
+                  onClick={closeStoreForm}
                 >
-                  🗺️ 选择地图位置
+                  ×
                 </button>
-                {formData.latitude && formData.longitude && (
-                  <span style={{ color: '#27ae60', fontSize: '0.9rem', fontWeight: '500' }}>
-                    ✅ 位置已选择 ({formData.latitude}, {formData.longitude})
-                  </span>
-                )}
               </div>
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}>
-                点击按钮打开地图窗口，在地图上点击选择位置
-              </p>
             </div>
 
-            <button
-              type="submit"
-              style={{
-                background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '12px 32px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 'bold',
-                boxShadow: '0 8px 20px rgba(56, 161, 105, 0.35)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 12px 25px rgba(56, 161, 105, 0.45)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(56, 161, 105, 0.35)';
-              }}
-            >
-              {isEditing ? '✅ 更新合伙店铺' : '🚀 创建合伙店铺'}
-            </button>
-          </form>
-        </div>
+            <form onSubmit={handleSubmit} className="store-form-modal__form">
+              <div className="store-form-modal__body">
+                <section className="store-form-section">
+                  <h3 className="store-form-section__title">店铺基本信息</h3>
+                  <div className="store-form-grid">
+                    <div className="store-form-field">
+                      <label>店铺名称 <span>*</span></label>
+                      <input
+                        type="text"
+                        name="store_name"
+                        value={formData.store_name}
+                        onChange={handleInputChange}
+                        placeholder="例: 缅甸中心店"
+                        required
+                      />
+                    </div>
+                    <div className="store-form-field store-form-field--readonly">
+                      <label>店铺代码 <span>*</span>（自动生成）</label>
+                      <input
+                        type="text"
+                        name="store_code"
+                        value={formData.store_code}
+                        readOnly
+                        placeholder="填写店铺名称后自动生成"
+                      />
+                    </div>
+                    <div className="store-form-field">
+                      <label>店铺类型 <span>*</span></label>
+                      <div
+                        className={`store-form-type ${showStoreTypeDropdown ? 'is-open' : ''}`}
+                        ref={storeTypeDropdownRef}
+                      >
+                        <button
+                          type="button"
+                          className="store-form-type__trigger"
+                          onClick={() => setShowStoreTypeDropdown(!showStoreTypeDropdown)}
+                        >
+                          <span>{STORE_TYPES.find(t => t.value === formData.store_type)?.label || '选择店铺类型'}</span>
+                          <span className="store-form-type__arrow">▼</span>
+                        </button>
+                        {showStoreTypeDropdown && (
+                          <div className="store-form-type__menu">
+                            {STORE_TYPES.map((type) => (
+                              <div
+                                key={type.value}
+                                className={`store-form-type__option ${formData.store_type === type.value ? 'is-selected' : ''}`}
+                                onClick={() => {
+                                  handleInputChange({ target: { name: 'store_type', value: type.value } } as React.ChangeEvent<HTMLSelectElement>);
+                                  setShowStoreTypeDropdown(false);
+                                }}
+                              >
+                                {type.label}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="store-form-field">
+                      <label>密码 <span>*</span></label>
+                      <input
+                        type="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        placeholder="合伙店铺登录密码"
+                        required
+                      />
+                    </div>
+                    <div className="store-form-field">
+                      <label>详细地址 <span>*</span></label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleInputChange}
+                        placeholder="详细地址"
+                        required
+                      />
+                    </div>
+                    <div className="store-form-field">
+                      <label>营业时间 <span>*</span></label>
+                      <input
+                        type="text"
+                        name="operating_hours"
+                        value={formData.operating_hours}
+                        onChange={handleInputChange}
+                        placeholder="例: 08:00-22:00"
+                        required
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="store-form-section">
+                  <h3 className="store-form-section__title">联系与店长</h3>
+                  <div className="store-form-grid">
+                    <div className="store-form-field">
+                      <label>联系电话 <span>*</span></label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleInputChange}
+                        placeholder="09-XXXXXXXXX"
+                        required
+                      />
+                    </div>
+                    <div className="store-form-field">
+                      <label>邮箱地址</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        placeholder="store@company.com"
+                      />
+                    </div>
+                    <div className="store-form-field">
+                      <label>店长姓名 <span>*</span></label>
+                      <input
+                        type="text"
+                        name="manager_name"
+                        value={formData.manager_name}
+                        onChange={handleInputChange}
+                        placeholder="店长姓名"
+                        required
+                      />
+                    </div>
+                    <div className="store-form-field">
+                      <label>店长电话 <span>*</span></label>
+                      <input
+                        type="tel"
+                        name="manager_phone"
+                        value={formData.manager_phone}
+                        onChange={handleInputChange}
+                        placeholder="09-XXXXXXXXX"
+                        required
+                      />
+                    </div>
+                    <div className="store-form-field">
+                      <label>COD 结清日 <span>*</span></label>
+                      <select
+                        name="cod_settlement_day"
+                        value={formData.cod_settlement_day}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="7">7天</option>
+                        <option value="10">10天</option>
+                        <option value="15">15天</option>
+                        <option value="30">1个月</option>
+                      </select>
+                    </div>
+                    {!isEditing && (
+                      <div className="store-form-field store-form-field--muted">
+                        <label>创建合伙时间</label>
+                        <input
+                          type="text"
+                          value={new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                          readOnly
+                        />
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="store-form-section">
+                  <h3 className="store-form-section__title">位置坐标</h3>
+                  <div className="store-form-grid">
+                    <div className="store-form-field">
+                      <label>纬度 <span>*</span></label>
+                      <input
+                        type="number"
+                        name="latitude"
+                        value={formData.latitude}
+                        onChange={handleInputChange}
+                        placeholder="21.9588"
+                        step="0.00000001"
+                        required
+                      />
+                    </div>
+                    <div className="store-form-field">
+                      <label>经度 <span>*</span></label>
+                      <input
+                        type="number"
+                        name="longitude"
+                        value={formData.longitude}
+                        onChange={handleInputChange}
+                        placeholder="96.0891"
+                        step="0.00000001"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="store-form-map" style={{ marginTop: '0.75rem' }}>
+                    <div className="store-form-map__row">
+                      <button type="button" className="store-form-btn store-form-btn--map" onClick={openMapSelection}>
+                        选择地图位置
+                      </button>
+                      {formData.latitude && formData.longitude && (
+                        <span className="store-form-map__status">
+                          位置已选择 ({formData.latitude}, {formData.longitude})
+                        </span>
+                      )}
+                    </div>
+                    <p className="store-form-map__hint">点击按钮打开地图窗口，在地图上点击选择位置</p>
+                  </div>
+                </section>
+
+                <section className="store-form-section">
+                  <h3 className="store-form-section__title">设施与备注</h3>
+                  <div className="store-form-facilities" style={{ marginBottom: '0.75rem' }}>
+                    {facilityOptions.map(facility => (
+                      <label key={facility.key} className="store-form-facility">
+                        <input
+                          type="checkbox"
+                          checked={formData.facilities.includes(facility.key)}
+                          onChange={() => handleFacilityChange(facility.key)}
+                        />
+                        {facility.label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="store-form-field">
+                    <label>备注</label>
+                    <textarea
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleInputChange}
+                      placeholder="其他备注信息"
+                      rows={2}
+                    />
+                  </div>
+                </section>
+              </div>
+
+              <div className="store-form-modal__foot">
+                <button type="button" className="store-form-btn store-form-btn--ghost" onClick={closeStoreForm}>
+                  取消
+                </button>
+                <button type="submit" className="store-form-btn store-form-btn--primary">
+                  {isEditing ? '更新合伙店铺' : '创建合伙店铺'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* 合伙店铺列表和地图 */}
@@ -2863,7 +2736,7 @@ const DeliveryStoreManagement: React.FC = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 3000
+          zIndex: 10100
         }}>
           <div style={{
             background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',

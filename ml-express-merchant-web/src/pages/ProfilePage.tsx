@@ -34,6 +34,7 @@ import MerchantDashboardOrderPanel from "../components/dashboard/MerchantDashboa
 import MerchantRevenuePanel from "../components/dashboard/MerchantRevenuePanel";
 import { useMerchantOrdersOptional } from "../contexts/MerchantOrderContext";
 import { MERCHANT_ORDERS_REFRESH } from "../utils/merchantOrderEvents";
+import { ensureDesktopNotificationPermission } from "../utils/merchantOrderDesktopAlert";
 import {
   computeMerchantOrderStats,
   getMerchantOrderStatusColor,
@@ -3847,13 +3848,24 @@ const ProfilePage: React.FC = () => {
                     onClick={() => {
                       if (!isVoiceEnabled) {
                         speakNotification("语音提醒功能已开启");
-                        alert(
-                          language === "zh"
-                            ? "✅ 语音提醒已开启！当有“待确认”新订单时，系统将自动为您播放播报并刷新列表。"
-                            : "Voice Alert Active! List will auto-refresh on new orders.",
-                        );
+                        void ensureDesktopNotificationPermission().then((perm) => {
+                          alert(
+                            language === "zh"
+                              ? perm === "granted"
+                                ? "✅ 语音与桌面通知已开启！有新订单时即使用其它软件也会弹出系统通知，点击通知可返回商家端。"
+                                : "✅ 语音提醒已开启！建议在浏览器地址栏允许「通知」权限，这样切换到其它软件时也能收到新订单弹窗。"
+                              : perm === "granted"
+                                ? "Voice and desktop notifications enabled. You will be alerted even when using other apps."
+                                : "Voice alert enabled. Allow browser notifications for alerts when using other apps.",
+                          );
+                        });
+                      } else {
+                        setIsVoiceEnabled(false);
+                        merchantOrdersCtx?.setIsVoiceEnabled(false);
+                        return;
                       }
-                      setIsVoiceEnabled(!isVoiceEnabled);
+                      setIsVoiceEnabled(true);
+                      merchantOrdersCtx?.setIsVoiceEnabled(true);
                     }}
                     style={{
                       background: isVoiceEnabled

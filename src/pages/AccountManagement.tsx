@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { adminAccountService, AdminAccount } from '../services/supabase';
 import { fileUploadService } from '../services/FileUploadService';
@@ -6,6 +7,8 @@ import { imageCompressionService, CompressionResult } from '../services/ImageCom
 import { fileValidationService } from '../services/FileValidationService';
 import { BatchProgress, UploadProgress } from '../components/UploadProgress';
 import { useResponsive } from '../hooks/useResponsive';
+import '../styles/adminAccountCreateForm.css';
+import '../styles/adminAccountList.css';
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
@@ -91,6 +94,17 @@ const AccountManagement: React.FC = () => {
     loadAccounts();
   }, []);
 
+  useEffect(() => {
+    if (!showForm) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showForm]);
+
+  const closeCreateForm = () => setShowForm(false);
+
   const loadAccounts = async () => {
     setLoading(true);
     const data = await adminAccountService.getAllAccounts();
@@ -147,38 +161,29 @@ const AccountManagement: React.FC = () => {
     return `${regionPrefix}-${positionType}-${nextNumber}`;
   };
 
-  const tableHeaderStyle: React.CSSProperties = {
-    padding: '12px 16px',
-    textAlign: 'left',
-    fontSize: '0.75rem',
-    fontWeight: 700,
-    color: 'rgba(255,255,255,0.5)',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)'
+  const getAccountRegionLabel = (account: AdminAccount): string => {
+    if (account.role === 'admin') return '万能';
+    const region = REGIONS.find(r => r.id === account.region);
+    if (region) return region.prefix;
+    if (account.employee_id) {
+      const prefix = account.employee_id.split('-')[0];
+      if (['MDY', 'YGN', 'POL', 'NPW', 'TGI', 'LSO', 'MUSE'].includes(prefix)) return prefix;
+      if (account.employee_id.startsWith('YGN')) return 'YGN';
+      if (account.employee_id.startsWith('MDY')) return 'MDY';
+      if (account.employee_id.startsWith('POL')) return 'POL';
+    }
+    return account.region || '-';
   };
 
-  const tableCellStyle: React.CSSProperties = {
-    padding: '16px',
-    fontSize: '0.9rem',
-    color: 'white',
-    verticalAlign: 'middle'
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin': return '系统管理员';
+      case 'manager': return '经理';
+      case 'operator': return '操作员';
+      case 'finance': return '财务人员';
+      default: return role;
+    }
   };
-
-  const actionButtonStyle = (color: string): React.CSSProperties => ({
-    background: 'rgba(255,255,255,0.05)',
-    border: `1px solid ${color}44`,
-    borderRadius: '8px',
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    fontSize: '1rem',
-    color: color
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -376,15 +381,6 @@ const AccountManagement: React.FC = () => {
     const matchesRole = filterRole === 'all' || acc.role === filterRole;
     return matchesSearch && matchesRole;
   });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return '#48bb78';
-      case 'inactive': return '#ed8936';
-      case 'suspended': return '#f56565';
-      default: return '#a0aec0';
-    }
-  };
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -742,649 +738,377 @@ const AccountManagement: React.FC = () => {
           </div>
         )}
 
-        {showForm && (
-          <div style={{
-            background: 'rgba(15, 32, 60, 0.5)',
-            borderRadius: '20px',
-            padding: isMobile ? '24px' : '32px',
-            marginBottom: '32px',
-            border: '1px solid rgba(255,255,255,0.15)',
-            boxShadow: '0 15px 35px rgba(0,0,0,0.3)',
-            backdropFilter: 'blur(20px)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '1.8rem' }}>📝</span> 创建新员工账号
-              </h2>
-              {/* 区域选择下拉框 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '6px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>工作区域：</label>
-                <select
-                  name="region"
-                  value={formData.region}
-                  onChange={handleInputChange}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'rgba(66, 153, 225, 0.2)',
-                    color: '#63b3ed',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    outline: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {REGIONS.map(r => (
-                    <option key={r.id} value={r.id} style={{ color: '#000' }}>
-                      {r.name} ({r.prefix})
-                    </option>
-                  ))}
-                </select>
+        {showForm && createPortal(
+          <div
+            className="acct-create-overlay"
+            role="presentation"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeCreateForm();
+            }}
+          >
+            <div className="acct-create-modal" role="dialog" aria-modal="true" aria-labelledby="acct-create-title">
+              <div className="acct-create-modal__head">
+                <div className="acct-create-modal__title-wrap">
+                  <h2 id="acct-create-title" className="acct-create-modal__title">创建新员工账号</h2>
+                  <p className="acct-create-modal__sub">填写基本信息与组织归属，员工编号将根据区域、职位和角色自动生成。</p>
+                </div>
+                <div className="acct-create-modal__head-actions">
+                  <div className="acct-create-modal__region">
+                    <label htmlFor="acct-create-region">工作区域</label>
+                    <select
+                      id="acct-create-region"
+                      name="region"
+                      value={formData.region}
+                      onChange={handleInputChange}
+                    >
+                      {REGIONS.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} ({r.prefix})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    className="acct-create-modal__close"
+                    aria-label="关闭"
+                    onClick={closeCreateForm}
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
+
+              <form onSubmit={handleSubmit} className="acct-create-modal__form">
+                <div className="acct-create-modal__body">
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">登录凭证</h3>
+                    <div className="acct-create-grid">
+                      <div className="acct-create-field">
+                        <label>用户名 <span>*</span></label>
+                        <input
+                          type="text"
+                          name="username"
+                          value={formData.username}
+                          onChange={handleInputChange}
+                          required
+                        />
+                      </div>
+                      <div className="acct-create-field">
+                        <label>密码 <span>*</span></label>
+                        <input
+                          type="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">员工信息</h3>
+                    <div className="acct-create-grid">
+                      <div className="acct-create-field">
+                        <label>员工姓名 <span>*</span></label>
+                        <input
+                          type="text"
+                          name="employee_name"
+                          value={formData.employee_name}
+                          onChange={handleInputChange}
+                          required
+                        />
+                      </div>
+                      <div className="acct-create-field acct-create-field--readonly">
+                        <label>员工编号 <span>*</span>（自动生成）</label>
+                        <input
+                          type="text"
+                          name="employee_id"
+                          value={formData.employee_id}
+                          readOnly
+                          placeholder="请先选择区域、职位和角色"
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">组织与权限</h3>
+                    <div className="acct-create-grid">
+                      <div className="acct-create-field">
+                        <label>部门 <span>*</span></label>
+                        <select
+                          name="department"
+                          value={formData.department}
+                          onChange={handleInputChange}
+                          required
+                        >
+                          <option value="">请选择部门</option>
+                          <option value="运营部">运营部</option>
+                          <option value="配送部">配送部</option>
+                          <option value="客服部">客服部</option>
+                          <option value="财务部">财务部</option>
+                          <option value="技术部">技术部</option>
+                          <option value="人事部">人事部</option>
+                          <option value="市场部">市场部</option>
+                        </select>
+                      </div>
+                      <div className="acct-create-field">
+                        <label>职位 <span>*</span></label>
+                        <select
+                          name="position"
+                          value={formData.position}
+                          onChange={handleInputChange}
+                          required
+                        >
+                          <option value="">请选择职位</option>
+                          <option value="总经理">总经理</option>
+                          <option value="部门经理">部门经理</option>
+                          <option value="主管">主管</option>
+                          <option value="骑手队长">骑手队长</option>
+                          <option value="骑手">骑手</option>
+                          <option value="客服专员">客服专员</option>
+                          <option value="财务专员">财务专员</option>
+                          <option value="技术专员">技术专员</option>
+                          <option value="操作员">操作员</option>
+                        </select>
+                      </div>
+                      <div className="acct-create-field">
+                        <label>角色 <span>*</span></label>
+                        <select
+                          name="role"
+                          value={formData.role}
+                          onChange={handleInputChange}
+                          required
+                        >
+                          <option value="operator">操作员</option>
+                          <option value="manager">经理</option>
+                          <option value="admin">管理员</option>
+                          <option value="finance">财务</option>
+                        </select>
+                      </div>
+                      <div className="acct-create-field">
+                        <label>入职日期 <span>*</span></label>
+                        <input
+                          type="date"
+                          name="hire_date"
+                          value={formData.hire_date}
+                          onChange={handleInputChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="acct-create-section">
+                    <h3 className="acct-create-section__title">联系方式与薪资</h3>
+                    <div className="acct-create-grid">
+                      <div className="acct-create-field">
+                        <label>手机号码</label>
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="acct-create-field">
+                        <label>邮箱</label>
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="acct-create-field">
+                        <label>基本工资 (MMK)</label>
+                        <input
+                          type="number"
+                          name="salary"
+                          value={formData.salary}
+                          onChange={handleInputChange}
+                          placeholder="例如: 300000"
+                        />
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="acct-create-modal__foot">
+                  <button type="button" className="acct-create-btn acct-create-btn--ghost" onClick={closeCreateForm}>
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    className="acct-create-btn acct-create-btn--secondary"
+                    onClick={() => setShowCvUploadModal(true)}
+                  >
+                    上传 CV Form
+                  </button>
+                  <button type="submit" className="acct-create-btn acct-create-btn--primary">
+                    创建账号
+                  </button>
+                </div>
+              </form>
             </div>
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))', gap: isMobile ? '12px' : '20px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    用户名 *
-                  </label>
-                  <input
-                    type="text"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    密码 *
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    员工姓名 *
-                  </label>
-                  <input
-                    type="text"
-                    name="employee_name"
-                    value={formData.employee_name}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    员工编号 * （自动生成）
-                  </label>
-                  <input
-                    type="text"
-                    name="employee_id"
-                    value={formData.employee_id}
-                    readOnly
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(72, 187, 120, 0.5)',
-                      background: 'rgba(72, 187, 120, 0.1)',
-                      color: '#48bb78',
-                      fontSize: '1rem',
-                      outline: 'none',
-                      fontWeight: 'bold',
-                      cursor: 'not-allowed'
-                    }}
-                    placeholder="请先选择区域、职位和角色"
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    部门 *
-                  </label>
-                  <select
-                    name="department"
-                    value={formData.department}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none',
-                      cursor: 'pointer'
-                    }}
-                    required
-                  >
-                    <option value="" style={{ color: '#000' }}>请选择部门</option>
-                    <option value="运营部" style={{ color: '#000' }}>运营部</option>
-                    <option value="配送部" style={{ color: '#000' }}>配送部</option>
-                    <option value="客服部" style={{ color: '#000' }}>客服部</option>
-                    <option value="财务部" style={{ color: '#000' }}>财务部</option>
-                    <option value="技术部" style={{ color: '#000' }}>技术部</option>
-                    <option value="人事部" style={{ color: '#000' }}>人事部</option>
-                    <option value="市场部" style={{ color: '#000' }}>市场部</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    职位 *
-                  </label>
-                  <select
-                    name="position"
-                    value={formData.position}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none',
-                      cursor: 'pointer'
-                    }}
-                    required
-                  >
-                    <option value="" style={{ color: '#000' }}>请选择职位</option>
-                    <option value="总经理" style={{ color: '#000' }}>总经理</option>
-                    <option value="部门经理" style={{ color: '#000' }}>部门经理</option>
-                    <option value="主管" style={{ color: '#000' }}>主管</option>
-                    <option value="骑手队长" style={{ color: '#000' }}>骑手队长</option>
-                    <option value="骑手" style={{ color: '#000' }}>骑手</option>
-                    <option value="客服专员" style={{ color: '#000' }}>客服专员</option>
-                    <option value="财务专员" style={{ color: '#000' }}>财务专员</option>
-                    <option value="技术专员" style={{ color: '#000' }}>技术专员</option>
-                    <option value="操作员" style={{ color: '#000' }}>操作员</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    角色 *
-                  </label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                    required
-                  >
-                    <option value="operator">操作员</option>
-                    <option value="manager">经理</option>
-                    <option value="admin">管理员</option>
-                    <option value="finance">财务</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    手机号码
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    邮箱
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    入职日期 *
-                  </label>
-                  <input
-                    type="date"
-                    name="hire_date"
-                    value={formData.hire_date}
-                    onChange={handleInputChange}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    基本工资 (MMK)
-                  </label>
-                  <input
-                    type="number"
-                    name="salary"
-                    value={formData.salary}
-                    onChange={handleInputChange}
-                    placeholder="例如: 300000"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      background: 'rgba(15, 32, 60, 0.55)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: isMobile ? '12px' : '16px', justifyContent: 'center' }}>
-                <button
-                  type="submit"
-                  style={{
-                    background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 32px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: 600
-                  }}
-                >
-                  创建账号
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCvUploadModal(true)}
-                  style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 32px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: 600
-                  }}
-                >
-                  📄 上传CV Form
-                </button>
-              </div>
-            </form>
-          </div>
+          </div>,
+          document.body
         )}
 
-        <div style={{
-          background: 'rgba(15, 32, 60, 0.45)',
-          borderRadius: '20px',
-          padding: isMobile ? '20px' : '32px',
-          border: '1px solid rgba(255,255,255,0.12)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-          backdropFilter: 'blur(15px)'
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: '28px',
-            flexWrap: 'wrap',
-            gap: '20px'
-          }}>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '1.8rem' }}>👥</span> 现有账号列表
-              <span style={{ 
-                fontSize: '0.9rem', 
-                background: 'rgba(255,255,255,0.1)', 
-                padding: '4px 12px', 
-                borderRadius: '20px',
-                fontWeight: 400,
-                opacity: 0.8
-              }}>
-                共 {filteredAccounts.length} 个账号
-              </span>
-            </h2>
-
-            <div style={{ display: 'flex', gap: '12px', flex: isMobile ? '1 1 100%' : 'none' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>🔍</span>
+        <div className="acct-list">
+          <div className="acct-list__toolbar">
+            <div className="acct-list__title-row">
+              <h2 className="acct-list__title">现有账号列表</h2>
+              <span className="acct-list__count">共 {filteredAccounts.length} 个账号</span>
+            </div>
+            <div className="acct-list__filters">
+              <div className="acct-list__search">
+                <span className="acct-list__search-icon">🔍</span>
                 <input
                   type="text"
                   placeholder="搜索用户名/姓名/编号..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    padding: '10px 12px 10px 36px',
-                    borderRadius: '10px',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    background: 'rgba(0,0,0,0.2)',
-                    color: 'white',
-                    width: isMobile ? '100%' : '260px',
-                    outline: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#4299e1'}
-                  onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
                 />
               </div>
-              <select
-                value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value)}
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  background: 'rgba(0,0,0,0.2)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  outline: 'none'
-                }}
-              >
-                <option value="all" style={{ color: '#000' }}>所有角色</option>
-                <option value="admin" style={{ color: '#000' }}>管理员</option>
-                <option value="manager" style={{ color: '#000' }}>经理</option>
-                <option value="operator" style={{ color: '#000' }}>操作员</option>
-                <option value="finance" style={{ color: '#000' }}>财务</option>
+              <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+                <option value="all">所有角色</option>
+                <option value="admin">管理员</option>
+                <option value="manager">经理</option>
+                <option value="operator">操作员</option>
+                <option value="finance">财务</option>
               </select>
             </div>
           </div>
-          
+
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px' }}>
-              <div className="loader" style={{ marginBottom: '16px' }}></div>
-              <div style={{ fontSize: '1.1rem', opacity: 0.7 }}>正在加载数据...</div>
-            </div>
+            <div className="acct-list__state">正在加载数据...</div>
           ) : filteredAccounts.length === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '80px 40px',
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: '16px',
-              border: '1px dashed rgba(255,255,255,0.1)'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '16px', opacity: 0.5 }}>🔎</div>
-              <div style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.6)' }}>未找到符合条件的账号</div>
+            <div className="acct-list__empty">
+              <div className="acct-list__empty-icon">🔎</div>
+              <div className="acct-list__empty-text">未找到符合条件的账号</div>
               {searchTerm && (
-                <button 
-                  onClick={() => {setSearchTerm(''); setFilterRole('all');}}
-                  style={{ 
-                    marginTop: '16px', 
-                    background: 'none', 
-                    border: '1px solid rgba(255,255,255,0.3)', 
-                    color: 'white',
-                    padding: '6px 16px',
-                    borderRadius: '6px',
-                    cursor: 'pointer'
-                  }}
+                <button
+                  type="button"
+                  className="acct-list__reset"
+                  onClick={() => { setSearchTerm(''); setFilterRole('all'); }}
                 >
                   重置筛选
                 </button>
               )}
             </div>
           ) : (
-            <div style={{ overflowX: 'auto', borderRadius: '12px' }}>
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
+            <div className="acct-list__table-wrap">
+              <table className="acct-list__table">
                 <thead>
                   <tr>
-                    <th style={tableHeaderStyle}>员工信息</th>
-                    <th style={tableHeaderStyle}>所属区域</th>
-                    <th style={tableHeaderStyle}>员工编号</th>
-                    <th style={tableHeaderStyle}>职位/部门</th>
-                    <th style={tableHeaderStyle}>角色权限</th>
-                    <th style={tableHeaderStyle}>当前状态</th>
-                    <th style={tableHeaderStyle}>最后登录</th>
-                    <th style={{ ...tableHeaderStyle, textAlign: 'center' }}>操作</th>
+                    <th>员工信息</th>
+                    <th>所属区域</th>
+                    <th>员工编号</th>
+                    <th>职位/部门</th>
+                    <th>角色权限</th>
+                    <th>当前状态</th>
+                    <th>最后登录</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAccounts.map((account) => (
-                    <tr key={account.id} style={{ 
-                      background: 'rgba(255,255,255,0.04)',
-                      transition: 'all 0.2s',
-                      cursor: 'default'
-                    }} 
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
-                    >
-                      <td style={{ ...tableCellStyle, borderRadius: '12px 0 0 12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ 
-                            width: '36px', 
-                            height: '36px', 
-                            borderRadius: '50%', 
-                            background: getRoleColor(account.role),
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.1rem',
-                            fontWeight: 'bold',
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
-                          }}>
+                    <tr key={account.id}>
+                      <td>
+                        <div className="acct-list__user">
+                          <div
+                            className="acct-list__avatar"
+                            style={{ background: getRoleColor(account.role) }}
+                          >
                             {account.employee_name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{account.employee_name}</div>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>@{account.username}</div>
+                            <div className="acct-list__name">{account.employee_name}</div>
+                            <div className="acct-list__username">@{account.username}</div>
                           </div>
                         </div>
                       </td>
-                      <td style={tableCellStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '1rem' }}>📍</span>
-                          <span style={{ fontWeight: 'bold', color: '#48bb78' }}>
-                            {(() => {
-                              // 0. 如果是系统管理员，显示“万能”
-                              if (account.role === 'admin') return '万能';
-                              
-                              // 1. 优先尝试从 region 字段映射
-                              const region = REGIONS.find(r => r.id === account.region);
-                              if (region) return region.prefix;
-                              
-                              // 2. 如果字段为空，从员工编号中提取前缀 (MDY/YGN/POL)
-                              if (account.employee_id) {
-                                const prefix = account.employee_id.split('-')[0];
-                                if (['MDY', 'YGN', 'POL', 'NPW', 'TGI', 'LSO', 'MUSE'].includes(prefix)) {
-                                  return prefix;
-                                }
-                                // 兼容 YGNML001 这种非横杠格式
-                                if (account.employee_id.startsWith('YGN')) return 'YGN';
-                                if (account.employee_id.startsWith('MDY')) return 'MDY';
-                                if (account.employee_id.startsWith('POL')) return 'POL';
-                              }
-                              
-                              return account.region || '-';
-                            })()}
-                          </span>
-                        </div>
+                      <td>
+                        <span className="acct-list__region">{getAccountRegionLabel(account)}</span>
                       </td>
-                      <td style={tableCellStyle}>
-                        <code style={{ 
-                          background: 'rgba(0,0,0,0.3)', 
-                          padding: '3px 8px', 
-                          borderRadius: '4px',
-                          fontSize: '0.85rem',
-                          color: '#63b3ed',
-                          fontFamily: 'monospace'
-                        }}>
-                          {account.employee_id}
-                        </code>
+                      <td>
+                        <code className="acct-list__code">{account.employee_id}</code>
                       </td>
-                      <td style={tableCellStyle}>
+                      <td>
                         <div>{account.position || '-'}</div>
-                        <div style={{ fontSize: '0.75rem', opacity: 0.5 }}>{account.department || '-'}</div>
+                        <div className="acct-list__dept">{account.department || '-'}</div>
                       </td>
-                      <td style={tableCellStyle}>
-                        <span style={{
-                          background: `${getRoleColor(account.role)}33`, // 20% opacity
-                          color: getRoleColor(account.role),
-                          border: `1px solid ${getRoleColor(account.role)}66`,
-                          padding: '4px 10px',
-                          borderRadius: '20px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px'
-                        }}>
-                          {account.role === 'admin' ? '系统管理员' : 
-                           account.role === 'manager' ? '经理' : 
-                           account.role === 'operator' ? '操作员' : 
-                           account.role === 'finance' ? '财务人员' : account.role}
+                      <td>
+                        <span
+                          className="acct-list__role"
+                          style={{
+                            background: `${getRoleColor(account.role)}22`,
+                            color: getRoleColor(account.role),
+                            border: `1px solid ${getRoleColor(account.role)}55`,
+                          }}
+                        >
+                          {getRoleLabel(account.role)}
                         </span>
                       </td>
-                      <td style={tableCellStyle}>
-                        <div style={{ position: 'relative' }}>
+                      <td>
+                        <div className="acct-list__status-wrap">
                           <select
+                            className="acct-list__status"
+                            data-status={account.status || 'active'}
                             value={account.status || 'active'}
                             onChange={(e) => handleStatusChange(account.id!, e.target.value as 'active' | 'inactive' | 'suspended')}
-                            style={{
-                              background: getStatusColor(account.status || 'active'),
-                              color: 'white',
-                              border: 'none',
-                              padding: '4px 24px 4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              appearance: 'none',
-                              outline: 'none',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
-                            }}
                           >
-                            <option value="active">🟢 正常</option>
-                            <option value="inactive">🟠 停用</option>
-                            <option value="suspended">🔴 暂停</option>
+                            <option value="active">正常</option>
+                            <option value="inactive">停用</option>
+                            <option value="suspended">暂停</option>
                           </select>
-                          <div style={{ 
-                            position: 'absolute', 
-                            right: '8px', 
-                            top: '50%', 
-                            transform: 'translateY(-50%)',
-                            pointerEvents: 'none',
-                            fontSize: '0.6rem'
-                          }}>▼</div>
+                          <span className="acct-list__status-arrow">▼</span>
                         </div>
                       </td>
-                      <td style={tableCellStyle}>
-                        <div style={{ fontSize: '0.85rem' }}>
+                      <td>
+                        <div className="acct-list__login-date">
                           {account.last_login ? new Date(account.last_login).toLocaleDateString('zh-CN') : '-'}
                         </div>
-                        <div style={{ fontSize: '0.7rem', opacity: 0.5 }}>
-                          {account.last_login ? new Date(account.last_login).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '从未登录'}
+                        <div className="acct-list__login-time">
+                          {account.last_login
+                            ? new Date(account.last_login).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+                            : '从未登录'}
                         </div>
                       </td>
-                      <td style={{ ...tableCellStyle, borderRadius: '0 12px 12px 0', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <td>
+                        <div className="acct-list__actions">
                           <button
+                            type="button"
+                            className="acct-list__action acct-list__action--view"
                             onClick={() => handleViewAccount(account)}
                             title="查看详情"
-                            style={actionButtonStyle('#4299e1')}
                           >
                             👁️
                           </button>
                           <button
+                            type="button"
+                            className="acct-list__action acct-list__action--edit"
                             onClick={() => handleEditAccount(account)}
                             title="编辑账号"
-                            style={actionButtonStyle('#48bb78')}
                           >
                             ✏️
                           </button>
                           <button
+                            type="button"
+                            className="acct-list__action acct-list__action--perm"
                             onClick={() => handleEditPermissions(account)}
                             title="管理权限"
-                            style={actionButtonStyle('#9f7aea')}
                           >
                             🔑
                           </button>
                           <button
+                            type="button"
+                            className="acct-list__action acct-list__action--delete"
                             onClick={() => handleDeleteAccount(account)}
                             title="删除账号"
-                            style={actionButtonStyle('#f56565')}
                           >
                             🗑️
                           </button>
@@ -1847,7 +1571,7 @@ const AccountManagement: React.FC = () => {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            zIndex: 1000
+            zIndex: 10100
           }}>
             <div style={{
               background: 'rgba(15, 32, 60, 0.95)',

@@ -9,6 +9,11 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Courier, CourierWithLocation, Coordinates } from '../types';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
+import {
+  isMerchantOrderPackage,
+  packageHasCod,
+  resolvePackageCodAmount,
+} from '../utils/packageCodAmount';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
@@ -54,10 +59,6 @@ const GOOGLE_MAP_DARK_STYLES = [
   { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#1d2c4d' }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
 ] as const;
-
-function packageCodAmount(pkg: Package): number {
-  return Number(pkg.cod_amount || 0);
-}
 
 const RealTimeTracking: React.FC = () => {
   const navigate = useNavigate();
@@ -973,6 +974,34 @@ const RealTimeTracking: React.FC = () => {
     [cityFilteredPackages],
   );
 
+  const pendingCodStats = useMemo(() => {
+    const withCod = pendingPackages.filter((p) => packageHasCod(p));
+    return {
+      count: withCod.length,
+      total: withCod.reduce((sum, p) => sum + resolvePackageCodAmount(p), 0),
+    };
+  }, [pendingPackages]);
+
+  const renderPackageCodLine = (pkg: Package, compact = false) => {
+    const cod = resolvePackageCodAmount(pkg);
+    if (cod <= 0) return null;
+    if (compact) {
+      return (
+        <span className="rt-tracking__badge rt-tracking__badge--cod">
+          COD {cod.toLocaleString()} MMK
+        </span>
+      );
+    }
+    return (
+      <p className="rt-tracking__pkg-cod">
+        <strong>COD 代收款:</strong> {cod.toLocaleString()} MMK
+        {isMerchantOrderPackage(pkg) ? (
+          <span className="rt-tracking__pkg-cod-note">（商家订单 · 骑手送达时向收件人收取）</span>
+        ) : null}
+      </p>
+    );
+  };
+
   const busyRiderCount = useMemo(
     () => couriers.filter((c) => c.status === 'busy').length,
     [couriers],
@@ -1027,9 +1056,9 @@ const RealTimeTracking: React.FC = () => {
         >
           跑腿费: {(pkg as Package & { payment_method?: string }).payment_method === 'balance' ? '余额' : '现金'}
         </span>
-        {packageCodAmount(pkg) > 0 && (
+        {packageHasCod(pkg) && (
           <span className="rt-tracking__badge rt-tracking__badge--cod">
-            COD代收款 {packageCodAmount(pkg).toLocaleString()} MMK
+            COD {resolvePackageCodAmount(pkg).toLocaleString()} MMK
           </span>
         )}
         {isVIP &&
@@ -1095,6 +1124,9 @@ const RealTimeTracking: React.FC = () => {
           </span>
           <span className="rt-tracking__chip rt-tracking__chip--pending">
             待分配 {pendingPackages.length}
+            {pendingCodStats.count > 0
+              ? ` · COD ${pendingCodStats.count}（${pendingCodStats.total.toLocaleString()} MMK）`
+              : ''}
           </span>
           <span className="rt-tracking__chip rt-tracking__chip--delivering">
             配送中 {assignedPackages.length}
@@ -1393,6 +1425,12 @@ const RealTimeTracking: React.FC = () => {
                                   <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
                                     <strong>状态:</strong> <span style={{ color: '#ef4444', fontWeight: 'bold' }}>待分配</span>
                                   </p>
+                                  {packageHasCod(pkg) && (
+                                    <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#b45309', fontWeight: 700 }}>
+                                      <strong>COD 代收款:</strong>{' '}
+                                      {resolvePackageCodAmount(pkg).toLocaleString()} MMK
+                                    </p>
+                                  )}
                                 </>
                               );
                             }
@@ -1590,7 +1628,8 @@ const RealTimeTracking: React.FC = () => {
               className={`rt-tracking__tab${sidebarTab === 'pending' ? ' rt-tracking__tab--active-pending' : ''}`}
               onClick={() => setSidebarTab('pending')}
             >
-              ⏳ 待分配 ({pendingPackages.length})
+              ⏳ 待分配 ({pendingPackages.length}
+              {pendingCodStats.count > 0 ? ` · COD ${pendingCodStats.count}` : ''})
             </button>
             <button
               type="button"
@@ -1660,11 +1699,7 @@ const RealTimeTracking: React.FC = () => {
                           <strong>配送选项:</strong> {adminDeliveryOptionLine(pkg)}
                         </p>
                         {pkg.price && <p>跑腿费 {pkg.price}</p>}
-                        {packageCodAmount(pkg) > 0 && (
-                          <p className="rt-tracking__pkg-cod">
-                            <strong>COD代收款:</strong> {packageCodAmount(pkg).toLocaleString()} MMK
-                          </p>
-                        )}
+                        {renderPackageCodLine(pkg)}
                       </div>
                       <div className="rt-tracking__pkg-actions">
                         {isLocked ? (
@@ -1738,11 +1773,7 @@ const RealTimeTracking: React.FC = () => {
                       <strong>配送选项:</strong> {adminDeliveryOptionLine(pkg)}
                       {pkg.price ? ` · 跑腿费 ${pkg.price}` : ''}
                     </p>
-                    {packageCodAmount(pkg) > 0 && (
-                      <p className="rt-tracking__pkg-cod">
-                        <strong>COD代收款:</strong> {packageCodAmount(pkg).toLocaleString()} MMK
-                      </p>
-                    )}
+                    {renderPackageCodLine(pkg)}
                   </div>
                 </article>
               ))
@@ -1781,6 +1812,12 @@ const RealTimeTracking: React.FC = () => {
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f3f4f6', borderRadius: '8px' }}>
               <p style={{ margin: '0.3rem 0' }}><strong>寄件地址:</strong> {selectedPackage.sender_address}</p>
               <p style={{ margin: '0.3rem 0' }}><strong>收件地址:</strong> {selectedPackage.receiver_address}</p>
+              {packageHasCod(selectedPackage) && (
+                <p style={{ margin: '0.5rem 0 0', color: '#b45309', fontWeight: 700 }}>
+                  <strong>COD 代收款:</strong> {resolvePackageCodAmount(selectedPackage).toLocaleString()} MMK
+                  {isMerchantOrderPackage(selectedPackage) ? '（商家订单）' : ''}
+                </p>
+              )}
             </div>
 
             {getRecommendedCouriers(selectedPackage)

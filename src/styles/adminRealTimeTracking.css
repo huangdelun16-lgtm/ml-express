@@ -451,6 +451,14 @@
   color: #991b1b;
 }
 
+.rt-tracking__pkg-cod-note {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #9a3412;
+}
+
 .rt-tracking__coord {
   margin-left: 0.35rem;
   font-size: 0.72rem;
