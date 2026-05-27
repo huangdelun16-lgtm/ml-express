@@ -38,18 +38,12 @@ if [ ! -d "android" ]; then
     npx expo prebuild --platform android --clean
 fi
 
-# 检查签名配置
+# 检查签名配置（必须使用 Play 登记的 release.keystore）
 if [ ! -f "android/app/release.keystore" ]; then
-    echo "⚠️  警告: 未找到 release.keystore"
-    echo "请先配置签名密钥："
-    echo "1. 从 EAS 下载: eas credentials --platform android --profile production"
-    echo "2. 或创建新的: keytool -genkeypair -v -storetype PKCS12 -keystore android/app/release.keystore -alias release -keyalg RSA -keysize 2048 -validity 10000"
-    echo ""
-    read -p "是否使用 debug keystore 继续构建？(y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
+    echo "❌ 未找到 android/app/release.keystore"
+    echo "   这是 Google Play 登记的上传密钥，不可替换。"
+    echo "   详见 docs/ANDROID_SIGNING.md"
+    exit 1
 fi
 
 # 构建 App Bundle
