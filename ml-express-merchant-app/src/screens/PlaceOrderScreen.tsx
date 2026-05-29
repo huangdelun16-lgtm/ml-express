@@ -45,6 +45,16 @@ import PriceCalculation from '../components/placeOrder/PriceCalculation';
 import MapModal from '../components/placeOrder/MapModal';
 import OrderWizardProgress, { OrderWizardStepIndex } from '../components/placeOrder/OrderWizardProgress';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ProductVariantPicker from '../components/ProductVariantPicker';
+import {
+  buildProductForCart,
+  cartLineKey,
+  formatProductPriceLabel,
+  maxSelectableStockForProduct,
+  parseCartLineKey,
+  productHasVariants,
+  resolveProductVariant,
+} from '../utils/productVariants';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const WIZARD_LAST_STEP: OrderWizardStepIndex = 3;
@@ -81,6 +91,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       if (route.params?.selectedProducts) {
         const incomingProducts = route.params.selectedProducts;
         const productMap: Record<string, number> = {};
+        const variantMap: Record<string, string> = {};
         
         // 1. 先把这些商品加入到 merchantProducts 列表中，这样后续逻辑能找到它们
         // 过滤掉已经在列表中的商品，避免重复
@@ -90,11 +101,17 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           return [...prev, ...newProducts];
         });
 
-        // 2. 设置选中状态
+        // 2. 设置选中状态（多规格按 lineKey 区分）
         incomingProducts.forEach((p: any) => {
-          productMap[p.id] = p.quantity;
+          productMap[cartLineKey(p.id, p.variant_id)] = p.quantity;
+          if (p.variant_id) {
+            variantMap[p.id] = p.variant_id;
+          }
         });
         setSelectedProducts(productMap);
+        if (Object.keys(variantMap).length > 0) {
+          setSelectedVariantByProduct((prev) => ({ ...prev, ...variantMap }));
+        }
         
         // 3. 开启代收
         setHasCOD(true);
@@ -393,7 +410,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   
   // 商品选择相关状态
   const [merchantProducts, setMerchantProducts] = useState<Product[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({}); // id -> quantity
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({}); // lineKey -> quantity
+  const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<string, string>>({});
   const [showProductSelector, setShowProductSelector] = useState(false);
   const [hasCOD, setHasCOD] = useState(true); // 新增：是否代收状态
   
@@ -2119,32 +2137,45 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     setToastVisible(true);
   };
 
-  const handleProductQuantityChange = (productId: string, delta: number) => {
-    setSelectedProducts(prev => {
-      const product = merchantProducts.find(p => p.id === productId);
-      if (!product) return prev;
+  const handleProductQuantityChange = (product: Product, delta: number, variantId?: string) => {
+    if (productHasVariants(product) && !variantId) {
+      showToast(
+        language === 'zh' ? '请先选择规格' : language === 'en' ? 'Please select a variant' : 'Variant ရွေးချယ်ပါ',
+        'warning',
+      );
+      return;
+    }
 
-      const currentQty = prev[productId] || 0;
+    const lineKey = cartLineKey(product.id, variantId);
+    const stockCap = maxSelectableStockForProduct(product, variantId);
+
+    setSelectedProducts((prev) => {
+      const currentQty = prev[lineKey] || 0;
       let newQty = currentQty + delta;
 
-      // 🚀 核心优化：增加库存校验逻辑
       if (delta > 0) {
-        // 如果库存不是无限(-1)且当前数量已达到库存上限
-        if (product.stock !== -1 && currentQty >= product.stock) {
-          showToast(language === 'zh' ? `库存不足 (剩余: ${product.stock})` : `Out of stock (Left: ${product.stock})`, 'warning');
+        if (stockCap !== 99999 && currentQty >= stockCap) {
+          showToast(
+            language === 'zh'
+              ? `库存不足 (剩余: ${stockCap})`
+              : language === 'en'
+                ? `Out of stock (Left: ${stockCap})`
+                : `လက်ကျန်မလုံလောက် (${stockCap})`,
+            'warning',
+          );
           return prev;
         }
       }
 
       newQty = Math.max(0, newQty);
-      
+
       const newSelected = { ...prev };
       if (newQty === 0) {
-        delete newSelected[productId];
+        delete newSelected[lineKey];
       } else {
-        newSelected[productId] = newQty;
+        newSelected[lineKey] = newQty;
       }
-      
+
       return newSelected;
     });
   };
@@ -2159,11 +2190,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     let productDetails: string[] = [];
     const sourceProducts = productsToUse || merchantProducts;
 
-    Object.entries(selected).forEach(([id, qty]) => {
-      const product = sourceProducts.find(p => p.id === id);
+    Object.entries(selected).forEach(([lineKey, qty]) => {
+      const { productId, variantId } = parseCartLineKey(lineKey);
+      const product = sourceProducts.find((p) => p.id === productId);
       if (product) {
-        totalCOD += product.price * qty;
-        productDetails.push(`${product.name} x${qty}`);
+        const line = buildProductForCart(product, variantId);
+        const variant = resolveProductVariant(product, variantId);
+        totalCOD += line.price * qty;
+        const label = variant ? `${product.name}(${variant.name})` : product.name;
+        productDetails.push(`${label} x${qty}`);
       }
     });
 
@@ -2211,7 +2246,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     setCalculatedDistance(0);
     setPrice('0');
     setDistance(0);
-    setSelectedProducts({}); // 同时重置选中的商品
+    setSelectedProducts({});
+    setSelectedVariantByProduct({});
     setHasCOD(true); // 重置为默认有代收
     setWizardStep(0);
   };
@@ -2482,22 +2518,36 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                   {/* 已选商品列表 */}
                   {Object.keys(selectedProducts).length > 0 ? (
                     <View style={styles.selectedProductsList}>
-                      {Object.entries(selectedProducts).map(([id, qty]) => {
-                        const product = merchantProducts.find(p => p.id === id);
+                      {Object.entries(selectedProducts).map(([lineKey, qty]) => {
+                        const { productId, variantId } = parseCartLineKey(lineKey);
+                        const product = merchantProducts.find((p) => p.id === productId);
                         if (!product) return null;
+                        const line = buildProductForCart(product, variantId);
+                        const variant = resolveProductVariant(product, variantId);
+                        const displayName = variant
+                          ? `${product.name} (${variant.name})`
+                          : product.name;
                         return (
-                          <View key={id} style={styles.selectedProductItem}>
-                            <Text style={styles.selectedProductName} numberOfLines={1}>{product.name}</Text>
+                          <View key={lineKey} style={styles.selectedProductItem}>
+                            <Text style={styles.selectedProductName} numberOfLines={2}>
+                              {displayName}
+                            </Text>
                             <View style={styles.qtyControl}>
-                              <TouchableOpacity onPress={() => handleProductQuantityChange(id, -1)}>
+                              <TouchableOpacity
+                                onPress={() => handleProductQuantityChange(product, -1, variantId)}
+                              >
                                 <Ionicons name="remove-circle-outline" size={20} color="#64748b" />
                               </TouchableOpacity>
                               <Text style={styles.qtyText}>{qty}</Text>
-                              <TouchableOpacity onPress={() => handleProductQuantityChange(id, 1)}>
+                              <TouchableOpacity
+                                onPress={() => handleProductQuantityChange(product, 1, variantId)}
+                              >
                                 <Ionicons name="add-circle-outline" size={20} color="#3b82f6" />
                               </TouchableOpacity>
                             </View>
-                            <Text style={styles.selectedProductPrice}>{(product.price * qty).toLocaleString()} MMK</Text>
+                            <Text style={styles.selectedProductPrice}>
+                              {(line.price * qty).toLocaleString()} MMK
+                            </Text>
                           </View>
                         );
                       })}
@@ -2886,7 +2936,39 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                   <Text style={{ marginTop: 12, color: '#94a3b8' }}>暂无上架商品</Text>
                 </View>
               ) : (
-                merchantProducts.map((item) => (
+                merchantProducts.map((item) => {
+                  const hasVariants = productHasVariants(item);
+                  const variantId = hasVariants ? selectedVariantByProduct[item.id] : undefined;
+                  const lineKey = cartLineKey(item.id, variantId);
+                  const displayProduct = buildProductForCart(item, variantId);
+                  const stockCap = maxSelectableStockForProduct(item, variantId);
+                  const qty = selectedProducts[lineKey] || 0;
+                  const priceLang = (language === 'zh' ? 'zh' : language === 'en' ? 'en' : 'my') as
+                    | 'zh'
+                    | 'en'
+                    | 'my';
+                  const priceLabel =
+                    hasVariants && !variantId
+                      ? formatProductPriceLabel(item, priceLang)
+                      : `${displayProduct.price.toLocaleString()} MMK`;
+                  const stockInfinite =
+                    language === 'zh' ? '无限' : language === 'en' ? 'Infinite' : 'အကန့်အသတ်မရှိ';
+                  const stockLabel =
+                    hasVariants && !variantId
+                      ? language === 'zh'
+                        ? '请先选规格'
+                        : language === 'en'
+                          ? 'Select variant'
+                          : 'Variant ရွေးပါ'
+                      : displayProduct.stock === -1
+                        ? stockInfinite
+                        : String(displayProduct.stock);
+                  const stockIsZero = hasVariants ? variantId && stockCap === 0 : item.stock === 0;
+                  const plusDisabled =
+                    (hasVariants && !variantId) ||
+                    (stockCap !== 99999 && qty >= stockCap);
+
+                  return (
                   <View key={item.id} style={styles.selectorItem}>
                     <View style={styles.selectorImageContainer}>
                       {item.image_url ? (
@@ -2897,47 +2979,58 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                     </View>
                     
                     <View style={styles.selectorRightContent}>
-                      <Text style={styles.selectorName} numberOfLines={1}>{item.name}</Text>
-                      <Text style={styles.selectorPrice} numberOfLines={1}>{item.price.toLocaleString()} MMK</Text>
+                      <Text style={styles.selectorName} numberOfLines={2}>{item.name}</Text>
+                      {hasVariants ? (
+                        <ProductVariantPicker
+                          product={item}
+                          selectedVariantId={variantId}
+                          onSelect={(vid) =>
+                            setSelectedVariantByProduct((prev) => ({ ...prev, [item.id]: vid }))
+                          }
+                          language={priceLang}
+                        />
+                      ) : null}
+                      <Text style={styles.selectorPrice} numberOfLines={1}>{priceLabel}</Text>
                       
                       <View style={styles.selectorBottomRow}>
                         <View style={styles.selectorStockRow}>
                           <Ionicons name="cube-outline" size={12} color="#94a3b8" />
                           <Text style={[
                             styles.selectorStockText,
-                            item.stock === 0 && { color: '#ef4444' }
+                            stockIsZero && { color: '#ef4444' },
                           ]}>
-                            {language === 'zh' ? '库存' : language === 'en' ? 'Stock' : 'လက်ကျန်'}: {item.stock === -1 ? (language === 'zh' ? '无限' : language === 'en' ? 'Infinite' : 'အကန့်အသတ်မရှိ') : item.stock}
+                            {language === 'zh' ? '库存' : language === 'en' ? 'Stock' : 'လက်ကျန်'}: {stockLabel}
                           </Text>
                         </View>
                         
                         <View style={styles.selectorQtyControl}>
                           <TouchableOpacity 
-                            onPress={() => handleProductQuantityChange(item.id, -1)}
-                            disabled={!selectedProducts[item.id]}
+                            onPress={() => handleProductQuantityChange(item, -1, variantId)}
+                            disabled={!qty}
                           >
                             <Ionicons 
                               name="remove-circle-outline" 
                               size={28} 
-                              color={selectedProducts[item.id] ? "#64748b" : "#e2e8f0"} 
+                              color={qty ? "#64748b" : "#e2e8f0"} 
                             />
                           </TouchableOpacity>
-                          <Text style={styles.qtyText}>{selectedProducts[item.id] || 0}</Text>
+                          <Text style={styles.qtyText}>{qty}</Text>
                           <TouchableOpacity 
-                            onPress={() => handleProductQuantityChange(item.id, 1)}
-                            disabled={item.stock !== -1 && (selectedProducts[item.id] || 0) >= item.stock}
+                            onPress={() => handleProductQuantityChange(item, 1, variantId)}
+                            disabled={plusDisabled}
                           >
                             <Ionicons 
                               name="add-circle-outline" 
                               size={28} 
-                              color={item.stock !== -1 && (selectedProducts[item.id] || 0) >= item.stock ? "#e2e8f0" : "#3b82f6"} 
+                              color={plusDisabled ? "#e2e8f0" : "#3b82f6"} 
                             />
                           </TouchableOpacity>
                         </View>
                       </View>
                     </View>
                   </View>
-                ))
+                  );
+                })
               )}
             </ScrollView>
 
@@ -4091,7 +4184,7 @@ const baseStyles = StyleSheet.create({
   },
   selectorItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 12,
     backgroundColor: '#f8fafc',
     borderRadius: 12,

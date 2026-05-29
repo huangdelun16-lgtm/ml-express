@@ -25,7 +25,7 @@ import QRCode from 'react-native-qrcode-svg';
 import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { useCart, summarizeCustomerRemarks } from '../contexts/CartContext';
+import { useCart, summarizeCustomerRemarks, getCartItemLineKey, CartItem } from '../contexts/CartContext';
 import { packageService, systemSettingsService, supabase, merchantService, Product } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
@@ -93,8 +93,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         });
 
         // 2. 设置选中状态
-        incomingProducts.forEach((p: any) => {
-          productMap[p.id] = p.quantity;
+        incomingProducts.forEach((p: CartItem) => {
+          productMap[getCartItemLineKey(p)] = p.quantity;
         });
         setSelectedProducts(productMap);
         
@@ -2168,11 +2168,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     let productDetails: string[] = [];
     const sourceProducts = productsToUse || merchantProducts;
 
-    Object.entries(selected).forEach(([id, qty]) => {
-      const product = sourceProducts.find(p => p.id === id);
+    Object.entries(selected).forEach(([lineKey, qty]) => {
+      const product =
+        sourceProducts.find((p) => getCartItemLineKey(p as CartItem) === lineKey) ??
+        sourceProducts.find((p) => p.id === lineKey);
       if (product) {
         totalCOD += product.price * qty;
-        productDetails.push(`${product.name} x${qty}`);
+        const variantName = (product as CartItem).variant_name?.trim();
+        const label = variantName ? `${product.name} (${variantName})` : product.name;
+        productDetails.push(`${label} x${qty}`);
       }
     });
 
@@ -2196,10 +2200,11 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       // 如果原先有描述，保留它（避免重复添加）
       const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]|\[买家商品备注:.*?\]|\[Buyer item notes:.*?\]|\[ဝယ်ယူသူမှတ်ချက်:.*?\]/g, '').trim();
       const remarkSegments: string[] = [];
-      Object.entries(selected).forEach(([id]) => {
-        const product = sourceProducts.find(p => p.id === id) as
-          | (Product & { customer_remark?: string; customer_remarks?: string[] })
-          | undefined;
+      Object.entries(selected).forEach(([lineKey]) => {
+        const found =
+          sourceProducts.find((p) => getCartItemLineKey(p as CartItem) === lineKey) ??
+          sourceProducts.find((p) => p.id === lineKey);
+        const product = found as CartItem | undefined;
         let note: string | undefined;
         if (product?.customer_remarks?.length) {
           note = summarizeCustomerRemarks(product.customer_remarks);

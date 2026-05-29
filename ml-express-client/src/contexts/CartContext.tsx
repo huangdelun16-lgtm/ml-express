@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Product } from '../services/supabase';
+import {
+  buildProductForCart,
+  cartLineKey,
+  productHasVariants,
+  resolveProductVariant,
+} from '../utils/productVariants';
 
 const PIECE_KEYCAP = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
@@ -24,7 +30,7 @@ function padRemarksToQuantity(remarks: string[], quantity: number): string[] {
 
 function normalizeIncomingRemarks(
   quantity: number,
-  input?: string | string[]
+  input?: string | string[],
 ): string[] | undefined {
   if (input === undefined) return undefined;
   if (typeof input === 'string') {
@@ -34,15 +40,15 @@ function normalizeIncomingRemarks(
   }
   return padRemarksToQuantity(
     input.map((x) => (typeof x === 'string' ? x : '')),
-    quantity
+    quantity,
   );
 }
 
 export interface CartItem extends Product {
   quantity: number;
-  /** 顾客对该商品行的备注（同城商场）；写入订单 description 供商家查看 */
+  variant_id?: string;
+  variant_name?: string;
   customer_remark?: string;
-  /** 与 quantity 对齐：第 i 件对应 customer_remarks[i] */
   customer_remarks?: string[];
 }
 
@@ -56,14 +62,21 @@ function legacyRemarksToArray(item: CartItem): string[] {
   return Array(item.quantity).fill('');
 }
 
+export function getCartItemLineKey(item: Pick<CartItem, 'id' | 'variant_id'>): string {
+  return cartLineKey(item.id, item.variant_id);
+}
+
 interface CartContextType {
   cartItems: CartItem[];
-  /** customerRemark: undefined 不改备注；string 或 string[]（与本次加入件数对齐） */
-  addToCart: (product: Product, quantity: number, customerRemark?: string | string[]) => void;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
-  /** 同城购物车：在详情弹窗中改数量与每件备注后写回 */
-  updateCartItemDetails: (productId: string, quantity: number, customerRemarks: string[]) => void;
+  addToCart: (
+    product: Product,
+    quantity: number,
+    customerRemark?: string | string[],
+    variantId?: string,
+  ) => void;
+  removeFromCart: (lineKey: string) => void;
+  updateQuantity: (lineKey: string, quantity: number) => void;
+  updateCartItemDetails: (lineKey: string, quantity: number, customerRemarks: string[]) => void;
   clearCart: () => void;
   cartTotal: number;
   cartCount: number;
@@ -74,7 +87,6 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  // Load cart from storage on mount
   useEffect(() => {
     const loadCart = async () => {
       try {
@@ -89,7 +101,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     loadCart();
   }, []);
 
-  // Save cart to storage whenever it changes
   useEffect(() => {
     const saveCart = async () => {
       try {
@@ -101,11 +112,37 @@ export function CartProvider({ children }: { children: ReactNode }) {
     saveCart();
   }, [cartItems]);
 
-  const addToCart = (product: Product, quantity: number, customerRemark?: string | string[]) => {
-    setCartItems(prevItems => {
-      // 🚀 核心逻辑优化：购物车只能存储一个店铺的商品
+  const addToCart = (
+    product: Product,
+    quantity: number,
+    customerRemark?: string | string[],
+    variantId?: string,
+  ) => {
+    if (productHasVariants(product)) {
+      if (!variantId) {
+        console.warn('addToCart: variant required for multi-spec product', product.id);
+        return;
+      }
+      if (!resolveProductVariant(product, variantId)) {
+        console.warn('addToCart: unknown variant for product', product.id, variantId);
+        return;
+      }
+    } else {
+      variantId = undefined;
+    }
+
+    const variant = resolveProductVariant(product, variantId);
+    const lineProduct = buildProductForCart(product, variantId);
+    const lineKey = cartLineKey(product.id, variantId);
+
+    setCartItems((prevItems) => {
       if (prevItems.length > 0 && prevItems[0].store_id !== product.store_id) {
-        const line: CartItem = { ...product, quantity };
+        const line: CartItem = {
+          ...lineProduct,
+          quantity,
+          variant_id: variantId,
+          variant_name: variant?.name,
+        };
         if (customerRemark !== undefined) {
           const remarks = normalizeIncomingRemarks(quantity, customerRemark)!;
           if (remarks.some((r) => r.trim())) {
@@ -116,11 +153,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return [line];
       }
 
-      const existingItem = prevItems.find(item => item.id === product.id);
+      const existingItem = prevItems.find((item) => getCartItemLineKey(item) === lineKey);
       if (existingItem) {
         const newQty = existingItem.quantity + quantity;
-        return prevItems.map(item => {
-          if (item.id !== product.id) return item;
+        return prevItems.map((item) => {
+          if (getCartItemLineKey(item) !== lineKey) return item;
           if (customerRemark !== undefined) {
             const incoming = normalizeIncomingRemarks(quantity, customerRemark)!;
             const prevArr = legacyRemarksToArray(item);
@@ -128,7 +165,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
             const hasAny = merged.some((r) => r.trim());
             return {
               ...item,
+              ...lineProduct,
               quantity: newQty,
+              variant_id: variantId,
+              variant_name: variant?.name,
               ...(hasAny
                 ? {
                     customer_remarks: merged,
@@ -140,12 +180,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const prevArr = legacyRemarksToArray(item);
           const merged = padRemarksToQuantity(
             [...prevArr, ...Array(quantity).fill('')],
-            newQty
+            newQty,
           );
           const hasAny = merged.some((r) => r.trim());
           return {
             ...item,
+            ...lineProduct,
             quantity: newQty,
+            variant_id: variantId,
+            variant_name: variant?.name,
             ...(hasAny
               ? {
                   customer_remarks: merged,
@@ -156,7 +199,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      const line: CartItem = { ...product, quantity };
+      const line: CartItem = {
+        ...lineProduct,
+        quantity,
+        variant_id: variantId,
+        variant_name: variant?.name,
+      };
       if (customerRemark !== undefined) {
         const remarks = normalizeIncomingRemarks(quantity, customerRemark)!;
         if (remarks.some((r) => r.trim())) {
@@ -169,13 +217,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const updateCartItemDetails = (
-    productId: string,
+    lineKey: string,
     quantity: number,
-    customerRemarks: string[]
+    customerRemarks: string[],
   ) => {
+    if (quantity <= 0) {
+      removeFromCart(lineKey);
+      return;
+    }
     setCartItems((prevItems) =>
       prevItems.map((item) => {
-        if (item.id !== productId) return item;
+        if (getCartItemLineKey(item) !== lineKey) return item;
         const padded = padRemarksToQuantity(customerRemarks, quantity);
         const hasAny = padded.some((r) => r.trim());
         return {
@@ -188,22 +240,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
               }
             : { customer_remarks: undefined, customer_remark: undefined }),
         };
-      })
+      }),
     );
   };
 
-  const removeFromCart = (productId: string) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
+  const removeFromCart = (lineKey: string) => {
+    setCartItems((prevItems) =>
+      prevItems.filter((item) => getCartItemLineKey(item) !== lineKey),
+    );
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (lineKey: string, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(lineKey);
       return;
     }
-    setCartItems(prevItems =>
-      prevItems.map(item => {
-        if (item.id !== productId) return item;
+    setCartItems((prevItems) =>
+      prevItems.map((item) => {
+        if (getCartItemLineKey(item) !== lineKey) return item;
         const prevArr = legacyRemarksToArray(item);
         const remarks = padRemarksToQuantity(prevArr, quantity);
         const hasAny = remarks.some((r) => r.trim());
@@ -221,7 +275,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           customer_remarks: remarks,
           customer_remark: summarizeCustomerRemarks(remarks),
         };
-      })
+      }),
     );
   };
 
@@ -233,16 +287,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ 
-      cartItems, 
-      addToCart, 
-      removeFromCart, 
-      updateQuantity, 
-      updateCartItemDetails,
-      clearCart, 
-      cartTotal, 
-      cartCount
-    }}>
+    <CartContext.Provider
+      value={{
+        cartItems,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        updateCartItemDetails,
+        clearCart,
+        cartTotal,
+        cartCount,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );

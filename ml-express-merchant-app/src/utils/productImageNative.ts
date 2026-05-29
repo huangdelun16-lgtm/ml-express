@@ -1,6 +1,6 @@
 import { Image } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const MAX_SIDE = 1000;
 const INITIAL_QUALITY = 0.68;

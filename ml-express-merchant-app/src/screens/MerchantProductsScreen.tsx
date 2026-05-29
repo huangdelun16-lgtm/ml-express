@@ -26,6 +26,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
 import { autoPrepareProductImageUri, autoPrepareProductImageUris } from '../utils/productImageNative';
+import ProductVariantsEditor from '../components/ProductVariantsEditor';
+import {
+  defaultMerchantProductForm,
+  merchantProductFormFromProduct,
+  buildMerchantProductDraft,
+  type MerchantProductFormState,
+} from '../utils/merchantProductForm';
+import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 
 const { width } = Dimensions.get('window');
 
@@ -43,16 +51,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formLoading, setFormLoading] = useState(false);
-  const [productForm, setProductForm] = useState({
-    name: '',
-    description: '',
-    price: '',
-    discountPercent: '',
-    stock: '-1',
-    image_url: '',
-    detail_image_urls: [] as string[],
-    is_available: true,
-  });
+  const [productForm, setProductForm] = useState<MerchantProductFormState>(defaultMerchantProductForm());
   const [showDetailImagesPanel, setShowDetailImagesPanel] = useState(false);
 
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
@@ -310,56 +309,24 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
-    setProductForm({
-      name: '',
-      description: '',
-      price: '',
-      discountPercent: '',
-      stock: '-1',
-      image_url: '',
-      detail_image_urls: [],
-      is_available: true,
-    });
+    setProductForm(defaultMerchantProductForm());
     setShowDetailImagesPanel(false);
     setShowProductModal(true);
   };
 
   const handleOpenEditProduct = (product: Product) => {
     setEditingProduct(product);
+    setProductForm(merchantProductFormFromProduct(product));
     const src = productFormSource(product);
-    setProductForm({
-      name: src.name,
-      description: src.description || '',
-      price: src.price.toString(),
-      discountPercent: (src.original_price && src.original_price > src.price)
-        ? Math.round((1 - src.price / src.original_price) * 100).toString()
-        : '',
-      stock: src.stock.toString(),
-      image_url: src.image_url || '',
-      detail_image_urls: src.detail_image_urls || [],
-      is_available: src.is_available,
-    });
     setShowDetailImagesPanel((src.detail_image_urls?.length ?? 0) > 0);
     setShowProductModal(true);
   };
 
   const handleSaveProduct = async () => {
-    if (!productForm.name || !productForm.price) {
-      showToast(language === 'zh' ? '请填写名称和价格' : 'Please fill name and price', 'warning');
+    const { draft, error: draftError } = buildMerchantProductDraft(productForm);
+    if (draftError) {
+      showToast(draftError, 'warning');
       return;
-    }
-
-    if (productForm.discountPercent) {
-      const discountValue = parseFloat(productForm.discountPercent);
-      const priceValue = parseFloat(productForm.price);
-      if (!Number.isFinite(discountValue) || discountValue <= 0 || discountValue >= 100) {
-        showToast(language === 'zh' ? '优惠比例需在 1-99 之间' : 'Discount must be between 1-99', 'warning');
-        return;
-      }
-      if (!Number.isFinite(priceValue) || priceValue <= 0) {
-        showToast(language === 'zh' ? '售价无效' : 'Invalid price', 'warning');
-        return;
-      }
     }
 
     try {
@@ -392,18 +359,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         }
       }
 
-      let productData: Record<string, unknown> = {
+      const productData: Record<string, unknown> = {
         store_id: storeId,
-        name: productForm.name,
-        description: productForm.description,
-        price: parseFloat(productForm.price),
-        original_price: productForm.discountPercent
-          ? Math.round(parseFloat(productForm.price) / (1 - parseFloat(productForm.discountPercent) / 100))
-          : null,
-        stock: parseInt(productForm.stock),
+        ...draft,
         image_url: finalImageUrl,
         detail_image_urls: finalDetailUrls,
-        is_available: productForm.is_available,
       };
 
       const result = await merchantService.saveMerchantProduct({
@@ -700,8 +660,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.productPrice}>{item.price.toLocaleString()} MMK</Text>
-            {item.original_price && item.original_price > item.price && (
+            <Text style={styles.productPrice}>
+              {formatProductPriceLabel(item, language === 'en' ? 'en' : 'zh')}
+            </Text>
+            {!productHasVariants(item) && item.original_price && item.original_price > item.price && (
               <Text style={styles.originalPrice}>{item.original_price.toLocaleString()} MMK</Text>
             )}
           </View>
@@ -1031,6 +993,18 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 </View>
               ) : null}
 
+              <ProductVariantsEditor
+                enabled={productForm.use_variants}
+                onEnabledChange={(use_variants) =>
+                  setProductForm((prev) => ({ ...prev, use_variants }))
+                }
+                variants={productForm.variants}
+                onChange={(variants) => setProductForm((prev) => ({ ...prev, variants }))}
+                language={language === 'en' ? 'en' : 'zh'}
+              />
+
+              {!productForm.use_variants ? (
+              <>
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{currentT.price} (MMK) *</Text>
                 <TextInput
@@ -1063,6 +1037,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   keyboardType="numeric"
                 />
               </View>
+              </>
+              ) : null}
 
               <View style={styles.switchGroup}>
                 <Text style={styles.formLabel}>是否上架</Text>

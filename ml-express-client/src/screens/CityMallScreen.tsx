@@ -9,6 +9,8 @@ import { deliveryStoreService, merchantService, reviewService, bannerService, Ba
 import { useApp } from '../contexts/AppContext';
 import BackToHomeButton from '../components/BackToHomeButton';
 import LoggerService from '../services/LoggerService';
+import ProductVariantChipList from '../components/ProductVariantChipList';
+import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 
 const { width } = Dimensions.get('window');
 
@@ -237,9 +239,11 @@ const StoreCard = React.memo(({ item, status, language, t, productMatches, stats
   );
 });
 
-const ProductCard = React.memo(({ item, t, onVisit, onAddToCart }: any) => {
+const ProductCard = React.memo(({ item, t, onVisit, onAddToCart, language }: any) => {
   const store = item.delivery_stores;
   const storeStatus = store ? checkStoreOpenStatus(store as any) : { isOpen: true };
+  const langKey = language === 'zh' ? 'zh' : language === 'my' ? 'my' : 'en';
+  const hasVariants = productHasVariants(item);
   
   return (
     <TouchableOpacity style={styles.productCard} onPress={() => onVisit(item, store)}>
@@ -249,9 +253,12 @@ const ProductCard = React.memo(({ item, t, onVisit, onAddToCart }: any) => {
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.productDesc} numberOfLines={2}>{item.description}</Text>
           <View style={styles.productPriceRow}>
-            <Text style={styles.productPrice}>{Number(item.price).toLocaleString()} MMK</Text>
-            {item.original_price && <Text style={styles.originalPrice}>{Number(item.original_price).toLocaleString()} MMK</Text>}
+            <Text style={styles.productPrice}>{formatProductPriceLabel(item, langKey)}</Text>
+            {!hasVariants && item.original_price && item.original_price > item.price && (
+              <Text style={styles.originalPrice}>{Number(item.original_price).toLocaleString()} MMK</Text>
+            )}
           </View>
+          {hasVariants ? <ProductVariantChipList product={item} language={langKey} /> : null}
           {store && (
             <View style={styles.productStoreInfo}>
               <Ionicons name="business-outline" size={14} color="#94a3b8" />
@@ -675,11 +682,16 @@ export default function CityMallScreen({ navigation }: any) {
 
   const handleAddToCart = useCallback((item: any, store: any) => {
     if (store) {
-      navigation.navigate('MerchantProducts', { 
-        storeId: store.id, 
+      const params: Record<string, string> = {
+        storeId: store.id,
         storeName: store.store_name,
-        autoAddProductId: item.id 
-      });
+      };
+      if (productHasVariants(item)) {
+        params.openProductDetailId = item.id;
+      } else {
+        params.autoAddProductId = item.id;
+      }
+      navigation.navigate('MerchantProducts', params);
     }
   }, [navigation]);
 
@@ -886,7 +898,8 @@ export default function CityMallScreen({ navigation }: any) {
         return (
           <ProductCard 
             item={item} 
-            t={t} 
+            t={t}
+            language={language}
             onVisit={handleProductVisit} 
             onAddToCart={handleAddToCart}
           />

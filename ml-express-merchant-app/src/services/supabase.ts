@@ -212,6 +212,16 @@ export interface Tutorial {
   updated_at?: string;
 }
 
+export type ProductVariant = {
+  id: string;
+  name: string;
+  price: number;
+  original_price?: number | null;
+  stock: number;
+  is_available?: boolean;
+  sort_order?: number;
+};
+
 // 商品接口
 export interface Product {
   id: string;
@@ -224,6 +234,8 @@ export interface Product {
   image_url?: string;
   /** 商品详细介绍滚动图（纵向浏览） */
   detail_image_urls?: string[];
+  /** 多规格 SKU；null 表示单一价格商品 */
+  variants?: ProductVariant[] | null;
   stock: number;
   is_available: boolean;
   sales_count: number;
@@ -240,6 +252,7 @@ export type ProductPendingUpdate = {
   original_price?: number | null;
   image_url?: string;
   detail_image_urls?: string[];
+  variants?: ProductVariant[] | null;
   stock?: number;
   is_available?: boolean;
   submitted_at?: string;
@@ -294,6 +307,7 @@ export function pickProductReviewSnapshot(product: Product): ProductPendingUpdat
     original_price: product.original_price ?? null,
     image_url: product.image_url,
     detail_image_urls: product.detail_image_urls,
+    variants: product.variants ?? null,
     stock: product.stock,
     is_available: product.is_available,
   };
@@ -320,6 +334,7 @@ export function normalizePendingPayload(
     original_price: raw.original_price as number | null | undefined,
     image_url: raw.image_url as string | undefined,
     detail_image_urls: raw.detail_image_urls as string[] | undefined,
+    variants: (raw.variants as ProductVariant[] | null | undefined) ?? undefined,
     stock: raw.stock as number | undefined,
     is_available: raw.is_available as boolean | undefined,
   };
@@ -333,6 +348,7 @@ export function toDirectProductPatch(snapshot: ProductPendingUpdate): Partial<Pr
     original_price: snapshot.original_price ?? undefined,
     image_url: snapshot.image_url,
     detail_image_urls: snapshot.detail_image_urls,
+    variants: snapshot.variants ?? null,
     stock: snapshot.stock,
     is_available: snapshot.is_available,
   };

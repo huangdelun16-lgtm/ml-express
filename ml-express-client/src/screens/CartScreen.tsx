@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useCart, CartItem } from '../contexts/CartContext';
+import { useCart, CartItem, getCartItemLineKey } from '../contexts/CartContext';
 import { useApp } from '../contexts/AppContext';
 import { theme } from '../config/theme';
 import BackToHomeButton from '../components/BackToHomeButton';
@@ -94,10 +94,13 @@ export default function CartScreen({ navigation }: any) {
     navigation.navigate('MerchantProducts', {
       storeId: item.store_id,
       openProductDetailId: item.id,
+      openProductDetailVariantId: item.variant_id,
     });
   };
 
-  const renderCartItem = ({ item }: { item: CartItem }) => (
+  const renderCartItem = ({ item }: { item: CartItem }) => {
+    const lineKey = getCartItemLineKey(item);
+    return (
     <View style={styles.cartItem}>
       <TouchableOpacity
         style={styles.cartItemTap}
@@ -116,6 +119,11 @@ export default function CartScreen({ navigation }: any) {
 
         <View style={styles.itemInfo}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+          {item.variant_name ? (
+            <Text style={styles.itemRemark} numberOfLines={1}>
+              {language === 'zh' ? '规格：' : 'Variant: '}{item.variant_name}
+            </Text>
+          ) : null}
           {item.customer_remark ? (
             <Text style={styles.itemRemark} numberOfLines={3}>
               📝 {item.customer_remark}
@@ -128,21 +136,21 @@ export default function CartScreen({ navigation }: any) {
       <View style={styles.cartItemSide}>
         <TouchableOpacity
           style={styles.deleteBtn}
-          onPress={() => removeFromCart(item.id)}
+          onPress={() => removeFromCart(lineKey)}
         >
           <Ionicons name="trash-outline" size={20} color="#ef4444" />
         </TouchableOpacity>
         <View style={styles.quantityControls}>
           <TouchableOpacity
             style={styles.quantityBtn}
-            onPress={() => updateQuantity(item.id, item.quantity - 1)}
+            onPress={() => updateQuantity(lineKey, item.quantity - 1)}
           >
             <Ionicons name="remove" size={18} color="#3b82f6" />
           </TouchableOpacity>
           <Text style={styles.quantityValue}>{item.quantity}</Text>
           <TouchableOpacity
             style={styles.quantityBtn}
-            onPress={() => updateQuantity(item.id, item.quantity + 1)}
+            onPress={() => updateQuantity(lineKey, item.quantity + 1)}
           >
             <Ionicons name="add" size={18} color="#3b82f6" />
           </TouchableOpacity>
@@ -150,6 +158,7 @@ export default function CartScreen({ navigation }: any) {
       </View>
     </View>
   );
+  };
 
   return (
     <View style={styles.container}>
@@ -178,7 +187,7 @@ export default function CartScreen({ navigation }: any) {
 
       <FlatList
         data={cartItems}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => getCartItemLineKey(item)}
         renderItem={renderCartItem}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={

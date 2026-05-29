@@ -120,9 +120,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     customerRemark?: string | string[],
     variantId?: string,
   ) => {
-    if (productHasVariants(product) && !variantId) {
-      console.warn('addToCart: variant required for multi-spec product', product.id);
-      return;
+    if (productHasVariants(product)) {
+      if (!variantId) {
+        console.warn('addToCart: variant required for multi-spec product', product.id);
+        return;
+      }
+      if (!resolveProductVariant(product, variantId)) {
+        console.warn('addToCart: unknown variant for product', product.id, variantId);
+        return;
+      }
+    } else {
+      variantId = undefined;
     }
 
     const variant = resolveProductVariant(product, variantId);
@@ -217,6 +225,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     quantity: number,
     customerRemarks: string[],
   ) => {
+    if (quantity <= 0) {
+      removeFromCart(lineKey);
+      return;
+    }
     setCartItems((prevItems) =>
       prevItems.map((item) => {
         if (getCartItemLineKey(item) !== lineKey) return item;

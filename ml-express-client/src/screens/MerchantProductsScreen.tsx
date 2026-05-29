@@ -21,11 +21,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../contexts/AppContext';
-import { useCart, CartItem } from '../contexts/CartContext';
+import { useCart, CartItem, getCartItemLineKey } from '../contexts/CartContext';
 import { merchantService, Product, ProductCategory } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
+import ProductVariantChipList from '../components/ProductVariantChipList';
+import {
+  buildProductForCart,
+  cartLineKey,
+  formatProductPriceLabel,
+  getAvailableVariants,
+  getProductDisplayOriginalPrice,
+  maxSelectableStockForProduct,
+  productHasVariants,
+} from '../utils/productVariants';
 
 const { width, height: WINDOW_HEIGHT } = Dimensions.get('window');
 /** 商品详情弹窗固定高度，否则内层 flex:1 在 RN 中会塌陷，只显示图片不显示备注区 */
@@ -51,9 +61,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     highlightProductId,
     autoAddProductId,
     openProductDetailId,
+    openProductDetailVariantId,
   } = route.params || {};
   const { language } = useApp();
-  const { addToCart, cartCount, cartItems, updateCartItemDetails } = useCart();
+  const { addToCart, removeFromCart, cartCount, cartItems, updateCartItemDetails } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -235,8 +246,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       if (autoAddProductId) {
         const product = products.find(p => p.id === autoAddProductId);
         if (product && product.is_available) {
-          updateItemQuantity(autoAddProductId, 1);
-          showToast(language === 'zh' ? '已为您自动选中商品' : 'Product auto-selected', 'success');
+          if (productHasVariants(product)) {
+            handleOpenProductDetail(product);
+          } else {
+            updateItemQuantity(autoAddProductId, 1);
+            showToast(language === 'zh' ? '已为您自动选中商品' : 'Product auto-selected', 'success');
+          }
         }
       }
     }
@@ -543,6 +558,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const [lineRemarks, setLineRemarks] = useState<Record<string, string[]>>({});
   const [detailRemarks, setDetailRemarks] = useState<string[]>(['']);
   const [detailQty, setDetailQty] = useState(1);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<string, string>>({});
+  const [detailCartLineKey, setDetailCartLineKey] = useState<string | null>(null);
 
   const updateItemQuantity = (id: string, delta: number) => {
     setItemQuantities((prev) => {
@@ -566,15 +584,22 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }));
   };
 
-  const maxSelectableStock = (p: Product | null) => {
+  const maxSelectableStock = (p: Product | null, variantId?: string | null) => {
     if (!p) return 99999;
-    if (p.stock === -1) return 99999;
-    return Math.max(0, p.stock ?? 0);
+    return maxSelectableStockForProduct(p, variantId);
   };
 
-  const handleOpenProductDetail = (product: Product, cartLine?: CartItem | null) => {
+  const handleOpenProductDetail = (
+    product: Product,
+    cartLine?: CartItem | null,
+    presetVariantId?: string | null,
+  ) => {
     setSelectedProductDetail(product);
-    const cap = maxSelectableStock(product);
+    const initialVariantId =
+      cartLine?.variant_id ?? presetVariantId ?? selectedVariantByProduct[product.id] ?? null;
+    setSelectedVariantId(initialVariantId);
+    setDetailCartLineKey(cartLine ? getCartItemLineKey(cartLine) : null);
+    const cap = maxSelectableStock(product, initialVariantId);
 
     if (cartLine) {
       setDetailOpenedFromCart(true);
@@ -611,7 +636,13 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     if (!isFocused || !openProductDetailId || loading || products.length === 0) return;
     const pid = openProductDetailId as string;
     const product = products.find((p) => p.id === pid);
-    const cartLine = cartItems.find((c) => c.id === pid);
+    const variantParam = route.params?.openProductDetailVariantId as string | undefined;
+    const cartLine =
+      cartItems.find((c) => {
+        if (c.id !== pid) return false;
+        if (variantParam) return c.variant_id === variantParam;
+        return true;
+      }) ?? null;
     if (!product) {
       navigation.setParams({ openProductDetailId: undefined });
       return;
@@ -628,7 +659,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       navigation.setParams({ openProductDetailId: undefined });
       return;
     }
-    handleOpenProductDetail(product, cartLine);
+    handleOpenProductDetail(product, cartLine, variantParam);
     navigation.setParams({ openProductDetailId: undefined });
   }, [
     isFocused,
@@ -659,12 +690,89 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     });
   };
 
-  const detailStockCap = maxSelectableStock(selectedProductDetail);
+  const detailStockCap = maxSelectableStock(selectedProductDetail, selectedVariantId);
+  const detailDisplayProduct = selectedProductDetail
+    ? buildProductForCart(selectedProductDetail, selectedVariantId)
+    : null;
   const detailQtyPlusDisabled =
     detailStockCap === 0 || (detailStockCap !== 99999 && detailQty >= detailStockCap);
   const detailAddDisabled =
     !selectedProductDetail ||
-    (selectedProductDetail.stock !== -1 && (selectedProductDetail.stock ?? 0) <= 0);
+    detailStockCap === 0 ||
+    (productHasVariants(selectedProductDetail) && !selectedVariantId);
+
+  const closeDetailModal = () => {
+    setShowEditDetailModal(false);
+    setSelectedProductDetail(null);
+    setSelectedVariantId(null);
+    setDetailCartLineKey(null);
+    setDetailOpenedFromCart(false);
+  };
+
+  const handleDetailSubmit = () => {
+    if (!selectedProductDetail) return;
+    const pid = selectedProductDetail.id;
+    if (productHasVariants(selectedProductDetail) && !selectedVariantId) {
+      showToast(
+        language === 'zh' ? '请先选择规格' : 'Please select a variant',
+        'warning',
+      );
+      return;
+    }
+    if (detailStockCap === 0) {
+      showToast(language === 'zh' ? '暂无库存' : 'Out of stock', 'warning');
+      return;
+    }
+    const qty =
+      detailStockCap === 99999 ? detailQty : Math.min(detailQty, detailStockCap);
+    const padded = padLineRemarks(detailRemarks, qty);
+    const remarks = padded.some((r) => r.trim()) ? padded : undefined;
+    const fromCart = detailOpenedFromCart;
+    const lineKey = cartLineKey(pid, selectedVariantId);
+    const oldKey = detailCartLineKey ?? lineKey;
+    const variantId = selectedVariantId ?? undefined;
+
+    const commitDetailCart = () => {
+      if (fromCart) {
+        if (qty <= 0) {
+          removeFromCart(oldKey);
+        } else if (oldKey !== lineKey) {
+          removeFromCart(oldKey);
+          addToCart(selectedProductDetail, qty, remarks, variantId);
+        } else {
+          updateCartItemDetails(oldKey, qty, padded);
+        }
+        showToast(
+          language === 'zh'
+            ? '购物车已更新'
+            : language === 'en'
+              ? 'Cart updated'
+              : 'ဈေးဝယ်လှည်းအပ်ဒိတ်လုပ်ပြီး',
+          'success',
+        );
+      } else {
+        addToCart(selectedProductDetail, qty, remarks, variantId);
+        showToast(currentT.addedToCart, 'success');
+      }
+      closeDetailModal();
+    };
+
+    if (!fromCart && cartItems.length > 0 && cartItems[0].store_id !== storeId) {
+      Alert.alert(
+        language === 'zh' ? '清空购物车提示' : 'Clear Cart Notice',
+        language === 'zh'
+          ? '购物车中已存在其他店铺的商品，继续添加将清空原有商品。确定继续吗？'
+          : 'Cart already contains items from another store. Adding new items will clear existing ones. Continue?',
+        [
+          { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
+          { text: language === 'zh' ? '确定' : 'Continue', onPress: commitDetailCart },
+        ],
+      );
+      return;
+    }
+
+    commitDetailCart();
+  };
 
   const handleBulkAddToCart = () => {
     const selectedItems = getSelectedItems();
@@ -686,7 +794,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             text: language === 'zh' ? '确定' : 'Continue', 
             onPress: () => {
               selectedItems.forEach(item => {
-                addToCart(item, item.quantity, remarkForProductId(item.id));
+                const variantId = productHasVariants(item)
+                  ? selectedVariantByProduct[item.id]
+                  : undefined;
+                addToCart(item, item.quantity, remarkForProductId(item.id), variantId);
               });
               showToast(currentT.addedToCart, 'success');
               setItemQuantities({});
@@ -698,8 +809,23 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       return;
     }
 
+    const missingVariant = selectedItems.find(
+      (p) => productHasVariants(p) && !selectedVariantByProduct[p.id],
+    );
+    if (missingVariant) {
+      Alert.alert(
+        language === 'zh' ? '提示' : 'Notice',
+        language === 'zh'
+          ? `请为「${missingVariant.name}」选择规格（点击商品卡片）`
+          : `Please select a variant for "${missingVariant.name}"`,
+      );
+      handleOpenProductDetail(missingVariant);
+      return;
+    }
+
     selectedItems.forEach(item => {
-      addToCart(item, item.quantity, remarkForProductId(item.id));
+      const variantId = productHasVariants(item) ? selectedVariantByProduct[item.id] : undefined;
+      addToCart(item, item.quantity, remarkForProductId(item.id), variantId);
     });
     showToast(currentT.addedToCart, 'success');
     // 可选：清空当前选择
@@ -710,6 +836,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const renderProductItem = ({ item }: { item: Product }) => {
     const quantity = itemQuantities[item.id] || 0;
     const isSelected = selectedProductIds.has(item.id);
+    const hasVariants = productHasVariants(item);
+    const langKey = language === 'zh' ? 'zh' : language === 'my' ? 'my' : 'en';
     
     return (
       <TouchableOpacity 
@@ -747,16 +875,24 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.productPrice}>{item.price.toLocaleString()} MMK</Text>
-            {item.original_price && item.original_price > item.price && (
+            <Text style={styles.productPrice}>{formatProductPriceLabel(item, langKey)}</Text>
+            {!hasVariants && item.original_price && item.original_price > item.price && (
               <Text style={styles.originalPrice}>{item.original_price.toLocaleString()} MMK</Text>
             )}
           </View>
+          {hasVariants ? <ProductVariantChipList product={item} language={langKey} /> : null}
           
           <View style={styles.stockRow}>
             <Ionicons name="cube-outline" size={14} color="#64748b" />
             <Text style={styles.productStock}>
-              {currentT.stock}: {item.stock === -1 ? currentT.infinite : item.stock}
+              {currentT.stock}:{' '}
+              {hasVariants
+                ? language === 'zh'
+                  ? '多规格'
+                  : 'Variants'
+                : item.stock === -1
+                  ? currentT.infinite
+                  : item.stock}
             </Text>
           </View>
 
@@ -782,6 +918,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
           {isReadOnly && item.is_available && (
             <View style={styles.customerActionContainer}>
+              {hasVariants ? (
+                <Text style={styles.variantHintText}>
+                  {language === 'zh' ? '点击选规格' : 'Tap to pick variant'}
+                </Text>
+              ) : (
               <View style={styles.smallQuantitySelector}>
                 <TouchableOpacity 
                   onPress={() => updateItemQuantity(item.id, -1)}
@@ -798,6 +939,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   <Ionicons name="add" size={14} color="#3b82f6" />
                 </TouchableOpacity>
               </View>
+              )}
             </View>
           )}
         </View>
@@ -1177,6 +1319,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   onPress={() => {
                     setDetailOpenedFromCart(false);
                     setShowEditDetailModal(false);
+                    setSelectedVariantId(null);
+                    setDetailCartLineKey(null);
                   }}
                   accessibilityLabel="Close"
                 >
@@ -1188,17 +1332,82 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 <View style={styles.detailHeader}>
                   <Text style={styles.detailName}>{selectedProductDetail?.name}</Text>
                   <View style={styles.detailPriceRow}>
-                    <Text style={styles.detailPrice}>
-                      {selectedProductDetail?.price.toLocaleString()} MMK
-                    </Text>
-                    {selectedProductDetail?.original_price &&
-                      selectedProductDetail.original_price > selectedProductDetail.price && (
-                        <Text style={styles.detailOriginalPrice}>
-                          {selectedProductDetail.original_price.toLocaleString()} MMK
+                    {selectedProductDetail && productHasVariants(selectedProductDetail) && !selectedVariantId ? (
+                      <Text style={styles.detailPriceHint}>
+                        {language === 'zh'
+                          ? '请选择规格查看价格'
+                          : language === 'en'
+                            ? 'Select a variant to see price'
+                            : 'စျေးနှုန်းကြည့်ရန် ရွေးချယ်ပါ'}
+                      </Text>
+                    ) : (
+                      <>
+                        <Text style={styles.detailPrice}>
+                          {(detailDisplayProduct ?? selectedProductDetail)?.price.toLocaleString()} MMK
                         </Text>
-                      )}
+                        {(() => {
+                          const dp = detailDisplayProduct ?? selectedProductDetail;
+                          const orig =
+                            dp?.original_price ??
+                            (selectedProductDetail
+                              ? getProductDisplayOriginalPrice(selectedProductDetail)
+                              : undefined);
+                          return orig && dp && orig > dp.price ? (
+                            <Text style={styles.detailOriginalPrice}>
+                              {orig.toLocaleString()} MMK
+                            </Text>
+                          ) : null;
+                        })()}
+                      </>
+                    )}
                   </View>
                 </View>
+
+                {selectedProductDetail && productHasVariants(selectedProductDetail) ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>
+                      {language === 'zh' ? '选择规格' : language === 'en' ? 'Select variant' : 'Variant'}
+                    </Text>
+                    <View style={styles.variantChipRow}>
+                      {getAvailableVariants(selectedProductDetail).map((variant) => {
+                        const selected = selectedVariantId === variant.id;
+                        const outOfStock =
+                          maxSelectableStockForProduct(selectedProductDetail, variant.id) === 0;
+                        return (
+                          <TouchableOpacity
+                            key={variant.id}
+                            disabled={outOfStock}
+                            onPress={() => {
+                              setSelectedVariantId(variant.id);
+                              const cap = maxSelectableStock(selectedProductDetail, variant.id);
+                              if (cap !== 99999 && detailQty > cap) {
+                                adjustDetailQty(Math.max(1, cap));
+                              }
+                            }}
+                            style={[
+                              styles.variantChip,
+                              selected && styles.variantChipSelected,
+                              outOfStock && styles.variantChipOut,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.variantChipText,
+                                selected && styles.variantChipTextSelected,
+                                outOfStock && styles.variantChipTextOut,
+                              ]}
+                            >
+                              {variant.name}
+                              {outOfStock
+                                ? ` (${language === 'zh' ? '售罄' : 'Sold out'})`
+                                : ''}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
 
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>{currentT.description}</Text>
@@ -1223,9 +1432,15 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   <Ionicons name="cube-outline" size={20} color="#2563eb" />
                   <Text style={styles.detailStockCardText}>
                     {currentT.stock}:{' '}
-                    {selectedProductDetail?.stock === -1
-                      ? currentT.infinite
-                      : selectedProductDetail?.stock}
+                    {selectedProductDetail &&
+                    productHasVariants(selectedProductDetail) &&
+                    !selectedVariantId
+                      ? language === 'zh'
+                        ? '请先选择规格'
+                        : 'Select variant first'
+                      : (detailDisplayProduct ?? selectedProductDetail)?.stock === -1
+                        ? currentT.infinite
+                        : (detailDisplayProduct ?? selectedProductDetail)?.stock}
                   </Text>
                 </View>
 
@@ -1321,41 +1536,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               <TouchableOpacity
                 style={[styles.detailAddBtn, detailAddDisabled && styles.detailAddBtnDisabled]}
                 disabled={detailAddDisabled}
-                onPress={() => {
-                  if (!selectedProductDetail) return;
-                  const pid = selectedProductDetail.id;
-                  if (detailStockCap === 0) {
-                    showToast(language === 'zh' ? '暂无库存' : 'Out of stock', 'warning');
-                    return;
-                  }
-                  const qty =
-                    detailStockCap === 99999 ? detailQty : Math.min(detailQty, detailStockCap);
-                  const padded = padLineRemarks(detailRemarks, qty);
-                  const fromCart = detailOpenedFromCart;
-                  setDetailOpenedFromCart(false);
-                  if (fromCart) {
-                    updateCartItemDetails(pid, qty, padded);
-                  } else {
-                    setLineRemarks((prev) => {
-                      const next = { ...prev };
-                      if (padded.some((r) => r.trim())) next[pid] = padded;
-                      else delete next[pid];
-                      return next;
-                    });
-                    setItemQuantities((prev) => ({ ...prev, [pid]: qty }));
-                  }
-                  setShowEditDetailModal(false);
-                  showToast(
-                    fromCart
-                      ? language === 'zh'
-                        ? '购物车已更新'
-                        : language === 'en'
-                          ? 'Cart updated'
-                          : 'ဈေးဝယ်လှည်းအပ်ဒိတ်လုပ်ပြီး'
-                      : currentT.detailSelectionSaved,
-                    'success'
-                  );
-                }}
+                onPress={handleDetailSubmit}
               >
                 <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.detailAddGradient}>
                   <Ionicons name="cart-outline" size={20} color="white" style={{ marginRight: 8 }} />
@@ -1816,6 +1997,55 @@ const styles = StyleSheet.create({
   customerActionContainer: {
     marginTop: 10,
     gap: 8,
+  },
+  variantHintText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563eb',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  detailPriceHint: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  variantChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  variantChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#fff',
+  },
+  variantChipSelected: {
+    borderColor: '#2563eb',
+    borderWidth: 2,
+    backgroundColor: '#eff6ff',
+  },
+  variantChipOut: {
+    backgroundColor: '#f8fafc',
+    opacity: 0.7,
+  },
+  variantChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  variantChipTextSelected: {
+    color: '#1d4ed8',
+  },
+  variantChipTextOut: {
+    color: '#94a3b8',
+    textDecorationLine: 'line-through',
   },
   smallQuantitySelector: {
     flexDirection: 'row',

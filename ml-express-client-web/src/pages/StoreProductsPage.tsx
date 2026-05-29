@@ -34,7 +34,7 @@ const StoreProductsPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
-  const { addToCart, updateCartItemDetails, cartCount, cartItems } = useCart();
+  const { addToCart, removeFromCart, updateCartItemDetails, cartCount, cartItems } = useCart();
 
   const [loading, setLoading] = useState(true);
   const [store, setStore] = useState<DeliveryStore | null>(null);
@@ -269,6 +269,14 @@ const StoreProductsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, products, location.search, storeId, cartItems.length]);
 
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedProductDetail(null);
+    setSelectedVariantId(null);
+    setDetailCartLineKey(null);
+    setDetailOpenedFromCart(false);
+  };
+
   const handleDetailSubmit = () => {
     if (!selectedProductDetail) return;
     const pid = selectedProductDetail.id;
@@ -285,30 +293,50 @@ const StoreProductsPage: React.FC = () => {
     }
     const qty = detailStockCap === 99999 ? detailQty : Math.min(detailQty, detailStockCap);
     const padded = padLineRemarks(detailRemarks, qty);
+    const remarks = padded.some((r) => r.trim()) ? padded : undefined;
     const fromCart = detailOpenedFromCart;
     const lineKey = cartLineKey(pid, selectedVariantId);
-    setDetailOpenedFromCart(false);
+    const oldKey = detailCartLineKey ?? lineKey;
+    const variantId = selectedVariantId ?? undefined;
 
-    if (fromCart) {
-      updateCartItemDetails(detailCartLineKey ?? lineKey, qty, padded);
-      showToast(t.store.cartUpdated);
-    } else {
-      setLineRemarks((prev) => {
-        const next = { ...prev };
-        if (padded.some((r) => r.trim())) next[pid] = padded;
-        else delete next[pid];
-        return next;
-      });
-      setItemQuantities((prev) => ({ ...prev, [pid]: qty }));
-      if (selectedVariantId) {
-        setSelectedVariantByProduct((prev) => ({ ...prev, [pid]: selectedVariantId }));
+    const commitDetailCart = () => {
+      if (fromCart) {
+        if (qty <= 0) {
+          removeFromCart(oldKey);
+        } else if (oldKey !== lineKey) {
+          removeFromCart(oldKey);
+          addToCart(selectedProductDetail, qty, remarks, variantId);
+        } else {
+          updateCartItemDetails(oldKey, qty, padded);
+        }
+        showToast(t.store.cartUpdated);
+      } else {
+        addToCart(selectedProductDetail, qty, remarks, variantId);
+        showToast(t.store.addedToCart);
       }
-      showToast(t.store.detailSelectionSaved);
+      closeDetailModal();
+    };
+
+    if (!fromCart) {
+      if (!currentUser) {
+        alert(
+          language === 'zh'
+            ? '请先登录后再加入购物车'
+            : language === 'en'
+              ? 'Please login first to add items'
+              : 'ခြင်းထဲသို့ထည့်ရန် အရင်ဝင်ပါ'
+        );
+        return;
+      }
+      const status = checkStoreOpenStatus();
+      if (!status.isOpen) {
+        alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
+        return;
+      }
+      if (!confirmReplaceOtherStore()) return;
     }
-    setShowDetailModal(false);
-    setSelectedProductDetail(null);
-    setSelectedVariantId(null);
-    setDetailCartLineKey(null);
+
+    commitDetailCart();
   };
 
   const handleAddToCart = (product: Product) => {
