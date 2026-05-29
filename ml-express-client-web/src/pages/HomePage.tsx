@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, Suspense,
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { packageService, supabase, userService, testConnection, systemSettingsService, tutorialService, Tutorial } from '../services/supabase';
-import { useCart } from '../contexts/CartContext';
+import { useCart, getCartItemLineKey } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
@@ -171,7 +171,7 @@ const HomePage: React.FC = () => {
       // 转换商品格式为 Record<string, number>
       const selectedMap: Record<string, number> = {};
       incomingProducts.forEach(item => {
-        selectedMap[item.id] = item.quantity;
+        selectedMap[getCartItemLineKey(item)] = item.quantity;
       });
       setSelectedProducts(selectedMap);
       setMerchantProducts(incomingProducts);
@@ -242,11 +242,15 @@ const HomePage: React.FC = () => {
       let totalProductPrice = 0;
       let productDetails: string[] = [];
       
-      Object.entries(selectedProducts).forEach(([id, qty]) => {
-        const product = merchantProducts.find(p => p.id === id);
+      Object.entries(selectedProducts).forEach(([lineKey, qty]) => {
+        const product = merchantProducts.find((p) => getCartItemLineKey(p) === lineKey);
         if (product) {
           totalProductPrice += product.price * qty;
           let line = `${product.name} x${qty}`;
+          const variantName = (product as { variant_name?: string }).variant_name?.trim();
+          if (variantName) {
+            line += ` (${variantName})`;
+          }
           const remark = (product as any).customer_remark?.trim();
           if (remark) {
             line += ` (${remark})`;

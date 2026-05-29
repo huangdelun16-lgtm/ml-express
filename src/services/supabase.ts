@@ -195,6 +195,16 @@ export interface DeliveryStore {
   cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
 }
 
+export type ProductVariant = {
+  id: string;
+  name: string;
+  price: number;
+  original_price?: number | null;
+  stock: number;
+  is_available?: boolean;
+  sort_order?: number;
+};
+
 export interface Product {
   id: string;
   store_id: string;
@@ -205,6 +215,8 @@ export interface Product {
   original_price?: number;
   image_url?: string;
   detail_image_urls?: string[];
+  /** 多规格 SKU；null 表示单一价格商品 */
+  variants?: ProductVariant[] | null;
   stock: number;
   is_available: boolean;
   sales_count: number;
@@ -220,6 +232,8 @@ export interface AdminProductDraft {
   price: string;
   image_url: string;
   detail_image_urls: string[];
+  use_variants: boolean;
+  variants: ProductVariant[];
 }
 
 export interface Banner {
@@ -2343,9 +2357,11 @@ export const productService = {
       name: string;
       description?: string;
       price: number;
+      original_price?: number;
       image_url?: string;
       detail_image_urls?: string[];
       stock?: number;
+      variants?: ProductVariant[] | null;
     },
   ): Promise<{ success: boolean; data?: Product; error?: string }> {
     try {
@@ -2357,8 +2373,10 @@ export const productService = {
             name: product.name,
             description: product.description || null,
             price: product.price,
+            original_price: product.original_price ?? null,
             image_url: product.image_url || null,
             detail_image_urls: product.detail_image_urls ?? [],
+            variants: product.variants?.length ? product.variants : null,
             stock: product.stock ?? -1,
             is_available: true,
             sales_count: 0,

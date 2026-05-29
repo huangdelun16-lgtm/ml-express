@@ -1,0 +1,395 @@
+/* 商品多规格编辑器 — Admin / Merchant 共用（紧凑布局） */
+
+.pv-editor {
+  --pv-border: #dbeafe;
+  --pv-bg: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
+  --pv-head-bg: rgba(255, 255, 255, 0.85);
+  --pv-title: #0f172a;
+  --pv-sub: #64748b;
+  --pv-hint: #475569;
+  --pv-idle: #64748b;
+  --pv-chip-bg: #eff6ff;
+  --pv-chip-text: #1d4ed8;
+  --pv-chip-border: #bfdbfe;
+  --pv-row-bg: #fff;
+  --pv-row-border: #e2e8f0;
+  --pv-badge-bg: #dbeafe;
+  --pv-badge-text: #1e40af;
+  --pv-label: #475569;
+  --pv-input-bg: #fff;
+  --pv-input-border: #cbd5e1;
+  --pv-input-text: #0f172a;
+  --pv-input-focus: rgba(37, 99, 235, 0.14);
+  --pv-switch-off: #cbd5e1;
+  --pv-switch-on: #2563eb;
+  --pv-switch-label: #334155;
+  --pv-remove-bg: #fef2f2;
+  --pv-remove-text: #b91c1c;
+  --pv-add-border: #93c5fd;
+  --pv-add-bg: #eff6ff;
+  --pv-add-text: #1d4ed8;
+
+  border: 1px solid var(--pv-border);
+  border-radius: 12px;
+  background: var(--pv-bg);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.pv-editor--merchant {
+  --pv-border: rgba(96, 165, 250, 0.22);
+  --pv-bg: linear-gradient(180deg, rgba(30, 41, 59, 0.55) 0%, rgba(15, 23, 42, 0.35) 100%);
+  --pv-head-bg: rgba(15, 23, 42, 0.35);
+  --pv-title: #f8fafc;
+  --pv-sub: rgba(203, 213, 225, 0.82);
+  --pv-hint: rgba(203, 213, 225, 0.78);
+  --pv-idle: rgba(148, 163, 184, 0.9);
+  --pv-chip-bg: rgba(59, 130, 246, 0.12);
+  --pv-chip-text: #93c5fd;
+  --pv-chip-border: rgba(96, 165, 250, 0.28);
+  --pv-row-bg: rgba(255, 255, 255, 0.05);
+  --pv-row-border: rgba(148, 163, 184, 0.2);
+  --pv-badge-bg: rgba(59, 130, 246, 0.2);
+  --pv-badge-text: #bfdbfe;
+  --pv-label: rgba(203, 213, 225, 0.85);
+  --pv-input-bg: rgba(255, 255, 255, 0.06);
+  --pv-input-border: rgba(148, 163, 184, 0.28);
+  --pv-input-text: #f8fafc;
+  --pv-input-focus: rgba(59, 130, 246, 0.22);
+  --pv-switch-off: rgba(100, 116, 139, 0.65);
+  --pv-switch-on: #3b82f6;
+  --pv-switch-label: rgba(226, 232, 240, 0.92);
+  --pv-remove-bg: rgba(239, 68, 68, 0.14);
+  --pv-remove-text: #fca5a5;
+  --pv-add-border: rgba(96, 165, 250, 0.35);
+  --pv-add-bg: rgba(59, 130, 246, 0.1);
+  --pv-add-text: #93c5fd;
+}
+
+.pv-editor--open {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.08);
+}
+
+.pv-editor--merchant.pv-editor--open {
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.pv-editor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--pv-head-bg);
+  border-bottom: 1px solid var(--pv-row-border);
+  flex-wrap: wrap;
+}
+
+.pv-editor__head-text {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.pv-editor__icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.pv-editor__title {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: var(--pv-title);
+  line-height: 1.25;
+}
+
+.pv-editor__subtitle {
+  margin-top: 0.1rem;
+  font-size: 0.68rem;
+  color: var(--pv-sub);
+  line-height: 1.35;
+}
+
+.pv-editor__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pv-editor__switch-knob {
+  position: relative;
+  width: 2.35rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--pv-switch-off);
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.pv-editor__switch-knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease;
+}
+
+.pv-editor__switch--on .pv-editor__switch-knob {
+  background: var(--pv-switch-on);
+}
+
+.pv-editor__switch--on .pv-editor__switch-knob::after {
+  transform: translateX(1.05rem);
+}
+
+.pv-editor__switch-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--pv-switch-label);
+  white-space: nowrap;
+}
+
+.pv-editor__idle {
+  padding: 0.55rem 0.75rem 0.65rem;
+}
+
+.pv-editor__idle-text {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  color: var(--pv-idle);
+  line-height: 1.4;
+}
+
+.pv-editor__examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.pv-editor__example-chip {
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--pv-chip-bg);
+  color: var(--pv-chip-text);
+  border: 1px solid var(--pv-chip-border);
+}
+
+.pv-editor__body {
+  padding: 0.55rem 0.75rem 0.65rem;
+}
+
+.pv-editor__hint {
+  margin: 0 0 0.5rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: var(--pv-hint);
+  background: var(--pv-chip-bg);
+  border: 1px dashed var(--pv-chip-border);
+}
+
+.pv-editor__list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pv-editor__row {
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  background: var(--pv-row-bg);
+  border: 1px solid var(--pv-row-border);
+}
+
+.pv-editor__row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.pv-editor__row-badge {
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  background: var(--pv-badge-bg);
+  color: var(--pv-badge-text);
+}
+
+.pv-editor__row-remove {
+  border: none;
+  background: var(--pv-remove-bg);
+  color: var(--pv-remove-text);
+  border-radius: 6px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pv-editor__row-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 规格名 + 价格 + 库存 同一行，宽度受限 */
+.pv-editor__row-main {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1fr) 5.5rem 4.25rem;
+  gap: 0.4rem;
+  align-items: end;
+  max-width: 22rem;
+}
+
+.pv-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.pv-editor__field-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--pv-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pv-editor__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 1.85rem;
+  padding: 0.28rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--pv-input-border);
+  background: var(--pv-input-bg);
+  color: var(--pv-input-text);
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pv-editor__field--price .pv-editor__input--price {
+  font-weight: 700;
+  border-color: #93c5fd;
+}
+
+.pv-editor--merchant .pv-editor__field--price .pv-editor__input--price {
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.pv-editor__input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px var(--pv-input-focus);
+}
+
+.pv-editor__input::placeholder {
+  color: #94a3b8;
+  font-size: 0.72rem;
+}
+
+.pv-editor--merchant .pv-editor__input::placeholder {
+  color: rgba(148, 163, 184, 0.75);
+}
+
+.pv-editor__required {
+  color: #ef4444;
+  margin-left: 0.1rem;
+  font-weight: 800;
+}
+
+.pv-editor__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  width: auto;
+  min-width: 6.5rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: 1px dashed var(--pv-add-border);
+  background: var(--pv-add-bg);
+  color: var(--pv-add-text);
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pv-editor__add:hover {
+  filter: brightness(1.03);
+}
+
+.pv-editor__add-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.12);
+  font-size: 0.85rem;
+  line-height: 1;
+  font-weight: 900;
+}
+
+@media (max-width: 480px) {
+  .pv-editor__row-main {
+    grid-template-columns: 1fr 1fr;
+    max-width: none;
+  }
+
+  .pv-editor__field--stock {
+    grid-column: 1 / -1;
+    max-width: 5.5rem;
+  }
+
+  .pv-editor__switch-label {
+    display: none;
+  }
+}
+
+/* 避免被店铺表单全局 input/label 样式污染 */
+.store-form-product__fields .pv-editor input,
+.store-form-product__fields .pv-editor button {
+  font-family: inherit;
+}
+
+.store-form-product__fields .pv-editor label.pv-editor__field {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+
+.store-form-product__fields .pv-editor label.pv-editor__field span.pv-editor__field-label {
+  color: var(--pv-label) !important;
+}
+
+.store-form-product__fields .pv-editor label.pv-editor__field span.pv-editor__required {
+  color: #ef4444 !important;
+}

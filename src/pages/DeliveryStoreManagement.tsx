@@ -8,7 +8,15 @@ import QRCode from 'qrcode';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 import ProductImageEditorModal from '../components/ProductImageEditorModal';
+import ProductVariantsEditor from '../components/ProductVariantsEditor';
+import '../styles/productVariantsEditor.css';
 import { prepareProductImage, PrepareProductImageSettings } from '../utils/productImagePrepare';
+import {
+  normalizeProductVariants,
+  syncProductAggregateFromVariants,
+  validateVariants,
+  formatVariantsForDisplay,
+} from '../utils/productVariants';
 import '../styles/adminStoreCreateForm.css';
 
 const REGIONS = [
@@ -218,6 +226,7 @@ const ADMIN_PRODUCT_FIELD_LABELS: Record<string, string> = {
   description: '商品描述',
   price: '售价',
   original_price: '原价',
+  variants: '规格与价格',
   image_url: '主图',
   detail_image_urls: '详细介绍图',
   stock: '库存',
@@ -227,8 +236,8 @@ const ADMIN_PRODUCT_FIELD_LABELS: Record<string, string> = {
 const ADMIN_PRODUCT_DIFF_KEYS = Object.keys(ADMIN_PRODUCT_FIELD_LABELS);
 
 function adminProductValuesEqual(key: string, a: unknown, b: unknown): boolean {
-  if (key === 'detail_image_urls') {
-    return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+  if (key === 'detail_image_urls' || key === 'variants') {
+    return JSON.stringify(a ?? (key === 'variants' ? null : [])) === JSON.stringify(b ?? (key === 'variants' ? null : []));
   }
   if (key === 'original_price') {
     const na = a == null || a === '' ? null : Number(a);
@@ -247,6 +256,7 @@ function formatAdminProductFieldText(key: string, value: unknown): string {
     return Number.isFinite(n) ? `${n.toLocaleString()} MMK` : '—';
   }
   if (key === 'stock') return Number(value) === -1 ? '无限' : String(value);
+  if (key === 'variants') return formatVariantsForDisplay(value);
   if (key === 'is_available') return value ? '在售' : '下架';
   if (key === 'detail_image_urls') {
     const arr = Array.isArray(value) ? value : [];
@@ -311,6 +321,8 @@ const DEFAULT_ADMIN_PRODUCT_FORM = {
   price: '',
   image_url: '',
   detail_image_urls: [] as string[],
+  use_variants: false,
+  variants: [] as import('../utils/productVariants').ProductVariant[],
 };
 
 const DeliveryStoreManagement: React.FC = () => {
@@ -719,6 +731,84 @@ const DeliveryStoreManagement: React.FC = () => {
     setAdminPendingDetailFiles([]);
   };
 
+  const hasAdminProductDraft = (): boolean => {
+    const f = adminProductForm;
+    return Boolean(
+      f.name.trim() ||
+        f.description.trim() ||
+        f.image_url ||
+        f.detail_image_urls.length > 0 ||
+        f.price.trim() ||
+        f.use_variants ||
+        f.variants.some((v) => v.name.trim() || String(v.price ?? '').trim()),
+    );
+  };
+
+  const reloadViewingStoreProducts = async (storeId: string) => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    setStoreProducts(data || []);
+  };
+
+  const saveAdminProductForStore = async (
+    storeId: string,
+    storeName?: string,
+  ): Promise<{ success: boolean; error?: string; productName?: string }> => {
+    if (!adminProductForm.name.trim()) {
+      return { success: false, error: '请填写商品名称' };
+    }
+
+    let price: number;
+    let stock = -1;
+    let originalPrice: number | undefined;
+    let variants: import('../utils/productVariants').ProductVariant[] | null = null;
+
+    if (adminProductForm.use_variants) {
+      const normalized = normalizeProductVariants(adminProductForm.variants);
+      const variantError = validateVariants(normalized);
+      if (variantError) {
+        return { success: false, error: variantError };
+      }
+      const agg = syncProductAggregateFromVariants(normalized);
+      price = agg.price;
+      stock = agg.stock;
+      originalPrice = agg.original_price;
+      variants = normalized;
+    } else {
+      if (!adminProductForm.price.trim()) {
+        return { success: false, error: '请填写商品价格' };
+      }
+      price = parseFloat(adminProductForm.price);
+      if (!Number.isFinite(price) || price <= 0) {
+        return { success: false, error: '请输入有效的商品价格' };
+      }
+    }
+
+    const result = await productService.createProductAsAdmin(storeId, {
+      name: adminProductForm.name.trim(),
+      description: adminProductForm.description.trim() || undefined,
+      price,
+      original_price: originalPrice,
+      stock,
+      variants,
+      image_url: adminProductForm.image_url || undefined,
+      detail_image_urls: adminProductForm.detail_image_urls,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error || '添加商品失败，请重试' };
+    }
+
+    return {
+      success: true,
+      productName: adminProductForm.name.trim(),
+    };
+  };
+
   const handleAdminProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editingStore?.id) return;
@@ -814,33 +904,20 @@ const DeliveryStoreManagement: React.FC = () => {
       setAdminProductError('请先保存店铺后再添加商品');
       return;
     }
-    if (!adminProductForm.name.trim() || !adminProductForm.price.trim()) {
-      setAdminProductError('请填写商品名称与价格');
-      return;
-    }
-
-    const price = parseFloat(adminProductForm.price);
-    if (!Number.isFinite(price) || price <= 0) {
-      setAdminProductError('请输入有效的商品价格');
-      return;
-    }
 
     setIsSavingAdminProduct(true);
     setAdminProductError(null);
 
     try {
-      const result = await productService.createProductAsAdmin(storeId, {
-        name: adminProductForm.name.trim(),
-        description: adminProductForm.description.trim() || undefined,
-        price,
-        image_url: adminProductForm.image_url || undefined,
-        detail_image_urls: adminProductForm.detail_image_urls,
-      });
+      const result = await saveAdminProductForStore(storeId, editingStore?.store_name);
 
       if (result.success) {
-        setSuccessMessage(`已为「${editingStore?.store_name}」添加商品「${adminProductForm.name.trim()}」`);
+        setSuccessMessage(`已为「${editingStore?.store_name}」添加商品「${result.productName}」`);
         resetAdminProductForm();
         await loadPendingProductReviewSummary();
+        if (viewingStoreId === storeId) {
+          await reloadViewingStoreProducts(storeId);
+        }
       } else {
         setAdminProductError(result.error || '添加商品失败，请重试');
       }
@@ -1111,6 +1188,7 @@ const DeliveryStoreManagement: React.FC = () => {
             'description',
             'price',
             'original_price',
+            'variants',
             'image_url',
             'detail_image_urls',
             'stock',
@@ -1310,6 +1388,32 @@ const DeliveryStoreManagement: React.FC = () => {
 
     try {
       if (isEditing && editingStore) {
+        let savedProductName: string | undefined;
+
+        if (hasAdminProductDraft()) {
+          if (!adminProductForm.name.trim()) {
+            const msg =
+              '您填写了部分商品信息但未填写商品名称。请先完善商品并点击「添加商品并上架」，或清空商品区域后再更新店铺。';
+            setFormSubmitError(msg);
+            setErrorMessage(msg);
+            return;
+          }
+          setAdminProductError(null);
+          const productResult = await saveAdminProductForStore(editingStore.id!, editingStore.store_name);
+          if (!productResult.success) {
+            const msg = productResult.error || '商品添加失败，店铺信息未更新';
+            setFormSubmitError(msg);
+            setAdminProductError(msg);
+            return;
+          }
+          savedProductName = productResult.productName;
+          resetAdminProductForm();
+          await loadPendingProductReviewSummary();
+          if (viewingStoreId === editingStore.id) {
+            await reloadViewingStoreProducts(editingStore.id!);
+          }
+        }
+
         const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
 
         const result = await deliveryStoreService.updateStore(editingStore.id!, {
@@ -1322,7 +1426,8 @@ const DeliveryStoreManagement: React.FC = () => {
         });
 
         if (result) {
-          setSuccessMessage('合伙店铺信息更新成功！');
+          const productNote = savedProductName ? `，并已上架商品「${savedProductName}」` : '';
+          setSuccessMessage(`合伙店铺信息更新成功${productNote}！`);
           setShowForm(false);
           setEditingStore(null);
           setIsEditing(false);
@@ -1898,7 +2003,9 @@ const DeliveryStoreManagement: React.FC = () => {
                   {isEditing && editingStore?.id ? (
                     <div className="store-form-product store-form-product--below">
                         <p className="store-form-product__title">代商家添加商品</p>
-                        <p className="store-form-product__sub">商家提供资料后，可在此上传商品主图与详细介绍图并直接上架</p>
+                        <p className="store-form-product__sub">
+                          商品须单独保存：点击「添加商品并上架」，或在填写完整后点「更新合伙店铺」也会一并上架。保存后在列表点「进入店铺」查看。
+                        </p>
 
                         {adminProductError && (
                           <div className="store-form-alert store-form-alert--error" role="alert">
@@ -1941,10 +2048,13 @@ const DeliveryStoreManagement: React.FC = () => {
                               className="store-form-product__detail-btn"
                               onClick={() => setShowAdminProductDetailPanel((v) => !v)}
                             >
-                              商品详细介绍
-                              {adminProductForm.detail_image_urls.length > 0
-                                ? ` (${adminProductForm.detail_image_urls.length})`
-                                : ''}
+                              <span aria-hidden="true">🖼️</span>
+                              详细介绍
+                              {adminProductForm.detail_image_urls.length > 0 ? (
+                                <span className="store-form-product__detail-btn-count">
+                                  {adminProductForm.detail_image_urls.length}
+                                </span>
+                              ) : null}
                             </button>
                             {showAdminProductDetailPanel ? (
                               <div className="store-form-product__detail-panel">
@@ -1997,16 +2107,34 @@ const DeliveryStoreManagement: React.FC = () => {
                               placeholder="输入商品名称"
                             />
                           </div>
-                          <div className="store-form-field">
-                            <label>商品价格 (MMK) <span>*</span></label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={adminProductForm.price}
-                              onChange={(e) => setAdminProductForm((prev) => ({ ...prev, price: e.target.value }))}
-                              placeholder="例: 5000"
+
+                          <div className="store-form-field--full store-form-variants-slot">
+                            <ProductVariantsEditor
+                              enabled={adminProductForm.use_variants}
+                              onEnabledChange={(use_variants) =>
+                                setAdminProductForm((prev) => ({ ...prev, use_variants }))
+                              }
+                              variants={adminProductForm.variants}
+                              onChange={(variants) =>
+                                setAdminProductForm((prev) => ({ ...prev, variants }))
+                              }
+                              language="zh"
+                              theme="admin"
                             />
                           </div>
+
+                          {!adminProductForm.use_variants ? (
+                            <div className="store-form-field">
+                              <label>商品价格 (MMK) <span>*</span></label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={adminProductForm.price}
+                                onChange={(e) => setAdminProductForm((prev) => ({ ...prev, price: e.target.value }))}
+                                placeholder="例: 5000"
+                              />
+                            </div>
+                          ) : null}
                           <div className="store-form-field store-form-field--full">
                             <label>商品描述</label>
                             <textarea
@@ -4949,6 +5077,9 @@ const DeliveryStoreManagement: React.FC = () => {
           const renderFieldValue = (key: string, value: unknown) => {
             if (key === 'image_url') return renderImageValue(value);
             if (key === 'detail_image_urls') return renderDetailImages(value);
+            if (key === 'variants') {
+              return <p className="admin-product-detail__desc">{formatVariantsForDisplay(value)}</p>;
+            }
             if (key === 'description') {
               return <p className="admin-product-detail__desc">{formatAdminProductFieldText(key, value)}</p>;
             }

@@ -1,9 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
-import { merchantService, deliveryStoreService, Product, DeliveryStore, productFormSource, hasPendingProductUpdate } from '../services/supabase';
+import { merchantService, deliveryStoreService, Product, DeliveryStore, hasPendingProductUpdate } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { autoPrepareProductImageForUpload } from '../utils/productImagePrepare';
+import ProductVariantsEditor from '../components/ProductVariantsEditor';
+import '../styles/productVariantsEditor.css';
+import {
+  defaultMerchantProductForm,
+  merchantProductFormFromProduct,
+  buildMerchantProductDraft,
+  type MerchantProductFormState,
+} from '../utils/merchantProductForm';
+import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 import '../styles/merchantProductsPage.css';
 
 const StoreProductsPage: React.FC = () => {
@@ -24,16 +33,7 @@ const StoreProductsPage: React.FC = () => {
   const productFileInputRef = useRef<HTMLInputElement>(null);
   const detailImagesFileInputRef = useRef<HTMLInputElement>(null);
   
-  const [productForm, setProductForm] = useState({
-    name: '',
-    description: '',
-    price: '',
-    discount_percent: '',
-    stock: '-1',
-    image_url: '',
-    detail_image_urls: [] as string[],
-    is_available: true
-  });
+  const [productForm, setProductForm] = useState<MerchantProductFormState>(defaultMerchantProductForm());
   const [showDetailImagesPanel, setShowDetailImagesPanel] = useState(false);
   const [isUploadingDetailImages, setIsUploadingDetailImages] = useState(false);
 
@@ -74,39 +74,14 @@ const StoreProductsPage: React.FC = () => {
   // 🚀 操作函数
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
-    setProductForm({
-      name: '',
-      description: '',
-      price: '',
-      discount_percent: '',
-      stock: '-1',
-      image_url: '',
-      detail_image_urls: [],
-      is_available: true
-    });
+    setProductForm(defaultMerchantProductForm());
     setShowDetailImagesPanel(false);
     setShowAddEditProductModal(true);
   };
 
   const handleOpenEditProduct = (product: Product) => {
     setEditingProduct(product);
-    const src = productFormSource(product);
-    
-    let discountPercent = '';
-    if (src.original_price && src.original_price > src.price) {
-      discountPercent = Math.round((1 - src.price / src.original_price) * 100).toString();
-    }
-
-    setProductForm({
-      name: src.name,
-      description: src.description || '',
-      price: src.price.toString(),
-      discount_percent: discountPercent,
-      stock: src.stock.toString(),
-      image_url: src.image_url || '',
-      detail_image_urls: src.detail_image_urls || [],
-      is_available: src.is_available
-    });
+    setProductForm(merchantProductFormFromProduct(product));
     setShowDetailImagesPanel((product.detail_image_urls?.length ?? 0) > 0);
     setShowAddEditProductModal(true);
   };
@@ -170,39 +145,21 @@ const StoreProductsPage: React.FC = () => {
 
   const handleSaveProduct = async () => {
     const storeId = currentUser?.store_id || currentUser?.id;
-    if (!productForm.name || !productForm.price || !storeId) {
-      alert(language === 'zh' ? '请填写必要信息' : 'Please fill required fields');
+    const { draft, error: formError } = buildMerchantProductDraft(productForm);
+    if (!storeId) return;
+    if (formError) {
+      alert(language === 'zh' ? formError : formError);
       return;
     }
 
     try {
       setIsSaving(true);
-      
-      const price = parseFloat(productForm.price);
-      const discountPercent = parseFloat(productForm.discount_percent);
-      let originalPrice = undefined;
-      
-      if (!isNaN(discountPercent) && discountPercent > 0 && discountPercent < 100) {
-        originalPrice = Math.round(price / (1 - discountPercent / 100));
-      }
 
-      let productData: Record<string, unknown> = {
-        store_id: storeId,
-        name: productForm.name,
-        price: price,
-        original_price: originalPrice,
-        stock: parseInt(productForm.stock),
-        image_url: productForm.image_url,
-        detail_image_urls: productForm.detail_image_urls,
-        is_available: productForm.is_available,
-        description: productForm.description
-      };
-
-      let result = await merchantService.saveMerchantProduct({
+      const result = await merchantService.saveMerchantProduct({
         mode: editingProduct ? 'edit' : 'create',
         product: editingProduct ?? null,
         storeId,
-        draft: productData,
+        draft: { ...draft, store_id: storeId },
       });
 
       if (result.success) {
@@ -391,9 +348,8 @@ const StoreProductsPage: React.FC = () => {
 
                 <div className="merchant-product-card__price-row">
                   <span className="merchant-product-card__price">
-                    {product.price.toLocaleString()}
+                    {formatProductPriceLabel(product, language === 'en' ? 'en' : 'zh')}
                   </span>
-                  <span className="merchant-product-card__currency">MMK</span>
                   {product.original_price && product.original_price > product.price ? (
                     <span className="merchant-product-card__original">
                       {product.original_price.toLocaleString()}
@@ -548,16 +504,19 @@ const StoreProductsPage: React.FC = () => {
                 />
               </div>
 
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                 <button
                   type="button"
                   className="merchant-product-modal__detail-btn"
                   onClick={() => setShowDetailImagesPanel((v) => !v)}
                 >
-                  {language === 'zh' ? '商品详细介绍' : 'Scrolling Pictures'}
-                  {productForm.detail_image_urls.length > 0
-                    ? ` (${productForm.detail_image_urls.length})`
-                    : ''}
+                  <span aria-hidden="true">🖼️</span>
+                  {language === 'zh' ? '详细介绍' : 'Detail pics'}
+                  {productForm.detail_image_urls.length > 0 ? (
+                    <span className="merchant-product-modal__detail-btn-count">
+                      {productForm.detail_image_urls.length}
+                    </span>
+                  ) : null}
                 </button>
                 {showDetailImagesPanel ? (
                   <div className="merchant-product-modal__detail-panel">
@@ -605,6 +564,18 @@ const StoreProductsPage: React.FC = () => {
                 ) : null}
               </div>
 
+              <ProductVariantsEditor
+                enabled={productForm.use_variants}
+                onEnabledChange={(use_variants) =>
+                  setProductForm((prev) => ({ ...prev, use_variants }))
+                }
+                variants={productForm.variants}
+                onChange={(variants) => setProductForm((prev) => ({ ...prev, variants }))}
+                language={language === 'en' ? 'en' : 'zh'}
+                theme="merchant"
+              />
+
+              {!productForm.use_variants ? (
               <div className="merchant-product-modal__row">
                 <div>
                   <label className="merchant-product-modal__label" htmlFor="product-price">
@@ -633,7 +604,9 @@ const StoreProductsPage: React.FC = () => {
                   />
                 </div>
               </div>
+              ) : null}
 
+              {!productForm.use_variants ? (
               <div>
                 <label className="merchant-product-modal__label" htmlFor="product-stock">
                   {t?.productStock} (-1={t?.stockInfinite})
@@ -646,6 +619,7 @@ const StoreProductsPage: React.FC = () => {
                   onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
                 />
               </div>
+              ) : null}
 
               <div className="merchant-product-modal__toggle-row">
                 <span className="merchant-product-modal__toggle-label">

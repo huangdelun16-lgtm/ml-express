@@ -101,6 +101,16 @@ export interface DeliveryStore {
 }
 
 // 商品接口
+export type ProductVariant = {
+  id: string;
+  name: string;
+  price: number;
+  original_price?: number | null;
+  stock: number;
+  is_available?: boolean;
+  sort_order?: number;
+};
+
 export interface Product {
   id: string;
   store_id: string;
@@ -112,6 +122,8 @@ export interface Product {
   image_url?: string;
   /** 商品详细介绍滚动图（纵向浏览） */
   detail_image_urls?: string[];
+  /** 多规格 SKU；null 表示单一价格商品 */
+  variants?: ProductVariant[] | null;
   stock: number;
   is_available: boolean;
   sales_count: number;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
+import { useCart, getCartItemLineKey } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import NavigationBar from '../components/home/NavigationBar';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
@@ -137,9 +137,11 @@ const CartPage: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {cartItems.map((item: any) => (
+                {cartItems.map((item: any) => {
+                  const lineKey = getCartItemLineKey(item);
+                  return (
                   <div
-                    key={item.id}
+                    key={lineKey}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -151,7 +153,12 @@ const CartPage: React.FC = () => {
                     }}
                   >
                     <div
-                      onClick={() => item.store_id && navigate(`/mall/${item.store_id}?openDetail=${item.id}`)}
+                      onClick={() =>
+                        item.store_id &&
+                        navigate(
+                          `/mall/${item.store_id}?openDetail=${item.id}${item.variant_id ? `&variant=${item.variant_id}` : ''}`,
+                        )
+                      }
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -194,6 +201,11 @@ const CartPage: React.FC = () => {
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h3 style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '0.2rem', color: '#f8fafc' }}>{item.name}</h3>
+                        {item.variant_name ? (
+                          <p style={{ color: '#93c5fd', fontSize: '0.78rem', margin: '0 0 0.15rem', fontWeight: 700 }}>
+                            {language === 'zh' ? '规格：' : 'Variant: '}{item.variant_name}
+                          </p>
+                        ) : null}
                         <p style={{ color: '#4ade80', fontSize: '0.9rem', fontWeight: 700 }}>{item.price.toLocaleString()} MMK</p>
                         {item.customer_remark ? (
                           <p style={{ color: 'rgba(203, 213, 225, 0.9)', fontSize: '0.8rem', margin: '0.35rem 0 0', fontWeight: 600, lineHeight: 1.4 }}>
@@ -212,7 +224,7 @@ const CartPage: React.FC = () => {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            updateQuantity(item.id, item.quantity - 1);
+                            updateQuantity(lineKey, item.quantity - 1);
                           }}
                           style={{
                             width: '28px',
@@ -233,7 +245,7 @@ const CartPage: React.FC = () => {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            updateQuantity(item.id, item.quantity + 1);
+                            updateQuantity(lineKey, item.quantity + 1);
                           }}
                           style={{
                             width: '28px',
@@ -254,7 +266,7 @@ const CartPage: React.FC = () => {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          removeFromCart(item.id);
+                          removeFromCart(lineKey);
                         }}
                         style={{
                           background: 'none',
@@ -277,7 +289,8 @@ const CartPage: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             </div>
 

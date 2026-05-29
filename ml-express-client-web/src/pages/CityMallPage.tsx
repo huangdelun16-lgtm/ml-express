@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { deliveryStoreService, DeliveryStore, reviewService, merchantService, bannerService, Banner } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import NavigationBar from '../components/home/NavigationBar';
+import ProductVariantPriceList from '../components/ProductVariantPriceList';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import LoggerService from '../services/LoggerService';
+import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 
 const CityMallPage: React.FC = () => {
   const navigate = useNavigate();
@@ -789,6 +791,8 @@ const CityMallPage: React.FC = () => {
                 {foundProducts.map((product: any) => {
                   const store = product.delivery_stores;
                   const storeStatus = store ? checkStoreOpenStatus(store as any) : { isOpen: true };
+                  const langKey = language === 'zh' ? 'zh' : language === 'my' ? 'my' : 'en';
+                  const hasVariants = productHasVariants(product);
                   return (
                     <div 
                       key={product.id}
@@ -815,11 +819,22 @@ const CityMallPage: React.FC = () => {
                       <div style={{ flex: 1 }}>
                         <h3 style={{ fontSize: '1.2rem', fontWeight: '900', color: '#0f172a', marginBottom: '0.4rem' }}>{product.name}</h3>
                         <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: '1.4', height: '2.8rem', overflow: 'hidden' }}>{product.description}</p>
-                        <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                          <span style={{ fontSize: '1.3rem', fontWeight: '900', color: '#1e40af' }}>{Number(product.price).toLocaleString()} MMK</span>
-                          {product.original_price && (
-                            <span style={{ fontSize: '0.9rem', color: '#94a3b8', textDecoration: 'line-through' }}>{Number(product.original_price).toLocaleString()} MMK</span>
-                          )}
+                        <div style={{ marginTop: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '1.3rem', fontWeight: '900', color: '#1e40af' }}>
+                              {formatProductPriceLabel(product, langKey)}
+                            </span>
+                            {!hasVariants && product.original_price && product.original_price > product.price && (
+                              <span style={{ fontSize: '0.9rem', color: '#94a3b8', textDecoration: 'line-through' }}>
+                                {Number(product.original_price).toLocaleString()} MMK
+                              </span>
+                            )}
+                          </div>
+                          {hasVariants ? (
+                            <div style={{ marginTop: '0.5rem' }}>
+                              <ProductVariantPriceList product={product} language={langKey} />
+                            </div>
+                          ) : null}
                         </div>
                         {store && (
                           <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.85rem' }}>

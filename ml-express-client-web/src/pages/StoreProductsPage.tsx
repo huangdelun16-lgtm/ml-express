@@ -2,9 +2,20 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { merchantService, deliveryStoreService, Product, DeliveryStore } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useCart, CartItem } from '../contexts/CartContext';
+import { useCart, CartItem, getCartItemLineKey } from '../contexts/CartContext';
 import NavigationBar from '../components/home/NavigationBar';
+import ProductVariantPriceList from '../components/ProductVariantPriceList';
 import LoggerService from '../services/LoggerService';
+import {
+  buildProductForCart,
+  cartLineKey,
+  formatProductPriceLabel,
+  getAvailableVariants,
+  getProductDisplayOriginalPrice,
+  isProductPurchasable,
+  maxSelectableStockForProduct,
+  productHasVariants,
+} from '../utils/productVariants';
 
 const PIECE_REMARK_LABELS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
@@ -30,6 +41,7 @@ const StoreProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
   const [lineRemarks, setLineRemarks] = useState<Record<string, string[]>>({});
+  const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<Record<string, string>>({});
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -37,6 +49,8 @@ const StoreProductsPage: React.FC = () => {
   const [detailRemarks, setDetailRemarks] = useState<string[]>(['']);
   const [detailQty, setDetailQty] = useState(1);
   const [detailOpenedFromCart, setDetailOpenedFromCart] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [detailCartLineKey, setDetailCartLineKey] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ message: string; type: 'ok' | 'warn' } | null>(null);
 
@@ -102,10 +116,9 @@ const StoreProductsPage: React.FC = () => {
     navigate('/');
   };
 
-  const maxSelectableStock = (p: Product | null) => {
+  const maxSelectableStock = (p: Product | null, variantId?: string | null) => {
     if (!p) return 99999;
-    if (p.stock === -1) return 99999;
-    return Math.max(0, p.stock ?? 0);
+    return maxSelectableStockForProduct(p, variantId);
   };
 
   const updateItemQuantity = (id: string, delta: number) => {
@@ -147,8 +160,17 @@ const StoreProductsPage: React.FC = () => {
     return window.confirm(`${t.store.clearCartDialogTitle}\n\n${t.store.clearCartDialogMessage}`);
   };
 
-  const handleOpenProductDetail = (product: Product, cartLine?: CartItem | null) => {
-    const cap = maxSelectableStock(product);
+  const handleOpenProductDetail = (
+    product: Product,
+    cartLine?: CartItem | null,
+    presetVariantId?: string | null,
+  ) => {
+    const initialVariantId =
+      cartLine?.variant_id ?? presetVariantId ?? selectedVariantByProduct[product.id] ?? null;
+    const cap = maxSelectableStock(product, initialVariantId);
+
+    setSelectedVariantId(initialVariantId);
+    setDetailCartLineKey(cartLine ? getCartItemLineKey(cartLine) : null);
 
     if (cartLine) {
       setDetailOpenedFromCart(true);
@@ -177,6 +199,7 @@ const StoreProductsPage: React.FC = () => {
     q = Math.max(1, q);
     const existing = lineRemarks[product.id];
     const base = Array.isArray(existing) ? [...existing] : [];
+    setSelectedVariantId(initialVariantId);
     setDetailRemarks(padLineRemarks(base, q));
     setDetailQty(q);
     setSelectedProductDetail(product);
@@ -193,12 +216,16 @@ const StoreProductsPage: React.FC = () => {
     });
   };
 
-  const detailStockCap = maxSelectableStock(selectedProductDetail);
+  const detailStockCap = maxSelectableStock(selectedProductDetail, selectedVariantId);
+  const detailDisplayProduct = selectedProductDetail
+    ? buildProductForCart(selectedProductDetail, selectedVariantId)
+    : null;
   const detailQtyPlusDisabled =
     detailStockCap === 0 || (detailStockCap !== 99999 && detailQty >= detailStockCap);
   const detailAddDisabled =
     !selectedProductDetail ||
-    (selectedProductDetail.stock !== -1 && (selectedProductDetail.stock ?? 0) <= 0);
+    detailStockCap === 0 ||
+    (productHasVariants(selectedProductDetail) && !selectedVariantId);
 
   useEffect(() => {
     if (loading || products.length === 0 || !storeId) return;
@@ -209,6 +236,7 @@ const StoreProductsPage: React.FC = () => {
     const product = products.find((p) => p.id === openId);
     if (!product) {
       params.delete('openDetail');
+      params.delete('variant');
       const qs = params.toString();
       navigate(`/mall/${storeId}${qs ? `?${qs}` : ''}`, { replace: true });
       return;
@@ -219,15 +247,23 @@ const StoreProductsPage: React.FC = () => {
         'warn'
       );
       params.delete('openDetail');
+      params.delete('variant');
       const qs = params.toString();
       navigate(`/mall/${storeId}${qs ? `?${qs}` : ''}`, { replace: true });
       return;
     }
 
-    const cartLine = cartItems.find((c) => c.id === openId) ?? null;
-    handleOpenProductDetail(product, cartLine);
+    const variantParam = params.get('variant');
+    const cartLine =
+      cartItems.find((c) => {
+        if (c.id !== openId) return false;
+        if (variantParam) return c.variant_id === variantParam;
+        return true;
+      }) ?? null;
+    handleOpenProductDetail(product, cartLine, variantParam);
 
     params.delete('openDetail');
+    params.delete('variant');
     const qs = params.toString();
     navigate(`/mall/${storeId}${qs ? `?${qs}` : ''}`, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,6 +272,13 @@ const StoreProductsPage: React.FC = () => {
   const handleDetailSubmit = () => {
     if (!selectedProductDetail) return;
     const pid = selectedProductDetail.id;
+    if (productHasVariants(selectedProductDetail) && !selectedVariantId) {
+      showToast(
+        language === 'zh' ? '请先选择规格' : language === 'en' ? 'Please select a variant' : t.store.unavailable,
+        'warn',
+      );
+      return;
+    }
     if (detailStockCap === 0) {
       showToast(t.store.outOfStock, 'warn');
       return;
@@ -243,10 +286,11 @@ const StoreProductsPage: React.FC = () => {
     const qty = detailStockCap === 99999 ? detailQty : Math.min(detailQty, detailStockCap);
     const padded = padLineRemarks(detailRemarks, qty);
     const fromCart = detailOpenedFromCart;
+    const lineKey = cartLineKey(pid, selectedVariantId);
     setDetailOpenedFromCart(false);
 
     if (fromCart) {
-      updateCartItemDetails(pid, qty, padded);
+      updateCartItemDetails(detailCartLineKey ?? lineKey, qty, padded);
       showToast(t.store.cartUpdated);
     } else {
       setLineRemarks((prev) => {
@@ -256,13 +300,22 @@ const StoreProductsPage: React.FC = () => {
         return next;
       });
       setItemQuantities((prev) => ({ ...prev, [pid]: qty }));
+      if (selectedVariantId) {
+        setSelectedVariantByProduct((prev) => ({ ...prev, [pid]: selectedVariantId }));
+      }
       showToast(t.store.detailSelectionSaved);
     }
     setShowDetailModal(false);
     setSelectedProductDetail(null);
+    setSelectedVariantId(null);
+    setDetailCartLineKey(null);
   };
 
   const handleAddToCart = (product: Product) => {
+    if (productHasVariants(product)) {
+      handleOpenProductDetail(product);
+      return;
+    }
     if (!currentUser) {
       alert(
         language === 'zh'
@@ -283,7 +336,13 @@ const StoreProductsPage: React.FC = () => {
     if (qty <= 0) return;
     if (!confirmReplaceOtherStore()) return;
 
-    addToCart(product, qty, remarkForProductId(product.id));
+    const variantId = productHasVariants(product) ? selectedVariantByProduct[product.id] : undefined;
+    if (productHasVariants(product) && !variantId) {
+      handleOpenProductDetail(product);
+      return;
+    }
+
+    addToCart(product, qty, remarkForProductId(product.id), variantId);
     setItemQuantities((prev) => ({ ...prev, [product.id]: 0 }));
     setLineRemarks((prev) => {
       const next = { ...prev };
@@ -323,14 +382,33 @@ const StoreProductsPage: React.FC = () => {
       return;
     }
 
+    const missingVariant = selectedItems.find(
+      (p) => productHasVariants(p) && !selectedVariantByProduct[p.id],
+    );
+    if (missingVariant) {
+      alert(
+        language === 'zh'
+          ? `请为「${missingVariant.name}」选择规格（点击商品卡片）`
+          : `Please select a variant for "${missingVariant.name}"`,
+      );
+      handleOpenProductDetail(missingVariant);
+      return;
+    }
+
     if (!confirmReplaceOtherStore()) return;
 
     selectedItems.forEach((product) => {
-      addToCart(product, itemQuantities[product.id], remarkForProductId(product.id));
+      addToCart(
+        product,
+        itemQuantities[product.id],
+        remarkForProductId(product.id),
+        productHasVariants(product) ? selectedVariantByProduct[product.id] : undefined,
+      );
     });
 
     setItemQuantities({});
     setLineRemarks({});
+    setSelectedVariantByProduct({});
     showToast(t.store.addedToCart);
   };
 
@@ -635,7 +713,9 @@ const StoreProductsPage: React.FC = () => {
                 {products.map((product: Product) => {
                   const qty = itemQuantities[product.id] || 0;
                   const isHighlighted = new URLSearchParams(location.search).get('highlight') === product.id;
-                  const available = product.is_available;
+                  const available = isProductPurchasable(product);
+                  const hasVariants = productHasVariants(product);
+                  const langKey = language === 'zh' ? 'zh' : language === 'my' ? 'my' : 'en';
 
                   return (
                     <div
@@ -732,23 +812,54 @@ const StoreProductsPage: React.FC = () => {
                             border: '1px solid #e0e7ff',
                           }}
                         >
-                          {t.store.stock}: {product.stock === -1 ? t.store.infinite : product.stock}
+                          {t.store.stock}:{' '}
+                          {hasVariants
+                            ? language === 'zh'
+                              ? '多规格'
+                              : 'Variants'
+                            : product.stock === -1
+                              ? t.store.infinite
+                              : product.stock}
                         </div>
                       </div>
 
                       <div style={{ padding: '1.2rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', marginBottom: '0.4rem' }}>{product.name}</h3>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '1.2rem', flexWrap: 'wrap' }}>
-                          <span style={{ color: '#10b981', fontSize: '1.3rem', fontWeight: 900 }}>{product.price.toLocaleString()} MMK</span>
-                          {product.original_price && product.original_price > product.price && (
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: hasVariants ? '0.5rem' : '1.2rem', flexWrap: 'wrap' }}>
+                          <span style={{ color: '#10b981', fontSize: '1.3rem', fontWeight: 900 }}>
+                            {formatProductPriceLabel(product, langKey)}
+                          </span>
+                          {!hasVariants && product.original_price && product.original_price > product.price && (
                             <span style={{ fontSize: '0.95rem', color: '#94a3b8', textDecoration: 'line-through' }}>
                               {product.original_price.toLocaleString()} MMK
                             </span>
                           )}
                         </div>
+                        {hasVariants ? (
+                          <div style={{ marginBottom: '0.85rem' }}>
+                            <ProductVariantPriceList product={product} language={langKey} />
+                          </div>
+                        ) : null}
 
                         {available && (
                           <div style={{ marginTop: 'auto' }}>
+                            {hasVariants ? (
+                              <div
+                                style={{
+                                  textAlign: 'center',
+                                  padding: '0.55rem',
+                                  borderRadius: '12px',
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  fontWeight: 800,
+                                  fontSize: '0.85rem',
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {language === 'zh' ? '点击卡片选择规格' : 'Tap card to pick variant'}
+                              </div>
+                            ) : (
+                            <>
                             <div
                               style={{
                                 display: 'flex',
@@ -823,6 +934,8 @@ const StoreProductsPage: React.FC = () => {
                             >
                               {t.store.addToCart}
                             </button>
+                            </>
+                            )}
                           </div>
                         )}
                       </div>
@@ -972,6 +1085,8 @@ const StoreProductsPage: React.FC = () => {
                   setDetailOpenedFromCart(false);
                   setShowDetailModal(false);
                   setSelectedProductDetail(null);
+                  setSelectedVariantId(null);
+                  setDetailCartLineKey(null);
                 }}
                 style={{
                   position: 'absolute',
@@ -993,14 +1108,76 @@ const StoreProductsPage: React.FC = () => {
 
             <div ref={detailScrollRef} style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', flex: 1 }}>
               <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>{selectedProductDetail.name}</h2>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: '1rem', flexWrap: 'wrap' }}>
-                <span style={{ color: '#10b981', fontSize: '1.35rem', fontWeight: 900 }}>{selectedProductDetail.price.toLocaleString()} MMK</span>
-                {selectedProductDetail.original_price && selectedProductDetail.original_price > selectedProductDetail.price && (
-                  <span style={{ color: '#94a3b8', textDecoration: 'line-through', fontSize: '1rem' }}>
-                    {selectedProductDetail.original_price.toLocaleString()} MMK
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: '1rem', flexWrap: 'wrap', minHeight: '1.75rem' }}>
+                {productHasVariants(selectedProductDetail) && !selectedVariantId ? (
+                  <span style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: 600 }}>
+                    {language === 'zh'
+                      ? '请选择规格查看价格'
+                      : language === 'en'
+                        ? 'Select a variant to see price'
+                        : 'စျေးနှုန်းကြည့်ရန် ရွေးချယ်ပါ'}
                   </span>
+                ) : (
+                  <>
+                    <span style={{ color: '#10b981', fontSize: '1.35rem', fontWeight: 900 }}>
+                      {(detailDisplayProduct ?? selectedProductDetail).price.toLocaleString()} MMK
+                    </span>
+                    {(() => {
+                      const dp = detailDisplayProduct ?? selectedProductDetail;
+                      const orig = dp.original_price ?? getProductDisplayOriginalPrice(selectedProductDetail);
+                      return orig && orig > dp.price ? (
+                        <span style={{ color: '#94a3b8', textDecoration: 'line-through', fontSize: '1rem' }}>
+                          {orig.toLocaleString()} MMK
+                        </span>
+                      ) : null;
+                    })()}
+                  </>
                 )}
               </div>
+
+              {productHasVariants(selectedProductDetail) ? (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontWeight: 800, color: '#334155', marginBottom: 8 }}>
+                    {language === 'zh' ? '选择规格' : language === 'en' ? 'Select variant' : 'Variant'}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {getAvailableVariants(selectedProductDetail).map((variant) => {
+                      const selected = selectedVariantId === variant.id;
+                      const outOfStock = maxSelectableStockForProduct(selectedProductDetail, variant.id) === 0;
+                      return (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          disabled={outOfStock}
+                          onClick={() => {
+                            setSelectedVariantId(variant.id);
+                            const cap = maxSelectableStock(selectedProductDetail, variant.id);
+                            if (cap !== 99999 && detailQty > cap) {
+                              adjustDetailQty(Math.max(1, cap));
+                            }
+                          }}
+                          style={{
+                            padding: '0.45rem 0.85rem',
+                            borderRadius: 10,
+                            border: selected ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                            background: selected ? '#eff6ff' : outOfStock ? '#f8fafc' : 'white',
+                            color: outOfStock ? '#94a3b8' : selected ? '#1d4ed8' : '#334155',
+                            fontWeight: 700,
+                            fontSize: '0.86rem',
+                            cursor: outOfStock ? 'not-allowed' : 'pointer',
+                            textDecoration: outOfStock ? 'line-through' : 'none',
+                          }}
+                        >
+                          {variant.name}
+                          {outOfStock
+                            ? ` (${language === 'zh' ? '售罄' : language === 'en' ? 'Sold out' : 'ကုန်သွားပြီ'})`
+                            : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
 
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ fontWeight: 800, color: '#334155', marginBottom: 6 }}>{t.store.description}</div>
@@ -1054,7 +1231,15 @@ const StoreProductsPage: React.FC = () => {
                 }}
               >
                 📦 {t.store.stock}:{' '}
-                {selectedProductDetail.stock === -1 ? t.store.infinite : selectedProductDetail.stock}
+                {productHasVariants(selectedProductDetail) && !selectedVariantId
+                  ? language === 'zh'
+                    ? '请先选择规格'
+                    : language === 'en'
+                      ? 'Select variant first'
+                      : '—'
+                  : (detailDisplayProduct ?? selectedProductDetail).stock === -1
+                    ? t.store.infinite
+                    : (detailDisplayProduct ?? selectedProductDetail).stock}
               </div>
 
               <div style={{ marginBottom: '0.5rem' }}>

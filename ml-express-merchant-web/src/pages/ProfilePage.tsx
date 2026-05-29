@@ -13,7 +13,6 @@ import {
   Product,
   DeliveryStore,
   deliveryStoreService,
-  productFormSource,
   hasPendingProductUpdate,
   rechargeService,
   reviewService,
@@ -25,6 +24,15 @@ import QRCode from "qrcode";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api"; // 🚀 新增
 import LoggerService from "../services/LoggerService";
 import { autoPrepareProductImageForUpload } from "../utils/productImagePrepare";
+import ProductVariantsEditor from "../components/ProductVariantsEditor";
+import {
+  defaultMerchantProductForm,
+  merchantProductFormFromProduct,
+  buildMerchantProductDraft,
+  type MerchantProductFormState,
+} from "../utils/merchantProductForm";
+import "../styles/merchantProductsPage.css";
+import "../styles/productVariantsEditor.css";
 import NavigationBar from "../components/home/NavigationBar";
 import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
@@ -352,16 +360,7 @@ const ProfilePage: React.FC = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [showAddEditProductModal, setShowAddEditProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [productForm, setProductForm] = useState({
-    name: "",
-    description: "",
-    price: "",
-    discount_percent: "",
-    stock: "-1",
-    image_url: "",
-    detail_image_urls: [] as string[],
-    is_available: true,
-  });
+  const [productForm, setProductForm] = useState<MerchantProductFormState>(defaultMerchantProductForm());
   const [isUploading, setIsUploading] = useState(false);
   const [showDetailImagesPanel, setShowDetailImagesPanel] = useState(false);
   const [isUploadingDetailImages, setIsUploadingDetailImages] = useState(false);
@@ -569,43 +568,15 @@ const ProfilePage: React.FC = () => {
 
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
-    setProductForm({
-      name: "",
-      description: "",
-      price: "",
-      discount_percent: "",
-      stock: "-1",
-      image_url: "",
-      detail_image_urls: [],
-      is_available: true,
-    });
+    setProductForm(defaultMerchantProductForm());
     setShowDetailImagesPanel(false);
     setShowAddEditProductModal(true);
   };
 
   const handleOpenEditProduct = (product: Product) => {
     setEditingProduct(product);
-    const src = productFormSource(product);
-    
-    // 计算优惠百分比
-    let discountPercent = "";
-    if (src.original_price && src.original_price > src.price) {
-      discountPercent = Math.round(
-        (1 - src.price / src.original_price) * 100,
-      ).toString();
-    }
-
-    setProductForm({
-      name: src.name,
-      description: src.description || "",
-      price: src.price.toString(),
-      discount_percent: discountPercent,
-      stock: src.stock.toString(),
-      image_url: src.image_url || "",
-      detail_image_urls: src.detail_image_urls || [],
-      is_available: src.is_available,
-    });
-    setShowDetailImagesPanel((src.detail_image_urls?.length ?? 0) > 0);
+    setProductForm(merchantProductFormFromProduct(product));
+    setShowDetailImagesPanel((product.detail_image_urls?.length ?? 0) > 0);
     setShowAddEditProductModal(true);
   };
 
@@ -670,43 +641,21 @@ const ProfilePage: React.FC = () => {
   };
 
   const handleSaveProduct = async () => {
-    if (!productForm.name || !productForm.price || !currentUser?.id) {
-      alert("请填写必要信息");
+    const { draft, error: formError } = buildMerchantProductDraft(productForm);
+    if (!currentUser?.id) return;
+    if (formError) {
+      alert(formError);
       return;
     }
 
     try {
       setLoadingProducts(true);
-      
-      const price = parseFloat(productForm.price);
-      const discountPercent = parseFloat(productForm.discount_percent);
-      let originalPrice = undefined;
-      
-      if (
-        !isNaN(discountPercent) &&
-        discountPercent > 0 &&
-        discountPercent < 100
-      ) {
-        originalPrice = Math.round(price / (1 - discountPercent / 100));
-      }
-
-      let productData: Record<string, unknown> = {
-        store_id: currentUser.id,
-        name: productForm.name,
-        price: price,
-        original_price: originalPrice,
-        stock: parseInt(productForm.stock),
-        image_url: productForm.image_url,
-        detail_image_urls: productForm.detail_image_urls,
-        is_available: productForm.is_available,
-        description: productForm.description,
-      };
 
       const result = await merchantService.saveMerchantProduct({
         mode: editingProduct ? "edit" : "create",
         product: editingProduct ?? null,
         storeId: currentUser.id,
-        draft: productData,
+        draft: { ...draft, store_id: currentUser.id },
       });
 
       if (result.success) {
@@ -6822,27 +6771,19 @@ const ProfilePage: React.FC = () => {
                 />
               </div>
 
-              <div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
                 <button
                   type="button"
+                  className="merchant-product-modal__detail-btn"
                   onClick={() => setShowDetailImagesPanel((v) => !v)}
-                  style={{
-                    width: "100%",
-                    marginTop: "0.25rem",
-                    padding: "0.65rem 1rem",
-                    borderRadius: "12px",
-                    border: "1px dashed rgba(96, 165, 250, 0.45)",
-                    background: "rgba(59, 130, 246, 0.08)",
-                    color: "#93c5fd",
-                    fontSize: "0.85rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
                 >
-                  {language === "zh" ? "商品详细介绍" : "Scrolling Pictures"}
-                  {productForm.detail_image_urls.length > 0
-                    ? ` (${productForm.detail_image_urls.length})`
-                    : ""}
+                  <span aria-hidden="true">🖼️</span>
+                  {language === "zh" ? "详细介绍" : "Detail pics"}
+                  {productForm.detail_image_urls.length > 0 ? (
+                    <span className="merchant-product-modal__detail-btn-count">
+                      {productForm.detail_image_urls.length}
+                    </span>
+                  ) : null}
                 </button>
                 {showDetailImagesPanel ? (
                   <div
@@ -6948,6 +6889,18 @@ const ProfilePage: React.FC = () => {
                 ) : null}
               </div>
 
+              <ProductVariantsEditor
+                enabled={productForm.use_variants}
+                onEnabledChange={(use_variants) =>
+                  setProductForm((prev) => ({ ...prev, use_variants }))
+                }
+                variants={productForm.variants}
+                onChange={(variants) => setProductForm((prev) => ({ ...prev, variants }))}
+                language={language === "en" ? "en" : "zh"}
+                theme="merchant"
+              />
+
+              {!productForm.use_variants ? (
               <div>
                 <label
                   style={{
@@ -6978,7 +6931,9 @@ const ProfilePage: React.FC = () => {
                   }}
                 />
               </div>
+              ) : null}
 
+              {!productForm.use_variants ? (
               <div>
                 <label
                   style={{
@@ -7012,7 +6967,9 @@ const ProfilePage: React.FC = () => {
                   }}
                 />
               </div>
+              ) : null}
 
+              {!productForm.use_variants ? (
               <div>
                 <label
                   style={{
@@ -7042,6 +6999,7 @@ const ProfilePage: React.FC = () => {
                   }}
                 />
               </div>
+              ) : null}
 
               <div
                 style={{
