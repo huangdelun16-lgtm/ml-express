@@ -731,7 +731,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         )}
         <View style={isReadOnly ? styles.productImageContainerGrid : styles.productImageContainerList}>
           {item.image_url && !item.image_url.startsWith('file://') ? (
-            <Image source={{ uri: item.image_url }} style={styles.productImage} />
+            <Image source={{ uri: item.image_url }} style={styles.productImage} resizeMode="contain" />
           ) : (
             <View style={styles.productImagePlaceholder}>
               <Ionicons name="image-outline" size={isReadOnly ? 24 : 32} color="#cbd5e1" />
@@ -1159,7 +1159,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   <Image
                     source={{ uri: selectedProductDetail.image_url }}
                     style={styles.detailHeroImage}
-                    resizeMode="cover"
+                    resizeMode="contain"
                   />
                 ) : (
                   <View style={styles.detailHeroPlaceholder}>
@@ -1270,7 +1270,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                         key={`${url}-${idx}`}
                         source={{ uri: url }}
                         style={styles.detailScrollingImage}
-                        resizeMode="cover"
+                        resizeMode="contain"
                       />
                     ))}
                   </View>
@@ -2046,10 +2046,10 @@ const styles = StyleSheet.create({
   },
   detailScrollingImage: {
     width: '100%',
-    height: 220,
+    aspectRatio: 3 / 4,
     borderRadius: 12,
     marginBottom: 10,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#f1f5f9',
   },
   detailIntroBtn: {
     flexDirection: 'row',

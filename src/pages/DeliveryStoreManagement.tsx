@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Autocomplete } from '@react-google-maps/api';
-import { supabase, deliveryStoreService, DeliveryStore, packageService, Package } from '../services/supabase';
+import { supabase, deliveryStoreService, productService, DeliveryStore, packageService, Package } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import QRCode from 'qrcode';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
+import ProductImageEditorModal from '../components/ProductImageEditorModal';
+import { prepareProductImage, PrepareProductImageSettings } from '../utils/productImagePrepare';
 import '../styles/adminStoreCreateForm.css';
 
 const REGIONS = [
@@ -18,6 +20,60 @@ const REGIONS = [
   { id: 'lashio', name: '腊戌', prefix: 'LSO' },
   { id: 'muse', name: '木姐', prefix: 'MUSE' }
 ];
+
+/** 表单 region → 列表城市筛选 key（与 myanmarCities 一致） */
+const regionToCityKey = (region?: string): string | null => {
+  if (!region) return null;
+  if (region === 'maymyo') return 'pyinoolwin';
+  return region;
+};
+
+const DEFAULT_OPERATING_HOURS = '08:00 - 22:00';
+
+const OPERATING_HOURS_PRESETS = [
+  { label: '08:00 - 22:00', value: '08:00 - 22:00' },
+  { label: '09:00 - 21:00', value: '09:00 - 21:00' },
+  { label: '07:00 - 23:00', value: '07:00 - 23:00' },
+  { label: '10:00 - 20:00', value: '10:00 - 20:00' },
+];
+
+const normalizeOperatingTime = (value: string): string => {
+  const trimmed = (value || '').trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return '';
+  const hours = Math.min(23, Math.max(0, parseInt(match[1], 10)));
+  const minutes = Math.min(59, Math.max(0, parseInt(match[2], 10)));
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+const parseOperatingHours = (hours: string): { open: string; close: string } => {
+  const parts = (hours || DEFAULT_OPERATING_HOURS).split(/\s*-\s*/);
+  return {
+    open: normalizeOperatingTime(parts[0] || '') || '08:00',
+    close: normalizeOperatingTime(parts[1] || '') || '22:00',
+  };
+};
+
+const formatOperatingHours = (open: string, close: string): string =>
+  `${normalizeOperatingTime(open) || '08:00'} - ${normalizeOperatingTime(close) || '22:00'}`;
+
+const getOperatingDurationLabel = (open: string, close: string): string => {
+  const start = normalizeOperatingTime(open);
+  const end = normalizeOperatingTime(close);
+  if (!start || !end) return '';
+
+  const [startHour, startMinute] = start.split(':').map(Number);
+  const [endHour, endMinute] = end.split(':').map(Number);
+  let startTotal = startHour * 60 + startMinute;
+  let endTotal = endHour * 60 + endMinute;
+  if (endTotal <= startTotal) endTotal += 24 * 60;
+
+  const diffMinutes = endTotal - startTotal;
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
+  if (minutes === 0) return `共 ${hours} 小时`;
+  return `共 ${hours} 小时 ${minutes} 分钟`;
+};
 
 const STORE_TYPES = [
   { value: 'restaurant', label: '餐厅' },
@@ -157,6 +213,106 @@ function adminProductDisplay(product: Record<string, unknown>) {
   return product;
 }
 
+const ADMIN_PRODUCT_FIELD_LABELS: Record<string, string> = {
+  name: '商品名称',
+  description: '商品描述',
+  price: '售价',
+  original_price: '原价',
+  image_url: '主图',
+  detail_image_urls: '详细介绍图',
+  stock: '库存',
+  is_available: '上架状态',
+};
+
+const ADMIN_PRODUCT_DIFF_KEYS = Object.keys(ADMIN_PRODUCT_FIELD_LABELS);
+
+function adminProductValuesEqual(key: string, a: unknown, b: unknown): boolean {
+  if (key === 'detail_image_urls') {
+    return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+  }
+  if (key === 'original_price') {
+    const na = a == null || a === '' ? null : Number(a);
+    const nb = b == null || b === '' ? null : Number(b);
+    return na === nb;
+  }
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function formatAdminProductFieldText(key: string, value: unknown): string {
+  if (value === undefined || value === null || value === '') {
+    return key === 'description' ? '无' : '—';
+  }
+  if (key === 'price' || key === 'original_price') {
+    const n = Number(value);
+    return Number.isFinite(n) ? `${n.toLocaleString()} MMK` : '—';
+  }
+  if (key === 'stock') return Number(value) === -1 ? '无限' : String(value);
+  if (key === 'is_available') return value ? '在售' : '下架';
+  if (key === 'detail_image_urls') {
+    const arr = Array.isArray(value) ? value : [];
+    return arr.length ? `${arr.length} 张` : '无';
+  }
+  if (key === 'image_url') return value ? '已上传' : '无';
+  if (key === 'description') {
+    const s = String(value).trim();
+    return s || '无';
+  }
+  return String(value);
+}
+
+type AdminProductChangeRow = {
+  key: string;
+  label: string;
+  before: unknown;
+  after: unknown;
+  changed: boolean;
+  isNewProduct?: boolean;
+};
+
+function buildAdminProductChanges(product: Record<string, unknown>): AdminProductChangeRow[] {
+  const ls = normalizeProductListingStatus(product as { listing_status?: string | null });
+  const pu = product.pending_update as Record<string, unknown> | null | undefined;
+  const isEditPending = ls === 'approved' && hasPendingProductUpdate(product as { pending_update?: Record<string, unknown> | null });
+
+  if (isEditPending && pu) {
+    return ADMIN_PRODUCT_DIFF_KEYS.filter((key) => pu[key] !== undefined).map((key) => ({
+      key,
+      label: ADMIN_PRODUCT_FIELD_LABELS[key],
+      before: product[key],
+      after: pu[key],
+      changed: !adminProductValuesEqual(key, product[key], pu[key]),
+    }));
+  }
+
+  if (ls === 'pending') {
+    return ADMIN_PRODUCT_DIFF_KEYS.map((key) => ({
+      key,
+      label: ADMIN_PRODUCT_FIELD_LABELS[key],
+      before: null,
+      after: product[key],
+      changed: true,
+      isNewProduct: true,
+    }));
+  }
+
+  return [];
+}
+
+function listingStatusLabel(status: 'pending' | 'approved' | 'rejected', isEditPending: boolean): string {
+  if (isEditPending) return '修改待审';
+  if (status === 'pending') return '待审核';
+  if (status === 'rejected') return '已拒绝';
+  return '已上架';
+}
+
+const DEFAULT_ADMIN_PRODUCT_FORM = {
+  name: '',
+  description: '',
+  price: '',
+  image_url: '',
+  detail_image_urls: [] as string[],
+};
+
 const DeliveryStoreManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -219,10 +375,13 @@ const DeliveryStoreManagement: React.FC = () => {
   const [productListingActionId, setProductListingActionId] = useState<string | null>(null);
   /** 商品列表弹窗：全部 / 待审核 / 已完成(已通过) / 已取消(已拒绝) */
   const [productListFilter, setProductListFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [selectedAdminProductId, setSelectedAdminProductId] = useState<string | null>(null);
   /** 全局待审核商品数（listing_status=pending），用于列表区与仪表板一致提示 */
   const [pendingProductReviewCount, setPendingProductReviewCount] = useState(0);
   /** 各合伙店铺待审核商品数量（store_id → 件数），用于列表按店展示与卡片提示 */
   const [pendingReviewByStoreId, setPendingReviewByStoreId] = useState<Record<string, number>>({});
+  /** 各合伙店铺商品总数（store_id → 件数） */
+  const [productCountByStoreId, setProductCountByStoreId] = useState<Record<string, number>>({});
 
   // Google Places API 相关状态
   const [placeSearchInput, setPlaceSearchInput] = useState('');
@@ -377,6 +536,8 @@ const DeliveryStoreManagement: React.FC = () => {
       );
     } else {
       filtered = allStores.filter((store) => {
+        const regionCity = regionToCityKey(store.region);
+        if (regionCity) return regionCity === selectedCity;
         const storeCity = getStoreCity(store);
         return storeCity === selectedCity;
       });
@@ -392,8 +553,22 @@ const DeliveryStoreManagement: React.FC = () => {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [currentStoreQR, setCurrentStoreQR] = useState<DeliveryStore | null>(null);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
+  const [isSubmittingStore, setIsSubmittingStore] = useState(false);
   const [editingStore, setEditingStore] = useState<DeliveryStore | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+
+  const [adminProductForm, setAdminProductForm] = useState(DEFAULT_ADMIN_PRODUCT_FORM);
+  const [showAdminProductDetailPanel, setShowAdminProductDetailPanel] = useState(false);
+  const [isUploadingAdminProductImage, setIsUploadingAdminProductImage] = useState(false);
+  const [isUploadingAdminProductDetailImages, setIsUploadingAdminProductDetailImages] = useState(false);
+  const [isSavingAdminProduct, setIsSavingAdminProduct] = useState(false);
+  const [adminProductError, setAdminProductError] = useState<string | null>(null);
+  const adminProductFileInputRef = useRef<HTMLInputElement>(null);
+  const adminProductDetailFileInputRef = useRef<HTMLInputElement>(null);
+  const [adminImageEditorFile, setAdminImageEditorFile] = useState<File | null>(null);
+  const [adminImageEditorTarget, setAdminImageEditorTarget] = useState<'main' | 'detail' | null>(null);
+  const [adminPendingDetailFiles, setAdminPendingDetailFiles] = useState<File[]>([]);
   
   // 包裹详情相关状态
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -429,7 +604,7 @@ const DeliveryStoreManagement: React.FC = () => {
     manager_name: '',
     manager_phone: '',
     store_type: 'restaurant' as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
-    operating_hours: '08:00-22:00',
+    operating_hours: DEFAULT_OPERATING_HOURS,
     service_area_radius: 5, // 保留默认值，但不在表单中显示
     capacity: 1000, // 保留默认值，但不在表单中显示
     facilities: [] as string[],
@@ -530,6 +705,150 @@ const DeliveryStoreManagement: React.FC = () => {
     setSuccessMessage('位置已选择，请填写其他信息');
   };
 
+  const resetAdminProductForm = () => {
+    setAdminProductForm(DEFAULT_ADMIN_PRODUCT_FORM);
+    setShowAdminProductDetailPanel(false);
+    setAdminProductError(null);
+    setIsUploadingAdminProductImage(false);
+    setIsUploadingAdminProductDetailImages(false);
+    setIsSavingAdminProduct(false);
+    if (adminProductFileInputRef.current) adminProductFileInputRef.current.value = '';
+    if (adminProductDetailFileInputRef.current) adminProductDetailFileInputRef.current.value = '';
+    setAdminImageEditorFile(null);
+    setAdminImageEditorTarget(null);
+    setAdminPendingDetailFiles([]);
+  };
+
+  const handleAdminProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingStore?.id) return;
+    setAdminImageEditorFile(file);
+    setAdminImageEditorTarget('main');
+    if (adminProductFileInputRef.current) adminProductFileInputRef.current.value = '';
+  };
+
+  const handleAdminProductDetailImagesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !editingStore?.id) return;
+    setAdminPendingDetailFiles(files.slice(1));
+    setAdminImageEditorFile(files[0]);
+    setAdminImageEditorTarget('detail');
+    if (adminProductDetailFileInputRef.current) adminProductDetailFileInputRef.current.value = '';
+  };
+
+  const handleAdminImageEditorCancel = () => {
+    setAdminImageEditorFile(null);
+    setAdminImageEditorTarget(null);
+    setAdminPendingDetailFiles([]);
+  };
+
+  const handleAdminImageEditorConfirm = async (
+    processedFile: File,
+    settings: PrepareProductImageSettings,
+  ) => {
+    const storeId = editingStore?.id;
+    const target = adminImageEditorTarget;
+    const restFiles = [...adminPendingDetailFiles];
+    handleAdminImageEditorCancel();
+    if (!storeId || !target) return;
+
+    if (target === 'main') {
+      setIsUploadingAdminProductImage(true);
+      setAdminProductError(null);
+      try {
+        const url = await productService.uploadProductImage(storeId, processedFile);
+        if (url) {
+          setAdminProductForm((prev) => ({ ...prev, image_url: url }));
+        } else {
+          setAdminProductError('图片上传失败，请重试');
+        }
+      } catch (error) {
+        console.error('Admin 商品主图上传失败:', error);
+        setAdminProductError('图片上传失败，请重试');
+      } finally {
+        setIsUploadingAdminProductImage(false);
+      }
+      return;
+    }
+
+    setIsUploadingAdminProductDetailImages(true);
+    setAdminProductError(null);
+    try {
+      const uploadedUrls: string[] = [];
+      const firstUrl = await productService.uploadProductImage(storeId, processedFile);
+      if (firstUrl) uploadedUrls.push(firstUrl);
+
+      for (const file of restFiles) {
+        const prepared = await prepareProductImage(file, settings);
+        const url = await productService.uploadProductImage(storeId, prepared);
+        if (url) uploadedUrls.push(url);
+      }
+
+      if (uploadedUrls.length > 0) {
+        setAdminProductForm((prev) => ({
+          ...prev,
+          detail_image_urls: [...prev.detail_image_urls, ...uploadedUrls],
+        }));
+        setShowAdminProductDetailPanel(true);
+      } else {
+        setAdminProductError('详细介绍图上传失败，请重试');
+      }
+    } catch (error) {
+      console.error('Admin 商品详细介绍图上传失败:', error);
+      setAdminProductError('详细介绍图上传失败，请重试');
+    } finally {
+      setIsUploadingAdminProductDetailImages(false);
+    }
+  };
+
+  const handleRemoveAdminProductDetailImage = (index: number) => {
+    setAdminProductForm((prev) => ({
+      ...prev,
+      detail_image_urls: prev.detail_image_urls.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSaveAdminProduct = async () => {
+    const storeId = editingStore?.id;
+    if (!storeId) {
+      setAdminProductError('请先保存店铺后再添加商品');
+      return;
+    }
+    if (!adminProductForm.name.trim() || !adminProductForm.price.trim()) {
+      setAdminProductError('请填写商品名称与价格');
+      return;
+    }
+
+    const price = parseFloat(adminProductForm.price);
+    if (!Number.isFinite(price) || price <= 0) {
+      setAdminProductError('请输入有效的商品价格');
+      return;
+    }
+
+    setIsSavingAdminProduct(true);
+    setAdminProductError(null);
+
+    try {
+      const result = await productService.createProductAsAdmin(storeId, {
+        name: adminProductForm.name.trim(),
+        description: adminProductForm.description.trim() || undefined,
+        price,
+        image_url: adminProductForm.image_url || undefined,
+        detail_image_urls: adminProductForm.detail_image_urls,
+      });
+
+      if (result.success) {
+        setSuccessMessage(`已为「${editingStore?.store_name}」添加商品「${adminProductForm.name.trim()}」`);
+        resetAdminProductForm();
+        await loadPendingProductReviewSummary();
+      } else {
+        setAdminProductError(result.error || '添加商品失败，请重试');
+      }
+    } finally {
+      setIsSavingAdminProduct(false);
+    }
+  };
+
   // 编辑店铺
   const editStore = (store: DeliveryStore) => {
     setEditingStore(store);
@@ -545,7 +864,10 @@ const DeliveryStoreManagement: React.FC = () => {
       manager_name: store.manager_name,
       manager_phone: store.manager_phone,
       store_type: store.store_type as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
-      operating_hours: store.operating_hours,
+      operating_hours: formatOperatingHours(
+        parseOperatingHours(store.operating_hours).open,
+        parseOperatingHours(store.operating_hours).close,
+      ),
       service_area_radius: store.service_area_radius,
       capacity: store.capacity,
       facilities: store.facilities || [],
@@ -554,6 +876,7 @@ const DeliveryStoreManagement: React.FC = () => {
       region: store.region || 'mandalay',
       cod_settlement_day: store.cod_settlement_day || '7'
     });
+    resetAdminProductForm();
     setShowForm(true);
   };
 
@@ -704,27 +1027,44 @@ const DeliveryStoreManagement: React.FC = () => {
 
   const loadPendingProductReviewSummary = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('store_id, listing_status, pending_update')
-        .or('listing_status.eq.pending,pending_update.not.is.null');
-      if (error) {
+      const [pendingRes, totalRes] = await Promise.all([
+        supabase
+          .from('products')
+          .select('store_id, listing_status, pending_update')
+          .or('listing_status.eq.pending,pending_update.not.is.null'),
+        supabase.from('products').select('store_id'),
+      ]);
+
+      if (pendingRes.error) {
         setPendingProductReviewCount(0);
         setPendingReviewByStoreId({});
-        return;
+      } else {
+        const byId: Record<string, number> = {};
+        for (const row of pendingRes.data || []) {
+          if (!productNeedsAdminReview(row)) continue;
+          const sid = row.store_id as string | undefined;
+          if (!sid) continue;
+          byId[sid] = (byId[sid] || 0) + 1;
+        }
+        setPendingReviewByStoreId(byId);
+        setPendingProductReviewCount(Object.values(byId).reduce((a, b) => a + b, 0));
       }
-      const byId: Record<string, number> = {};
-      for (const row of data || []) {
-        if (!productNeedsAdminReview(row)) continue;
-        const sid = row.store_id as string | undefined;
-        if (!sid) continue;
-        byId[sid] = (byId[sid] || 0) + 1;
+
+      if (totalRes.error) {
+        setProductCountByStoreId({});
+      } else {
+        const totalById: Record<string, number> = {};
+        for (const row of totalRes.data || []) {
+          const sid = row.store_id as string | undefined;
+          if (!sid) continue;
+          totalById[sid] = (totalById[sid] || 0) + 1;
+        }
+        setProductCountByStoreId(totalById);
       }
-      setPendingReviewByStoreId(byId);
-      setPendingProductReviewCount(Object.values(byId).reduce((a, b) => a + b, 0));
     } catch {
       setPendingProductReviewCount(0);
       setPendingReviewByStoreId({});
+      setProductCountByStoreId({});
     }
   }, []);
 
@@ -855,6 +1195,11 @@ const DeliveryStoreManagement: React.FC = () => {
     return storeProducts.filter((p) => normalizeProductListingStatus(p) === productListFilter);
   }, [storeProducts, productListFilter]);
 
+  const selectedAdminProduct = useMemo(
+    () => storeProducts.find((p) => p.id === selectedAdminProductId) ?? null,
+    [storeProducts, selectedAdminProductId],
+  );
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
@@ -888,6 +1233,23 @@ const DeliveryStoreManagement: React.FC = () => {
     }
   };
 
+  const handleOperatingHoursPartChange = (part: 'open' | 'close', value: string) => {
+    setFormData(prev => {
+      const { open, close } = parseOperatingHours(prev.operating_hours);
+      return {
+        ...prev,
+        operating_hours: formatOperatingHours(
+          part === 'open' ? value : open,
+          part === 'close' ? value : close,
+        ),
+      };
+    });
+  };
+
+  const applyOperatingHoursPreset = (value: string) => {
+    setFormData(prev => ({ ...prev, operating_hours: value }));
+  };
+
   const handleFacilityChange = (facility: string) => {
     setFormData(prev => ({
       ...prev,
@@ -913,60 +1275,96 @@ const DeliveryStoreManagement: React.FC = () => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setFormSubmitError(null);
 
-    // 验证必填项
-    if (!formData.store_name || !formData.store_code || !formData.address || !formData.latitude || !formData.longitude || !formData.password || !formData.region) {
-      setErrorMessage('请填写所有必填项');
+    if (
+      !formData.store_name ||
+      !formData.store_code ||
+      !formData.address ||
+      !formData.latitude ||
+      !formData.longitude ||
+      !formData.password ||
+      !formData.region ||
+      !formData.phone ||
+      !formData.manager_name ||
+      !formData.manager_phone ||
+      !formData.operating_hours
+    ) {
+      const msg = '请填写所有必填项（含地图位置、联系电话与店长信息）';
+      setFormSubmitError(msg);
+      setErrorMessage(msg);
+      return;
+    }
+
+    const lat = Number(formData.latitude);
+    const lng = Number(formData.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      const msg = '经纬度无效，请通过「选择地图位置」重新选点';
+      setFormSubmitError(msg);
+      setErrorMessage(msg);
       return;
     }
 
     const currentUser = localStorage.getItem('currentUser') || 'admin';
-    
-    if (isEditing && editingStore) {
-      // 编辑模式
-      // 🚀 优化：解构 formData，将需要转换为数字的字段分离出来，避免类型冲突
-      const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
+    setIsSubmittingStore(true);
 
-      const result = await deliveryStoreService.updateStore(editingStore.id!, {
-        ...restFormData,
-        latitude: Number(latitude),
-        longitude: Number(longitude),
-        service_area_radius: Number(service_area_radius),
-        capacity: Number(capacity),
-        updated_at: new Date().toISOString()
-      });
+    try {
+      if (isEditing && editingStore) {
+        const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
 
-      if (result) {
-        setSuccessMessage('合伙店铺信息更新成功！');
-        setShowForm(false);
-        setEditingStore(null);
-        setIsEditing(false);
-        loadStores();
+        const result = await deliveryStoreService.updateStore(editingStore.id!, {
+          ...restFormData,
+          latitude: lat,
+          longitude: lng,
+          service_area_radius: Number(service_area_radius),
+          capacity: Number(capacity),
+          updated_at: new Date().toISOString(),
+        });
+
+        if (result) {
+          setSuccessMessage('合伙店铺信息更新成功！');
+          setShowForm(false);
+          setEditingStore(null);
+          setIsEditing(false);
+          const cityKey = regionToCityKey(formData.region);
+          if (cityKey && cityKey in myanmarCities) {
+            setSelectedCity(cityKey as typeof selectedCity);
+          }
+          await loadStores();
+        } else {
+          const msg = '更新失败，请重试';
+          setFormSubmitError(msg);
+          setErrorMessage(msg);
+        }
       } else {
-        setErrorMessage('更新失败，请重试');
-      }
-    } else {
-      // 创建模式
-      // 🚀 优化：同样进行解构处理
-      const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
+        const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
 
-      const result = await deliveryStoreService.createStore({
-        ...restFormData,
-        latitude: Number(latitude),
-        longitude: Number(longitude),
-        service_area_radius: Number(service_area_radius),
-        capacity: Number(capacity),
-        created_by: currentUser
-      });
+        const result = await deliveryStoreService.createStore({
+          ...restFormData,
+          latitude: lat,
+          longitude: lng,
+          service_area_radius: Number(service_area_radius),
+          capacity: Number(capacity),
+          created_by: currentUser,
+        });
 
-      if (result.success) {
-        setSuccessMessage('合伙店铺创建成功！');
-        setShowForm(false);
-        resetForm();
-        loadStores();
-      } else {
-        setErrorMessage(result.error || '创建失败，请重试');
+        if (result.success) {
+          setSuccessMessage('合伙店铺创建成功！');
+          setShowForm(false);
+          resetForm();
+          const cityKey = regionToCityKey(formData.region);
+          if (cityKey && cityKey in myanmarCities) {
+            setSelectedCity(cityKey as typeof selectedCity);
+          }
+          await loadStores();
+        } else {
+          const msg = result.error || '创建失败，请重试';
+          setFormSubmitError(msg);
+          setErrorMessage(msg);
+        }
       }
+    } finally {
+      setIsSubmittingStore(false);
     }
   };
 
@@ -1033,7 +1431,7 @@ const DeliveryStoreManagement: React.FC = () => {
       manager_name: '',
       manager_phone: '',
       store_type: 'restaurant' as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
-      operating_hours: '08:00-22:00',
+      operating_hours: DEFAULT_OPERATING_HOURS,
       service_area_radius: 5,
       capacity: 1000,
       facilities: [],
@@ -1050,6 +1448,8 @@ const DeliveryStoreManagement: React.FC = () => {
       setIsEditing(false);
     }
     setShowForm(false);
+    setFormSubmitError(null);
+    resetAdminProductForm();
     resetForm();
   };
 
@@ -1242,6 +1642,11 @@ const DeliveryStoreManagement: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="store-form-modal__form">
               <div className="store-form-modal__body">
+                {formSubmitError && (
+                  <div className="store-form-alert store-form-alert--error" role="alert">
+                    {formSubmitError}
+                  </div>
+                )}
                 <section className="store-form-section">
                   <h3 className="store-form-section__title">店铺基本信息</h3>
                   <div className="store-form-grid">
@@ -1320,16 +1725,55 @@ const DeliveryStoreManagement: React.FC = () => {
                         required
                       />
                     </div>
-                    <div className="store-form-field">
+                    <div className="store-form-field store-form-field--hours">
                       <label>营业时间 <span>*</span></label>
-                      <input
-                        type="text"
-                        name="operating_hours"
-                        value={formData.operating_hours}
-                        onChange={handleInputChange}
-                        placeholder="例: 08:00-22:00"
-                        required
-                      />
+                      {(() => {
+                        const { open, close } = parseOperatingHours(formData.operating_hours);
+                        const durationLabel = getOperatingDurationLabel(open, close);
+                        return (
+                          <div className="store-form-hours">
+                            <div className="store-form-hours__pickers">
+                              <div className="store-form-hours__picker">
+                                <span className="store-form-hours__picker-label">开始时间</span>
+                                <input
+                                  type="time"
+                                  value={open}
+                                  onChange={(e) => handleOperatingHoursPartChange('open', e.target.value)}
+                                  required
+                                />
+                              </div>
+                              <span className="store-form-hours__sep" aria-hidden="true">至</span>
+                              <div className="store-form-hours__picker">
+                                <span className="store-form-hours__picker-label">结束时间</span>
+                                <input
+                                  type="time"
+                                  value={close}
+                                  onChange={(e) => handleOperatingHoursPartChange('close', e.target.value)}
+                                  required
+                                />
+                              </div>
+                              {durationLabel ? (
+                                <span className="store-form-hours__duration">{durationLabel}</span>
+                              ) : null}
+                            </div>
+                            <div className="store-form-hours__presets" role="group" aria-label="常用营业时间">
+                              {OPERATING_HOURS_PRESETS.map((preset) => (
+                                <button
+                                  key={preset.value}
+                                  type="button"
+                                  className={`store-form-hours__preset ${formData.operating_hours === preset.value ? 'is-active' : ''}`}
+                                  onClick={() => applyOperatingHoursPreset(preset.value)}
+                                >
+                                  {preset.label}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="store-form-hours__hint">
+                              保存格式：{formData.operating_hours || DEFAULT_OPERATING_HOURS}（客户端按此时段判断营业状态）
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </section>
@@ -1380,18 +1824,19 @@ const DeliveryStoreManagement: React.FC = () => {
                         required
                       />
                     </div>
-                    <div className="store-form-field">
+                    <div className="store-form-field store-form-field--cod">
                       <label>COD 结清日 <span>*</span></label>
                       <select
                         name="cod_settlement_day"
+                        className="store-form-select"
                         value={formData.cod_settlement_day}
                         onChange={handleInputChange}
                         required
                       >
-                        <option value="7">7天</option>
-                        <option value="10">10天</option>
-                        <option value="15">15天</option>
-                        <option value="30">1个月</option>
+                        <option value="7">7 天</option>
+                        <option value="10">10 天</option>
+                        <option value="15">15 天</option>
+                        <option value="30">1 个月</option>
                       </select>
                     </div>
                     {!isEditing && (
@@ -1409,7 +1854,7 @@ const DeliveryStoreManagement: React.FC = () => {
 
                 <section className="store-form-section">
                   <h3 className="store-form-section__title">位置坐标</h3>
-                  <div className="store-form-grid">
+                  <div className="store-form-grid store-form-grid--coords">
                     <div className="store-form-field">
                       <label>纬度 <span>*</span></label>
                       <input
@@ -1422,32 +1867,171 @@ const DeliveryStoreManagement: React.FC = () => {
                         required
                       />
                     </div>
-                    <div className="store-form-field">
+                    <div className="store-form-field store-form-field--longitude">
                       <label>经度 <span>*</span></label>
-                      <input
-                        type="number"
-                        name="longitude"
-                        value={formData.longitude}
-                        onChange={handleInputChange}
-                        placeholder="96.0891"
-                        step="0.00000001"
-                        required
-                      />
+                      <div className="store-form-coords-action">
+                        <input
+                          type="number"
+                          name="longitude"
+                          value={formData.longitude}
+                          onChange={handleInputChange}
+                          placeholder="96.0891"
+                          step="0.00000001"
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="store-form-btn store-form-btn--map store-form-btn--inline"
+                          onClick={openMapSelection}
+                        >
+                          选择地图位置
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="store-form-map" style={{ marginTop: '0.75rem' }}>
-                    <div className="store-form-map__row">
-                      <button type="button" className="store-form-btn store-form-btn--map" onClick={openMapSelection}>
-                        选择地图位置
-                      </button>
-                      {formData.latitude && formData.longitude && (
-                        <span className="store-form-map__status">
-                          位置已选择 ({formData.latitude}, {formData.longitude})
-                        </span>
-                      )}
-                    </div>
-                    <p className="store-form-map__hint">点击按钮打开地图窗口，在地图上点击选择位置</p>
-                  </div>
+                  {formData.latitude && formData.longitude && (
+                    <p className="store-form-map__status store-form-map__status--below">
+                      位置已选择 ({formData.latitude}, {formData.longitude})
+                    </p>
+                  )}
+
+                  {isEditing && editingStore?.id ? (
+                    <div className="store-form-product store-form-product--below">
+                        <p className="store-form-product__title">代商家添加商品</p>
+                        <p className="store-form-product__sub">商家提供资料后，可在此上传商品主图与详细介绍图并直接上架</p>
+
+                        {adminProductError && (
+                          <div className="store-form-alert store-form-alert--error" role="alert">
+                            {adminProductError}
+                          </div>
+                        )}
+
+                        <div className="store-form-product__media">
+                          <div
+                            className="store-form-product__upload"
+                            onClick={() => adminProductFileInputRef.current?.click()}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') adminProductFileInputRef.current?.click();
+                            }}
+                            role="button"
+                            tabIndex={0}
+                          >
+                            {adminProductForm.image_url ? (
+                              <img src={adminProductForm.image_url} alt="" />
+                            ) : (
+                              <>
+                                <span className="store-form-product__upload-icon" aria-hidden>📸</span>
+                                <span className="store-form-product__upload-hint">
+                                  {isUploadingAdminProductImage ? '上传中…' : '上传图片（可调整规格）'}
+                                </span>
+                              </>
+                            )}
+                            <input
+                              type="file"
+                              ref={adminProductFileInputRef}
+                              onChange={handleAdminProductImageUpload}
+                              style={{ display: 'none' }}
+                              accept="image/*"
+                            />
+                          </div>
+
+                          <div className="store-form-product__detail-wrap">
+                            <button
+                              type="button"
+                              className="store-form-product__detail-btn"
+                              onClick={() => setShowAdminProductDetailPanel((v) => !v)}
+                            >
+                              商品详细介绍
+                              {adminProductForm.detail_image_urls.length > 0
+                                ? ` (${adminProductForm.detail_image_urls.length})`
+                                : ''}
+                            </button>
+                            {showAdminProductDetailPanel ? (
+                              <div className="store-form-product__detail-panel">
+                                <p className="store-form-product__detail-hint">
+                                  上传多张介绍图，顾客在商品详情页可纵向滚动浏览
+                                </p>
+                                <div className="store-form-product__detail-scroll">
+                                  {adminProductForm.detail_image_urls.map((url, idx) => (
+                                    <div key={`${url}-${idx}`} className="store-form-product__detail-thumb">
+                                      <img src={url} alt="" />
+                                      <button
+                                        type="button"
+                                        className="store-form-product__detail-remove"
+                                        onClick={() => handleRemoveAdminProductDetailImage(idx)}
+                                        aria-label="删除图片"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    className="store-form-product__detail-add"
+                                    onClick={() => adminProductDetailFileInputRef.current?.click()}
+                                    disabled={isUploadingAdminProductDetailImages}
+                                  >
+                                    {isUploadingAdminProductDetailImages ? '上传中…' : '+ 添加图片'}
+                                  </button>
+                                </div>
+                                <input
+                                  type="file"
+                                  ref={adminProductDetailFileInputRef}
+                                  onChange={handleAdminProductDetailImagesUpload}
+                                  style={{ display: 'none' }}
+                                  accept="image/*"
+                                  multiple
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="store-form-product__fields">
+                          <div className="store-form-field">
+                            <label>商品名称 <span>*</span></label>
+                            <input
+                              type="text"
+                              value={adminProductForm.name}
+                              onChange={(e) => setAdminProductForm((prev) => ({ ...prev, name: e.target.value }))}
+                              placeholder="输入商品名称"
+                            />
+                          </div>
+                          <div className="store-form-field">
+                            <label>商品价格 (MMK) <span>*</span></label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={adminProductForm.price}
+                              onChange={(e) => setAdminProductForm((prev) => ({ ...prev, price: e.target.value }))}
+                              placeholder="例: 5000"
+                            />
+                          </div>
+                          <div className="store-form-field store-form-field--full">
+                            <label>商品描述</label>
+                            <textarea
+                              value={adminProductForm.description}
+                              onChange={(e) => setAdminProductForm((prev) => ({ ...prev, description: e.target.value }))}
+                              placeholder="输入商品简介（可选）"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="store-form-btn store-form-btn--primary store-form-product__save"
+                          onClick={handleSaveAdminProduct}
+                          disabled={
+                            isSavingAdminProduct ||
+                            isUploadingAdminProductImage ||
+                            isUploadingAdminProductDetailImages
+                          }
+                        >
+                          {isSavingAdminProduct ? '添加中…' : '添加商品并上架'}
+                        </button>
+                      </div>
+                    ) : null}
                 </section>
 
                 <section className="store-form-section">
@@ -1481,8 +2065,8 @@ const DeliveryStoreManagement: React.FC = () => {
                 <button type="button" className="store-form-btn store-form-btn--ghost" onClick={closeStoreForm}>
                   取消
                 </button>
-                <button type="submit" className="store-form-btn store-form-btn--primary">
-                  {isEditing ? '更新合伙店铺' : '创建合伙店铺'}
+                <button type="submit" className="store-form-btn store-form-btn--primary" disabled={isSubmittingStore}>
+                  {isSubmittingStore ? '保存中…' : isEditing ? '更新合伙店铺' : '创建合伙店铺'}
                 </button>
               </div>
             </form>
@@ -1551,6 +2135,7 @@ const DeliveryStoreManagement: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {stores.map((store) => {
                 const pendingN = store.id ? (pendingReviewByStoreId[store.id] ?? 0) : 0;
+                const productTotal = store.id ? (productCountByStoreId[store.id] ?? 0) : 0;
                 const baseShadow = selectedStore?.id === store.id ? '0 10px 25px rgba(0,0,0,0.2)' : '0 4px 15px rgba(0,0,0,0.1)';
                 const pendingInset = pendingN > 0 ? ', inset 5px 0 0 0 rgba(245, 158, 11, 0.92)' : '';
                 return (
@@ -1640,7 +2225,10 @@ const DeliveryStoreManagement: React.FC = () => {
                     </span>
                   </div>
                   <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>{store.address}</p>
-                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem', opacity: 0.7 }}>
+                  <p style={{ margin: '4px 0 0', opacity: 0.78, fontSize: '0.85rem' }}>
+                    🛍️ 共 {productTotal} 条商品
+                  </p>
+                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem', opacity: 0.7, marginTop: '6px' }}>
                     <span>📞 {store.phone}</span>
                     <span>👤 {store.manager_name}</span>
                     <span>⏰ {store.operating_hours}</span>
@@ -2723,32 +3311,21 @@ const DeliveryStoreManagement: React.FC = () => {
         </div>
       )}
 
-      {/* 地图选择模态框 */}
-      {showMapModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 10100
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
-            padding: '2rem',
-            borderRadius: '20px',
-            width: '90%',
-            maxWidth: '800px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
+      {/* 地图选择模态框（挂到 body，确保在新增店铺弹窗之上） */}
+      {showMapModal && createPortal(
+        <div
+          className="store-form-map-overlay"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowMapModal(false);
+          }}
+        >
+          <div
+            className="store-form-map-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="store-map-title"
+          >
             {/* 头部 */}
             <div style={{
               display: 'flex',
@@ -2758,7 +3335,7 @@ const DeliveryStoreManagement: React.FC = () => {
               paddingBottom: '1rem',
               borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
-              <h2 style={{
+              <h2 id="store-map-title" style={{
                 margin: 0,
                 color: '#A5C7FF',
                 fontSize: '1.5rem',
@@ -3068,10 +3645,9 @@ const DeliveryStoreManagement: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-
-      {/* 入库包裹模态框 */}
       {showStorageModal && (
         <div style={{
           position: 'fixed',
@@ -4108,7 +4684,7 @@ const DeliveryStoreManagement: React.FC = () => {
                 </p>
               </div>
               <button 
-                onClick={() => { setShowProductsModal(false); setViewingStoreId(null); }}
+                onClick={() => { setShowProductsModal(false); setViewingStoreId(null); setSelectedAdminProductId(null); }}
                 style={{
                   background: 'rgba(255, 255, 255, 0.2)',
                   border: 'none',
@@ -4198,13 +4774,25 @@ const DeliveryStoreManagement: React.FC = () => {
                       normalizeProductListingStatus(product) === 'approved' &&
                       hasPendingProductUpdate(product);
                     return (
-                    <div key={product.id} style={{
+                    <div
+                      key={product.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedAdminProductId(product.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') setSelectedAdminProductId(product.id);
+                      }}
+                      style={{
                       background: 'rgba(255, 255, 255, 0.05)',
                       borderRadius: '16px',
                       padding: '16px',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      transition: 'transform 0.3s ease'
-                    }}>
+                      transition: 'transform 0.3s ease',
+                      cursor: 'pointer',
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
+                    >
                       <div style={{
                         width: '100%',
                         aspectRatio: '1',
@@ -4309,6 +4897,9 @@ const DeliveryStoreManagement: React.FC = () => {
                       <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>
                         库存: {display.stock === -1 ? '无限' : display.stock}
                       </div>
+                      <div style={{ marginTop: '8px', fontSize: '0.72rem', color: 'rgba(148, 163, 184, 0.9)' }}>
+                        点击查看完整信息与变更详情
+                      </div>
                     </div>
                     );
                   })}
@@ -4320,6 +4911,232 @@ const DeliveryStoreManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      {selectedAdminProduct && createPortal(
+        (() => {
+          const product = selectedAdminProduct;
+          const ls = normalizeProductListingStatus(product);
+          const isEditPending = ls === 'approved' && hasPendingProductUpdate(product);
+          const changes = buildAdminProductChanges(product);
+          const changedCount = changes.filter((c) => c.changed).length;
+          const pu = product.pending_update as Record<string, unknown> | null | undefined;
+          const submittedAt = typeof pu?.submitted_at === 'string' ? pu.submitted_at : null;
+
+          const renderImageValue = (value: unknown) => {
+            const url = typeof value === 'string' ? value : '';
+            if (!url) return <span className="admin-product-detail__empty">无</span>;
+            return (
+              <a href={url} target="_blank" rel="noreferrer" className="admin-product-detail__img-link">
+                <img src={url} alt="" className="admin-product-detail__thumb" />
+              </a>
+            );
+          };
+
+          const renderDetailImages = (value: unknown) => {
+            const urls = Array.isArray(value) ? value.filter((u) => typeof u === 'string') as string[] : [];
+            if (!urls.length) return <span className="admin-product-detail__empty">无</span>;
+            return (
+              <div className="admin-product-detail__detail-scroll">
+                {urls.map((url, idx) => (
+                  <a key={`${url}-${idx}`} href={url} target="_blank" rel="noreferrer">
+                    <img src={url} alt="" className="admin-product-detail__detail-thumb" />
+                  </a>
+                ))}
+              </div>
+            );
+          };
+
+          const renderFieldValue = (key: string, value: unknown) => {
+            if (key === 'image_url') return renderImageValue(value);
+            if (key === 'detail_image_urls') return renderDetailImages(value);
+            if (key === 'description') {
+              return <p className="admin-product-detail__desc">{formatAdminProductFieldText(key, value)}</p>;
+            }
+            return <span>{formatAdminProductFieldText(key, value)}</span>;
+          };
+
+          return (
+            <div
+              className="admin-product-detail-overlay"
+              role="presentation"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedAdminProductId(null);
+              }}
+            >
+              <div className="admin-product-detail" role="dialog" aria-modal="true" aria-labelledby="admin-product-detail-title">
+                <div className="admin-product-detail__head">
+                  <div>
+                    <h2 id="admin-product-detail-title" className="admin-product-detail__title">{product.name || '商品详情'}</h2>
+                    <p className="admin-product-detail__sub">
+                      {viewingStoreName} · ID: {product.id}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="admin-product-detail__close"
+                    onClick={() => setSelectedAdminProductId(null)}
+                    aria-label="关闭"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="admin-product-detail__body">
+                  <div className="admin-product-detail__badges">
+                    <span className={`admin-product-detail__badge admin-product-detail__badge--${ls}`}>
+                      {listingStatusLabel(ls, isEditPending)}
+                    </span>
+                    {product.is_available ? (
+                      <span className="admin-product-detail__badge admin-product-detail__badge--live">在售</span>
+                    ) : (
+                      <span className="admin-product-detail__badge admin-product-detail__badge--off">下架</span>
+                    )}
+                    {typeof product.sales_count === 'number' && (
+                      <span className="admin-product-detail__badge admin-product-detail__badge--muted">销量 {product.sales_count}</span>
+                    )}
+                  </div>
+
+                  {changes.length > 0 && (
+                    <section className="admin-product-detail__section">
+                      <h3 className="admin-product-detail__section-title">
+                        {isEditPending
+                          ? `商家修改申请（${changedCount} 项变更）`
+                          : ls === 'pending'
+                            ? '新商品待审内容'
+                            : '变更记录'}
+                      </h3>
+                      {submittedAt && (
+                        <p className="admin-product-detail__hint">
+                          提交时间：{new Date(submittedAt).toLocaleString('zh-CN')}
+                        </p>
+                      )}
+                      <div className={`admin-product-detail__diff-table${changes[0]?.isNewProduct ? ' admin-product-detail__diff-table--new' : ''}`}>
+                        <div className="admin-product-detail__diff-row admin-product-detail__diff-row--head">
+                          <span>字段</span>
+                          {!changes[0]?.isNewProduct && <span>线上现值</span>}
+                          <span>{changes[0]?.isNewProduct ? '提交内容' : '商家申请改为'}</span>
+                        </div>
+                        {changes.map((row) => (
+                          <div
+                            key={row.key}
+                            className={`admin-product-detail__diff-row${row.changed ? ' is-changed' : ''}`}
+                          >
+                            <span className="admin-product-detail__diff-label">
+                              {row.label}
+                              {row.changed && <em>已改</em>}
+                            </span>
+                            {!row.isNewProduct && (
+                              <div className="admin-product-detail__diff-cell">{renderFieldValue(row.key, row.before)}</div>
+                            )}
+                            <div className="admin-product-detail__diff-cell admin-product-detail__diff-cell--after">
+                              {renderFieldValue(row.key, row.after)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  <section className="admin-product-detail__section">
+                    <h3 className="admin-product-detail__section-title">
+                      {isEditPending ? '线上当前版本（客户可见）' : '商品完整信息'}
+                    </h3>
+                    <div className="admin-product-detail__grid">
+                      {ADMIN_PRODUCT_DIFF_KEYS.map((key) => (
+                        <div key={key} className="admin-product-detail__field">
+                          <div className="admin-product-detail__field-label">{ADMIN_PRODUCT_FIELD_LABELS[key]}</div>
+                          <div className="admin-product-detail__field-value">{renderFieldValue(key, product[key])}</div>
+                        </div>
+                      ))}
+                      <div className="admin-product-detail__field">
+                        <div className="admin-product-detail__field-label">审核状态</div>
+                        <div className="admin-product-detail__field-value">{listingStatusLabel(ls, isEditPending)}</div>
+                      </div>
+                      {product.created_at && (
+                        <div className="admin-product-detail__field">
+                          <div className="admin-product-detail__field-label">创建时间</div>
+                          <div className="admin-product-detail__field-value">
+                            {new Date(product.created_at).toLocaleString('zh-CN')}
+                          </div>
+                        </div>
+                      )}
+                      {product.updated_at && (
+                        <div className="admin-product-detail__field">
+                          <div className="admin-product-detail__field-label">更新时间</div>
+                          <div className="admin-product-detail__field-value">
+                            {new Date(product.updated_at).toLocaleString('zh-CN')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {isEditPending && (
+                    <section className="admin-product-detail__section">
+                      <h3 className="admin-product-detail__section-title">通过后客户将看到（预览）</h3>
+                      <div className="admin-product-detail__grid">
+                        {ADMIN_PRODUCT_DIFF_KEYS.map((key) => {
+                          const previewVal = pu?.[key] !== undefined ? pu[key] : product[key];
+                          return (
+                            <div key={`preview-${key}`} className="admin-product-detail__field">
+                              <div className="admin-product-detail__field-label">{ADMIN_PRODUCT_FIELD_LABELS[key]}</div>
+                              <div className="admin-product-detail__field-value">{renderFieldValue(key, previewVal)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
+                </div>
+
+                <div className="admin-product-detail__foot">
+                  {productNeedsAdminReview(product) && (
+                    <>
+                      <button
+                        type="button"
+                        className="admin-product-detail__btn admin-product-detail__btn--approve"
+                        disabled={productListingActionId === product.id}
+                        onClick={async () => {
+                          await updateProductListingStatus(product.id, 'approved');
+                        }}
+                      >
+                        {productListingActionId === product.id ? '处理中…' : '通过'}
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-product-detail__btn admin-product-detail__btn--reject"
+                        disabled={productListingActionId === product.id}
+                        onClick={async () => {
+                          await updateProductListingStatus(product.id, 'rejected');
+                        }}
+                      >
+                        拒绝
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="admin-product-detail__btn admin-product-detail__btn--ghost"
+                    onClick={() => setSelectedAdminProductId(null)}
+                  >
+                    关闭
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })(),
+        document.body
+      )}
+
+      <ProductImageEditorModal
+        file={adminImageEditorFile}
+        defaultPresetId={adminImageEditorTarget === 'detail' ? 'portrait' : 'square'}
+        language="zh"
+        theme="light"
+        onCancel={handleAdminImageEditorCancel}
+        onConfirm={handleAdminImageEditorConfirm}
+      />
     </div>
   );
 };

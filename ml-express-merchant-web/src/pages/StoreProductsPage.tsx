@@ -3,6 +3,7 @@ import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
 import { merchantService, deliveryStoreService, Product, DeliveryStore, productFormSource, hasPendingProductUpdate } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { autoPrepareProductImageForUpload } from '../utils/productImagePrepare';
 import '../styles/merchantProductsPage.css';
 
 const StoreProductsPage: React.FC = () => {
@@ -117,28 +118,31 @@ const StoreProductsPage: React.FC = () => {
 
     try {
       setIsUploading(true);
-      const url = await merchantService.uploadProductImage(storeId, file);
+      const prepared = await autoPrepareProductImageForUpload(file);
+      const url = await merchantService.uploadProductImage(storeId, prepared);
       if (url) {
-        setProductForm(prev => ({ ...prev, image_url: url }));
+        setProductForm((prev) => ({ ...prev, image_url: url }));
       }
     } catch (error) {
       LoggerService.error('图片上传失败:', error);
       alert(language === 'zh' ? '图片上传失败，请重试' : 'Image upload failed');
     } finally {
       setIsUploading(false);
+      if (productFileInputRef.current) productFileInputRef.current.value = '';
     }
   };
 
   const handleDetailImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    const files = Array.from(e.target.files || []);
     const storeId = currentUser?.store_id || currentUser?.id;
-    if (!files?.length || !storeId) return;
+    if (!files.length || !storeId) return;
 
     try {
       setIsUploadingDetailImages(true);
       const uploadedUrls: string[] = [];
-      for (const file of Array.from(files)) {
-        const url = await merchantService.uploadProductImage(storeId, file);
+      for (const file of files) {
+        const prepared = await autoPrepareProductImageForUpload(file);
+        const url = await merchantService.uploadProductImage(storeId, prepared);
         if (url) uploadedUrls.push(url);
       }
       if (uploadedUrls.length > 0) {
@@ -153,9 +157,7 @@ const StoreProductsPage: React.FC = () => {
       alert(language === 'zh' ? '图片上传失败，请重试' : 'Image upload failed');
     } finally {
       setIsUploadingDetailImages(false);
-      if (detailImagesFileInputRef.current) {
-        detailImagesFileInputRef.current.value = '';
-      }
+      if (detailImagesFileInputRef.current) detailImagesFileInputRef.current.value = '';
     }
   };
 
@@ -502,7 +504,9 @@ const StoreProductsPage: React.FC = () => {
                     <span className="merchant-product-modal__upload-hint">
                       {isUploading
                         ? t?.uploading || '上传中...'
-                        : t?.uploadImage || '上传商品图片'}
+                        : language === 'zh'
+                          ? '上传图片（自动原比例压缩）'
+                          : 'Upload (auto compress)'}
                     </span>
                   </>
                 )}

@@ -810,7 +810,7 @@ const CityMallPage: React.FC = () => {
                       <img 
                         src={product.image_url || 'https://via.placeholder.com/150'} 
                         alt={product.name} 
-                        style={{ width: '100%', height: '180px', borderRadius: '16px', objectFit: 'cover' }}
+                        style={{ width: '100%', aspectRatio: '1', borderRadius: '16px', objectFit: 'contain', background: '#f8fafc' }}
                       />
                       <div style={{ flex: 1 }}>
                         <h3 style={{ fontSize: '1.2rem', fontWeight: '900', color: '#0f172a', marginBottom: '0.4rem' }}>{product.name}</h3>

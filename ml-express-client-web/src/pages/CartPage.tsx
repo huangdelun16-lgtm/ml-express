@@ -174,7 +174,7 @@ const CartPage: React.FC = () => {
                         }}
                       >
                         {item.image_url && !item.image_url.startsWith('file://') ? (
-                          <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         ) : (
                           <div
                             style={{

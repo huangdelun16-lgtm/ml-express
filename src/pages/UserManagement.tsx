@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
+import '../styles/adminUserManagement.css';
 
 // 用户数据类型定义
 interface User {
@@ -72,24 +73,6 @@ const REGIONS = [
   { id: 'muse', name: '木姐', prefix: 'MUSE' }
 ];
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'active': return '#27ae60';
-    case 'inactive': return '#f39c12';
-    case 'suspended': return '#e74c3c';
-    default: return '#95a5a6';
-  }
-};
-
-const getStatusText = (status: string) => {
-  switch (status) {
-    case 'active': return '活跃';
-    case 'inactive': return '非活跃';
-    case 'suspended': return '已暂停';
-    default: return status;
-  }
-};
-
 const getUserTypeText = (user: any) => {
   if (user.user_type === 'merchant') return 'MERCHANTS';
   if (user.user_type === 'courier') return 'Courier';
@@ -102,16 +85,21 @@ const getUserTypeText = (user: any) => {
   return 'MEMBER';
 };
 
-const getUserTypeColor = (user: any) => {
-  if (user.user_type === 'admin') return '#e67e22';
-  if (user.user_type === 'courier') return '#9b59b6';
-  if (user.user_type === 'merchant') return '#3498db';
-  
-  if (user.balance > 0 || user.user_type === 'vip') {
-    return 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)';
-  }
-  return '#7f8c8d'; // 普通 Member 灰色
+const getUserTypeBadgeClass = (user: User) => {
+  if (user.user_type === 'admin') return 'user-mgmt-card__badge--admin';
+  if (user.user_type === 'merchant') return 'user-mgmt-card__badge--merchant';
+  if (user.user_type === 'courier') return 'user-mgmt-card__badge--courier';
+  if ((user.balance || 0) > 0 || user.user_type === 'vip') return 'user-mgmt-card__badge--vip';
+  return 'user-mgmt-card__badge--member';
 };
+
+const USER_TABS = [
+  { id: 'customer_list', label: '客户列表', icon: '👥' },
+  { id: 'admin_list', label: '管理员', icon: '🔐' },
+  { id: 'merchant_store', label: 'MERCHANTS', icon: '🏪' },
+  { id: 'courier_management', label: '快递员', icon: '🛵' },
+  { id: 'recharge_requests', label: '充值审核', icon: '💰' },
+] as const;
 
 const getVehicleIcon = (type: string) => {
   switch (type) {
@@ -126,396 +114,183 @@ const getVehicleIcon = (type: string) => {
 };
 
 // 列表行组件 - 用户
-const UserRow = ({ 
-  user, 
-  selectedUsers, 
-  handleSelectUser, 
-  isMobile, 
-  handleEditUser, 
-  updateUserStatus, 
-  handleDeleteUser, 
-  handleOpenRecharge, 
+const UserRow = ({
+  user,
+  selectedUsers,
+  handleSelectUser,
+  handleEditUser,
+  updateUserStatus,
+  handleDeleteUser,
+  handleOpenRecharge,
   pendingRecharge,
   handleApproveRecharge,
-  handleRejectRecharge 
+  handleRejectRecharge,
 }: any) => {
   if (!user) return null;
-  
+
   const isSelected = selectedUsers.has(user.id);
   const hasPendingRecharge = !!pendingRecharge;
-  
+
+  const stopCardClick = (e: React.MouseEvent) => {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'BUTTON' || tag === 'SELECT' || tag === 'OPTION' || tag === 'A' || tag === 'IMG') {
+      e.stopPropagation();
+    }
+  };
+
   return (
-    <div style={{ paddingBottom: '15px', boxSizing: 'border-box' }}>
-      <div 
-        key={user.id} 
-        style={{
-          background: isSelected ? 'rgba(52, 152, 219, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-          borderRadius: '20px',
-          padding: isMobile ? '20px' : '28px',
-          border: hasPendingRecharge ? '2px solid #e74c3c' : (isSelected ? '2px solid #3498db' : '1px solid rgba(255, 255, 255, 0.12)'), // 🚀 充值中变红框
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          position: 'relative',
-          backdropFilter: 'blur(12px)',
-          boxShadow: hasPendingRecharge ? '0 0 20px rgba(231, 76, 60, 0.4)' : (isSelected ? '0 12px 30px rgba(52, 152, 219, 0.25)' : '0 6px 12px rgba(0, 0, 0, 0.15)'), // 🚀 充值中发红光
-          cursor: 'pointer',
-          boxSizing: 'border-box',
-          animation: hasPendingRecharge ? 'pulse-border 2s infinite' : 'none' // 🚀 充值中呼吸效果
-        }}
+    <article
+      className={`user-mgmt-card${isSelected ? ' is-selected' : ''}${hasPendingRecharge ? ' is-recharge' : ''}`}
+      onClick={(e) => {
+        stopCardClick(e);
+        if (!(e.target as HTMLElement).closest('button, select, a, .user-mgmt-card__check')) {
+          handleSelectUser(user.id);
+        }
+      }}
+    >
+      {hasPendingRecharge && (
+        <div className="user-mgmt-card__alert">
+          <span>🚨</span>
+          <span>客户正在充值</span>
+        </div>
+      )}
+
+      <div
+        className="user-mgmt-card__check"
+        role="checkbox"
+        aria-checked={isSelected}
         onClick={(e) => {
-          if ((e.target as HTMLElement).tagName !== 'BUTTON' && (e.target as HTMLElement).parentElement?.tagName !== 'BUTTON') {
-            handleSelectUser(user.id);
-          }
+          e.stopPropagation();
+          handleSelectUser(user.id);
         }}
       >
-        {/* 🚀 新增：充值警报器 */}
-        {hasPendingRecharge && (
-          <div style={{
-            position: 'absolute',
-            top: '-15px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
-            color: 'white',
-            padding: '6px 20px',
-            borderRadius: '30px',
-            fontSize: '0.9rem',
-            fontWeight: 900,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 0 25px rgba(231, 76, 60, 0.8)',
-            zIndex: 100,
-            border: '2px solid rgba(255,255,255,0.3)',
-            animation: 'pulse-scale 1.5s infinite'
-          }}>
-            <span style={{ fontSize: '1.2rem', animation: 'blink 0.6s infinite alternate' }}>🚨</span>
-            <span style={{ textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>客户正在充值</span>
+        {isSelected ? '✓' : ''}
+      </div>
+
+      <div className="user-mgmt-card__head">
+        <div>
+          <div className="user-mgmt-card__name-row">
+            <h3 className="user-mgmt-card__name">{user.name}</h3>
+            <span className="user-mgmt-card__id">{user.id}</span>
+            <span className="user-mgmt-card__balance">💰 {(user.balance ?? 0).toLocaleString()} MMK</span>
+          </div>
+          <p className="user-mgmt-card__meta">
+            注册 {user.registration_date || '—'} · 最后登录 {user.last_login || '—'}
+          </p>
+        </div>
+        <div className="user-mgmt-card__badges">
+          {user.register_region && (
+            <span className="user-mgmt-card__badge user-mgmt-card__badge--region">
+              📍 {REGIONS.find((r) => r.id === user.register_region)?.name || user.register_region}
+            </span>
+          )}
+          <span className={`user-mgmt-card__badge ${getUserTypeBadgeClass(user)}`}>
+            {getUserTypeText(user)}
+          </span>
+          <div className="user-mgmt-card__status-wrap">
+            <select
+              className="user-mgmt-card__status"
+              data-status={user.status}
+              value={user.status}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => updateUserStatus(user, e.target.value as User['status'])}
+            >
+              <option value="active">活跃</option>
+              <option value="inactive">非活跃</option>
+              <option value="suspended">已暂停</option>
+            </select>
+            <span className="user-mgmt-card__status-arrow">▼</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="user-mgmt-card__body">
+        <div>
+          <h4 className="user-mgmt-card__section-title">📞 联系信息</h4>
+          <p className="user-mgmt-card__line">
+            <span className="user-mgmt-card__line-label">电话</span>
+            <span className="user-mgmt-card__line--strong">{user.phone || '—'}</span>
+          </p>
+          <p className="user-mgmt-card__line">
+            <span className="user-mgmt-card__line-label">邮箱</span>
+            {user.email || '未绑定'}
+          </p>
+          <p className="user-mgmt-card__line">
+            <span className="user-mgmt-card__line-label">地址</span>
+            {user.address || '未填写'}
+          </p>
+        </div>
+        <div>
+          <h4 className="user-mgmt-card__section-title">📊 业务统计</h4>
+          <p className="user-mgmt-card__line">
+            <span className="user-mgmt-card__line-label">订单</span>
+            <span className="user-mgmt-card__line--strong">{user.total_orders || 0}</span>
+          </p>
+          <p className="user-mgmt-card__line">
+            <span className="user-mgmt-card__line-label">消费</span>
+            <span className="user-mgmt-card__line--strong">{(user.total_spent ?? 0).toLocaleString()} MMK</span>
+          </p>
+          <p className="user-mgmt-card__line">
+            <span className="user-mgmt-card__line-label">评分</span>
+            ⭐ {user.rating?.toFixed(1) || '5.0'}
+          </p>
+        </div>
+        <div>
+          <h4 className="user-mgmt-card__section-title">📝 内部备注</h4>
+          <p className={`user-mgmt-card__notes${user.notes ? '' : ''}`}>{user.notes || '暂无备注信息'}</p>
+        </div>
+      </div>
+
+      <div className="user-mgmt-card__actions">
+        {pendingRecharge && (
+          <div className="user-mgmt-card__recharge-group">
+            <button
+              type="button"
+              className="user-mgmt-card__action user-mgmt-card__action--approve"
+              onClick={() => handleApproveRecharge(pendingRecharge)}
+            >
+              ✅ 同意 {pendingRecharge.amount.toLocaleString()} MMK
+            </button>
+            <a href={pendingRecharge.proof_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+              <div className="user-mgmt-card__proof">
+                <img src={pendingRecharge.proof_url} alt="汇款凭证" />
+              </div>
+            </a>
+            <button
+              type="button"
+              className="user-mgmt-card__action user-mgmt-card__action--reject"
+              onClick={() => handleRejectRecharge(pendingRecharge)}
+            >
+              拒绝
+            </button>
           </div>
         )}
 
-        {/* Checkbox Badge */}
-        <div 
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSelectUser(user.id);
-          }}
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            width: '24px',
-            height: '24px',
-            borderRadius: '6px',
-            border: isSelected ? 'none' : '2px solid rgba(255, 255, 255, 0.3)',
-            background: isSelected ? '#3498db' : 'rgba(255, 255, 255, 0.05)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            zIndex: 10
-          }}
-        >
-          {isSelected && <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>✓</span>}
-        </div>
-
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '15px',
-          paddingRight: '40px'
-        }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
-              <h3 style={{ color: 'white', margin: 0, fontSize: '1.3rem', fontWeight: 'bold' }}>
-                {user.name}
-              </h3>
-              <span style={{ 
-                background: 'rgba(255,255,255,0.1)', 
-                padding: '2px 8px', 
-                borderRadius: '6px', 
-                fontSize: '0.75rem', 
-                color: 'rgba(255,255,255,0.6)',
-                fontFamily: 'monospace'
-              }}>
-                {user.id}
-              </span>
-              {/* 🚀 新增：余额标签 */}
-              <div style={{
-                background: 'rgba(46, 204, 113, 0.15)',
-                color: '#2ecc71',
-                padding: '2px 10px',
-                borderRadius: '6px',
-                fontSize: '0.85rem',
-                fontWeight: 'bold',
-                border: '1px solid rgba(46, 204, 113, 0.3)',
-                marginLeft: '5px'
-              }}>
-                💰 {user.balance?.toLocaleString() || 0} MMK
-              </div>
-            </div>
-            <p style={{ color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.85rem' }}>
-              📅 注册: {user.registration_date} | 🔑 最后登录: {user.last_login}
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            {user.register_region && (
-              <div style={{
-                background: 'rgba(52, 152, 219, 0.2)',
-                color: '#3498db',
-                padding: '5px 15px',
-                borderRadius: '20px',
-                fontSize: '0.85rem',
-                fontWeight: 'bold',
-                border: '1px solid rgba(52, 152, 219, 0.3)'
-              }}>
-                📍 {REGIONS.find(r => r.id === user.register_region)?.name || user.register_region}
-              </div>
-            )}
-            <div style={{
-              background: getUserTypeColor(user),
-              color: 'white',
-              padding: '5px 15px',
-              borderRadius: '20px',
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              boxShadow: (user.balance > 0 || user.user_type === 'vip') ? '0 4px 10px rgba(251, 191, 36, 0.3)' : 'none'
-            }}>
-              {getUserTypeText(user)}
-            </div>
-            <div style={{
-              background: getStatusColor(user.status),
-              color: 'white',
-              padding: '5px 15px',
-              borderRadius: '20px',
-              fontSize: '0.9rem',
-              fontWeight: 'bold'
-            }}>
-              {getStatusText(user.status)}
-            </div>
-          </div>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '20px',
-          marginBottom: '20px',
-          background: 'rgba(0,0,0,0.15)',
-          padding: '20px',
-          borderRadius: '15px'
-        }}>
-          <div>
-            <h4 style={{ color: '#3498db', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📞 联系信息</h4>
-            <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>电话:</span>
-              <span style={{ fontWeight: 600 }}>{user.phone}</span>
-            </p>
-            <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>邮箱:</span>
-              <span style={{ opacity: 0.9 }}>{user.email || '未绑定'}</span>
-            </p>
-            <p style={{ color: 'white', margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-              <span style={{ opacity: 0.6, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>地址:</span>
-              <span style={{ opacity: 0.8, lineHeight: '1.4' }}>{user.address || '未填写'}</span>
-            </p>
-          </div>
-          <div>
-            <h4 style={{ color: '#f1c40f', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📊 业务统计</h4>
-            <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>订单总数:</span>
-              <span style={{ fontWeight: 700, color: '#3498db' }}>{user.total_orders || 0}</span>
-            </p>
-            <p style={{ color: 'white', margin: '0 0 8px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>累计消费:</span>
-              <span style={{ fontWeight: 700, color: '#2ecc71' }}>{user.total_spent?.toLocaleString() || 0} MMK</span>
-            </p>
-            <p style={{ color: 'white', margin: 0, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>综合评分:</span>
-              <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>⭐ {user.rating?.toFixed(1) || 5.0}</span>
-            </p>
-          </div>
-          <div>
-            <h4 style={{ color: '#e67e22', margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>📝 内部备注</h4>
-            <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '0.9rem', lineHeight: '1.6', fontStyle: user.notes ? 'normal' : 'italic' }}>
-              {user.notes || '暂无备注信息'}
-            </p>
-          </div>
-        </div>
-
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          flexWrap: 'wrap'
-        }}>
-          {/* 🚀 新增：快捷处理充值申请按钮 */}
-          {pendingRecharge && (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                onClick={() => handleApproveRecharge(pendingRecharge)}
-                style={{
-                  background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '0.95rem',
-                  fontWeight: 'bold',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 4px 12px rgba(46, 204, 113, 0.4)',
-                  animation: 'blink 1s infinite alternate'
-                }}
-              >
-                ✅ 同意充值 ({pendingRecharge.amount.toLocaleString()} MMK)
-              </button>
-              
-              {/* 查看凭证小图 */}
-              <a href={pendingRecharge.proof_url} target="_blank" rel="noreferrer">
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  border: '2px solid #2ecc71',
-                  background: '#000'
-                }}>
-                  <img src={pendingRecharge.proof_url} alt="Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              </a>
-
-              <button
-                onClick={() => handleRejectRecharge(pendingRecharge)}
-                style={{
-                  background: 'rgba(231, 76, 60, 0.2)',
-                  color: '#e74c3c',
-                  border: '1px solid rgba(231, 76, 60, 0.3)',
-                  padding: '10px 15px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600'
-                }}
-              >
-                拒绝
-              </button>
-            </div>
-          )}
-
-          {/* 🚀 仅非管理员账号显示 Credit 充值按钮 */}
-          {user.user_type !== 'admin' && (
-            <button
-              onClick={() => handleOpenRecharge(user)}
-              style={{
-                background: 'linear-gradient(135deg, #f1c40f 0%, #f39c12 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-                fontWeight: 'bold',
-                transition: 'all 0.3s ease',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 12px rgba(243, 156, 18, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(243, 156, 18, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(243, 156, 18, 0.3)';
-              }}
-            >
-              💰 Credit 充值
-            </button>
-          )}
-
-          <button
-            onClick={() => handleEditUser(user)}
-            style={{
-              background: 'rgba(52, 152, 219, 0.2)',
-              color: '#3498db',
-              border: '1px solid rgba(52, 152, 219, 0.3)',
-              padding: '10px 20px',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            ✏️ 编辑资料
-          </button>
-          <button
-            onClick={() => updateUserStatus(user, user.status === 'active' ? 'inactive' : 'active')}
-            style={{
-              background: user.status === 'active' ? 'rgba(243, 156, 18, 0.2)' : 'rgba(39, 174, 96, 0.2)',
-              color: user.status === 'active' ? '#f39c12' : '#2ecc71',
-              border: '1px solid ' + (user.status === 'active' ? 'rgba(243, 156, 18, 0.3)' : 'rgba(39, 174, 96, 0.3)'),
-              padding: '10px 20px',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            {user.status === 'active' ? '🚫 停用账户' : '✅ 启用账户'}
-          </button>
-          <button
-            onClick={() => updateUserStatus(user, 'suspended')}
-            style={{
-              background: 'rgba(231, 76, 60, 0.15)',
-              color: '#e74c3c',
-              border: '1px solid rgba(231, 76, 60, 0.25)',
-              padding: '10px 20px',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            ⚠️ 暂停服务
-          </button>
+        {user.user_type !== 'admin' && (
           <button
             type="button"
-            onClick={() => handleDeleteUser(user)}
-            style={{
-              marginLeft: 'auto',
-              background: 'rgba(231, 76, 60, 0.15)',
-              color: '#fecaca',
-              border: '1px solid rgba(231, 76, 60, 0.45)',
-              padding: '10px 16px',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: '700',
-              transition: 'all 0.3s ease'
-            }}
+            className="user-mgmt-card__action user-mgmt-card__action--credit"
+            onClick={() => handleOpenRecharge(user)}
           >
-            🗑️ 删除账户
+            💰 Credit 充值
           </button>
-        </div>
+        )}
+
+        <button type="button" className="user-mgmt-card__action user-mgmt-card__action--edit" onClick={() => handleEditUser(user)}>
+          ✏️ 编辑资料
+        </button>
+        <button
+          type="button"
+          className="user-mgmt-card__action"
+          onClick={() => updateUserStatus(user, user.status === 'active' ? 'inactive' : 'active')}
+        >
+          {user.status === 'active' ? '🚫 停用' : '✅ 启用'}
+        </button>
+        <button type="button" className="user-mgmt-card__action user-mgmt-card__action--delete" onClick={() => handleDeleteUser(user)}>
+          🗑️ 删除账户
+        </button>
       </div>
-    </div>
+    </article>
   );
 };
 
@@ -952,6 +727,9 @@ const UserManagement: React.FC = () => {
   useEffect(() => {
     const q = searchParams.get('q');
     const tab = searchParams.get('tab');
+    const status = searchParams.get('status');
+    const type = searchParams.get('type');
+    const sort = searchParams.get('sort');
     if (q) setSearchTerm(q);
     if (
       tab &&
@@ -961,9 +739,19 @@ const UserManagement: React.FC = () => {
         tab as 'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management' | 'recharge_requests'
       );
     }
+    if (status && ['all', 'active', 'inactive', 'suspended'].includes(status)) {
+      setFilterStatus(status);
+    }
+    if (type && ['all', 'vip', 'member'].includes(type)) {
+      setFilterType(type);
+    }
+    if (sort && ['newest', 'balance', 'orders', 'name'].includes(sort)) {
+      setSortBy(sort as 'newest' | 'balance' | 'orders' | 'name');
+    }
   }, [searchParams]);
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'balance' | 'orders' | 'name'>('newest');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddUserForm, setShowAddUserForm] = useState(false);
   const [showAddCourierForm, setShowAddCourierForm] = useState(false);
@@ -1167,23 +955,65 @@ const UserManagement: React.FC = () => {
 
   // 过滤用户
   const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           user.phone?.includes(searchTerm) ||
-                           user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-                           
+    const list = users.filter((user) => {
+      const q = searchTerm.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        user.name?.toLowerCase().includes(q) ||
+        user.phone?.includes(searchTerm.trim()) ||
+        user.email?.toLowerCase().includes(q) ||
+        user.id?.toLowerCase().includes(q);
+
       let matchesType = true;
       if (activeTab === 'customer_list') {
         matchesType = user.user_type === 'customer';
+        if (filterType === 'vip') {
+          matchesType = matchesType && ((user.balance || 0) > 0 || user.user_type === 'vip');
+        } else if (filterType === 'member') {
+          matchesType = matchesType && (user.balance || 0) <= 0 && user.user_type !== 'vip';
+        }
       } else if (activeTab === 'admin_list') {
         matchesType = user.user_type === 'admin';
       }
-      
+
       const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-      
       return matchesSearch && matchesType && matchesStatus;
     });
-  }, [users, searchTerm, activeTab, filterStatus]);
+
+    return [...list].sort((a, b) => {
+      if (sortBy === 'balance') return (b.balance || 0) - (a.balance || 0);
+      if (sortBy === 'orders') return (b.total_orders || 0) - (a.total_orders || 0);
+      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '', 'zh-CN');
+      const dateA = new Date(a.created_at || a.registration_date || 0).getTime();
+      const dateB = new Date(b.created_at || b.registration_date || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [users, searchTerm, activeTab, filterStatus, filterType, sortBy]);
+
+  const filteredCouriers = useMemo(() => {
+    const q = courierSearchTerm.trim().toLowerCase();
+    return couriers.filter((courier) => {
+      const matchesSearch =
+        !q ||
+        courier.name?.toLowerCase().includes(q) ||
+        courier.phone?.includes(courierSearchTerm.trim()) ||
+        courier.employee_id?.toLowerCase().includes(q);
+      const matchesStatus = courierStatusFilter === 'all' || courier.status === courierStatusFilter;
+      const matchesVehicle = vehicleFilter === 'all' || courier.vehicle_type === vehicleFilter;
+      return matchesSearch && matchesStatus && matchesVehicle;
+    });
+  }, [couriers, courierSearchTerm, courierStatusFilter, vehicleFilter]);
+
+  const pendingRechargeCount = Object.keys(pendingRechargeRequests).length;
+
+  const resetUserFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('all');
+    setFilterType('all');
+    setSortBy('newest');
+    setSelectedUsers(new Set());
+    navigate('/admin/users', { replace: true });
+  };
 
   // 🚀 核心优化：增加自动轮询，实时检测充值申请
   useEffect(() => {
@@ -1840,461 +1670,434 @@ const UserManagement: React.FC = () => {
     else loadUsers();
   }, [activeTab]);
 
+  const statCards = useMemo(() => {
+    switch (activeTab) {
+      case 'customer_list':
+        return [
+          { tone: 'blue', value: summaryStats.totalCustomers, label: '客户总数' },
+          { tone: 'amber', value: summaryStats.vipCustomers, label: 'VIP 会员' },
+          { tone: 'green', value: summaryStats.activeCustomers, label: '活跃客户' },
+          { tone: 'purple', value: summaryStats.totalOrders, label: '总订单数' },
+        ];
+      case 'admin_list':
+        return [
+          { tone: 'blue', value: summaryStats.totalAdmins, label: '管理账号总数' },
+          { tone: 'green', value: summaryStats.activeAdmins, label: '活跃账号' },
+          { tone: 'purple', value: summaryStats.superAdmins, label: '超级管理员' },
+          { tone: 'amber', value: summaryStats.recentLogins, label: '今日活跃' },
+        ];
+      case 'merchant_store':
+        return [
+          { tone: 'blue', value: summaryStats.totalStores, label: '店铺总数' },
+          { tone: 'green', value: summaryStats.activeStores, label: '正在营业' },
+          { tone: 'red', value: summaryStats.totalStores - summaryStats.activeStores, label: '休息中' },
+          { tone: 'amber', value: summaryStats.totalOrders, label: '总订单数' },
+        ];
+      case 'courier_management':
+        return [
+          { tone: 'purple', value: summaryStats.totalCouriers, label: '快递员总数' },
+          { tone: 'green', value: summaryStats.activeCouriers, label: '活跃骑手' },
+          { tone: 'amber', value: summaryStats.totalDeliveries, label: '配送总数' },
+          { tone: 'blue', value: summaryStats.avgRating.toFixed(1), label: '平均评分' },
+        ];
+      default:
+        return [];
+    }
+  }, [activeTab, summaryStats]);
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(165deg, #0a0f1c 0%, #0f172a 35%, #152f4a 70%, #1a2744 100%)',
-        padding: isMobile ? '14px 12px 48px' : '36px 28px 56px',
-        color: 'white',
-        fontFamily: "'PingFang SC', 'Segoe UI', system-ui, sans-serif",
-        position: 'relative',
-        boxSizing: 'border-box',
-      }}
-    >
-      <div
-        aria-hidden
-        style={{
-          position: 'fixed',
-          inset: 0,
-          pointerEvents: 'none',
-          background:
-            'radial-gradient(ellipse 70% 45% at 0% -10%, rgba(59, 130, 246, 0.14), transparent 50%), radial-gradient(ellipse 50% 40% at 100% 100%, rgba(16, 185, 129, 0.08), transparent 45%)',
-          zIndex: 0,
-        }}
-      />
-      {/* 🚀 新增全局动画样式 */}
-      <style>{`
-        @keyframes blink {
-          0% { opacity: 1; transform: scale(1); }
-          100% { opacity: 0.5; transform: scale(1.2); }
-        }
-        @keyframes pulse-scale {
-          0% { transform: translateX(-50%) scale(1); }
-          50% { transform: translateX(-50%) scale(1.05); }
-          100% { transform: translateX(-50%) scale(1); }
-        }
-        @keyframes pulse-border {
-          0% { border-color: rgba(231, 76, 60, 0.4); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
-          70% { border-color: rgba(231, 76, 60, 1); box-shadow: 0 0 0 15px rgba(231, 76, 60, 0); }
-          100% { border-color: rgba(231, 76, 60, 0.4); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
-        }
-      `}</style>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '36px',
-            flexWrap: 'wrap',
-            gap: '20px',
-            paddingBottom: '24px',
-            borderBottom: '1px solid rgba(148, 163, 184, 0.15)',
-          }}
-        >
+    <div className="user-mgmt">
+      <div className="user-mgmt__glow" aria-hidden />
+      <div className="user-mgmt__inner">
+        <header className="user-mgmt__head">
           <div>
-            <div
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: 'rgba(186, 230, 253, 0.85)',
-                marginBottom: '10px',
-              }}
-            >
-              ML EXPRESS · ADMIN
-            </div>
-            <h1
-              style={{
-                fontSize: isMobile ? '1.85rem' : '2.6rem',
-                fontWeight: 800,
-                margin: 0,
-                letterSpacing: '-0.02em',
-                background: 'linear-gradient(100deg, #f8fafc 0%, #93c5fd 50%, #a5b4fc 100%)',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent',
-              }}
-            >
-              用户管理
-            </h1>
-            <p style={{ opacity: 0.88, fontSize: '1.05rem', marginTop: '12px', marginBottom: 0, maxWidth: 560, lineHeight: 1.55 }}>
+            <div className="user-mgmt__eyebrow">ML EXPRESS · ADMIN</div>
+            <h1 className="user-mgmt__title">用户管理</h1>
+            <p className="user-mgmt__desc">
               管理客户、商户、快递员与管理员；删除与状态已按数据源自动同步到「用户表」或「后台账户表」。
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/admin/dashboard')}
-            style={{
-              background: 'rgba(15, 23, 42, 0.55)',
-              color: '#e2e8f0',
-              border: '1px solid rgba(148, 163, 184, 0.35)',
-              padding: '12px 22px',
-              borderRadius: '14px',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              fontWeight: 600,
-              backdropFilter: 'blur(10px)',
-              transition: 'all 0.2s ease',
-              flexShrink: 0,
-            }}
-          >
+          <button type="button" className="user-mgmt__back" onClick={() => navigate('/admin/dashboard')}>
             ← 返回管理后台
           </button>
-        </div>
+        </header>
 
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
-          {['customer_list', 'admin_list', 'merchant_store', 'courier_management', 'recharge_requests'].map(tab => {
-            const isRechargeTab = tab === 'recharge_requests';
-            const hasPending = Object.keys(pendingRechargeRequests).length > 0;
-
+        <nav className="user-mgmt__tabs" aria-label="用户管理分类">
+          {USER_TABS.map((tab) => {
+            const isRechargeTab = tab.id === 'recharge_requests';
+            const hasPending = pendingRechargeCount > 0;
+            const isActive = activeTab === tab.id;
             return (
               <button
                 type="button"
-                key={tab}
+                key={tab.id}
+                className={`user-mgmt__tab${isActive ? ' is-active' : ''}${isRechargeTab && hasPending ? ' is-alert' : ''}`}
                 onClick={() => {
-                  setActiveTab(tab as any);
+                  setActiveTab(tab.id);
                   if (isRechargeTab) setHasNewRequest(false);
                 }}
-                style={{
-                  padding: '12px 20px',
-                  borderRadius: '14px',
-                  border:
-                    isRechargeTab && hasPending
-                      ? '2px solid #f87171'
-                      : activeTab === tab
-                        ? '1px solid rgba(96, 165, 250, 0.55)'
-                        : '1px solid rgba(148, 163, 184, 0.2)',
-                  background:
-                    activeTab === tab
-                      ? 'linear-gradient(145deg, rgba(37, 99, 235, 0.35) 0%, rgba(30, 41, 59, 0.9) 100%)'
-                      : 'rgba(15, 23, 42, 0.55)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: activeTab === tab ? '700' : '500',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow:
-                    isRechargeTab && hasPending
-                      ? '0 0 20px rgba(248, 113, 113, 0.25)'
-                      : activeTab === tab
-                        ? '0 8px 24px rgba(0, 0, 0, 0.22)'
-                        : 'none',
-                  animation: isRechargeTab && hasPending ? 'pulse-border 2s infinite' : 'none',
-                }}
               >
+                {isRechargeTab && hasPending && <span>🚨</span>}
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
                 {isRechargeTab && hasPending && (
-                  <span style={{ animation: 'blink 0.6s infinite alternate' }}>🚨</span>
+                  <span className="user-mgmt__tab-badge">{pendingRechargeCount}</span>
                 )}
-                {tab === 'customer_list' ? '客户列表' : 
-                 tab === 'admin_list' ? '管理员列表' : 
-                 tab === 'merchant_store' ? 'MERCHANTS' : 
-                 tab === 'courier_management' ? '快递员管理' : 
-                 '充值申请审核'}
               </button>
             );
           })}
-        </div>
+        </nav>
 
-        {(activeTab === 'customer_list' || activeTab === 'admin_list' || activeTab === 'merchant_store' || activeTab === 'courier_management') && !showAddUserForm && (
-          <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)', marginBottom: '30px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '15px' }}>
-              {activeTab === 'customer_list' ? (
-                <>
-                  <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.totalCustomers}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>客户总数</p>
-                  </div>
-                  <div style={{ background: 'rgba(241, 196, 15, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#f1c40f', margin: '0 0 5px 0' }}>{summaryStats.vipCustomers}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>VIP 会员</p>
-                  </div>
-                  <div style={{ background: 'rgba(46, 204, 113, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#2ecc71', margin: '0 0 5px 0' }}>{summaryStats.activeCustomers}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>活跃客户</p>
-                  </div>
-                  <div style={{ background: 'rgba(230, 126, 34, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#e67e22', margin: '0 0 5px 0' }}>{summaryStats.totalOrders}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>总订单数</p>
-                  </div>
-                </>
-              ) : activeTab === 'admin_list' ? (
-                <>
-                  <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.totalAdmins}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>管理账号总数</p>
-                  </div>
-                  <div style={{ background: 'rgba(46, 204, 113, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#2ecc71', margin: '0 0 5px 0' }}>{summaryStats.activeAdmins}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>活跃账号</p>
-                  </div>
-                  <div style={{ background: 'rgba(155, 89, 182, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#9b59b6', margin: '0 0 5px 0' }}>{summaryStats.superAdmins}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>超级管理员</p>
-                  </div>
-                  <div style={{ background: 'rgba(230, 126, 34, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#e67e22', margin: '0 0 5px 0' }}>{summaryStats.recentLogins}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>今日活跃</p>
-                  </div>
-                </>
-              ) : activeTab === 'merchant_store' ? (
-                <>
-                  <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.totalStores}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>店铺总数</p>
-                  </div>
-                  <div style={{ background: 'rgba(46, 204, 113, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#2ecc71', margin: '0 0 5px 0' }}>{summaryStats.activeStores}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>正在营业</p>
-                  </div>
-                  <div style={{ background: 'rgba(231, 76, 60, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#e74c3c', margin: '0 0 5px 0' }}>{summaryStats.totalStores - summaryStats.activeStores}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>休息中</p>
-                  </div>
-                  <div style={{ background: 'rgba(230, 126, 34, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#e67e22', margin: '0 0 5px 0' }}>{summaryStats.totalOrders}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>总订单数</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div style={{ background: 'rgba(155, 89, 182, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#9b59b6', margin: '0 0 5px 0' }}>{summaryStats.totalCouriers}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>快递员总数</p>
-                  </div>
-                  <div style={{ background: 'rgba(46, 204, 113, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#2ecc71', margin: '0 0 5px 0' }}>{summaryStats.activeCouriers}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>活跃骑手</p>
-                  </div>
-                  <div style={{ background: 'rgba(241, 196, 15, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#f1c40f', margin: '0 0 5px 0' }}>{summaryStats.totalDeliveries}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>配送总数</p>
-                  </div>
-                  <div style={{ background: 'rgba(52, 152, 219, 0.2)', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                    <h3 style={{ color: '#3498db', margin: '0 0 5px 0' }}>{summaryStats.avgRating.toFixed(1)}</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>平均评分</p>
-                  </div>
-                </>
-              )}
-            </div>
+        {(activeTab === 'customer_list' || activeTab === 'admin_list' || activeTab === 'merchant_store' || activeTab === 'courier_management') && !showAddUserForm && statCards.length > 0 && (
+          <div className="user-mgmt__stats">
+            {statCards.map((card) => (
+              <div key={card.label} className={`user-mgmt__stat user-mgmt__stat--${card.tone}`}>
+                <p className="user-mgmt__stat-value">{card.value}</p>
+                <p className="user-mgmt__stat-label">{card.label}</p>
+              </div>
+            ))}
           </div>
         )}
 
         {(activeTab === 'customer_list' || activeTab === 'admin_list') && !showAddUserForm && (
-          <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginBottom: '24px', alignItems: 'center' }}>
-              <input type="text" placeholder="🔍 搜索客户姓名、电话..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ flex: 1, padding: '14px 20px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.2)', background: 'rgba(0, 0, 0, 0.4)', color: 'white' }} />
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '14px 20px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.2)', background: 'rgba(0, 0, 0, 0.4)', color: 'white' }}>
-                <option value="all">📊 所有状态</option>
-                <option value="active">✅ 活跃</option>
-                <option value="inactive">💤 非活跃</option>
-                <option value="suspended">🚫 已暂停</option>
-              </select>
-              <button onClick={() => setShowAddUserForm(true)} style={{ background: '#27ae60', color: 'white', border: 'none', padding: '14px 24px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>＋ 新增用户</button>
-              <button onClick={handleSelectAll} style={{ background: 'rgba(255, 255, 255, 0.1)', color: 'white', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '14px 24px', borderRadius: '12px', cursor: 'pointer' }}>{selectedUsers.size === filteredUsers.length ? '取消全选' : '▢ 全选'}</button>
+          <section className="user-mgmt__panel">
+            <div className="user-mgmt__toolbar">
+              <div>
+                <h2 className="user-mgmt__toolbar-title">
+                  {activeTab === 'customer_list' ? '客户列表' : '管理员列表'}
+                </h2>
+                <div className="user-mgmt__toolbar-meta">
+                  <span className="user-mgmt__count">共 {filteredUsers.length} 人</span>
+                  {selectedUsers.size > 0 && (
+                    <span className="user-mgmt__count">已选 {selectedUsers.size}</span>
+                  )}
+                  {pendingRechargeCount > 0 && activeTab === 'customer_list' && (
+                    <span className="user-mgmt__count" style={{ color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }}>
+                      {pendingRechargeCount} 笔待充值
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="user-mgmt__filters">
+                <div className="user-mgmt__search">
+                  <span className="user-mgmt__search-icon">🔍</span>
+                  <input
+                    type="search"
+                    placeholder={activeTab === 'customer_list' ? '搜索姓名、电话、邮箱、ID…' : '搜索管理员…'}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                {activeTab === 'customer_list' && (
+                  <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                    <option value="all">全部客户</option>
+                    <option value="vip">VIP 会员</option>
+                    <option value="member">普通会员</option>
+                  </select>
+                )}
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                  <option value="all">全部状态</option>
+                  <option value="active">活跃</option>
+                  <option value="inactive">非活跃</option>
+                  <option value="suspended">已暂停</option>
+                </select>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                  <option value="newest">最新注册</option>
+                  <option value="balance">余额从高到低</option>
+                  <option value="orders">订单从多到少</option>
+                  <option value="name">姓名 A-Z</option>
+                </select>
+              </div>
+              <div className="user-mgmt__actions">
+                <button type="button" className="user-mgmt__btn user-mgmt__btn--primary" onClick={() => setShowAddUserForm(true)}>
+                  ＋ 新增用户
+                </button>
+                <button type="button" className="user-mgmt__btn" onClick={handleSelectAll}>
+                  {selectedUsers.size === filteredUsers.length && filteredUsers.length > 0 ? '取消全选' : '全选'}
+                </button>
+                <button type="button" className="user-mgmt__btn" onClick={() => loadUsers()}>
+                  🔄 刷新
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
-              {filteredUsers.map((user, index) => (
-                <UserRow 
-                  key={user.id} 
-                  user={user} 
-                  selectedUsers={selectedUsers} 
-                  handleSelectUser={handleSelectUser} 
-                  isMobile={isMobile} 
-                  handleEditUser={handleEditUser} 
-                  updateUserStatus={updateUserStatus} 
-                  handleDeleteUser={handleDeleteUser}
-                  handleOpenRecharge={handleOpenRecharge} 
-                  pendingRecharge={pendingRechargeRequests[user.id]}
-                  handleApproveRecharge={handleApproveRecharge}
-                  handleRejectRecharge={handleRejectRecharge}
-                />
-              ))}
-            </div>
-          </div>
+            {selectedUsers.size > 0 && (
+              <div className="user-mgmt__bulk">
+                <span className="user-mgmt__bulk-text">已选择 {selectedUsers.size} 个用户</span>
+                <div className="user-mgmt__actions">
+                  <button type="button" className="user-mgmt__btn user-mgmt__btn--danger" onClick={handleBatchDelete} disabled={isBatchDeleting}>
+                    {isBatchDeleting ? '删除中…' : '🗑️ 批量删除'}
+                  </button>
+                  <button type="button" className="user-mgmt__btn" onClick={() => setSelectedUsers(new Set())}>
+                    取消选择
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {loading ? (
+              <SkeletonTable rows={4} />
+            ) : filteredUsers.length === 0 ? (
+              <div className="user-mgmt__empty">
+                <div className="user-mgmt__empty-icon">👥</div>
+                <p className="user-mgmt__empty-text">没有匹配的用户</p>
+                <button type="button" className="user-mgmt__reset" onClick={resetUserFilters}>
+                  重置筛选条件
+                </button>
+              </div>
+            ) : (
+              <div className="user-mgmt__list">
+                {filteredUsers.map((user) => (
+                  <UserRow
+                    key={user.id}
+                    user={user}
+                    selectedUsers={selectedUsers}
+                    handleSelectUser={handleSelectUser}
+                    handleEditUser={handleEditUser}
+                    updateUserStatus={updateUserStatus}
+                    handleDeleteUser={handleDeleteUser}
+                    handleOpenRecharge={handleOpenRecharge}
+                    pendingRecharge={pendingRechargeRequests[user.id]}
+                    handleApproveRecharge={handleApproveRecharge}
+                    handleRejectRecharge={handleRejectRecharge}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         )}
 
         {activeTab === 'recharge_requests' && (
-          <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ color: 'white', margin: 0 }}>💰 充值申请审核</h2>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
+          <section className="user-mgmt__panel">
+            <div className="user-mgmt__toolbar">
+              <div>
+                <h2 className="user-mgmt__toolbar-title">💰 充值申请审核</h2>
+                <div className="user-mgmt__toolbar-meta">
+                  <span className="user-mgmt__count">共 {rechargeRequests.length} 条</span>
+                  {pendingRechargeCount > 0 && (
+                    <span className="user-mgmt__count" style={{ color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }}>
+                      {pendingRechargeCount} 待审核
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="user-mgmt__actions">
+                <button
+                  type="button"
+                  className="user-mgmt__btn user-mgmt__btn--primary"
                   onClick={() => {
-                    // 🚀 核心：用户必须点击一次来“解锁”浏览器的语音引擎
                     speakNotification('声音提醒功能已开启');
                     window.alert('✅ 声音播报已激活！\n\n系统现在将自动检测充值申请，并每隔 30 秒为您进行语音提醒。请确保您的设备没有开启静音模式。');
-                  }} 
-                  style={{ 
-                    background: 'rgba(46, 204, 113, 0.2)', 
-                    color: '#2ecc71', 
-                    border: '1px solid rgba(46, 204, 113, 0.4)', 
-                    padding: '8px 16px', 
-                    borderRadius: '10px', 
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    boxShadow: '0 4px 15px rgba(46, 204, 113, 0.2)'
                   }}
                 >
                   🔔 开启语音提醒
                 </button>
-                <button onClick={loadRechargeRequests} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer' }}>🔄 刷新列表</button>
+                <button type="button" className="user-mgmt__btn" onClick={loadRechargeRequests}>
+                  🔄 刷新列表
+                </button>
               </div>
             </div>
 
             {loadingRequests ? (
               <SkeletonTable rows={5} />
             ) : rechargeRequests.length === 0 ? (
-              <div style={{ padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
-                <span style={{ fontSize: '4rem', display: 'block', marginBottom: '20px' }}>📋</span>
-                <p style={{ fontSize: '1.2rem' }}>暂无充值申请记录</p>
+              <div className="user-mgmt__empty">
+                <div className="user-mgmt__empty-icon">📋</div>
+                <p className="user-mgmt__empty-text">暂无充值申请记录</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: '20px' }}>
+              <div className="user-mgmt-recharge-list">
                 {rechargeRequests.map(request => (
-                  <div key={request.id} style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    borderRadius: '20px',
-                    padding: '24px',
-                    border: request.status === 'pending' ? '2px solid #e74c3c' : '1px solid rgba(255, 255, 255, 0.12)',
-                    display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr 1.5fr 1.5fr',
-                    gap: '20px',
-                    alignItems: 'center',
-                    boxShadow: request.status === 'pending' ? '0 0 15px rgba(231, 76, 60, 0.2)' : 'none',
-                    animation: request.status === 'pending' ? 'pulse-border 2s infinite' : 'none',
-                    position: 'relative'
-                  }}>
-                    {/* 🚀 新增：待审核项的闪烁警报 */}
+                  <article
+                    key={request.id}
+                    className={`user-mgmt-recharge-item${request.status === 'pending' ? ' is-pending' : ''}`}
+                  >
                     {request.status === 'pending' && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '-12px',
-                        left: '20px',
-                        background: '#e74c3c',
-                        color: 'white',
-                        padding: '2px 12px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        animation: 'pulse-scale 1.5s infinite',
-                        zIndex: 10
-                      }}>
-                        <span style={{ animation: 'blink 0.6s infinite alternate' }}>🚨</span> 新申请
+                      <div className="user-mgmt-recharge-item__badge">
+                        <span className="user-mgmt-recharge-item__badge-icon">🚨</span> 新申请
                       </div>
                     )}
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '1.5rem' }}>👤</span>
-                        <div>
-                          <div style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>{request.user_name}</div>
-                          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>{request.user_id}</div>
+
+                    <div className="user-mgmt-recharge-item__user">
+                      <span className="user-mgmt-recharge-item__avatar" aria-hidden>👤</span>
+                      <div>
+                        <div className="user-mgmt-recharge-item__name">{request.user_name}</div>
+                        <div className="user-mgmt-recharge-item__uid">{request.user_id}</div>
+                        <div className="user-mgmt-recharge-item__time">
+                          ⏰ {new Date(request.created_at || '').toLocaleString('zh-CN')}
                         </div>
                       </div>
-                      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
-                        ⏰ {new Date(request.created_at).toLocaleString('zh-CN')}
+                    </div>
+
+                    <div className="user-mgmt-recharge-item__amount-wrap">
+                      <div className="user-mgmt-recharge-item__amount-label">充值金额</div>
+                      <div className="user-mgmt-recharge-item__amount">
+                        {request.amount.toLocaleString()} MMK
                       </div>
                     </div>
 
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', marginBottom: '4px' }}>充值金额</div>
-                      <div style={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: '900' }}>{request.amount.toLocaleString()} MMK</div>
+                    <div className="user-mgmt-recharge-item__proof-wrap">
+                      <div className="user-mgmt-recharge-item__proof-label">汇款凭证</div>
+                      {request.proof_url ? (
+                        <a
+                          href={request.proof_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="user-mgmt-recharge-item__proof-link"
+                        >
+                          <div className="user-mgmt-recharge-item__proof">
+                            <img src={request.proof_url} alt="汇款凭证" />
+                          </div>
+                        </a>
+                      ) : (
+                        <div className="user-mgmt-recharge-item__notes">无凭证</div>
+                      )}
                     </div>
 
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', marginBottom: '8px' }}>汇款凭证</div>
-                      <a href={request.proof_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block' }}>
-                        <div style={{
-                          width: '100px',
-                          height: '100px',
-                          borderRadius: '12px',
-                          overflow: 'hidden',
-                          border: '2px solid rgba(255,255,255,0.1)',
-                          background: '#000'
-                        }}>
-                          <img src={request.proof_url} alt="Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </div>
-                      </a>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ 
-                        textAlign: 'center',
-                        padding: '6px 12px',
-                        borderRadius: '10px',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        background: request.status === 'pending' ? 'rgba(241, 196, 15, 0.2)' : 
-                                   request.status === 'completed' ? 'rgba(46, 204, 113, 0.2)' : 'rgba(231, 76, 60, 0.2)',
-                        color: request.status === 'pending' ? '#f1c40f' : 
-                               request.status === 'completed' ? '#2ecc71' : '#e74c3c',
-                        border: `1px solid ${request.status === 'pending' ? '#f1c40f44' : 
-                                             request.status === 'completed' ? '#2ecc7144' : '#e74c3c44'}`
-                      }}>
-                        {request.status === 'pending' ? '⏳ 待审核' : 
-                         request.status === 'completed' ? '✅ 已通过' : '❌ 已拒绝'}
+                    <div className="user-mgmt-recharge-item__actions">
+                      <div
+                        className={`user-mgmt-recharge-item__status ${
+                          request.status === 'pending'
+                            ? 'is-pending'
+                            : request.status === 'completed'
+                              ? 'is-completed'
+                              : 'is-rejected'
+                        }`}
+                      >
+                        {request.status === 'pending'
+                          ? '⏳ 待审核'
+                          : request.status === 'completed'
+                            ? '✅ 已通过'
+                            : '❌ 已拒绝'}
                       </div>
 
                       {request.status === 'pending' ? (
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <button onClick={() => handleApproveRecharge(request)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#2ecc71', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>通过</button>
-                          <button onClick={() => handleRejectRecharge(request)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#e74c3c', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>拒绝</button>
+                        <div className="user-mgmt-recharge-item__btns">
+                          <button
+                            type="button"
+                            className="user-mgmt-recharge-item__btn user-mgmt-recharge-item__btn--approve"
+                            onClick={() => handleApproveRecharge(request)}
+                          >
+                            通过
+                          </button>
+                          <button
+                            type="button"
+                            className="user-mgmt-recharge-item__btn user-mgmt-recharge-item__btn--reject"
+                            onClick={() => handleRejectRecharge(request)}
+                          >
+                            拒绝
+                          </button>
                         </div>
                       ) : (
-                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontStyle: 'italic', textAlign: 'center' }}>
+                        <div className="user-mgmt-recharge-item__notes">
                           {request.notes || '无备注'}
                         </div>
                       )}
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             )}
-          </div>
+          </section>
         )}
 
         {activeTab === 'merchant_store' && (
-          <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-            <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
-              {merchantStores.map(store => (
-                <StoreRow 
-                  key={store.id} 
-                  store={store} 
-                  isMobile={isMobile} 
-                  pendingRecharge={pendingRechargeRequests[store.id] || (store.user_id && pendingRechargeRequests[store.user_id])}
-                />
-              ))}
+          <section className="user-mgmt__panel">
+            <div className="user-mgmt__toolbar">
+              <div>
+                <h2 className="user-mgmt__toolbar-title">MERCHANTS 店铺</h2>
+                <div className="user-mgmt__toolbar-meta">
+                  <span className="user-mgmt__count">共 {merchantStores.length} 家</span>
+                </div>
+              </div>
+              <div className="user-mgmt__actions">
+                <button type="button" className="user-mgmt__btn" onClick={() => navigate('/admin/delivery-stores')}>
+                  🏪 前往商家管理
+                </button>
+              </div>
             </div>
-          </div>
+            {loadingStores ? (
+              <SkeletonTable rows={3} />
+            ) : merchantStores.length === 0 ? (
+              <div className="user-mgmt__empty">
+                <div className="user-mgmt__empty-icon">🏪</div>
+                <p className="user-mgmt__empty-text">暂无合伙店铺数据</p>
+              </div>
+            ) : (
+              <div className="user-mgmt__list">
+                {merchantStores.map((store) => (
+                  <StoreRow
+                    key={store.id}
+                    store={store}
+                    isMobile={isMobile}
+                    pendingRecharge={pendingRechargeRequests[store.id] || (store.user_id && pendingRechargeRequests[store.user_id])}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         )}
 
         {activeTab === 'courier_management' && (
-          <div style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', borderRadius: '15px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-            <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}>
-              {couriers.map(courier => (
-                <CourierRow 
-                  key={courier.id} 
-                  courier={courier} 
-                  isMobile={isMobile} 
-                  handleEditCourier={handleEditCourier} 
-                  handleCourierStatusChange={handleCourierStatusChange} 
-                  handleDeleteCourier={handleDeleteCourier} 
-                />
-              ))}
+          <section className="user-mgmt__panel">
+            <div className="user-mgmt__toolbar">
+              <div>
+                <h2 className="user-mgmt__toolbar-title">快递员管理</h2>
+                <div className="user-mgmt__toolbar-meta">
+                  <span className="user-mgmt__count">共 {filteredCouriers.length} 人</span>
+                </div>
+              </div>
+              <div className="user-mgmt__filters">
+                <div className="user-mgmt__search">
+                  <span className="user-mgmt__search-icon">🔍</span>
+                  <input
+                    type="search"
+                    placeholder="搜索姓名、电话、工号…"
+                    value={courierSearchTerm}
+                    onChange={(e) => setCourierSearchTerm(e.target.value)}
+                  />
+                </div>
+                <select value={courierStatusFilter} onChange={(e) => setCourierStatusFilter(e.target.value)}>
+                  <option value="all">全部状态</option>
+                  <option value="active">活跃</option>
+                  <option value="inactive">停用</option>
+                </select>
+                <select value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)}>
+                  <option value="all">全部车型</option>
+                  <option value="motorcycle">摩托车</option>
+                  <option value="car">汽车</option>
+                  <option value="bicycle">自行车</option>
+                  <option value="truck">货车</option>
+                </select>
+              </div>
+              <div className="user-mgmt__actions">
+                <button type="button" className="user-mgmt__btn" onClick={() => loadCouriers()}>
+                  🔄 刷新
+                </button>
+              </div>
             </div>
-          </div>
+            {courierLoading ? (
+              <SkeletonTable rows={3} />
+            ) : filteredCouriers.length === 0 ? (
+              <div className="user-mgmt__empty">
+                <div className="user-mgmt__empty-icon">🛵</div>
+                <p className="user-mgmt__empty-text">没有匹配的快递员</p>
+              </div>
+            ) : (
+              <div className="user-mgmt__list">
+                {filteredCouriers.map((courier) => (
+                  <CourierRow
+                    key={courier.id}
+                    courier={courier}
+                    isMobile={isMobile}
+                    handleEditCourier={handleEditCourier}
+                    handleCourierStatusChange={handleCourierStatusChange}
+                    handleDeleteCourier={handleDeleteCourier}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         )}
 
         {showAddUserForm && (

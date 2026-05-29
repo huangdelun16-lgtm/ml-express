@@ -195,6 +195,33 @@ export interface DeliveryStore {
   cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
 }
 
+export interface Product {
+  id: string;
+  store_id: string;
+  category_id?: string;
+  name: string;
+  description?: string;
+  price: number;
+  original_price?: number;
+  image_url?: string;
+  detail_image_urls?: string[];
+  stock: number;
+  is_available: boolean;
+  sales_count: number;
+  listing_status?: 'pending' | 'approved' | 'rejected' | null;
+  pending_update?: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AdminProductDraft {
+  name: string;
+  description: string;
+  price: string;
+  image_url: string;
+  detail_image_urls: string[];
+}
+
 export interface Banner {
   id?: string;
   title: string;
@@ -2120,13 +2147,33 @@ export const deliveryStoreService = {
   // 创建新快递店
   async createStore(storeData: Omit<DeliveryStore, 'id' | 'current_load' | 'status' | 'created_at' | 'updated_at'>): Promise<{ success: boolean; data?: DeliveryStore; error?: string }> {
     try {
+      const insertRow = {
+        store_name: storeData.store_name,
+        store_code: storeData.store_code,
+        address: storeData.address,
+        latitude: storeData.latitude,
+        longitude: storeData.longitude,
+        phone: storeData.phone,
+        email: storeData.email || null,
+        manager_name: storeData.manager_name,
+        manager_phone: storeData.manager_phone,
+        store_type: storeData.store_type,
+        operating_hours: storeData.operating_hours,
+        service_area_radius: storeData.service_area_radius,
+        capacity: storeData.capacity,
+        facilities: storeData.facilities ?? [],
+        notes: storeData.notes || null,
+        password: storeData.password || null,
+        region: storeData.region || null,
+        created_by: storeData.created_by || null,
+        cod_settlement_day: storeData.cod_settlement_day || '7',
+        current_load: 0,
+        status: 'active' as const,
+      };
+
       const { data, error } = await supabase
         .from('delivery_stores')
-        .insert([{
-          ...storeData,
-          current_load: 0,
-          status: 'active' // Status is set internally
-        }])
+        .insert([insertRow])
         .select()
         .single();
 
@@ -2142,17 +2189,17 @@ export const deliveryStoreService = {
         }
         // 检查是否是检查约束错误
         if (error.code === '23514') {
-          if (error.message.includes('store_type_check')) {
+          if (error.message.includes('store_type')) {
             return { success: false, error: '店铺类型无效，请联系管理员更新数据库约束' };
           }
         }
-        return { success: false, error: '创建失败，请重试' };
+        return { success: false, error: error.message || '创建失败，请重试' };
       }
 
       return { success: true, data };
     } catch (err) {
       console.error('创建快递店异常:', err);
-      return { success: false, error: '创建失败，请重试' };
+      return { success: false, error: err instanceof Error ? err.message : '创建失败，请重试' };
     }
   },
 
@@ -2264,6 +2311,75 @@ export const deliveryStoreService = {
       return [];
     }
   }
+};
+
+export const productService = {
+  async uploadProductImage(storeId: string, file: File): Promise<string | null> {
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${storeId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+
+      const { error } = await supabase.storage
+        .from('product_images')
+        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product_images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (err) {
+      console.error('上传商品图片失败:', err);
+      return null;
+    }
+  },
+
+  /** Admin 代商家添加商品：直接上架，无需商家端审核 */
+  async createProductAsAdmin(
+    storeId: string,
+    product: {
+      name: string;
+      description?: string;
+      price: number;
+      image_url?: string;
+      detail_image_urls?: string[];
+      stock?: number;
+    },
+  ): Promise<{ success: boolean; data?: Product; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert([
+          {
+            store_id: storeId,
+            name: product.name,
+            description: product.description || null,
+            price: product.price,
+            image_url: product.image_url || null,
+            detail_image_urls: product.detail_image_urls ?? [],
+            stock: product.stock ?? -1,
+            is_available: true,
+            sales_count: 0,
+            listing_status: 'approved',
+            pending_update: null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Admin 添加商品失败:', error);
+        return { success: false, error: error.message || '添加商品失败' };
+      }
+
+      return { success: true, data: data as Product };
+    } catch (err) {
+      console.error('Admin 添加商品异常:', err);
+      return { success: false, error: err instanceof Error ? err.message : '添加商品失败' };
+    }
+  },
 };
 
 // 审计日志服务

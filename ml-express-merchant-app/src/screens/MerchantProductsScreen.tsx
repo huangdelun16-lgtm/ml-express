@@ -25,6 +25,7 @@ import { merchantService, Product, ProductCategory, productFormSource, hasPendin
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
+import { autoPrepareProductImageUri, autoPrepareProductImageUris } from '../utils/productImageNative';
 
 const { width } = Dimensions.get('window');
 
@@ -239,34 +240,29 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         return;
       }
 
-      // 使用兼容性写法，优先尝试新版 API，失败则回退
-      const options: any = {
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
       };
-
-      // 尝试使用字符串数组，这是新版 Expo 推荐的写法
-      options.mediaTypes = ['images'];
 
       const result = await ImagePicker.launchImageLibraryAsync(options);
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const uri = result.assets[0].uri;
-        setProductForm(prev => ({ ...prev, image_url: uri }));
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        const preparedUri = await autoPrepareProductImageUri(result.assets[0].uri);
+        setProductForm((prev) => ({ ...prev, image_url: preparedUri }));
       }
     } catch (error) {
       console.error('Pick image error:', error);
-      // 如果 ['images'] 报错，尝试回退到旧版 MediaTypeOptions
       try {
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.7,
+          allowsEditing: false,
+          quality: 1,
         });
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          setProductForm(prev => ({ ...prev, image_url: result.assets[0].uri }));
+        if (!result.canceled && result.assets?.[0]?.uri) {
+          const preparedUri = await autoPrepareProductImageUri(result.assets[0].uri);
+          setProductForm((prev) => ({ ...prev, image_url: preparedUri }));
         }
       } catch (retryError) {
         Alert.alert('错误', '无法打开相册，请检查权限');
@@ -285,13 +281,14 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       const options: ImagePicker.ImagePickerOptions = {
         allowsMultipleSelection: true,
         selectionLimit: 12,
-        quality: 0.7,
+        allowsEditing: false,
+        quality: 1,
         mediaTypes: ['images'],
       };
 
       const result = await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled && result.assets?.length) {
-        const uris = result.assets.map((asset) => asset.uri);
+        const uris = await autoPrepareProductImageUris(result.assets.map((asset) => asset.uri));
         setProductForm((prev) => ({
           ...prev,
           detail_image_urls: [...prev.detail_image_urls, ...uris],

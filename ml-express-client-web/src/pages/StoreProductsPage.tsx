@@ -681,9 +681,9 @@ const StoreProductsPage: React.FC = () => {
                         }
                       }}
                     >
-                      <div style={{ height: '180px', background: '#f8fafc', position: 'relative' }}>
+                      <div style={{ aspectRatio: '1', background: '#f8fafc', position: 'relative' }}>
                         {product.image_url && !product.image_url.startsWith('file://') ? (
-                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         ) : (
                           <div
                             style={{
@@ -960,7 +960,7 @@ const StoreProductsPage: React.FC = () => {
           >
             <div style={{ position: 'relative', height: 220, background: '#f1f5f9', flexShrink: 0 }}>
               {selectedProductDetail.image_url && !selectedProductDetail.image_url.startsWith('file://') ? (
-                <img src={selectedProductDetail.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={selectedProductDetail.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>
                   📦
@@ -1113,10 +1113,11 @@ const StoreProductsPage: React.FC = () => {
                         alt=""
                         style={{
                           width: '100%',
+                          height: 'auto',
                           borderRadius: 14,
-                          objectFit: 'cover',
+                          objectFit: 'contain',
                           display: 'block',
-                          background: '#e2e8f0',
+                          background: '#f1f5f9',
                         }}
                       />
                     ))}

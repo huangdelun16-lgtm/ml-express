@@ -24,6 +24,7 @@ import {
 import QRCode from "qrcode";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api"; // 🚀 新增
 import LoggerService from "../services/LoggerService";
+import { autoPrepareProductImageForUpload } from "../utils/productImagePrepare";
 import NavigationBar from "../components/home/NavigationBar";
 import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
@@ -614,9 +615,10 @@ const ProfilePage: React.FC = () => {
 
     try {
       setIsUploading(true);
+      const prepared = await autoPrepareProductImageForUpload(file);
       const url = await merchantService.uploadProductImage(
         currentUser.id,
-        file,
+        prepared,
       );
       if (url) {
         setProductForm((prev) => ({ ...prev, image_url: url }));
@@ -626,6 +628,7 @@ const ProfilePage: React.FC = () => {
       alert("图片上传失败，请重试");
     } finally {
       setIsUploading(false);
+      if (productFileInputRef.current) productFileInputRef.current.value = "";
     }
   };
 
@@ -637,7 +640,8 @@ const ProfilePage: React.FC = () => {
       setIsUploadingDetailImages(true);
       const uploadedUrls: string[] = [];
       for (const file of Array.from(files)) {
-        const url = await merchantService.uploadProductImage(currentUser.id, file);
+        const prepared = await autoPrepareProductImageForUpload(file);
+        const url = await merchantService.uploadProductImage(currentUser.id, prepared);
         if (url) uploadedUrls.push(url);
       }
       if (uploadedUrls.length > 0) {

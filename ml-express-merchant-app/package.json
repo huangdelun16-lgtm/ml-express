@@ -1,6 +1,6 @@
 {
   "name": "ml-express-merchant-app",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -27,6 +27,7 @@
     "expo-clipboard": "~8.0.7",
     "expo-constants": "~18.0.9",
     "expo-file-system": "~19.0.21",
+    "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.10",
     "expo-keep-awake": "~14.0.3",
     "expo-linear-gradient": "~15.0.7",
