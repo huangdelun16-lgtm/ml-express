@@ -33,6 +33,7 @@ import type {
   UserNotification,
   WelcomeScreen,
 } from "./_shared/domainTypes";
+import { createBannerService, createTutorialService } from "./_shared/services";
 export type {
   Banner,
   Tutorial,
@@ -42,7 +43,6 @@ export type {
   UserNotification,
   WelcomeScreen,
 };
-import { createBannerService, createTutorialService } from "./_shared/services";
 
 type SupabaseExtra = { supabaseUrl?: string; supabaseAnonKey?: string };
 const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra) as SupabaseExtra | undefined;

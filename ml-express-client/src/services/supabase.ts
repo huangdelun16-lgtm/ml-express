@@ -19,6 +19,7 @@ import type {
   UserNotification,
   WelcomeScreen,
 } from './_shared/domainTypes';
+import { createBannerService, createTutorialService } from './_shared/services';
 export type {
   Banner,
   Tutorial,
@@ -28,7 +29,6 @@ export type {
   UserNotification,
   WelcomeScreen,
 };
-import { createBannerService, createTutorialService } from './_shared/services';
 
 // 使用环境变量配置 Supabase
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';

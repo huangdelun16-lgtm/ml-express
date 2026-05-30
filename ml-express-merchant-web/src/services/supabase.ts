@@ -24,8 +24,8 @@ import type {
   StoreReview,
   RechargeRequest,
 } from './_shared/domainTypes';
-export type { Banner, Tutorial, ProductCategory, StoreReview, RechargeRequest };
 import { createBannerService, createTutorialService } from './_shared/services';
+export type { Banner, Tutorial, ProductCategory, StoreReview, RechargeRequest };
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
