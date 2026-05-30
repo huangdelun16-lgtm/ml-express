@@ -232,6 +232,7 @@ shared/
 4. **改数据层纯逻辑**（计费/商品审核/充值QR）：改 `/shared/src`，**不要**逐个 app 改 `supabase.ts`，更不要改 `_shared/` 副本。
 5. **不要硬编码生产域名**拼接资源/API，优先相对路径或 `window.location.origin`。
 6. **提交**：仅在用户明确要求时提交；保持单一主题、勿混入无关 WIP；勿提交密钥/`.env`。
+7. **CI 类型检查**：`.github/workflows/typecheck.yml` 对 6 个项目跑 `tsc --noEmit`，以**基线门禁**方式（`scripts/typecheck-baselines.json` + `scripts/ci-typecheck.mjs`）挡住新增类型错误。clean 项目（根/client-web/merchant-web）基线为 0；RN 项目暂以现有错误数为基线。**修复历史错误后请同步下调对应基线**（最终归 0）。注意：各 app 构建脚本仍是 `CI=false ... build`，类型把关由本 CI 负责。
 
 ---
 

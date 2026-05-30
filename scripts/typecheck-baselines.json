@@ -1,0 +1,9 @@
+{
+  "_comment": "每个项目允许的最大 tsc 错误数（基线）。CI 在超过基线时失败，用于挡住「新增」类型错误。修复历史错误后，请把对应数字调小（最终归 0）。",
+  ".": 0,
+  "ml-express-client-web": 0,
+  "ml-express-merchant-web": 0,
+  "ml-express-client": 52,
+  "ml-express-merchant-app": 56,
+  "ml-express-mobile-app": 2
+}

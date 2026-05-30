@@ -1,0 +1,55 @@
+name: Typecheck
+
+# 对 6 个子项目跑 `tsc --noEmit`，以「基线门禁」方式挡住新增类型错误。
+# 基线见 scripts/typecheck-baselines.json：clean 项目必须 0 错误；
+# RN 项目暂以现有错误数为基线（不允许变多），修复后请下调基线。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同一分支新推送时取消旧的运行
+concurrency:
+  group: typecheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: tsc (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - "."
+          - "ml-express-client-web"
+          - "ml-express-merchant-web"
+          - "ml-express-client"
+          - "ml-express-merchant-app"
+          - "ml-express-mobile-app"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.project }}/node_modules
+          key: deps-${{ runner.os }}-${{ matrix.project }}-${{ hashFiles(format('{0}/package.json', matrix.project)) }}
+          restore-keys: |
+            deps-${{ runner.os }}-${{ matrix.project }}-
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.project }}
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Sync shared modules
+        working-directory: ${{ matrix.project }}
+        run: npm run sync:shared
+
+      - name: Typecheck (baseline-gated)
+        run: node scripts/ci-typecheck.mjs "${{ matrix.project }}"
