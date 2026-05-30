@@ -1,12 +1,12 @@
 # MARKET LINK EXPRESS — AI 与维护者架构指南
 
-本文档概括本仓库（**market-link-express / ml-express**）内所有面向用户与管理的产品形态、目录职责、路由与部署关系，便于后续改需求时不混淆边界。
+本文档概括本仓库（**market-link-express / ml-express**）内所有产品形态、目录职责、文件路径、路由与部署关系，便于后续改需求时不混淆边界。**若本指南与代码不一致，以仓库当前文件为准，并请同步更新本文件。**
 
 ---
 
 ## 1. 仓库总览
 
-本仓库是 **多包单体仓库（monorepo）**：根目录即 **管理后台 Web**；其余业务线为子目录独立应用，**各自**依赖 Supabase、各自动 Netlify / 应用商店发布。
+本仓库是 **多包单体仓库（monorepo）**，但**没有 npm workspaces**：根目录即 **管理后台 Web**；其余业务线为子目录独立应用，**各自**依赖 Supabase、各自独立部署（Netlify 静态站 / EAS 应用）。
 
 ```mermaid
 flowchart TB
@@ -22,6 +22,7 @@ flowchart TB
     ADM[src/* 管理后台 CRA]
     RIDER[ml-express-mobile-app\nExpo 骑手端]
   end
+  SH[/shared\n跨端共享纯逻辑/]
   SB[(Supabase\nPostgreSQL + Auth + Storage + Realtime)]
   NF[Netlify\n静态站 + Functions]
   CW --> SB
@@ -30,6 +31,12 @@ flowchart TB
   MA --> SB
   ADM --> SB
   RIDER --> SB
+  SH -. sync .-> CW
+  SH -. sync .-> CA
+  SH -. sync .-> MW
+  SH -. sync .-> MA
+  SH -. sync .-> ADM
+  SH -. sync .-> RIDER
   CW --> NF
   MW --> NF
   ADM --> NF
@@ -39,169 +46,199 @@ flowchart TB
 
 ## 2. 子项目一览
 
-| 目录 | 类型 | 角色 | 技术栈 |
-|------|------|------|--------|
-| **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、账号权限、报表、骑手绩效、商家对账导出等 | Create React App + TypeScript + React Router v6 |
-| **`ml-express-client-web/`** | Web | **会员端网站**：首页（含内嵌服务/追踪/联系板块）、商城、购物车、账户、条款 | CRA + TS + React Router v7 |
-| **`ml-express-merchant-web/`** | Web | **商家端网站**：登录后门店订单/商品等（与商家 App 业务对齐） | CRA + TS + React Router v7 |
-| **`ml-express-client/`** | Mobile | **会员 App**（MARKET LINK EXPRESS） | Expo / React Native |
-| **`ml-express-merchant-app/`** | Mobile | **商家 App** | Expo / React Native |
-| **`ml-express-mobile-app/`** | Mobile | **骑手/配送员端**（package 名 `market-link-express-mobile`） | Expo / React Native |
-| **`design/`** | 资源 | 应用图标等设计资产 | — |
-| **`specs/`** | 文档 | 功能规格/通知等说明 | — |
+| 目录 | 类型 | 角色 | 技术栈 | 部署 |
+|------|------|------|--------|------|
+| **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、账号权限、报表、骑手绩效、商家对账导出等 | CRA + TS + React Router **v6** | Netlify（根目录） |
+| **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户、条款 | CRA + TS + React Router **v7** | Netlify |
+| **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账（与商家 App 对齐） | CRA + TS + React Router **v7** | Netlify |
+| **`ml-express-client/`** | Mobile | **会员 App**（`com.mlexpress.client`） | Expo SDK 54 / RN | EAS |
+| **`ml-express-merchant-app/`** | Mobile | **商家 App** | Expo SDK 54 / RN | EAS |
+| **`ml-express-mobile-app/`** | Mobile | **骑手/配送员端**（`market-link-express-mobile`） | Expo SDK 54 / RN | EAS |
+| **`shared/`** | 共享源 | 跨端共享的**纯逻辑单一源**（见 §7） | TS | 经 sync 复制进各 app |
+| **`netlify/`** | 服务端 | 管理后台 Netlify Functions（邮件/短信/管理鉴权等） | Node | — |
+| **`supabase/`** | 数据 | 迁移与 functions | SQL | — |
+| **`design/` `specs/` `memory/` `scripts/`** | 资源/文档 | 设计资产、规格、脚本 | — | — |
 
-**说明**：根目录 `package.json` 的 `name` 为 `market-link-express`，与 C 端站点品牌一致，但 **代码职责是管理后台**，部署时不要与 `ml-express-client-web` 站点混用 Base directory。
+> 根 `package.json` 的 `name` 为 `market-link-express`，与 C 端品牌一致，但**代码职责是管理后台**；部署时勿与 `ml-express-client-web` 站点混用 Base directory。
+
+> ⚠️ 仓库根目录散落大量历史 `*.md` 指南与 `*.sql` 脚本（几百个），多为一次性排障/建表记录，**不代表当前架构**。判断结构时以各 app 的 `src/` 与本指南为准。
 
 ---
 
 ## 3. 管理后台（仓库根 `src/`）
 
-### 3.1 入口与路由
+### 3.1 目录结构
 
-- 入口：`src/index.tsx` → `src/App.tsx`
-- 根路径 `/` 重定向到 **`/admin/login`**
-- 受保护区域：`**`/admin/*`**`，外层 `AdminShellLayout`（侧栏 + 顶栏），内层 `ProtectedRoute` 按 **角色**（`admin` | `manager` | `operator` | `finance`）与可选 **permissionId** 控制菜单与页面
+| 路径 | 职责 |
+|------|------|
+| `src/index.tsx` → `src/App.tsx` | 入口与路由表 |
+| `src/pages/` | 页面（见 3.3） |
+| `src/components/` | 通用与业务组件（全局搜索、待办栏、异常告警等） |
+| `src/layouts/` | `AdminShellLayout`（侧栏+顶栏）等外壳 |
+| `src/contexts/` | 全局 Context（如 `AdminTodoProvider`） |
+| `src/services/` | 数据/能力层（见 3.2） |
+| `src/hooks/` `src/utils/` `src/constants/` `src/types/` | 钩子 / 工具 / 常量 / 类型 |
+| `src/api/` `src/assets/` `src/styles/` | API 封装 / 静态资源 / 样式 |
+| `src/services/_shared/` | 由 `/shared` 同步生成（**勿手改**，见 §7） |
 
-主要路径（节选，以 `src/App.tsx` 为准）：
+### 3.2 `src/services/` 关键文件
 
-| 路径 | 权限要点 |
-|------|----------|
-| `/admin/login` | 登录 |
-| `/admin/dashboard` | 仪表盘 |
-| `/admin/city-packages` | `city_packages` |
-| `/admin/users` | `users` |
-| `/admin/finance` | `finance` |
-| `/admin/tracking`、`/admin/realtime-tracking` | `tracking` |
-| `/admin/settings`、`/admin/system-settings` | `settings`（多 admin） |
-| `/admin/accounts` | 账号与权限 |
-| `/admin/banners` | 轮播 |
-| `/admin/delivery-stores` | 送达店铺/商家 |
-| `/admin/supervision`、`/admin/audit-logs` | 督导/审计 |
-| `/admin/delivery-alerts` | 配送警报 |
-| `/admin/recharges` | 充值审核 |
-| `/admin/reports` | 报表 |
-| `/admin/courier-performance` | 骑手绩效 |
-| `/admin/merchant-reconciliation` | 商家对账导出 |
+`supabase.ts`（后台主 API 封装，与 RLS/表名强相关）、`authService.ts`、`emailService.ts`、`smsService.ts`、`deliveryAlertService.ts`、`orderNotificationService.ts`、`adminInsightsService.ts`、`errorHandler.ts`、`FileUploadService.ts`、`FileValidationService.ts`、`ImageCompressionService.ts`、`_shared/{pricing,productReview,rechargeQr}.ts`。
 
-全局组件：`AdminGlobalSearch`、`AdminTodoBar`、`AdminTodoProvider`、`AbnormalAlertManager` 等。
+### 3.3 路由与页面（以 `src/App.tsx` 为准）
 
-### 3.2 服务端能力
+- 根 `/` 重定向到 **`/admin/login`**；受保护区 `**/admin/***` 外层 `AdminShellLayout`，内层 `ProtectedRoute` 按**角色**（`admin`|`manager`|`operator`|`finance`）+ 可选 **permissionId** 控制。
 
-- Netlify：`netlify.toml` 在**仓库根**；`netlify/functions/` 提供邮件/短信等（与 Dashboard 环境变量配合）
-- 默认生产部署站点 ID（`package.json` **`deploy:netlify`**）：`ed9c2173-4031-4f10-a466-5b041dfe3511`（以你 Netlify 控制台为准）
+| 路径 | 页面文件 | 权限要点 |
+|------|----------|----------|
+| `/admin/login` | `AdminLogin.tsx` | 登录 |
+| `/admin/dashboard` | `AdminDashboard(Home).tsx` | 仪表盘 |
+| `/admin/city-packages` | `CityPackages.tsx` | `city_packages` |
+| `/admin/users` | `UserManagement.tsx` | `users` |
+| `/admin/finance` | `FinanceManagement.tsx`(+`.translations.ts`) | `finance` |
+| `/admin/tracking`、`/admin/realtime-tracking` | `TrackingPage.tsx` / `RealTimeTracking.tsx` | `tracking` |
+| `/admin/settings`、`/admin/system-settings` | `SystemSettings.tsx` | `settings` |
+| `/admin/accounts` | `AccountManagement.tsx` | 账号与权限 |
+| `/admin/banners` | `BannerManagement.tsx` | 轮播 |
+| `/admin/delivery-stores` | `DeliveryStoreManagement.tsx` | 送达店铺/商家 |
+| `/admin/supervision`、`/admin/audit-logs` | `EmployeeSupervision.tsx` | 督导/审计 |
+| `/admin/delivery-alerts` | `DeliveryAlerts.tsx` | 配送警报 |
+| `/admin/recharges` | `RechargeManagement.tsx` | 充值管理 |
+| `/admin/reports` | `AdminReportsPage.tsx` | 报表 |
+| `/admin/courier-performance` | `CourierPerformancePage.tsx` | 骑手绩效 |
+| `/admin/merchant-reconciliation` | `MerchantReconciliationExportPage.tsx` | 商家对账导出 |
+| （另有）| `ImportMetricDraftsPage.tsx`、`ImportPriceListPage.tsx` | 导入/价目 |
 
-### 3.3 核心数据层
+### 3.4 服务端
 
-- `src/services/supabase.ts`：后台主要 API 封装（与 RLS、表名强相关；改表结构需同步此处）
+- `netlify.toml` 在**仓库根**；`netlify/functions/`：`send-email-code.js`、`verify-email-code.js`、`send-sms.js`、`send-order-confirmation.js`、`admin-password.js`、`verify-admin.js`、`ensure-courier-auth.js`、`upload-banner.js`、`cleanup-delivery-photos.js`、`utils/`。
+- 生产站点 ID（`deploy:netlify`）：`ed9c2173-4031-4f10-a466-5b041dfe3511`（以 Netlify 控制台为准）。
 
 ---
 
 ## 4. 会员端网站 `ml-express-client-web/`
 
-### 4.1 职责
-
-- 仅服务 **会员**（`localStorage` **`ml-express-customer`**）；若检测到 `user_type === 'merchant'` 会清空并刷新，避免与商家端混淆（见 `App.tsx` 内 `ClientWebMerchantSessionGuard`）。
-
-### 4.2 路由（`src/App.tsx`）
-
-| 路径 | 行为 |
-|------|------|
-| `/` | `HomePage`（首页 + 内嵌 `#landing-services` / `#landing-tracking` / `#landing-contact`，见 `HomePage.tsx`） |
-| `/services`、`/tracking`、`/contact` | `Navigate` 回 `/` 并带 `state.landingScrollTo`，滚动到对应锚点 |
-| `/login` | 回 `/` |
-| `/profile`、`/mall`、`/mall/:storeId`、`/cart` 等 | 独立懒加载页面 |
-| `/privacy-policy`、`/terms-of-service` | 法律页 |
-
-### 4.3 UI 结构
-
-- **着陆区**：`HomePage` + `styles/homeLanding.css`；内页区块外壳：`components/layout/ClientInteriorShell.tsx` + `styles/clientInterior.css`
-- Netlify：`ml-express-client-web/netlify.toml`；Functions：`ml-express-client-web/netlify/functions/`
-- 生产部署站点 ID（`package.json`）：`52f5f573-ca0a-4769-a8c7-e5f675764056`
-
-### 4.4 数据层
-
-- `src/services/supabase.ts`、`LanguageContext`、`CartContext`
+- **仅服务会员**（`localStorage` 键 `ml-express-customer`）；检测到 `user_type==='merchant'` 会清空刷新（`App.tsx` 内 `ClientWebMerchantSessionGuard`）。
+- 目录：`src/{pages,components,contexts,services,constants,styles,utils}` + `src/services/_shared/`。
+- 路由（`src/App.tsx`）：`/`(`HomePage`，内嵌 `#landing-services`/`#landing-tracking`/`#landing-contact`)；`/services`、`/tracking`、`/contact` 重定向回 `/` 带 `state.landingScrollTo`；`/login`→`/`；`/profile`、`/mall`、`/mall/:storeId`、`/cart`；`/privacy-policy`、`/terms-of-service`。
+- UI 外壳：`components/layout/ClientInteriorShell.tsx` + `styles/clientInterior.css`；着陆样式 `styles/homeLanding.css`。
+- 数据：`src/services/supabase.ts`、`contexts/{LanguageContext,CartContext}`。
+- Netlify：`ml-express-client-web/netlify.toml`，站点 ID `52f5f573-ca0a-4769-a8c7-e5f675764056`。
 
 ---
 
 ## 5. 商家端网站 `ml-express-merchant-web/`
 
-- CRA + React Router，路由入口 `src/App.tsx`（`/login`、`/`、`/products`、`/orders` 等）
-- Supabase：`src/services/supabase.ts`（与后台/会员库同一 Supabase 项目，表权限由 RLS 区分角色）
-- Netlify：`ml-express-merchant-web/netlify.toml`；站点 ID：`126af2b9-244f-47fd-9be9-58fb45b6e7a2`
+- 目录：`src/{pages,components,contexts,hooks,services,constants,styles,utils}` + `src/services/_shared/`。
+- 路由入口 `src/App.tsx`（`/login`、`/`、`/products`、`/orders` 等）。
+- **下单弹窗**：`src/components/home/OrderModal.tsx` + `orderModalWizard.ts`（4 步向导：地址/包裹/配送/确认）；下单逻辑在 `src/pages/ProfilePage.tsx`。多规格：`src/components/ProductVariantPicker.tsx` + `src/utils/productVariants.ts`。
+- 数据：`src/services/supabase.ts`（与后台/会员同一 Supabase 项目，RLS 区分角色）。
+- Netlify：`ml-express-merchant-web/netlify.toml`，站点 ID `126af2b9-244f-47fd-9be9-58fb45b6e7a2`。
 
 ---
 
-## 6. 移动端应用
+## 6. 移动端应用（Expo SDK 54）
 
-### 6.1 `ml-express-client/`（会员 Expo）
+三者目录结构相近：会员/商家 App 用 `src/{screens,components,contexts,hooks,services,config,constants,utils}`；骑手端把这些放在**仓库子目录根**（`screens/`、`services/` 等，无 `src/`）。
 
-- `app.json`：`com.mlexpress.client`，品牌 MARKET LINK EXPRESS
-- `services/supabase.ts` + 多 screens；可选用 `netlify.toml` 做 Web 导出版本相关配置
+### 6.1 `ml-express-client/`（会员 App，`com.mlexpress.client`）
+- 屏幕（`src/screens/`）：`Home`、`Login`/`Register`/`Welcome`、`CityMall`、`MerchantProducts`、`Cart`、`PlaceOrder`、`MyOrders`、`OrderDetail`、`TrackOrder`、`AddressBook`、`Profile`、`Notification*`。
+- 下单组件：`src/components/placeOrder/{SenderForm,ReceiverForm,OrderWizardProgress}.tsx`；`src/screens/PlaceOrderScreen.tsx`。
+- 数据：`src/services/supabase.ts` + `src/services/_shared/`。
 
-### 6.2 `ml-express-merchant-app/`（商家 Expo）
+### 6.2 `ml-express-merchant-app/`（商家 App）
+- 屏幕与会员 App 基本同名（含 `MerchantProductsScreen`、`PlaceOrderScreen` 等）。
+- 多规格：`src/components/ProductVariantPicker.tsx` + `src/utils/productVariants.ts`。
+- 数据：`src/services/supabase.ts`（体量大：订单/商品/店铺）+ `src/services/_shared/`。
 
-- 与商家 Web 业务对齐；`src/services/supabase.ts` 体量较大（订单/商品/店铺等）
+### 6.3 `ml-express-mobile-app/`（骑手端，`market-link-express-mobile`）
+- 屏幕（`screens/`）：`CourierHome`、`Dashboard`、`MyTasks`、`Map`/`MapView`、`Scan`/`Scanner`、`PackageManagement`/`PackageDetail`、`DeliveryHistory`、`FinanceManagement`、`Performance/Statistics`、`LocationDisclosure`、`Login`、`Profile`、`Settings`。
+- 目录：`navigation/`、`screens/`、`components/`、`contexts/`、`hooks/`、`services/`（含 `services/_shared/`）、`database/`、`utils/`、`constants/`、`docs/`。
 
-### 6.3 `ml-express-mobile-app/`（骑手 Expo）
-
-- `package.json` 描述为骑手端；含地图、任务、定位等
-- `services/supabase.ts` 与配送状态常量等
-
-**共性**：环境变量多为 `EXPO_PUBLIC_*` 或项目内约定常量，需与 Supabase 项目 URL/anon key 一致；**不要**假设与 CRA 的 `REACT_APP_*` 自动互通。
-
----
-
-## 7. Supabase 与数据模型（跨项目）
-
-- 所有前后端应用共享 **同一 Supabase 项目**（由各自 env 指向）
-- 业务表举例（非 exhaustive）：`packages`、`users`、`delivery_stores`、`couriers`、`delivery_alerts`、`recharge_requests`、`system_settings` 等
-- **注意**：`couriers` 等表若缺列（如历史代码引用 `credit_score`），PostgREST 会对非法 `select` 返回 **400**，需与真实 schema 对齐
-- 各子项目内 **`supabase.ts` 多份拷贝** — 改接口时需考虑是否需同步改多处（或后续可抽共享包，当前以仓库现状为准）
+**移动端共性**：环境变量用 `EXPO_PUBLIC_*` 或 `app.config`/`Constants.expoConfig.extra` 注入；与 CRA 的 `REACT_APP_*` **不互通**。
 
 ---
 
-## 8. Netlify 部署约定
+## 7. 共享代码层 `/shared`（重要）
 
-| 应用 | 配置文件路径 | 典型 Base directory |
-|------|----------------|---------------------|
-| 管理后台 | `/netlify.toml` | **仓库根** |
-| 会员 Web | `ml-express-client-web/netlify.toml` | `ml-express-client-web` |
-| 商家 Web | `ml-express-merchant-web/netlify.toml` | `ml-express-merchant-web` |
+为减少 6 份 `supabase.ts` 重复维护，**纯逻辑**抽到 `/shared` 单一源，经同步脚本复制到各 app。
 
-Functions、重定向（如 SPA `/*` → `/index.html`）、缓存头以各自 `netlify.toml` 为准。
+### 7.1 为什么用「同步」而非 workspaces/共享包
+- 无 npm workspaces；3 个 CRA app 的 `ModuleScopePlugin` **禁止 import `src/` 外部文件**；各 app 独立部署（Netlify 按子目录 base / EAS 各自构建）。
+- 真共享包需改 craco/metro/部署命令，风险高。故采用「源 + 同步脚本 + 提交副本」。
 
-**自定义域名**：DNS 仅需指向 **一个** 生产站点；避免同一主机名同时 CNAME 到多个 `*.netlify.app` 或混用冲突记录，否则会出现部分网络「找不到服务器」或证书异常。
+### 7.2 结构与机制
+```
+shared/
+├── src/
+│   ├── pricing.ts        # 计费合并算法 buildPricingSettings + 领区解析
+│   ├── productReview.ts  # Product/ProductVariant 类型 + 上架审核辅助
+│   └── rechargeQr.ts     # 充值 QR key/档位 + 合并逻辑
+├── sync.mjs              # 无依赖复制脚本：/shared/src → 某 app 的 _shared
+└── README.md
+```
+- 各 app 的 `package.json` 有 `sync:shared` 脚本 + `prestart`/`prebuild` 钩子，构建/启动时自动复制到：
+  - CRA/会员App/商家App：`src/services/_shared/`
+  - 骑手端：`services/_shared/`
+- 同步产物带 `AUTO-GENERATED` 头注释、**已提交 git**，故 Netlify/EAS 无需特殊配置。
 
----
-
-## 9. 环境变量（常见模式）
-
-- **CRA**：`REACT_APP_SUPABASE_URL`、`REACT_APP_SUPABASE_ANON_KEY`、`REACT_APP_GOOGLE_MAPS_API_KEY`（若用地图）、各类 `REACT_APP_*_URL`（应用商店链接等）
-- **Expo**：按子项目文档使用 `EXPO_PUBLIC_*` 或 `app.config` 注入
-- **Netlify Functions**：密钥在 Netlify Dashboard，勿提交私钥
-
-会员 Web 中邮件相关：`REACT_APP_EMAIL_FUNCTION_URL` 可选覆盖默认 `/.netlify/functions/send-email-code`。
-
----
-
-## 10. 给后续改代码的提示（AI / 人本）
-
-1. **改路由**：先确认是根目录 `src/`（后台）还是 `ml-express-client-web/src/`（会员站），二者 Router 版本与路径前缀均不同。  
-2. **改权限**：后台新页面需同时改 `ProtectedRoute`、`AccountManagement` 内权限列表、以及 `AdminShellLayout` 菜单（若有）。  
-3. **改 C 端着陆页块**：`HomePage` 内嵌 `ServicesPage` / `TrackingPage` / `ContactPage` 的 `embedInLanding` 模式不再重复导航栏。  
-4. **不要用硬编码生产域名**拼接静态资源或 API，优先 **相对路径** 或 `window.location.origin`，避免 DNS 未就绪时开发/预览异常。  
-5. **Deploy Preview** 的 `https://{deploy-id}--site.netlify.app` 会随部署失效，文档/测试应用 **正式域名** 或 **主站点 netlify.app**。
+### 7.3 规则
+- ❌ **不要改任何 app 里 `_shared/` 下的文件**（会被覆盖）。
+- ✅ 只改 `/shared/src/*`，再 `npm run sync:shared`（或直接 `npm start`/`npm run build`）。
+- 只放**环境无关纯逻辑**；`createClient`、env 读取、retry/错误处理、各端默认值、输出键风格（snake/camel）保留在各 app 本地，经参数注入。
+- 各端 `getPricingSettings` = 本地拉取 `system_settings` → 调 `buildPricingSettings(rows, region, { defaults, toField? })`；admin/mobile 的 `getRegionalPricingMap`（语义不同，无 mandalay 兜底）保留各自实现。
 
 ---
 
-## 11. 版本与同步
+## 8. Supabase 与数据模型（跨项目）
 
-- 根 `package.json`：`market-link-express` `2.2.4`（管理后台）
-- 各子目录另有独立 `version`，发布流程相互独立
-
-若本指南与代码不一致，**以当前仓库文件为准**，并建议更新本 `AI_GUIDE.md`。
+- 所有前后端共享 **同一 Supabase 项目**（由各自 env 指向）。
+- 业务表举例：`packages`、`users`、`delivery_stores`、`couriers`、`products`、`delivery_alerts`、`recharge_requests`、`system_settings`、`banners`、`tutorials` 等。
+- 计费规则存 `system_settings`：全局 `pricing.{field}` + 领区 `pricing.{region}.{field}`；无 Realtime，各端按需 `getPricingSettings()` 拉取；历史订单 `price`/`pricing_base_fee_mmk` 为快照不随改价变动。
+- 充值 QR 配置键：`client.recharge_qr_urls`。
+- 各子项目 **`supabase.ts` 多份**；改接口时注意是否需同步多处（纯逻辑优先抽到 `/shared`）。
+- 注意：表若缺列（历史代码引用不存在字段），PostgREST 对非法 `select` 返回 **400**，需与真实 schema 对齐。
 
 ---
 
-*最后更新：基于仓库结构梳理，供 AI 与维护者快速建立上下文。*
+## 9. Netlify 部署约定
+
+| 应用 | 配置文件 | Base directory | 站点 ID |
+|------|----------|----------------|---------|
+| 管理后台 | `/netlify.toml` | 仓库根 | `ed9c2173-…` |
+| 会员 Web | `ml-express-client-web/netlify.toml` | `ml-express-client-web` | `52f5f573-…` |
+| 商家 Web | `ml-express-merchant-web/netlify.toml` | `ml-express-merchant-web` | `126af2b9-…` |
+
+- 构建命令均为 `npm install --legacy-peer-deps && CI=false npm run build`，故 `prebuild`（`sync:shared`）会执行。
+- **自定义域名**：DNS 仅指向**一个**生产站点；勿同主机名 CNAME 到多个 `*.netlify.app`，否则部分网络「找不到服务器」或证书异常。
+
+---
+
+## 10. 环境变量
+
+- **CRA**：`REACT_APP_SUPABASE_URL`、`REACT_APP_SUPABASE_ANON_KEY`、`REACT_APP_GOOGLE_MAPS_API_KEY`、各类 `REACT_APP_*_URL`；会员 Web 邮件可选 `REACT_APP_EMAIL_FUNCTION_URL`。
+- **Expo**：`EXPO_PUBLIC_*` 或 `app.config`/`Constants.expoConfig.extra`（如 `supabaseUrl`/`supabaseAnonKey`/`netlifyUrl`）。
+- **Netlify Functions**：密钥在 Netlify Dashboard，勿提交私钥。本地用各 app 的 `.env.local`（见各自 `.env.example` / `env.example`）。
+
+---
+
+## 11. 给后续改代码的提示
+
+1. **改路由**：先确认是根 `src/`（后台，Router v6）还是 `*-web/src/`（会员/商家，Router v7），路径前缀与版本不同。
+2. **改后台权限**：新页面需同时改 `ProtectedRoute`、`AccountManagement` 权限列表、`AdminShellLayout` 菜单。
+3. **改 C 端着陆页块**：`HomePage` 内嵌 `ServicesPage`/`TrackingPage`/`ContactPage` 的 `embedInLanding` 模式不重复导航栏。
+4. **改数据层纯逻辑**（计费/商品审核/充值QR）：改 `/shared/src`，**不要**逐个 app 改 `supabase.ts`，更不要改 `_shared/` 副本。
+5. **不要硬编码生产域名**拼接资源/API，优先相对路径或 `window.location.origin`。
+6. **提交**：仅在用户明确要求时提交；保持单一主题、勿混入无关 WIP；勿提交密钥/`.env`。
+
+---
+
+## 12. 版本与同步
+
+- 根 `package.json`：`market-link-express`（管理后台）。
+- 各子目录另有独立 `version`，发布流程相互独立。
+- 当前主分支工作分支示例：`cursor/client-merchant-order-and-web`。
+
+---
+
+*最后更新：补充完整目录路径、各 app 结构、`/shared` 共享机制与部署矩阵。供 AI 与维护者快速建立上下文。*
