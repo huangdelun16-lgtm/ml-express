@@ -1,6 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 import LoggerService from './LoggerService';
 import { getProductItemFeeMmkForPackage } from '../utils/parseMerchantProductFee';
+import type {
+  Product,
+  ProductVariant,
+  ProductPendingUpdate,
+} from './_shared/productReview';
+import {
+  isProductLiveApproved,
+  hasPendingProductUpdate,
+  productFormSource,
+  productNeedsAdminReview,
+  pickProductReviewSnapshot,
+  buildPendingUpdateFromProduct,
+  normalizePendingPayload,
+  toDirectProductPatch,
+} from './_shared/productReview';
+import { buildPricingSettings, pricingFieldToCamel } from './_shared/pricing';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -101,148 +117,18 @@ export interface DeliveryStore {
 }
 
 // 商品接口
-export type ProductVariant = {
-  id: string;
-  name: string;
-  price: number;
-  original_price?: number | null;
-  stock: number;
-  is_available?: boolean;
-  sort_order?: number;
+// 商品类型与上架审核辅助函数已抽到 /shared/src/productReview.ts（见顶部 import），此处仅再导出
+export type { Product, ProductVariant, ProductPendingUpdate };
+export {
+  isProductLiveApproved,
+  hasPendingProductUpdate,
+  productFormSource,
+  productNeedsAdminReview,
+  pickProductReviewSnapshot,
+  buildPendingUpdateFromProduct,
+  normalizePendingPayload,
+  toDirectProductPatch,
 };
-
-export interface Product {
-  id: string;
-  store_id: string;
-  category_id?: string;
-  name: string;
-  description?: string;
-  price: number;
-  original_price?: number;
-  image_url?: string;
-  /** 商品详细介绍滚动图（纵向浏览） */
-  detail_image_urls?: string[];
-  /** 多规格 SKU；null 表示单一价格商品 */
-  variants?: ProductVariant[] | null;
-  stock: number;
-  is_available: boolean;
-  sales_count: number;
-  /** 上架审核：pending 待审 / approved 已通过 / rejected 已拒绝（缺省按已通过处理） */
-  listing_status?: 'pending' | 'approved' | 'rejected' | null;
-  /** 已上架商品的编辑待审快照；Admin 通过后合并到主字段 */
-  pending_update?: ProductPendingUpdate | null;
-  created_at?: string;
-  updated_at?: string;
-}
-
-/** 商家编辑待审字段（不含 listing_status / sales_count） */
-export type ProductPendingUpdate = {
-  name?: string;
-  description?: string;
-  price?: number;
-  original_price?: number | null;
-  image_url?: string;
-  detail_image_urls?: string[];
-  variants?: ProductVariant[] | null;
-  stock?: number;
-  is_available?: boolean;
-  submitted_at?: string;
-};
-
-export function isProductLiveApproved(listingStatus?: string | null): boolean {
-  const s = (listingStatus ?? 'approved').trim();
-  return s === 'approved' || s === '';
-}
-
-export function hasPendingProductUpdate(product: Pick<Product, 'pending_update'>): boolean {
-  const pu = product.pending_update;
-  if (!pu || typeof pu !== 'object') return false;
-  return Object.keys(pu).some(
-    (k) => k !== 'submitted_at' && (pu as Record<string, unknown>)[k] !== undefined,
-  );
-}
-
-/** 编辑表单：有待审修改时展示商家最新提交的内容 */
-export function productFormSource(product: Product): Product {
-  if (isProductLiveApproved(product.listing_status) && hasPendingProductUpdate(product)) {
-    const pu = product.pending_update!;
-    return {
-      ...product,
-      ...pu,
-      original_price: pu.original_price ?? undefined,
-    };
-  }
-  return product;
-}
-
-export function productNeedsAdminReview(product: Pick<Product, 'listing_status' | 'pending_update'>): boolean {
-  const ls = (product.listing_status ?? 'pending').trim();
-  return ls === 'pending' || hasPendingProductUpdate(product);
-}
-
-/**
- * 商品上架审核（商家 → Admin → 客户端）
- *
- * 1. 新建：listing_status=pending，客户端不可见
- * 2. 编辑已上架(approved)：改动写入 pending_update，客户端仍读主表旧数据
- * 3. 编辑待审/被拒：直接写主表，保持 pending，客户端仍不可见
- * 4. Admin「商家管理」通过：合并 pending_update 或首次上架 → listing_status=approved
- * 5. 客户端仅 getPublicStoreProducts：listing_status=approved 且 is_available=true
- */
-export function pickProductReviewSnapshot(product: Product): ProductPendingUpdate {
-  return {
-    name: product.name,
-    description: product.description,
-    price: product.price,
-    original_price: product.original_price ?? null,
-    image_url: product.image_url,
-    detail_image_urls: product.detail_image_urls,
-    variants: product.variants ?? null,
-    stock: product.stock,
-    is_available: product.is_available,
-  };
-}
-
-export function buildPendingUpdateFromProduct(
-  product: Product,
-  changes: Partial<ProductPendingUpdate>,
-): ProductPendingUpdate {
-  const base =
-    isProductLiveApproved(product.listing_status) && hasPendingProductUpdate(product)
-      ? { ...pickProductReviewSnapshot(product), ...product.pending_update! }
-      : pickProductReviewSnapshot(product);
-  return { ...base, ...changes };
-}
-
-export function normalizePendingPayload(
-  raw: Partial<ProductPendingUpdate> & Record<string, unknown>,
-): ProductPendingUpdate {
-  return {
-    name: raw.name as string | undefined,
-    description: raw.description as string | undefined,
-    price: raw.price as number | undefined,
-    original_price: raw.original_price as number | null | undefined,
-    image_url: raw.image_url as string | undefined,
-    detail_image_urls: raw.detail_image_urls as string[] | undefined,
-    variants: (raw.variants as ProductVariant[] | null | undefined) ?? undefined,
-    stock: raw.stock as number | undefined,
-    is_available: raw.is_available as boolean | undefined,
-  };
-}
-
-export function toDirectProductPatch(snapshot: ProductPendingUpdate): Partial<Product> {
-  return {
-    name: snapshot.name,
-    description: snapshot.description,
-    price: snapshot.price,
-    original_price: snapshot.original_price ?? undefined,
-    image_url: snapshot.image_url,
-    detail_image_urls: snapshot.detail_image_urls,
-    variants: snapshot.variants ?? null,
-    stock: snapshot.stock,
-    is_available: snapshot.is_available,
-  };
-}
 
 // 商品分类接口
 export interface ProductCategory {
@@ -1573,35 +1459,7 @@ export const merchantService = {
   }
 };
 
-/** Admin 仅保存领区键时回退；与 ml-express-client-web 一致 */
-const DEFAULT_PRICING_REGION_FALLBACK = 'mandalay';
-
-function isGlobalPricingKey(settingsKey: string): boolean {
-  const parts = settingsKey.split('.');
-  return parts.length === 2 && parts[0] === 'pricing';
-}
-
-function pricingFieldToCamel(rawKey: string): string {
-  return rawKey.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
-}
-
-function parsePricingValue(raw: unknown): number {
-  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-  if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
-    return parsePricingValue((raw as { value: unknown }).value);
-  }
-  if (typeof raw === 'string') {
-    try {
-      const j = JSON.parse(raw);
-      return parsePricingValue(j);
-    } catch {
-      return parseFloat(raw) || 0;
-    }
-  }
-  return 0;
-}
-
-// 系统设置服务（客户端使用）
+// 系统设置服务（客户端使用）；计费合并算法见 /shared/src/pricing.ts，输出 camelCase
 export const systemSettingsService = {
   async getPricingSettings(region?: string) {
     const defaults: Record<string, number> = {
@@ -1625,32 +1483,10 @@ export const systemSettingsService = {
 
       if (error) throw error;
 
-      const settings: any = { ...defaults };
-
-      const applyRegionPrefix = (prefix: string) => {
-        data?.forEach((item: any) => {
-          if (!item.settings_key.startsWith(prefix)) return;
-          const rawField = item.settings_key.slice(prefix.length);
-          const camelKey = pricingFieldToCamel(rawField);
-          settings[camelKey] = parsePricingValue(item.settings_value);
-        });
-      };
-
-      if (data && data.length > 0) {
-        data.forEach((item: any) => {
-          if (!isGlobalPricingKey(item.settings_key)) return;
-          const rawField = item.settings_key.replace('pricing.', '');
-          const camelKey = pricingFieldToCamel(rawField);
-          settings[camelKey] = parsePricingValue(item.settings_value);
-        });
-
-        const regionalPrefix = region
-          ? `pricing.${region.toLowerCase()}.`
-          : `pricing.${DEFAULT_PRICING_REGION_FALLBACK}.`;
-        applyRegionPrefix(regionalPrefix);
-      }
-
-      return settings;
+      return buildPricingSettings(data, region, {
+        defaults,
+        toField: pricingFieldToCamel,
+      });
     } catch (error) {
       LoggerService.error('获取计费设置异常:', error);
       return { ...defaults };

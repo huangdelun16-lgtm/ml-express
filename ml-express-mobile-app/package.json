@@ -4,6 +4,8 @@
   "description": "MARKET LINK STAFF - 缅甸专业快递骑手端",
   "main": "index.ts",
   "scripts": {
+    "sync:shared": "node ../shared/sync.mjs --out services/_shared",
+    "prestart": "npm run sync:shared",
     "start": "expo start",
     "android": "expo run:android",
     "android:setup": "./run-android.sh",

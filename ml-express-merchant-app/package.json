@@ -3,13 +3,15 @@
   "version": "2.2.4",
   "main": "index.js",
   "scripts": {
+    "sync:shared": "node ../shared/sync.mjs --out src/services/_shared",
+    "prestart": "npm run sync:shared",
     "start": "expo start",
     "start:offline": "EXPO_OFFLINE=1 expo start --offline",
     "start:normal": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build:web": "npx expo export --platform web"
+    "build:web": "npm run sync:shared && npx expo export --platform web"
   },
   "dependencies": {
     "@babel/runtime": "^7.25.0",

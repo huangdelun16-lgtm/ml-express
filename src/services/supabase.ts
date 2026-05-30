@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { buildPricingSettings } from './_shared/pricing';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -1290,29 +1291,20 @@ export const systemSettingsService = {
     }
   },
 
-  // 获取计费规则（与客户端下单、SystemSettings 保存格式一致）
+  // 获取计费规则（合并算法见 /shared/src/pricing.ts；默认值与错误处理保留本地）
   async getPricingSettings(region?: string): Promise<Record<string, any>> {
-    const DEFAULT_REGION_FALLBACK = 'mandalay';
-
-    const isGlobalPricingKey = (settingsKey: string) => {
-      const parts = settingsKey.split('.');
-      return parts.length === 2 && parts[0] === 'pricing';
-    };
-
-    const parseVal = (raw: unknown): number => {
-      if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-      if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
-        return parseVal((raw as { value: unknown }).value);
-      }
-      if (typeof raw === 'string') {
-        try {
-          const j = JSON.parse(raw);
-          return parseVal(j);
-        } catch {
-          return parseFloat(raw) || 0;
-        }
-      }
-      return 0;
+    const defaults: Record<string, number> = {
+      base_fee: 1500,
+      per_km_fee: 250,
+      weight_surcharge: 150,
+      urgent_surcharge: 500,
+      oversize_surcharge: 300,
+      scheduled_surcharge: 200,
+      fragile_surcharge: 300,
+      food_beverage_surcharge: 300,
+      free_km_threshold: 3,
+      courier_km_rate: 500,
+      way_side_courier_per_order: 0
     };
 
     try {
@@ -1323,57 +1315,10 @@ export const systemSettingsService = {
 
       if (error) throw error;
 
-      const settings: Record<string, any> = {
-        base_fee: 1500,
-        per_km_fee: 250,
-        weight_surcharge: 150,
-        urgent_surcharge: 500,
-        oversize_surcharge: 300,
-        scheduled_surcharge: 200,
-        fragile_surcharge: 300,
-        food_beverage_surcharge: 300,
-        free_km_threshold: 3,
-        courier_km_rate: 500,
-        way_side_courier_per_order: 0
-      };
-
-      const applyRegionPrefix = (prefix: string) => {
-        data?.forEach((item: any) => {
-          if (!item.settings_key.startsWith(prefix)) return;
-          const field = item.settings_key.slice(prefix.length);
-          settings[field] = parseVal(item.settings_value);
-        });
-      };
-
-      if (data && data.length > 0) {
-        data.forEach((item: any) => {
-          if (!isGlobalPricingKey(item.settings_key)) return;
-          const field = item.settings_key.replace('pricing.', '');
-          settings[field] = parseVal(item.settings_value);
-        });
-
-        const regionalPrefix = region
-          ? `pricing.${region.toLowerCase()}.`
-          : `pricing.${DEFAULT_REGION_FALLBACK}.`;
-        applyRegionPrefix(regionalPrefix);
-      }
-
-      return settings;
+      return buildPricingSettings(data, region, { defaults });
     } catch (err) {
       console.error('获取计费规则失败:', err);
-      return {
-        base_fee: 1500,
-        per_km_fee: 250,
-        weight_surcharge: 150,
-        urgent_surcharge: 500,
-        oversize_surcharge: 300,
-        scheduled_surcharge: 200,
-        fragile_surcharge: 300,
-        food_beverage_surcharge: 300,
-        free_km_threshold: 3,
-        courier_km_rate: 500,
-        way_side_courier_per_order: 0
-      };
+      return { ...defaults };
     }
   },
 

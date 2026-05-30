@@ -23,6 +23,9 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
+    "sync:shared": "node ../shared/sync.mjs --out src/services/_shared",
+    "prestart": "npm run sync:shared",
+    "prebuild": "npm run sync:shared",
     "start": "react-scripts start",
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",

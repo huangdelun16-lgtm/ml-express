@@ -391,107 +391,40 @@ export const adminAccountService = {
   }
 };
 
-/** 与 Admin Web、财务管理一致的计费读取（领区默认 mandalay） */
-const DEFAULT_PRICING_REGION_FALLBACK = 'mandalay';
+// 计费合并算法 + 领区解析已抽到 /shared/src/pricing.ts，此处导入并对外再导出
+import {
+  DEFAULT_PRICING_REGION_FALLBACK,
+  PRICING_REGION_IDS,
+  buildPricingSettings,
+  parsePricingSettingValue,
+  resolvePackagePricingRegionId,
+  getRegionalPricingForPackage,
+  resolveRiderPricingRegionId,
+} from './_shared/pricing';
 
-export const PRICING_REGION_IDS = [
-  'mandalay',
-  'maymyo',
-  'yangon',
-  'naypyidaw',
-  'taunggyi',
-  'lashio',
-  'muse',
-] as const;
-
-const PACKAGE_PREFIX_TO_REGION: Record<string, string> = {
-  MDY: 'mandalay',
-  POL: 'maymyo',
-  YGN: 'yangon',
-  NPW: 'naypyidaw',
-  TGI: 'taunggyi',
-  LSO: 'lashio',
-  MUSE: 'muse',
+export {
+  PRICING_REGION_IDS,
+  resolvePackagePricingRegionId,
+  getRegionalPricingForPackage,
+  resolveRiderPricingRegionId,
 };
-
-const PRICING_REGION_ID_SET = new Set<string>(PRICING_REGION_IDS);
-
-function normalizePackageRegionField(raw?: string | null): string | null {
-  if (raw == null || !String(raw).trim()) return null;
-  const s = String(raw).trim().toLowerCase();
-  if (PRICING_REGION_ID_SET.has(s)) return s;
-  const aliases: Record<string, string> = {
-    mdy: 'mandalay',
-    ygn: 'yangon',
-    pol: 'maymyo',
-    npw: 'naypyidaw',
-    tgi: 'taunggyi',
-    lso: 'lashio',
-    muse: 'muse',
-  };
-  const mapped = aliases[s];
-  return mapped && PRICING_REGION_ID_SET.has(mapped) ? mapped : null;
-}
-
-/** 订单计费领区：与 Admin / 财务一致 */
-export function resolvePackagePricingRegionId(pkg: {
-  id?: string;
-  region?: string | null;
-}): string {
-  const fromField = normalizePackageRegionField(pkg.region);
-  if (fromField) return fromField;
-  const id = (pkg.id || '').toUpperCase();
-  for (const [prefix, rid] of Object.entries(PACKAGE_PREFIX_TO_REGION)) {
-    if (id.startsWith(prefix)) return rid;
-  }
-  return DEFAULT_PRICING_REGION_FALLBACK;
-}
-
-export function getRegionalPricingForPackage(
-  pkg: { id?: string; region?: string | null },
-  map: Record<string, Record<string, number>>,
-): Record<string, number> {
-  const rid = resolvePackagePricingRegionId(pkg);
-  return map[rid] || map[DEFAULT_PRICING_REGION_FALLBACK] || {};
-}
-
-/** 骑手账号所属领区（登录时写入 AsyncStorage pricingRegionId） */
-export function resolveRiderPricingRegionId(
-  accountRegion?: string | null,
-  username?: string | null,
-): string {
-  const fromAccount = normalizePackageRegionField(accountRegion);
-  if (fromAccount) return fromAccount;
-  const u = (username || '').toUpperCase();
-  for (const [prefix, rid] of Object.entries(PACKAGE_PREFIX_TO_REGION)) {
-    if (u.startsWith(prefix)) return rid;
-  }
-  return DEFAULT_PRICING_REGION_FALLBACK;
-}
-
-function isGlobalPricingKey(settingsKey: string): boolean {
-  const parts = settingsKey.split('.');
-  return parts.length === 2 && parts[0] === 'pricing';
-}
-
-function parsePricingSettingValue(raw: unknown): number {
-  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-  if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
-    return parsePricingSettingValue((raw as { value: unknown }).value);
-  }
-  if (typeof raw === 'string') {
-    try {
-      const j = JSON.parse(raw);
-      return parsePricingSettingValue(j);
-    } catch {
-      return parseFloat(raw) || 0;
-    }
-  }
-  return 0;
-}
 
 export const systemSettingsService = {
   async getPricingSettings(region?: string): Promise<Record<string, number>> {
+    const defaults: Record<string, number> = {
+      base_fee: 1500,
+      per_km_fee: 250,
+      weight_surcharge: 150,
+      urgent_surcharge: 500,
+      scheduled_surcharge: 200,
+      oversize_surcharge: 300,
+      fragile_surcharge: 300,
+      food_beverage_surcharge: 300,
+      free_km_threshold: 3,
+      courier_km_rate: 500,
+      way_side_courier_per_order: 0,
+    };
+
     try {
       const { data, error } = await supabase
         .from('system_settings')
@@ -500,57 +433,10 @@ export const systemSettingsService = {
 
       if (error) throw error;
 
-      const settings: Record<string, number> = {
-        base_fee: 1500,
-        per_km_fee: 250,
-        weight_surcharge: 150,
-        urgent_surcharge: 500,
-        scheduled_surcharge: 200,
-        oversize_surcharge: 300,
-        fragile_surcharge: 300,
-        food_beverage_surcharge: 300,
-        free_km_threshold: 3,
-        courier_km_rate: 500,
-        way_side_courier_per_order: 0,
-      };
-
-      const applyRegionPrefix = (prefix: string) => {
-        data?.forEach((item: { settings_key: string; settings_value: unknown }) => {
-          if (!item.settings_key.startsWith(prefix)) return;
-          const field = item.settings_key.slice(prefix.length);
-          settings[field] = parsePricingSettingValue(item.settings_value);
-        });
-      };
-
-      if (data && data.length > 0) {
-        data.forEach((item: { settings_key: string; settings_value: unknown }) => {
-          if (!isGlobalPricingKey(item.settings_key)) return;
-          const field = item.settings_key.replace('pricing.', '');
-          settings[field] = parsePricingSettingValue(item.settings_value);
-        });
-
-        const regionalPrefix = region
-          ? `pricing.${region.toLowerCase()}.`
-          : `pricing.${DEFAULT_PRICING_REGION_FALLBACK}.`;
-        applyRegionPrefix(regionalPrefix);
-      }
-
-      return settings;
+      return buildPricingSettings(data, region, { defaults });
     } catch (err) {
       console.warn('获取计费规则失败，使用默认值:', err);
-      return {
-        base_fee: 1500,
-        per_km_fee: 250,
-        weight_surcharge: 150,
-        urgent_surcharge: 500,
-        scheduled_surcharge: 200,
-        oversize_surcharge: 300,
-        fragile_surcharge: 300,
-        food_beverage_surcharge: 300,
-        free_km_threshold: 3,
-        courier_km_rate: 500,
-        way_side_courier_per_order: 0,
-      };
+      return { ...defaults };
     }
   },
 

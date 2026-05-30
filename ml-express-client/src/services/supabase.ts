@@ -4,6 +4,12 @@ import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
 import { retry } from '../utils/retry';
+import { buildPricingSettings } from './_shared/pricing';
+import {
+  CLIENT_RECHARGE_QR_SETTING_KEY,
+  RECHARGE_QR_AMOUNT_TIERS,
+  mergeRechargeQrUrlMap,
+} from './_shared/rechargeQr';
 
 // 使用环境变量配置 Supabase
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -1560,96 +1566,37 @@ export const systemSettingsService = {
     }
   },
 
-  // 获取计费规则（与 Admin system_settings、客户端 Web 对齐）
+  // 获取计费规则（合并算法见 /shared/src/pricing.ts；默认值与 retry 保留本地）
   async getPricingSettings(region?: string) {
-    const DEFAULT_REGION_FALLBACK = 'mandalay';
-
-    const isGlobalPricingKey = (settingsKey: string) => {
-      const parts = settingsKey.split('.');
-      return parts.length === 2 && parts[0] === 'pricing';
-    };
-
-    const parseVal = (raw: unknown): number => {
-      if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-      if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
-        return parseVal((raw as { value: unknown }).value);
-      }
-      if (typeof raw === 'string') {
-        try {
-          const j = JSON.parse(raw);
-          return parseVal(j);
-        } catch {
-          return parseFloat(raw) || 0;
-        }
-      }
-      return 0;
+    const defaults = {
+      base_fee: 1500,
+      per_km_fee: 250,
+      weight_surcharge: 150,
+      urgent_surcharge: 500,
+      scheduled_surcharge: 200,
+      oversize_surcharge: 300,
+      fragile_surcharge: 300,
+      food_beverage_surcharge: 300,
+      free_km_threshold: 3,
+      way_side_courier_per_order: 0,
     };
 
     return retry(async () => {
-      try {
-        const { data, error } = await supabase
-          .from('system_settings')
-          .select('settings_key, settings_value')
-          .like('settings_key', 'pricing.%');
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('settings_key, settings_value')
+        .like('settings_key', 'pricing.%');
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const settings: any = {
-          base_fee: 1500,
-          per_km_fee: 250,
-          weight_surcharge: 150,
-          urgent_surcharge: 500,
-          scheduled_surcharge: 200,
-          oversize_surcharge: 300,
-          fragile_surcharge: 300,
-          food_beverage_surcharge: 300,
-          free_km_threshold: 3,
-          way_side_courier_per_order: 0,
-        };
-
-        const applyRegionPrefix = (prefix: string) => {
-          data?.forEach((item: any) => {
-            if (!item.settings_key.startsWith(prefix)) return;
-            const field = item.settings_key.slice(prefix.length);
-            settings[field] = parseVal(item.settings_value);
-          });
-        };
-
-        if (data && data.length > 0) {
-          data.forEach((item: any) => {
-            if (!isGlobalPricingKey(item.settings_key)) return;
-            const field = item.settings_key.replace('pricing.', '');
-            settings[field] = parseVal(item.settings_value);
-          });
-
-          const regionalPrefix = region
-            ? `pricing.${region.toLowerCase()}.`
-            : `pricing.${DEFAULT_REGION_FALLBACK}.`;
-          applyRegionPrefix(regionalPrefix);
-        }
-
-        return settings;
-      } catch (error) {
-        throw error;
-      }
+      return buildPricingSettings(data, region, { defaults });
     }, {
       retries: 3,
       delay: 1000,
       shouldRetry: (error) => error.message?.includes('Network request failed') || error.message?.includes('timeout')
     }).catch(error => {
       errorService.handleError(error, { context: 'systemSettingsService.getPricingSettings', silent: true });
-      return {
-        base_fee: 1500,
-        per_km_fee: 250,
-        weight_surcharge: 150,
-        urgent_surcharge: 500,
-        scheduled_surcharge: 200,
-        oversize_surcharge: 300,
-        fragile_surcharge: 300,
-        food_beverage_surcharge: 300,
-        free_km_threshold: 3,
-        way_side_courier_per_order: 0,
-      };
+      return { ...defaults };
     });
   },
 };
@@ -1749,11 +1696,10 @@ export const rechargeService = {
 };
 
 /** 后台「广告管理 → 余额充值 QR」与客户端扫码图共用此 key（system_settings.settings_key） */
-export const CLIENT_RECHARGE_QR_SETTING_KEY = 'client.recharge_qr_urls';
+/** key/档位/合并逻辑见 /shared/src/rechargeQr.ts；此处仅再导出并提供 App 默认图 */
+export { CLIENT_RECHARGE_QR_SETTING_KEY, RECHARGE_QR_AMOUNT_TIERS };
 
 const RECHARGE_QR_PUBLIC_BASE = 'https://market-link-express.com';
-
-export const RECHARGE_QR_AMOUNT_TIERS = [10000, 50000, 100000, 300000, 500000, 1000000] as const;
 
 export function getDefaultRechargeQrUrlMap(): Record<number, string> {
   return {
@@ -1776,23 +1722,7 @@ export async function fetchRechargeQrUrlMap(): Promise<Record<number, string>> {
       .eq('settings_key', CLIENT_RECHARGE_QR_SETTING_KEY)
       .maybeSingle();
     if (error || data == null) return { ...defaults };
-    let raw: unknown = data.settings_value;
-    if (typeof raw === 'string') {
-      try {
-        raw = JSON.parse(raw);
-      } catch {
-        return { ...defaults };
-      }
-    }
-    if (!raw || typeof raw !== 'object') return { ...defaults };
-    const merged = { ...defaults };
-    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-      const n = Number(k);
-      if (Number.isFinite(n) && typeof v === 'string' && v.trim()) {
-        merged[n] = v.trim();
-      }
-    }
-    return merged;
+    return mergeRechargeQrUrlMap(defaults, data.settings_value);
   } catch {
     return { ...defaults };
   }

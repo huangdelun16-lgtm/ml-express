@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { PACKAGE_STATUS } from '../constants/packageStatus';
 import LoggerService from './LoggerService';
+import { buildPricingSettings, pricingFieldToCamel } from './_shared/pricing';
+import {
+  CLIENT_RECHARGE_QR_SETTING_KEY,
+  RECHARGE_QR_AMOUNT_TIERS,
+  mergeRechargeQrUrlMap,
+} from './_shared/rechargeQr';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -1194,34 +1200,7 @@ export const merchantService = {
 };
 
 /** Admin 仅保存「领区」键（如 pricing.mandalay.base_fee）时，无全局 pricing.base_fee 则回退该领区 */
-const DEFAULT_PRICING_REGION_FALLBACK = 'mandalay';
-
-function isGlobalPricingKey(settingsKey: string): boolean {
-  const parts = settingsKey.split('.');
-  return parts.length === 2 && parts[0] === 'pricing';
-}
-
-function pricingFieldToCamel(rawKey: string): string {
-  return rawKey.replace(/_([a-z])/g, (_: string, g: string) => g.toUpperCase());
-}
-
-function parsePricingValue(raw: unknown): number {
-  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-  if (raw && typeof raw === 'object' && raw !== null && 'value' in (raw as object)) {
-    return parsePricingValue((raw as { value: unknown }).value);
-  }
-  if (typeof raw === 'string') {
-    try {
-      const j = JSON.parse(raw);
-      return parsePricingValue(j);
-    } catch {
-      return parseFloat(raw) || 0;
-    }
-  }
-  return 0;
-}
-
-// 系统设置服务（客户端使用）
+// 系统设置服务（客户端使用）；计费合并算法见 /shared/src/pricing.ts，输出 camelCase
 export const systemSettingsService = {
   /**
    * 获取计费规则（与 Admin「计费规则」一致）
@@ -1250,32 +1229,10 @@ export const systemSettingsService = {
 
       if (error) throw error;
 
-      const settings: any = { ...defaults };
-
-      const applyRegionPrefix = (prefix: string) => {
-        data?.forEach((item: any) => {
-          if (!item.settings_key.startsWith(prefix)) return;
-          const rawField = item.settings_key.slice(prefix.length);
-          const camelKey = pricingFieldToCamel(rawField);
-          settings[camelKey] = parsePricingValue(item.settings_value);
-        });
-      };
-
-      if (data && data.length > 0) {
-        data.forEach((item: any) => {
-          if (!isGlobalPricingKey(item.settings_key)) return;
-          const rawField = item.settings_key.replace('pricing.', '');
-          const camelKey = pricingFieldToCamel(rawField);
-          settings[camelKey] = parsePricingValue(item.settings_value);
-        });
-
-        const regionalPrefix = region
-          ? `pricing.${region.toLowerCase()}.`
-          : `pricing.${DEFAULT_PRICING_REGION_FALLBACK}.`;
-        applyRegionPrefix(regionalPrefix);
-      }
-
-      return settings;
+      return buildPricingSettings(data, region, {
+        defaults,
+        toField: pricingFieldToCamel,
+      });
     } catch (error) {
       LoggerService.error('获取计费设置异常:', error);
       return { ...defaults };
@@ -1561,12 +1518,10 @@ export const testConnection = async (): Promise<boolean> => {
   }
 };
 
-/** 与 Admin 广告管理「余额充值 QR」、App 端共用 */
-export const CLIENT_RECHARGE_QR_SETTING_KEY = 'client.recharge_qr_urls';
+/** key/档位/合并逻辑见 /shared/src/rechargeQr.ts；此处仅再导出并提供 Web 默认图 */
+export { CLIENT_RECHARGE_QR_SETTING_KEY, RECHARGE_QR_AMOUNT_TIERS };
 
 /** 充值 QR 默认图：用当前站点根路径，避免自定义域名 DNS 未就绪时仍指向不可解析的域名 */
-export const RECHARGE_QR_AMOUNT_TIERS = [10000, 50000, 100000, 300000, 500000, 1000000] as const;
-
 export function getDefaultRechargeQrUrlMap(): Record<number, string> {
   return {
     10000: '/kbz_qr_10000.png',
@@ -1578,6 +1533,7 @@ export function getDefaultRechargeQrUrlMap(): Record<number, string> {
   };
 }
 
+/** 合并 Supabase 配置与默认静态图；无网或失败时返回默认 */
 export async function fetchRechargeQrUrlMap(): Promise<Record<number, string>> {
   const defaults = getDefaultRechargeQrUrlMap();
   try {
@@ -1587,23 +1543,7 @@ export async function fetchRechargeQrUrlMap(): Promise<Record<number, string>> {
       .eq('settings_key', CLIENT_RECHARGE_QR_SETTING_KEY)
       .maybeSingle();
     if (error || data == null) return { ...defaults };
-    let raw: unknown = data.settings_value;
-    if (typeof raw === 'string') {
-      try {
-        raw = JSON.parse(raw);
-      } catch {
-        return { ...defaults };
-      }
-    }
-    if (!raw || typeof raw !== 'object') return { ...defaults };
-    const merged = { ...defaults };
-    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-      const n = Number(k);
-      if (Number.isFinite(n) && typeof v === 'string' && v.trim()) {
-        merged[n] = v.trim();
-      }
-    }
-    return merged;
+    return mergeRechargeQrUrlMap(defaults, data.settings_value);
   } catch {
     return { ...defaults };
   }
