@@ -10,6 +10,24 @@ import {
   RECHARGE_QR_AMOUNT_TIERS,
   mergeRechargeQrUrlMap,
 } from './_shared/rechargeQr';
+import type {
+  Banner,
+  Tutorial,
+  ProductCategory,
+  StoreReview,
+  AddressItem,
+  UserNotification,
+  WelcomeScreen,
+} from './_shared/domainTypes';
+export type {
+  Banner,
+  Tutorial,
+  ProductCategory,
+  StoreReview,
+  AddressItem,
+  UserNotification,
+  WelcomeScreen,
+};
 
 // 使用环境变量配置 Supabase
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -109,106 +127,7 @@ export interface Package {
   pricing_base_fee_mmk?: number | null;
 }
 
-// 商店评价接口
-export interface StoreReview {
-  id: string;
-  store_id: string;
-  order_id: string;
-  user_id: string;
-  user_name: string;
-  rating: number;
-  /** 骑手配送服务评分 1-5 */
-  courier_rating?: number;
-  comment: string;
-  images: string[];
-  reply_text?: string;
-  replied_at?: string;
-  is_anonymous: boolean;
-  status: 'pending' | 'published' | 'hidden';
-  created_at?: string;
-  updated_at?: string;
-}
-
-// 广告横幅接口
-export interface Banner {
-  id?: string;
-  title: string;
-  subtitle?: string;
-  burmese_title?: string;
-  image_url?: string;
-  link_url?: string;
-  bg_color_start?: string;
-  bg_color_end?: string;
-  display_order?: number;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
-
-// 常用地址接口
-export interface AddressItem {
-  id?: string;
-  user_id: string;
-  label: string;
-  contact_name: string;
-  contact_phone: string;
-  address_text: string;
-  latitude?: number;
-  longitude?: number;
-  is_default?: boolean;
-}
-
-// 通知接口
-export interface UserNotification {
-  id: string;
-  user_id: string;
-  title: string;
-  content: string;
-  type: 'system' | 'order' | 'promotion';
-  is_read: boolean;
-  related_id?: string;
-  created_at: string;
-}
-
-// 欢迎页面接口
-export interface WelcomeScreen {
-  id?: string;
-  title_zh: string;
-  title_en?: string;
-  title_my?: string;
-  description_zh: string;
-  description_en?: string;
-  description_my?: string;
-  button_text_zh: string;
-  button_text_en?: string;
-  button_text_my?: string;
-  image_url: string; // 对应 logo-large.png
-  bg_color_start?: string;
-  bg_color_end?: string;
-  button_color_start?: string;
-  button_color_end?: string;
-  countdown: number;
-  is_active: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
-
-// 教学步骤接口
-export interface Tutorial {
-  id?: string;
-  title_zh: string;
-  title_en?: string;
-  title_my?: string;
-  content_zh: string;
-  content_en?: string;
-  content_my?: string;
-  image_url?: string;
-  image_urls?: string[]; // 🚀 支持多图
-  display_order?: number;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+// Banner/Tutorial/StoreReview/AddressItem/UserNotification/WelcomeScreen 已抽到 /shared/src/domainTypes.ts（见顶部 import）
 
 // 商品接口
 export type ProductVariant = {
@@ -243,14 +162,7 @@ export interface Product {
   updated_at?: string;
 }
 
-// 商品分类接口
-export interface ProductCategory {
-  id: string;
-  store_id: string;
-  name: string;
-  display_order: number;
-}
-
+// ProductCategory 已抽到 /shared/src/domainTypes.ts（见顶部 import）
 
 // 客户服务（使用users表）
 export const customerService = {

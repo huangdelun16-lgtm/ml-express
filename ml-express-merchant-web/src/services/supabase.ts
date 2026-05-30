@@ -17,6 +17,14 @@ import {
   toDirectProductPatch,
 } from './_shared/productReview';
 import { buildPricingSettings, pricingFieldToCamel } from './_shared/pricing';
+import type {
+  Banner,
+  Tutorial,
+  ProductCategory,
+  StoreReview,
+  RechargeRequest,
+} from './_shared/domainTypes';
+export type { Banner, Tutorial, ProductCategory, StoreReview, RechargeRequest };
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -80,20 +88,7 @@ export interface Package {
 }
 
 // 广告横幅接口
-export interface Banner {
-  id?: string;
-  title: string;
-  subtitle?: string;
-  burmese_title?: string;
-  image_url?: string;
-  link_url?: string;
-  bg_color_start?: string;
-  bg_color_end?: string;
-  display_order?: number;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+// Banner/Tutorial/ProductCategory/StoreReview/RechargeRequest 已抽到 /shared/src/domainTypes.ts（见顶部 import）
 
 // 配送店接口
 export interface DeliveryStore {
@@ -129,62 +124,6 @@ export {
   normalizePendingPayload,
   toDirectProductPatch,
 };
-
-// 商品分类接口
-export interface ProductCategory {
-  id: string;
-  store_id: string;
-  name: string;
-  display_order: number;
-}
-
-// 充值申请接口
-export interface RechargeRequest {
-  id?: string;
-  user_id: string;
-  user_name: string;
-  amount: number;
-  status: 'pending' | 'completed' | 'rejected';
-  proof_url: string;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-// 商店评价接口
-export interface StoreReview {
-  id: string;
-  store_id: string;
-  order_id: string;
-  user_id: string;
-  user_name: string;
-  rating: number;
-  courier_rating?: number;
-  comment: string;
-  images: string[];
-  reply_text?: string;
-  replied_at?: string;
-  is_anonymous: boolean;
-  status: 'pending' | 'published' | 'hidden';
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface Tutorial {
-  id?: string;
-  title_zh: string;
-  title_en?: string;
-  title_my?: string;
-  content_zh: string;
-  content_en?: string;
-  content_my?: string;
-  image_url?: string;
-  image_urls?: string[]; // 🚀 新增：多图支持
-  display_order?: number;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
 
 // 客户端包裹服务（只包含客户端需要的功能）
 export const packageService = {

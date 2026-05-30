@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildPricingSettings } from './_shared/pricing';
+import type { Banner, Tutorial, WelcomeScreen } from './_shared/domainTypes';
+export type { Banner, Tutorial, WelcomeScreen };
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -67,21 +69,7 @@ export interface Package {
   pricing_base_fee_mmk?: number | null;
 }
 
-export interface Tutorial {
-  id?: string;
-  title_zh: string;
-  title_en?: string;
-  title_my?: string;
-  content_zh: string;
-  content_en?: string;
-  content_my?: string;
-  image_url?: string;
-  image_urls?: string[]; // 🚀 新增：支持多张图片
-  display_order?: number;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+// Tutorial 已抽到 /shared/src/domainTypes.ts（见顶部 import）
 
 export interface FinanceRecord {
   id: string;
@@ -237,22 +225,9 @@ export interface AdminProductDraft {
   variants: ProductVariant[];
 }
 
-export interface Banner {
-  id?: string;
-  title: string;
-  subtitle?: string;
-  burmese_title?: string;
-  image_url?: string;
-  link_url?: string;
-  bg_color_start?: string;
-  bg_color_end?: string;
-  display_order?: number;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+// Banner 已抽到 /shared/src/domainTypes.ts（见顶部 import）
 
-// 🚀 新增：充值申请接口
+// 🚀 新增：充值申请接口（admin 形态含 register_region/user_balance，保留本地）
 export interface RechargeRequest {
   id?: string;
   user_id: string;
@@ -285,28 +260,7 @@ export interface AuditLog {
   created_at?: string;
 }
 
-// 欢迎页面接口
-export interface WelcomeScreen {
-  id?: string;
-  title_zh: string;
-  title_en?: string;
-  title_my?: string;
-  description_zh: string;
-  description_en?: string;
-  description_my?: string;
-  button_text_zh: string;
-  button_text_en?: string;
-  button_text_my?: string;
-  image_url: string; // 对应 logo-large.png
-  bg_color_start?: string;
-  bg_color_end?: string;
-  button_color_start?: string;
-  button_color_end?: string;
-  countdown: number;
-  is_active: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
+// WelcomeScreen 已抽到 /shared/src/domainTypes.ts（见顶部 import）
 
 // 🚀 新增：使用教学服务
 export const tutorialService = {
