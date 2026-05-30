@@ -61,7 +61,9 @@ flowchart TB
 
 > 根 `package.json` 的 `name` 为 `market-link-express`，与 C 端品牌一致，但**代码职责是管理后台**；部署时勿与 `ml-express-client-web` 站点混用 Base directory。
 
-> ⚠️ 仓库根目录散落大量历史 `*.md` 指南与 `*.sql` 脚本（几百个），多为一次性排障/建表记录，**不代表当前架构**。判断结构时以各 app 的 `src/` 与本指南为准。
+> 📦 历史一次性文档/脚本（排障 `*.md`、建表 `*.sql`、诊断 `*.html`、临时脚本）已归档到 **`docs/archive/{md,sql,html,scripts}/`**，不代表当前架构。根目录现仅保留活跃配置与 `AI_GUIDE.md`。判断结构时以各 app 的 `src/` 与本指南为准。
+>
+> 🚫 构建产物（`*.apk` / `*.aab` / `*.zip` / `**/android/app/release/`）已加入 `.gitignore`，不再入库。
 
 ---
 

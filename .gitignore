@@ -43,3 +43,12 @@ ml-express-client-web/build/
 *.jks
 vercel.json
 !vercel.json.example
+
+# Build artifacts / 大二进制产物（勿入库）
+*.zip
+*.apk
+*.aab
+*.ipa
+**/android/app/release/
+**/android/app/build/
+**/ios/build/
