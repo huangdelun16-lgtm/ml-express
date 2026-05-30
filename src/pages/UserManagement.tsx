@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SkeletonTable } from '../components/SkeletonLoader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
@@ -25,18 +25,6 @@ interface User {
   notes?: string;
   register_region?: string;
   created_at?: string;
-  updated_at?: string;
-}
-
-interface RechargeRequest {
-  id: string;
-  user_id: string;
-  user_name: string;
-  amount: number;
-  status: 'pending' | 'completed' | 'rejected';
-  proof_url: string;
-  notes?: string;
-  created_at: string;
   updated_at?: string;
 }
 
@@ -98,7 +86,6 @@ const USER_TABS = [
   { id: 'admin_list', label: '管理员', icon: '🔐' },
   { id: 'merchant_store', label: 'MERCHANTS', icon: '🏪' },
   { id: 'courier_management', label: '快递员', icon: '🛵' },
-  { id: 'recharge_requests', label: '充值审核', icon: '💰' },
 ] as const;
 
 const getVehicleIcon = (type: string) => {
@@ -122,14 +109,10 @@ const UserRow = ({
   updateUserStatus,
   handleDeleteUser,
   handleOpenRecharge,
-  pendingRecharge,
-  handleApproveRecharge,
-  handleRejectRecharge,
 }: any) => {
   if (!user) return null;
 
   const isSelected = selectedUsers.has(user.id);
-  const hasPendingRecharge = !!pendingRecharge;
 
   const stopCardClick = (e: React.MouseEvent) => {
     const tag = (e.target as HTMLElement).tagName;
@@ -140,7 +123,7 @@ const UserRow = ({
 
   return (
     <article
-      className={`user-mgmt-card${isSelected ? ' is-selected' : ''}${hasPendingRecharge ? ' is-recharge' : ''}`}
+      className={`user-mgmt-card${isSelected ? ' is-selected' : ''}`}
       onClick={(e) => {
         stopCardClick(e);
         if (!(e.target as HTMLElement).closest('button, select, a, .user-mgmt-card__check')) {
@@ -148,13 +131,6 @@ const UserRow = ({
         }
       }}
     >
-      {hasPendingRecharge && (
-        <div className="user-mgmt-card__alert">
-          <span>🚨</span>
-          <span>客户正在充值</span>
-        </div>
-      )}
-
       <div
         className="user-mgmt-card__check"
         role="checkbox"
@@ -242,30 +218,6 @@ const UserRow = ({
       </div>
 
       <div className="user-mgmt-card__actions">
-        {pendingRecharge && (
-          <div className="user-mgmt-card__recharge-group">
-            <button
-              type="button"
-              className="user-mgmt-card__action user-mgmt-card__action--approve"
-              onClick={() => handleApproveRecharge(pendingRecharge)}
-            >
-              ✅ 同意 {pendingRecharge.amount.toLocaleString()} MMK
-            </button>
-            <a href={pendingRecharge.proof_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-              <div className="user-mgmt-card__proof">
-                <img src={pendingRecharge.proof_url} alt="汇款凭证" />
-              </div>
-            </a>
-            <button
-              type="button"
-              className="user-mgmt-card__action user-mgmt-card__action--reject"
-              onClick={() => handleRejectRecharge(pendingRecharge)}
-            >
-              拒绝
-            </button>
-          </div>
-        )}
-
         {user.user_type !== 'admin' && (
           <button
             type="button"
@@ -295,10 +247,8 @@ const UserRow = ({
 };
 
 // 列表行组件 - 商家店铺
-const StoreRow = ({ store, isMobile, pendingRecharge }: any) => {
+const StoreRow = ({ store, isMobile }: any) => {
   if (!store) return null;
-  
-  const hasPendingRecharge = !!pendingRecharge;
   
   return (
     <div style={{ paddingBottom: '20px', boxSizing: 'border-box' }}>
@@ -308,56 +258,25 @@ const StoreRow = ({ store, isMobile, pendingRecharge }: any) => {
           background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)',
           borderRadius: '24px',
           padding: '28px',
-          border: hasPendingRecharge ? '2px solid #e74c3c' : '1px solid rgba(255, 255, 255, 0.15)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
           backdropFilter: 'blur(15px)',
           transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: hasPendingRecharge ? '0 0 20px rgba(231, 76, 60, 0.4)' : '0 12px 36px rgba(0,0,0,0.2)',
+          boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
           position: 'relative',
           overflow: 'hidden',
           boxSizing: 'border-box',
-          animation: hasPendingRecharge ? 'pulse-border 2s infinite' : 'none'
         }}
         onMouseEnter={(e) => {
-          if (!hasPendingRecharge) {
-            e.currentTarget.style.transform = 'translateY(-5px) scale(1.01)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-            e.currentTarget.style.boxShadow = '0 20px 50px rgba(0,0,0,0.3)';
-          }
+          e.currentTarget.style.transform = 'translateY(-5px) scale(1.01)';
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+          e.currentTarget.style.boxShadow = '0 20px 50px rgba(0,0,0,0.3)';
         }}
         onMouseLeave={(e) => {
-          if (!hasPendingRecharge) {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-            e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.2)';
-          }
+          e.currentTarget.style.transform = 'translateY(0) scale(1)';
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+          e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.2)';
         }}
       >
-        {/* 🚀 新增：充值警报器 */}
-        {hasPendingRecharge && (
-          <div style={{
-            position: 'absolute',
-            top: '-15px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
-            color: 'white',
-            padding: '6px 20px',
-            borderRadius: '30px',
-            fontSize: '0.9rem',
-            fontWeight: 900,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 0 25px rgba(231, 76, 60, 0.8)',
-            zIndex: 100,
-            border: '2px solid rgba(255,255,255,0.3)',
-            animation: 'pulse-scale 1.5s infinite'
-          }}>
-            <span style={{ fontSize: '1.2rem', animation: 'blink 0.6s infinite alternate' }}>🚨</span>
-            <span style={{ textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>商户正在充值</span>
-          </div>
-        )}
-
         {/* 背景装饰光晕 */}
         <div style={{
           position: 'absolute',
@@ -463,61 +382,7 @@ const UserManagement: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { language } = useLanguage();
 
-  // 🚀 新增：注入动画样式
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @keyframes blink {
-        0%, 100% { opacity: 1; transform: scale(1.2); }
-        50% { opacity: 0.5; transform: scale(1); }
-      }
-      @keyframes pulse-border {
-        0% { border-color: rgba(231, 76, 60, 0.5); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
-        70% { border-color: rgba(231, 76, 60, 1); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
-        100% { border-color: rgba(231, 76, 60, 0.5); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
-  }, []);
-
-  const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management' | 'recharge_requests'>('customer_list');
-  const [rechargeRequests, setRechargeRequests] = useState<RechargeRequest[]>([]);
-
-  const [loadingRequests, setLoadingRequests] = useState(false);
-
-  // 🚀 新增：通知和警报逻辑
-  const alertAudioRef = useRef<HTMLAudioElement | null>(null);
-  const prevPendingCountRef = useRef<number>(0);
-  const lastVoiceBroadcastRef = useRef<number>(0); // 🚀 新增：记录上次语音播报时间
-  const [hasNewRequest, setHasNewRequest] = useState(false);
-  const activeTabRef = useRef(activeTab);
-
-  // 同步 activeTab 到 ref
-  useEffect(() => {
-    activeTabRef.current = activeTab;
-  }, [activeTab]);
-
-  // 🚀 新增：语音播报函数
-  const speakNotification = (text: string) => {
-    if ('speechSynthesis' in window) {
-      // 停止当前的，防止堆叠
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-
-      // 修复 Chrome 兼容性问题：有时需要再次触发
-      window.speechSynthesis.speak(utterance);
-      lastVoiceBroadcastRef.current = Date.now();
-      console.log('🗣️ 正在播报:', text);
-    }
-  };
-
-  // 列表行组件 - 快递员 (移动到内部以确保闭包正确)
+  const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management'>('customer_list');
   const CourierRow = ({ courier, isMobile, handleEditCourier, handleCourierStatusChange, handleDeleteCourier }: any) => {
     if (!courier) return null;
     
@@ -693,7 +558,6 @@ const UserManagement: React.FC = () => {
   };
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [users, setUsers] = useState<User[]>([]);
-  const [pendingRechargeRequests, setPendingRechargeRequests] = useState<Record<string, RechargeRequest>>({}); // 🚀 存储每个用户的待处理充值申请详情
   const [loading, setLoading] = useState(true);
   const [merchantStores, setMerchantStores] = useState<any[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
@@ -733,10 +597,10 @@ const UserManagement: React.FC = () => {
     if (q) setSearchTerm(q);
     if (
       tab &&
-      ['customer_list', 'admin_list', 'merchant_store', 'courier_management', 'recharge_requests'].includes(tab)
+      ['customer_list', 'admin_list', 'merchant_store', 'courier_management'].includes(tab)
     ) {
       setActiveTab(
-        tab as 'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management' | 'recharge_requests'
+        tab as 'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management'
       );
     }
     if (status && ['all', 'active', 'inactive', 'suspended'].includes(status)) {
@@ -1004,7 +868,10 @@ const UserManagement: React.FC = () => {
     });
   }, [couriers, courierSearchTerm, courierStatusFilter, vehicleFilter]);
 
-  const pendingRechargeCount = Object.keys(pendingRechargeRequests).length;
+  // 初始加载用户数据
+  useEffect(() => {
+    loadUsers();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetUserFilters = () => {
     setSearchTerm('');
@@ -1014,73 +881,6 @@ const UserManagement: React.FC = () => {
     setSelectedUsers(new Set());
     navigate('/admin/users', { replace: true });
   };
-
-  // 🚀 核心优化：增加自动轮询，实时检测充值申请
-  useEffect(() => {
-    // 首次加载
-    loadUsers();
-    
-    // 计数器用于 1 分钟自动刷新
-    let refreshCounter = 0;
-
-    // 每 10 秒轮询一次充值申请
-    const timer = setInterval(() => {
-      console.log('🔄 正在自动检测充值状态...');
-      refreshCounter += 10;
-
-      // 每 60 秒强制刷新一次列表
-      if (refreshCounter >= 60) {
-        console.log('⏱️ 1分钟自动刷新列表...');
-        refreshCounter = 0;
-        loadUsers(); // 刷新用户列表和统计
-        if (activeTabRef.current === 'recharge_requests') {
-          loadRechargeRequests(); // 刷新充值申请列表
-        }
-      }
-      
-      supabase
-        .from('recharge_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .then(({ data }) => {
-          if (data) {
-            const requestsMap: Record<string, RechargeRequest> = {};
-            data.forEach(req => {
-              requestsMap[req.user_id] = req;
-            });
-            setPendingRechargeRequests(requestsMap);
-
-            // 🚀 触发报警音：如果当前待审核数量 > 之前记录的数量
-            const currentCount = data.length;
-            if (currentCount > prevPendingCountRef.current) {
-              console.log('🚨 检测到新充值申请:', currentCount);
-              alertAudioRef.current?.play().catch(e => console.log('音频播放失败:', e));
-              
-              // 立即进行一次语音播报
-              speakNotification('你有新的充值 请审核');
-              setHasNewRequest(true);
-              
-              // 自动刷新当前列表（如果在充值页面）
-              if (activeTabRef.current === 'recharge_requests') {
-                loadRechargeRequests();
-              }
-            } else if (currentCount > 0) {
-              // 🚀 周期性语音提醒：如果仍有待处理申请，每 30 秒播报一次
-              const now = Date.now();
-              if (now - lastVoiceBroadcastRef.current >= 30000) {
-                console.log('📢 30秒周期性播报提醒...');
-                speakNotification('你有新的充值 请审核');
-              }
-            } else if (currentCount === 0) {
-              setHasNewRequest(false);
-            }
-            prevPendingCountRef.current = currentCount;
-          }
-        });
-    }, 10000);
-
-    return () => clearInterval(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadUsers = async () => {
     try {
@@ -1094,20 +894,6 @@ const UserManagement: React.FC = () => {
         .order('created_at', { ascending: false });
       
       if (usersError) throw usersError;
-      
-      // 🚀 新增：获取所有待审核的充值申请
-      const { data: pendingRequests, error: pendingError } = await supabase
-        .from('recharge_requests')
-        .select('*')
-        .eq('status', 'pending');
-      
-      if (!pendingError && pendingRequests) {
-        const requestsMap: Record<string, RechargeRequest> = {};
-        pendingRequests.forEach(req => {
-          requestsMap[req.user_id] = req;
-        });
-        setPendingRechargeRequests(requestsMap);
-      }
 
       // 2. 获取所有管理端账号并整合进管理员列表
       const adminAccounts = await adminAccountService.getAllAccounts();
@@ -1564,109 +1350,9 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const loadRechargeRequests = async () => {
-    try {
-      setLoadingRequests(true);
-      const { data, error } = await supabase
-        .from('recharge_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setRechargeRequests(data || []);
-    } catch (error) {
-      console.error('加载充值申请失败:', error);
-    } finally {
-      setLoadingRequests(false);
-    }
-  };
-
-  const handleApproveRecharge = async (request: RechargeRequest) => {
-    if (!window.confirm(`确定要通过该充值申请吗？\n用户: ${request.user_name}\n金额: ${request.amount.toLocaleString()} MMK`)) return;
-
-    try {
-      setLoadingRequests(true);
-      
-      // 1. 获取当前用户余额
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('balance')
-        .eq('id', request.user_id)
-        .single();
-      
-      if (userError) throw userError;
-
-      const newBalance = (userData.balance || 0) + request.amount;
-
-      // 2. 更新用户余额
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ balance: newBalance })
-        .eq('id', request.user_id);
-      
-      if (updateError) throw updateError;
-
-      // 3. 更新申请状态
-      const { error: requestError } = await supabase
-        .from('recharge_requests')
-        .update({ status: 'completed', updated_at: new Date().toISOString() })
-        .eq('id', request.id);
-      
-      if (requestError) throw requestError;
-
-      // 4. 记录日志
-      await auditLogService.log({
-        user_id: 'admin',
-        user_name: '管理员',
-        action_type: 'update',
-        module: 'users',
-        target_id: request.user_id,
-        target_name: request.user_name,
-        action_description: `通过充值申请: ${request.amount} MMK, 新余额: ${newBalance} MMK`
-      });
-
-      window.alert('充值已到账！');
-      await loadRechargeRequests();
-      await loadUsers(); // 🚀 同时也刷新用户列表，更新余额显示和警报消失
-    } catch (error: any) {
-      console.error('审批失败:', error);
-      window.alert(`操作失败: ${error.message}`);
-    } finally {
-      setLoadingRequests(false);
-    }
-  };
-
-  const handleRejectRecharge = async (request: RechargeRequest) => {
-    const reason = window.prompt('请输入拒绝原因:');
-    if (reason === null) return;
-
-    try {
-      setLoadingRequests(true);
-      const { error } = await supabase
-        .from('recharge_requests')
-        .update({ 
-          status: 'rejected', 
-          notes: `拒绝原因: ${reason}`,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', request.id);
-      
-      if (error) throw error;
-
-      window.alert('申请已拒绝');
-      await loadRechargeRequests();
-      await loadUsers(); // 🚀 同时也刷新用户列表
-    } catch (error: any) {
-      window.alert(`操作失败: ${error.message}`);
-    } finally {
-      setLoadingRequests(false);
-    }
-  };
-
   useEffect(() => {
     if (activeTab === 'courier_management') loadCouriers();
     else if (activeTab === 'merchant_store') loadMerchantStores();
-    else if (activeTab === 'recharge_requests') loadRechargeRequests();
     else loadUsers();
   }, [activeTab]);
 
@@ -1724,25 +1410,16 @@ const UserManagement: React.FC = () => {
 
         <nav className="user-mgmt__tabs" aria-label="用户管理分类">
           {USER_TABS.map((tab) => {
-            const isRechargeTab = tab.id === 'recharge_requests';
-            const hasPending = pendingRechargeCount > 0;
             const isActive = activeTab === tab.id;
             return (
               <button
                 type="button"
                 key={tab.id}
-                className={`user-mgmt__tab${isActive ? ' is-active' : ''}${isRechargeTab && hasPending ? ' is-alert' : ''}`}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  if (isRechargeTab) setHasNewRequest(false);
-                }}
+                className={`user-mgmt__tab${isActive ? ' is-active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
               >
-                {isRechargeTab && hasPending && <span>🚨</span>}
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
-                {isRechargeTab && hasPending && (
-                  <span className="user-mgmt__tab-badge">{pendingRechargeCount}</span>
-                )}
               </button>
             );
           })}
@@ -1770,11 +1447,6 @@ const UserManagement: React.FC = () => {
                   <span className="user-mgmt__count">共 {filteredUsers.length} 人</span>
                   {selectedUsers.size > 0 && (
                     <span className="user-mgmt__count">已选 {selectedUsers.size}</span>
-                  )}
-                  {pendingRechargeCount > 0 && activeTab === 'customer_list' && (
-                    <span className="user-mgmt__count" style={{ color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }}>
-                      {pendingRechargeCount} 笔待充值
-                    </span>
                   )}
                 </div>
               </div>
@@ -1857,144 +1529,7 @@ const UserManagement: React.FC = () => {
                     updateUserStatus={updateUserStatus}
                     handleDeleteUser={handleDeleteUser}
                     handleOpenRecharge={handleOpenRecharge}
-                    pendingRecharge={pendingRechargeRequests[user.id]}
-                    handleApproveRecharge={handleApproveRecharge}
-                    handleRejectRecharge={handleRejectRecharge}
                   />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {activeTab === 'recharge_requests' && (
-          <section className="user-mgmt__panel">
-            <div className="user-mgmt__toolbar">
-              <div>
-                <h2 className="user-mgmt__toolbar-title">💰 充值申请审核</h2>
-                <div className="user-mgmt__toolbar-meta">
-                  <span className="user-mgmt__count">共 {rechargeRequests.length} 条</span>
-                  {pendingRechargeCount > 0 && (
-                    <span className="user-mgmt__count" style={{ color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }}>
-                      {pendingRechargeCount} 待审核
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="user-mgmt__actions">
-                <button
-                  type="button"
-                  className="user-mgmt__btn user-mgmt__btn--primary"
-                  onClick={() => {
-                    speakNotification('声音提醒功能已开启');
-                    window.alert('✅ 声音播报已激活！\n\n系统现在将自动检测充值申请，并每隔 30 秒为您进行语音提醒。请确保您的设备没有开启静音模式。');
-                  }}
-                >
-                  🔔 开启语音提醒
-                </button>
-                <button type="button" className="user-mgmt__btn" onClick={loadRechargeRequests}>
-                  🔄 刷新列表
-                </button>
-              </div>
-            </div>
-
-            {loadingRequests ? (
-              <SkeletonTable rows={5} />
-            ) : rechargeRequests.length === 0 ? (
-              <div className="user-mgmt__empty">
-                <div className="user-mgmt__empty-icon">📋</div>
-                <p className="user-mgmt__empty-text">暂无充值申请记录</p>
-              </div>
-            ) : (
-              <div className="user-mgmt-recharge-list">
-                {rechargeRequests.map(request => (
-                  <article
-                    key={request.id}
-                    className={`user-mgmt-recharge-item${request.status === 'pending' ? ' is-pending' : ''}`}
-                  >
-                    {request.status === 'pending' && (
-                      <div className="user-mgmt-recharge-item__badge">
-                        <span className="user-mgmt-recharge-item__badge-icon">🚨</span> 新申请
-                      </div>
-                    )}
-
-                    <div className="user-mgmt-recharge-item__user">
-                      <span className="user-mgmt-recharge-item__avatar" aria-hidden>👤</span>
-                      <div>
-                        <div className="user-mgmt-recharge-item__name">{request.user_name}</div>
-                        <div className="user-mgmt-recharge-item__uid">{request.user_id}</div>
-                        <div className="user-mgmt-recharge-item__time">
-                          ⏰ {new Date(request.created_at || '').toLocaleString('zh-CN')}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="user-mgmt-recharge-item__amount-wrap">
-                      <div className="user-mgmt-recharge-item__amount-label">充值金额</div>
-                      <div className="user-mgmt-recharge-item__amount">
-                        {request.amount.toLocaleString()} MMK
-                      </div>
-                    </div>
-
-                    <div className="user-mgmt-recharge-item__proof-wrap">
-                      <div className="user-mgmt-recharge-item__proof-label">汇款凭证</div>
-                      {request.proof_url ? (
-                        <a
-                          href={request.proof_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="user-mgmt-recharge-item__proof-link"
-                        >
-                          <div className="user-mgmt-recharge-item__proof">
-                            <img src={request.proof_url} alt="汇款凭证" />
-                          </div>
-                        </a>
-                      ) : (
-                        <div className="user-mgmt-recharge-item__notes">无凭证</div>
-                      )}
-                    </div>
-
-                    <div className="user-mgmt-recharge-item__actions">
-                      <div
-                        className={`user-mgmt-recharge-item__status ${
-                          request.status === 'pending'
-                            ? 'is-pending'
-                            : request.status === 'completed'
-                              ? 'is-completed'
-                              : 'is-rejected'
-                        }`}
-                      >
-                        {request.status === 'pending'
-                          ? '⏳ 待审核'
-                          : request.status === 'completed'
-                            ? '✅ 已通过'
-                            : '❌ 已拒绝'}
-                      </div>
-
-                      {request.status === 'pending' ? (
-                        <div className="user-mgmt-recharge-item__btns">
-                          <button
-                            type="button"
-                            className="user-mgmt-recharge-item__btn user-mgmt-recharge-item__btn--approve"
-                            onClick={() => handleApproveRecharge(request)}
-                          >
-                            通过
-                          </button>
-                          <button
-                            type="button"
-                            className="user-mgmt-recharge-item__btn user-mgmt-recharge-item__btn--reject"
-                            onClick={() => handleRejectRecharge(request)}
-                          >
-                            拒绝
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="user-mgmt-recharge-item__notes">
-                          {request.notes || '无备注'}
-                        </div>
-                      )}
-                    </div>
-                  </article>
                 ))}
               </div>
             )}
@@ -2030,7 +1565,6 @@ const UserManagement: React.FC = () => {
                     key={store.id}
                     store={store}
                     isMobile={isMobile}
-                    pendingRecharge={pendingRechargeRequests[store.id] || (store.user_id && pendingRechargeRequests[store.user_id])}
                   />
                 ))}
               </div>
@@ -2296,12 +1830,6 @@ const UserManagement: React.FC = () => {
           </div>
         )}
       </div>
-      {/* 🚀 警报提示音 */}
-      <audio 
-        ref={alertAudioRef}
-        src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" 
-        preload="auto"
-      />
     </div>
   );
 };
