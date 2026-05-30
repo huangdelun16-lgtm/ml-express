@@ -15,6 +15,7 @@ import type {
   RechargeRequest,
 } from './_shared/domainTypes';
 export type { Banner, Tutorial, ProductCategory, StoreReview, RechargeRequest };
+import { createBannerService, createTutorialService } from './_shared/services';
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -612,28 +613,8 @@ export const packageService = {
 };
 
 // 广告服务
-export const bannerService = {
-  // 获取所有启用的广告
-  async getActiveBanners(): Promise<Banner[]> {
-    try {
-      const { data, error } = await supabase
-        .from('banners')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      if (error) {
-        LoggerService.error('获取广告列表失败:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      LoggerService.error('获取广告列表异常:', error);
-      return [];
-    }
-  }
-};
+// bannerService.getActiveBanners 实现见 /shared/src/services.ts（工厂注入 client + logger）
+export const bannerService = createBannerService(supabase, LoggerService);
 
 // 简化的用户服务（客户端使用）
 export interface User {
@@ -1426,25 +1407,8 @@ export const reviewService = {
 };
 
 // 🚀 新增：使用教学服务
-export const tutorialService = {
-  async getAllTutorials(): Promise<Tutorial[]> {
-    try {
-      const { data, error } = await supabase
-        .from('tutorials')
-        .select('*')
-        .order('display_order', { ascending: true });
-      
-      if (error) {
-        LoggerService.error('获取教学列表失败:', error);
-        return [];
-      }
-      return data || [];
-    } catch (err) {
-      LoggerService.error('获取教学列表异常:', err);
-      return [];
-    }
-  }
-};
+// tutorialService.getAllTutorials 实现见 /shared/src/services.ts
+export const tutorialService = createTutorialService(supabase, LoggerService);
 
 // 测试连接（简化版）
 export const testConnection = async (): Promise<boolean> => {

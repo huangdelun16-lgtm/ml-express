@@ -42,6 +42,7 @@ export type {
   UserNotification,
   WelcomeScreen,
 };
+import { createBannerService, createTutorialService } from "./_shared/services";
 
 type SupabaseExtra = { supabaseUrl?: string; supabaseAnonKey?: string };
 const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra) as SupabaseExtra | undefined;
@@ -1656,28 +1657,8 @@ export const packageService = {
 };
 
 // 广告服务
-export const bannerService = {
-  // 获取所有启用的广告
-  async getActiveBanners(): Promise<Banner[]> {
-    try {
-      const { data, error } = await supabase
-        .from("banners")
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order", { ascending: true });
-
-      if (error) {
-        LoggerService.error("获取广告列表失败:", error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      LoggerService.error("获取广告列表异常:", error);
-      return [];
-    }
-  },
-};
+// bannerService.getActiveBanners 实现见 /shared/src/services.ts（工厂注入 client + logger）
+export const bannerService = createBannerService(supabase, LoggerService);
 
 // 系统设置服务
 export const systemSettingsService = {
@@ -2358,25 +2339,8 @@ export const reviewService = {
 };
 
 // 🚀 新增：使用教学服务
-export const tutorialService = {
-  async getAllTutorials(): Promise<Tutorial[]> {
-    try {
-      const { data, error } = await supabase
-        .from("tutorials")
-        .select("*")
-        .order("display_order", { ascending: true });
-
-      if (error) {
-        LoggerService.error("获取教学列表失败:", error);
-        return [];
-      }
-      return data || [];
-    } catch (err) {
-      LoggerService.error("获取教学列表异常:", err);
-      return [];
-    }
-  },
-};
+// tutorialService.getAllTutorials 实现见 /shared/src/services.ts
+export const tutorialService = createTutorialService(supabase, LoggerService);
 
 // 🚀 新增：欢迎页面服务
 export const welcomeScreenService = {
