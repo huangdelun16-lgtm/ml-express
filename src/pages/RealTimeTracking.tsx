@@ -517,7 +517,11 @@ const RealTimeTracking: React.FC = () => {
 
             const rtActiveTime = parseDate(courierRt?.last_active);
             const loginActiveTime = parseDate(acc.last_login);
-            const locationUpdateTime = parseDate(location?.updated_at || location?.last_update); // 🚀 新增：包含位置更新时间
+            const locationUpdateTime = parseDate(
+              location?.updated_at ||
+                location?.last_update ||
+                courierRt?.last_location_update, // 🚀 回退：couriers 表的位置更新时间
+            );
             
             const mostRecentActiveTime = Math.max(rtActiveTime, loginActiveTime, locationUpdateTime);
 
@@ -535,8 +539,12 @@ const RealTimeTracking: React.FC = () => {
             }
           }
 
-          const latRaw = location?.latitude;
-          const lngRaw = location?.longitude;
+          // 优先用 courier_locations 表坐标；缺失时回退 couriers 表的 last_latitude/last_longitude
+          // （骑手 App 会同时写两张表，回退可避免 courier_locations 单点失败导致地图无坐标）
+          const latRaw =
+            location?.latitude ?? (courierRt as any)?.last_latitude;
+          const lngRaw =
+            location?.longitude ?? (courierRt as any)?.last_longitude;
           const lat =
             latRaw !== null && latRaw !== undefined && latRaw !== ''
               ? Number(latRaw)
@@ -561,7 +569,7 @@ const RealTimeTracking: React.FC = () => {
             batteryLevel: location?.battery_level ?? 100,
             signal_strength: location?.signal_strength ?? 100, // 🚀 映射信号强度
             vehicle_type: acc.position === '骑手队长' ? 'car' : 'motorcycle',
-            location_updated_at: location?.updated_at || location?.last_update || courierRt?.last_active || acc.last_login
+            location_updated_at: location?.updated_at || location?.last_update || (courierRt as any)?.last_location_update || courierRt?.last_active || acc.last_login
           } as any;
         });
 
