@@ -14,7 +14,10 @@ import { useApp } from '../contexts/AppContext';
 import { locationService } from '../services/locationService';
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 import { setLocationDisclosureAccepted } from '../utils/locationDisclosureStorage';
-import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
+import {
+  requestForegroundPermissionsIfDisclosed,
+  requestBackgroundPermissionsIfDisclosed,
+} from '../utils/locationPermissionGate';
 import { Ionicons } from '@expo/vector-icons';
 
 type Props = { navigation: any; route?: { params?: { fromProfile?: boolean } } };
@@ -69,12 +72,9 @@ export default function LocationDisclosureScreen({ navigation, route }: Props) {
       if (fg === 'granted') {
         // 2. 增加小延迟，确保系统前台权限对话框完全消失后再请求后台
         await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // 3. 检查并请求后台权限
-        const { status: bgExisting } = await Location.getBackgroundPermissionsAsync();
-        if (bgExisting !== 'granted') {
-          await requestBackgroundPermissionsIfDisclosed(language);
-        }
+
+        // 3. 请求后台权限（gate 内部已检查披露状态与现有授权）
+        await requestBackgroundPermissionsIfDisclosed(language);
       }
     } catch (e) {
       console.warn('LocationDisclosure onAgree:', e);
