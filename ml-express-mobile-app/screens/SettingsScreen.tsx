@@ -464,7 +464,7 @@ export default function SettingsScreen({ navigation }: any) {
             <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
               {[
                 { t: '📦 任务处理', c: '在“我的任务”中查看分配给您的包裹，点击进入详情可进行扫码取件、拍照上传及状态更新。' },
-                { t: '📍 导航功能', c: '点击任务详情中的“导航前往”按钮，将自动打开外部地图应用引导您到达收件地点。' },
+                { t: '📍 导航功能', c: '「规划路线」可手动点选 P/D 站点排成 A→B→C 顺序；「Google 语音导航」按此顺序导航，到站自动语音播报。' },
                 { t: '📸 配送证明', c: '送达包裹时，请点击“上传照片”拍摄配送现场照片，系统将自动记录GPS坐标作为凭证。' },
                 { t: '💰 费用结算', c: '在“配送历史”中可查看未结清的跑腿费和代收款，请定期联系财务进行结算。' },
               ].map((item, i) => (

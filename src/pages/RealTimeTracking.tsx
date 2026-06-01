@@ -49,6 +49,26 @@ function adminDeliveryOptionLine(pkg: Package): string {
 
 type MapThemeSetting = 'dark' | 'light' | 'satellite';
 
+const normalizePhoneForMatch = (p: string) =>
+  p ? p.replace(/\D/g, '').replace(/^0+/, '') : '';
+
+/** 从 couriers 行解析有效 GPS（含 last_latitude 回退） */
+function resolveCourierGps(
+  location: CourierLocation | undefined,
+  courierRt: Record<string, unknown> | undefined,
+): { lat?: number; lng?: number } {
+  const latRaw =
+    location?.latitude ?? (courierRt?.last_latitude as number | string | null | undefined);
+  const lngRaw =
+    location?.longitude ?? (courierRt?.last_longitude as number | string | null | undefined);
+  const lat =
+    latRaw !== null && latRaw !== undefined && latRaw !== '' ? Number(latRaw) : NaN;
+  const lng =
+    lngRaw !== null && lngRaw !== undefined && lngRaw !== '' ? Number(lngRaw) : NaN;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return {};
+  return { lat, lng };
+}
+
 /** 暗色地图样式（与系统设置「地图主题 → 暗色」对应） */
 const GOOGLE_MAP_DARK_STYLES = [
   { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
@@ -470,6 +490,32 @@ const RealTimeTracking: React.FC = () => {
         }
       });
 
+      const locationByCourierId = new Map<string, CourierLocation>();
+      (locationsData || []).forEach(loc => {
+        if (loc?.courier_id) locationByCourierId.set(String(loc.courier_id), loc);
+      });
+
+      const couriersByEmployeeId = new Map<string, (typeof couriersData)[0]>();
+      const couriersByPhone = new Map<string, (typeof couriersData)[0]>();
+      const couriersByName = new Map<string, (typeof couriersData)[0]>();
+      couriersData.forEach(c => {
+        if (c.employee_id) couriersByEmployeeId.set(String(c.employee_id), c);
+        const ph = normalizePhoneForMatch(c.phone || '');
+        if (ph) couriersByPhone.set(ph, c);
+        if (c.name) couriersByName.set(String(c.name), c);
+      });
+
+      const resolveCourierRt = (acc: (typeof riderAccounts)[0]) => {
+        const accPhone = normalizePhoneForMatch(acc.phone || '');
+        const candidates = [
+          acc.employee_id ? couriersByEmployeeId.get(String(acc.employee_id)) : undefined,
+          accPhone ? couriersByPhone.get(accPhone) : undefined,
+          acc.employee_name ? couriersByName.get(String(acc.employee_name)) : undefined,
+        ].filter(Boolean) as (typeof couriersData)[0][];
+        const withLocation = candidates.find(c => locationByCourierId.has(String(c.id)));
+        return withLocation || candidates[0];
+      };
+
       // 7. 合并数据并过滤
       // 以账号系统 (riderAccounts) 为准，确保所有骑手都能显示
       const enrichedCouriers: CourierWithLocation[] = riderAccounts
@@ -481,19 +527,12 @@ const RealTimeTracking: React.FC = () => {
           return true;
         })
         .map(acc => {
-          // 在 couriers 表中查找对应的实时数据
-          // 🚀 优化：增强匹配逻辑，同时支持 employee_id 和 phone 匹配（忽略 0 开头差异）
-          const normalizePhoneForMatch = (p: string) => p ? p.replace(/^0/, '') : '';
-          const accPhone = normalizePhoneForMatch(acc.phone);
-          
-          const courierRt = couriersData.find(c => {
-            if (c.employee_id === acc.employee_id) return true;
-            if (normalizePhoneForMatch(c.phone) === accPhone) return true;
-            return false;
-          });
-          
-          // 在 courier_locations 表中查找位置
-          const location = locationsData?.find(loc => loc.courier_id === (courierRt?.id || acc.id));
+          const courierRt = resolveCourierRt(acc);
+
+          // 在 courier_locations 表中查找位置（必须用 couriers.id，不能用 admin_accounts.id）
+          const location = courierRt
+            ? locationByCourierId.get(String(courierRt.id))
+            : undefined;
           
           const currentPackages = packageCounts[acc.employee_name] || 0;
 
@@ -539,21 +578,9 @@ const RealTimeTracking: React.FC = () => {
             }
           }
 
-          // 优先用 courier_locations 表坐标；缺失时回退 couriers 表的 last_latitude/last_longitude
-          // （骑手 App 会同时写两张表，回退可避免 courier_locations 单点失败导致地图无坐标）
-          const latRaw =
-            location?.latitude ?? (courierRt as any)?.last_latitude;
-          const lngRaw =
-            location?.longitude ?? (courierRt as any)?.last_longitude;
-          const lat =
-            latRaw !== null && latRaw !== undefined && latRaw !== ''
-              ? Number(latRaw)
-              : NaN;
-          const lng =
-            lngRaw !== null && lngRaw !== undefined && lngRaw !== ''
-              ? Number(lngRaw)
-              : NaN;
-          const hasValidGps = Number.isFinite(lat) && Number.isFinite(lng);
+          // 优先 courier_locations；缺失时回退 couriers.last_latitude/last_longitude
+          const { lat, lng } = resolveCourierGps(location, courierRt as Record<string, unknown> | undefined);
+          const hasValidGps = lat !== undefined && lng !== undefined;
 
           return {
             id: courierRt?.id || acc.id,
@@ -582,6 +609,48 @@ const RealTimeTracking: React.FC = () => {
       setOnlineRiderCount(0);
     }
   };
+
+  /** Supabase Realtime：`couriers` 表地理字段更新（courier_locations 写入失败时的回退通道） */
+  const mergeRealtimeCourierGeo = useCallback((row: Record<string, unknown>) => {
+    const cid = row.id as string | undefined;
+    if (!cid) return;
+    const lat = Number(row.last_latitude);
+    const lng = Number(row.last_longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const ts = (row.last_location_update || row.last_active) as string | undefined;
+
+    setCouriers(prev =>
+      prev.map(c => {
+        if (c.id !== cid) return c;
+        const next: CourierWithLocation = { ...c, latitude: lat, longitude: lng };
+        if (ts) (next as CourierWithLocation & { location_updated_at?: string }).location_updated_at = ts;
+        return next;
+      })
+    );
+
+    setSelectedCourier(prev => {
+      if (!prev || prev.id !== cid) return prev;
+      const next: CourierWithLocation = { ...prev, latitude: lat, longitude: lng };
+      if (ts) (next as CourierWithLocation & { location_updated_at?: string }).location_updated_at = ts;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-realtime-courier-geo')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'couriers' },
+        payload => {
+          mergeRealtimeCourierGeo((payload.new || {}) as Record<string, unknown>);
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [mergeRealtimeCourierGeo]);
 
   /** Supabase Realtime：`courier_locations` 行级更新立即反映到地图，不等待轮询 */
   const mergeRealtimeCourierLocation = useCallback(

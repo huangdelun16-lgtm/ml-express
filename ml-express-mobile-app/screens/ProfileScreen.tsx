@@ -28,7 +28,7 @@ import {
   isActiveCourierTaskStatus,
 } from '../utils/packageStatusNormalize';
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
-import { locationService } from '../services/locationService';
+import { locationService, syncCourierLocationToSupabase } from '../services/locationService';
 import * as Location from 'expo-location';
 import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
 import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
@@ -169,15 +169,10 @@ export default function ProfileScreen({ navigation }: any) {
           const loc = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
-          await supabase.from('courier_locations').upsert(
-            {
-              courier_id: courierId,
-              latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
-              last_update: new Date().toISOString(),
-            },
-            { onConflict: 'courier_id' },
-          );
+          await syncCourierLocationToSupabase(courierId, {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          });
         } catch (e) {
           console.warn('courier_locations 首包同步失败', e);
         }

@@ -111,12 +111,28 @@ export default function LoginScreen({ navigation }: any) {
         if (userPosition === '骑手' || userPosition === '骑手队长') {
           console.log('🛵 检测到骑手身份，同步骑手数据...');
           try {
-            // 1. 尝试查找现有骑手记录
+            // 1. 尝试查找现有骑手记录（优先 employee_id，避免同名重复建号导致位置对不上）
             let { data: courierData, error: fetchError } = await supabase
               .from('couriers')
               .select('*')
-              .eq('name', userEmployeeName)
+              .eq('employee_id', account.employee_id || '')
               .maybeSingle();
+
+            if (!courierData && account.phone) {
+              ({ data: courierData, error: fetchError } = await supabase
+                .from('couriers')
+                .select('*')
+                .eq('phone', account.phone)
+                .maybeSingle());
+            }
+
+            if (!courierData && !fetchError) {
+              ({ data: courierData, error: fetchError } = await supabase
+                .from('couriers')
+                .select('*')
+                .eq('name', userEmployeeName)
+                .maybeSingle());
+            }
             
             // 2. 如果不存在，则创建一个新的骑手记录
             if (!courierData && !fetchError) {

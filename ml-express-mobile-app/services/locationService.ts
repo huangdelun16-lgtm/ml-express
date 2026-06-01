@@ -7,8 +7,78 @@ import {
   requestForegroundPermissionsIfDisclosed,
   requestBackgroundPermissionsIfDisclosed,
 } from '../utils/locationPermissionGate';
+import { checkRouteArrivalAtLocation } from './routeNavigationSession';
 
 const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
+
+export type CourierLocationPayload = {
+  latitude: number;
+  longitude: number;
+  heading?: number;
+  speed?: number;
+  battery_level?: number;
+  status?: string;
+  last_update?: string;
+};
+
+/** 同步骑手坐标到 courier_locations + couriers（含 upsert 失败时的 insert/update 回退） */
+export async function syncCourierLocationToSupabase(
+  courierId: string,
+  payload: CourierLocationPayload,
+): Promise<boolean> {
+  const lastUpdate = payload.last_update || new Date().toISOString();
+  const row = {
+    courier_id: courierId,
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    heading: payload.heading,
+    speed: payload.speed,
+    battery_level: payload.battery_level,
+    status: payload.status || 'active',
+    last_update: lastUpdate,
+  };
+
+  let locOk = false;
+  const { error: upsertError } = await supabase
+    .from('courier_locations')
+    .upsert(row, { onConflict: 'courier_id' });
+
+  if (upsertError) {
+    const { data: existing } = await supabase
+      .from('courier_locations')
+      .select('id')
+      .eq('courier_id', courierId)
+      .maybeSingle();
+
+    const { error: writeError } = existing
+      ? await supabase.from('courier_locations').update(row).eq('courier_id', courierId)
+      : await supabase.from('courier_locations').insert([row]);
+
+    if (writeError) {
+      console.warn('⚠️ 更新实时位置失败:', writeError.message);
+    } else {
+      locOk = true;
+    }
+  } else {
+    locOk = true;
+  }
+
+  const { error: courierError } = await supabase
+    .from('couriers')
+    .update({
+      last_active: lastUpdate,
+      last_latitude: payload.latitude,
+      last_longitude: payload.longitude,
+      last_location_update: lastUpdate,
+    })
+    .eq('id', courierId);
+
+  if (courierError) {
+    console.warn('⚠️ 更新 couriers 地理字段失败:', courierError.message);
+  }
+
+  return locOk;
+}
 
 // 🚀 坐标平滑处理状态
 let lastLat = 0;
@@ -67,31 +137,13 @@ async function saveLocationToSupabase(latitude: number, longitude: number, isMov
     const minInterval = isMoving ? 12 * 1000 : 90 * 1000;
     if (now - lastUpdate < minInterval) return;
 
-    // 更新 courier_locations 表
-    const { error: locError } = await supabase
-      .from('courier_locations')
-      .upsert({
-        courier_id: courierId,
-        latitude,
-        longitude,
-        last_update: new Date().toISOString(),
-        status: isMoving ? 'active' : 'static'
-      }, { onConflict: 'courier_id' });
+    await syncCourierLocationToSupabase(courierId, {
+      latitude,
+      longitude,
+      status: isMoving ? 'active' : 'static',
+    });
 
-    if (locError) {
-      console.warn('⚠️ 更新实时位置失败:', locError.message);
-    }
-
-    // 同时更新 couriers 表的最后活跃时间
-    await supabase
-      .from('couriers')
-      .update({
-        last_active: new Date().toISOString(),
-        last_latitude: latitude,
-        last_longitude: longitude,
-        last_location_update: new Date().toISOString()
-      })
-      .eq('id', courierId);
+    void checkRouteArrivalAtLocation(latitude, longitude);
 
     await AsyncStorage.setItem('last_location_update_time', now.toString());
     // console.log(`📍 位置同步成功 (${isMoving ? '移动' : '静止'}):`, { latitude, longitude });

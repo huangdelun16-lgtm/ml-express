@@ -17,6 +17,7 @@ import { packageService, supabase, notificationService, Notification } from '../
 import { useApp } from '../contexts/AppContext';
 import * as Location from 'expo-location';
 import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
+import { syncCourierLocationToSupabase } from '../services/locationService';
 import { Alert } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -110,38 +111,16 @@ export default function DashboardScreen({ navigation }: any) {
         accuracy: Location.Accuracy.Balanced,
       });
 
-      const { latitude, longitude, altitude, heading, speed } = location.coords;
+      const { latitude, longitude, heading, speed } = location.coords;
 
-      // 检查是否已有位置记录
-      const { data: existingLocation } = await supabase
-        .from('courier_locations')
-        .select('id')
-        .eq('courier_id', courierId)
-        .single();
-
-      const locationData = {
-        courier_id: courierId,
+      await syncCourierLocationToSupabase(courierId, {
         latitude,
         longitude,
         heading: heading || 0,
         speed: speed || 0,
-        last_update: new Date().toISOString(),
         battery_level: await getBatteryLevel(),
-        status: 'active'
-      };
-
-      if (existingLocation) {
-        // 更新现有记录
-        await supabase
-          .from('courier_locations')
-          .update(locationData)
-          .eq('courier_id', courierId);
-      } else {
-        // 创建新记录
-        await supabase
-          .from('courier_locations')
-          .insert([locationData]);
-      }
+        status: 'active',
+      });
 
       console.log(`✅ 位置已更新: ${latitude?.toFixed(6) || 'N/A'}, ${longitude?.toFixed(6) || 'N/A'}`);
     } catch (error) {
