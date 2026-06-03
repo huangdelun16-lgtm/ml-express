@@ -6,6 +6,7 @@ npm-debug.*
 *.keystore
 !android/app/debug.keystore
 !android/app/release.keystore
+!android/app/upload-release.keystore
 *.p8
 *.p12
 *.key

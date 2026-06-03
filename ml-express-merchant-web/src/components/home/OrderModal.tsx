@@ -1,5 +1,16 @@
-import React, { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import React, { useState, useEffect, useCallback, useRef, type CSSProperties } from 'react';
 import OrderWizardProgress from './OrderWizardProgress';
+import ProductVariantPicker from '../ProductVariantPicker';
+import {
+  cartLineKey,
+  buildProductForCart,
+  formatProductPriceLabel,
+  maxSelectableStockForProduct,
+  parseCartLineKey,
+  productHasVariants,
+  resolveProductVariant,
+} from '../../utils/productVariants';
+import type { Product } from '../../services/supabase';
 import {
   WIZARD_LAST_STEP,
   getWizardCopy,
@@ -7,6 +18,7 @@ import {
   validateAddressStep,
   validateDeliveryStep,
   validatePackageStep,
+  parseCoordsFromAddress,
   type OrderWizardStepIndex,
 } from './orderModalWizard';
 import Logo from '../Logo';
@@ -111,6 +123,47 @@ const FORM_ACTIONS_ROW: CSSProperties = {
   flexWrap: 'wrap' as const,
 };
 
+const WIZARD_BOTTOM_BAR: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  marginTop: '1.25rem',
+  paddingTop: '1rem',
+  paddingBottom: 'max(0.25rem, env(safe-area-inset-bottom, 0px))',
+  borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+  position: 'sticky',
+  bottom: 0,
+  zIndex: 5,
+  background: 'linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.88) 28%, rgba(15, 23, 42, 0.98) 100%)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+};
+
+const WIZARD_BTN_BACK: CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.2)',
+  background: 'rgba(15,23,42,0.35)',
+  color: '#e2e8f0',
+  fontWeight: 700,
+  fontSize: '0.88rem',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+const WIZARD_BTN_NEXT: CSSProperties = {
+  padding: '10px 16px',
+  borderRadius: 10,
+  border: 'none',
+  background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+  color: '#0f172a',
+  fontWeight: 800,
+  fontSize: '0.92rem',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
 interface OrderModalProps {
   showOrderForm: boolean;
   setShowOrderForm: (show: boolean) => void;
@@ -154,9 +207,12 @@ interface OrderModalProps {
   setSelectedSenderLocation?: (loc: {lat: number, lng: number} | null) => void;
   setSelectedReceiverLocation?: (loc: {lat: number, lng: number} | null) => void;
   // 🚀 新增：商家选货相关
-  merchantProducts?: any[];
+  merchantProducts?: Product[];
   selectedProducts?: Record<string, number>;
-  handleProductQuantityChange?: (productId: string, delta: number) => void;
+  handleProductQuantityChange?: (product: Product, delta: number, variantId?: string) => void;
+  selectedVariantByProduct?: Record<string, string>;
+  setSelectedVariantByProduct?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  onEnterConfirmStep?: () => void | Promise<void>;
   cartTotal?: number;
   hasCOD?: boolean;
   setHasCOD?: (val: boolean) => void;
@@ -215,6 +271,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
   merchantProducts = [],
   selectedProducts = {},
   handleProductQuantityChange = () => {},
+  selectedVariantByProduct = {},
+  setSelectedVariantByProduct = () => {},
+  onEnterConfirmStep,
   cartTotal = 0,
   hasCOD = true,
   setHasCOD = () => {},
@@ -229,10 +288,31 @@ const OrderModal: React.FC<OrderModalProps> = ({
 }) => {
   const isMerchant = currentUser?.user_type === 'merchant';
   const [wizardStep, setWizardStep] = useState<OrderWizardStepIndex>(0);
+  const confirmSectionRef = useRef<HTMLDivElement>(null);
+  const confirmSubmitReadyRef = useRef(false);
   const wizardCopy = getWizardCopy(language);
   const wizardLabels = getWizardStepLabels(language);
   const goToStep = useCallback((step: OrderWizardStepIndex) => setWizardStep(step), []);
   useEffect(() => { if (showOrderForm) goToStep(0); }, [showOrderForm, goToStep]);
+
+  useEffect(() => {
+    if (wizardStep !== WIZARD_LAST_STEP) {
+      confirmSubmitReadyRef.current = false;
+      return;
+    }
+    confirmSubmitReadyRef.current = false;
+    const scrollTimer = window.setTimeout(() => {
+      confirmSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    const readyTimer = window.setTimeout(() => {
+      confirmSubmitReadyRef.current = true;
+    }, 450);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(readyTimer);
+    };
+  }, [wizardStep]);
+
   const handleWizardBack = () => { if (wizardStep > 0) goToStep((wizardStep - 1) as OrderWizardStepIndex); };
   const handleWizardNext = () => {
     if (wizardStep === 0) {
@@ -250,12 +330,28 @@ const OrderModal: React.FC<OrderModalProps> = ({
     if (wizardStep === 2) {
       const err = validateDeliveryStep(selectedDeliverySpeed, scheduledDeliveryTime, t.ui.scheduledDelivery, wizardCopy);
       if (err) { window.alert(err); return; }
+      void onEnterConfirmStep?.();
     }
     if (wizardStep < WIZARD_LAST_STEP) goToStep((wizardStep + 1) as OrderWizardStepIndex);
   };
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleConfirmSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (wizardStep !== WIZARD_LAST_STEP) { handleWizardNext(); return; }
+    if (wizardStep !== WIZARD_LAST_STEP) {
+      handleWizardNext();
+      return;
+    }
+    if (!confirmSubmitReadyRef.current) return;
+    if (!isCalculated) {
+      window.alert(
+        language === 'zh'
+          ? '请稍候，跑腿费正在估算中…'
+          : language === 'en'
+            ? 'Please wait, delivery fee is being estimated…'
+            : 'ခဏစောင့်ပါ၊ ပို့ဆောင်ခ ခန့်မှန်းနေပါသည်…',
+      );
+      void onEnterConfirmStep?.();
+      return;
+    }
     handleOrderSubmit(e);
   };
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
@@ -362,17 +458,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
           </div>
         )}
         
-        <form onSubmit={handleFormSubmit}>
+        <form onSubmit={handleConfirmSubmit}>
         <OrderWizardProgress currentStep={wizardStep} labels={wizardLabels} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
-          <button type="button" onClick={handleWizardBack} disabled={wizardStep === 0} style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(15,23,42,0.35)', color: '#e2e8f0', fontWeight: 700, cursor: wizardStep === 0 ? 'not-allowed' : 'pointer', opacity: wizardStep === 0 ? 0.4 : 1 }}>← {wizardCopy.back}</button>
-          <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem', fontWeight: 800 }}>{wizardStep + 1} / {WIZARD_LAST_STEP + 1}</span>
-          {wizardStep < WIZARD_LAST_STEP ? (
-            <button type="button" onClick={handleWizardNext} style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}>{wizardCopy.next} →</button>
-          ) : (
-            <button type="submit" style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>{t.order.submit}</button>
-          )}
-        </div>
 
           {wizardStep === 0 && (<>
           <div style={{ marginBottom: '1.5rem' }}>
@@ -464,22 +551,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 }}
                 onChange={(e) => {
                   const value = e.target.value;
-                  // 如果用户手动编辑地址，移除坐标信息并清除坐标状态
-                  const lines = value.split('\n');
-                  const addressLines = lines.filter(line => !line.includes('📍 坐标:'));
-                  setSenderAddressText(addressLines.join('\n'));
-                  
-                  // 🚀 优化：如果用户手动修改了非坐标部分的地址，清除精确坐标状态
-                  if (value.includes('📍 坐标:')) {
-                    // 说明只是在带有坐标的地址上删除了东西，或者增加了东西
-                    // 如果删除了坐标行，清除状态
-                    if (!value.includes('📍 坐标:')) {
-                      setSelectedSenderLocation(null);
-                    }
-                  } else {
-                    // 如果地址里本来就没有坐标，每次编辑都确保状态为null（除非是从地图选的）
-                    setSelectedSenderLocation(null);
-                  }
+                  setSenderAddressText(value);
+                  const parsed = parseCoordsFromAddress(value);
+                  setSelectedSenderLocation(parsed);
                 }}
               />
               <button
@@ -602,14 +676,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 }}
                 onChange={(e) => {
                   const value = e.target.value;
-                  const lines = value.split('\n');
-                  const addressLines = lines.filter(line => !line.includes('📍 坐标:'));
-                  setReceiverAddressText(addressLines.join('\n'));
-                  
-                  // 🚀 优化：如果用户手动修改地址，清除精确坐标状态
-                  if (!value.includes('📍 坐标:')) {
-                    setSelectedReceiverLocation(null);
-                  }
+                  setReceiverAddressText(value);
+                  const parsed = parseCoordsFromAddress(value);
+                  setSelectedReceiverLocation(parsed);
                 }}
               />
               <button
@@ -680,11 +749,15 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 {/* 已选商品列表 */}
                 {Object.keys(selectedProducts).length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'rgba(255, 255, 255, 0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    {Object.entries(selectedProducts).map(([id, qty]) => {
-                      const product = merchantProducts.find(p => p.id === id);
+                    {Object.entries(selectedProducts).map(([lineKey, qty]) => {
+                      const { productId, variantId } = parseCartLineKey(lineKey);
+                      const product = merchantProducts.find(p => p.id === productId);
                       if (!product) return null;
+                      const line = buildProductForCart(product, variantId);
+                      const variant = variantId ? resolveProductVariant(product, variantId) : null;
+                      const displayName = variant ? `${product.name} · ${variant.name}` : product.name;
                       return (
-                        <div key={id} style={{ 
+                        <div key={lineKey} style={{ 
                           display: 'flex', 
                           justifyContent: 'space-between', 
                           alignItems: 'center',
@@ -693,19 +766,19 @@ const OrderModal: React.FC<OrderModalProps> = ({
                           borderRadius: '10px'
                         }}>
                           <div style={{ flex: 1, marginRight: '10px' }}>
-                            <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{product.name}</div>
-                            <div style={{ color: '#10b981', fontSize: '0.8rem' }}>{product.price.toLocaleString()} MMK</div>
+                            <div style={{ color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>{displayName}</div>
+                            <div style={{ color: '#10b981', fontSize: '0.8rem' }}>{line.price.toLocaleString()} MMK</div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <button 
                               type="button"
-                              onClick={() => handleProductQuantityChange(id, -1)}
+                              onClick={() => handleProductQuantityChange(product, -1, variantId)}
                               style={{ width: '24px', height: '24px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}
                             >-</button>
                             <span style={{ color: 'white', fontWeight: 'bold' }}>{qty}</span>
                             <button 
                               type="button"
-                              onClick={() => handleProductQuantityChange(id, 1)}
+                              onClick={() => handleProductQuantityChange(product, 1, variantId)}
                               style={{ width: '24px', height: '24px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer' }}
                             >+</button>
                           </div>
@@ -1264,7 +1337,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
           {wizardStep === 3 && (<>
           {/* 💰 价格估算部分 */}
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div ref={confirmSectionRef} style={{ marginBottom: '1.5rem' }}>
             <h3 style={SECTION_HEADING}>
               💰 {language === 'zh' ? '价格估算' : language === 'en' ? 'Price Estimate' : 'စျေးနှုန်းခန့်မှန်းခြင်း'}
             </h3>
@@ -1573,74 +1646,77 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
           </>)}
 
-          {wizardStep === WIZARD_LAST_STEP && (<div
-            style={{
-              ...FORM_ACTIONS_ROW,
-              flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-            }}
-          >
+          <div style={WIZARD_BOTTOM_BAR}>
             <button
               type="button"
-              onClick={handleCancelOrder}
+              onClick={handleWizardBack}
+              disabled={wizardStep === 0}
               style={{
-                flex: window.innerWidth < 768 ? 'none' : 1,
-                minWidth: 0,
-                background: 'rgba(255,255,255,0.1)',
-                color: 'rgba(248,250,252,0.95)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                padding: '0.9rem 1.25rem',
-                borderRadius: 12,
-                cursor: 'pointer',
-                fontWeight: 700,
-                width: window.innerWidth < 768 ? '100%' : 'auto',
-                transition: 'background 0.2s ease, border-color 0.2s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                ...WIZARD_BTN_BACK,
+                cursor: wizardStep === 0 ? 'not-allowed' : 'pointer',
+                opacity: wizardStep === 0 ? 0.4 : 1,
               }}
             >
-              {t.order.cancel}
+              ← {wizardCopy.back}
             </button>
-            <button
-              type="submit"
-              style={{
-                flex: window.innerWidth < 768 ? 'none' : 1.2,
-                minWidth: 0,
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 55%, #1e40af 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '0.9rem 1.25rem',
-                borderRadius: 12,
-                cursor: 'pointer',
-                fontWeight: 800,
-                width: window.innerWidth < 768 ? '100%' : 'auto',
-                boxShadow: '0 8px 24px rgba(37, 99, 235, 0.45), 0 1px 0 rgba(255,255,255,0.15) inset',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 12px 28px rgba(37, 99, 235, 0.5), 0 1px 0 rgba(255,255,255,0.2) inset';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.45), 0 1px 0 rgba(255,255,255,0.15) inset';
-              }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span>{t.order.submit}</span>
-                {isCalculated && (
-                  <span style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '0.2rem' }}>
-                    {calculatedPriceDetail} MMK
-                  </span>
-                )}
+            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.06em' }}>
+              {wizardStep + 1} / {WIZARD_LAST_STEP + 1}
+            </span>
+            {wizardStep < WIZARD_LAST_STEP ? (
+              <button type="button" onClick={handleWizardNext} style={WIZARD_BTN_NEXT}>
+                {wizardCopy.next} →
+              </button>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.65rem',
+                  flexWrap: 'wrap',
+                  justifyContent: 'flex-end',
+                  flex: 1,
+                  maxWidth: 'min(100%, 320px)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleCancelOrder}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'rgba(255,255,255,0.1)',
+                    color: 'rgba(248,250,252,0.95)',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t.order.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isCalculated}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: isCalculated
+                      ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                      : 'rgba(100,116,139,0.45)',
+                    color: 'white',
+                    fontWeight: 800,
+                    cursor: isCalculated ? 'pointer' : 'not-allowed',
+                    opacity: isCalculated ? 1 : 0.75,
+                    whiteSpace: 'nowrap',
+                    boxShadow: isCalculated ? '0 6px 18px rgba(37, 99, 235, 0.4)' : 'none',
+                  }}
+                >
+                  {t.order.submit}
+                  {isCalculated ? ` · ${calculatedPriceDetail.toLocaleString()} MMK` : ''}
+                </button>
               </div>
-            </button>
-          </div>)}
+            )}
+          </div>
         </form>
       </div>
 
@@ -1675,6 +1751,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2 style={{ color: 'white', margin: 0 }}>🛍️ {language === 'zh' ? '选择商品' : language === 'en' ? 'Select Product' : 'ပစ္စည်းရွေးရန်'}</h2>
               <button 
+                type="button"
                 onClick={() => setShowProductSelector(false)}
                 style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '18px', cursor: 'pointer' }}
               >✕</button>
@@ -1688,7 +1765,24 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: '1rem' }}>
-                  {merchantProducts.map((item) => (
+                  {merchantProducts.map((item) => {
+                    const hasVariants = productHasVariants(item);
+                    const variantId = hasVariants ? selectedVariantByProduct[item.id] : undefined;
+                    const lineKey = cartLineKey(item.id, variantId);
+                    const displayProduct = buildProductForCart(item, variantId);
+                    const stockCap = maxSelectableStockForProduct(item, variantId);
+                    const qty = selectedProducts[lineKey] || 0;
+                    const priceLang = (language === 'zh' ? 'zh' : language === 'en' ? 'en' : 'my') as 'zh' | 'en' | 'my';
+                    const priceLabel = hasVariants && !variantId
+                      ? formatProductPriceLabel(item, priceLang)
+                      : `${displayProduct.price.toLocaleString()} MMK`;
+                    const stockInfinite = language === 'zh' ? '无限' : language === 'en' ? 'Infinite' : 'အကန့်အသတ်မရှိ';
+                    const stockLabel = hasVariants && !variantId
+                      ? (language === 'zh' ? '请先选规格' : language === 'en' ? 'Select variant' : 'Variant ရွေးပါ')
+                      : displayProduct.stock === -1 ? stockInfinite : String(displayProduct.stock);
+                    const plusDisabled = (hasVariants && !variantId) || (stockCap !== 99999 && qty >= stockCap);
+
+                    return (
                     <div key={item.id} style={{
                       display: 'flex',
                       gap: '1rem',
@@ -1697,37 +1791,48 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       borderRadius: '16px',
                       border: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                      <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#0f172a', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#0f172a', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {item.image_url ? (
                           <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           <span style={{ fontSize: '1.5rem' }}>📦</span>
                         )}
                       </div>
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ color: 'white', fontWeight: 'bold', marginBottom: '4px' }}>{item.name}</div>
-                        <div style={{ color: '#10b981', fontWeight: 'bold' }}>{item.price.toLocaleString()} MMK</div>
+                        {hasVariants ? (
+                          <ProductVariantPicker
+                            product={item}
+                            selectedVariantId={variantId}
+                            onSelect={(vid) =>
+                              setSelectedVariantByProduct((prev) => ({ ...prev, [item.id]: vid }))
+                            }
+                            language={priceLang}
+                          />
+                        ) : null}
+                        <div style={{ color: '#10b981', fontWeight: 'bold' }}>{priceLabel}</div>
                         <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
-                          {language === 'zh' ? '库存' : language === 'en' ? 'Stock' : 'လက်ကျန်'}: {item.stock === -1 ? (language === 'zh' ? '无限' : 'Infinite') : item.stock}
+                          {language === 'zh' ? '库存' : language === 'en' ? 'Stock' : 'လက်ကျန်'}: {stockLabel}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                         <button 
                           type="button"
-                          onClick={() => handleProductQuantityChange(item.id, -1)}
-                          disabled={!selectedProducts[item.id]}
-                          style={{ width: '32px', height: '32px', borderRadius: '16px', border: 'none', background: selectedProducts[item.id] ? '#3b82f6' : 'rgba(255,255,255,0.1)', color: 'white', cursor: selectedProducts[item.id] ? 'pointer' : 'default' }}
+                          onClick={() => handleProductQuantityChange(item, -1, variantId)}
+                          disabled={!qty}
+                          style={{ width: '32px', height: '32px', borderRadius: '16px', border: 'none', background: qty ? '#3b82f6' : 'rgba(255,255,255,0.1)', color: 'white', cursor: qty ? 'pointer' : 'default' }}
                         >-</button>
-                        <span style={{ color: 'white', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>{selectedProducts[item.id] || 0}</span>
+                        <span style={{ color: 'white', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>{qty}</span>
                         <button 
                           type="button"
-                          onClick={() => handleProductQuantityChange(item.id, 1)}
-                          disabled={item.stock !== -1 && (selectedProducts[item.id] || 0) >= item.stock}
-                          style={{ width: '32px', height: '32px', borderRadius: '16px', border: 'none', background: '#3b82f6', color: 'white', cursor: 'pointer' }}
+                          onClick={() => handleProductQuantityChange(item, 1, variantId)}
+                          disabled={plusDisabled}
+                          style={{ width: '32px', height: '32px', borderRadius: '16px', border: 'none', background: plusDisabled ? 'rgba(255,255,255,0.1)' : '#3b82f6', color: 'white', cursor: plusDisabled ? 'default' : 'pointer', opacity: plusDisabled ? 0.5 : 1 }}
                         >+</button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

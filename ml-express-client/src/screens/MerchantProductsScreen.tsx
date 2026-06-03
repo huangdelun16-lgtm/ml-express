@@ -27,6 +27,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
 import ProductVariantChipList from '../components/ProductVariantChipList';
+import MyanmarAwareText from '../components/MyanmarAwareText';
 import {
   buildProductForCart,
   cartLineKey,
@@ -838,12 +839,37 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     const isSelected = selectedProductIds.has(item.id);
     const hasVariants = productHasVariants(item);
     const langKey = language === 'zh' ? 'zh' : language === 'my' ? 'my' : 'en';
+
+    const customerAction = isReadOnly && item.is_available ? (
+      hasVariants ? (
+        <Text style={styles.variantHintText}>
+          {language === 'zh' ? '选规格' : language === 'en' ? 'Variant' : 'Variant'}
+        </Text>
+      ) : (
+        <View style={styles.smallQuantitySelector}>
+          <TouchableOpacity
+            onPress={() => updateItemQuantity(item.id, -1)}
+            style={[styles.smallQtyBtn, quantity === 0 && styles.disabledQtyBtn]}
+            disabled={quantity === 0}
+          >
+            <Ionicons name="remove" size={14} color={quantity === 0 ? '#cbd5e1' : '#3b82f6'} />
+          </TouchableOpacity>
+          <Text style={[styles.smallQtyValue, quantity === 0 && { color: '#cbd5e1' }]}>{quantity}</Text>
+          <TouchableOpacity
+            onPress={() => updateItemQuantity(item.id, 1)}
+            style={styles.smallQtyBtn}
+          >
+            <Ionicons name="add" size={14} color="#3b82f6" />
+          </TouchableOpacity>
+        </View>
+      )
+    ) : null;
     
     return (
       <TouchableOpacity 
         style={[
-          styles.productCard, 
-          isReadOnly ? { width: (width - 48) / 2, flexDirection: 'column', alignItems: 'flex-start' } : { width: '100%', flexDirection: 'row', alignItems: 'center' },
+          styles.productCard,
+          isReadOnly ? styles.productCardCustomer : styles.productCardManage,
           item.id === highlightProductId && styles.highlightedCard // 🚀 高亮显示
         ]}
         onPress={() => isReadOnly ? handleOpenProductDetail(item) : handleOpenEditProduct(item)}
@@ -857,12 +883,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             {isSelected && <Ionicons name="checkmark" size={14} color="white" />}
           </TouchableOpacity>
         )}
-        <View style={isReadOnly ? styles.productImageContainerGrid : styles.productImageContainerList}>
+        <View style={isReadOnly ? styles.productImageContainerCustomer : styles.productImageContainerList}>
           {item.image_url && !item.image_url.startsWith('file://') ? (
             <Image source={{ uri: item.image_url }} style={styles.productImage} resizeMode="contain" />
           ) : (
             <View style={styles.productImagePlaceholder}>
-              <Ionicons name="image-outline" size={isReadOnly ? 24 : 32} color="#cbd5e1" />
+              <Ionicons name="image-outline" size={isReadOnly ? 28 : 32} color="#cbd5e1" />
             </View>
           )}
           {!item.is_available && (
@@ -872,8 +898,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           )}
         </View>
         
-        <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+        <View style={[styles.productInfo, isReadOnly && styles.productInfoCustomer]}>
+          <MyanmarAwareText style={styles.productName} numberOfLines={isReadOnly ? 2 : 1}>
+            {item.name}
+          </MyanmarAwareText>
           <View style={styles.priceRow}>
             <Text style={styles.productPrice}>{formatProductPriceLabel(item, langKey)}</Text>
             {!hasVariants && item.original_price && item.original_price > item.price && (
@@ -883,17 +911,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           {hasVariants ? <ProductVariantChipList product={item} language={langKey} /> : null}
           
           <View style={styles.stockRow}>
-            <Ionicons name="cube-outline" size={14} color="#64748b" />
-            <Text style={styles.productStock}>
-              {currentT.stock}:{' '}
-              {hasVariants
-                ? language === 'zh'
-                  ? '多规格'
-                  : 'Variants'
-                : item.stock === -1
-                  ? currentT.infinite
-                  : item.stock}
-            </Text>
+            <View style={styles.stockRowLeft}>
+              <Ionicons name="cube-outline" size={14} color="#64748b" />
+              <Text style={styles.productStock} numberOfLines={1}>
+                {currentT.stock}:{' '}
+                {hasVariants
+                  ? language === 'zh'
+                    ? '多规格'
+                    : 'Variants'
+                  : item.stock === -1
+                    ? currentT.infinite
+                    : item.stock}
+              </Text>
+            </View>
+            {customerAction}
           </View>
 
           {/* 管理模式下显示状态文字和开关 */}
@@ -916,32 +947,6 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             </View>
           )}
 
-          {isReadOnly && item.is_available && (
-            <View style={styles.customerActionContainer}>
-              {hasVariants ? (
-                <Text style={styles.variantHintText}>
-                  {language === 'zh' ? '点击选规格' : 'Tap to pick variant'}
-                </Text>
-              ) : (
-              <View style={styles.smallQuantitySelector}>
-                <TouchableOpacity 
-                  onPress={() => updateItemQuantity(item.id, -1)}
-                  style={[styles.smallQtyBtn, quantity === 0 && styles.disabledQtyBtn]}
-                  disabled={quantity === 0}
-                >
-                  <Ionicons name="remove" size={14} color={quantity === 0 ? "#cbd5e1" : "#3b82f6"} />
-                </TouchableOpacity>
-                <Text style={[styles.smallQtyValue, quantity === 0 && { color: '#cbd5e1' }]}>{quantity}</Text>
-                <TouchableOpacity 
-                  onPress={() => updateItemQuantity(item.id, 1)}
-                  style={styles.smallQtyBtn}
-                >
-                  <Ionicons name="add" size={14} color="#3b82f6" />
-                </TouchableOpacity>
-              </View>
-              )}
-            </View>
-          )}
         </View>
 
         {!isReadOnly && (
@@ -996,12 +1001,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           </View>
         ) : (
           <FlatList
-            key={isReadOnly ? 'grid' : 'list'}
             data={products}
             keyExtractor={(item) => item.id}
             renderItem={renderProductItem}
-            numColumns={isReadOnly ? 2 : 1}
-            columnWrapperStyle={isReadOnly ? { justifyContent: 'space-between' } : null}
+            numColumns={1}
             contentContainerStyle={[styles.listContent, isReadOnly ? { paddingBottom: 100 } : { paddingBottom: 180 }]}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
@@ -1412,9 +1415,9 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>{currentT.description}</Text>
                   <View style={styles.descriptionBox}>
-                    <Text style={styles.detailDescription}>
+                    <MyanmarAwareText style={styles.detailDescription}>
                       {selectedProductDetail?.description || currentT.noDescription}
-                    </Text>
+                    </MyanmarAwareText>
                   </View>
                   {hasDetailIntroImages(selectedProductDetail) ? (
                     <TouchableOpacity
@@ -1637,6 +1640,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     ...theme.shadows.small,
   },
+  productCardCustomer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  productCardManage: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   highlightedCard: {
     borderColor: '#3b82f6',
     borderWidth: 2,
@@ -1665,6 +1678,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     marginBottom: 8,
+  },
+  productImageContainerCustomer: {
+    width: 96,
+    height: 96,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
+    position: 'relative',
+    flexShrink: 0,
   },
   productImageContainerList: {
     width: 80,
@@ -1701,6 +1723,11 @@ const styles = StyleSheet.create({
   productInfo: {
     flex: 1,
     marginLeft: 12,
+    minWidth: 0,
+  },
+  productInfoCustomer: {
+    flex: 1,
+    paddingTop: 2,
   },
   productName: {
     fontSize: 15,
@@ -1727,8 +1754,17 @@ const styles = StyleSheet.create({
   stockRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 2,
+    marginTop: 2,
+  },
+  stockRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
-    marginBottom: 4,
+    flex: 1,
+    minWidth: 0,
   },
   productStock: {
     fontSize: 12,
@@ -2003,10 +2039,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2563eb',
     backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     overflow: 'hidden',
+    textAlign: 'center',
   },
   detailPriceHint: {
     fontSize: 14,
@@ -2053,10 +2090,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderRadius: 6,
     padding: 2,
-    alignSelf: 'flex-start',
-    gap: 10,
+    gap: 6,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    flexShrink: 0,
   },
   smallQtyBtn: {
     width: 24,
@@ -2310,7 +2347,7 @@ const styles = StyleSheet.create({
   detailDescription: {
     fontSize: 15,
     color: '#475569',
-    lineHeight: 22,
+    lineHeight: 26,
   },
   detailStockCard: {
     flexDirection: 'row',

@@ -13,9 +13,11 @@ export interface MerchantPackingModalProps {
   model: PackingModalModel | null;
   checkedItems: Record<string, boolean>;
   actionLoading: boolean;
+  printLoading?: boolean;
   canComplete: boolean;
   onClose: () => void;
   onToggleItem: (itemId: string) => void;
+  onPrint: () => void;
   onComplete: () => void;
 }
 
@@ -34,6 +36,8 @@ function getCopy(language: MerchantLanguage) {
       itemsTotal: 'Items total',
       customerNote: 'Customer note',
       complete: 'Confirm packing done',
+      print: 'Print receipt',
+      printSub: 'Reprint if you missed it at accept',
       footerHint: 'Ensure every item is packed securely',
       close: 'Close',
       formula: (unit: string, qty: number, total: string) =>
@@ -54,6 +58,8 @@ function getCopy(language: MerchantLanguage) {
       itemsTotal: 'ပစ္စည်းစုစုပေါင်း',
       customerNote: 'ဖောက်သည်မှတ်ချက်',
       complete: 'ထုပ်ပိုးပြီးကြောင်း အတည်ပြုပါ',
+      print: 'ပရင့်ထုတ်ရန်',
+      printSub: 'လက်ခံချိန်တွင် မပရင့်ထုတ်ရသေးပါက ဤနေရာမှ ထပ်ထုတ်ပါ',
       footerHint: 'ပစ္စည်းအားလုံး မှန်ကန်စွာ ထုပ်ပိုးထားကြောင်း သေချာပါစေ',
       close: 'ပိတ်ရန်',
       formula: (unit: string, qty: number, total: string) =>
@@ -72,9 +78,11 @@ function getCopy(language: MerchantLanguage) {
     totalPieces: '总件数',
     itemsTotal: '商品合计',
     customerNote: '客户备注',
-    complete: '确认打包完成',
-    footerHint: '请确保所有商品已备齐并打包好',
-    close: '关闭',
+      complete: '确认打包完成',
+      print: '打印小票',
+      printSub: '接单时未打印可在此补打',
+      footerHint: '请确保所有商品已备齐并打包好',
+      close: '关闭',
     formula: (unit: string, qty: number, total: string) =>
       `${unit} × ${qty} = ${total} MMK`,
   };
@@ -93,9 +101,11 @@ const MerchantPackingModal: React.FC<MerchantPackingModalProps> = ({
   model,
   checkedItems,
   actionLoading,
+  printLoading = false,
   canComplete,
   onClose,
   onToggleItem,
+  onPrint,
   onComplete,
 }) => {
   const copy = useMemo(() => getCopy(language), [language]);
@@ -155,8 +165,17 @@ const MerchantPackingModal: React.FC<MerchantPackingModalProps> = ({
               {model?.rows.map((row, index) => {
                 const itemKey = `item-${index}`;
                 const checked = !!checkedItems[itemKey];
-                const unitStr = formatMmk(row.unitPrice);
-                const lineStr = formatMmk(row.lineTotal);
+                const effectiveLine =
+                  row.lineTotal ??
+                  (row.unitPrice != null ? row.unitPrice * row.qty : null) ??
+                  (displayTotal != null && model.totalQty > 0
+                    ? (displayTotal * row.qty) / model.totalQty
+                    : null);
+                const effectiveUnit =
+                  row.unitPrice ??
+                  (effectiveLine != null ? effectiveLine / Math.max(1, row.qty) : null);
+                const unitStr = formatMmk(effectiveUnit);
+                const lineStr = formatMmk(effectiveLine);
 
                 return (
                   <div
@@ -178,7 +197,7 @@ const MerchantPackingModal: React.FC<MerchantPackingModalProps> = ({
 
                     <div className="merchant-packing-row__info">
                       <span className="merchant-packing-row__name">{row.name}</span>
-                      {row.unitPrice != null && row.lineTotal != null ? (
+                      {effectiveUnit != null && effectiveLine != null ? (
                         <span className="merchant-packing-row__formula">
                           {copy.formula(unitStr, row.qty, lineStr)}
                         </span>
@@ -259,15 +278,28 @@ const MerchantPackingModal: React.FC<MerchantPackingModalProps> = ({
         </div>
 
         <footer className="merchant-packing-footer">
-          <button
-            type="button"
-            className="merchant-packing-complete-btn"
-            onClick={onComplete}
-            disabled={actionLoading || !canComplete}
-          >
-            {actionLoading ? '...' : copy.complete}
-          </button>
-          <p className="merchant-packing-footer__hint">{copy.footerHint}</p>
+          <div className="merchant-packing-footer__actions">
+            <button
+              type="button"
+              className="merchant-packing-print-btn"
+              onClick={onPrint}
+              disabled={actionLoading || printLoading}
+              title={copy.printSub}
+            >
+              {printLoading ? '...' : `🖨️ ${copy.print}`}
+            </button>
+            <button
+              type="button"
+              className="merchant-packing-complete-btn"
+              onClick={onComplete}
+              disabled={actionLoading || printLoading || !canComplete}
+            >
+              {actionLoading ? '...' : copy.complete}
+            </button>
+          </div>
+          <p className="merchant-packing-footer__hint">
+            {copy.printSub} · {copy.footerHint}
+          </p>
         </footer>
       </div>
     </div>

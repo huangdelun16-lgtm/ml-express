@@ -10,6 +10,7 @@ import { useApp } from '../contexts/AppContext';
 import BackToHomeButton from '../components/BackToHomeButton';
 import LoggerService from '../services/LoggerService';
 import ProductVariantChipList from '../components/ProductVariantChipList';
+import MyanmarAwareText from '../components/MyanmarAwareText';
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 
 const { width } = Dimensions.get('window');
@@ -251,7 +252,9 @@ const ProductCard = React.memo(({ item, t, onVisit, onAddToCart, language }: any
         <Image source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} style={styles.productImage} />
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.productDesc} numberOfLines={2}>{item.description}</Text>
+          <MyanmarAwareText style={styles.productDesc} numberOfLines={2}>
+            {item.description}
+          </MyanmarAwareText>
           <View style={styles.productPriceRow}>
             <Text style={styles.productPrice}>{formatProductPriceLabel(item, langKey)}</Text>
             {!hasVariants && item.original_price && item.original_price > item.price && (

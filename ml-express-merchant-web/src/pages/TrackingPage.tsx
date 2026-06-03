@@ -1,14 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import LoggerService from "../services/LoggerService";
 import { useNavigate, useLocation } from "react-router-dom";
-import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
-import {
-  packageService,
-  supabase,
-  merchantService,
-  deliveryStoreService,
-} from "../services/supabase";
-import NavigationBar from "../components/home/NavigationBar";
+import { packageService, merchantService, deliveryStoreService } from "../services/supabase";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useMerchantOrdersOptional } from "../contexts/MerchantOrderContext";
 import { MERCHANT_ORDERS_REFRESH } from "../utils/merchantOrderEvents";
@@ -20,28 +13,22 @@ import {
   type MerchantLanguage,
 } from "../constants/merchantOrderStatus";
 import { useMerchantPackageModals } from "../hooks/useMerchantPackageModals";
+import { buildProductNamePriceMap } from "../utils/parseOrderPackingItems";
 import MerchantPackageDetailModal from "../components/orders/MerchantPackageDetailModal";
 import MerchantPackingModal from "../components/orders/MerchantPackingModal";
-
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || "";
-const GOOGLE_MAPS_LIBRARIES: any = ["places"];
 
 const TrackingPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { language, setLanguage, t: allT } = useLanguage();
+  const { language, t: allT } = useLanguage();
   const merchantOrdersCtx = useMerchantOrdersOptional();
   const t = allT.profile;
-  
-  const { isLoaded: isMapLoaded } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPartnerStore, setIsPartnerStore] = useState(false);
   const [storeInfo, setStoreInfo] = useState<any>(null);
   const [productPriceMap, setProductPriceMap] = useState<
@@ -49,26 +36,7 @@ const TrackingPage: React.FC = () => {
   >({});
 
   const lang = language as MerchantLanguage;
-
-  const packageModals = useMerchantPackageModals({
-    language: lang,
-    productPriceMap,
-    isPartnerStore,
-    onRefresh: () => currentUser && loadActiveOrders(currentUser),
-    onPackageStatusChange: (packageId, status) => {
-      setActiveOrders((prev) =>
-        prev.map((p) => (p.id === packageId ? { ...p, status } : p)),
-      );
-    },
-    removePendingOrder: (id) => merchantOrdersCtx?.removePendingOrder(id),
-  });
-
-  // 分页显示
-  const [currentPage, setCurrentPage] = useState(1);
-  const packagesPerPage = 5;
-
-  const searchParams = new URLSearchParams(location.search);
-  const statusFilter = searchParams.get("status") || "all";
+  const currentUserRef = useRef<any>(null);
 
   const loadStoreData = useCallback(async (storeId: string) => {
     try {
@@ -78,14 +46,7 @@ const TrackingPage: React.FC = () => {
       ]);
       setStoreInfo(storeData);
 
-      const priceMap = productsData.reduce<Record<string, number>>(
-        (acc, product) => {
-          acc[product.name] = product.price;
-          return acc;
-        },
-        {},
-      );
-      setProductPriceMap(priceMap);
+      setProductPriceMap(buildProductNamePriceMap(productsData));
     } catch (error) {
       LoggerService.error(
         "Failed to load store/products data in TrackingPage:",
@@ -95,39 +56,65 @@ const TrackingPage: React.FC = () => {
   }, []);
 
   const loadActiveOrders = useCallback(
-    async (user: any) => {
-      setLoading(true);
+    async (user: any, options?: { background?: boolean }) => {
+      const background = options?.background === true;
+      if (!background) {
+        setInitialLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       try {
         const storeId = user.store_id || user.id;
-      const packages = await packageService.getPackagesByUser(
-          user.email,
-          user.phone,
-        undefined,
-          storeId,
-          user.id,
-          user.name,
-        );
+        const packages = await packageService.getPackagesByStore(storeId, {
+          limit: 500,
+        });
 
         setActiveOrders(packages);
         if (user.user_type === "merchant") {
           setIsPartnerStore(true);
-          await loadStoreData(storeId);
+          if (!storeInfo) {
+            await loadStoreData(storeId);
+          }
         }
-    } catch (error) {
+      } catch (error) {
         LoggerService.error("Failed to load orders:", error);
-    } finally {
-        setLoading(false);
-    }
+      } finally {
+        setInitialLoading(false);
+        setIsRefreshing(false);
+      }
     },
-    [loadStoreData],
+    [loadStoreData, storeInfo],
   );
+
+  const packageModals = useMerchantPackageModals({
+    language: lang,
+    productPriceMap,
+    isPartnerStore,
+    onRefresh: () => {
+      const user = currentUserRef.current;
+      if (user) void loadActiveOrders(user, { background: true });
+    },
+    onPackageStatusChange: (packageId, status) => {
+      setActiveOrders((prev) =>
+        prev.map((p) => (p.id === packageId ? { ...p, status } : p)),
+      );
+    },
+    removePendingOrder: (id) => merchantOrdersCtx?.removePendingOrder(id),
+  });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const packagesPerPage = 5;
+
+  const searchParams = new URLSearchParams(location.search);
+  const statusFilter = searchParams.get("status") || "all";
 
   useEffect(() => {
     const savedUser = localStorage.getItem("ml-express-customer");
     if (savedUser) {
       const user = JSON.parse(savedUser);
       setCurrentUser(user);
-      loadActiveOrders(user);
+      currentUserRef.current = user;
+      void loadActiveOrders(user);
     } else {
       navigate("/login");
     }
@@ -140,17 +127,12 @@ const TrackingPage: React.FC = () => {
 
   useEffect(() => {
     const onRefresh = () => {
-      if (currentUser) loadActiveOrders(currentUser);
+      const user = currentUserRef.current;
+      if (user) void loadActiveOrders(user, { background: true });
     };
     window.addEventListener(MERCHANT_ORDERS_REFRESH, onRefresh);
     return () => window.removeEventListener(MERCHANT_ORDERS_REFRESH, onRefresh);
-  }, [currentUser, loadActiveOrders]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("ml-express-customer");
-    localStorage.removeItem("userType");
-    navigate("/login");
-  };
+  }, [loadActiveOrders]);
 
   const getStatusColor = getMerchantOrderStatusColor;
   const getStatusText = (status: string) =>
@@ -158,10 +140,19 @@ const TrackingPage: React.FC = () => {
   const getPaymentMethodText = (paymentMethod?: string) =>
     getMerchantPaymentMethodText(paymentMethod, lang, { emptyAsDash: true });
 
+  const formatOrderTime = (order: { created_at?: string; create_time?: string }) => {
+    const raw = order.created_at || order.create_time;
+    if (!raw) return "—";
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? raw : d.toLocaleString();
+  };
+
+  const formatDisplayStatus = (status: string) =>
+    getStatusText(status === "待收款" ? "待取件" : status);
+
   return (
     <>
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        {/* 页眉 */}
         <div
           style={{
             display: "flex",
@@ -202,7 +193,7 @@ const TrackingPage: React.FC = () => {
                 }}
               >
                 {t?.packages || "订单列表"}
-          </h1>
+              </h1>
               <p
                 style={{
                   color: "rgba(255,255,255,0.5)",
@@ -222,15 +213,16 @@ const TrackingPage: React.FC = () => {
                     : language === "my"
                       ? " ခု"
                       : ""}
-          </p>
-        </div>
+                {isRefreshing ? " · 更新中…" : ""}
+              </p>
+            </div>
           </div>
           <div style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.85rem" }}>
             {statusFilter.toUpperCase()}
           </div>
-            </div>
-            
-        {loading && activeOrders.length === 0 ? (
+        </div>
+
+        {initialLoading && activeOrders.length === 0 ? (
           <div style={{ textAlign: "center", padding: "10rem 0" }}>
             <div
               className="spinner"
@@ -243,9 +235,9 @@ const TrackingPage: React.FC = () => {
                 animation: "spin 1s linear infinite",
                 margin: "0 auto",
               }}
-            ></div>
-                </div>
-              ) : (
+            />
+          </div>
+        ) : (
           <div style={{ display: "grid", gap: "1.5rem" }}>
             {filteredOrders
               .slice(
@@ -253,8 +245,8 @@ const TrackingPage: React.FC = () => {
                 currentPage * packagesPerPage,
               )
               .map((order) => (
-                    <div
-                      key={order.id}
+                <div
+                  key={order.id}
                   onClick={() => packageModals.handleOrderClick(order)}
                   style={{
                     background: "rgba(255,255,255,0.05)",
@@ -294,7 +286,7 @@ const TrackingPage: React.FC = () => {
                         }}
                       >
                         #{order.id}
-                        </span>
+                      </span>
                       <span
                         style={{
                           background: getStatusColor(
@@ -307,11 +299,9 @@ const TrackingPage: React.FC = () => {
                           fontWeight: "bold",
                         }}
                       >
-                        {order.status === "待收款"
-                          ? getStatusText(order.status)
-                          : order.status}
+                        {formatDisplayStatus(order.status)}
                       </span>
-                        </div>
+                    </div>
                     <p
                       style={{
                         color: "rgba(255,255,255,0.6)",
@@ -330,7 +320,7 @@ const TrackingPage: React.FC = () => {
                     >
                       地址: {order.receiver_address}
                     </p>
-                      </div>
+                  </div>
                   <div style={{ textAlign: "right" }}>
                     <p
                       style={{
@@ -341,7 +331,7 @@ const TrackingPage: React.FC = () => {
                       }}
                     >
                       {order.price
-                        ? `${order.price.replace("MMK", "").trim()} MMK`
+                        ? `${order.price.replace(/MMK/gi, "").trim()} MMK`
                         : "-"}
                     </p>
                     <p
@@ -350,18 +340,17 @@ const TrackingPage: React.FC = () => {
                         fontSize: "0.8rem",
                       }}
                     >
-                      {new Date(order.created_at).toLocaleString()}
+                      {formatOrderTime(order)}
                     </p>
-                      </div>
-                      </div>
+                  </div>
+                </div>
               ))}
           </div>
         )}
 
-        {/* 分页 */}
         {filteredOrders.length > packagesPerPage && (
           <div
-                style={{
+            style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -380,6 +369,7 @@ const TrackingPage: React.FC = () => {
               }}
             >
               <button
+                type="button"
                 onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
                 style={{
@@ -408,10 +398,11 @@ const TrackingPage: React.FC = () => {
                   },
                   (_, i) => i + 1,
                 ).map((page) => (
-              <button
+                  <button
+                    type="button"
                     key={page}
                     onClick={() => setCurrentPage(page)}
-                style={{
+                    style={{
                       background:
                         currentPage === page ? "#3b82f6" : "transparent",
                       color: "white",
@@ -437,6 +428,7 @@ const TrackingPage: React.FC = () => {
                 ))}
               </div>
               <button
+                type="button"
                 onClick={() =>
                   setCurrentPage((prev) =>
                     Math.min(
@@ -486,11 +478,11 @@ const TrackingPage: React.FC = () => {
               {language === "zh"
                 ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, filteredOrders.length)} 条，共 ${filteredOrders.length} 条`
                 : `Showing ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, filteredOrders.length)} of ${filteredOrders.length}`}
-          </div>
+            </div>
           </div>
         )}
 
-        {!loading && filteredOrders.length === 0 && (
+        {!initialLoading && filteredOrders.length === 0 && (
           <div
             style={{
               textAlign: "center",
@@ -503,10 +495,10 @@ const TrackingPage: React.FC = () => {
             <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>✨</div>
             <h3 style={{ color: "rgba(255,255,255,0.5)" }}>
               当前暂无该状态下的订单
-                  </h3>
-                    </div>
+            </h3>
+          </div>
         )}
-                    </div>
+      </div>
 
       <style>{` @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .spinner { animation: spin 1s linear infinite; } `}</style>
 
@@ -517,8 +509,8 @@ const TrackingPage: React.FC = () => {
         productPriceMap={productPriceMap}
         isPartnerStore={isPartnerStore}
         actionLoading={packageModals.actionLoading}
-        title={t?.packageDetails || '包裹详情'}
-        closeLabel={t?.close || '关闭'}
+        title={t?.packageDetails || "包裹详情"}
+        closeLabel={t?.close || "关闭"}
         packageIdLabel={t.packageId}
         getStatusColor={getStatusColor}
         getStatusText={getStatusText}
@@ -532,13 +524,15 @@ const TrackingPage: React.FC = () => {
         open={packageModals.showPackingModal}
         order={packageModals.packingOrderData}
         language={lang}
-        packageIdLabel={t?.packageId || '订单号'}
+        packageIdLabel={t?.packageId || "订单号"}
         model={packageModals.packingModalModel}
         checkedItems={packageModals.checkedItems}
         actionLoading={packageModals.actionLoading}
+        printLoading={packageModals.printLoading}
         canComplete={packageModals.isPackingCompleteEnabled}
         onClose={packageModals.closePackingModal}
         onToggleItem={packageModals.togglePackingItem}
+        onPrint={packageModals.handlePackingPrint}
         onComplete={packageModals.handleCompletePacking}
       />
     </>

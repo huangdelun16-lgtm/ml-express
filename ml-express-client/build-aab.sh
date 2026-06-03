@@ -15,7 +15,7 @@ if [ -z "$EXPO_TOKEN" ]; then
 fi
 
 echo "📋 版本: $(node -p "require('./app.json').expo.version") (code $(node -p "require('./app.json').expo.android.versionCode"))"
-echo "🔑 签名: 使用 EAS production 凭据，须为 release.keystore (SHA1 91:4B:4F:BC:...)"
+echo "🔑 签名: 使用 EAS production 凭据，须为 upload-release.keystore (SHA1 AA:FA:1E:8C:...)"
 echo "   详见 docs/ANDROID_SIGNING.md"
 echo ""
 

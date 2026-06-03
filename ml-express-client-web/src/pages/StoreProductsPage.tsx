@@ -16,6 +16,7 @@ import {
   maxSelectableStockForProduct,
   productHasVariants,
 } from '../utils/productVariants';
+import { myanmarTextCss } from '../utils/myanmarText';
 
 const PIECE_REMARK_LABELS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
@@ -1219,6 +1220,7 @@ const StoreProductsPage: React.FC = () => {
                     lineHeight: 1.55,
                     maxHeight: 140,
                     overflowY: 'auto',
+                    ...myanmarTextCss(selectedProductDetail.description),
                   }}
                 >
                   {selectedProductDetail.description?.trim() ? selectedProductDetail.description : t.store.noDescription}

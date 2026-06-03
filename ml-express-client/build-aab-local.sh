@@ -38,9 +38,9 @@ if [ ! -d "android" ]; then
     npx expo prebuild --platform android --clean
 fi
 
-# 检查签名配置（必须使用 Play 登记的 release.keystore）
-if [ ! -f "android/app/release.keystore" ]; then
-    echo "❌ 未找到 android/app/release.keystore"
+# 检查签名配置（必须使用 Play 登记的 upload-release.keystore）
+if [ ! -f "android/app/upload-release.keystore" ]; then
+    echo "❌ 未找到 android/app/upload-release.keystore"
     echo "   这是 Google Play 登记的上传密钥，不可替换。"
     echo "   详见 docs/ANDROID_SIGNING.md"
     exit 1

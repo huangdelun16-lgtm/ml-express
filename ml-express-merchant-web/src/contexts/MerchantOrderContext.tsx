@@ -43,6 +43,9 @@ const MerchantOrderContext = createContext<MerchantOrderContextValue | undefined
 );
 
 const VOICE_STORAGE_KEY = 'ml-merchant-voice-alert';
+const PENDING_POLL_MS = 10_000;
+const PENDING_SELECT =
+  'id,status,delivery_store_id,sender_name,receiver_name,receiver_address,receiver_phone,description,price,created_at,create_time,payment_method,cod_amount';
 
 function speakMerchantAlert(text: string, lang: string) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -77,6 +80,8 @@ export function MerchantOrderProvider({
   });
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastVoiceAtRef = useRef(0);
+  const knownPendingIdsRef = useRef<Set<string>>(new Set());
+  const pendingSyncReadyRef = useRef(false);
 
   const setIsVoiceEnabled = useCallback((enabled: boolean) => {
     setIsVoiceEnabledState(enabled);
@@ -87,6 +92,7 @@ export function MerchantOrderProvider({
     }
     if (enabled) {
       void ensureDesktopNotificationPermission();
+      playNewOrderChime();
     }
   }, []);
 
@@ -105,18 +111,30 @@ export function MerchantOrderProvider({
     [language],
   );
 
-  const addPendingOrder = useCallback((order: MerchantPendingOrder) => {
-    if (!order?.id || order.status !== '待确认') return;
-    setPendingOrders((prev) => {
-      if (prev.some((o) => o.id === order.id)) return prev;
-      return [order, ...prev];
-    });
-    setShowOrderAlert(true);
-    broadcastMerchantOrdersRefresh();
-    notifyNewPendingOrder(1);
-  }, [notifyNewPendingOrder]);
+  const addPendingOrder = useCallback(
+    (order: MerchantPendingOrder, options?: { silent?: boolean }) => {
+      if (!order?.id || order.status !== '待确认') return false;
+      let added = false;
+      setPendingOrders((prev) => {
+        if (prev.some((o) => o.id === order.id)) return prev;
+        added = true;
+        knownPendingIdsRef.current.add(order.id);
+        return [order, ...prev];
+      });
+      if (added) {
+        setShowOrderAlert(true);
+        broadcastMerchantOrdersRefresh();
+        if (!options?.silent) {
+          notifyNewPendingOrder(1);
+        }
+      }
+      return added;
+    },
+    [notifyNewPendingOrder],
+  );
 
   const removePendingOrder = useCallback((orderId: string) => {
+    knownPendingIdsRef.current.delete(orderId);
     setPendingOrders((prev) => {
       const next = prev.filter((o) => o.id !== orderId);
       if (next.length === 0) setShowOrderAlert(false);
@@ -125,33 +143,57 @@ export function MerchantOrderProvider({
     broadcastMerchantOrdersRefresh();
   }, []);
 
+  const applyPendingRows = useCallback(
+    (rows: MerchantPendingOrder[]) => {
+      const nextIds = new Set(rows.map((r) => r.id));
+      let newCount = 0;
+      if (pendingSyncReadyRef.current) {
+        nextIds.forEach((id) => {
+          if (!knownPendingIdsRef.current.has(id)) newCount += 1;
+        });
+      }
+      knownPendingIdsRef.current = nextIds;
+      pendingSyncReadyRef.current = true;
+      setPendingOrders(rows);
+      if (rows.length > 0) setShowOrderAlert(true);
+      else setShowOrderAlert(false);
+      if (newCount > 0) {
+        notifyNewPendingOrder(newCount);
+        broadcastMerchantOrdersRefresh();
+      }
+    },
+    [notifyNewPendingOrder],
+  );
+
   const syncPendingFromServer = useCallback(async () => {
     if (!storeId) {
+      knownPendingIdsRef.current = new Set();
+      pendingSyncReadyRef.current = false;
       setPendingOrders([]);
       return;
     }
     try {
       const { data, error } = await supabase
         .from('packages')
-        .select('*')
+        .select(PENDING_SELECT)
         .eq('delivery_store_id', storeId)
         .eq('status', '待确认')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      const rows = (data || []) as MerchantPendingOrder[];
-      setPendingOrders(rows);
-      if (rows.length > 0) setShowOrderAlert(true);
-      else setShowOrderAlert(false);
+      applyPendingRows((data || []) as MerchantPendingOrder[]);
     } catch (err) {
       LoggerService.error('同步待确认订单失败', err);
     }
-  }, [storeId]);
+  }, [storeId, applyPendingRows]);
 
   useEffect(() => {
     if (!storeId) return undefined;
 
-    syncPendingFromServer();
+    pendingSyncReadyRef.current = false;
+    knownPendingIdsRef.current = new Set();
+    void ensureDesktopNotificationPermission();
+    void syncPendingFromServer();
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -183,22 +225,49 @@ export function MerchantOrderProvider({
         },
         (payload) => {
           const row = payload.new as MerchantPendingOrder;
-          if (row?.status !== '待确认') {
+          const old = payload.old as MerchantPendingOrder | undefined;
+          if (row?.status === '待确认') {
+            if (old?.status !== '待确认') {
+              addPendingOrder(row);
+            }
+          } else if (row?.id) {
             removePendingOrder(row.id);
           }
           broadcastMerchantOrdersRefresh();
         },
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          LoggerService.debug('商家订单实时通道已连接', storeId);
+        } else if (
+          status === 'CHANNEL_ERROR' ||
+          status === 'TIMED_OUT' ||
+          status === 'CLOSED'
+        ) {
+          LoggerService.warn('商家订单实时通道异常，改为轮询补偿', status, err);
+          void syncPendingFromServer();
+        }
+      });
 
     channelRef.current = channel;
 
     const pollId = window.setInterval(() => {
-      syncPendingFromServer();
-    }, 30000);
+      void syncPendingFromServer();
+    }, PENDING_POLL_MS);
+
+    const onVisible = () => {
+      if (!document.hidden) {
+        stopPendingOrderTitleFlash();
+        void syncPendingFromServer();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
       window.clearInterval(pollId);
+      document.removeEventListener('visibilitychange', onVisible);
+      pendingSyncReadyRef.current = false;
+      knownPendingIdsRef.current = new Set();
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -219,18 +288,6 @@ export function MerchantOrderProvider({
   }, [pendingOrders.length, language]);
 
   useEffect(() => {
-    const onVisibility = () => {
-      if (!document.hidden) {
-        stopPendingOrderTitleFlash();
-      } else if (pendingOrders.length > 0) {
-        startPendingOrderTitleFlash(pendingOrders.length, language);
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [pendingOrders.length, language]);
-
-  useEffect(() => {
     if (!isVoiceEnabled || pendingOrders.length === 0) return;
     const now = Date.now();
     if (now - lastVoiceAtRef.current < 8000) return;
@@ -242,13 +299,7 @@ export function MerchantOrderProvider({
           ? `You have ${pendingOrders.length} new order(s), please accept`
           : `您有 ${pendingOrders.length} 个新订单，请接单`;
     speakMerchantAlert(text, language);
-    if (document.hidden) {
-      playNewOrderChime();
-      showNewOrderDesktopNotification(pendingOrders.length, language, () => {
-        setShowOrderAlert(true);
-      });
-    }
-  }, [pendingOrders.length, isVoiceEnabled, language, showOrderAlert]);
+  }, [pendingOrders.length, isVoiceEnabled, language]);
 
   const value: MerchantOrderContextValue = {
     pendingOrders,

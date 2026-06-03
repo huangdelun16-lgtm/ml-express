@@ -211,6 +211,89 @@ function computeGoodsTotalLabelAndUnits(lineItems: LineLike[]): {
   return { goodsTotalLabel, unitTotalsSummary };
 }
 
+type DraftTableSortKey =
+  | 'registerNo'
+  | 'licOrderCode'
+  | 'startDate'
+  | 'edDate'
+  | 'customerName'
+  | 'portOfDischarge'
+  | 'lineItemCount'
+  | 'totalQty'
+  | 'totalAmount';
+
+type DraftTableSortDirection = 'asc' | 'desc';
+
+function draftTotalQtyNumeric(d: ImportMetricDraftSaved): number {
+  return d.lineItems.reduce((sum, row) => sum + parseNumberLoose(row.quantity), 0);
+}
+
+function draftPrimaryAmountNumeric(d: ImportMetricDraftSaved): number {
+  const byCurrency: Record<string, number> = {};
+  d.lineItems.forEach((row) => {
+    const sub = lineSubtotalNumber(
+      parseNumberLoose(row.unitPrice),
+      parseNumberLoose(row.quantity),
+    );
+    const cur = row.currency || 'USD';
+    byCurrency[cur] = (byCurrency[cur] || 0) + sub;
+  });
+  if (byCurrency.USD != null && byCurrency.USD !== 0) return byCurrency.USD;
+  if (byCurrency.CNY != null && byCurrency.CNY !== 0) return byCurrency.CNY;
+  if (byCurrency.MMK != null && byCurrency.MMK !== 0) return byCurrency.MMK;
+  const vals = Object.values(byCurrency).filter((v) => v !== 0);
+  return vals.length ? vals[0] : 0;
+}
+
+function draftSortComparable(
+  d: ImportMetricDraftSaved,
+  key: DraftTableSortKey,
+): string | number {
+  switch (key) {
+    case 'registerNo':
+      return d.registerNo?.trim() || '';
+    case 'licOrderCode':
+      return d.licOrderCode?.trim() || '';
+    case 'startDate':
+      return d.startDate?.trim() || '';
+    case 'edDate':
+      return d.edDate?.trim() || '';
+    case 'customerName':
+      return d.customerName?.trim() || '';
+    case 'portOfDischarge':
+      return d.portOfDischarge?.trim() || '';
+    case 'lineItemCount':
+      return d.lineItems.length;
+    case 'totalQty':
+      return draftTotalQtyNumeric(d);
+    case 'totalAmount':
+      return draftPrimaryAmountNumeric(d);
+    default:
+      return '';
+  }
+}
+
+function sortImportMetricDrafts(
+  drafts: ImportMetricDraftSaved[],
+  key: DraftTableSortKey,
+  direction: DraftTableSortDirection,
+): ImportMetricDraftSaved[] {
+  const sign = direction === 'asc' ? 1 : -1;
+  return [...drafts].sort((a, b) => {
+    const va = draftSortComparable(a, key);
+    const vb = draftSortComparable(b, key);
+    if (typeof va === 'number' && typeof vb === 'number') {
+      return (va - vb) * sign;
+    }
+    return (
+      String(va).localeCompare(String(vb), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }) * sign
+    );
+  });
+}
+
 function formatDisplayDate(isoDate: string, locale = 'zh-CN'): string {
   if (!isoDate?.trim()) return '—';
   const d = new Date(`${isoDate}T12:00:00`);
@@ -2552,6 +2635,10 @@ const ImportMetricDraftsPage: React.FC = () => {
   const [editingDraft, setEditingDraft] = useState<ImportMetricDraftSaved | null>(null);
   const [lineItemsPreviewDraft, setLineItemsPreviewDraft] = useState<ImportMetricDraftSaved | null>(null);
   const [savedDrafts, setSavedDrafts] = useState<ImportMetricDraftSaved[]>([]);
+  const [tableSort, setTableSort] = useState<{
+    key: DraftTableSortKey | null;
+    direction: DraftTableSortDirection;
+  }>({ key: null, direction: 'asc' });
 
   const reloadDrafts = useCallback(async () => {
     const rows = await importMetricDraftService.listAll();
@@ -2757,6 +2844,36 @@ const ImportMetricDraftsPage: React.FC = () => {
           };
 
   const dateLocale = language === 'en' ? 'en-US' : language === 'my' ? 'my-MM' : 'zh-CN';
+
+  const displayedDrafts = useMemo(() => {
+    if (!tableSort.key) return savedDrafts;
+    return sortImportMetricDrafts(savedDrafts, tableSort.key, tableSort.direction);
+  }, [savedDrafts, tableSort]);
+
+  const toggleTableSort = useCallback((key: DraftTableSortKey) => {
+    setTableSort((prev) => {
+      if (prev.key !== key) return { key, direction: 'asc' };
+      return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+    });
+  }, []);
+
+  const draftTableColumns: {
+    sortKey?: DraftTableSortKey;
+    label: string;
+    align?: 'left' | 'right';
+    compact?: boolean;
+  }[] = [
+    { sortKey: 'registerNo', label: t.colRegister, compact: true },
+    { sortKey: 'licOrderCode', label: t.colOrderNo, compact: true },
+    { sortKey: 'startDate', label: t.colStart, compact: true },
+    { sortKey: 'edDate', label: t.colEd, compact: true },
+    { sortKey: 'customerName', label: t.colCustomer },
+    { sortKey: 'portOfDischarge', label: t.colPort },
+    { sortKey: 'lineItemCount', label: t.colMmDesc },
+    { sortKey: 'totalQty', label: t.colQty },
+    { sortKey: 'totalAmount', label: t.colAmt },
+    { label: t.colActions, align: 'right' },
+  ];
 
   const draftsTabSelected = hubPanelOpen === null;
   const pricesTabSelected = hubPanelOpen === 'prices';
@@ -3037,38 +3154,106 @@ const ImportMetricDraftsPage: React.FC = () => {
             >
               <thead>
                 <tr style={{ background: 'rgba(30, 41, 59, 0.85)', borderBottom: '1px solid rgba(148, 163, 184, 0.25)' }}>
-                  {[
-                    t.colRegister,
-                    t.colOrderNo,
-                    t.colStart,
-                    t.colEd,
-                    t.colCustomer,
-                    t.colPort,
-                    t.colMmDesc,
-                    t.colQty,
-                    t.colAmt,
-                    t.colActions,
-                  ].map((label) => {
-                    const compact =
-                      label === t.colRegister ||
-                      label === t.colOrderNo ||
-                      label === t.colStart ||
-                      label === t.colEd;
+                  {draftTableColumns.map((col) => {
+                    const sortable = Boolean(col.sortKey);
+                    const active = sortable && tableSort.key === col.sortKey;
+                    const sortMark = active
+                      ? tableSort.direction === 'asc'
+                        ? ' ▲'
+                        : ' ▼'
+                      : sortable
+                        ? ' ⇅'
+                        : '';
+                    const headerInner = (
+                      <>
+                        {col.label}
+                        {sortable ? (
+                          <span
+                            style={{
+                              marginLeft: 4,
+                              fontSize: 10,
+                              opacity: active ? 1 : 0.45,
+                              color: active ? '#7dd3fc' : 'rgba(148, 163, 184, 0.9)',
+                            }}
+                            aria-hidden
+                          >
+                            {sortMark.trim() || '⇅'}
+                          </span>
+                        ) : null}
+                      </>
+                    );
                     return (
-                    <th
-                      key={label}
-                      style={{
-                        textAlign: label === t.colActions ? 'right' : 'left',
-                        padding: '14px 16px',
-                        fontWeight: 700,
-                        letterSpacing: compact ? '0.04em' : 'normal',
-                        fontSize: compact ? 12 : 13,
-                        color: 'rgba(248, 250, 252, 0.95)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {label}
-                    </th>
+                      <th
+                        key={col.sortKey ?? col.label}
+                        style={{
+                          textAlign: col.align === 'right' ? 'right' : 'left',
+                          padding: 0,
+                          fontWeight: 700,
+                          verticalAlign: 'middle',
+                        }}
+                      >
+                        {sortable ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleTableSort(col.sortKey!)}
+                            title={
+                              language === 'en'
+                                ? active
+                                  ? `Sorted ${tableSort.direction === 'asc' ? 'A→Z' : 'Z→A'}; click to reverse`
+                                  : 'Click to sort'
+                                : language === 'my'
+                                  ? 'စီရန် နှိပ်ပါ'
+                                  : active
+                                    ? `已${tableSort.direction === 'asc' ? '升序' : '降序'}；再次点击切换`
+                                    : '点击排序'
+                            }
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              width: '100%',
+                              textAlign: col.align === 'right' ? 'right' : 'left',
+                              padding: '14px 16px',
+                              margin: 0,
+                              border: 'none',
+                              background: active
+                                ? 'rgba(37, 99, 235, 0.22)'
+                                : 'transparent',
+                              color: 'rgba(248, 250, 252, 0.95)',
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                              letterSpacing: col.compact ? '0.04em' : 'normal',
+                              fontSize: col.compact ? 12 : 13,
+                              whiteSpace: 'nowrap',
+                              fontFamily: 'inherit',
+                              transition: 'background 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!active) {
+                                e.currentTarget.style.background = 'rgba(51, 65, 85, 0.55)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = active
+                                ? 'rgba(37, 99, 235, 0.22)'
+                                : 'transparent';
+                            }}
+                          >
+                            {headerInner}
+                          </button>
+                        ) : (
+                          <div
+                            style={{
+                              padding: '14px 16px',
+                              letterSpacing: col.compact ? '0.04em' : 'normal',
+                              fontSize: col.compact ? 12 : 13,
+                              color: 'rgba(248, 250, 252, 0.95)',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {headerInner}
+                          </div>
+                        )}
+                      </th>
                     );
                   })}
                 </tr>
@@ -3089,7 +3274,7 @@ const ImportMetricDraftsPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  savedDrafts.map((d, rowIdx) => {
+                  displayedDrafts.map((d, rowIdx) => {
                     const { goodsTotalLabel, unitTotalsSummary } = computeGoodsTotalLabelAndUnits(d.lineItems);
                     const regDisplay = d.registerNo?.trim() ? d.registerNo : '—';
                     return (

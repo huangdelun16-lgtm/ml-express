@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
-  KeyboardAvoidingView,
+  Keyboard,
   Switch,
   Modal,
   Dimensions,
@@ -76,6 +76,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [wizardStep, setWizardStep] = useState<OrderWizardStepIndex>(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   // 处理从其他页面（如商品详情/购物车）传来的预选商品
   useEffect(() => {
@@ -175,6 +176,17 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       );
     }
   };
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const loadUserInfo = async () => {
@@ -419,6 +431,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       wizardSteps: ['地址', '包裹', '配送', '确认'],
       wizardNext: '下一步',
       wizardBack: '上一步',
+      wizardExit: '退出',
       guestLoginToSubmit: '登录后即可提交订单',
       senderInfo: '寄件人信息',
       useMyInfo: '使用我的信息',
@@ -545,6 +558,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       wizardSteps: ['Address', 'Package', 'Delivery', 'Confirm'],
       wizardNext: 'Next',
       wizardBack: 'Back',
+      wizardExit: 'Exit',
       guestLoginToSubmit: 'Sign in to submit your order',
       senderInfo: 'Sender Information',
       useMyInfo: 'Use my info',
@@ -671,6 +685,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       wizardSteps: ['လိပ်စာ', 'ပါဆယ်', 'ပို့ဆောင်', 'အတည်ပြု'],
       wizardNext: 'ရှေ့သို့',
       wizardBack: 'နောက်သို့',
+      wizardExit: 'ထွက်မည်',
       guestLoginToSubmit: 'အော်ဒါတင်ရန် ဝင်ရောက်ပါ',
       senderInfo: 'ပေးပို့သူအချက်အလက်',
       useMyInfo: 'ကျွန်ုပ်၏အချက်အလက်သုံးမည်',
@@ -1700,6 +1715,14 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     }
   };
 
+  const handleWizardExit = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('Main');
+  };
+
   // 提交订单
   const handleSubmitOrder = async () => {
     if (isGuest) {
@@ -2319,7 +2342,18 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             </Text>
           </TouchableOpacity>
         ) : (
-          <View style={wizardStyles.actionSidePlaceholder} />
+          <TouchableOpacity
+            style={wizardStyles.actionBack}
+            onPress={handleWizardExit}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={(currentT as { wizardExit?: string }).wizardExit}
+          >
+            <Ionicons name="close" size={18} color="#e2e8f0" />
+            <Text style={wizardStyles.backBtnText}>
+              {(currentT as { wizardExit?: string }).wizardExit ?? '退出'}
+            </Text>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -2374,6 +2408,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     </View>
   );
 
+  const bottomBarInset = Math.max(insets.bottom, 10);
+  const bottomBarHeight = 52 + bottomBarInset;
+
   return (
     <View style={styles.container}>
       {/* 优化背景视觉效果 */}
@@ -2405,44 +2442,89 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         zIndex: 0
       }} />
 
-      <View
-        style={[
-          wizardStyles.topChrome,
-          { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 12 : 8) },
-        ]}
-      >
-        <View style={[styles.header, { marginBottom: 8, paddingTop: 0 }]}>
-          <Text style={[styles.headerTitle, { color: '#ffffff', fontSize: 32, fontWeight: '800' }]}>{currentT.title}</Text>
-          <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
-          <Text style={[styles.headerSubtitle, { color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }]}>{currentT.subtitle}</Text>
+      <View style={wizardStyles.mainColumn}>
+        <View
+          style={[
+            wizardStyles.topChrome,
+            { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 12 : 8) },
+            keyboardVisible && wizardStyles.topChromeCompact,
+          ]}
+        >
+          <View
+            style={[
+              styles.header,
+              {
+                marginBottom: keyboardVisible ? 0 : 4,
+                paddingTop: 0,
+                paddingBottom: keyboardVisible ? 4 : 10,
+                paddingHorizontal: 0,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.headerTitle,
+                {
+                  color: '#ffffff',
+                  fontSize: keyboardVisible ? 20 : 24,
+                  fontWeight: '800',
+                  marginBottom: 0,
+                },
+              ]}
+            >
+              {currentT.title}
+            </Text>
+            {!keyboardVisible && (
+              <>
+                <View
+                  style={{
+                    height: 3,
+                    width: 32,
+                    backgroundColor: '#fbbf24',
+                    borderRadius: 2,
+                    marginTop: 5,
+                    marginBottom: 5,
+                  }}
+                />
+                <Text
+                  style={[
+                    styles.headerSubtitle,
+                    { color: 'rgba(255, 255, 255, 0.88)', fontSize: 13 },
+                  ]}
+                >
+                  {currentT.subtitle}
+                </Text>
+              </>
+            )}
+          </View>
+
+          <OrderWizardProgress
+            currentStep={wizardStep}
+            labels={wizardStepLabels}
+            language={language}
+            compact={keyboardVisible}
+          />
         </View>
 
-        <OrderWizardProgress
-          currentStep={wizardStep}
-          labels={wizardStepLabels}
-          language={language}
-        />
-
-        {renderWizardActionBar()}
-      </View>
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}
-      >
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[
             styles.scrollContent,
             {
               paddingHorizontal: 16,
-              paddingTop: 8,
-              paddingBottom: Math.max(insets.bottom, 16) + 24,
+              paddingTop: 4,
+              paddingBottom: bottomBarHeight + 16,
             },
           ]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           showsVerticalScrollIndicator={false}
+          decelerationRate="normal"
+          scrollEventThrottle={16}
+          overScrollMode="always"
+          bounces
+          nestedScrollEnabled
         >
           {isGuest && (
             <View style={wizardStyles.guestBanner}>
@@ -2704,7 +2786,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           />
           )}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
+
+      <View
+        style={[
+          wizardStyles.bottomBar,
+          { paddingBottom: bottomBarInset },
+        ]}
+      >
+        {renderWizardActionBar()}
+      </View>
 
       <MapModal
         visible={showMapModal}
@@ -3132,14 +3223,14 @@ const baseStyles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 24,
-    marginTop: 20,
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 8,
     shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.9)',
   },
@@ -3183,7 +3274,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: '#1e293b',
   },
@@ -3199,13 +3290,13 @@ const baseStyles = StyleSheet.create({
     color: '#64748b',
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 10,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#475569',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   labelRow: {
     flexDirection: 'row',
@@ -3222,13 +3313,14 @@ const baseStyles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
     color: '#1e293b',
   },
   textArea: {
-    minHeight: 80,
+    minHeight: 68,
     textAlignVertical: 'top',
   },
   coordsContainer: {
@@ -4228,6 +4320,20 @@ const baseStyles = StyleSheet.create({
 });
 
 const wizardStyles = StyleSheet.create({
+  mainColumn: {
+    flex: 1,
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
   guestBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4257,16 +4363,18 @@ const wizardStyles = StyleSheet.create({
     zIndex: 2,
     backgroundColor: 'transparent',
   },
+  topChromeCompact: {
+    paddingBottom: 0,
+  },
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
     gap: 8,
   },
   actionBarSide: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: 'center',
   },
   actionBarSideEnd: {
@@ -4288,8 +4396,8 @@ const wizardStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 9,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.22)',
@@ -4313,8 +4421,8 @@ const wizardStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
   },
   nextBtnText: {
     color: '#fff',

@@ -111,6 +111,7 @@ export interface CourierLocation {
   heading?: number;
   speed?: number;
   last_update: string;
+  updated_at?: string;
   battery_level?: number;
   status: string;
   created_at?: string;

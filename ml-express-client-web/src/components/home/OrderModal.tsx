@@ -290,6 +290,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
   const [wizardStep, setWizardStep] = useState<OrderWizardStepIndex>(0);
+  /** 进入确认步后短暂禁用「提交」，避免与「下一步」同位置误触 */
+  const [confirmStepArmed, setConfirmStepArmed] = useState(false);
 
   const wizardCopy = getWizardCopy(language);
   const wizardLabels = getWizardStepLabels(language);
@@ -302,18 +304,40 @@ const OrderModal: React.FC<OrderModalProps> = ({
     [onWizardStepChange]
   );
 
-  // 价格估算内跑腿费仅现金：若此前为「余额」则纠偏（余额按键已禁用，不可点）
-  useEffect(() => {
-    if (showOrderForm && paymentMethod === "balance") {
-      setPaymentMethod("cash");
-    }
-  }, [showOrderForm, paymentMethod, setPaymentMethod]);
+  const isVipMember = Boolean(
+    currentUser && (currentUser.balance > 0 || currentUser.user_type === 'vip'),
+  );
+  const balanceAfterCart = (currentUser?.balance ?? 0) - (isFromCart ? cartTotal : 0);
+  const courierFeeMmk = Math.round(calculatedPriceDetail);
+  const canPayCourierFeeByBalance =
+    isVipMember && balanceAfterCart >= courierFeeMmk && courierFeeMmk > 0;
 
   useEffect(() => {
     if (showOrderForm) {
       goToStep(0);
     }
   }, [showOrderForm, goToStep]);
+
+  useEffect(() => {
+    if (!showOrderForm) {
+      setConfirmStepArmed(false);
+      return;
+    }
+    if (wizardStep !== WIZARD_LAST_STEP) {
+      setConfirmStepArmed(false);
+      return;
+    }
+    setConfirmStepArmed(false);
+    const timer = window.setTimeout(() => setConfirmStepArmed(true), 480);
+    return () => window.clearTimeout(timer);
+  }, [showOrderForm, wizardStep]);
+
+  useEffect(() => {
+    if (!showOrderForm) return;
+    if (paymentMethod === 'balance' && !canPayCourierFeeByBalance) {
+      setPaymentMethod('cash');
+    }
+  }, [showOrderForm, paymentMethod, canPayCourierFeeByBalance, setPaymentMethod]);
 
   const handleWizardBack = () => {
     if (wizardStep > 0) goToStep((wizardStep - 1) as OrderWizardStepIndex);
@@ -340,6 +364,10 @@ const OrderModal: React.FC<OrderModalProps> = ({
       }
     }
     if (wizardStep === 1) {
+      if (selectedDeliverySpeed !== 'Eco Way' && !selectedPackageType?.trim()) {
+        window.alert(wizardCopy.fillRequired);
+        return;
+      }
       const err = validatePackageStep(showWeightInput, orderWeight, wizardCopy);
       if (err) {
         window.alert(err);
@@ -359,6 +387,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
       }
     }
     if (wizardStep < WIZARD_LAST_STEP) {
+      setConfirmStepArmed(false);
       goToStep((wizardStep + 1) as OrderWizardStepIndex);
     }
   };
@@ -369,7 +398,24 @@ const OrderModal: React.FC<OrderModalProps> = ({
       handleWizardNext();
       return;
     }
+    if (!isCalculated) {
+      window.alert(
+        language === 'zh'
+          ? '请稍候，正在计算跑腿费…'
+          : language === 'en'
+            ? 'Please wait for the delivery fee estimate.'
+            : 'ပို့ဆောင်ခ ခန့်မှန်းချက် စောင့်ပါ',
+      );
+      return;
+    }
+    if (!confirmStepArmed) {
+      return;
+    }
     handleOrderSubmit(e);
+  };
+
+  const handleExplicitSubmit = () => {
+    handleFormSubmit({ preventDefault: () => {} } as React.FormEvent);
   };
 
   if (!showOrderForm) return null;
@@ -467,9 +513,25 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 </button>
               ) : (
                 <button
-                  type="submit"
-                  form="client-order-wizard-form"
-                  style={WIZARD_BTN_PRIMARY}
+                  type="button"
+                  disabled={!confirmStepArmed || !isCalculated}
+                  onClick={handleExplicitSubmit}
+                  style={{
+                    ...WIZARD_BTN_PRIMARY,
+                    opacity: !confirmStepArmed || !isCalculated ? 0.55 : 1,
+                    cursor: !confirmStepArmed || !isCalculated ? 'not-allowed' : 'pointer',
+                  }}
+                  title={
+                    !isCalculated
+                      ? language === 'zh'
+                        ? '请先完成价格估算'
+                        : 'Complete price estimate first'
+                      : !confirmStepArmed
+                        ? language === 'zh'
+                          ? '请选择支付方式后再提交'
+                          : 'Choose payment method first'
+                        : undefined
+                  }
                 >
                   🚚 {t.order.submit}
                   {isCalculated
@@ -518,7 +580,31 @@ const OrderModal: React.FC<OrderModalProps> = ({
         )}
         </div>
 
-        <form id="client-order-wizard-form" onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <form
+          id="client-order-wizard-form"
+          onSubmit={handleFormSubmit}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            if (wizardStep !== WIZARD_LAST_STEP || !confirmStepArmed) {
+              e.preventDefault();
+            }
+          }}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+        >
+          {/* 确认步各向导字段不在 DOM 中，隐藏域保证 FormData/提交逻辑始终能读到值 */}
+          <input type="hidden" name="senderName" value={senderName} readOnly />
+          <input type="hidden" name="senderPhone" value={senderPhone} readOnly />
+          <input type="hidden" name="receiverName" value={receiverName} readOnly />
+          <input type="hidden" name="receiverPhone" value={receiverPhone} readOnly />
+          <input
+            type="hidden"
+            name="packageType"
+            value={selectedDeliverySpeed === 'Eco Way' ? t.ui.waySide : selectedPackageType}
+            readOnly
+          />
+          <input type="hidden" name="weight" value={orderWeight} readOnly />
+          <input type="hidden" name="deliverySpeed" value={selectedDeliverySpeed} readOnly />
+          <input type="hidden" name="description" value={description} readOnly />
           <div style={MODAL_BODY}>
           {wizardStep === 0 && (
           <div style={SECTION_CARD}>
@@ -1397,12 +1483,8 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     borderTop: '1px solid rgba(255, 255, 255, 0.2)', 
                     paddingTop: '0.5rem', 
                     marginTop: '0.5rem', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    gap: '0.5rem'
                   }}>
-                    {/* 🚀 跑腿费显示 */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
                         🚚 {language === 'zh' ? '跑腿费' : language === 'en' ? 'Delivery Fee' : 'ပို့ဆောင်ခ'}
                       </span>
@@ -1410,83 +1492,123 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         {Math.round(calculatedPriceDetail).toLocaleString()} MMK
                       </span>
                     </div>
-
-                    {/* 🚀 跑腿费支付方式选择 (优化视觉效果) */}
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '0.5rem' }}>
-                      <button
-                        type="button"
-                        disabled
-                        title={
-                          language === 'zh'
-                            ? '暂不支持在此选择余额支付跑腿费'
-                            : language === 'en'
-                              ? 'Balance for delivery fee is not available here'
-                              : 'ဤနေရာတွင် ပို့ဆောင်ခကို လက်ကျန်ငွေဖြင့် ရွေးချယ်နိုင်မည်မဟုတ်ပါ'
-                        }
-                        onClick={(e) => e.preventDefault()}
-                        style={{
-                          flex: 1,
-                          padding: '10px',
-                          borderRadius: '12px',
-                          fontSize: '0.85rem',
-                          fontWeight: '800',
-                          border: '2px solid',
-                          borderColor: 'rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.06)',
-                          color: 'rgba(255,255,255,0.4)',
-                          cursor: 'not-allowed',
-                          opacity: 0.7,
-                          transition: 'all 0.3s ease',
-                        }}
-                      >
-                        💳 {language === 'zh' ? '余额支付' : 'Balance'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('cash')}
-                        style={{
-                          flex: 1,
-                          padding: '10px',
-                          borderRadius: '12px',
-                          fontSize: '0.85rem',
-                          fontWeight: '800',
-                          border: '2px solid',
-                          borderColor: paymentMethod === 'cash' ? '#10b981' : 'rgba(255,255,255,0.15)',
-                          background: paymentMethod === 'cash' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(255,255,255,0.05)',
-                          color: 'white',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          boxShadow: paymentMethod === 'cash' ? '0 4px 15px rgba(16, 185, 129, 0.3)' : 'none'
-                        }}
-                      >
-                        💵 {language === 'zh' ? '现金支付' : 'Cash'}
-                      </button>
-                    </div>
-
-                    {/* 🚀 余额信息 (仅限会员) */}
-                    {currentUser && (
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        marginTop: '0.5rem',
-                        padding: '0.75rem',
-                        background: 'rgba(0,0,0,0.2)',
-                        borderRadius: '10px'
-                      }}>
-                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
-                          💰 {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}:
-                        </span>
-                        <span style={{ 
-                          color: (currentUser.balance - (isFromCart ? cartTotal : 0)) >= 0 ? '#4ade80' : '#f87171', 
-                          fontWeight: 'bold' 
-                        }}>
-                          {(currentUser.balance - (isFromCart ? cartTotal : 0)).toLocaleString()} MMK
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
+            </div>
+
+            <h3 style={{ ...SECTION_HEADING, marginTop: '1rem', marginBottom: '0.65rem' }}>
+              💳 {language === 'zh' ? '跑腿费支付方式' : language === 'en' ? 'Pay delivery fee with' : 'ပို့ဆောင်ခ ပေးချေမှု'}
+            </h3>
+            <div style={PRICE_ESTIMATE_CARD}>
+              <p style={{ margin: '0 0 0.75rem', color: 'rgba(255,255,255,0.85)', fontSize: '0.88rem' }}>
+                {language === 'zh'
+                  ? '请选择余额或现金支付跑腿费，确认后再点右上角「提交订单」。'
+                  : language === 'en'
+                    ? 'Choose balance or cash for the delivery fee, then tap Submit.'
+                    : 'ပို့ဆောင်ခ အတွက် လက်ကျန်ငွေ သို့မဟုတ် ငွေသား ရွေးချယ်ပါ'}
+              </p>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '0.5rem' }}>
+                <button
+                  type="button"
+                  disabled={!canPayCourierFeeByBalance}
+                  title={
+                    !isVipMember
+                      ? language === 'zh'
+                        ? '仅 VIP 会员可使用余额支付跑腿费'
+                        : language === 'en'
+                          ? 'Balance payment for delivery fee is for VIP members only'
+                          : 'VIP အဖွဲ့ဝင်များသာ လက်ကျန်ငွေဖြင့် ပို့ဆောင်ခ ပေးချေနိုင်ပါသည်'
+                      : !canPayCourierFeeByBalance
+                        ? language === 'zh'
+                          ? `余额不足（需 ${courierFeeMmk.toLocaleString()} MMK，可用 ${Math.max(0, balanceAfterCart).toLocaleString()} MMK）`
+                          : language === 'en'
+                            ? `Insufficient balance (need ${courierFeeMmk.toLocaleString()} MMK)`
+                            : 'လက်ကျန်ငွေ မလုံလောက်ပါ'
+                        : language === 'zh'
+                          ? '使用账户余额支付跑腿费'
+                          : language === 'en'
+                            ? 'Pay delivery fee from balance'
+                            : 'လက်ကျန်ငွေဖြင့် ပို့ဆောင်ခ ပေးချေရန်'
+                  }
+                  onClick={() => canPayCourierFeeByBalance && setPaymentMethod('balance')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: '800',
+                    border: '2px solid',
+                    borderColor: paymentMethod === 'balance' ? '#fbbf24' : 'rgba(255,255,255,0.15)',
+                    background:
+                      paymentMethod === 'balance'
+                        ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)'
+                        : canPayCourierFeeByBalance
+                          ? 'rgba(255,255,255,0.05)'
+                          : 'rgba(255,255,255,0.06)',
+                    color:
+                      paymentMethod === 'balance'
+                        ? '#1e293b'
+                        : canPayCourierFeeByBalance
+                          ? 'white'
+                          : 'rgba(255,255,255,0.4)',
+                    cursor: canPayCourierFeeByBalance ? 'pointer' : 'not-allowed',
+                    opacity: canPayCourierFeeByBalance ? 1 : 0.65,
+                    transition: 'all 0.3s ease',
+                    boxShadow:
+                      paymentMethod === 'balance'
+                        ? '0 4px 15px rgba(251, 191, 36, 0.3)'
+                        : 'none',
+                  }}
+                >
+                  💳 {language === 'zh' ? '余额支付' : 'Balance'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('cash')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: '800',
+                    border: '2px solid',
+                    borderColor: paymentMethod === 'cash' ? '#10b981' : 'rgba(255,255,255,0.15)',
+                    background: paymentMethod === 'cash' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(255,255,255,0.05)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: paymentMethod === 'cash' ? '0 4px 15px rgba(16, 185, 129, 0.3)' : 'none',
+                  }}
+                >
+                  💵 {language === 'zh' ? '现金支付' : 'Cash'}
+                </button>
+              </div>
+
+              {currentUser ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '0.5rem',
+                    padding: '0.75rem',
+                    background: 'rgba(0,0,0,0.2)',
+                    borderRadius: '10px',
+                  }}
+                >
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
+                    💰 {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}:
+                  </span>
+                  <span
+                    style={{
+                      color: balanceAfterCart >= 0 ? '#4ade80' : '#f87171',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {balanceAfterCart.toLocaleString()} MMK
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
           )}

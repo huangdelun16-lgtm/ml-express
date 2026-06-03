@@ -53,6 +53,26 @@ function validatePhone(value: string): boolean {
   return trimmed.length > 0 && /^09\d{7,9}$/.test(trimmed);
 }
 
+/** 从地址文本中解析「📍 坐标: lat, lng」 */
+export function parseCoordsFromAddress(
+  addressText: string,
+): { lat: number; lng: number } | null {
+  const match = addressText?.match(/📍\s*坐标:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
+  if (!match) return null;
+  const lat = parseFloat(match[1]);
+  const lng = parseFloat(match[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function resolveLocation(
+  location: { lat: number; lng: number } | null | undefined,
+  addressText: string,
+): { lat: number; lng: number } | null {
+  if (location?.lat != null && location?.lng != null) return location;
+  return parseCoordsFromAddress(addressText);
+}
+
 export function validateAddressStep(
   fields: {
     senderName: string;
@@ -69,7 +89,9 @@ export function validateAddressStep(
   if (!fields.senderName.trim() || !fields.receiverName.trim()) return copy.fillRequired;
   if (!fields.senderAddress.trim() || !fields.receiverAddress.trim()) return copy.fillRequired;
   if (!validatePhone(fields.senderPhone) || !validatePhone(fields.receiverPhone)) return copy.phoneInvalid;
-  if (!fields.senderLocation || !fields.receiverLocation) return copy.coordsRequired;
+  const senderLoc = resolveLocation(fields.senderLocation, fields.senderAddress);
+  const receiverLoc = resolveLocation(fields.receiverLocation, fields.receiverAddress);
+  if (!senderLoc || !receiverLoc) return copy.coordsRequired;
   return null;
 }
 

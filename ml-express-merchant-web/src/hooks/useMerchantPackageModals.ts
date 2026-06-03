@@ -24,6 +24,7 @@ export function useMerchantPackageModals({
   removePendingOrder,
 }: UseMerchantPackageModalsOptions) {
   const [actionLoading, setActionLoading] = useState(false);
+  const [printLoading, setPrintLoading] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [showPackageDetailModal, setShowPackageDetailModal] = useState(false);
   const [packingOrderData, setPackingOrderData] = useState<any>(null);
@@ -143,6 +144,25 @@ export function useMerchantPackageModals({
     [language, onPackageStatusChange, onRefresh],
   );
 
+  const handlePackingPrint = useCallback(async () => {
+    if (!packingOrderData?.id) return;
+    try {
+      setPrintLoading(true);
+      await printMerchantReceipt(packingOrderData, productPriceMap, language);
+    } catch (error) {
+      LoggerService.warn('打包窗口补打小票失败', error);
+      alert(
+        language === 'zh'
+          ? '打印失败，请检查浏览器是否允许打印，或稍后重试。'
+          : language === 'en'
+            ? 'Print failed. Check print permissions and try again.'
+            : 'ပရင့်မရပါ။ ပြန်ကြိုးစားပါ။',
+      );
+    } finally {
+      setPrintLoading(false);
+    }
+  }, [packingOrderData, productPriceMap, language]);
+
   const handleCompletePacking = useCallback(async () => {
     if (!packingOrderData) return;
     try {
@@ -185,6 +205,7 @@ export function useMerchantPackageModals({
 
   return {
     actionLoading,
+    printLoading,
     selectedPackage,
     setSelectedPackage,
     showPackageDetailModal,
@@ -203,6 +224,7 @@ export function useMerchantPackageModals({
     handleAcceptOrder,
     handleCancelOrder,
     handleCompletePacking,
+    handlePackingPrint,
     isPackingCompleteEnabled,
     closePackingModal: () => {
       if (!actionLoading) setShowPackingModal(false);

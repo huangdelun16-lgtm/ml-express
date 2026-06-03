@@ -55,6 +55,27 @@ describe("parseOrderPackingItems", () => {
     expect(m.totalQty).toBe(2);
   });
 
+  it("parses fullwidth 商品费用 tag and fills unit price", () => {
+    const desc =
+      "[已选商品: X Banner Stand x1 (180x80cm) x1][商品费用（仅余额支付）: 10,000 MMK]";
+    const { rows } = buildPackingRows(desc, {});
+    expect(rows[0].unitPrice).toBe(10000);
+    expect(rows[0].lineTotal).toBe(10000);
+  });
+
+  it("matches variant line and declared balance total", () => {
+    const desc =
+      "[已选商品: X Banner Stand x1 (180x80cm) x1][余额支付: 8,000 MMK]";
+    const { rows, summaryTotal } = buildPackingRows(desc, {
+      "X Banner Stand (180x80cm)": 8000,
+      "X Banner Stand": 7500,
+    });
+    expect(rows[0].name).toBe("X Banner Stand x1 (180x80cm)");
+    expect(rows[0].qty).toBe(1);
+    expect(rows[0].lineTotal).toBe(8000);
+    expect(summaryTotal).toBe(8000);
+  });
+
   it("getPackingModalModel sums totalQty across rows", () => {
     const m = getPackingModalModel(
       "[已选商品: 苹果 x2, 香蕉 x1][余额支付: 9,000 MMK]",

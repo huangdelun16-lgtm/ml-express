@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { LocationIcon } from '../Icon';
-import { FadeInView } from '../Animations';
 
 interface ReceiverFormProps {
   language: 'zh' | 'en' | 'my';
@@ -52,25 +51,18 @@ const ReceiverForm = memo<ReceiverFormProps>(({
   }[language] || '常用地址';
 
   return (
-    <FadeInView delay={200}>
-      <View style={styles.section}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+    <View style={styles.section}>
+        <View style={receiverStyles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <LocationIcon size={18} color="#1e293b" />
             <Text style={styles.sectionTitle}> {currentT.receiverInfo}</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={onOpenAddressBook}
-            style={{
-              backgroundColor: '#eff6ff',
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#bfdbfe'
-            }}
+            style={receiverStyles.addressBookBtn}
+            activeOpacity={0.75}
           >
-            <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: 'bold' }}>📖 {chooseAddressT}</Text>
+            <Text style={receiverStyles.addressBookBtnText}>📖 {chooseAddressT}</Text>
           </TouchableOpacity>
         </View>
 
@@ -145,11 +137,34 @@ const ReceiverForm = memo<ReceiverFormProps>(({
           )}
         </View>
       </View>
-    </FadeInView>
   );
 });
 
 ReceiverForm.displayName = 'ReceiverForm';
+
+const receiverStyles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  addressBookBtn: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    flexShrink: 0,
+  },
+  addressBookBtnText: {
+    fontSize: 12,
+    color: '#2563eb',
+    fontWeight: '700',
+  },
+});
 
 export default ReceiverForm;
 

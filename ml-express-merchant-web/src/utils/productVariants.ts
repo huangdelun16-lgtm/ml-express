@@ -65,6 +65,47 @@ export function resolveProductVariant(
   return variants.find((v) => v.id === variantId) ?? null;
 }
 
+export function cartLineKey(productId: string, variantId?: string | null): string {
+  return variantId ? `${productId}::${variantId}` : productId;
+}
+
+export function parseCartLineKey(lineKey: string): { productId: string; variantId?: string } {
+  const idx = lineKey.indexOf('::');
+  if (idx === -1) return { productId: lineKey };
+  return { productId: lineKey.slice(0, idx), variantId: lineKey.slice(idx + 2) };
+}
+
+export function maxSelectableStockForProduct(
+  product: ProductWithVariants,
+  variantId?: string | null,
+): number {
+  if (productHasVariants(product)) {
+    const v =
+      resolveProductVariant(product, variantId) ??
+      getAvailableVariants(product)[0] ??
+      null;
+    if (!v) return 0;
+    if (v.stock === -1) return 99999;
+    return Math.max(0, v.stock ?? 0);
+  }
+  if (product.stock === -1) return 99999;
+  return Math.max(0, product.stock ?? 0);
+}
+
+export function buildProductForCart<T extends ProductWithVariants>(
+  product: T,
+  variantId?: string | null,
+): T {
+  const variant = resolveProductVariant(product, variantId);
+  if (!variant) return { ...product };
+  return {
+    ...product,
+    price: variant.price,
+    original_price: variant.original_price ?? undefined,
+    stock: variant.stock,
+  };
+}
+
 export function getProductDisplayPrice(product: ProductWithVariants): number {
   const variants = getAvailableVariants(product);
   if (!variants.length) return product.price;

@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, TextInput, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 import { PackageIcon } from '../Icon';
-import { FadeInView } from '../Animations';
 
 interface SenderFormProps {
   language: 'zh' | 'en' | 'my';
@@ -46,7 +45,6 @@ const SenderForm = memo<SenderFormProps>(({
 }) => {
   const handleAddressChange = (text: string) => {
     if (disabled) return;
-    // 如果用户手动编辑地址，移除坐标信息
     const lines = text.split('\n');
     const addressLines = lines.filter(line => !line.includes('📍'));
     onSenderAddressChange(addressLines.join('\n'));
@@ -55,67 +53,56 @@ const SenderForm = memo<SenderFormProps>(({
   const chooseAddressT = {
     zh: '常用地址',
     en: 'Saved Address',
-    my: 'လိပ်စာစာအုပ်'
+    my: 'လိပ်စာစာအုပ်',
   }[language] || '常用地址';
 
   const myInfoT = {
     zh: '我的信息',
     en: 'My Info',
-    my: 'ကျွန်ုပ်၏အချက်အလက်'
+    my: 'ကျွန်ုပ်၏အချက်အလက်',
   }[language] || '我的信息';
 
   const mallSenderLockT = {
     zh: '商城订单已自动锁定店铺信息',
     en: 'Store info locked for mall order',
-    my: 'ဆိုင်အချက်အလက်များကို ပိတ်ထားသည်'
+    my: 'ဆိုင်အချက်အလက်များကို ပိတ်ထားသည်',
   }[language] || '商城订单已自动锁定店铺信息';
 
   return (
-    <FadeInView delay={100}>
-      <View style={[styles.section, disabled && { opacity: 0.8 }]}>
-        <View style={styles.sectionHeader}>
+    <View style={[styles.section, disabled && { opacity: 0.8 }]}>
+        <View style={localStyles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
-            <PackageIcon size={18} color="#1e293b" />
+            <PackageIcon size={16} color="#1e293b" />
             <Text style={styles.sectionTitle}> {currentT.senderInfo}</Text>
           </View>
-          {!disabled && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <TouchableOpacity 
-                onPress={onOpenAddressBook}
-                style={{
-                  backgroundColor: '#eff6ff',
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#bfdbfe'
-                }}
-              >
-                <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: 'bold' }}>📖 {chooseAddressT}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => onUseMyInfoChange(!useMyInfo)}
-                activeOpacity={0.7}
-                style={styles.switchContainer}
-              >
-                <Text style={styles.switchLabel}>{myInfoT}</Text>
-                <Switch
-                  value={useMyInfo}
-                  onValueChange={onUseMyInfoChange}
-                  trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-                  thumbColor={useMyInfo ? '#3b82f6' : '#f3f4f6'}
-                  ios_backgroundColor="#d1d5db"
-                  pointerEvents="none" 
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-          {disabled && (
-            <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-              <Text style={{ fontSize: 10, color: '#3b82f6', fontWeight: 'bold' }}>🔒 {mallSenderLockT}</Text>
+          {!disabled ? (
+            <TouchableOpacity
+              onPress={onOpenAddressBook}
+              style={localStyles.addressBookBtn}
+              activeOpacity={0.75}
+            >
+              <Text style={localStyles.addressBookBtnText}>📖 {chooseAddressT}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={localStyles.lockBadge}>
+              <Text style={localStyles.lockBadgeText}>🔒 {mallSenderLockT}</Text>
             </View>
           )}
         </View>
+
+        {!disabled && (
+          <View style={localStyles.myInfoRow}>
+            <Text style={localStyles.myInfoLabel}>{myInfoT}</Text>
+            <Switch
+              value={useMyInfo}
+              onValueChange={onUseMyInfoChange}
+              trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
+              thumbColor={useMyInfo ? '#2563eb' : '#f8fafc'}
+              ios_backgroundColor="#cbd5e1"
+              style={localStyles.myInfoSwitch}
+            />
+          </View>
+        )}
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{currentT.senderName} *</Text>
@@ -123,7 +110,7 @@ const SenderForm = memo<SenderFormProps>(({
             style={[
               styles.input,
               touched.senderName && errors.senderName ? { borderColor: '#ef4444', borderWidth: 1 } : null,
-              disabled && { backgroundColor: '#f8fafc', color: '#64748b' }
+              disabled && { backgroundColor: '#f8fafc', color: '#64748b' },
             ]}
             value={senderName}
             onChangeText={onSenderNameChange}
@@ -133,7 +120,7 @@ const SenderForm = memo<SenderFormProps>(({
             editable={!disabled}
           />
           {touched.senderName && errors.senderName && (
-            <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{errors.senderName}</Text>
+            <Text style={localStyles.errorText}>{errors.senderName}</Text>
           )}
         </View>
 
@@ -143,7 +130,7 @@ const SenderForm = memo<SenderFormProps>(({
             style={[
               styles.input,
               touched.senderPhone && errors.senderPhone ? { borderColor: '#ef4444', borderWidth: 1 } : null,
-              disabled && { backgroundColor: '#f8fafc', color: '#64748b' }
+              disabled && { backgroundColor: '#f8fafc', color: '#64748b' },
             ]}
             value={senderPhone}
             onChangeText={onSenderPhoneChange}
@@ -154,7 +141,7 @@ const SenderForm = memo<SenderFormProps>(({
             editable={!disabled}
           />
           {touched.senderPhone && errors.senderPhone && (
-            <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{errors.senderPhone}</Text>
+            <Text style={localStyles.errorText}>{errors.senderPhone}</Text>
           )}
         </View>
 
@@ -169,10 +156,10 @@ const SenderForm = memo<SenderFormProps>(({
           </View>
           <TextInput
             style={[
-              styles.input, 
+              styles.input,
               styles.textArea,
               touched.senderAddress && errors.senderAddress ? { borderColor: '#ef4444', borderWidth: 1 } : null,
-              disabled && { backgroundColor: '#f8fafc', color: '#64748b' }
+              disabled && { backgroundColor: '#f8fafc', color: '#64748b' },
             ]}
             value={senderAddress}
             onChangeText={handleAddressChange}
@@ -180,11 +167,11 @@ const SenderForm = memo<SenderFormProps>(({
             placeholder={currentT.placeholders.address}
             placeholderTextColor="#9ca3af"
             multiline
-            numberOfLines={3}
+            numberOfLines={2}
             editable={!disabled}
           />
           {touched.senderAddress && errors.senderAddress && (
-            <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{errors.senderAddress}</Text>
+            <Text style={localStyles.errorText}>{errors.senderAddress}</Text>
           )}
           {senderCoordinates && (
             <View style={styles.coordsContainer}>
@@ -196,11 +183,65 @@ const SenderForm = memo<SenderFormProps>(({
           )}
         </View>
       </View>
-    </FadeInView>
   );
 });
 
 SenderForm.displayName = 'SenderForm';
 
-export default SenderForm;
+const localStyles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  addressBookBtn: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    flexShrink: 0,
+  },
+  addressBookBtnText: {
+    fontSize: 11,
+    color: '#2563eb',
+    fontWeight: '700',
+  },
+  lockBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flexShrink: 1,
+  },
+  lockBadgeText: {
+    fontSize: 10,
+    color: '#3b82f6',
+    fontWeight: '700',
+  },
+  myInfoRow: {
+    marginBottom: 8,
+  },
+  myInfoLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 1,
+  },
+  myInfoSwitch: {
+    alignSelf: 'flex-start',
+    transform: [{ scaleX: 0.78 }, { scaleY: 0.78 }],
+    marginLeft: -8,
+    marginTop: -2,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
+});
 
+export default SenderForm;

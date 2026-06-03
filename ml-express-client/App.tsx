@@ -17,6 +17,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  NotoSansMyanmar_400Regular,
+  NotoSansMyanmar_600SemiBold,
+  NotoSansMyanmar_700Bold,
+} from '@expo-google-fonts/noto-sans-myanmar';
 import Constants from 'expo-constants';
 import NotificationService from './src/services/notificationService';
 import { AppProvider, useApp } from './src/contexts/AppContext';
@@ -247,6 +253,17 @@ function AppContent({ onLayoutRootView }: any) {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [appIsReady, setAppIsReady] = useState(false);
+  const [fontsLoaded, fontError] = useFonts({
+    NotoSansMyanmar_400Regular,
+    NotoSansMyanmar_600SemiBold,
+    NotoSansMyanmar_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontError) {
+      console.warn('缅文字体加载失败，将使用系统字体:', fontError);
+    }
+  }, [fontError]);
 
   // 将致命错误保存到本地，方便无 adb 时查看
   const saveErrorToStorage = useCallback(async (tag: string, error: any, isFatal?: boolean) => {
@@ -424,7 +441,7 @@ export default function App() {
     }
   };
 
-  if (!appIsReady || isLoggedIn === null) {
+  if (!appIsReady || isLoggedIn === null || !fontsLoaded) {
     return (
       <View style={{ flex: 1, backgroundColor: '#2E86AB', justifyContent: 'center', alignItems: 'center' }} onLayout={onLayoutRootView}>
         {/* 即使在初始化阶段也显示背景色，避免纯白屏 */}

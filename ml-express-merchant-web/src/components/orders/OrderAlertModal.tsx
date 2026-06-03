@@ -8,28 +8,13 @@ import {
 } from '../../services/supabase';
 import LoggerService from '../../services/LoggerService';
 import type { MerchantPendingOrder } from '../../contexts/MerchantOrderContext';
+import {
+  buildPackingRows,
+  buildProductNamePriceMap,
+} from '../../utils/parseOrderPackingItems';
 import './OrderAlertModal.css';
 
 type Lang = 'zh' | 'en' | 'my';
-
-function parseOrderItems(
-  description: string | undefined,
-  priceMap: Record<string, number>,
-) {
-  if (!description) return [];
-  const itemsMatch = description.match(
-    /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/,
-  );
-  if (!itemsMatch?.[1]) return [];
-  return itemsMatch[1].split(', ').map((item) => {
-    const match = item.match(/^(.+?)\s*x(\d+)$/i);
-    if (!match) return { label: item, qty: 1, price: undefined as number | undefined };
-    const name = match[1].trim();
-    const qty = Number(match[2]) || 1;
-    const unit = priceMap[name];
-    return { label: name, qty, price: unit ? unit * qty : undefined };
-  });
-}
 
 async function printMerchantReceipt(
   orderData: MerchantPendingOrder,
@@ -37,13 +22,19 @@ async function printMerchantReceipt(
   productPriceMap: Record<string, number>,
 ) {
   const qrDataUrl = await QRCode.toDataURL(String(orderData.id), { width: 140, margin: 1 });
-  const parsedItems = parseOrderItems(String(orderData.description || ''), productPriceMap);
+  const { rows: parsedItems } = buildPackingRows(
+    String(orderData.description || ''),
+    productPriceMap,
+  );
   const itemPayMatch = String(orderData.description || '').match(
     /\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/,
   );
   const itemCost = itemPayMatch?.[1] ? parseFloat(itemPayMatch[1].replace(/,/g, '')) : 0;
   const deliveryFee = parseFloat(String(orderData.price || '').replace(/[^0-9.]/g, '') || '0');
-  const computedItemTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);
+  const computedItemTotal = parsedItems.reduce(
+    (sum, item) => sum + (item.lineTotal || 0),
+    0,
+  );
   const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
   const totalFee = deliveryFee + finalItemTotal;
   const paymentText =
@@ -130,12 +121,7 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
       }
       const products = await merchantService.getStoreProducts(String(storeId));
       if (!active) return;
-      setProductPriceMap(
-        products.reduce<Record<string, number>>((acc, p) => {
-          acc[p.name] = p.price;
-          return acc;
-        }, {}),
-      );
+      setProductPriceMap(buildProductNamePriceMap(products));
     };
     load();
     return () => {
@@ -143,10 +129,12 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
     };
   }, [orderData?.delivery_store_id]);
 
-  const items = useMemo(
-    () => parseOrderItems(String(orderData?.description || ''), productPriceMap),
+  const packing = useMemo(
+    () =>
+      buildPackingRows(String(orderData?.description || ''), productPriceMap),
     [orderData?.description, productPriceMap],
   );
+  const items = packing.rows;
 
   if (!visible || orders.length === 0 || !orderData) return null;
 
@@ -334,15 +322,34 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
             <div className="order-alert-items">
               <div className="order-alert-items-title">{t.items}</div>
               {items.map((item) => (
-                <div key={`${item.label}-${item.qty}`} className="order-alert-item-line">
+                <div
+                  key={`${item.name}-${item.qty}`}
+                  className="order-alert-item-line"
+                >
                   <span>
-                    {item.label} ×{item.qty}
+                    {item.name} ×{item.qty}
                   </span>
                   <span>
-                    {item.price != null ? `${item.price.toLocaleString()} MMK` : '-'}
+                    {item.lineTotal != null
+                      ? `${item.lineTotal.toLocaleString()} MMK`
+                      : item.unitPrice != null
+                        ? `${(item.unitPrice * item.qty).toLocaleString()} MMK`
+                        : '-'}
                   </span>
                 </div>
               ))}
+              {packing.summaryTotal != null && items.length > 0 ? (
+                <div className="order-alert-item-line order-alert-item-line--total">
+                  <span>
+                    {language === 'zh'
+                      ? '商品合计'
+                      : language === 'en'
+                        ? 'Items total'
+                        : 'စုစုပေါင်း'}
+                  </span>
+                  <span>{packing.summaryTotal.toLocaleString()} MMK</span>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

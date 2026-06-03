@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { LocationIcon } from '../Icon';
-import { FadeInView } from '../Animations';
 
 interface ReceiverFormProps {
   language: 'zh' | 'en' | 'my';
@@ -39,7 +38,6 @@ const ReceiverForm = memo<ReceiverFormProps>(({
   onBlur,
 }) => {
   const handleAddressChange = (text: string) => {
-    // 如果用户手动编辑地址，移除坐标信息
     const lines = text.split('\n');
     const addressLines = lines.filter(line => !line.includes('📍'));
     onReceiverAddressChange(addressLines.join('\n'));
@@ -48,29 +46,22 @@ const ReceiverForm = memo<ReceiverFormProps>(({
   const chooseAddressT = {
     zh: '常用地址',
     en: 'Saved Address',
-    my: 'လိပ်စာစာအုပ်'
+    my: 'လိပ်စာစာအုပ်',
   }[language] || '常用地址';
 
   return (
-    <FadeInView delay={200}>
-      <View style={styles.section}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+    <View style={styles.section}>
+        <View style={receiverStyles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
             <LocationIcon size={18} color="#1e293b" />
             <Text style={styles.sectionTitle}> {currentT.receiverInfo}</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={onOpenAddressBook}
-            style={{
-              backgroundColor: '#eff6ff',
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#bfdbfe'
-            }}
+            style={receiverStyles.addressBookBtn}
+            activeOpacity={0.75}
           >
-            <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: 'bold' }}>📖 {chooseAddressT}</Text>
+            <Text style={receiverStyles.addressBookBtnText}>📖 {chooseAddressT}</Text>
           </TouchableOpacity>
         </View>
 
@@ -79,7 +70,7 @@ const ReceiverForm = memo<ReceiverFormProps>(({
           <TextInput
             style={[
               styles.input,
-              touched.receiverName && errors.receiverName ? { borderColor: '#ef4444', borderWidth: 1 } : null
+              touched.receiverName && errors.receiverName ? { borderColor: '#ef4444', borderWidth: 1 } : null,
             ]}
             value={receiverName}
             onChangeText={onReceiverNameChange}
@@ -97,7 +88,7 @@ const ReceiverForm = memo<ReceiverFormProps>(({
           <TextInput
             style={[
               styles.input,
-              touched.receiverPhone && errors.receiverPhone ? { borderColor: '#ef4444', borderWidth: 1 } : null
+              touched.receiverPhone && errors.receiverPhone ? { borderColor: '#ef4444', borderWidth: 1 } : null,
             ]}
             value={receiverPhone}
             onChangeText={onReceiverPhoneChange}
@@ -120,9 +111,9 @@ const ReceiverForm = memo<ReceiverFormProps>(({
           </View>
           <TextInput
             style={[
-              styles.input, 
+              styles.input,
               styles.textArea,
-              touched.receiverAddress && errors.receiverAddress ? { borderColor: '#ef4444', borderWidth: 1 } : null
+              touched.receiverAddress && errors.receiverAddress ? { borderColor: '#ef4444', borderWidth: 1 } : null,
             ]}
             value={receiverAddress}
             onChangeText={handleAddressChange}
@@ -130,7 +121,7 @@ const ReceiverForm = memo<ReceiverFormProps>(({
             placeholder={currentT.placeholders.address}
             placeholderTextColor="#9ca3af"
             multiline
-            numberOfLines={3}
+            numberOfLines={2}
           />
           {touched.receiverAddress && errors.receiverAddress && (
             <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{errors.receiverAddress}</Text>
@@ -145,11 +136,33 @@ const ReceiverForm = memo<ReceiverFormProps>(({
           )}
         </View>
       </View>
-    </FadeInView>
   );
 });
 
 ReceiverForm.displayName = 'ReceiverForm';
 
-export default ReceiverForm;
+const receiverStyles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  addressBookBtn: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    flexShrink: 0,
+  },
+  addressBookBtnText: {
+    fontSize: 11,
+    color: '#2563eb',
+    fontWeight: '700',
+  },
+});
 
+export default ReceiverForm;

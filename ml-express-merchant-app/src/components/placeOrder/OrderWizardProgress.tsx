@@ -7,13 +7,14 @@ type Props = {
   currentStep: OrderWizardStepIndex;
   labels: string[];
   language: 'zh' | 'en' | 'my';
+  compact?: boolean;
 };
 
 const STEP_COUNT = 4;
 
-export default function OrderWizardProgress({ currentStep, labels, language }: Props) {
+export default function OrderWizardProgress({ currentStep, labels, language, compact = false }: Props) {
   return (
-    <View style={styles.wrap} accessibilityRole="tablist">
+    <View style={[styles.wrap, compact && styles.wrapCompact]} accessibilityRole="tablist">
       {labels.map((label, index) => {
         const done = index < currentStep;
         const active = index === currentStep;
@@ -23,11 +24,12 @@ export default function OrderWizardProgress({ currentStep, labels, language }: P
               <View
                 style={[
                   styles.dot,
+                  compact && styles.dotCompact,
                   done && styles.dotDone,
                   active && styles.dotActive,
                 ]}
               >
-                <Text style={[styles.dotText, (done || active) && styles.dotTextOn]}>
+                <Text style={[styles.dotText, compact && styles.dotTextCompact, (done || active) && styles.dotTextOn]}>
                   {done ? '✓' : index + 1}
                 </Text>
               </View>
@@ -35,17 +37,19 @@ export default function OrderWizardProgress({ currentStep, labels, language }: P
                 <View style={[styles.line, index < currentStep && styles.lineDone]} />
               )}
             </View>
-            <Text
-              style={[styles.label, active && styles.labelActive]}
-              numberOfLines={1}
-              accessibilityLabel={
-                language === 'zh'
-                  ? `步骤 ${index + 1}：${label}`
-                  : `Step ${index + 1}: ${label}`
-              }
-            >
-              {label}
-            </Text>
+            {!compact && (
+              <Text
+                style={[styles.label, active && styles.labelActive]}
+                numberOfLines={1}
+                accessibilityLabel={
+                  language === 'zh'
+                    ? `步骤 ${index + 1}：${label}`
+                    : `Step ${index + 1}: ${label}`
+                }
+              >
+                {label}
+              </Text>
+            )}
           </View>
         );
       })}
@@ -56,8 +60,11 @@ export default function OrderWizardProgress({ currentStep, labels, language }: P
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 12,
     paddingHorizontal: 4,
+  },
+  wrapCompact: {
+    marginBottom: 6,
   },
   stepItem: {
     flex: 1,
@@ -80,6 +87,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dotCompact: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+  },
   dotDone: {
     backgroundColor: '#10b981',
     borderColor: '#10b981',
@@ -92,6 +104,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: 'rgba(255,255,255,0.7)',
+  },
+  dotTextCompact: {
+    fontSize: 10,
   },
   dotTextOn: {
     color: '#0f172a',

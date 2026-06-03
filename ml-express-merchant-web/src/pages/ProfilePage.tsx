@@ -33,6 +33,17 @@ import {
 } from "../utils/merchantProductForm";
 import "../styles/merchantProductsPage.css";
 import "../styles/productVariantsEditor.css";
+import {
+  buildProductForCart,
+  cartLineKey,
+  maxSelectableStockForProduct,
+  parseCartLineKey,
+  productHasVariants,
+  resolveProductVariant,
+} from "../utils/productVariants";
+import { parseCoordsFromAddress } from "../components/home/orderModalWizard";
+import { buildProductNamePriceMap } from "../utils/parseOrderPackingItems";
+import { generateMyanmarPackageId } from "../utils/generateMyanmarPackageId";
 import NavigationBar from "../components/home/NavigationBar";
 import OrderModal from "../components/home/OrderModal"; // 🚀 新增
 import { useLanguage } from "../contexts/LanguageContext";
@@ -244,6 +255,9 @@ const ProfilePage: React.FC = () => {
   } | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<
     Record<string, number>
+  >({});
+  const [selectedVariantByProduct, setSelectedVariantByProduct] = useState<
+    Record<string, string>
   >({});
   const [cartTotal, setCartTotal] = useState(0);
   const [selectedPackageType, setSelectedPackageType] = useState("");
@@ -554,11 +568,7 @@ const ProfilePage: React.FC = () => {
       setProducts(data);
       
       // 🚀 新增：构建商品价格映射
-      const priceMap = data.reduce<Record<string, number>>((acc, product) => {
-        acc[product.name] = product.price;
-        return acc;
-      }, {});
-      setProductPriceMap(priceMap);
+      setProductPriceMap(buildProductNamePriceMap(data));
     } catch (error) {
       LoggerService.error("加载商品失败:", error);
     } finally {
@@ -1022,25 +1032,30 @@ const ProfilePage: React.FC = () => {
   }, [navigate, checkIfPartnerStore]);
 
   // 加载用户的包裹列表
-  const loadUserPackages = useCallback(async () => {
+  const loadUserPackages = useCallback(async (options?: { background?: boolean }) => {
     if (!currentUser?.id) {
       setLoading(false);
       return;
     }
-    
-    setLoading(true);
+
+    if (!options?.background) {
+      setLoading(true);
+    }
     try {
       // 🚀 核心优化：移除所有账号的注册时间限制，确保 Web 端与 App 端数据完全同步一致
       const queryStartDate = undefined;
       
-      const packages = await packageService.getPackagesByUser(
-        currentUser.email,
-        currentUser.phone,
-        queryStartDate,
-        isPartnerStore ? currentUser.store_id || currentUser.id : undefined,
-        currentUser.id,
-        isPartnerStore ? currentUser.name : undefined,
-      );
+      const storeId = currentUser.store_id || currentUser.id;
+      const packages = isPartnerStore
+        ? await packageService.getPackagesByStore(storeId, { limit: 500 })
+        : await packageService.getPackagesByUser(
+            currentUser.email,
+            currentUser.phone,
+            queryStartDate,
+            undefined,
+            currentUser.id,
+            undefined,
+          );
       
       setUserPackages(packages);
 
@@ -1192,6 +1207,70 @@ const ProfilePage: React.FC = () => {
     loadPricingSettings();
   }, [loadPricingSettings]);
 
+  const detectPricingRegionFromAddress = useCallback((address: string) => {
+    if (!address?.trim()) return "";
+    const regionMap: Record<string, string> = {
+      曼德勒: "mandalay",
+      Mandalay: "mandalay",
+      မန္တလေး: "mandalay",
+      彬乌伦: "maymyo",
+      "Pyin Oo Lwin": "maymyo",
+      ပင်းတလဲ: "maymyo",
+      仰光: "yangon",
+      Yangon: "yangon",
+      ရန်ကုန်: "yangon",
+      内比都: "naypyidaw",
+      NPW: "naypyidaw",
+      နေပြည်တော်: "naypyidaw",
+      东枝: "taunggyi",
+      TGI: "taunggyi",
+      တောင်ကြီး: "taunggyi",
+      腊戌: "lashio",
+      Lashio: "lashio",
+      လားရှိုး: "lashio",
+      木姐: "muse",
+      Muse: "muse",
+      မူဆယ်: "muse",
+    };
+    for (const [city, regionId] of Object.entries(regionMap)) {
+      if (address.includes(city)) return regionId;
+    }
+    return "";
+  }, []);
+
+  useEffect(() => {
+    const detectedRegion = detectPricingRegionFromAddress(senderAddressText);
+    loadPricingSettings(detectedRegion || undefined);
+  }, [senderAddressText, detectPricingRegionFromAddress, loadPricingSettings]);
+
+  // 打开「立即下单」时重新拉取计费规则，避免 Admin 已改价但页面仍用旧缓存
+  useEffect(() => {
+    if (!showOrderForm) return;
+    const detectedRegion = detectPricingRegionFromAddress(senderAddressText);
+    loadPricingSettings(detectedRegion || undefined);
+  }, [showOrderForm, senderAddressText, detectPricingRegionFromAddress, loadPricingSettings]);
+
+  // 打开下单弹窗后，若店铺已有坐标则补全寄件坐标（避免 storeInfo 晚于弹窗加载）
+  useEffect(() => {
+    if (!showOrderForm || !storeInfo?.latitude || !storeInfo?.longitude) return;
+    if (selectedSenderLocation || parseCoordsFromAddress(senderAddressText)) return;
+    setSelectedSenderLocation({
+      lat: storeInfo.latitude,
+      lng: storeInfo.longitude,
+    });
+    setSenderAddressText((prev) => {
+      const base = (prev || storeInfo.address || "").split("\n📍 坐标:")[0].trim();
+      return `${base}\n📍 坐标: ${Number(storeInfo.latitude).toFixed(6)}, ${Number(storeInfo.longitude).toFixed(6)}`;
+    });
+  }, [
+    showOrderForm,
+    storeInfo?.latitude,
+    storeInfo?.longitude,
+    storeInfo?.address,
+    selectedSenderLocation,
+    senderAddressText,
+  ]);
+
   // 🚀 新增：打开立即下单窗口
   const handleOpenPlaceOrder = () => {
     if (!currentUser) return;
@@ -1216,12 +1295,17 @@ const ProfilePage: React.FC = () => {
     }
 
     // 重置其他字段
+    setSelectedReceiverLocation(null);
+    if (!storeInfo?.latitude || !storeInfo?.longitude) {
+      setSelectedSenderLocation(null);
+    }
     setReceiverName("");
     setReceiverPhone("");
     setReceiverAddressText("");
     setCodAmount("");
     setDescription("");
     setSelectedProducts({});
+    setSelectedVariantByProduct({});
     setCartTotal(0);
     setSelectedPackageType("");
     setOrderWeight("");
@@ -1237,16 +1321,46 @@ const ProfilePage: React.FC = () => {
     setShowOrderForm(true);
   };
 
-  // 🚀 新增：处理商品数量变化 (对齐 HomePage)
-  const handleProductQuantityChange = (productId: string, delta: number) => {
+  // 🚀 新增：处理商品数量变化（支持多规格 cart line key）
+  const handleProductQuantityChange = (
+    product: Product,
+    delta: number,
+    variantId?: string,
+  ) => {
+    if (productHasVariants(product) && !variantId) {
+      alert(
+        language === "zh"
+          ? "请先选择规格"
+          : language === "en"
+            ? "Please select a variant"
+            : "Variant ရွေးချယ်ပါ",
+      );
+      return;
+    }
+
+    const lineKey = cartLineKey(product.id, variantId);
+    const stockCap = maxSelectableStockForProduct(product, variantId);
+
     setSelectedProducts((prev) => {
-      const currentQty = prev[productId] || 0;
+      const currentQty = prev[lineKey] || 0;
+
+      if (delta > 0 && stockCap !== 99999 && currentQty >= stockCap) {
+        alert(
+          language === "zh"
+            ? `库存不足 (剩余: ${stockCap})`
+            : language === "en"
+              ? `Out of stock (Left: ${stockCap})`
+              : `လက်ကျန်မလုံလောက် (${stockCap})`,
+        );
+        return prev;
+      }
+
       const newQty = Math.max(0, currentQty + delta);
       const newMap = { ...prev };
       if (newQty === 0) {
-        delete newMap[productId];
+        delete newMap[lineKey];
       } else {
-        newMap[productId] = newQty;
+        newMap[lineKey] = newQty;
       }
       return newMap;
     });
@@ -1258,11 +1372,17 @@ const ProfilePage: React.FC = () => {
       let totalProductPrice = 0;
       let productDetails: string[] = [];
 
-      Object.entries(selectedProducts).forEach(([id, qty]) => {
-        const product = products.find((p) => p.id === id);
+      Object.entries(selectedProducts).forEach(([lineKey, qty]) => {
+        const { productId, variantId } = parseCartLineKey(lineKey);
+        const product = products.find((p) => p.id === productId);
         if (product) {
-          totalProductPrice += product.price * qty;
-          productDetails.push(`${product.name} x${qty}`);
+          const line = buildProductForCart(product, variantId);
+          const variant = resolveProductVariant(product, variantId);
+          totalProductPrice += line.price * qty;
+          const label = variant
+            ? `${product.name}(${variant.name})`
+            : product.name;
+          productDetails.push(`${label} x${qty}`);
         }
       });
 
@@ -1522,15 +1642,9 @@ const ProfilePage: React.FC = () => {
       setOrderSubmitStatus("processing");
       setShowOrderSuccessModal(true);
 
-      // 构造订单 ID
-      const now = new Date();
-      const myanmarTime = new Date(
-        now.toLocaleString("en-US", { timeZone: "Asia/Yangon" }),
-      );
-      const datePart = myanmarTime.toISOString().slice(2, 10).replace(/-/g, "");
-      const randomPart = Math.floor(1000 + Math.random() * 9000);
-      const orderId = `MDY${datePart}${randomPart}`;
+      const orderId = generateMyanmarPackageId(senderAddressText);
       setGeneratedOrderId(orderId);
+      const now = new Date();
 
       const isMerchantUser = currentUser.user_type === "merchant";
       const hasStoreProducts =
@@ -1565,13 +1679,21 @@ const ProfilePage: React.FC = () => {
         sender_name: senderName,
         sender_phone: senderPhone,
         sender_address: senderAddressText,
-        sender_latitude: selectedSenderLocation?.lat,
-        sender_longitude: selectedSenderLocation?.lng,
+        sender_latitude:
+          selectedSenderLocation?.lat ??
+          parseCoordsFromAddress(senderAddressText)?.lat,
+        sender_longitude:
+          selectedSenderLocation?.lng ??
+          parseCoordsFromAddress(senderAddressText)?.lng,
         receiver_name: receiverName,
         receiver_phone: receiverPhone,
         receiver_address: receiverAddressText,
-        receiver_latitude: selectedReceiverLocation?.lat,
-        receiver_longitude: selectedReceiverLocation?.lng,
+        receiver_latitude:
+          selectedReceiverLocation?.lat ??
+          parseCoordsFromAddress(receiverAddressText)?.lat,
+        receiver_longitude:
+          selectedReceiverLocation?.lng ??
+          parseCoordsFromAddress(receiverAddressText)?.lng,
         package_type: selectedPackageType || "标准件",
         weight: orderWeight?.trim() ? orderWeight.trim() : "1.0",
         description: finalDescription,
@@ -1609,8 +1731,15 @@ const ProfilePage: React.FC = () => {
   // 🚀 新增：处理地图弹窗打开
   const handleOpenMapModal = (type: "sender" | "receiver") => {
     setMapSelectionType(type);
-    setMapClickPosition(null);
-    setMapModalPreviewAddress("");
+    const existingCoords =
+      type === "sender"
+        ? selectedSenderLocation || parseCoordsFromAddress(senderAddressText)
+        : selectedReceiverLocation || parseCoordsFromAddress(receiverAddressText);
+    const existingAddress =
+      type === "sender" ? senderAddressText : receiverAddressText;
+    const previewBase = existingAddress.split("\n📍 坐标:")[0].trim();
+    setMapClickPosition(existingCoords);
+    setMapModalPreviewAddress(previewBase);
     setMerchantMapSuggestions([]);
     setShowMerchantMapSuggestions(false);
     lastMerchantMapSearchQueryRef.current = "";
@@ -1955,7 +2084,7 @@ const ProfilePage: React.FC = () => {
   }, [loadUserPackages]);
 
   useEffect(() => {
-    const onRefresh = () => loadUserPackages();
+    const onRefresh = () => loadUserPackages({ background: true });
     window.addEventListener(MERCHANT_ORDERS_REFRESH, onRefresh);
     return () => window.removeEventListener(MERCHANT_ORDERS_REFRESH, onRefresh);
   }, [loadUserPackages]);
@@ -8393,6 +8522,9 @@ const ProfilePage: React.FC = () => {
         merchantProducts={products}
         selectedProducts={selectedProducts}
         handleProductQuantityChange={handleProductQuantityChange}
+        selectedVariantByProduct={selectedVariantByProduct}
+        setSelectedVariantByProduct={setSelectedVariantByProduct}
+        onEnterConfirmStep={() => calculatePriceEstimate({ silent: true })}
         cartTotal={cartTotal}
         hasCOD={hasCOD}
         setHasCOD={setHasCOD}
@@ -8993,9 +9125,11 @@ const ProfilePage: React.FC = () => {
         model={packageModals.packingModalModel}
         checkedItems={packageModals.checkedItems}
         actionLoading={packageModals.actionLoading}
+        printLoading={packageModals.printLoading}
         canComplete={packageModals.isPackingCompleteEnabled}
         onClose={packageModals.closePackingModal}
         onToggleItem={packageModals.togglePackingItem}
+        onPrint={packageModals.handlePackingPrint}
         onComplete={packageModals.handleCompletePacking}
       />
 

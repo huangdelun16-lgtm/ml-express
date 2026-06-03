@@ -1774,45 +1774,70 @@ const HomePage: React.FC = () => {
 
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget as HTMLFormElement);
-    
+
     // 从地址文本中提取纯地址（移除坐标信息）
     const extractAddress = (addressText: string) => {
       const lines = addressText.split('\n');
       return lines.filter(line => !line.includes('📍 坐标:')).join('\n').trim();
     };
-    
+
+    // 向导确认步仅渲染第 4 步 UI，地址/包裹/配送 input 已卸载，须全程用 React state
+    const effectivePackageType =
+      selectedDeliverySpeed === 'Eco Way' ? t.ui.waySide : selectedPackageType;
+
     const orderInfo = {
-      senderName: formData.get('senderName') as string,
-      senderPhone: formData.get('senderPhone') as string,
+      senderName: senderName.trim(),
+      senderPhone: senderPhone.trim(),
       senderAddress: extractAddress(senderAddressText),
-      receiverName: formData.get('receiverName') as string,
-      receiverPhone: formData.get('receiverPhone') as string,
+      receiverName: receiverName.trim(),
+      receiverPhone: receiverPhone.trim(),
       receiverAddress: extractAddress(receiverAddressText),
-      packageType: formData.get('packageType') as string,
-      weight: formData.get('weight') as string,
-      deliverySpeed: formData.get('deliverySpeed') as string,
+      packageType: effectivePackageType,
+      weight: orderWeight,
+      deliverySpeed: selectedDeliverySpeed,
       scheduledTime: scheduledDeliveryTime || null,
       senderLatitude: selectedSenderLocation?.lat || null,
       senderLongitude: selectedSenderLocation?.lng || null,
       receiverLatitude: selectedReceiverLocation?.lat || null,
       receiverLongitude: selectedReceiverLocation?.lng || null,
       codAmount: codAmount ? parseFloat(codAmount) : 0,
-      description: description // 🚀 新增：传递物品描述
+      description: description.trim(),
     };
-    
-    // 验证必填字段
-    if (!orderInfo.senderAddress || !orderInfo.receiverAddress) {
-      alert(t.errors?.addressRequired || '请填写完整的寄件和收件地址');
+
+    if (
+      !orderInfo.senderName ||
+      !orderInfo.senderPhone ||
+      !orderInfo.receiverName ||
+      !orderInfo.receiverPhone ||
+      !orderInfo.senderAddress ||
+      !orderInfo.receiverAddress
+    ) {
+      alert(t.errors?.addressRequired || '请填写完整的寄件和收件信息');
+      return;
+    }
+
+    if (!selectedSenderLocation || !selectedReceiverLocation) {
+      alert(
+        language === 'zh'
+          ? '请在地图中选择寄件与收件精确位置'
+          : language === 'en'
+            ? 'Please pick sender and receiver locations on the map'
+            : 'ပို့သူနှင့် လက်ခံသူ လိပ်စာကို မြေပွင့်တွင် ရွေးချယ်ပါ',
+      );
       return;
     }
 
     // 根据包裹类型决定是否需要重量
-    const needWeight = orderInfo.packageType === t.ui.overweightPackageDetail || 
-                      orderInfo.packageType === t.ui.oversizedPackageDetail ||
-                      orderInfo.packageType === '超重件（5KG）以上' || 
-                      orderInfo.packageType === '超规件（45x60x15cm）以上';
-    if (!orderInfo.packageType || (needWeight && !orderInfo.weight) || !orderInfo.deliverySpeed) {
+    const needWeight =
+      orderInfo.packageType === t.ui.overweightPackageDetail ||
+      orderInfo.packageType === t.ui.oversizedPackageDetail ||
+      orderInfo.packageType === '超重件（5KG）以上' ||
+      orderInfo.packageType === '超规件（45x60x15cm）以上';
+    if (
+      !orderInfo.packageType?.trim() ||
+      !orderInfo.deliverySpeed?.trim() ||
+      (needWeight && !String(orderInfo.weight ?? '').trim())
+    ) {
       alert('请填写完整的包裹信息');
       return;
     }

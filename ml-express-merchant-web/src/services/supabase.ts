@@ -437,6 +437,37 @@ export const packageService = {
     }
   },
 
+  /** 商家店铺订单列表（按 delivery_store_id，避免宽泛 OR 查询拖慢页面） */
+  async getPackagesByStore(
+    storeId: string,
+    options?: { limit?: number },
+  ): Promise<Package[]> {
+    if (!storeId) return [];
+    try {
+      let query = supabase
+        .from('packages')
+        .select(
+          'id,status,sender_name,sender_phone,sender_address,receiver_name,receiver_phone,receiver_address,package_type,weight,description,price,payment_method,cod_amount,created_at,create_time,delivery_store_id,courier',
+        )
+        .eq('delivery_store_id', storeId)
+        .order('created_at', { ascending: false });
+
+      if (options?.limit && options.limit > 0) {
+        query = query.limit(options.limit);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        LoggerService.error('getPackagesByStore failed:', error);
+        return [];
+      }
+      return (data || []) as Package[];
+    } catch (err) {
+      LoggerService.error('getPackagesByStore exception:', err);
+      return [];
+    }
+  },
+
   // 获取合伙店铺代收款统计
   async getPartnerStats(userId: string, storeName?: string, month?: string) {
     try {
@@ -639,7 +670,7 @@ export const packageService = {
   },
 
   // 获取特定店铺的入库包裹（已送达的）
-  async getPackagesByStore(storeId: string): Promise<Package[]> {
+  async getDeliveredPackagesByStore(storeId: string): Promise<Package[]> {
     try {
       const { data, error } = await supabase
         .from('packages')

@@ -30,8 +30,34 @@ const TRACKING_SETTING_KEYS = [
   'tracking.webhook_push_enabled',
 ] as const;
 
+/** 卡片展示用：去掉地址文本里内嵌的坐标行 */
+function formatTrackingAddress(address?: string | null): string {
+  if (!address?.trim()) return '—';
+  const lines = address
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(
+      (line) =>
+        line &&
+        !line.includes('📍 坐标:') &&
+        !/^坐标:\s*-?\d/i.test(line),
+    );
+  const joined = lines.join(', ').replace(/,?\s*坐标:\s*-?\d+\.?\d*,\s*-?\d+\.?\d*/gi, '').trim();
+  return joined || address.split('\n')[0]?.trim() || '—';
+}
+
+/** 跑腿费展示：统一为「数字 + MMK」 */
+function formatTrackingDeliveryFee(price?: string | null): string | null {
+  if (!price?.trim()) return null;
+  const trimmed = price.trim();
+  if (/mmk/i.test(trimmed)) return trimmed;
+  const num = trimmed.replace(/[^\d.]/g, '');
+  if (!num) return trimmed;
+  return `${Number(num).toLocaleString()} MMK`;
+}
+
 /** 实时跟踪包裹卡片：客户下单时选择的配送速度 / 预约时间（与 packages 表字段一致） */
-function adminDeliveryOptionLine(pkg: Package): string {
+function adminDeliveryOptionLine(pkg: Package): string | null {
   const speed = (pkg.delivery_speed || '').trim();
   const sched = (pkg.scheduled_delivery_time || '').trim();
   const desc = pkg.description || '';
@@ -44,7 +70,7 @@ function adminDeliveryOptionLine(pkg: Package): string {
   const bits: string[] = [];
   if (speed) bits.push(speed);
   if (sched) bits.push(`指定时间 ${sched}`);
-  return bits.length > 0 ? bits.join(' · ') : '—';
+  return bits.length > 0 ? bits.join(' · ') : null;
 }
 
 type MapThemeSetting = 'dark' | 'light' | 'satellite';
@@ -1138,20 +1164,6 @@ const RealTimeTracking: React.FC = () => {
             COD {resolvePackageCodAmount(pkg).toLocaleString()} MMK
           </span>
         )}
-        {isVIP &&
-          (() => {
-            const balanceMatch = pkg.description?.match(
-              /\[(?:余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/,
-            );
-            if (balanceMatch?.[1]) {
-              return (
-                <span className="rt-tracking__badge rt-tracking__badge--balance">
-                  商品费余额 {balanceMatch[1]} MMK
-                </span>
-              );
-            }
-            return null;
-          })()}
       </>
     );
   };
@@ -1734,6 +1746,8 @@ const RealTimeTracking: React.FC = () => {
                 pendingPackages.map((pkg) => {
                   const isLocked =
                     !!pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配';
+                  const deliveryOption = adminDeliveryOptionLine(pkg);
+                  const deliveryFee = formatTrackingDeliveryFee(pkg.price);
                   return (
                     <article
                       key={pkg.id}
@@ -1747,7 +1761,7 @@ const RealTimeTracking: React.FC = () => {
                       </div>
                       <div className="rt-tracking__pkg-body">
                         <p>
-                          从 {pkg.sender_address}
+                          从 {formatTrackingAddress(pkg.sender_address)}
                           {pkg.sender_latitude != null && pkg.sender_longitude != null && (
                             <span
                               className="rt-tracking__coord rt-tracking__coord--pickup"
@@ -1758,7 +1772,7 @@ const RealTimeTracking: React.FC = () => {
                           )}
                         </p>
                         <p>
-                          到 {pkg.receiver_address}
+                          到 {formatTrackingAddress(pkg.receiver_address)}
                           {pkg.receiver_latitude != null && pkg.receiver_longitude != null && (
                             <span
                               className="rt-tracking__coord rt-tracking__coord--delivery"
@@ -1772,10 +1786,12 @@ const RealTimeTracking: React.FC = () => {
                           {pkg.package_type} · {pkg.weight}
                           {pkg.delivery_distance ? ` · ${pkg.delivery_distance} km` : ''}
                         </p>
-                        <p>
-                          <strong>配送选项:</strong> {adminDeliveryOptionLine(pkg)}
-                        </p>
-                        {pkg.price && <p>跑腿费 {pkg.price}</p>}
+                        {deliveryOption && (
+                          <p>
+                            <strong>配送选项:</strong> {deliveryOption}
+                          </p>
+                        )}
+                        {deliveryFee && <p>跑腿费 {deliveryFee}</p>}
                         {renderPackageCodLine(pkg)}
                       </div>
                       <div className="rt-tracking__pkg-actions">
@@ -1816,7 +1832,10 @@ const RealTimeTracking: React.FC = () => {
                 <p>暂无配送中包裹</p>
               </div>
             ) : (
-              assignedPackages.map((pkg) => (
+              assignedPackages.map((pkg) => {
+                const deliveryOption = adminDeliveryOptionLine(pkg);
+                const deliveryFee = formatTrackingDeliveryFee(pkg.price);
+                return (
                 <article key={pkg.id} className="rt-tracking__pkg rt-tracking__pkg--assigned">
                   <div className="rt-tracking__pkg-head">
                     <span className="rt-tracking__pkg-id">{pkg.id}</span>
@@ -1832,7 +1851,7 @@ const RealTimeTracking: React.FC = () => {
                       {pkg.sender_name} → {pkg.receiver_name}
                     </p>
                     <p>
-                      到 {pkg.receiver_address}
+                      到 {formatTrackingAddress(pkg.receiver_address)}
                       {pkg.receiver_latitude != null && pkg.receiver_longitude != null && (
                         <span
                           className="rt-tracking__coord rt-tracking__coord--delivery"
@@ -1846,14 +1865,22 @@ const RealTimeTracking: React.FC = () => {
                       骑手 <strong>{pkg.courier || '未分配'}</strong>
                       {pkg.pickup_time ? ` · 取件 ${pkg.pickup_time}` : ''}
                     </p>
-                    <p>
-                      <strong>配送选项:</strong> {adminDeliveryOptionLine(pkg)}
-                      {pkg.price ? ` · 跑腿费 ${pkg.price}` : ''}
-                    </p>
+                    {(deliveryOption || deliveryFee) && (
+                      <p>
+                        {deliveryOption ? (
+                          <>
+                            <strong>配送选项:</strong> {deliveryOption}
+                            {deliveryFee ? ' · ' : ''}
+                          </>
+                        ) : null}
+                        {deliveryFee ? `跑腿费 ${deliveryFee}` : null}
+                      </p>
+                    )}
                     {renderPackageCodLine(pkg)}
                   </div>
                 </article>
-              ))
+              );
+              })
             )}
           </div>
         </section>

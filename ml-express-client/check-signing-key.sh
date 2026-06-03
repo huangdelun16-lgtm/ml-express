@@ -3,7 +3,7 @@
 
 set -e
 
-EXPECTED_SHA1="91:4B:4F:BC:D4:1D:CA:F1:E0:44:63:A9:FC:CE:63:77:B7:69:74:46"
+EXPECTED_SHA1="AA:FA:1E:8C:F7:B1:ED:5C:97:DE:C2:87:AB:89:5A:5F:E7:88:13:97"
 
 if [ -z "$1" ]; then
   echo "用法: ./check-signing-key.sh <file.aab|file.apk>"
@@ -38,7 +38,7 @@ if [ "$SHA1" = "$EXPECTED_SHA1" ]; then
   echo "✅ 签名正确，可以上传 Play Store"
 else
   echo "❌ 签名不匹配！老用户将无法 OTA 更新。"
-  echo "   请使用 release.keystore 重新构建，并同步 EAS 凭据。"
+  echo "   请使用 upload-release.keystore 重新构建，并同步 EAS 凭据。"
   echo "   详见 docs/ANDROID_SIGNING.md"
   exit 1
 fi
