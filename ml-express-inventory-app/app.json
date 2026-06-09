@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "ML Inventory",
+    "slug": "ml-express-inventory",
+    "version": "1.0.0",
+    "scheme": "ml-express-inventory",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "description": "MARKET LINK 平台库存管理：入库、出库、扫码枪与条码标签打印（独立运行，暂不关联其它业务端）。",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mlexpress.inventory",
+      "infoPlist": {
+        "NSCameraUsageDescription": "扫描商品条码需要使用相机。",
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.mlexpress.inventory",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "扫描商品条码需要使用相机"
+        }
+      ]
+    ]
+  }
+}
