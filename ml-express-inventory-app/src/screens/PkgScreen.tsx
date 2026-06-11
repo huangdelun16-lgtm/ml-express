@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -8,9 +9,22 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../contexts/AuthContext';
+import PkgActionModal from '../components/PkgActionModal';
+import PkgEditModal from '../components/PkgEditModal';
 import PkgOrdersModal from '../components/PkgOrdersModal';
-import { listPackedShipments } from '../services/inventoryService';
-import type { PackedShipmentDetail } from '../types/inventory';
+import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
+import {
+  listPackedShipmentRows,
+  resyncLoadedPackToCloud,
+  syncInboundHubPacksToLocal,
+} from '../services/inventoryService';
+import { isSupabaseConfigured } from '../services/supabase';
+import { packOrderBarcodeData } from '../utils/orderBarcodeData';
+import type { PackedShipmentListRow } from '../types/inventory';
+import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
+import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { canEditOwnedRecord, resolveOwnerKeyForListItem } from '../utils/storeOwnership';
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -19,19 +33,27 @@ function formatTime(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function isPkgBarcode(code: string): boolean {
-  return code.trim().toUpperCase().startsWith('PKG');
-}
-
 export default function PkgScreen() {
+  const { store, hubCode, operatorName } = useAuth();
   const [search, setSearch] = useState('');
-  const [packs, setPacks] = useState<PackedShipmentDetail[]>([]);
+  const [packs, setPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [ordersPack, setOrdersPack] = useState<PackedShipmentDetail | null>(null);
+  const [actionPack, setActionPack] = useState<PackedShipmentListRow | null>(null);
+  const [editPack, setEditPack] = useState<PackedShipmentListRow | null>(null);
+  const [ordersPack, setOrdersPack] = useState<PackedShipmentListRow | null>(null);
+  const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
+  const [resyncing, setResyncing] = useState(false);
 
   const load = useCallback(async () => {
-    setPacks(await listPackedShipments(search));
-  }, [search]);
+    if (store && hubCode) {
+      try {
+        await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? '工作人员');
+      } catch {
+        // 云端未配置或离线时仍显示本地列表
+      }
+    }
+    setPacks(await listPackedShipmentRows(search));
+  }, [search, store, hubCode, operatorName]);
 
   useFocusEffect(
     useCallback(() => {
@@ -42,6 +64,21 @@ export default function PkgScreen() {
   useEffect(() => {
     void load();
   }, [search]);
+
+  const openPrint = (pack: PackedShipmentListRow) => {
+    const dest = packDestinationFromBarcode(pack.bundle_barcode);
+    setOrderBarcodeData(
+      packOrderBarcodeData({
+        name: pack.bundle_name,
+        barcode: pack.bundle_barcode,
+        spec: pack.spec,
+        unit: pack.unit,
+        weight: pack.weight,
+        destination: dest || undefined,
+      }),
+    );
+    setActionPack(null);
+  };
 
   return (
     <View style={styles.root}>
@@ -67,66 +104,145 @@ export default function PkgScreen() {
         refreshing={refreshing}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            暂无包裹{'\n'}在商品库「打包快递」确认打包后会出现在这里
+            暂无包裹{'\n'}本站打包或「到站收货」确认完成后会出现在这里
           </Text>
         }
         renderItem={({ item }) => {
-          const pkgClickable = isPkgBarcode(item.bundle_barcode);
+          const statusStyle = packStatusStyle(item.display_status);
+          const statusLabel = PACK_DISPLAY_LABEL[item.display_status];
+          const dest = packDestinationFromBarcode(item.bundle_barcode);
+
           return (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.packName} numberOfLines={2}>
-                  {item.bundle_name}
-                </Text>
-                <View style={styles.countBadge}>
-                  <Text style={styles.countText}>{item.items.length}</Text>
-                  <Text style={styles.countUnit}>件</Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.card,
+                { borderLeftColor: statusStyle.border },
+                pressed && styles.cardPressed,
+              ]}
+              onPress={() => setActionPack(item)}
+              accessibilityLabel={`快递包 ${item.bundle_name}，${statusLabel}`}
+            >
+              <View style={styles.cardTop}>
+                <View style={styles.titleBlock}>
+                  <Text style={styles.packName} numberOfLines={1}>
+                    {item.bundle_name}
+                  </Text>
+                  {dest ? (
+                    <Text style={styles.destTag} numberOfLines={1}>
+                      → {dest}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: statusStyle.badgeBg }]}>
+                  <Text style={[styles.statusBadgeText, { color: statusStyle.badgeText }]}>
+                    {statusLabel}
+                  </Text>
                 </View>
               </View>
 
-              {pkgClickable ? (
-                <Pressable
-                  style={({ pressed }) => [styles.barcodePill, pressed && styles.barcodePillPressed]}
-                  onPress={() => setOrdersPack(item)}
-                >
-                  <Text style={styles.barcodeValue} numberOfLines={1}>
-                    {item.bundle_barcode}
-                  </Text>
-                  <Text style={styles.barcodeHint}>点击查看内含订单</Text>
-                </Pressable>
-              ) : (
+              <View style={styles.barcodeRow}>
                 <View style={styles.barcodePill}>
+                  <Text style={styles.barcodeLabel}>包装号</Text>
                   <Text style={styles.barcodeValue} numberOfLines={1}>
                     {item.bundle_barcode}
                   </Text>
                 </View>
-              )}
+                <View style={styles.countInline}>
+                  <Text style={styles.countText}>{item.items.length}</Text>
+                  <Text style={styles.countUnit}>件</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </View>
 
               {(item.spec || item.unit || item.weight) ? (
-                <Text style={styles.meta}>
+                <Text style={styles.meta} numberOfLines={1}>
                   {[item.spec, item.unit, item.weight].filter(Boolean).join(' · ')}
                 </Text>
               ) : null}
 
-              <View style={styles.noteBox}>
-                <Text style={styles.noteLabel}>备注</Text>
-                <View style={styles.noteRow}>
-                  <Text style={styles.noteText}>打包人：{item.operator || '—'}</Text>
-                  <Text style={styles.noteSep}>·</Text>
-                  <Text style={styles.noteText}>包含 {item.items.length} 件</Text>
-                </View>
+              <View style={styles.noteRow}>
+                <Text style={styles.noteText}>打包人：{item.operator || '—'}</Text>
+                <Text style={styles.noteSep}>·</Text>
+                <Text style={styles.footer}>{formatTime(item.created_at)}</Text>
               </View>
-
-              <Text style={styles.footer}>{formatTime(item.created_at)}</Text>
-            </View>
+            </Pressable>
           );
         }}
+      />
+
+      <PkgActionModal
+        visible={!!actionPack}
+        pack={actionPack}
+        canEdit={
+          !!actionPack &&
+          !!store &&
+          canEditOwnedRecord(
+            store,
+            actionPack.owner_store_code || resolveOwnerKeyForListItem({
+              owner_store_code: actionPack.owner_store_code,
+              barcode: actionPack.bundle_barcode,
+              destination: '',
+            }),
+          )
+        }
+        onClose={() => setActionPack(null)}
+        onEdit={() => {
+          if (!actionPack) return;
+          setEditPack(actionPack);
+          setActionPack(null);
+        }}
+        onPrint={() => {
+          if (!actionPack) return;
+          openPrint(actionPack);
+        }}
+        onViewOrders={() => {
+          if (!actionPack) return;
+          setOrdersPack(actionPack);
+          setActionPack(null);
+        }}
+        onResyncCloud={
+          actionPack?.loaded && !actionPack.cloud_status && store && isSupabaseConfigured()
+            ? () => {
+                if (!actionPack || !store || resyncing) return;
+                void (async () => {
+                  setResyncing(true);
+                  try {
+                    await resyncLoadedPackToCloud(actionPack.bundle_barcode, {
+                      id: store.id,
+                      storeCode: store.storeCode,
+                      storeName: store.storeName,
+                    });
+                    Alert.alert('已补传云端', `${actionPack.bundle_barcode} 已写入云端追踪，目的地站点可扫码收货`);
+                    setActionPack(null);
+                    await load();
+                  } catch (e: unknown) {
+                    Alert.alert('补传失败', e instanceof Error ? e.message : '请重试');
+                  } finally {
+                    setResyncing(false);
+                  }
+                })();
+              }
+            : undefined
+        }
+      />
+
+      <PkgEditModal
+        visible={!!editPack}
+        pack={editPack}
+        onClose={() => setEditPack(null)}
+        onSaved={() => void load()}
       />
 
       <PkgOrdersModal
         visible={!!ordersPack}
         pack={ordersPack}
         onClose={() => setOrdersPack(null)}
+      />
+
+      <OrderBarcodeModal
+        visible={!!orderBarcodeData}
+        data={orderBarcodeData}
+        onClose={() => setOrderBarcodeData(null)}
       />
     </View>
   );
@@ -156,64 +272,98 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#1e293b',
     borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: '#a855f7',
+    borderWidth: 1,
+    borderColor: 'rgba(51,65,85,0.6)',
   },
-  cardHeader: {
+  cardPressed: {
+    backgroundColor: '#243044',
+    borderColor: '#475569',
+  },
+  cardTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
+  titleBlock: { flex: 1, minWidth: 0 },
   packName: {
-    flex: 1,
     color: '#f8fafc',
     fontSize: 16,
     fontWeight: '800',
   },
-  countBadge: { alignItems: 'center', minWidth: 36 },
-  countText: { color: '#c4b5fd', fontSize: 20, fontWeight: '900' },
-  countUnit: { color: '#94a3b8', fontSize: 10, fontWeight: '700' },
-  barcodePill: {
+  destTag: {
+    color: '#38bdf8',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  statusBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    flexShrink: 0,
+  },
+  statusBadgeText: { fontSize: 11, fontWeight: '900' },
+  barcodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginTop: 10,
-    alignSelf: 'stretch',
-    backgroundColor: 'rgba(168,85,247,0.12)',
+  },
+  barcodePill: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: 'rgba(168,85,247,0.1)',
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderWidth: 1,
-    borderColor: 'rgba(168,85,247,0.35)',
+    borderColor: 'rgba(168,85,247,0.28)',
   },
-  barcodePillPressed: {
-    backgroundColor: 'rgba(168,85,247,0.22)',
-    borderColor: 'rgba(168,85,247,0.55)',
+  barcodeLabel: {
+    color: '#94a3b8',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   barcodeValue: {
     color: '#d8b4fe',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     fontFamily: 'monospace',
   },
-  barcodeHint: {
-    color: '#a78bfa',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 4,
+  countInline: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+    flexShrink: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(148,163,184,0.1)',
+    borderRadius: 8,
   },
-  meta: { color: '#94a3b8', fontSize: 12, marginTop: 8, fontFamily: 'monospace' },
-  noteBox: {
-    marginTop: 10,
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
+  countText: { color: '#e2e8f0', fontSize: 16, fontWeight: '900', lineHeight: 18 },
+  countUnit: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
+  chevron: {
+    color: '#64748b',
+    fontSize: 22,
+    fontWeight: '300',
+    marginLeft: -2,
   },
-  noteLabel: { color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 6 },
-  noteRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  noteText: { color: '#cbd5e1', fontSize: 13, fontWeight: '600' },
-  noteSep: { color: '#475569', fontSize: 13 },
-  footer: { color: '#64748b', fontSize: 11, marginTop: 10, fontWeight: '600' },
+  meta: { color: '#94a3b8', fontSize: 11, marginTop: 8, fontFamily: 'monospace' },
+  noteRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+  },
+  noteText: { color: '#94a3b8', fontSize: 11, fontWeight: '600' },
+  noteSep: { color: '#475569', fontSize: 11 },
+  footer: { color: '#64748b', fontSize: 11, fontWeight: '600' },
 });

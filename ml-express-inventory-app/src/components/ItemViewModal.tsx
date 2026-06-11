@@ -8,8 +8,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import OrderBarcodeModal, { type OrderBarcodeData } from './OrderBarcodeModal';
 import { getItemDetail } from '../services/inventoryService';
-import type { InventoryItemDetail } from '../types/inventory';
+import type { InventoryItemDetail, PackedShipmentItem } from '../types/inventory';
+import { inboundOrderBarcodeData } from '../utils/orderBarcodeData';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 
 type Props = {
@@ -50,6 +52,17 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function ItemViewModal({ visible, itemId, onClose }: Props) {
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
+
+  const openLinePrint = (line: PackedShipmentItem) => {
+    setOrderBarcodeData(
+      inboundOrderBarcodeData({
+        name: line.item_name,
+        barcode: line.item_barcode,
+        input_barcode: line.input_barcode,
+      }),
+    );
+  };
 
   useEffect(() => {
     if (!visible || !itemId) {
@@ -70,6 +83,7 @@ export default function ItemViewModal({ visible, itemId, onClose }: Props) {
   }, [visible, itemId]);
 
   return (
+    <>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.root}>
         <View style={styles.header}>
@@ -137,11 +151,24 @@ export default function ItemViewModal({ visible, itemId, onClose }: Props) {
                 <Section title={`内含商品（${detail.pack.items.length} 件）`}>
                   {detail.pack.items.map((line) => (
                     <View key={line.id} style={styles.packLine}>
-                      <Text style={styles.packLineName}>{line.item_name}</Text>
-                      <Text style={styles.packLineCode} selectable>
-                        入库 {line.item_barcode}
-                      </Text>
-                      <Text style={styles.packLineQty}>× {line.qty}</Text>
+                      <View style={styles.packLineMain}>
+                        <Text style={styles.packLineName}>{line.item_name}</Text>
+                        {line.input_barcode ? (
+                          <Text style={styles.packLineExpress} selectable>
+                            快递单 {line.input_barcode}
+                          </Text>
+                        ) : null}
+                        <Text style={styles.packLineCode} selectable>
+                          入库 {line.item_barcode}
+                        </Text>
+                        <Text style={styles.packLineQty}>× {line.qty}</Text>
+                      </View>
+                      <Pressable
+                        style={styles.printBtn}
+                        onPress={() => openLinePrint(line)}
+                      >
+                        <Text style={styles.printBtnText}>打印标签</Text>
+                      </Pressable>
                     </View>
                   ))}
                 </Section>
@@ -159,6 +186,13 @@ export default function ItemViewModal({ visible, itemId, onClose }: Props) {
         )}
       </View>
     </Modal>
+
+    <OrderBarcodeModal
+      visible={!!orderBarcodeData}
+      data={orderBarcodeData}
+      onClose={() => setOrderBarcodeData(null)}
+    />
+    </>
   );
 }
 
@@ -203,11 +237,30 @@ const styles = StyleSheet.create({
   rowValue: { color: '#e2e8f0', fontSize: 15, fontWeight: '700', fontFamily: 'monospace' },
   noteText: { color: '#cbd5e1', fontSize: 14, lineHeight: 21 },
   packLine: {
-    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
   },
+  packLineMain: { flex: 1, minWidth: 0 },
   packLineName: { color: '#f8fafc', fontSize: 14, fontWeight: '800' },
+  packLineExpress: {
+    color: '#7dd3fc',
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+  },
   packLineCode: { color: '#fde68a', fontSize: 12, marginTop: 2, fontFamily: 'monospace' },
   packLineQty: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
+  printBtn: {
+    backgroundColor: '#0ea5e9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    flexShrink: 0,
+  },
+  printBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
 });

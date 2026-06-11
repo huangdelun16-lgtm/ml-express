@@ -124,3 +124,30 @@ export async function printInboundBarcodeOnly(
   }
   return true;
 }
+
+export type BatchPrintEntry = {
+  kind: 'inbound' | 'pack';
+  barcode: string;
+  inputBarcode?: string;
+  label?: LabelPrintPayload;
+};
+
+/** 批量打印多个标签（入库单 / 快递包） */
+export async function printBatchLabels(entries: BatchPrintEntry[]): Promise<boolean> {
+  if (entries.length === 0) return false;
+  const settings = await getPrinterSettings();
+  if (!settings.enabled) return false;
+
+  const copies = Math.max(1, settings.copies);
+  for (const entry of entries) {
+    const html =
+      entry.kind === 'pack' && entry.label
+        ? buildBarcodeLabelHtml({ ...entry.label, widthMm: settings.labelWidthMm })
+        : buildInboundBarcodeOnlyHtml(entry.barcode, entry.inputBarcode, settings.labelWidthMm);
+
+    for (let i = 0; i < copies; i += 1) {
+      await Print.printAsync({ html });
+    }
+  }
+  return true;
+}

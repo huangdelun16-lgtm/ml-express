@@ -11,7 +11,7 @@ import { getDatabase } from './src/services/database';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Root() {
-  const { ready, operatorName } = useAuth();
+  const { ready, isAuthenticated } = useAuth();
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ function Root() {
     );
   }
 
-  return operatorName ? (
+  return isAuthenticated ? (
     <NavigationContainer>
       <AppNavigator />
     </NavigationContainer>

@@ -89,6 +89,81 @@ async function migrateInventorySchema(db: SQLite.SQLiteDatabase): Promise<void> 
   if (!moveNames.has('input_barcode')) {
     await db.execAsync(`ALTER TABLE stock_movements ADD COLUMN input_barcode TEXT DEFAULT ''`);
   }
+  if (!moveNames.has('origin_store_id')) {
+    await db.execAsync(`ALTER TABLE stock_movements ADD COLUMN origin_store_id TEXT DEFAULT ''`);
+  }
+  if (!moveNames.has('origin_store_code')) {
+    await db.execAsync(`ALTER TABLE stock_movements ADD COLUMN origin_store_code TEXT DEFAULT ''`);
+  }
+  if (!moveNames.has('origin_store_name')) {
+    await db.execAsync(`ALTER TABLE stock_movements ADD COLUMN origin_store_name TEXT DEFAULT ''`);
+  }
+
+  if (!itemNames.has('owner_store_code')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN owner_store_code TEXT DEFAULT ''`);
+  }
+  if (!itemNames.has('final_destination')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN final_destination TEXT DEFAULT ''`);
+    await backfillFinalDestination(db);
+  }
+
+  const packCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(packed_shipments)');
+  const packNames = new Set(packCols.map((c) => c.name));
+  if (!packNames.has('owner_store_code')) {
+    await db.execAsync(`ALTER TABLE packed_shipments ADD COLUMN owner_store_code TEXT DEFAULT ''`);
+  }
+
+  await backfillItemOwnerCodes(db);
+}
+
+async function backfillFinalDestination(db: SQLite.SQLiteDatabase): Promise<void> {
+  const { normalizePackDestination } = await import('../constants/destinationOptions');
+  const rows = await db.getAllAsync<{ id: string }>(
+    `SELECT id FROM inventory_items WHERE TRIM(COALESCE(final_destination, '')) = ''`,
+  );
+  for (const row of rows) {
+    const destRow = await db.getFirstAsync<{ destination: string }>(
+      `SELECT destination FROM stock_movements
+       WHERE item_id = ? AND type = 'in' AND TRIM(destination) != ''
+       ORDER BY created_at ASC LIMIT 1`,
+      [row.id],
+    );
+    if (!destRow?.destination?.trim()) continue;
+    const code =
+      normalizePackDestination(destRow.destination) ||
+      destRow.destination.trim().toUpperCase().slice(0, 3);
+    if (!code) continue;
+    await db.runAsync('UPDATE inventory_items SET final_destination = ? WHERE id = ?', [
+      code,
+      row.id,
+    ]);
+  }
+}
+
+async function backfillItemOwnerCodes(db: SQLite.SQLiteDatabase): Promise<void> {
+  const { inferOwnerKeyFromItem } = await import('../utils/storeOwnership');
+  const rows = await db.getAllAsync<{ id: string; barcode: string }>(
+    `SELECT id, barcode FROM inventory_items
+     WHERE owner_store_code IS NULL OR TRIM(owner_store_code) = ''`,
+  );
+
+  for (const row of rows) {
+    const destRow = await db.getFirstAsync<{ destination: string }>(
+      `SELECT destination FROM stock_movements
+       WHERE item_id = ? AND type = 'in' AND TRIM(destination) != ''
+       ORDER BY created_at ASC LIMIT 1`,
+      [row.id],
+    );
+    const key = inferOwnerKeyFromItem({
+      barcode: row.barcode,
+      destination: destRow?.destination,
+    });
+    if (!key) continue;
+    await db.runAsync('UPDATE inventory_items SET owner_store_code = ? WHERE id = ?', [
+      key,
+      row.id,
+    ]);
+  }
 }
 
 export function newId(): string {

@@ -15,12 +15,14 @@ import {
   savePrinterSettings,
   type PrinterSettings,
 } from '../services/printerService';
+import { clearAllTestData } from '../services/inventoryService';
 
 const WIDTH_OPTIONS: PrinterSettings['labelWidthMm'][] = [40, 50, 60, 80];
 
 export default function SettingsScreen() {
-  const { operatorName, logout } = useAuth();
+  const { operatorName, storeCode, store, logout } = useAuth();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     void getPrinterSettings().then(setSettings);
@@ -43,11 +45,23 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <Text style={styles.section}>工作人员</Text>
+      <Text style={styles.section}>中转站账号</Text>
       <View style={styles.card}>
-        <Text style={styles.rowLabel}>当前账号</Text>
+        <Text style={styles.rowLabel}>店铺名称</Text>
         <Text style={styles.rowValue}>{operatorName}</Text>
-        <Pressable onPress={() => logout()}>
+        {storeCode ? (
+          <>
+            <Text style={styles.rowLabel}>店铺代码</Text>
+            <Text style={styles.rowMeta}>{storeCode}</Text>
+          </>
+        ) : null}
+        {store?.region ? (
+          <>
+            <Text style={styles.rowLabel}>区域</Text>
+            <Text style={styles.rowMeta}>{store.region}</Text>
+          </>
+        ) : null}
+        <Pressable onPress={() => void logout()}>
           <Text style={styles.link}>退出登录</Text>
         </Pressable>
       </View>
@@ -88,18 +102,67 @@ export default function SettingsScreen() {
         </Text>
       </View>
 
-      <Text style={styles.section}>扫码枪</Text>
+      <Text style={styles.section}>扫码说明</Text>
       <View style={styles.card}>
         <Text style={styles.note}>
-          USB、Wi-Fi、蓝牙扫码枪请设置为 HID 键盘模式。入库/出库页保持输入框聚焦，扫完自动回车即可录入。
+          · 扫码枪（USB/WiFi/蓝牙 HID）：保持输入框聚焦，扫完自动回车{'\n'}
+          · 手机相机：点输入框右侧「扫码」，支持补光与手动输入{'\n'}
+          · 通用扫码页：首页「相机扫码」，扫完显示本地+云端状态
         </Text>
+      </View>
+
+      <Text style={styles.section}>测试数据</Text>
+      <View style={styles.card}>
+        <Text style={styles.note}>
+          清空本机全部订单、快递包、库存流水，并尝试清空 Supabase 云端追踪记录。仅用于重新测试，不可恢复。
+        </Text>
+        <Pressable
+          style={[styles.dangerBtn, clearing && styles.dangerBtnDisabled]}
+          disabled={clearing}
+          onPress={() => {
+            Alert.alert(
+              '清空全部订单',
+              '将删除本机所有入库订单、快递包、流水，并清空云端装车/到站追踪。确定继续？',
+              [
+                { text: '取消', style: 'cancel' },
+                {
+                  text: '全部删除',
+                  style: 'destructive',
+                  onPress: () => {
+                    void (async () => {
+                      setClearing(true);
+                      try {
+                        const result = await clearAllTestData();
+                        const cloudPart = result.cloud
+                          ? `\n云端：${result.cloud.packs} 包、${result.cloud.orders} 单`
+                          : result.cloudError
+                            ? `\n云端：${result.cloudError}`
+                            : '';
+                        Alert.alert(
+                          '已清空',
+                          `本机：${result.local.items} 商品、${result.local.packs} 包裹、${result.local.movements} 条流水${cloudPart}`,
+                        );
+                      } catch (e: unknown) {
+                        Alert.alert('失败', e instanceof Error ? e.message : '请重试');
+                      } finally {
+                        setClearing(false);
+                      }
+                    })();
+                  },
+                },
+              ],
+            );
+          }}
+        >
+          <Text style={styles.dangerBtnText}>{clearing ? '清空中…' : '清空全部订单（测试）'}</Text>
+        </Pressable>
       </View>
 
       <Text style={styles.section}>关于</Text>
       <View style={styles.card}>
         <Text style={styles.note}>
-          ML Inventory v1.0 — 平台库存独立 App{'\n'}
-          数据保存在本机 SQLite，暂不连接 Supabase 或其它业务端。
+          ML Inventory v1.0 — 中转站库存 App{'\n'}
+          登录校验连接 Admin 合伙店铺；库存与流水在本机 SQLite；装车/到站状态同步 Supabase 云端。
         </Text>
         <Pressable
           onPress={() =>
@@ -129,6 +192,7 @@ const styles = StyleSheet.create({
   },
   rowLabel: { color: '#e2e8f0', fontWeight: '700', marginBottom: 6 },
   rowValue: { color: '#f8fafc', fontSize: 18, fontWeight: '800', marginBottom: 8 },
+  rowMeta: { color: '#94a3b8', fontSize: 15, fontWeight: '700', fontFamily: 'monospace', marginBottom: 8 },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   chip: {
@@ -151,4 +215,13 @@ const styles = StyleSheet.create({
   },
   note: { color: '#94a3b8', fontSize: 13, lineHeight: 20 },
   link: { color: '#60a5fa', fontWeight: '700', marginTop: 10 },
+  dangerBtn: {
+    marginTop: 12,
+    backgroundColor: '#991b1b',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  dangerBtnDisabled: { opacity: 0.6 },
+  dangerBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

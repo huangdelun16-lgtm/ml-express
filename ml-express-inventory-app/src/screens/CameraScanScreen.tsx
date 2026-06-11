@@ -1,146 +1,153 @@
-import React, { useRef, useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import React, { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
+import BarcodeScannerView from '../components/BarcodeScannerView';
 import { getItemByBarcode } from '../services/inventoryService';
+import { findTrackingByAnyCode } from '../services/trackingService';
+import type { InventoryItem } from '../types/inventory';
+import { PKG_STATUS_LABEL } from '../types/tracking';
 
-type Nav = { navigate: (name: string, params?: { presetBarcode?: string }) => void };
+type Nav = {
+  navigate: (
+    name: string,
+    params?: { presetBarcode?: string; presetCode?: string },
+  ) => void;
+};
+
+type ScanResult = {
+  code: string;
+  item: InventoryItem | null;
+  cloudStatus: string | null;
+  cloudRoute: string | null;
+};
 
 export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
-  const [permission, requestPermission] = useCameraPermissions();
   const isFocused = useIsFocused();
-  const [scanned, setScanned] = useState(false);
-  const [manual, setManual] = useState('');
-  const lastRef = useRef('');
-  const lastTimeRef = useRef(0);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ScanResult | null>(null);
 
-  const handleCode = async (code: string) => {
-    const trimmed = code.trim();
-    if (!trimmed) return;
-    const now = Date.now();
-    if (scanned || trimmed === lastRef.current || now - lastTimeRef.current < 1500) return;
-    setScanned(true);
-    lastRef.current = trimmed;
-    lastTimeRef.current = now;
-
-    const item = await getItemByBarcode(trimmed);
-    Alert.alert(
-      item ? item.name : '未建档条码',
-      item
-        ? `条码：${item.barcode}\n库存：${item.qty_on_hand} ${item.unit}`
-        : `条码：${trimmed}\n可选择入库并自动建档`,
-      [
-        { text: '重新扫描', onPress: () => setScanned(false) },
-        {
-          text: '去入库',
-          onPress: () => {
-            setScanned(false);
-            navigation.navigate('StockIn', { presetBarcode: trimmed });
-          },
-        },
-        item
-          ? {
-              text: '去出库',
-              onPress: () => {
-                setScanned(false);
-                navigation.navigate('StockOut', { presetBarcode: trimmed });
-              },
-            }
-          : { text: '去建档', onPress: () => navigation.navigate('ItemForm') },
-      ],
-    );
+  const handleScan = async (code: string) => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const [item, cloud] = await Promise.all([
+        getItemByBarcode(code),
+        findTrackingByAnyCode(code),
+      ]);
+      const pkg = cloud.pkg;
+      setResult({
+        code,
+        item,
+        cloudStatus: pkg ? PKG_STATUS_LABEL[pkg.status] : null,
+        cloudRoute: pkg ? `${pkg.origin_store_code} → ${pkg.destination_code}` : null,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!permission) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.hint}>检查相机权限…</Text>
-      </View>
-    );
-  }
+  const goTrack = () => {
+    if (!result) return;
+    navigation.navigate('TrackExpress', { presetCode: result.code });
+  };
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.title}>需要相机权限</Text>
-        <Pressable style={styles.btn} onPress={requestPermission}>
-          <Text style={styles.btnText}>授予权限</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const goStockIn = () => {
+    if (!result) return;
+    navigation.navigate('StockIn', { presetBarcode: result.code });
+  };
+
+  const goHubReceive = () => {
+    navigation.navigate('HubReceive');
+  };
 
   return (
     <View style={styles.root}>
-      {isFocused ? (
-        <CameraView
-          style={styles.camera}
-          facing="back"
-          onBarcodeScanned={scanned ? undefined : ({ data }) => void handleCode(data)}
-          barcodeScannerSettings={{
-            barcodeTypes: ['ean13', 'ean8', 'code128', 'qr', 'pdf417'],
-          }}
+      <View style={styles.scannerArea}>
+        <BarcodeScannerView
+          active={isFocused}
+          compact
+          onScan={(code) => void handleScan(code)}
+          title="通用扫码"
+          subtitle="扫完自动查询本地与云端状态"
         />
-      ) : (
-        <View style={styles.camera} />
-      )}
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>对准条码 / 二维码</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="或手动输入条码"
-          placeholderTextColor="#94a3b8"
-          value={manual}
-          onChangeText={setManual}
-          onSubmitEditing={() => {
-            setScanned(false);
-            void handleCode(manual);
-            setManual('');
-          }}
-        />
-        {scanned ? (
-          <Pressable style={styles.btn} onPress={() => setScanned(false)}>
-            <Text style={styles.btnText}>重新扫描</Text>
-          </Pressable>
-        ) : null}
+      </View>
+
+      <View style={styles.resultPanel}>
+        {loading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color="#38bdf8" />
+            <Text style={styles.loadingText}>查询中…</Text>
+          </View>
+        ) : !result ? (
+          <Text style={styles.placeholder}>扫码后在此显示结果与快捷操作</Text>
+        ) : (
+          <>
+            <Text style={styles.code} selectable>
+              {result.code}
+            </Text>
+            <Text style={styles.meta}>
+              {result.item
+                ? `本地：${result.item.name} · 库存 ${result.item.qty_on_hand}`
+                : '本地：未建档'}
+            </Text>
+            {result.cloudStatus ? (
+              <Text style={styles.meta}>
+                云端：{result.cloudStatus}
+                {result.cloudRoute ? ` · ${result.cloudRoute}` : ''}
+              </Text>
+            ) : (
+              <Text style={styles.meta}>云端：无在途记录</Text>
+            )}
+
+            <View style={styles.actions}>
+              <Pressable style={styles.actionPrimary} onPress={goTrack}>
+                <Text style={styles.actionPrimaryText}>追踪详情</Text>
+              </Pressable>
+              <Pressable style={styles.action} onPress={goStockIn}>
+                <Text style={styles.actionText}>去入库</Text>
+              </Pressable>
+              {result.code.toUpperCase().startsWith('PKG') ? (
+                <Pressable style={styles.action} onPress={goHubReceive}>
+                  <Text style={styles.actionText}>到站收货</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
-  camera: { flex: 1 },
-  panel: {
-    backgroundColor: '#0f172a',
-    padding: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  root: { flex: 1, backgroundColor: '#0f172a' },
+  scannerArea: { flex: 1, minHeight: 300 },
+  resultPanel: {
+    backgroundColor: '#1e293b',
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    padding: 14,
+    minHeight: 140,
   },
-  panelTitle: { color: '#f8fafc', fontWeight: '800', marginBottom: 10 },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    fontFamily: 'monospace',
-  },
-  center: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  title: { color: '#f8fafc', fontSize: 18, fontWeight: '800', marginBottom: 16 },
-  hint: { color: '#94a3b8' },
-  btn: {
+  placeholder: { color: '#64748b', fontSize: 13, textAlign: 'center', marginTop: 12 },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center', marginTop: 12 },
+  loadingText: { color: '#94a3b8' },
+  code: { color: '#fde68a', fontSize: 16, fontWeight: '900', fontFamily: 'monospace' },
+  meta: { color: '#94a3b8', fontSize: 13, marginTop: 6, lineHeight: 18 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  actionPrimary: {
     backgroundColor: '#2563eb',
     borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  btnText: { color: '#fff', fontWeight: '800' },
+  actionPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  action: {
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#475569',
+  },
+  actionText: { color: '#cbd5e1', fontWeight: '700', fontSize: 13 },
 });

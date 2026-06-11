@@ -7,18 +7,24 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
-
-const STAFF_KEY = 'inventory_staff_name';
-const PIN_KEY = 'inventory_staff_pin';
+import {
+  clearSession,
+  loginTransitStationStore,
+  restoreSession,
+  type InventoryStoreSession,
+} from '../services/authService';
+import { resolveStoreHubCode } from '../utils/storeZone';
 
 type AuthContextValue = {
   ready: boolean;
+  isAuthenticated: boolean;
+  store: InventoryStoreSession | null;
+  /** 本站服务区域码（到站收货匹配用，如 YGN、MDY） */
+  hubCode: string | null;
+  /** 店铺名称，兼容各业务页的 operator 展示 */
   operatorName: string | null;
-  hasPin: boolean;
-  login: (name: string, pin: string) => Promise<boolean>;
-  setupPin: (name: string, pin: string) => Promise<void>;
+  storeCode: string | null;
+  login: (storeCode: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -26,46 +32,36 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [operatorName, setOperatorName] = useState<string | null>(null);
-  const [hasPin, setHasPin] = useState(false);
+  const [store, setStore] = useState<InventoryStoreSession | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const pin = await SecureStore.getItemAsync(PIN_KEY);
-      const name = await AsyncStorage.getItem(STAFF_KEY);
-      setHasPin(!!pin);
-      if (pin && name) setOperatorName(name);
-      setReady(true);
-    })();
+    void restoreSession()
+      .then(setStore)
+      .finally(() => setReady(true));
   }, []);
 
-  const setupPin = useCallback(async (name: string, pin: string) => {
-    const trimmed = name.trim();
-    if (!trimmed || pin.length < 4) throw new Error('请填写姓名且 PIN 至少 4 位');
-    await SecureStore.setItemAsync(PIN_KEY, pin);
-    await AsyncStorage.setItem(STAFF_KEY, trimmed);
-    setOperatorName(trimmed);
-    setHasPin(true);
-  }, []);
-
-  const login = useCallback(async (name: string, pin: string) => {
-    const storedPin = await SecureStore.getItemAsync(PIN_KEY);
-    const storedName = await AsyncStorage.getItem(STAFF_KEY);
-    if (!storedPin) return false;
-    if (pin !== storedPin) return false;
-    const trimmed = name.trim() || storedName || '工作人员';
-    await AsyncStorage.setItem(STAFF_KEY, trimmed);
-    setOperatorName(trimmed);
-    return true;
+  const login = useCallback(async (storeCode: string, password: string) => {
+    const session = await loginTransitStationStore(storeCode, password);
+    setStore(session);
   }, []);
 
   const logout = useCallback(async () => {
-    setOperatorName(null);
+    await clearSession();
+    setStore(null);
   }, []);
 
   const value = useMemo(
-    () => ({ ready, operatorName, hasPin, login, setupPin, logout }),
-    [ready, operatorName, hasPin, login, setupPin, logout],
+    () => ({
+      ready,
+      isAuthenticated: !!store,
+      store,
+      hubCode: store ? resolveStoreHubCode(store) : null,
+      operatorName: store?.storeName ?? null,
+      storeCode: store?.storeCode ?? null,
+      login,
+      logout,
+    }),
+    [ready, store, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

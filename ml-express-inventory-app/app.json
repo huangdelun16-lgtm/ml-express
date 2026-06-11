@@ -7,7 +7,7 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "description": "MARKET LINK 平台库存管理：入库、出库、扫码枪与条码标签打印（独立运行，暂不关联其它业务端）。",
+    "description": "MARKET LINK 中转站库存管理：入库、打包、装车出库与条码标签打印（中转站合伙店铺登录）。",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -31,7 +31,9 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.mlexpress.inventory",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA"
+      ]
     },
     "plugins": [
       [
@@ -39,7 +41,8 @@
         {
           "cameraPermission": "扫描商品条码需要使用相机"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

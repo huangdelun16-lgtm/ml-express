@@ -56,3 +56,16 @@ export function formatWeight(parts: WeightPart): string {
 export function stockUnitLabel(): string {
   return 'Pcs';
 }
+
+export function parseWeightKg(value: string): number {
+  const n = parseWeight(value).n;
+  if (!n) return 0;
+  const num = Number(n);
+  return Number.isFinite(num) ? num : 0;
+}
+
+export function sumPackageWeightsKg(weights: string[]): string {
+  const total = weights.reduce((acc, w) => acc + parseWeightKg(w), 0);
+  if (total <= 0) return '';
+  return total % 1 === 0 ? String(total) : total.toFixed(2);
+}

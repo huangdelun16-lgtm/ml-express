@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -8,38 +8,70 @@ import {
   View,
 } from 'react-native';
 import BarcodeImage from './BarcodeImage';
-import { printInboundBarcodeOnly } from '../services/printerService';
+import type { LabelPrintPayload } from '../services/printerService';
+import { printBarcodeLabel, printInboundBarcodeOnly } from '../services/printerService';
 
-export type StockInSuccessData = {
+export type OrderBarcodeData = {
+  productName: string;
   barcode: string;
   inputBarcode?: string;
-  productName: string;
-  inboundDateLabel: string;
-  recipientName: string;
-  destination: string;
-  qty: number;
-  spec?: string;
-  weight?: string;
+  destination?: string;
+  customerName?: string;
+  kind?: 'inbound' | 'pack';
+  packLabel?: LabelPrintPayload;
 };
 
 type Props = {
   visible: boolean;
-  data: StockInSuccessData | null;
-  onDone: () => void;
+  data: OrderBarcodeData | null;
+  onClose: () => void;
+  /** 须先打印才能点「完成」 */
+  requirePrintBeforeDone?: boolean;
+  onDone?: () => void;
 };
 
-export default function StockInSuccessModal({ visible, data, onDone }: Props) {
+function InfoRow({ label, value }: { label: string; value?: string }) {
+  if (!value?.trim()) return null;
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue} numberOfLines={2}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+export default function OrderBarcodeModal({
+  visible,
+  data,
+  onClose,
+  requirePrintBeforeDone = false,
+  onDone,
+}: Props) {
   const [printing, setPrinting] = useState(false);
+  const [printed, setPrinted] = useState(false);
+
+  useEffect(() => {
+    if (visible) setPrinted(false);
+  }, [visible, data?.barcode]);
 
   const printBarcode = async () => {
     if (!data?.barcode) return;
     setPrinting(true);
     try {
-      const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode);
+      const ok =
+        data.kind === 'pack' && data.packLabel
+          ? await printBarcodeLabel(data.packLabel)
+          : await printInboundBarcodeOnly(
+              data.barcode,
+              data.inputBarcode?.trim() || undefined,
+            );
       if (!ok) {
         Alert.alert('提示', '打印已关闭，请在设置中启用打印');
         return;
       }
+      setPrinted(true);
       Alert.alert('已发送打印', '请在系统对话框选择标签打印机');
     } catch (e: unknown) {
       Alert.alert('打印失败', e instanceof Error ? e.message : '请重试');
@@ -48,27 +80,29 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
     }
   };
 
+  const finish = () => {
+    if (requirePrintBeforeDone && !printed) {
+      Alert.alert('提示', '请先点击「打印 Barcode」完成打印');
+      return;
+    }
+    onDone?.();
+    onClose();
+  };
+
   if (!data) return null;
 
-  const meta = [data.spec, data.weight].filter(Boolean).join(' · ');
-
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.icon}>✓</Text>
-          </View>
-          <Text style={styles.title}>订单入库完成</Text>
-          <Text style={styles.summary}>
-            「{data.productName}」已登记入库，库存 +{data.qty}。入库条码已生成，可在「快递明细」查看与打包。
+          <Text style={styles.title}>订单 Barcode</Text>
+          <Text style={styles.productName} numberOfLines={2}>
+            {data.productName}
           </Text>
 
           <View style={styles.infoBox}>
-            <InfoRow label="入库日期" value={data.inboundDateLabel} />
-            <InfoRow label="收件人" value={data.recipientName} />
-            <InfoRow label="最终目的地" value={data.destination} />
-            {meta ? <InfoRow label="规格 / 重量" value={meta} /> : null}
+            <InfoRow label="客户" value={data.customerName} />
+            <InfoRow label="目的地" value={data.destination} />
           </View>
 
           <View style={styles.barcodeSection}>
@@ -85,29 +119,22 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
 
           <Pressable
             style={[styles.btnPrint, printing && styles.btnDisabled]}
-            onPress={printBarcode}
+            onPress={() => void printBarcode()}
             disabled={printing}
           >
             <Text style={styles.btnPrintText}>{printing ? '发送中…' : '🖨 打印 Barcode'}</Text>
           </Pressable>
-          <Pressable style={styles.btnDone} onPress={onDone}>
-            <Text style={styles.btnDoneText}>返回首页</Text>
+          <Pressable
+            style={[styles.btnClose, requirePrintBeforeDone && !printed && styles.btnCloseDisabled]}
+            onPress={finish}
+          >
+            <Text style={styles.btnCloseText}>
+              {requirePrintBeforeDone && !printed ? '完成（请先打印）' : '关闭'}
+            </Text>
           </Pressable>
         </View>
       </View>
     </Modal>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  if (!value.trim()) return null;
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue} numberOfLines={2}>
-        {value}
-      </Text>
-    </View>
   );
 }
 
@@ -125,22 +152,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
   },
-  iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(5,150,105,0.2)',
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  icon: { color: '#6ee7b7', fontSize: 28, fontWeight: '900' },
-  title: { color: '#6ee7b7', fontSize: 22, fontWeight: '900', textAlign: 'center', marginBottom: 10 },
-  summary: {
-    color: '#cbd5e1',
-    fontSize: 14,
-    lineHeight: 22,
+  title: { color: '#7dd3fc', fontSize: 22, fontWeight: '900', textAlign: 'center', marginBottom: 8 },
+  productName: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 14,
   },
@@ -149,13 +165,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#334155',
   },
   infoRow: { flexDirection: 'row', gap: 10 },
-  infoLabel: { color: '#64748b', fontSize: 12, fontWeight: '700', width: 78 },
+  infoLabel: { color: '#64748b', fontSize: 12, fontWeight: '700', width: 52 },
   infoValue: { flex: 1, color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
+  barcodeSection: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   inputCodeText: {
     color: '#0284c7',
     fontSize: 14,
@@ -173,14 +196,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 10,
   },
-  barcodeSection: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-  },
   btnPrint: {
-    marginTop: 18,
     backgroundColor: '#2563eb',
     borderRadius: 14,
     paddingVertical: 15,
@@ -188,12 +204,14 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.7 },
   btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  btnDone: {
+  btnClose: {
     marginTop: 10,
-    backgroundColor: '#059669',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#475569',
   },
-  btnDoneText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  btnCloseDisabled: { opacity: 0.55 },
+  btnCloseText: { color: '#cbd5e1', fontWeight: '700', fontSize: 15 },
 });

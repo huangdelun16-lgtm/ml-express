@@ -18,3 +18,23 @@ export function buildPackageNumberBody(
 export function formatPackageSequence(seq: number): string {
   return String(seq).padStart(4, '0');
 }
+
+/** 解析包装号 PKG26YGN20002 → 目的地 YGN、件数 2 等 */
+export function packDestinationFromBarcode(barcode: string): string {
+  return parsePackageBarcode(barcode)?.destination ?? '';
+}
+
+export function parsePackageBarcode(barcode: string): {
+  destination: string;
+  pieceCount: number;
+  sequence: string;
+} | null {
+  const code = barcode.trim().toUpperCase();
+  const match = code.match(/^PKG(\d{2})([A-Z]{3})(\d+)(\d{4})$/);
+  if (!match) return null;
+  return {
+    destination: match[2],
+    pieceCount: Number(match[3]) || 0,
+    sequence: match[4],
+  };
+}

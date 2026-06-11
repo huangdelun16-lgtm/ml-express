@@ -4,12 +4,14 @@ import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
 
 type Props = {
   label?: string;
+  hint?: string;
   value: string;
   onChange: (v: string) => void;
 };
 
 export default function DestinationPickerField({
   label = '目的地',
+  hint,
   value,
   onChange,
 }: Props) {
@@ -44,6 +46,7 @@ export default function DestinationPickerField({
           })}
         </View>
       ) : null}
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -86,4 +89,5 @@ const styles = StyleSheet.create({
   optionText: { color: '#e2e8f0', fontSize: 16, fontWeight: '600' },
   optionTextOn: { color: '#c4b5fd', fontWeight: '800' },
   check: { color: '#c4b5fd', fontWeight: '900', fontSize: 16 },
+  hint: { color: '#64748b', fontSize: 12, marginTop: 6, lineHeight: 18 },
 });

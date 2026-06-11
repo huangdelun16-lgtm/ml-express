@@ -17,6 +17,7 @@ import { useItemFormState } from '../hooks/useItemFormState';
 import { generatePackageNumber } from '../services/inventoryService';
 import type { InventoryItem } from '../types/inventory';
 import { extractDestinationCode } from '../utils/inboundBarcode';
+import { sumPackageWeightsKg } from '../utils/itemFieldFormat';
 
 type Props = {
   visible: boolean;
@@ -61,11 +62,16 @@ export default function PackExpressModal({
     () => selectedItems.map((i) => i.id).join(','),
     [selectedItems],
   );
+  const totalWeightN = useMemo(
+    () => sumPackageWeightsKg(selectedItems.map((i) => i.weight)),
+    [selectedItems],
+  );
 
   useEffect(() => {
     if (!visible || selectedItems.length === 0) return;
     setDestination(guessDestination(selectedItems));
-  }, [visible, selectedKey]);
+    form.setWeightN(totalWeightN);
+  }, [visible, selectedKey, totalWeightN]);
 
   useEffect(() => {
     if (!visible || selectedItems.length === 0 || !destination) return;
@@ -82,6 +88,7 @@ export default function PackExpressModal({
           barcode: packageNo,
           name: `快递包-${names}${suffix}`,
           unitN: packCount,
+          weightN: totalWeightN,
           note: formatPackNote(selectedItems, operatorName),
         });
       } catch (e: unknown) {
@@ -94,7 +101,7 @@ export default function PackExpressModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, selectedKey, operatorName, destination]);
+  }, [visible, selectedKey, operatorName, destination, totalWeightN]);
 
   const save = async () => {
     if (!destination) {

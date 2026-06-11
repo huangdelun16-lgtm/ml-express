@@ -2,13 +2,14 @@ import React, { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import { getStats, listPackedShipments } from '../services/inventoryService';
-import type { PackedShipmentDetail } from '../types/inventory';
+import { getStats, listPackedShipmentRows } from '../services/inventoryService';
+import type { PackedShipmentListRow } from '../types/inventory';
+import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
 
 type Nav = { navigate: (name: string) => void };
 
 export default function HomeScreen({ navigation }: { navigation: Nav }) {
-  const { operatorName, logout } = useAuth();
+  const { operatorName, storeCode, hubCode, logout } = useAuth();
   const [stats, setStats] = useState({
     itemCount: 0,
     totalQty: 0,
@@ -17,11 +18,11 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     todayOut: 0,
     packCount: 0,
   });
-  const [recentPacks, setRecentPacks] = useState<PackedShipmentDetail[]>([]);
+  const [recentPacks, setRecentPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [s, packs] = await Promise.all([getStats(), listPackedShipments()]);
+    const [s, packs] = await Promise.all([getStats(), listPackedShipmentRows()]);
     setStats(s);
     setRecentPacks(packs.slice(0, 3));
   }, []);
@@ -34,12 +35,15 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
 
   const tiles = [
     { title: '入库', icon: '📥', screen: 'StockIn', color: '#059669' },
-    { title: '出库', icon: '📤', screen: 'StockOut', color: '#dc2626' },
-    { title: 'PKG', icon: '📦', screen: 'Pkg', color: '#a855f7' },
-    { title: '商品库', icon: '📋', screen: 'Items', color: '#2563eb' },
+    { title: '快递明细', icon: '📋', screen: 'Items', color: '#2563eb' },
+    { title: '打包', icon: '📦', screen: 'Pkg', color: '#a855f7' },
+    { title: '装车出库', icon: '🚚', screen: 'StockOut', color: '#dc2626' },
+    { title: '到站收货', icon: '✅', screen: 'HubReceive', color: '#0d9488' },
+    { title: '在途追踪', icon: '🛰️', screen: 'ShipmentTrack', color: '#0284c7' },
     { title: '流水', icon: '📜', screen: 'Movements', color: '#7c3aed' },
-    { title: '相机扫码', icon: '📷', screen: 'CameraScan', color: '#0891b2' },
+    { title: '通用扫码', icon: '📷', screen: 'CameraScan', color: '#0891b2' },
     { title: '设置', icon: '⚙️', screen: 'Settings', color: '#64748b' },
+    { title: '追踪快递', icon: '🔍', screen: 'TrackExpress', color: '#0ea5e9' },
   ];
 
   return (
@@ -57,7 +61,10 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
       <View style={styles.header}>
         <View>
           <Text style={styles.hello}>你好，{operatorName}</Text>
-          <Text style={styles.hint}>平台库存管理（本地独立数据）</Text>
+          <Text style={styles.hint}>
+            {storeCode ? `${storeCode}` : '中转站'}
+            {hubCode ? ` · 区域 ${hubCode}` : ''} · 本地库存 + 云端在途
+          </Text>
         </View>
         <Pressable onPress={() => logout()}>
           <Text style={styles.logout}>退出</Text>
@@ -67,7 +74,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
       <View style={styles.statsRow}>
         <StatCard label="SKU" value={String(stats.itemCount)} />
         <StatCard label="总库存" value={String(stats.totalQty)} />
-        <StatCard label="PKG" value={String(stats.packCount)} />
+        <StatCard label="打包" value={String(stats.packCount)} />
         <StatCard label="今日入" value={String(stats.todayIn)} />
         <StatCard label="今日出" value={String(stats.todayOut)} />
       </View>
@@ -75,17 +82,29 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
         <Text style={styles.warn}>⚠️ {stats.lowStockCount} 个 SKU 低于安全库存</Text>
       ) : null}
 
+      <Pressable style={styles.trackCard} onPress={() => navigation.navigate('TrackExpress')}>
+        <View style={styles.trackCardHeader}>
+          <Text style={styles.trackCardTitle}>🔍 追踪快递</Text>
+          <Text style={styles.trackCardMore}>立即查询 →</Text>
+        </View>
+        <Text style={styles.trackCardHint}>
+          扫描或输入快递单号、入库条码，查看订单详情、所属包裹与装车状态
+        </Text>
+      </Pressable>
+
       <Pressable style={styles.pkgCard} onPress={() => navigation.navigate('Pkg')}>
         <View style={styles.pkgCardHeader}>
-          <Text style={styles.pkgCardTitle}>📦 PKG</Text>
+          <Text style={styles.pkgCardTitle}>📦 打包</Text>
           <Text style={styles.pkgCardMore}>
             {stats.packCount > 0 ? `共 ${stats.packCount} 个包裹 →` : '查看全部 →'}
           </Text>
         </View>
         {recentPacks.length === 0 ? (
-          <Text style={styles.pkgEmpty}>商品库「打包快递」确认打包后，包裹会出现在这里</Text>
+          <Text style={styles.pkgEmpty}>快递明细「打包快递」确认打包后，包裹会出现在这里</Text>
         ) : (
-          recentPacks.map((pack) => (
+          recentPacks.map((pack) => {
+            const statusStyle = packStatusStyle(pack.display_status);
+            return (
             <View key={pack.id} style={styles.pkgRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.pkgName} numberOfLines={1}>
@@ -95,9 +114,17 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
                   {pack.bundle_barcode}
                 </Text>
               </View>
-              <Text style={styles.pkgQty}>{pack.items.length} 件</Text>
+              <View style={styles.pkgRowRight}>
+                <View style={[styles.loadBadge, { backgroundColor: statusStyle.badgeBg }]}>
+                  <Text style={[styles.loadBadgeText, { color: statusStyle.badgeText }]}>
+                    {PACK_DISPLAY_LABEL[pack.display_status]}
+                  </Text>
+                </View>
+                <Text style={styles.pkgQty}>{pack.items.length} 件</Text>
+              </View>
             </View>
-          ))
+            );
+          })
         )}
       </Pressable>
 
@@ -145,6 +172,23 @@ const styles = StyleSheet.create({
   statValue: { color: '#fbbf24', fontSize: 20, fontWeight: '900' },
   statLabel: { color: '#94a3b8', fontSize: 12, marginTop: 4 },
   warn: { color: '#fbbf24', marginBottom: 16, fontSize: 13 },
+  trackCard: {
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0ea5e9',
+  },
+  trackCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  trackCardTitle: { color: '#f8fafc', fontSize: 18, fontWeight: '900' },
+  trackCardMore: { color: '#7dd3fc', fontSize: 13, fontWeight: '700' },
+  trackCardHint: { color: '#94a3b8', fontSize: 13, lineHeight: 20 },
   pkgCard: {
     backgroundColor: '#1e293b',
     borderRadius: 14,
@@ -173,6 +217,13 @@ const styles = StyleSheet.create({
   },
   pkgName: { color: '#e2e8f0', fontSize: 14, fontWeight: '800' },
   pkgBarcode: { color: '#d8b4fe', fontSize: 12, fontFamily: 'monospace', marginTop: 2 },
+  pkgRowRight: { alignItems: 'flex-end', gap: 6 },
+  loadBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  loadBadgeDone: { backgroundColor: 'rgba(34,197,94,0.15)' },
+  loadBadgePending: { backgroundColor: 'rgba(251,146,60,0.15)' },
+  loadBadgeText: { fontSize: 10, fontWeight: '900' },
+  loadBadgeTextDone: { color: '#4ade80' },
+  loadBadgeTextPending: { color: '#fb923c' },
   pkgQty: { color: '#c4b5fd', fontSize: 13, fontWeight: '800' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   tile: {

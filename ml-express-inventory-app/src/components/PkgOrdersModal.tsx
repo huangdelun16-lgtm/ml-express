@@ -29,14 +29,20 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
                   <Text style={styles.orderName} numberOfLines={2}>
                     {line.item_name}
                   </Text>
-                  <Text style={styles.orderCode} selectable>
-                    入库 {line.item_barcode}
-                  </Text>
-                  {line.input_barcode ? (
-                    <Text style={styles.orderExpress} selectable>
-                      快递单 {line.input_barcode}
-                    </Text>
-                  ) : null}
+                  <View style={styles.codeRow}>
+                    <View style={styles.tagBlue}>
+                      <Text style={styles.tagBlueLabel}>快递单</Text>
+                      <Text style={styles.tagBlueValue} numberOfLines={1} selectable>
+                        {line.input_barcode || '—'}
+                      </Text>
+                    </View>
+                    <View style={styles.tagYellow}>
+                      <Text style={styles.tagYellowLabel}>入库单</Text>
+                      <Text style={styles.tagYellowValue} numberOfLines={1} selectable>
+                        {line.item_barcode}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
             ))}
@@ -96,19 +102,53 @@ const styles = StyleSheet.create({
   },
   orderBody: { flex: 1, minWidth: 0 },
   orderName: { color: '#f8fafc', fontSize: 14, fontWeight: '800' },
-  orderCode: {
-    color: '#fde68a',
-    fontSize: 12,
-    fontFamily: 'monospace',
-    marginTop: 4,
-    fontWeight: '700',
+  codeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: 6,
   },
-  orderExpress: {
+  tagBlue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
+    maxWidth: '100%',
+    backgroundColor: 'rgba(56,189,248,0.1)',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(56,189,248,0.3)',
+  },
+  tagBlueLabel: { color: '#38bdf8', fontSize: 10, fontWeight: '800' },
+  tagBlueValue: {
     color: '#7dd3fc',
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '800',
     fontFamily: 'monospace',
-    marginTop: 2,
-    fontWeight: '700',
+    flexShrink: 1,
+  },
+  tagYellow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
+    maxWidth: '100%',
+    backgroundColor: 'rgba(251,191,36,0.1)',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.3)',
+  },
+  tagYellowLabel: { color: '#fbbf24', fontSize: 10, fontWeight: '800' },
+  tagYellowValue: {
+    color: '#fde68a',
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    flexShrink: 1,
   },
   btn: {
     marginTop: 14,

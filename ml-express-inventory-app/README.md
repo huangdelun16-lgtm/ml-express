@@ -1,10 +1,10 @@
 # ML Inventory（平台库存 App）
 
-独立运行的手机/平板库存管理应用，供 **平台工作人员** 使用。数据保存在本机 SQLite，**暂不连接** Supabase、商家端或其它业务系统；后续需要时再对接。
+独立运行的手机/平板库存管理应用，供 **Admin 后台创建的中转站合伙店铺** 使用。登录校验连接 Supabase `delivery_stores`；库存与流水仍保存在本机 SQLite。
 
 ## 功能
 
-- 工作人员 PIN 登录（首次使用设置 PIN）
+- **中转站店铺登录**（店铺代码 + 密码，须 `store_type = transit_station`）
 - 商品建档、搜索、安全库存预警
 - 入库 / 出库流水
 - **扫码枪**：USB / Wi-Fi / 蓝牙 HID 键盘模式（入库/出库页聚焦输入框）
@@ -21,6 +21,8 @@
 
 ```bash
 cd ml-express-inventory-app
+cp .env.example .env
+# 填写与 Admin Web 相同的 EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY
 npm install
 npx expo start
 ```
@@ -28,11 +30,12 @@ npx expo start
 - 按 `i` 打开 iOS 模拟器，或 `a` 打开 Android
 - 真机：安装 Expo Go，扫描终端二维码
 
-## 首次使用
+## 登录说明
 
-1. 打开 App，填写 **姓名** 与 **PIN**（至少 4 位）完成首次设置
-2. 之后用同一 PIN 登录（姓名可修改）
-3. 在 **设置** 中配置标签打印参数
+1. 在 Admin Web「合伙店铺管理」→「新增合伙店铺」，**店铺类型** 须选 **中转站**
+2. 使用该店铺的 **店铺代码** + **密码** 登录本 App
+3. 非中转站类型或其它合伙店铺账号将无法登录
+4. 在 **设置** 中可查看当前店铺并退出登录
 
 ## 扫码枪说明
 
@@ -51,10 +54,10 @@ npx expo start
 ```
 src/
   components/     ScanInputBar（扫码枪输入）
-  contexts/       AuthContext（本地 PIN）
+  contexts/       AuthContext（中转站店铺会话）
+  services/       SQLite、库存、Supabase 登录
   navigation/     AppNavigator
   screens/        各业务页面
-  services/       SQLite、库存业务、打印
   types/
 ```
 
