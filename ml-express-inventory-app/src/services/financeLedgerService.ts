@@ -1,3 +1,4 @@
+import { getHubTransportFeePaidBarcodeSet } from './hubTransportFeeService';
 import type { InventoryStoreSession } from './authService';
 import { getDatabase } from './database';
 import { listInboundPackages } from './trackingService';
@@ -211,14 +212,19 @@ function buildTransportEntry(params: {
   legDest: string;
   originLabel: string;
   occurredAt: string;
+  paid?: boolean;
 }): FinanceLedgerEntry {
   return {
     id: params.id,
     category: 'transport_cost',
     title: '运输成本 · 装车车费',
     subtitle: `${params.originLabel} → ${params.legDest} · ${params.packBarcode}`,
-    amount: params.fee,
-    amountDisplay: params.fee > 0 ? `−${formatMmk(params.fee)}` : '待登记车费',
+    amount: params.paid ? 0 : params.fee,
+    amountDisplay: params.paid
+      ? '已支付'
+      : params.fee > 0
+        ? `−${formatMmk(params.fee)}`
+        : '待登记车费',
     occurredAt: params.occurredAt,
     barcode: params.packBarcode,
     itemName: params.packName,
@@ -274,6 +280,7 @@ export async function listFinanceLedger(
   const entries: FinanceLedgerEntry[] = [];
   const transportSeen = new Set<string>();
   const orderSeen = new Set<string>();
+  const transportPaidBarcodes = await getHubTransportFeePaidBarcodeSet();
 
   const inboundRows = await db.getAllAsync<Record<string, unknown>>(
     `SELECT m.*, i.final_destination, i.recipient_name AS item_recipient_name,
@@ -340,6 +347,7 @@ export async function listFinanceLedger(
     const fee = feeFromCol > 0 ? feeFromCol : feeFromNote;
     const originKey = ownershipKeyFromStoreCode(String(row.owner_store_code ?? ''));
     const originLabel = ownershipLabelFromKey(originKey);
+    const paid = transportPaidBarcodes.has(packBarcode);
 
     entries.push(
       buildTransportEntry({
@@ -350,6 +358,7 @@ export async function listFinanceLedger(
         legDest,
         originLabel,
         occurredAt: String(row.created_at),
+        paid,
       }),
     );
   }
@@ -374,6 +383,7 @@ export async function listFinanceLedger(
       const originLabel =
         pkg.origin_store_name.trim() ||
         ownershipLabelFromKey(ownershipKeyFromStoreCode(pkg.origin_store_code));
+      const paid = transportPaidBarcodes.has(packBarcode);
 
       entries.push(
         buildTransportEntry({
@@ -384,6 +394,7 @@ export async function listFinanceLedger(
           legDest,
           originLabel,
           occurredAt: pkg.truck_loaded_at || pkg.updated_at,
+          paid,
         }),
       );
 

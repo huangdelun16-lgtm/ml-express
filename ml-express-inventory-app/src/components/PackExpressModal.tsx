@@ -15,14 +15,20 @@ import ItemFormFields from './ItemFormFields';
 import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
 import { useItemFormState } from '../hooks/useItemFormState';
 import { generatePackageNumber } from '../services/inventoryService';
+import type { InventoryStoreSession } from '../services/authService';
 import type { InventoryItem } from '../types/inventory';
 import { extractDestinationCode } from '../utils/inboundBarcode';
-import { sumPackageWeightsKg } from '../utils/itemFieldFormat';
+import { aggregatePackSpecFromItems, sumPackageWeightsKg } from '../utils/itemFieldFormat';
+import {
+  isPackContentLockedForStore,
+  packContentLockHint,
+} from '../utils/storeOwnership';
 
 type Props = {
   visible: boolean;
   selectedItems: InventoryItem[];
   operatorName: string;
+  store: InventoryStoreSession | null;
   onClose: () => void;
   onSubmit: (payload: {
     barcode: string;
@@ -52,6 +58,7 @@ export default function PackExpressModal({
   visible,
   selectedItems,
   operatorName,
+  store,
   onClose,
   onSubmit,
 }: Props) {
@@ -62,16 +69,34 @@ export default function PackExpressModal({
     () => selectedItems.map((i) => i.id).join(','),
     [selectedItems],
   );
+  const packSpec = useMemo(
+    () => aggregatePackSpecFromItems(selectedItems),
+    [selectedItems],
+  );
   const totalWeightN = useMemo(
     () => sumPackageWeightsKg(selectedItems.map((i) => i.weight)),
     [selectedItems],
   );
+  const bundleContentLocked = useMemo(
+    () => (store ? isPackContentLockedForStore(store, selectedItems) : false),
+    [store, selectedItems],
+  );
+  const contentLockHint = useMemo(
+    () => (store && bundleContentLocked ? packContentLockHint(store, selectedItems) : undefined),
+    [store, bundleContentLocked, selectedItems],
+  );
+  const autoFillHint = bundleContentLocked
+    ? contentLockHint
+    : '已从已选订单入库登记自动汇总规格与重量';
 
   useEffect(() => {
     if (!visible || selectedItems.length === 0) return;
     setDestination(guessDestination(selectedItems));
+    form.setSpecL(packSpec.l);
+    form.setSpecW(packSpec.w);
+    form.setSpecH(packSpec.h);
     form.setWeightN(totalWeightN);
-  }, [visible, selectedKey, totalWeightN]);
+  }, [visible, selectedKey, totalWeightN, packSpec]);
 
   useEffect(() => {
     if (!visible || selectedItems.length === 0 || !destination) return;
@@ -87,6 +112,9 @@ export default function PackExpressModal({
         form.reset({
           barcode: packageNo,
           name: `快递包-${names}${suffix}`,
+          specL: packSpec.l,
+          specW: packSpec.w,
+          specH: packSpec.h,
           unitN: packCount,
           weightN: totalWeightN,
           note: formatPackNote(selectedItems, operatorName),
@@ -101,7 +129,7 @@ export default function PackExpressModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, selectedKey, operatorName, destination, totalWeightN]);
+  }, [visible, selectedKey, operatorName, destination, totalWeightN, packSpec]);
 
   const save = async () => {
     if (!destination) {
@@ -162,6 +190,10 @@ export default function PackExpressModal({
             barcodeHint="PKG + 年份 + 目的地 + 件数 + 流水号（如 PKG26YGN20001）"
             unitLocked
             unitHint={`已选 ${selectedItems.length} 个包裹，自动填写 ${selectedItems.length} Pcs`}
+            specLocked={bundleContentLocked}
+            weightLocked={bundleContentLocked}
+            specHint={autoFillHint}
+            weightHint={autoFillHint}
           />
 
           <Pressable style={[styles.btn, loading && styles.btnDisabled]} onPress={save} disabled={loading}>

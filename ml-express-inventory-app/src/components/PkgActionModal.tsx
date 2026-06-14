@@ -12,7 +12,10 @@ type Props = {
   onPrint: () => void;
   onViewOrders?: () => void;
   onResyncCloud?: () => void;
+  onUnpack?: () => void;
   canEdit?: boolean;
+  canUnpack?: boolean;
+  unpacking?: boolean;
 };
 
 export default function PkgActionModal({
@@ -23,7 +26,10 @@ export default function PkgActionModal({
   onPrint,
   onViewOrders,
   onResyncCloud,
+  onUnpack,
   canEdit = true,
+  canUnpack = false,
+  unpacking = false,
 }: Props) {
   if (!pack) return null;
 
@@ -55,10 +61,22 @@ export default function PkgActionModal({
             </Text>
           ) : null}
 
-          {canEdit ? (
-            <Pressable style={styles.btnEdit} onPress={onEdit}>
-              <Text style={styles.btnEditText}>编辑快递包</Text>
-            </Pressable>
+          {canEdit || (onViewOrders && orderCount > 0) ? (
+            <View style={styles.dualBtnRow}>
+              {canEdit ? (
+                <Pressable style={[styles.dualBtn, styles.dualBtnEdit]} onPress={onEdit}>
+                  <Text style={styles.btnEditText}>编辑快递包</Text>
+                </Pressable>
+              ) : null}
+              {onViewOrders && orderCount > 0 ? (
+                <Pressable
+                  style={[styles.dualBtn, styles.dualBtnOrders, !canEdit && styles.dualBtnFull]}
+                  onPress={onViewOrders}
+                >
+                  <Text style={styles.btnOrdersText}>查看内含订单</Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : (
             <View style={styles.readonlyHint}>
               <Text style={styles.readonlyHintText}>
@@ -66,17 +84,23 @@ export default function PkgActionModal({
               </Text>
             </View>
           )}
+          {canUnpack && onUnpack ? (
+            <Pressable
+              style={[styles.btnUnpack, unpacking && styles.btnBusy]}
+              onPress={onUnpack}
+              disabled={unpacking}
+            >
+              <Text style={styles.btnUnpackText}>
+                {unpacking ? '拆包中…' : '拆包取消'}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable style={styles.btnPrint} onPress={onPrint}>
             <Text style={styles.btnPrintText}>打印标签</Text>
           </Pressable>
           {onResyncCloud ? (
             <Pressable style={styles.btnResync} onPress={onResyncCloud}>
               <Text style={styles.btnResyncText}>补传云端（到站可扫码）</Text>
-            </Pressable>
-          ) : null}
-          {onViewOrders && pack.items.length > 0 ? (
-            <Pressable style={styles.btnOrders} onPress={onViewOrders}>
-              <Text style={styles.btnOrdersText}>查看内含订单</Text>
             </Pressable>
           ) : null}
           <Pressable style={styles.btnCancel} onPress={onClose}>
@@ -136,6 +160,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 14,
   },
+  dualBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  dualBtn: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  dualBtnFull: { flex: 1 },
+  dualBtnEdit: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#a855f7',
+  },
+  dualBtnOrders: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#475569',
+  },
   btnEdit: {
     backgroundColor: '#0f172a',
     borderRadius: 14,
@@ -172,16 +219,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   btnResyncText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  btnOrders: {
+  btnUnpack: {
     backgroundColor: 'transparent',
     borderRadius: 14,
-    paddingVertical: 13,
+    paddingVertical: 14,
     alignItems: 'center',
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#475569',
-    marginBottom: 6,
+    borderColor: '#ef4444',
   },
-  btnOrdersText: { color: '#cbd5e1', fontWeight: '700', fontSize: 15 },
+  btnUnpackText: { color: '#f87171', fontWeight: '800', fontSize: 15 },
+  btnBusy: { opacity: 0.6 },
+  btnOrdersText: { color: '#cbd5e1', fontWeight: '700', fontSize: 14 },
   btnCancel: { paddingVertical: 10, alignItems: 'center' },
   btnCancelText: { color: '#64748b', fontWeight: '700', fontSize: 15 },
 });

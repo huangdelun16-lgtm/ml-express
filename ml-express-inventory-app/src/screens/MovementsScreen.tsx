@@ -162,27 +162,30 @@ function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
   );
 }
 
-function SummaryStat({
+function SummaryBar({
   label,
   value,
   prefix,
   accent,
   icon,
+  tint,
 }: {
   label: string;
   value: string;
   prefix?: string;
   accent: string;
   icon: string;
+  tint: string;
 }) {
   return (
-    <View style={[styles.statCard, { borderColor: accent }]}>
-      <View style={styles.statTop}>
-        <Text style={styles.statIcon}>{icon}</Text>
-        <Text style={[styles.statLabel, { color: accent }]}>{label}</Text>
+    <View style={[styles.statBar, { borderColor: accent, backgroundColor: tint }]}>
+      <View style={[styles.statBarIconWrap, { backgroundColor: `${accent}22` }]}>
+        <Text style={styles.statBarIcon}>{icon}</Text>
       </View>
-      <Text style={[styles.statValue, { color: accent }]}>
+      <Text style={styles.statBarLabel}>{label}</Text>
+      <Text style={[styles.statBarValue, { color: accent }]} numberOfLines={1}>
         {prefix}{value}
+        <Text style={styles.statBarUnit}> MMK</Text>
       </Text>
     </View>
   );
@@ -299,26 +302,29 @@ export default function MovementsScreen() {
           <Text style={styles.netHint}>待收 + 已收 − 运输成本</Text>
         </View>
 
-        <View style={styles.statsGrid}>
-          <SummaryStat
-            label="到付待收"
+        <View style={styles.statsStack}>
+          <SummaryBar
+            label="到付代收"
             value={formatMmk(summary.codPendingTotal)}
             prefix="+"
             accent="#34d399"
             icon="💵"
+            tint="rgba(52,211,153,0.08)"
           />
-          <SummaryStat
-            label="已付款/已收"
+          <SummaryBar
+            label="已收金额"
             value={formatMmk(summary.collectedTotal)}
             accent="#60a5fa"
             icon="✓"
+            tint="rgba(96,165,250,0.08)"
           />
-          <SummaryStat
+          <SummaryBar
             label="运输成本"
             value={formatMmk(summary.transportCostTotal)}
             prefix="−"
             accent="#f87171"
             icon="🚚"
+            tint="rgba(248,113,113,0.08)"
           />
         </View>
       </View>
@@ -440,19 +446,37 @@ const styles = StyleSheet.create({
   netPositive: { color: '#fbbf24' },
   netNegative: { color: '#f87171' },
   netHint: { color: '#475569', fontSize: 11, marginTop: 6 },
-  statsGrid: { flexDirection: 'row', gap: 8 },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#0f172a',
+  statsStack: { gap: 8 },
+  statBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 12,
-    padding: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderLeftWidth: 3,
+    gap: 10,
   },
-  statTop: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  statIcon: { fontSize: 12 },
-  statLabel: { fontSize: 10, fontWeight: '800' },
-  statValue: { fontSize: 15, fontWeight: '900' },
+  statBarIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statBarIcon: { fontSize: 16 },
+  statBarLabel: {
+    flex: 1,
+    color: '#e2e8f0',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  statBarValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'right',
+    maxWidth: '42%',
+  },
+  statBarUnit: { fontSize: 11, fontWeight: '700', color: '#94a3b8' },
   tabScroll: {
     paddingBottom: 10,
     gap: 8,

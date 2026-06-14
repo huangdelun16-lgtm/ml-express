@@ -22,7 +22,8 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [s, packs] = await Promise.all([getStats(), listPackedShipmentRows()]);
+    const scope = store && hubCode ? { store, hubCode } : undefined;
+    const [s, packs] = await Promise.all([getStats(), listPackedShipmentRows(undefined, scope)]);
     if (store && hubCode) {
       try {
         await syncPlatformInventoryCloud(store, hubCode);
@@ -30,8 +31,8 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
         // 离线时仍显示本地统计
       }
     }
-    const [statsAfter, packsAfter] = await Promise.all([getStats(), listPackedShipmentRows()]);
-    setStats(statsAfter);
+    const packsAfter = await listPackedShipmentRows(undefined, scope);
+    setStats({ ...s, packCount: packsAfter.length });
     setRecentPacks(packsAfter.slice(0, 3));
   }, [store, hubCode]);
 

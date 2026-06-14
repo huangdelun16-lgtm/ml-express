@@ -103,3 +103,34 @@ export function editDeniedMessage(ownerRef: string | null | undefined): string {
   const label = ownershipLabelFromKey(ownerKey);
   return `该订单由「${label}」区域入库登记，仅 ${label} 账号与 Admin 账号可编辑内容。`;
 }
+
+type PackContentItemRef = {
+  owner_store_code?: string;
+  barcode: string;
+  destination?: string;
+};
+
+/** 包裹内任一订单非本站入库时，规格/重量仅发站可改 */
+export function isPackContentLockedForStore(
+  store: InventoryStoreSession,
+  items: PackContentItemRef[],
+): boolean {
+  if (isAdminStore(store)) return false;
+  return items.some(
+    (item) => !canEditOwnedRecord(store, resolveOwnerKeyForListItem(item)),
+  );
+}
+
+export function packContentLockHint(
+  store: InventoryStoreSession,
+  items: PackContentItemRef[],
+): string | undefined {
+  if (isAdminStore(store)) return undefined;
+  const locked = items.find(
+    (item) => !canEditOwnedRecord(store, resolveOwnerKeyForListItem(item)),
+  );
+  if (!locked) return undefined;
+  const ownerKey = resolveOwnerKeyForListItem(locked);
+  const label = ownershipLabelFromKey(ownerKey);
+  return `规格与重量沿用「${label}」入库登记，仅该区域账号可修改。`;
+}

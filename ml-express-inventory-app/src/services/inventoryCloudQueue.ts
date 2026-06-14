@@ -45,6 +45,10 @@ function rowToItem(row: Record<string, unknown>): InventoryItem {
     final_destination: String(row.final_destination ?? ''),
     hub_arrived_at: String(row.hub_arrived_at ?? ''),
     customer_signed_at: String(row.customer_signed_at ?? ''),
+    packed_at: String(row.packed_at ?? ''),
+    packed_bundle_barcode: String(row.packed_bundle_barcode ?? ''),
+    hub_transit_released_at: String(row.hub_transit_released_at ?? ''),
+    hub_transit_shipped_at: String(row.hub_transit_shipped_at ?? ''),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };

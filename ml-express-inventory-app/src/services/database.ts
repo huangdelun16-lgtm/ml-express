@@ -70,6 +70,15 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
           last_error TEXT DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_cloud_sync_queue_created ON cloud_sync_queue(created_at ASC);
+        CREATE TABLE IF NOT EXISTS hub_transport_fee_payments (
+          pack_barcode TEXT PRIMARY KEY NOT NULL,
+          fee TEXT NOT NULL DEFAULT '',
+          leg_destination TEXT DEFAULT '',
+          origin_store_code TEXT DEFAULT '',
+          operator TEXT NOT NULL,
+          store_code TEXT NOT NULL DEFAULT '',
+          paid_at TEXT NOT NULL
+        );
       `);
       await migrateInventorySchema(db);
       return db;
@@ -141,6 +150,12 @@ async function migrateInventorySchema(db: SQLite.SQLiteDatabase): Promise<void> 
   if (!itemNames.has('packed_bundle_barcode')) {
     await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN packed_bundle_barcode TEXT DEFAULT ''`);
   }
+  if (!itemNames.has('hub_transit_released_at')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN hub_transit_released_at TEXT DEFAULT ''`);
+  }
+  if (!itemNames.has('hub_transit_shipped_at')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN hub_transit_shipped_at TEXT DEFAULT ''`);
+  }
 
   const packCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(packed_shipments)');
   const packNames = new Set(packCols.map((c) => c.name));
@@ -154,9 +169,35 @@ async function migrateInventorySchema(db: SQLite.SQLiteDatabase): Promise<void> 
     await db.execAsync(`ALTER TABLE packed_shipments ADD COLUMN truck_leg_destination TEXT DEFAULT ''`);
   }
 
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS hub_transport_fee_payments (
+      pack_barcode TEXT PRIMARY KEY NOT NULL,
+      fee TEXT NOT NULL DEFAULT '',
+      leg_destination TEXT DEFAULT '',
+      origin_store_code TEXT DEFAULT '',
+      operator TEXT NOT NULL,
+      store_code TEXT NOT NULL DEFAULT '',
+      paid_at TEXT NOT NULL
+    );
+  `);
+
   await backfillItemOwnerCodes(db);
   await backfillItemRecipientNames(db);
   await backfillPackedItemFlags(db);
+  await backfillHubTransitShippedFlags(db);
+}
+
+async function backfillHubTransitShippedFlags(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.execAsync(
+    `UPDATE inventory_items
+     SET hub_transit_shipped_at = packed_at,
+         hub_transit_released_at = '',
+         updated_at = packed_at
+     WHERE TRIM(COALESCE(hub_transit_released_at, '')) != ''
+       AND TRIM(COALESCE(packed_at, '')) != ''
+       AND qty_on_hand = 0
+       AND TRIM(COALESCE(hub_transit_shipped_at, '')) = ''`,
+  );
 }
 
 async function backfillPackedItemFlags(db: SQLite.SQLiteDatabase): Promise<void> {

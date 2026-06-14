@@ -14,12 +14,22 @@ type DimProps = {
   w: string;
   h: string;
   onChange: (next: { l: string; w: string; h: string }) => void;
+  editable?: boolean;
   lInput?: DimInputProps;
   wInput?: DimInputProps;
   hInput?: DimInputProps;
 };
 
-export function DimensionSpecField({ l, w, h, onChange, lInput, wInput, hInput }: DimProps) {
+export function DimensionSpecField({
+  l,
+  w,
+  h,
+  onChange,
+  editable = true,
+  lInput,
+  wInput,
+  hInput,
+}: DimProps) {
   const set = (key: 'l' | 'w' | 'h', v: string) => {
     onChange({ l, w, h, [key]: sanitizeNumberInput(v) });
   };
@@ -32,11 +42,11 @@ export function DimensionSpecField({ l, w, h, onChange, lInput, wInput, hInput }
       </View>
       <View style={styles.specCard}>
         <View style={styles.specRow}>
-          <DimCell label="长" value={l} onChange={(v) => set('l', v)} input={lInput} />
+          <DimCell label="长" value={l} onChange={(v) => set('l', v)} editable={editable} input={lInput} />
           <Text style={styles.times}>×</Text>
-          <DimCell label="宽" value={w} onChange={(v) => set('w', v)} input={wInput} />
+          <DimCell label="宽" value={w} onChange={(v) => set('w', v)} editable={editable} input={wInput} />
           <Text style={styles.times}>×</Text>
-          <DimCell label="高" value={h} onChange={(v) => set('h', v)} input={hInput} />
+          <DimCell label="高" value={h} onChange={(v) => set('h', v)} editable={editable} input={hInput} />
         </View>
       </View>
     </View>
@@ -101,11 +111,13 @@ function DimCell({
   label,
   value,
   onChange,
+  editable = true,
   input,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  editable?: boolean;
   input?: DimInputProps;
 }) {
   return (
@@ -113,12 +125,13 @@ function DimCell({
       <Text style={styles.dimLabel}>{label}</Text>
       <TextInput
         ref={input?.inputRef}
-        style={styles.dimInput}
+        style={[styles.dimInput, !editable && styles.dimInputReadonly]}
         value={value}
         onChangeText={(t) => onChange(sanitizeNumberInput(t))}
         keyboardType="decimal-pad"
         placeholder="0"
         placeholderTextColor="#94a3b8"
+        editable={editable}
         returnKeyType={input?.returnKeyType}
         onSubmitEditing={input?.onSubmitEditing}
         blurOnSubmit={input?.blurOnSubmit}
@@ -175,6 +188,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     color: '#0f172a',
+  },
+  dimInputReadonly: {
+    backgroundColor: '#e2e8f0',
+    color: '#475569',
   },
   times: {
     color: '#64748b',

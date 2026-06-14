@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -6,12 +6,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import type { InventoryStoreSession } from '../services/authService';
 import type { PkgTrackingDetail } from '../types/tracking';
 import { ORDER_STATUS_LABEL, PKG_STATUS_LABEL } from '../types/tracking';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
+import { formatTransportFeeDisplay, parseTransportFeeAmount } from '../services/hubTransportFeeService';
 
 type Props = {
   visible: boolean;
@@ -21,10 +23,13 @@ type Props = {
   loading: boolean;
   confirmingOrderId: string | null;
   releasing: boolean;
+  payingTransportFee: boolean;
+  transportFeePaid: boolean;
   onClose: () => void;
   onConfirmPack: () => void;
   onConfirmOrder: (orderId: string) => void;
   onReleaseTransit: () => void;
+  onPayTransportFee: () => void;
 };
 
 export default function HubReceiveOrdersModal({
@@ -35,11 +40,24 @@ export default function HubReceiveOrdersModal({
   loading,
   confirmingOrderId,
   releasing,
+  payingTransportFee,
+  transportFeePaid,
   onClose,
   onConfirmPack,
   onConfirmOrder,
   onReleaseTransit,
+  onPayTransportFee,
 }: Props) {
+  const { height: windowHeight } = useWindowDimensions();
+
+  const layout = useMemo(() => {
+    const cardMax = windowHeight * 0.92;
+    const headerEstimate = needsPackConfirmEstimate(pack);
+    const footerEstimate = 148;
+    const orderListMax = Math.max(180, cardMax - headerEstimate - footerEstimate);
+    return { cardMax, orderListMax };
+  }, [windowHeight, pack?.status, pack?.orders.length]);
+
   if (!pack || !store) return null;
 
   const packReceived =
@@ -52,47 +70,75 @@ export default function HubReceiveOrdersModal({
   const transitPending = pack.orders.filter(
     (o) => o.status === 'in_transit' && resolveOrderDestinationCode(o) !== hubCode,
   );
+  const ordersAllProcessed = pack.orders.every((o) => o.status !== 'in_transit');
+  const legDest = pack.leg_destination_code || pack.destination_code || hubCode;
+  const feeDisplay = formatTransportFeeDisplay(pack.transport_fee);
+  const feeAmount = parseTransportFeeAmount(pack.transport_fee);
+  const canPayTransportFee =
+    packReceived &&
+    ordersAllProcessed &&
+    !transportFeePaid &&
+    feeAmount > 0 &&
+    !needsPackConfirm;
+  const needsFeePayment =
+    ordersAllProcessed && feeAmount > 0 && !transportFeePaid && !needsPackConfirm;
+  const canDismiss = !needsFeePayment;
+
+  const handleDismiss = () => {
+    if (canDismiss) onClose();
+  };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>快递包内含订单</Text>
-          <Text style={styles.packageNo} selectable>{pack.pack_barcode}</Text>
-          <View style={styles.metaRow}>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>{PKG_STATUS_LABEL[pack.status]}</Text>
-            </View>
-            <Text style={styles.progress}>
-              进度 {pack.received_order_count}/{pack.item_count}
-            </Text>
-          </View>
-          <Text style={styles.routeMeta}>
-            {pack.origin_store_code} → 本段 {pack.leg_destination_code || pack.destination_code}
-            {pack.leg_destination_code && pack.leg_destination_code !== pack.destination_code
-              ? ` · 标注 ${pack.destination_code}`
-              : ''}
-          </Text>
-
-          {needsPackConfirm ? (
-            <Pressable
-              style={[styles.packConfirmBtn, loading && styles.btnBusy]}
-              onPress={onConfirmPack}
-              disabled={loading}
-            >
-              <Text style={styles.packConfirmBtnText}>
-                {loading ? '处理中…' : '确认快递包到站收货'}
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
+      <View style={styles.overlay}>
+        {canDismiss ? (
+          <Pressable style={styles.backdrop} onPress={handleDismiss} accessibilityLabel="关闭" />
+        ) : (
+          <View style={styles.backdrop} />
+        )}
+        <View style={[styles.card, { maxHeight: layout.cardMax }]}>
+          <View style={styles.headerBlock}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>内含订单</Text>
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusBadgeText}>{PKG_STATUS_LABEL[pack.status]}</Text>
+              </View>
+              <Text style={styles.progress}>
+                {pack.received_order_count}/{pack.item_count}
               </Text>
-            </Pressable>
-          ) : null}
+            </View>
+            <Text style={styles.packageNo} selectable>{pack.pack_barcode}</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.routeMeta} numberOfLines={1}>
+                {pack.origin_store_code} → {legDest}
+              </Text>
+              <Text style={styles.feeInline}>{feeDisplay}</Text>
+              {transportFeePaid ? (
+                <Text style={styles.feePaidChip}>已付</Text>
+              ) : null}
+            </View>
 
-          {!needsPackConfirm && !packDone ? (
-            <Text style={styles.hint}>
-              本站订单点「确认入库」；需中转的订单点下方「释放中转订单」后至「快递明细」重新打包
-            </Text>
-          ) : null}
+            {needsPackConfirm ? (
+              <Pressable
+                style={[styles.packConfirmBtn, loading && styles.btnBusy]}
+                onPress={onConfirmPack}
+                disabled={loading}
+              >
+                <Text style={styles.packConfirmBtnText}>
+                  {loading ? '处理中…' : '确认到站收货'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
 
-          <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+          <ScrollView
+            style={[styles.orderScroll, { maxHeight: layout.orderListMax }]}
+            contentContainerStyle={styles.listContent}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={16}
+          >
             {pack.orders.map((line, index) => {
               const orderDest = resolveOrderDestinationCode(line);
               const isLocal = orderDest === hubCode;
@@ -130,10 +176,15 @@ export default function HubReceiveOrdersModal({
                             ]}
                           >
                             {orderDest}
-                            {isLocal ? ' 本站' : ' 中转'}
                           </Text>
                         </View>
                       ) : null}
+                      <Text
+                        style={[styles.orderStatus, isDone && styles.orderStatusDone]}
+                        numberOfLines={1}
+                      >
+                        {ORDER_STATUS_LABEL[line.status]}
+                      </Text>
                     </View>
                     {line.recipient_name?.trim() ? (
                       <Text style={styles.customerName} numberOfLines={1}>
@@ -142,23 +193,14 @@ export default function HubReceiveOrdersModal({
                     ) : null}
                     <View style={styles.codeRow}>
                       {line.express_barcode ? (
-                        <View style={styles.tagBlue}>
-                          <Text style={styles.tagBlueLabel}>快递单</Text>
-                          <Text style={styles.tagBlueValue} numberOfLines={1} selectable>
-                            {line.express_barcode}
-                          </Text>
-                        </View>
-                      ) : null}
-                      <View style={styles.tagYellow}>
-                        <Text style={styles.tagYellowLabel}>入库单</Text>
-                        <Text style={styles.tagYellowValue} numberOfLines={1} selectable>
-                          {line.order_barcode}
+                        <Text style={styles.codeMono} numberOfLines={1} selectable>
+                          {line.express_barcode}
                         </Text>
-                      </View>
+                      ) : null}
+                      <Text style={styles.codeMonoMuted} numberOfLines={1} selectable>
+                        {line.order_barcode}
+                      </Text>
                     </View>
-                    <Text style={[styles.orderStatus, isDone && styles.orderStatusDone]}>
-                      {ORDER_STATUS_LABEL[line.status]}
-                    </Text>
                   </View>
                   {canInbound ? (
                     <Pressable
@@ -167,7 +209,7 @@ export default function HubReceiveOrdersModal({
                       disabled={isConfirming || loading}
                     >
                       <Text style={styles.inboundBtnText}>
-                        {isConfirming ? '…' : '确认入库'}
+                        {isConfirming ? '…' : '入库'}
                       </Text>
                     </Pressable>
                   ) : isDone ? (
@@ -176,7 +218,7 @@ export default function HubReceiveOrdersModal({
                     </View>
                   ) : !isLocal && line.status === 'in_transit' && packReceived ? (
                     <View style={styles.transitMark}>
-                      <Text style={styles.transitMarkText}>待中转</Text>
+                      <Text style={styles.transitMarkText}>中转</Text>
                     </View>
                   ) : null}
                 </View>
@@ -184,202 +226,261 @@ export default function HubReceiveOrdersModal({
             })}
           </ScrollView>
 
-          {transitPending.length > 0 && pack.status === 'hub_received' ? (
+          <View style={styles.footerBlock}>
+            {transitPending.length > 0 && pack.status === 'hub_received' ? (
+              <Pressable
+                style={[styles.transitBtn, (releasing || loading) && styles.btnBusy]}
+                onPress={onReleaseTransit}
+                disabled={releasing || loading}
+              >
+                <Text style={styles.transitBtnText}>
+                  {releasing ? '释放中…' : `释放中转 · ${transitPending.length}`}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {canPayTransportFee ? (
+              <Pressable
+                style={[styles.payFeeBtn, (payingTransportFee || loading) && styles.btnBusy]}
+                onPress={onPayTransportFee}
+                disabled={payingTransportFee || loading}
+              >
+                <Text style={styles.payFeeBtnText}>
+                  {payingTransportFee ? '处理中…' : `支付车费 ${feeDisplay}`}
+                </Text>
+              </Pressable>
+            ) : transportFeePaid ? (
+              <View style={styles.feePaidRow}>
+                <Text style={styles.feePaidText}>车费已付</Text>
+              </View>
+            ) : null}
+
+            {loading && !confirmingOrderId && !releasing && !payingTransportFee ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color="#38bdf8" size="small" />
+              </View>
+            ) : null}
+
             <Pressable
-              style={[styles.transitBtn, (releasing || loading) && styles.btnBusy]}
-              onPress={onReleaseTransit}
-              disabled={releasing || loading}
+              style={[styles.closeBtn, !canDismiss && styles.closeBtnDisabled]}
+              onPress={handleDismiss}
+              disabled={!canDismiss}
             >
-              <Text style={styles.transitBtnText}>
-                {releasing
-                  ? '释放中…'
-                  : `释放 ${transitPending.length} 个中转订单（供重新打包）`}
+              <Text style={styles.closeBtnText}>
+                {needsFeePayment
+                  ? '请先支付车费'
+                  : packDone || transportFeePaid
+                    ? '完成'
+                    : '关闭'}
               </Text>
             </Pressable>
-          ) : null}
-
-          {loading && !confirmingOrderId && !releasing ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator color="#38bdf8" size="small" />
-            </View>
-          ) : null}
-
-          <Pressable style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeBtnText}>{packDone ? '完成' : '稍后继续'}</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
+          </View>
+        </View>
+      </View>
     </Modal>
   );
+}
+
+function needsPackConfirmEstimate(pack: PkgTrackingDetail | null): number {
+  if (!pack) return 120;
+  return pack.status === 'in_transit' ? 168 : 108;
 }
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.82)',
     justifyContent: 'center',
-    padding: 16,
+    alignItems: 'center',
+    padding: 12,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.82)',
   },
   card: {
+    width: '100%',
     backgroundColor: '#1e293b',
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#334155',
-    maxHeight: '92%',
+    zIndex: 1,
   },
-  title: { color: '#5eead4', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
-  packageNo: {
-    color: '#d8b4fe',
-    fontSize: 18,
-    fontWeight: '900',
-    fontFamily: 'monospace',
-    marginTop: 6,
+  headerBlock: {
+    flexShrink: 0,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 8,
+  footerBlock: {
+    flexShrink: 0,
+    marginTop: 2,
   },
-  statusBadge: {
-    backgroundColor: 'rgba(14,165,233,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statusBadgeText: { color: '#7dd3fc', fontSize: 11, fontWeight: '900' },
-  progress: { color: '#fbbf24', fontSize: 12, fontWeight: '800' },
-  routeMeta: { color: '#94a3b8', fontSize: 12, marginTop: 6, lineHeight: 18 },
-  hint: {
-    color: '#64748b',
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  packConfirmBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  packConfirmBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
-  list: { maxHeight: 360, marginTop: 10 },
-  listContent: { gap: 8, paddingBottom: 4 },
-  orderRow: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#0f172a',
+  },
+  title: { color: '#94a3b8', fontSize: 12, fontWeight: '800' },
+  packageNo: {
+    color: '#d8b4fe',
+    fontSize: 17,
+    fontWeight: '900',
+    fontFamily: 'monospace',
+    marginTop: 4,
+  },
+  statusBadge: {
+    backgroundColor: 'rgba(14,165,233,0.15)',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  statusBadgeText: { color: '#7dd3fc', fontSize: 10, fontWeight: '900' },
+  progress: { color: '#fbbf24', fontSize: 12, fontWeight: '800', marginLeft: 'auto' },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  routeMeta: { color: '#94a3b8', fontSize: 12, flex: 1 },
+  feeInline: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
+  feePaidChip: {
+    color: '#4ade80',
+    fontSize: 10,
+    fontWeight: '900',
+    backgroundColor: 'rgba(34,197,94,0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  packConfirmBtn: {
+    backgroundColor: '#059669',
     borderRadius: 10,
-    padding: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  packConfirmBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  orderScroll: {
+    marginTop: 6,
+  },
+  listContent: {
+    gap: 6,
+    paddingBottom: 4,
+  },
+  orderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#0f172a',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: '#334155',
   },
-  orderRowDone: { borderColor: 'rgba(34,197,94,0.4)' },
+  orderRowDone: { borderColor: 'rgba(34,197,94,0.35)' },
   orderIndex: {
     color: '#38bdf8',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    width: 18,
+    width: 16,
     textAlign: 'center',
   },
   orderBody: { flex: 1, minWidth: 0 },
-  orderTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  orderName: { color: '#f8fafc', fontSize: 14, fontWeight: '800', flexShrink: 1 },
-  customerName: { color: '#7dd3fc', fontSize: 12, fontWeight: '700', marginTop: 2 },
-  destBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  orderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexWrap: 'wrap',
+  },
+  orderName: { color: '#f8fafc', fontSize: 13, fontWeight: '800', flexShrink: 1 },
+  customerName: { color: '#7dd3fc', fontSize: 11, fontWeight: '700', marginTop: 1 },
+  destBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
   destBadgeLocal: { backgroundColor: 'rgba(34,197,94,0.15)' },
   destBadgeTransit: { backgroundColor: 'rgba(168,85,247,0.15)' },
-  destBadgeText: { fontSize: 10, fontWeight: '900' },
+  destBadgeText: { fontSize: 9, fontWeight: '900' },
   destBadgeTextLocal: { color: '#4ade80' },
   destBadgeTextTransit: { color: '#c4b5fd' },
-  codeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 6 },
-  tagBlue: {
+  codeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(56,189,248,0.1)',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(56,189,248,0.3)',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 3,
   },
-  tagBlueLabel: { color: '#38bdf8', fontSize: 10, fontWeight: '800' },
-  tagBlueValue: {
+  codeMono: {
     color: '#7dd3fc',
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '700',
     fontFamily: 'monospace',
     flexShrink: 1,
   },
-  tagYellow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(251,191,36,0.1)',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.3)',
-  },
-  tagYellowLabel: { color: '#fbbf24', fontSize: 10, fontWeight: '800' },
-  tagYellowValue: {
+  codeMonoMuted: {
     color: '#fde68a',
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '700',
     fontFamily: 'monospace',
     flexShrink: 1,
   },
-  orderStatus: { color: '#fb923c', fontSize: 11, fontWeight: '900', marginTop: 4 },
+  orderStatus: { color: '#fb923c', fontSize: 10, fontWeight: '800' },
   orderStatusDone: { color: '#4ade80' },
   inboundBtn: {
     backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    minWidth: 72,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minWidth: 52,
     alignItems: 'center',
   },
-  inboundBtnText: { color: '#fff', fontWeight: '900', fontSize: 12 },
+  inboundBtnText: { color: '#fff', fontWeight: '900', fontSize: 11 },
   doneMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: 'rgba(34,197,94,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  doneMarkText: { color: '#4ade80', fontSize: 18, fontWeight: '900' },
+  doneMarkText: { color: '#4ade80', fontSize: 16, fontWeight: '900' },
   transitMark: {
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
     backgroundColor: 'rgba(168,85,247,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(168,85,247,0.35)',
   },
-  transitMarkText: { color: '#c4b5fd', fontSize: 10, fontWeight: '900' },
+  transitMarkText: { color: '#c4b5fd', fontSize: 9, fontWeight: '900' },
   transitBtn: {
     backgroundColor: '#7c3aed',
-    borderRadius: 12,
-    paddingVertical: 13,
+    borderRadius: 10,
+    paddingVertical: 11,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
   },
   transitBtnText: { color: '#fff', fontWeight: '900', fontSize: 13 },
-  loadingRow: { alignItems: 'center', paddingVertical: 8 },
-  btnBusy: { opacity: 0.6 },
-  closeBtn: {
-    marginTop: 12,
-    backgroundColor: '#334155',
-    borderRadius: 12,
-    paddingVertical: 13,
+  feePaidRow: {
+    marginTop: 8,
     alignItems: 'center',
   },
-  closeBtnText: { color: '#e2e8f0', fontWeight: '800', fontSize: 15 },
+  feePaidText: { color: '#4ade80', fontSize: 12, fontWeight: '800' },
+  payFeeBtn: {
+    backgroundColor: '#d97706',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  payFeeBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  loadingRow: { alignItems: 'center', paddingVertical: 6 },
+  btnBusy: { opacity: 0.6 },
+  closeBtn: {
+    marginTop: 8,
+    backgroundColor: '#334155',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  closeBtnDisabled: {
+    opacity: 0.45,
+  },
+  closeBtnText: { color: '#e2e8f0', fontWeight: '800', fontSize: 14 },
 });

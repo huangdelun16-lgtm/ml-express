@@ -10,6 +10,7 @@ import { getSupabaseConfigHint, isSupabaseConfigured, supabase } from './supabas
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { toNullableUuid } from '../utils/uuid';
 
 type OriginStore = {
   id: string;
@@ -213,6 +214,30 @@ export function formatPkgNotFoundHint(packBarcode: string, hubCode: string): str
   return lines.join('\n');
 }
 
+/** 到站扫码入库单/快递单查不到时的说明 */
+export function formatOrderNotFoundHint(scanCode: string, hubCode: string): string {
+  const dest = extractDestinationCode(scanCode);
+  const hub = hubCode.trim().toUpperCase();
+  const lines = [
+    '云端未找到该订单追踪记录。',
+    '',
+    '您扫描的可能是入库单或快递单，而非快递包 PKG 号。',
+    '',
+    '建议操作：',
+    '1. 优先扫描快递包条码（PKG 开头）',
+    '2. 或确认发站已装车出库并「已同步云端」',
+    '3. 发站与本站 Supabase 配置一致',
+  ];
+  if (dest && hub && dest !== hub) {
+    lines.push(
+      '',
+      `条码前缀 ${dest} 表示订单最终目的地，本站为 ${hub}。若为本站中转，请先扫所属 PKG 确认到站。`,
+    );
+  }
+  lines.push('', '也可在弹窗订单列表中手动点「确认入库」或「释放中转」。');
+  return lines.join('\n');
+}
+
 export type OrderInboundSnapshot = {
   recipient_name: string;
   recipient_phone: string;
@@ -253,7 +278,7 @@ export async function pushTruckLoadTracking(params: {
         {
           pack_barcode: pack.bundle_barcode,
           pack_name: pack.bundle_name,
-          origin_store_id: params.originStore.id,
+          origin_store_id: toNullableUuid(params.originStore.id),
           origin_store_code: params.originStore.storeCode,
           origin_store_name: params.originStore.storeName,
           destination_code: packLabelDest,

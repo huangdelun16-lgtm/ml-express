@@ -31,6 +31,10 @@ export interface InventoryItem {
   packed_at?: string;
   /** 所属快递包包装号 */
   packed_bundle_barcode?: string;
+  /** 中转站释放待转出时间（本站重新打包发往下一站） */
+  hub_transit_released_at?: string;
+  /** 中转站装车发往下一站时间（与发站打包出库后展示一致） */
+  hub_transit_shipped_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +44,8 @@ export interface InventoryItemListRow extends InventoryItem {
   stocked_in: boolean;
   packed: boolean;
   hub_arrived: boolean;
+  hub_transit_released: boolean;
+  hub_transit_shipped: boolean;
   customer_signed: boolean;
   /** 所属快递包包装号（已打包时由列表查询填充） */
   parent_pack_barcode?: string;
@@ -97,6 +103,8 @@ export interface PackedShipmentItem {
   destination: string;
   /** 收件人 / 客户姓名（来自入库流水） */
   customer_name: string;
+  /** 订单入库登记站店铺代码 */
+  owner_store_code?: string;
   qty: number;
 }
 

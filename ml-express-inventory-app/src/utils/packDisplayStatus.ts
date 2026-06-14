@@ -10,11 +10,49 @@ export const PACK_DISPLAY_LABEL: Record<PackDisplayStatus, string> = {
   completed: '已完成',
 };
 
+const CLOUD_LOCKED_STATUSES: PkgTrackingStatus[] = [
+  'in_transit',
+  'hub_received',
+  'completed',
+  'split_at_hub',
+];
+
+/** 云端追踪已进入运输/到站流程，发站不可再改包 */
+export function isPackedShipmentCloudLocked(
+  cloudStatus: PkgTrackingStatus | null | undefined,
+): boolean {
+  if (!cloudStatus) return false;
+  return CLOUD_LOCKED_STATUSES.includes(cloudStatus);
+}
+
+/** 是否允许编辑快递包（未装车且云端未锁定） */
+export function canEditPackedShipment(pack: {
+  loaded: boolean;
+  cloud_status?: PkgTrackingStatus | null;
+}): boolean {
+  return canSelectPackedShipmentForTruckLoad(pack);
+}
+
+/** 是否可加入「装车出库」候选（未装车且云端未进入在途/到站流程） */
+export function canSelectPackedShipmentForTruckLoad(pack: {
+  loaded: boolean;
+  cloud_status?: PkgTrackingStatus | null;
+}): boolean {
+  if (pack.loaded) return false;
+  if (isPackedShipmentCloudLocked(pack.cloud_status)) return false;
+  return true;
+}
+
 export function resolvePackDisplayStatus(
   pack: PackedShipmentDetail,
   cloudStatus: PkgTrackingStatus | null | undefined,
 ): PackDisplayStatus {
-  if (cloudStatus === 'completed' && pack.loaded) return 'completed';
+  const legDoneAtHub =
+    cloudStatus === 'hub_received' ||
+    cloudStatus === 'split_at_hub' ||
+    cloudStatus === 'completed';
+
+  if (legDoneAtHub && pack.loaded) return 'completed';
   if (cloudStatus === 'completed' && !pack.loaded) return 'arrived';
   if (cloudStatus === 'split_at_hub') return 'arrived';
   if (cloudStatus === 'hub_received') return 'arrived';

@@ -16,6 +16,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { updatePackedShipment } from '../services/inventoryService';
 import type { PackedShipmentListRow } from '../types/inventory';
+import {
+  isPackContentLockedForStore,
+  packContentLockHint,
+} from '../utils/storeOwnership';
 
 type Props = {
   visible: boolean;
@@ -40,6 +44,17 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
       note: pack.note,
     });
   }, [visible, pack?.id]);
+
+  const packItems = pack?.items ?? [];
+  const packItemRefs = packItems.map((item) => ({
+    owner_store_code: item.owner_store_code,
+    barcode: item.item_barcode,
+    destination: item.destination,
+  }));
+  const contentLocked =
+    !!store && packItemRefs.length > 0 && isPackContentLockedForStore(store, packItemRefs);
+  const contentLockHint =
+    store && contentLocked ? packContentLockHint(store, packItemRefs) : undefined;
 
   const save = async () => {
     if (!pack) return;
@@ -92,6 +107,10 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
             barcodeEditable={false}
             unitLocked
             unitHint="件数与打包时一致，不可修改"
+            specLocked={contentLocked}
+            weightLocked={contentLocked}
+            specHint={contentLockHint}
+            weightHint={contentLockHint}
             showPreview
           />
         </ScrollView>

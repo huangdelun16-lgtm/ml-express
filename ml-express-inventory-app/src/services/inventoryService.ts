@@ -15,7 +15,7 @@ import { normalizePackDestination } from '../constants/destinationOptions';
 import { parseInboundMovementNote } from '../utils/inboundMovementNote';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
 import { formatInboundDateLabel } from '../utils/stockInDate';
-import { resolvePackDisplayStatus } from '../utils/packDisplayStatus';
+import { resolvePackDisplayStatus, canEditPackedShipment, canSelectPackedShipmentForTruckLoad } from '../utils/packDisplayStatus';
 import { todayIsoDate } from '../utils/dateFormat';
 import { buildPackageNumberBody, formatPackageSequence } from '../utils/packageNumber';
 import { customerSignDeniedMessage, canMarkCustomerSigned } from '../utils/customerSign';
@@ -23,6 +23,7 @@ import {
   canEditOwnedRecord,
   editDeniedMessage,
   inferOwnerKeyFromItem,
+  isPackContentLockedForStore,
   normalizeOwnerKey,
   ownershipKeyFromStoreCode,
 } from '../utils/storeOwnership';
@@ -95,6 +96,7 @@ const STOCKED_IN_SUBQUERY = `(
   WHERE m.item_id = i.id AND m.type = 'in'
 )`;
 const PACKED_SUBQUERY = `CASE
+  WHEN TRIM(COALESCE(i.hub_transit_released_at, '')) != '' THEN 0
   WHEN TRIM(COALESCE(i.packed_at, '')) != '' THEN 1
   WHEN (SELECT COUNT(*) FROM packed_shipment_items psi WHERE psi.item_id = i.id) > 0 THEN 1
   ELSE 0
@@ -107,8 +109,10 @@ const PARENT_PACK_BARCODE_SUBQUERY = `COALESCE(
    ORDER BY p.created_at DESC LIMIT 1)
 )`;
 const HUB_ARRIVED_SUBQUERY = `CASE WHEN TRIM(COALESCE(i.hub_arrived_at, '')) != '' THEN 1 ELSE 0 END`;
+const HUB_TRANSIT_RELEASED_SUBQUERY = `CASE WHEN TRIM(COALESCE(i.hub_transit_released_at, '')) != '' THEN 1 ELSE 0 END`;
+const HUB_TRANSIT_SHIPPED_SUBQUERY = `CASE WHEN TRIM(COALESCE(i.hub_transit_shipped_at, '')) != '' THEN 1 ELSE 0 END`;
 const CUSTOMER_SIGNED_SUBQUERY = `CASE WHEN TRIM(COALESCE(i.customer_signed_at, '')) != '' THEN 1 ELSE 0 END`;
-const ITEM_LIST_SELECT = `i.*, ${CUSTOMER_NAME_SELECT}, ${DESTINATION_SELECT}, ${STOCKED_IN_SUBQUERY} AS stocked_in, ${PACKED_SUBQUERY} AS packed, ${HUB_ARRIVED_SUBQUERY} AS hub_arrived, ${CUSTOMER_SIGNED_SUBQUERY} AS customer_signed, ${PARENT_PACK_BARCODE_SUBQUERY} AS parent_pack_barcode`;
+const ITEM_LIST_SELECT = `i.*, ${CUSTOMER_NAME_SELECT}, ${DESTINATION_SELECT}, ${STOCKED_IN_SUBQUERY} AS stocked_in, ${PACKED_SUBQUERY} AS packed, ${HUB_ARRIVED_SUBQUERY} AS hub_arrived, ${HUB_TRANSIT_RELEASED_SUBQUERY} AS hub_transit_released, ${HUB_TRANSIT_SHIPPED_SUBQUERY} AS hub_transit_shipped, ${CUSTOMER_SIGNED_SUBQUERY} AS customer_signed, ${PARENT_PACK_BARCODE_SUBQUERY} AS parent_pack_barcode`;
 const NOT_EXPRESS_PACK_CLAUSE = `UPPER(i.barcode) NOT LIKE 'PKG%'`;
 
 function persistFinalDestinationCode(raw: string): string {
@@ -123,6 +127,8 @@ function rowToListItem(row: Record<string, unknown>): InventoryItemListRow {
     stocked_in: Boolean(Number(row.stocked_in)),
     packed: Boolean(Number(row.packed)),
     hub_arrived: Boolean(Number(row.hub_arrived)),
+    hub_transit_released: Boolean(Number(row.hub_transit_released)),
+    hub_transit_shipped: Boolean(Number(row.hub_transit_shipped)),
     customer_signed: Boolean(Number(row.customer_signed)),
     parent_pack_barcode: String(row.parent_pack_barcode ?? ''),
   };
@@ -150,6 +156,8 @@ function rowToItem(row: Record<string, unknown>): InventoryItem {
     customer_signed_at: String(row.customer_signed_at ?? ''),
     packed_at: String(row.packed_at ?? ''),
     packed_bundle_barcode: String(row.packed_bundle_barcode ?? ''),
+    hub_transit_released_at: String(row.hub_transit_released_at ?? ''),
+    hub_transit_shipped_at: String(row.hub_transit_shipped_at ?? ''),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -174,7 +182,9 @@ export async function getItemInboundSnapshot(itemId: string): Promise<ItemInboun
   const lastIn = await db.getFirstAsync<Record<string, unknown>>(
     `SELECT recipient_name, recipient_phone, packaging, detail_address, note, origin_store_name, created_at
      FROM stock_movements
-     WHERE item_id = ? AND type = 'in' ORDER BY created_at DESC LIMIT 1`,
+     WHERE item_id = ? AND type = 'in'
+     ORDER BY ${INBOUND_MOVEMENT_RICHNESS_SQL}, created_at ASC
+     LIMIT 1`,
     [itemId],
   );
   return {
@@ -359,7 +369,7 @@ async function upsertInboundSnapshotFromHubOrder(params: {
      ORDER BY ${INBOUND_MOVEMENT_RICHNESS_SQL}, created_at DESC LIMIT 1`,
     [params.item.id],
   );
-  if (richIn?.id) {
+  if (richIn?.id && snapshot.note) {
     await db.runAsync(
       `UPDATE stock_movements SET note = ?, created_at = ? WHERE id = ?`,
       [snapshot.note, inboundAt, richIn.id],
@@ -382,6 +392,87 @@ async function getBestInboundMovement(
       [itemId],
     )) ?? null
   );
+}
+
+/** 订单详情用：优先取含总费用的发站入库流水（中转站本地流水不含费用） */
+async function getInvoiceInboundMovement(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  itemId: string,
+): Promise<Record<string, unknown> | null> {
+  const feeRow = await db.getFirstAsync<Record<string, unknown>>(
+    `SELECT qty, note, created_at, origin_store_name, recipient_name, recipient_phone,
+            detail_address, packaging
+     FROM stock_movements
+     WHERE item_id = ? AND type = 'in' AND TRIM(note) LIKE '%总费用%'
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    [itemId],
+  );
+  if (feeRow) return feeRow;
+  return await getBestInboundMovement(db, itemId);
+}
+
+function isInboundInvoiceIncomplete(
+  parsedNote: ReturnType<typeof parseInboundMovementNote>,
+): boolean {
+  return !parsedNote.totalFee?.trim() || !parsedNote.paymentLabel?.trim();
+}
+
+/** 从云端订单追踪补全发站入库 Invoice（总费用/付款方式等） */
+async function refreshInboundInvoiceFromCloudOrder(
+  item: InventoryItem,
+  operator = '系统同步',
+): Promise<boolean> {
+  const { getOrderTrackingByBarcode } = await import('./trackingService');
+  const { isSupabaseConfigured } = await import('./supabase');
+  if (!isSupabaseConfigured()) return false;
+
+  const order = await getOrderTrackingByBarcode(item.barcode);
+  if (!order?.inbound_note?.trim()) return false;
+
+  const parsed = parseInboundMovementNote(order.inbound_note);
+  if (isInboundInvoiceIncomplete(parsed)) return false;
+
+  const db = await getDatabase();
+  const hasFeeMovement = await db.getFirstAsync<{ c: number }>(
+    `SELECT COUNT(*) AS c FROM stock_movements
+     WHERE item_id = ? AND type = 'in' AND TRIM(note) LIKE '%总费用%'`,
+    [item.id],
+  );
+  if (Number(hasFeeMovement?.c) > 0) return false;
+
+  const inboundAt = order.inbound_at?.trim() || item.created_at?.trim() || nowIso();
+  const originStore: OriginStoreRef = {
+    id: '',
+    storeCode: item.owner_store_code?.trim() || '',
+    storeName: order.inbound_store_name?.trim() || item.owner_store_code?.trim() || '',
+  };
+
+  await insertInboundMovementSnapshot({
+    item,
+    qty: Math.max(1, order.qty || 1),
+    operator,
+    note: order.inbound_note.trim(),
+    recipientName: order.recipient_name?.trim() || item.recipient_name?.trim() || '',
+    recipientPhone: order.recipient_phone?.trim() || '',
+    destination: order.destination_code?.trim() || item.final_destination?.trim() || '',
+    detailAddress: order.detail_address?.trim() || '',
+    packaging: order.packaging?.trim() || '',
+    inputBarcode: order.express_barcode?.trim() || item.input_barcode?.trim() || '',
+    originStore,
+    inboundAt,
+    increaseQty: false,
+  });
+
+  if (order.recipient_name?.trim()) {
+    await db.runAsync('UPDATE inventory_items SET recipient_name = ?, updated_at = ? WHERE id = ?', [
+      order.recipient_name.trim(),
+      inboundAt,
+      item.id,
+    ]);
+  }
+
+  return true;
 }
 
 async function getFirstInboundMovementAt(
@@ -629,6 +720,24 @@ export async function assertCanEditPackById(
   assertCanEditItem(actingStore, owner);
 }
 
+async function assertPackedShipmentEditable(packId: string): Promise<void> {
+  const pack = await getPackedShipmentById(packId);
+  if (!pack) throw new Error('包裹不存在');
+
+  let cloudStatus: import('../types/tracking').PkgTrackingStatus | null = null;
+  try {
+    const { listPkgTrackingStatusMap } = await import('./trackingService');
+    const statusMap = await listPkgTrackingStatusMap([pack.bundle_barcode]);
+    cloudStatus = statusMap[pack.bundle_barcode.trim().toUpperCase()] ?? null;
+  } catch {
+    // 离线时仅按本地装车状态判断
+  }
+
+  if (!canEditPackedShipment({ loaded: pack.loaded, cloud_status: cloudStatus })) {
+    throw new Error('该快递包已装车出库或目的地站点已确认到站，不可再修改');
+  }
+}
+
 async function queryItemListRows(search?: string): Promise<Record<string, unknown>[]> {
   const db = await getDatabase();
   const q = search?.trim();
@@ -653,14 +762,20 @@ async function queryItemListRows(search?: string): Promise<Record<string, unknow
       );
 }
 
-export async function listItems(search?: string): Promise<InventoryItemListRow[]> {
+export async function listItems(
+  search?: string,
+  scope?: { store: InventoryStoreSession; hubCode: string },
+): Promise<InventoryItemListRow[]> {
   try {
     await syncMissingCustomerNamesFromCloud('系统同步');
   } catch {
     // 离线时仍展示本地列表
   }
   const rows = await queryItemListRows(search);
-  return rows.map(rowToListItem);
+  const items = rows.map(rowToListItem);
+  if (!scope) return items;
+  const { isVisibleInExpressDetailsList } = await import('../utils/expressDetailsVisibility');
+  return items.filter((item) => isVisibleInExpressDetailsList(item, scope.store, scope.hubCode));
 }
 
 export async function getItemById(id: string): Promise<InventoryItem | null> {
@@ -935,7 +1050,10 @@ export async function applyStockMovement(params: {
 }
 
 /** 曾入库且仍有库存的商品，可用于打包快递 */
-export async function listPackableItems(search?: string): Promise<InventoryItemListRow[]> {
+export async function listPackableItems(
+  search?: string,
+  scope?: { store: InventoryStoreSession; hubCode: string },
+): Promise<InventoryItemListRow[]> {
   const db = await getDatabase();
   const q = search?.trim();
   const rows = q
@@ -956,7 +1074,14 @@ export async function listPackableItems(search?: string): Promise<InventoryItemL
            AND ${NOT_EXPRESS_PACK_CLAUSE}
          ORDER BY i.updated_at DESC`,
       );
-  return rows.map(rowToListItem);
+  const items = rows.map(rowToListItem);
+  if (!scope) return items;
+  const { isVisibleInExpressDetailsList } = await import('../utils/expressDetailsVisibility');
+  return items.filter((item) => {
+    if (!isVisibleInExpressDetailsList(item, scope.store, scope.hubCode)) return false;
+    if (item.packed && !item.hub_transit_released) return false;
+    return true;
+  });
 }
 
 export async function createPackedShipment(params: {
@@ -986,6 +1111,17 @@ export async function createPackedShipment(params: {
       [id],
     );
     if (!hasIn?.c) throw new Error(`${item.name} 未入库，无法打包`);
+    const inInboundPack = await db.getFirstAsync<{ bundle_barcode: string }>(
+      `SELECT p.bundle_barcode FROM packed_shipment_items psi
+       INNER JOIN packed_shipments p ON p.id = psi.pack_id
+       WHERE psi.item_id = ?`,
+      [id],
+    );
+    if (inInboundPack?.bundle_barcode) {
+      throw new Error(
+        `${item.name} 仍在 inbound 包裹 ${inInboundPack.bundle_barcode} 中，请先「释放中转」`,
+      );
+    }
     picked.push(item);
   }
 
@@ -1053,7 +1189,7 @@ export async function createPackedShipment(params: {
       actingStore: cloudStore ?? undefined,
     });
     await db.runAsync(
-      `UPDATE inventory_items SET packed_at = ?, packed_bundle_barcode = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE inventory_items SET packed_at = ?, packed_bundle_barcode = ?, hub_transit_released_at = '', updated_at = ? WHERE id = ?`,
       [ts, bundleItem.barcode, ts, item.id],
     );
   }
@@ -1169,6 +1305,7 @@ function rowToPackedShipmentItem(row: Record<string, unknown>): PackedShipmentIt
     item_name: String(row.item_name),
     destination: String(row.item_destination ?? ''),
     customer_name: String(row.item_customer_name ?? ''),
+    owner_store_code: String(row.item_owner_store_code ?? ''),
     qty: Number(row.qty) || 0,
   };
 }
@@ -1197,6 +1334,7 @@ async function fetchPackedShipmentItems(
        i.name AS item_name,
        COALESCE(NULLIF(TRIM(i.final_destination), ''), '') AS item_destination,
        COALESCE(NULLIF(TRIM(i.recipient_name), ''), '') AS item_customer_name,
+       COALESCE(NULLIF(TRIM(i.owner_store_code), ''), '') AS item_owner_store_code,
        1 AS qty
      FROM inventory_items i
      WHERE UPPER(TRIM(i.packed_bundle_barcode)) = UPPER(TRIM(?))
@@ -1213,6 +1351,7 @@ async function fetchPackedShipmentItems(
     item_name: String(row.item_name),
     destination: String(row.item_destination ?? ''),
     customer_name: String(row.item_customer_name ?? ''),
+    owner_store_code: String(row.item_owner_store_code ?? ''),
     qty: Number(row.qty) || 1,
   }));
 }
@@ -1231,7 +1370,7 @@ const PACKED_ITEM_CUSTOMER_SUBQUERY = `COALESCE(
   )), ''),
   ''
 )`;
-const PACKED_ITEM_SELECT = `psi.*, ii.input_barcode AS item_input_barcode, ${PACKED_ITEM_DESTINATION_SUBQUERY} AS item_destination, ${PACKED_ITEM_CUSTOMER_SUBQUERY} AS item_customer_name`;
+const PACKED_ITEM_SELECT = `psi.*, ii.input_barcode AS item_input_barcode, ii.owner_store_code AS item_owner_store_code, ${PACKED_ITEM_DESTINATION_SUBQUERY} AS item_destination, ${PACKED_ITEM_CUSTOMER_SUBQUERY} AS item_customer_name`;
 const PACKED_SHIPMENT_SELECT = `p.*, i.spec, i.unit, i.weight, i.qty_on_hand`;
 
 async function enrichPackLoadMeta(
@@ -1277,7 +1416,10 @@ function mapPackDetailFromRow(
   };
 }
 
-export async function listPackedShipments(search?: string): Promise<PackedShipmentDetail[]> {
+export async function listPackedShipments(
+  search?: string,
+  scope?: { store: InventoryStoreSession; hubCode: string },
+): Promise<PackedShipmentDetail[]> {
   const db = await getDatabase();
   const q = search?.trim();
   const rows = q
@@ -1304,12 +1446,17 @@ export async function listPackedShipments(search?: string): Promise<PackedShipme
     const detail = mapPackDetailFromRow(row, items);
     result.push(await enrichPackLoadMeta(detail, db));
   }
-  return result;
+  if (!scope) return result;
+  const { isVisibleInPackedList } = await import('../utils/expressDetailsVisibility');
+  return result.filter((pack) => isVisibleInPackedList(pack, scope.store, scope.hubCode));
 }
 
 /** 打包列表（合并云端在途状态） */
-export async function listPackedShipmentRows(search?: string): Promise<PackedShipmentListRow[]> {
-  const list = await listPackedShipments(search);
+export async function listPackedShipmentRows(
+  search?: string,
+  scope?: { store: InventoryStoreSession; hubCode: string },
+): Promise<PackedShipmentListRow[]> {
+  const list = await listPackedShipments(search, scope);
   const { listPkgTrackingStatusMap } = await import('./trackingService');
   let statusMap: Record<string, import('../types/tracking').PkgTrackingStatus> = {};
   try {
@@ -1339,14 +1486,33 @@ export async function updatePackedShipment(
   if (actingStore) {
     await assertCanEditPackById(actingStore, packId);
   }
+  await assertPackedShipmentEditable(packId);
 
-  const row = await db.getFirstAsync<{ bundle_item_id: string }>(
-    'SELECT bundle_item_id FROM packed_shipments WHERE id = ?',
+  const row = await db.getFirstAsync<{ bundle_item_id: string; bundle_barcode: string }>(
+    'SELECT bundle_item_id, bundle_barcode FROM packed_shipments WHERE id = ?',
     [packId],
   );
   if (!row) throw new Error('包裹不存在');
 
   await db.runAsync('UPDATE packed_shipments SET bundle_name = ? WHERE id = ?', [name, packId]);
+
+  const packItems = await fetchPackedShipmentItems(db, packId, row.bundle_barcode);
+  const contentLocked =
+    actingStore &&
+    isPackContentLockedForStore(
+      actingStore,
+      packItems.map((item) => ({
+        owner_store_code: item.owner_store_code,
+        barcode: item.item_barcode,
+        destination: item.destination,
+      })),
+    );
+
+  if (contentLocked) {
+    await db.runAsync('UPDATE inventory_items SET name = ? WHERE id = ?', [name, row.bundle_item_id]);
+    return;
+  }
+
   await db.runAsync(
     'UPDATE inventory_items SET name = ?, spec = ?, unit = ?, weight = ? WHERE id = ?',
     [name, params.spec, params.unit, params.weight, row.bundle_item_id],
@@ -1366,6 +1532,29 @@ export async function applyTruckLoadOutbound(params: {
   actingStore?: InventoryStoreSession;
 }): Promise<{ count: number; cloudSynced: boolean; cloudError?: string }> {
   if (params.packs.length === 0) throw new Error('请至少选择一个包装号');
+
+  const { listPkgTrackingStatusMap } = await import('./trackingService');
+  let cloudStatusMap: Record<string, import('../types/tracking').PkgTrackingStatus> = {};
+  try {
+    cloudStatusMap = await listPkgTrackingStatusMap(params.packs.map((p) => p.bundle_barcode));
+  } catch {
+    // 离线时仅按本地装车状态校验
+  }
+
+  for (const pack of params.packs) {
+    const cloud = cloudStatusMap[pack.bundle_barcode.trim().toUpperCase()] ?? null;
+    if (!canSelectPackedShipmentForTruckLoad({ loaded: pack.loaded, cloud_status: cloud })) {
+      const label =
+        cloud === 'hub_received' || cloud === 'completed' || cloud === 'split_at_hub'
+          ? '目的地站点已确认到站'
+          : cloud === 'in_transit'
+            ? '已在运输途中'
+            : pack.loaded
+              ? '已装车出库'
+              : '不可重复装车';
+      throw new Error(`${pack.bundle_barcode} ${label}，无法再次装车出库`);
+    }
+  }
 
   const barcodes = params.packs.map((p) => p.bundle_barcode);
   const fee = params.transportFee?.trim() ?? '';
@@ -1398,6 +1587,16 @@ export async function applyTruckLoadOutbound(params: {
     await db.runAsync(
       `UPDATE packed_shipments SET transport_fee = ?, truck_leg_destination = ? WHERE bundle_barcode = ?`,
       [fee, legDest, pack.bundle_barcode],
+    );
+  }
+
+  const loadTs = nowIso();
+  if (params.actingStore) {
+    const { resolveStoreHubCode } = await import('../utils/storeZone');
+    await markHubTransitOrdersShippedAfterLoad(
+      params.packs,
+      resolveStoreHubCode(params.actingStore),
+      loadTs,
     );
   }
 
@@ -1438,10 +1637,22 @@ export async function applyTruckLoadOutbound(params: {
   return { count: params.packs.length, cloudSynced, cloudError };
 }
 
-/** 可出库的 PKG 包裹（包装商品仍有库存） */
-export async function listOutboundPackages(): Promise<PackedShipmentDetail[]> {
-  const all = await listPackedShipments();
-  return all.filter((pack) => !pack.loaded);
+/** 可出库的 PKG 包裹（未装车且云端未进入在途/到站） */
+export async function listOutboundPackages(
+  scope?: { store: InventoryStoreSession; hubCode: string },
+): Promise<PackedShipmentDetail[]> {
+  const all = await listPackedShipments(undefined, scope);
+  const { listPkgTrackingStatusMap } = await import('./trackingService');
+  let statusMap: Record<string, import('../types/tracking').PkgTrackingStatus> = {};
+  try {
+    statusMap = await listPkgTrackingStatusMap(all.map((p) => p.bundle_barcode));
+  } catch {
+    // 离线时仅按本地 loaded 过滤
+  }
+  return all.filter((pack) => {
+    const cloud = statusMap[pack.bundle_barcode.trim().toUpperCase()] ?? null;
+    return canSelectPackedShipmentForTruckLoad({ loaded: pack.loaded, cloud_status: cloud });
+  });
 }
 
 async function packedShipmentRowToDetail(
@@ -1484,6 +1695,123 @@ export async function getPackedShipmentByBarcode(
   );
   if (!row) return null;
   return packedShipmentRowToDetail(row, db);
+}
+
+export async function getPackedShipmentById(packId: string): Promise<PackedShipmentDetail | null> {
+  const id = packId.trim();
+  if (!id) return null;
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<Record<string, unknown>>(
+    `SELECT ${PACKED_SHIPMENT_SELECT}
+     FROM packed_shipments p
+     LEFT JOIN inventory_items i ON i.id = p.bundle_item_id
+     WHERE p.id = ?`,
+    [id],
+  );
+  if (!row) return null;
+  return packedShipmentRowToDetail(row, db);
+}
+
+/** 取消打包 / 拆包：退回内含订单库存，删除快递包（仅未装车出库） */
+export async function cancelPackedShipment(
+  packId: string,
+  operator: string,
+  actingStore?: InventoryStoreSession,
+): Promise<{ restoredCount: number }> {
+  const pack = await getPackedShipmentById(packId);
+  if (!pack) throw new Error('快递包不存在');
+
+  if (pack.loaded || pack.bundle_qty_on_hand <= 0) {
+    throw new Error('已装车出库的快递包不能拆包');
+  }
+
+  const { listPkgTrackingStatusMap } = await import('./trackingService');
+  try {
+    const statusMap = await listPkgTrackingStatusMap([pack.bundle_barcode]);
+    const cloud = statusMap[pack.bundle_barcode.trim().toUpperCase()];
+    if (
+      cloud === 'in_transit' ||
+      cloud === 'hub_received' ||
+      cloud === 'completed' ||
+      cloud === 'split_at_hub'
+    ) {
+      throw new Error('该快递包已在运输中或已到站，无法拆包');
+    }
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes('无法拆包')) throw e;
+  }
+
+  if (actingStore) {
+    await assertCanEditPackById(actingStore, packId);
+  }
+
+  const db = await getDatabase();
+  const ts = nowIso();
+  const originStore: OriginStoreRef = {
+    id: actingStore?.id?.trim() || '',
+    storeCode: pack.owner_store_code?.trim() || actingStore?.storeCode?.trim() || '',
+    storeName: actingStore?.storeName?.trim() || '',
+  };
+
+  let restoredCount = 0;
+  for (const line of pack.items) {
+    const inner = await getItemById(line.item_id);
+    if (!inner) continue;
+    const qty = Math.max(1, line.qty || 1);
+    const wasPacked =
+      Boolean(inner.packed_at?.trim()) ||
+      Boolean(inner.packed_bundle_barcode?.trim()) ||
+      inner.qty_on_hand < qty;
+
+    if (wasPacked) {
+      await applyStockMovement({
+        barcode: inner.barcode,
+        type: 'in',
+        qty,
+        operator,
+        note: `拆包退回 ${pack.bundle_barcode}`,
+        originStore,
+        actingStore: actingStore ?? undefined,
+        syncToCloud: false,
+      });
+      restoredCount += 1;
+    }
+
+    await db.runAsync(
+      `UPDATE inventory_items
+       SET packed_at = '', packed_bundle_barcode = '', hub_transit_shipped_at = '', updated_at = ?
+       WHERE id = ?`,
+      [ts, inner.id],
+    );
+
+    if (actingStore) {
+      scheduleCloudSync({
+        type: 'item_and_movement',
+        store: actingStore,
+        itemId: inner.id,
+      });
+    }
+  }
+
+  await db.runAsync('DELETE FROM packed_shipment_items WHERE pack_id = ?', [pack.id]);
+  await db.runAsync('DELETE FROM packed_shipments WHERE id = ?', [pack.id]);
+
+  const bundleItem = await getItemById(pack.bundle_item_id);
+  if (bundleItem) {
+    await db.runAsync('DELETE FROM stock_movements WHERE item_id = ?', [bundleItem.id]);
+    await db.runAsync('DELETE FROM inventory_items WHERE id = ?', [bundleItem.id]);
+  }
+
+  try {
+    const { deleteCloudPackedShipment } = await import('./inventoryCloudApi');
+    await deleteCloudPackedShipment(pack.bundle_barcode);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '云端拆包失败';
+    if (msg.includes('无法拆包')) throw e;
+    // 离线或未同步云端时仍完成本地拆包
+  }
+
+  return { restoredCount };
 }
 
 /** 已装车但未同步云端时，从本地出库记录补传追踪与平台包裹数据 */
@@ -1620,116 +1948,222 @@ export async function deliverLocalHubOrderToInventory(params: {
   }
 }
 
-/** 到站全部订单确认后，将云端快递包写入本地区域账号（供打包 / 装车出库继续中转） */
-export async function importHubReceivedPackToLocal(
+/** 中转站确认快递包到站：为非本站目的地订单登记本站库存（待释放后重新打包） */
+export async function deliverTransitOrderAtHubStation(params: {
+  order: OrderTrackingRecord;
+  pkg: PkgTrackingDetail;
+  store: InventoryStoreSession;
+  hubCode: string;
+  operator: string;
+}): Promise<void> {
+  const { resolveOrderDestinationCode } = await import('../utils/orderDestination');
+  const hub = params.hubCode.trim().toUpperCase();
+  const orderDest = resolveOrderDestinationCode(params.order);
+  if (!orderDest || orderDest === hub) return;
+  if (params.order.status === 'released_at_hub' || params.order.status === 'hub_received') return;
+
+  const hubStationAt =
+    params.pkg.hub_received_at?.trim() ||
+    params.order.hub_received_at?.trim() ||
+    nowIso();
+  const cloudStore = params.store;
+  const originStore: OriginStoreRef = {
+    id: params.pkg.origin_store_id?.trim() || params.store.id,
+    storeCode: params.pkg.origin_store_code?.trim() || params.store.storeCode,
+    storeName: params.pkg.origin_store_name?.trim() || params.store.storeName,
+  };
+
+  let item = await getItemByBarcode(params.order.order_barcode);
+  if (!item) {
+    const orderName = params.order.order_name?.trim() || params.order.order_barcode;
+    item = await upsertItem(
+      {
+        barcode: params.order.order_barcode,
+        name: orderName,
+        spec: params.order.spec?.trim() || '',
+        unit: `${params.order.qty || 1} Pcs`,
+        weight: params.order.weight?.trim() || '',
+        min_qty: 0,
+        note: `中转站到站 · 包 ${params.pkg.pack_barcode}`,
+        input_barcode: params.order.express_barcode?.trim() || '',
+        qty_on_hand: 0,
+      },
+      {
+        internal: true,
+        ownerStoreCode: params.pkg.origin_store_code?.trim() || params.store.storeCode,
+      },
+    );
+  }
+
+  const db = await getDatabase();
+  const childDest = persistFinalDestinationCode(params.order.destination_code || orderDest);
+  const recipientName = params.order.recipient_name?.trim() || '';
+  await db.runAsync(
+    `UPDATE inventory_items
+     SET updated_at = ?${
+       recipientName ? ', recipient_name = ?' : ''
+     }${childDest ? ', final_destination = ?' : ''} WHERE id = ?`,
+    recipientName
+      ? childDest
+        ? [hubStationAt, recipientName, childDest, item.id]
+        : [hubStationAt, recipientName, item.id]
+      : childDest
+        ? [hubStationAt, childDest, item.id]
+        : [hubStationAt, item.id],
+  );
+
+  item = (await getItemById(item.id))!;
+  if (item.qty_on_hand < 1) {
+    await applyStockMovement({
+      barcode: item.barcode,
+      type: 'in',
+      qty: Math.max(1, params.order.qty || 1),
+      operator: params.operator,
+      note: `中转站到站收货 · 包 ${params.pkg.pack_barcode}`,
+      destination: orderDest,
+      originStore,
+      inboundAt: hubStationAt,
+      actingStore: cloudStore,
+    });
+  } else if (cloudStore) {
+    scheduleCloudSync({
+      type: 'item_and_movement',
+      store: cloudStore,
+      itemId: item.id,
+    });
+  }
+}
+
+/** 到站收货后写入本地打包列表（含本站+中转混合包；确认到站即可见，不必等全部订单入库） */
+export async function importInboundPackToLocal(
   detail: PkgTrackingDetail,
   store: InventoryStoreSession,
   operator: string,
 ): Promise<boolean> {
-  if (!detail.orders.every((o) => o.status === 'hub_received')) return false;
+  const inboundStatuses: PkgTrackingDetail['status'][] = [
+    'hub_received',
+    'split_at_hub',
+    'completed',
+  ];
+  if (!inboundStatuses.includes(detail.status)) return false;
 
-  const existing = await getPackedShipmentByBarcode(detail.pack_barcode);
+  const { resolveStoreHubCode } = await import('../utils/storeZone');
+  const { resolveOrderDestinationCode } = await import('../utils/orderDestination');
+  const hub = resolveStoreHubCode(store);
+  const legDest =
+    detail.leg_destination_code?.trim().toUpperCase() ||
+    detail.destination_code?.trim().toUpperCase() ||
+    '';
+  if (legDest && legDest !== hub) return false;
+
   const db = await getDatabase();
-
-  if (existing) {
-    const hubArrivedAt = detail.hub_received_at?.trim() || nowIso();
-    const legDest =
-      detail.leg_destination_code?.trim() || detail.destination_code?.trim() || '';
-    const transportFee = detail.transport_fee?.trim() || '';
-    if (transportFee || legDest) {
-      await db.runAsync(
-        `UPDATE packed_shipments SET transport_fee = ?, truck_leg_destination = ? WHERE bundle_barcode = ?`,
-        [transportFee, legDest.toUpperCase(), detail.pack_barcode],
-      );
-    }
-    const { resolveStoreHubCode } = await import('../utils/storeZone');
-    const hub = resolveStoreHubCode(store);
-    for (const order of detail.orders) {
-      await deliverLocalHubOrderToInventory({
-        order,
-        pkg: detail,
-        store,
-        hubCode: hub,
-        operator,
-      });
-    }
-    return false;
-  }
-
+  const existing = await getPackedShipmentByBarcode(detail.pack_barcode);
   const packNote = `到站收货 · ${detail.origin_store_code} → ${detail.destination_code}`;
   const hubOrigin: OriginStoreRef = {
     id: store.id,
     storeCode: store.storeCode,
     storeName: store.storeName,
   };
-  const { resolveStoreHubCode } = await import('../utils/storeZone');
-  const hub = resolveStoreHubCode(store);
-
-  let bundleItem = await getItemByBarcode(detail.pack_barcode);
-  if (!bundleItem) {
-    bundleItem = await upsertItem(
-      {
-        barcode: detail.pack_barcode,
-        name: detail.pack_name?.trim() || detail.pack_barcode,
-        spec: '',
-        unit: `${detail.item_count} Pcs`,
-        weight: detail.total_weight?.trim() || '',
-        min_qty: 0,
-        note: packNote,
-        qty_on_hand: 0,
-      },
-      { internal: true, ownerStoreCode: store.storeCode },
-    );
-  }
-
-  if (bundleItem.qty_on_hand < 1) {
-    await applyStockMovement({
-      barcode: detail.pack_barcode,
-      type: 'in',
-      qty: 1,
-      operator,
-      note: `到站收货入库 · 内含 ${detail.item_count} 件`,
-      destination: detail.destination_code,
-      originStore: hubOrigin,
-      inboundAt: detail.hub_received_at ?? undefined,
-    });
-    bundleItem = (await getItemByBarcode(detail.pack_barcode))!;
-  }
-
-  const packId = newId();
-  const ts = detail.hub_received_at || nowIso();
-  const legDest =
-    detail.leg_destination_code?.trim() || detail.destination_code?.trim() || '';
+  const ts = detail.hub_received_at?.trim() || nowIso();
   const transportFee = detail.transport_fee?.trim() || '';
+  const legDestPersist = legDest || detail.destination_code?.trim().toUpperCase() || '';
 
-  await db.runAsync(
-    `INSERT INTO packed_shipments
-     (id, bundle_item_id, bundle_barcode, bundle_name, operator, note, owner_store_code, created_at,
-      transport_fee, truck_leg_destination)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      packId,
-      bundleItem.id,
-      detail.pack_barcode,
-      detail.pack_name?.trim() || detail.pack_barcode,
-      operator,
-      packNote,
-      store.storeCode,
-      ts,
-      transportFee,
-      legDest.toUpperCase(),
-    ],
-  );
+  let packId: string;
+  let created = false;
 
-  const hubArrivedAt = detail.hub_received_at?.trim() || ts;
+  if (existing) {
+    packId = existing.id;
+    if (transportFee || legDestPersist) {
+      await db.runAsync(
+        `UPDATE packed_shipments SET transport_fee = ?, truck_leg_destination = ? WHERE id = ?`,
+        [transportFee, legDestPersist, packId],
+      );
+    }
+  } else {
+    let bundleItem = await getItemByBarcode(detail.pack_barcode);
+    if (!bundleItem) {
+      bundleItem = await upsertItem(
+        {
+          barcode: detail.pack_barcode,
+          name: detail.pack_name?.trim() || detail.pack_barcode,
+          spec: '',
+          unit: `${detail.item_count} Pcs`,
+          weight: detail.total_weight?.trim() || '',
+          min_qty: 0,
+          note: packNote,
+          qty_on_hand: 0,
+        },
+        { internal: true, ownerStoreCode: store.storeCode },
+      );
+    }
+
+    if (bundleItem.qty_on_hand < 1) {
+      await applyStockMovement({
+        barcode: detail.pack_barcode,
+        type: 'in',
+        qty: 1,
+        operator,
+        note: `到站收货入库 · 内含 ${detail.item_count} 件`,
+        destination: detail.destination_code,
+        originStore: hubOrigin,
+        inboundAt: detail.hub_received_at ?? undefined,
+      });
+      bundleItem = (await getItemByBarcode(detail.pack_barcode))!;
+    }
+
+    packId = newId();
+    await db.runAsync(
+      `INSERT INTO packed_shipments
+       (id, bundle_item_id, bundle_barcode, bundle_name, operator, note, owner_store_code, created_at,
+        transport_fee, truck_leg_destination)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        packId,
+        bundleItem.id,
+        detail.pack_barcode,
+        detail.pack_name?.trim() || detail.pack_barcode,
+        operator,
+        packNote,
+        store.storeCode,
+        ts,
+        transportFee,
+        legDestPersist,
+      ],
+    );
+    created = true;
+  }
+
   const originOwnerCode = detail.origin_store_code?.trim() || store.storeCode;
+  const originStore: OriginStoreRef = {
+    id: detail.origin_store_id?.trim() || store.id,
+    storeCode: originOwnerCode,
+    storeName: detail.origin_store_name?.trim() || store.storeName,
+  };
+
+  const { shouldPersistInboundOrderAtHub } = await import('../utils/expressDetailsVisibility');
 
   for (const order of detail.orders) {
     const orderName = order.order_name?.trim() || order.order_barcode;
     const orderSpec = order.spec?.trim() || '';
     const orderWeight = order.weight?.trim() || '';
-    const orderUnit = `${order.qty} Pcs`;
+    const orderUnit = `${order.qty || 1} Pcs`;
     const expressCode = order.express_barcode?.trim() || '';
+    const orderDest = resolveOrderDestinationCode(order);
+    if (
+      !shouldPersistInboundOrderAtHub(
+        order.destination_code || orderDest || '',
+        store,
+        hub,
+        originOwnerCode,
+      )
+    ) {
+      continue;
+    }
+    const isLocal = orderDest === hub;
+    const hubArrivedAt =
+      order.status === 'hub_received' && isLocal
+        ? order.hub_received_at?.trim() || ts
+        : '';
 
     let childItem = await getItemByBarcode(order.order_barcode);
     if (!childItem) {
@@ -1745,105 +2179,182 @@ export async function importHubReceivedPackToLocal(
           input_barcode: expressCode,
           qty_on_hand: 0,
         },
-        {
-          internal: true,
-          ownerStoreCode: originOwnerCode,
-        },
+        { internal: true, ownerStoreCode: originOwnerCode },
       );
     }
 
-    const childDest = persistFinalDestinationCode(order.destination_code || '');
+    const childDest = persistFinalDestinationCode(order.destination_code || orderDest || '');
     const recipientName = order.recipient_name?.trim() || '';
     await db.runAsync(
       `UPDATE inventory_items
-       SET name = ?, spec = ?, unit = ?, weight = ?, input_barcode = ?,
-           hub_arrived_at = ?, updated_at = ?${
-             recipientName ? ', recipient_name = ?' : ''
-           }${childDest ? ', final_destination = ?' : ''} WHERE id = ?`,
-      recipientName
-        ? childDest
-          ? [
-              orderName,
-              orderSpec,
-              orderUnit,
-              orderWeight,
-              expressCode,
-              hubArrivedAt,
-              hubArrivedAt,
-              recipientName,
-              childDest,
-              childItem.id,
-            ]
-          : [
-              orderName,
-              orderSpec,
-              orderUnit,
-              orderWeight,
-              expressCode,
-              hubArrivedAt,
-              hubArrivedAt,
-              recipientName,
-              childItem.id,
-            ]
-        : childDest
-          ? [
-              orderName,
-              orderSpec,
-              orderUnit,
-              orderWeight,
-              expressCode,
-              hubArrivedAt,
-              hubArrivedAt,
-              childDest,
-              childItem.id,
-            ]
-          : [
-              orderName,
-              orderSpec,
-              orderUnit,
-              orderWeight,
-              expressCode,
-              hubArrivedAt,
-              hubArrivedAt,
-              childItem.id,
-            ],
+       SET name = ?, spec = ?, unit = ?, weight = ?, input_barcode = ?, updated_at = ?${
+         hubArrivedAt ? ', hub_arrived_at = ?' : ''
+       }${recipientName ? ', recipient_name = ?' : ''}${
+         childDest ? ', final_destination = ?' : ''
+       } WHERE id = ?`,
+      hubArrivedAt
+        ? recipientName
+          ? childDest
+            ? [
+                orderName,
+                orderSpec,
+                orderUnit,
+                orderWeight,
+                expressCode,
+                ts,
+                hubArrivedAt,
+                recipientName,
+                childDest,
+                childItem.id,
+              ]
+            : [
+                orderName,
+                orderSpec,
+                orderUnit,
+                orderWeight,
+                expressCode,
+                ts,
+                hubArrivedAt,
+                recipientName,
+                childItem.id,
+              ]
+          : childDest
+            ? [
+                orderName,
+                orderSpec,
+                orderUnit,
+                orderWeight,
+                expressCode,
+                ts,
+                hubArrivedAt,
+                childDest,
+                childItem.id,
+              ]
+            : [
+                orderName,
+                orderSpec,
+                orderUnit,
+                orderWeight,
+                expressCode,
+                ts,
+                hubArrivedAt,
+                childItem.id,
+              ]
+        : recipientName
+          ? childDest
+            ? [
+                orderName,
+                orderSpec,
+                orderUnit,
+                orderWeight,
+                expressCode,
+                ts,
+                recipientName,
+                childDest,
+                childItem.id,
+              ]
+            : [
+                orderName,
+                orderSpec,
+                orderUnit,
+                orderWeight,
+                expressCode,
+                ts,
+                recipientName,
+                childItem.id,
+              ]
+          : childDest
+            ? [
+                orderName,
+                orderSpec,
+                orderUnit,
+                orderWeight,
+                expressCode,
+                ts,
+                childDest,
+                childItem.id,
+              ]
+            : [
+                orderName,
+                orderSpec,
+                orderUnit,
+                orderWeight,
+                expressCode,
+                ts,
+                childItem.id,
+              ],
     );
-    childItem = {
-      ...childItem,
-      name: orderName,
-      spec: orderSpec,
-      unit: orderUnit,
-      weight: orderWeight,
-      input_barcode: expressCode,
-      hub_arrived_at: hubArrivedAt,
-      ...(recipientName ? { recipient_name: recipientName, customer_name: recipientName } : {}),
-      ...(childDest ? { final_destination: childDest, destination: childDest } : {}),
-    };
 
-    await deliverLocalHubOrderToInventory({
-      order,
-      pkg: detail,
-      store,
-      hubCode: hub,
-      operator,
-    });
-
-    await db.runAsync(
-      `INSERT INTO packed_shipment_items
-       (id, pack_id, item_id, item_barcode, item_name, qty)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        newId(),
-        packId,
-        childItem.id,
-        order.order_barcode,
-        order.order_name?.trim() || order.order_barcode,
-        order.qty,
-      ],
+    const lineExists = await db.getFirstAsync<{ c: number }>(
+      `SELECT COUNT(*) AS c FROM packed_shipment_items
+       WHERE pack_id = ? AND item_barcode = ?`,
+      [packId, order.order_barcode],
     );
+    const shouldLinkToInboundPack =
+      (isLocal && order.status === 'hub_received') ||
+      (!isLocal && order.status === 'in_transit');
+    if (!Number(lineExists?.c) && shouldLinkToInboundPack) {
+      childItem = (await getItemById(childItem.id))!;
+      await db.runAsync(
+        `INSERT INTO packed_shipment_items
+         (id, pack_id, item_id, item_barcode, item_name, qty)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          newId(),
+          packId,
+          childItem.id,
+          order.order_barcode,
+          orderName,
+          order.qty || 1,
+        ],
+      );
+    }
+
+    if (order.status === 'hub_received' && isLocal) {
+      await deliverLocalHubOrderToInventory({
+        order,
+        pkg: detail,
+        store,
+        hubCode: hub,
+        operator,
+      });
+    } else if (!isLocal && order.status === 'in_transit') {
+      await deliverTransitOrderAtHubStation({
+        order,
+        pkg: detail,
+        store,
+        hubCode: hub,
+        operator,
+      });
+    } else if (order.status === 'released_at_hub' && !isLocal) {
+      await restoreTransitOrderForRepack({
+        orderBarcode: order.order_barcode,
+        expressBarcode: order.express_barcode,
+        orderName: order.order_name,
+        orderDest,
+        qty: order.qty,
+        spec: order.spec,
+        weight: order.weight,
+        recipientName: order.recipient_name,
+        packBarcode: detail.pack_barcode,
+        operator,
+        originStore,
+        ownerStoreCode: originOwnerCode,
+        actingStore: store,
+      });
+    }
   }
 
-  return true;
+  return created;
+}
+
+/** @deprecated 使用 importInboundPackToLocal */
+export async function importHubReceivedPackToLocal(
+  detail: PkgTrackingDetail,
+  store: InventoryStoreSession,
+  operator: string,
+): Promise<boolean> {
+  return importInboundPackToLocal(detail, store, operator);
 }
 
 async function persistCustomerNameOnItem(
@@ -1973,15 +2484,230 @@ export async function syncInboundHubPacksToLocal(
   operator: string,
 ): Promise<number> {
   const { listInboundPackages } = await import('./trackingService');
-  const inbound = await listInboundPackages(hubCode, ['hub_received', 'completed']);
+  const inbound = await listInboundPackages(hubCode, [
+    'hub_received',
+    'completed',
+    'split_at_hub',
+  ]);
   let imported = 0;
   for (const pkg of inbound) {
-    if (pkg.status === 'split_at_hub') continue;
-    if (!pkg.orders.every((o) => o.status === 'hub_received')) continue;
-    if (await importHubReceivedPackToLocal(pkg, store, operator)) imported += 1;
+    await syncReleasedTransitOrdersFromPack(pkg, store, hubCode, operator);
+    if (await importInboundPackToLocal(pkg, store, operator)) imported += 1;
   }
   await syncMissingCustomerNamesFromCloud(operator);
+  await reconcileHubTransitStockAtStation(store);
+  await pruneItemsOutsideExpressDetailsScope(store, hubCode);
+  await prunePacksOutsideExpressDetailsScope(store, hubCode);
   return imported;
+}
+
+/** 校正：有到站/释放入库流水但 qty 被同步归零的中转订单 */
+async function reconcileHubTransitStockAtStation(store: InventoryStoreSession): Promise<void> {
+  const db = await getDatabase();
+  const ts = nowIso();
+  const rows = await db.getAllAsync<{ id: string }>(
+    `SELECT DISTINCT i.id FROM inventory_items i
+     INNER JOIN stock_movements m ON m.item_id = i.id AND m.type = 'in'
+       AND (m.note LIKE '%中转站到站%' OR m.note LIKE '%中转站释放%' OR m.note LIKE '%到站交付%')
+     WHERE i.qty_on_hand < 1 AND UPPER(i.barcode) NOT LIKE 'PKG%'`,
+  );
+  for (const row of rows) {
+    const mov = await db.getFirstAsync<{ qty: number }>(
+      `SELECT qty FROM stock_movements WHERE item_id = ? AND type = 'in'
+       ORDER BY created_at DESC LIMIT 1`,
+      [row.id],
+    );
+    const qty = Math.max(1, Number(mov?.qty) || 1);
+    await db.runAsync('UPDATE inventory_items SET qty_on_hand = ?, updated_at = ? WHERE id = ?', [
+      qty,
+      ts,
+      row.id,
+    ]);
+    scheduleCloudSync({ type: 'item_and_movement', store, itemId: row.id });
+  }
+}
+
+/** 将云端已释放的中转订单恢复为可打包库存（供快递明细列表展示与装车出库） */
+async function syncReleasedTransitOrdersFromPack(
+  pkg: import('../types/tracking').PkgTrackingDetail,
+  store: InventoryStoreSession,
+  hubCode: string,
+  operator: string,
+): Promise<number> {
+  const { resolveOrderDestinationCode } = await import('../utils/orderDestination');
+  const hub = hubCode.trim().toUpperCase();
+  const originStore: OriginStoreRef = {
+    id: pkg.origin_store_id?.trim() || store.id,
+    storeCode: pkg.origin_store_code?.trim() || store.storeCode,
+    storeName: pkg.origin_store_name?.trim() || store.storeName,
+  };
+  const ownerStoreCode = pkg.origin_store_code?.trim() || store.storeCode;
+
+  let count = 0;
+  for (const order of pkg.orders) {
+    if (order.status !== 'released_at_hub') continue;
+    if (resolveOrderDestinationCode(order) === hub) continue;
+    const restored = await restoreTransitOrderForRepack({
+      orderBarcode: order.order_barcode,
+      expressBarcode: order.express_barcode,
+      orderName: order.order_name,
+      orderDest: resolveOrderDestinationCode(order),
+      qty: order.qty,
+      spec: order.spec,
+      weight: order.weight,
+      recipientName: order.recipient_name,
+      packBarcode: pkg.pack_barcode,
+      operator,
+      originStore,
+      ownerStoreCode,
+      actingStore: store,
+    });
+    if (restored) count += 1;
+  }
+  return count;
+}
+
+type TransitRepackRestoreInput = {
+  orderBarcode: string;
+  expressBarcode?: string;
+  orderName?: string;
+  orderDest: string;
+  qty?: number;
+  spec?: string;
+  weight?: string;
+  recipientName?: string;
+  packBarcode: string;
+  operator: string;
+  originStore: OriginStoreRef;
+  ownerStoreCode: string;
+  actingStore?: InventoryStoreSession;
+};
+
+/** 已装车转出：勿再按云端 released_at_hub 重复恢复 */
+async function shouldSkipTransitOrderRestore(item: InventoryItem): Promise<boolean> {
+  if (item.hub_transit_shipped_at?.trim()) return true;
+  return false;
+}
+
+/** 中转站装车出库后：标记订单已中转（与发站打包出库展示一致） */
+export async function markHubTransitOrdersShippedAfterLoad(
+  packs: PackedShipmentDetail[],
+  hubCode: string,
+  shippedAt: string,
+): Promise<void> {
+  const hub = hubCode.trim().toUpperCase();
+  if (!hub) return;
+
+  const { resolveItemDestinationCode } = await import('../utils/itemDestination');
+  const db = await getDatabase();
+
+  for (const pack of packs) {
+    for (const line of pack.items) {
+      const dest = resolveItemDestinationCode({
+        barcode: line.item_barcode,
+        destination: line.destination,
+        final_destination: line.destination,
+      });
+      if (!dest || dest === hub) continue;
+
+      const item = await getItemByBarcode(line.item_barcode);
+      if (!item) continue;
+
+      const wasAtHub =
+        Boolean(item.hub_arrived_at?.trim()) ||
+        Boolean(item.hub_transit_released_at?.trim()) ||
+        Boolean(item.hub_transit_shipped_at?.trim());
+
+      if (!wasAtHub) continue;
+
+      await db.runAsync(
+        `UPDATE inventory_items
+         SET hub_transit_shipped_at = ?, hub_transit_released_at = '', updated_at = ?
+         WHERE id = ?`,
+        [shippedAt, shippedAt, item.id],
+      );
+    }
+  }
+}
+
+/** 中转站释放：解绑原快递包、恢复库存，供本站重新打包 */
+async function restoreTransitOrderForRepack(
+  input: TransitRepackRestoreInput,
+): Promise<boolean> {
+  const { extractDestinationCode } = await import('../utils/inboundBarcode');
+  const db = await getDatabase();
+  const ts = nowIso();
+  const orderBarcode = input.orderBarcode.trim();
+  if (!orderBarcode) return false;
+
+  let item = await getItemByBarcode(orderBarcode);
+  if (item && (await shouldSkipTransitOrderRestore(item))) return false;
+
+  if (!item) {
+    item = await upsertItem(
+      {
+        barcode: orderBarcode,
+        name: input.orderName?.trim() || orderBarcode,
+        spec: input.spec?.trim() || '',
+        unit: `${Math.max(1, input.qty || 1)} Pcs`,
+        weight: input.weight?.trim() || '',
+        min_qty: 0,
+        note: `中转释放 · 原包 ${input.packBarcode}`,
+        input_barcode: input.expressBarcode?.trim() || '',
+        qty_on_hand: 0,
+      },
+      { internal: true, ownerStoreCode: input.ownerStoreCode },
+    );
+  }
+
+  if (input.orderDest) {
+    const code = persistFinalDestinationCode(input.orderDest);
+    await db.runAsync('UPDATE inventory_items SET final_destination = ? WHERE id = ?', [
+      code,
+      item.id,
+    ]);
+  }
+
+  const recipientName = input.recipientName?.trim() || '';
+  if (recipientName) {
+    await db.runAsync('UPDATE inventory_items SET recipient_name = ? WHERE id = ?', [
+      recipientName,
+      item.id,
+    ]);
+  }
+
+  await db.runAsync('DELETE FROM packed_shipment_items WHERE item_id = ? OR item_barcode = ?', [
+    item.id,
+    orderBarcode,
+  ]);
+  await db.runAsync(
+    `UPDATE inventory_items
+     SET packed_at = '', packed_bundle_barcode = '', hub_transit_released_at = ?, updated_at = ?
+     WHERE id = ?`,
+    [ts, ts, item.id],
+  );
+
+  item = (await getItemById(item.id))!;
+  if (item.qty_on_hand < 1) {
+    await applyStockMovement({
+      barcode: orderBarcode,
+      type: 'in',
+      qty: Math.max(1, input.qty || 1),
+      operator: input.operator,
+      note: `中转站释放待转出 · 原包 ${input.packBarcode}`,
+      destination: input.orderDest || extractDestinationCode(orderBarcode),
+      originStore: input.originStore,
+      actingStore: input.actingStore,
+    });
+  } else if (input.actingStore) {
+    scheduleCloudSync({
+      type: 'item_and_movement',
+      store: input.actingStore,
+      itemId: item.id,
+    });
+  }
+
+  return true;
 }
 
 /** 中转站释放非本站订单：云端标记 + 本地入库供重新打包 */
@@ -1993,7 +2719,6 @@ export async function releaseHubTransitOrders(params: {
 }): Promise<{ releasedCount: number }> {
   const { releaseTransitOrdersAtHub } = await import('./trackingService');
   const { resolveOrderDestinationCode } = await import('../utils/orderDestination');
-  const { extractDestinationCode } = await import('../utils/inboundBarcode');
 
   const pkg = await releaseTransitOrdersAtHub(
     params.packBarcode,
@@ -2007,73 +2732,34 @@ export async function releaseHubTransitOrders(params: {
   );
   if (released.length === 0) return { releasedCount: 0 };
 
-  const db = await getDatabase();
-  const localPack = await getPackedShipmentByBarcode(params.packBarcode);
-  const hubOrigin: OriginStoreRef = {
-    id: params.store.id,
-    storeCode: params.store.storeCode,
-    storeName: params.store.storeName,
+  const originStore: OriginStoreRef = {
+    id: pkg.origin_store_id?.trim() || params.store.id,
+    storeCode: pkg.origin_store_code?.trim() || params.store.storeCode,
+    storeName: pkg.origin_store_name?.trim() || params.store.storeName,
   };
+  const ownerStoreCode = pkg.origin_store_code?.trim() || params.store.storeCode;
 
+  let restoredCount = 0;
   for (const order of released) {
-    let item = await getItemByBarcode(order.order_barcode);
-    const orderDest = resolveOrderDestinationCode(order);
-    if (!item) {
-      item = await upsertItem(
-        {
-          barcode: order.order_barcode,
-          name: order.order_name?.trim() || order.order_barcode,
-          spec: '',
-          unit: `${order.qty} Pcs`,
-          weight: '',
-          min_qty: 0,
-          note: `中转释放 · 原包 ${params.packBarcode}`,
-          input_barcode: order.express_barcode?.trim() || '',
-          qty_on_hand: 0,
-        },
-        { internal: true, ownerStoreCode: params.store.storeCode },
-      );
-    }
-
-    if (orderDest) {
-      const code = persistFinalDestinationCode(orderDest);
-      await db.runAsync('UPDATE inventory_items SET final_destination = ? WHERE id = ?', [
-        code,
-        item.id,
-      ]);
-    }
-
-    if (localPack) {
-      await db.runAsync(
-        'DELETE FROM packed_shipment_items WHERE pack_id = ? AND item_barcode = ?',
-        [localPack.id, order.order_barcode],
-      );
-    }
-
-    const stillPacked = await db.getFirstAsync<{ c: number }>(
-      'SELECT COUNT(*) AS c FROM packed_shipment_items WHERE item_barcode = ?',
-      [order.order_barcode],
-    );
-    const packedCount = Number(stillPacked?.c) || 0;
-
-    if (packedCount === 0 && item.qty_on_hand < 1) {
-      await db.runAsync(
-        `UPDATE inventory_items SET packed_at = '', packed_bundle_barcode = '', updated_at = ? WHERE id = ?`,
-        [nowIso(), item.id],
-      );
-      await applyStockMovement({
-        barcode: order.order_barcode,
-        type: 'in',
-        qty: 1,
-        operator: params.operator,
-        note: `中转站释放待转出 · 原包 ${params.packBarcode}`,
-        destination: orderDest || extractDestinationCode(order.order_barcode),
-        originStore: hubOrigin,
-      });
-    }
+    const ok = await restoreTransitOrderForRepack({
+      orderBarcode: order.order_barcode,
+      expressBarcode: order.express_barcode,
+      orderName: order.order_name,
+      orderDest: resolveOrderDestinationCode(order),
+      qty: order.qty,
+      spec: order.spec,
+      weight: order.weight,
+      recipientName: order.recipient_name,
+      packBarcode: params.packBarcode,
+      operator: params.operator,
+      originStore,
+      ownerStoreCode,
+      actingStore: params.store,
+    });
+    if (ok) restoredCount += 1;
   }
 
-  return { releasedCount: released.length };
+  return { releasedCount: restoredCount };
 }
 
 /** 查找包含该入库商品的 PKG 包裹 */
@@ -2349,7 +3035,7 @@ async function buildItemDetailFromLocal(id: string): Promise<InventoryItemDetail
   );
   if (!row) return null;
 
-  const lastIn = await getBestInboundMovement(db, id);
+  const lastIn = await getInvoiceInboundMovement(db, id);
   const inboundDateIso = await getFirstInboundMovementAt(db, id);
   const pack = await getPackedShipmentByBundleItemId(id);
 
@@ -2388,19 +3074,105 @@ export async function getItemDetail(id: string): Promise<InventoryItemDetail | n
   if (!detail) return null;
 
   const db = await getDatabase();
-  const lastIn = await getBestInboundMovement(db, id);
+  const lastIn = await getInvoiceInboundMovement(db, id);
   const parsedNote = parseInboundMovementNote(String(lastIn?.note ?? ''));
 
-  if (isHubInboundSnapshotIncomplete(detail, lastIn, parsedNote)) {
+  if (isInboundInvoiceIncomplete(parsedNote)) {
+    try {
+      const refreshed = await refreshInboundInvoiceFromCloudOrder(detail);
+      if (refreshed) {
+        const rebuilt = await buildItemDetailFromLocal(id);
+        if (rebuilt) detail = rebuilt;
+      }
+    } catch {
+      // 离线或云端未配置时仍展示本地已有数据
+    }
+  }
+
+  if (!detail) return null;
+
+  const lastInAfter = await getInvoiceInboundMovement(db, id);
+  const parsedAfter = parseInboundMovementNote(String(lastInAfter?.note ?? ''));
+
+  if (detail.hub_arrived_at?.trim() && isHubInboundSnapshotIncomplete(detail, lastInAfter, parsedAfter)) {
     try {
       const refreshed = await refreshInboundSnapshotFromCloud(detail);
-      if (refreshed) detail = await buildItemDetailFromLocal(id);
+      if (refreshed) {
+        const rebuilt = await buildItemDetailFromLocal(id);
+        if (rebuilt) detail = rebuilt;
+      }
     } catch {
       // 离线或云端未配置时仍展示本地已有数据
     }
   }
 
   return detail;
+}
+
+async function deleteItemCascadeLocal(itemId: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM packed_shipment_items WHERE item_id = ?', [itemId]);
+  await db.runAsync('DELETE FROM stock_movements WHERE item_id = ?', [itemId]);
+  await db.runAsync('DELETE FROM inventory_items WHERE id = ?', [itemId]);
+}
+
+async function deletePackCascadeLocal(packId: string): Promise<void> {
+  const db = await getDatabase();
+  const pack = await db.getFirstAsync<{ bundle_item_id: string }>(
+    'SELECT bundle_item_id FROM packed_shipments WHERE id = ?',
+    [packId],
+  );
+  await db.runAsync('DELETE FROM packed_shipment_items WHERE pack_id = ?', [packId]);
+  await db.runAsync('DELETE FROM packed_shipments WHERE id = ?', [packId]);
+  if (pack?.bundle_item_id) {
+    await deleteItemCascadeLocal(pack.bundle_item_id);
+  }
+}
+
+/** 移除本机不应出现在快递明细的订单（其它地区残留缓存） */
+export async function pruneItemsOutsideExpressDetailsScope(
+  store: InventoryStoreSession,
+  hubCode: string,
+): Promise<number> {
+  const { isVisibleInExpressDetailsList } = await import('../utils/expressDetailsVisibility');
+  const { getQueuedLocalItemIds } = await import('./inventoryCloudQueue');
+  const queued = await getQueuedLocalItemIds();
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `SELECT ${ITEM_LIST_SELECT} FROM inventory_items i WHERE ${NOT_EXPRESS_PACK_CLAUSE}`,
+  );
+  let removed = 0;
+  for (const row of rows) {
+    const id = String(row.id);
+    if (queued.has(id)) continue;
+    const item = rowToListItem(row);
+    if (isVisibleInExpressDetailsList(item, store, hubCode)) continue;
+    await deleteItemCascadeLocal(id);
+    removed += 1;
+  }
+  return removed;
+}
+
+/** 移除本机不应出现在「打包」列表的快递包（其它地区残留缓存） */
+export async function prunePacksOutsideExpressDetailsScope(
+  store: InventoryStoreSession,
+  hubCode: string,
+): Promise<number> {
+  const { isVisibleInPackedList } = await import('../utils/expressDetailsVisibility');
+  const { getQueuedLocalPackIds } = await import('./inventoryCloudQueue');
+  const queued = await getQueuedLocalPackIds();
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ id: string }>('SELECT id FROM packed_shipments');
+  let removed = 0;
+  for (const row of rows) {
+    if (queued.has(row.id)) continue;
+    const pack = await getPackedShipmentById(row.id);
+    if (!pack) continue;
+    if (isVisibleInPackedList(pack, store, hubCode)) continue;
+    await deletePackCascadeLocal(row.id);
+    removed += 1;
+  }
+  return removed;
 }
 
 /** 取消订单：删除商品记录；若为包裹则退回内含商品库存 */

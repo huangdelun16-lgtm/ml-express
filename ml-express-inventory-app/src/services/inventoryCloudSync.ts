@@ -34,6 +34,21 @@ function emptyTs(value?: string | null): string {
   return value?.trim() ? value.trim() : '';
 }
 
+/** 中转站/目的站到站入库流水（与发站「打包入」出库区分） */
+const HUB_STATION_INBOUND_NOTE_SQL = `(
+  note LIKE '%中转站到站%' OR note LIKE '%中转站释放%' OR note LIKE '%到站交付%'
+)`;
+
+async function hasHubStationInboundMovement(itemId: string): Promise<boolean> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ c: number }>(
+    `SELECT COUNT(*) AS c FROM stock_movements
+     WHERE item_id = ? AND type = 'in' AND ${HUB_STATION_INBOUND_NOTE_SQL}`,
+    [itemId],
+  );
+  return Number(row?.c) > 0;
+}
+
 async function mergeCloudItem(row: CloudStoreItemRow): Promise<void> {
   const db = await getDatabase();
   const local = await db.getFirstAsync<Record<string, unknown>>(
@@ -47,23 +62,65 @@ async function mergeCloudItem(row: CloudStoreItemRow): Promise<void> {
 
   const localQty = local ? Number(local.qty_on_hand) || 0 : 0;
   const cloudQty = Number(row.qty_on_hand) || 0;
-  if (local && localQty === 0 && cloudQty > 0) {
+  const localTransitReleased = local
+    ? String(local.hub_transit_released_at ?? '').trim()
+    : '';
+  const localTransitShipped = local
+    ? String(local.hub_transit_shipped_at ?? '').trim()
+    : '';
+  if ((localTransitReleased || localTransitShipped) && localQty > 0) {
+    row.qty_on_hand = localQty;
+  }
+  const localItemId = local ? String(local.id) : '';
+  const localHubInbound = localItemId ? await hasHubStationInboundMovement(localItemId) : false;
+  if (localHubInbound && localQty > 0) {
+    row.qty_on_hand = localQty;
+  }
+  if (
+    local &&
+    localQty === 0 &&
+    cloudQty > 0 &&
+    !localTransitReleased &&
+    !localTransitShipped &&
+    !localHubInbound
+  ) {
     const inPack = await db.getFirstAsync<{ c: number }>(
       'SELECT COUNT(*) AS c FROM packed_shipment_items WHERE item_id = ?',
-      [String(local.id)],
+      [localItemId],
     );
     const packOut = await db.getFirstAsync<{ c: number }>(
       `SELECT COUNT(*) AS c FROM stock_movements
        WHERE item_id = ? AND type = 'out' AND note LIKE '打包入 %'`,
-      [String(local.id)],
+      [localItemId],
     );
-    if (Number(inPack?.c) > 0 || Number(packOut?.c) > 0) {
+    const cloudPacked = Boolean(row.packed_at?.trim()) || Boolean(row.packed_bundle_barcode?.trim());
+    if (Number(inPack?.c) > 0 || Number(packOut?.c) > 0 || cloudPacked) {
+      row.qty_on_hand = 0;
+    }
+  }
+
+  const cloudPackedAt = emptyTs(row.packed_at);
+  const cloudPackedBundle = String(row.packed_bundle_barcode ?? '').trim();
+  if (cloudPackedAt || cloudPackedBundle) {
+    if (localTransitReleased || localTransitShipped || localHubInbound) {
+      if (localQty > 0) row.qty_on_hand = localQty;
+    } else if (!localHubInbound) {
       row.qty_on_hand = 0;
     }
   }
 
   const hubArrived = emptyTs(row.hub_arrived_at);
   const signedAt = emptyTs(row.customer_signed_at);
+  const packedAt =
+    cloudPackedAt ||
+    (local ? String(local.packed_at ?? '').trim() : '');
+  const packedBundle =
+    cloudPackedBundle ||
+    (local ? String(local.packed_bundle_barcode ?? '').trim() : '');
+  const transitReleasedAt =
+    localTransitReleased || emptyTs(row.hub_transit_released_at);
+  const transitShippedAt =
+    localTransitShipped || emptyTs(row.hub_transit_shipped_at);
   const ts = row.updated_at || nowIso();
   const created = row.created_at || ts;
 
@@ -73,7 +130,9 @@ async function mergeCloudItem(row: CloudStoreItemRow): Promise<void> {
          input_barcode = ?, name = ?, spec = ?, unit = ?, weight = ?,
          qty_on_hand = ?, min_qty = ?, note = ?, owner_store_code = ?,
          recipient_name = ?, final_destination = ?,
-         hub_arrived_at = ?, customer_signed_at = ?, updated_at = ?
+         hub_arrived_at = ?, customer_signed_at = ?,
+         packed_at = ?, packed_bundle_barcode = ?,
+         hub_transit_released_at = ?, hub_transit_shipped_at = ?, updated_at = ?
        WHERE barcode = ?`,
       [
         row.input_barcode,
@@ -89,6 +148,10 @@ async function mergeCloudItem(row: CloudStoreItemRow): Promise<void> {
         row.final_destination,
         hubArrived,
         signedAt,
+        packedAt,
+        packedBundle,
+        transitReleasedAt,
+        transitShippedAt,
         ts,
         row.barcode,
       ],
@@ -100,8 +163,9 @@ async function mergeCloudItem(row: CloudStoreItemRow): Promise<void> {
     `INSERT INTO inventory_items
      (id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, min_qty, note,
       owner_store_code, recipient_name, final_destination, hub_arrived_at, customer_signed_at,
+      packed_at, packed_bundle_barcode, hub_transit_released_at, hub_transit_shipped_at,
       created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.id,
       row.barcode,
@@ -118,6 +182,10 @@ async function mergeCloudItem(row: CloudStoreItemRow): Promise<void> {
       row.final_destination,
       hubArrived,
       signedAt,
+      packedAt,
+      packedBundle,
+      transitReleasedAt,
+      transitShippedAt,
       created,
       ts,
     ],
@@ -261,6 +329,82 @@ async function mergeCloudPack(row: CloudPackRow): Promise<void> {
       ],
     );
   }
+
+  await syncPackedFlagsFromPackLines(packId, row.bundle_barcode, row.created_at || nowIso());
+}
+
+/** 合并云端快递包后，同步订单打包标记与库存（多设备一致） */
+async function syncPackedFlagsFromPackLines(
+  packId: string,
+  bundleBarcode: string,
+  packedAt: string,
+): Promise<void> {
+  const db = await getDatabase();
+  const ts = packedAt.trim() || nowIso();
+  const code = bundleBarcode.trim();
+  const lines = await db.getAllAsync<{ item_id: string; item_barcode: string }>(
+    `SELECT item_id, item_barcode FROM packed_shipment_items WHERE pack_id = ?`,
+    [packId],
+  );
+  for (const line of lines) {
+    let itemId = line.item_id?.trim();
+    if (!itemId && line.item_barcode?.trim()) {
+      const found = await db.getFirstAsync<{ id: string }>(
+        'SELECT id FROM inventory_items WHERE barcode = ?',
+        [line.item_barcode.trim()],
+      );
+      itemId = found?.id ?? '';
+    }
+    if (!itemId) continue;
+
+    await db.runAsync(
+      `UPDATE inventory_items
+       SET packed_at = CASE WHEN TRIM(COALESCE(packed_at, '')) = '' THEN ? ELSE packed_at END,
+           packed_bundle_barcode = CASE WHEN TRIM(COALESCE(packed_bundle_barcode, '')) = '' THEN ? ELSE packed_bundle_barcode END,
+           updated_at = ?
+       WHERE id = ?`,
+      [ts, code, ts, itemId],
+    );
+
+    const qtyRow = await db.getFirstAsync<{ qty_on_hand: number }>(
+      'SELECT qty_on_hand FROM inventory_items WHERE id = ?',
+      [itemId],
+    );
+    const packOut = await db.getFirstAsync<{ c: number }>(
+      `SELECT COUNT(*) AS c FROM stock_movements
+       WHERE item_id = ? AND type = 'out' AND note LIKE '打包入 %'`,
+      [itemId],
+    );
+    const hubInbound = await hasHubStationInboundMovement(itemId);
+    const releasedRow = await db.getFirstAsync<{ v: string }>(
+      'SELECT hub_transit_released_at AS v FROM inventory_items WHERE id = ?',
+      [itemId],
+    );
+    const transitReleased = Boolean(releasedRow?.v?.trim());
+    if (
+      Number(qtyRow?.qty_on_hand) > 0 &&
+      Number(packOut?.c) > 0 &&
+      !hubInbound &&
+      !transitReleased
+    ) {
+      await db.runAsync(
+        'UPDATE inventory_items SET qty_on_hand = 0, updated_at = ? WHERE id = ?',
+        [ts, itemId],
+      );
+    }
+  }
+}
+
+async function reconcilePackedItemStateFromCloud(): Promise<void> {
+  const db = await getDatabase();
+  const packs = await db.getAllAsync<{
+    id: string;
+    bundle_barcode: string;
+    created_at: string;
+  }>('SELECT id, bundle_barcode, created_at FROM packed_shipments');
+  for (const pack of packs) {
+    await syncPackedFlagsFromPackLines(pack.id, pack.bundle_barcode, pack.created_at);
+  }
 }
 
 async function bundleItemLoadedAt(bundleItemId: string, fallbackTs: string): Promise<string | null> {
@@ -298,6 +442,10 @@ async function pushLocalItemsForStore(store: InventoryStoreSession, hubCode: str
       final_destination: String(row.final_destination ?? ''),
       hub_arrived_at: String(row.hub_arrived_at ?? ''),
       customer_signed_at: String(row.customer_signed_at ?? ''),
+      packed_at: String(row.packed_at ?? ''),
+      packed_bundle_barcode: String(row.packed_bundle_barcode ?? ''),
+      hub_transit_released_at: String(row.hub_transit_released_at ?? ''),
+      hub_transit_shipped_at: String(row.hub_transit_shipped_at ?? ''),
       created_at: String(row.created_at),
       updated_at: String(row.updated_at),
     };
@@ -338,8 +486,11 @@ async function pushLocalItemsForStore(store: InventoryStoreSession, hubCode: str
   }
 
   const packs = await db.getAllAsync<Record<string, unknown>>(
-    'SELECT * FROM packed_shipments WHERE UPPER(owner_store_code) = ?',
-    [storeCode],
+    `SELECT DISTINCT p.* FROM packed_shipments p
+     LEFT JOIN packed_shipment_items psi ON psi.pack_id = p.id
+     LEFT JOIN inventory_items i ON i.id = psi.item_id
+     WHERE UPPER(p.owner_store_code) = ? OR UPPER(i.final_destination) = ?`,
+    [storeCode, hub],
   );
   for (const packRow of packs) {
     const packId = String(packRow.id);
@@ -421,8 +572,11 @@ async function reconcileLocalScopeWithCloud(
   }
 
   const localPacks = await db.getAllAsync<{ id: string; bundle_barcode: string }>(
-    'SELECT id, bundle_barcode FROM packed_shipments WHERE UPPER(owner_store_code) = ?',
-    [storeCode],
+    `SELECT DISTINCT p.id, p.bundle_barcode FROM packed_shipments p
+     LEFT JOIN packed_shipment_items psi ON psi.pack_id = p.id
+     LEFT JOIN inventory_items i ON i.id = psi.item_id
+     WHERE UPPER(p.owner_store_code) = ? OR UPPER(i.final_destination) = ?`,
+    [storeCode, hub],
   );
   for (const pack of localPacks) {
     if (queuedPackIds.has(pack.id)) continue;
@@ -442,6 +596,8 @@ export async function pullPlatformInventoryFromCloud(
 
   const cloudItems = await fetchCloudStoreItems(store, hubCode);
   for (const row of cloudItems) {
+    const { shouldMergeCloudItemToLocal } = await import('../utils/expressDetailsVisibility');
+    if (!shouldMergeCloudItemToLocal(row, store, hubCode)) continue;
     await mergeCloudItem(row);
   }
 
@@ -457,13 +613,21 @@ export async function pullPlatformInventoryFromCloud(
     await mergeCloudMovement(m, localItem.id);
   }
 
-  const packs = await fetchCloudPackedShipments(store);
+  const packs = await fetchCloudPackedShipments(store, hubCode);
   for (const pack of packs) {
+    const { shouldMergeCloudPackToLocal } = await import('../utils/expressDetailsVisibility');
+    if (!shouldMergeCloudPackToLocal(pack, store, hubCode)) continue;
     await mergeCloudPack(pack);
   }
 
+  await reconcilePackedItemStateFromCloud();
   await reconcileLocalScopeWithCloud(store, hubCode, cloudItems, packs);
   await reconcileTruckLoadFromCloud(store);
+
+  const { pruneItemsOutsideExpressDetailsScope, prunePacksOutsideExpressDetailsScope } =
+    await import('./inventoryService');
+  await pruneItemsOutsideExpressDetailsScope(store, hubCode);
+  await prunePacksOutsideExpressDetailsScope(store, hubCode);
 }
 
 /** 通过 Edge Function（Service Role）清空本站可见范围云端测试数据 */
@@ -712,7 +876,10 @@ export async function reconcileTruckLoadFromCloud(store: InventoryStoreSession):
   const {
     getPackedShipmentByBarcode,
     applyStockMovement,
+    markHubTransitOrdersShippedAfterLoad,
   } = await import('./inventoryService');
+  const { resolveStoreHubCode } = await import('../utils/storeZone');
+  const hubCode = resolveStoreHubCode(store);
 
   const db = await getDatabase();
   for (const cloudPkg of cloudPkgs) {
@@ -752,6 +919,7 @@ export async function reconcileTruckLoadFromCloud(store: InventoryStoreSession):
         actingStore: store,
         syncToCloud: false,
       });
+      await markHubTransitOrdersShippedAfterLoad([local], hubCode, cloudPkg.truck_loaded_at || nowIso());
     }
   }
 }

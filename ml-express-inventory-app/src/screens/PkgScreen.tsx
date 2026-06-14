@@ -15,6 +15,7 @@ import PkgEditModal from '../components/PkgEditModal';
 import PkgOrdersModal from '../components/PkgOrdersModal';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import {
+  cancelPackedShipment,
   listPackedShipmentRows,
   resyncLoadedPackToCloud,
   syncInboundHubPacksToLocal,
@@ -23,7 +24,7 @@ import {
 import { isSupabaseConfigured } from '../services/supabase';
 import { packOrderBarcodeData } from '../utils/orderBarcodeData';
 import type { PackedShipmentListRow } from '../types/inventory';
-import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
+import { PACK_DISPLAY_LABEL, packStatusStyle, canEditPackedShipment } from '../utils/packDisplayStatus';
 import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
@@ -46,6 +47,7 @@ export default function PkgScreen() {
   const [ordersPack, setOrdersPack] = useState<PackedShipmentListRow | null>(null);
   const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
   const [resyncing, setResyncing] = useState(false);
+  const [unpacking, setUnpacking] = useState(false);
 
   const load = useCallback(async () => {
     if (store && hubCode) {
@@ -56,7 +58,7 @@ export default function PkgScreen() {
         // 云端未配置或离线时仍显示本地列表
       }
     }
-    setPacks(await listPackedShipmentRows(search));
+    setPacks(await listPackedShipmentRows(search, store && hubCode ? { store, hubCode } : undefined));
   }, [search, store, hubCode, operatorName]);
 
   useFocusEffect(
@@ -191,6 +193,7 @@ export default function PkgScreen() {
         canEdit={
           !!actionPack &&
           !!store &&
+          canEditPackedShipment(actionPack) &&
           canEditOwnedRecord(
             store,
             actionPack.owner_store_code || resolveOwnerKeyForListItem({
@@ -200,6 +203,57 @@ export default function PkgScreen() {
             }),
           )
         }
+        canUnpack={
+          !!actionPack &&
+          !!store &&
+          actionPack.display_status === 'pending_load' &&
+          !actionPack.loaded &&
+          canEditOwnedRecord(
+            store,
+            actionPack.owner_store_code || resolveOwnerKeyForListItem({
+              owner_store_code: actionPack.owner_store_code,
+              barcode: actionPack.bundle_barcode,
+              destination: '',
+            }),
+          )
+        }
+        unpacking={unpacking}
+        onUnpack={() => {
+          if (!actionPack || !store || unpacking) return;
+          Alert.alert(
+            '拆包取消',
+            `确定拆包 ${actionPack.bundle_barcode}？\n内含订单将退回库存，可重新勾选打包。`,
+            [
+              { text: '取消', style: 'cancel' },
+              {
+                text: '确认拆包',
+                style: 'destructive',
+                onPress: () => {
+                  void (async () => {
+                    setUnpacking(true);
+                    try {
+                      const { restoredCount } = await cancelPackedShipment(
+                        actionPack.id,
+                        operatorName ?? '工作人员',
+                        store,
+                      );
+                      showTaskSuccess(
+                        '拆包成功',
+                        `已取消快递包 ${actionPack.bundle_barcode}，${restoredCount} 个订单已退回可打包列表`,
+                      );
+                      setActionPack(null);
+                      await load();
+                    } catch (e: unknown) {
+                      Alert.alert('拆包失败', e instanceof Error ? e.message : '请重试');
+                    } finally {
+                      setUnpacking(false);
+                    }
+                  })();
+                },
+              },
+            ],
+          );
+        }}
         onClose={() => setActionPack(null)}
         onEdit={() => {
           if (!actionPack) return;

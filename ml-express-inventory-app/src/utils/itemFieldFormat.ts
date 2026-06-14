@@ -77,17 +77,39 @@ export function resolveItemCardQty(item: {
   packed?: boolean;
   packed_at?: string;
   hub_arrived?: boolean;
+  hub_transit_released?: boolean;
+  hub_transit_released_at?: string;
+  hub_transit_shipped?: boolean;
+  hub_transit_shipped_at?: string;
   customer_signed?: boolean;
   customer_signed_at?: string;
 }): number {
   if (isCustomerSignedItem(item)) return 0;
+
+  const transitShipped =
+    item.hub_transit_shipped || Boolean(item.hub_transit_shipped_at?.trim());
+
+  if (transitShipped) return 0;
+
+  const transitReleased =
+    item.hub_transit_released || Boolean(item.hub_transit_released_at?.trim());
+
+  if (transitReleased) {
+    if (item.qty_on_hand > 0) return item.qty_on_hand;
+    const specN = Math.max(1, parseInt(parseUnit(item.unit ?? '').n, 10) || 1);
+    return specN;
+  }
 
   if (item.hub_arrived) {
     if (item.qty_on_hand > 0) return item.qty_on_hand;
     return 1;
   }
 
-  if (item.packed || Boolean(item.packed_at?.trim())) return 0;
+  if (item.packed || Boolean(item.packed_at?.trim())) {
+    // 中转站已确认到站、在 inbound 包内待转出：展示本站库存
+    if (item.qty_on_hand > 0) return item.qty_on_hand;
+    return 0;
+  }
 
   if (item.qty_on_hand > 0) return item.qty_on_hand;
 
@@ -118,4 +140,29 @@ export function sumPackageWeightsKg(weights: string[]): string {
   const total = weights.reduce((acc, w) => acc + parseWeightKg(w), 0);
   if (total <= 0) return '';
   return total % 1 === 0 ? String(total) : total.toFixed(2);
+}
+
+/** 打包快递包：从已选订单汇总规格（发站入库登记） */
+export function aggregatePackSpecFromItems(
+  items: { spec?: string }[],
+): { l: string; w: string; h: string } {
+  if (items.length === 0) return { l: '', w: '', h: '' };
+
+  const specs = items.map((item) => parseSpec(item.spec ?? ''));
+  const hasAny = specs.some((s) => s.l || s.w || s.h);
+  if (!hasAny) return { l: '', w: '', h: '' };
+
+  if (items.length === 1) {
+    return { l: specs[0].l, w: specs[0].w, h: specs[0].h };
+  }
+
+  const l = Math.max(...specs.map((s) => Number(s.l) || 0));
+  const w = Math.max(...specs.map((s) => Number(s.w) || 0));
+  const h = specs.reduce((sum, s) => sum + (Number(s.h) || 0), 0);
+
+  return {
+    l: l > 0 ? String(l) : '',
+    w: w > 0 ? String(w) : '',
+    h: h > 0 ? String(h) : '',
+  };
 }

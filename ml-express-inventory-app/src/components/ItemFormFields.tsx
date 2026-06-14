@@ -14,6 +14,10 @@ type Props = {
   showPreview?: boolean;
   unitLocked?: boolean;
   unitHint?: string;
+  specLocked?: boolean;
+  weightLocked?: boolean;
+  specHint?: string;
+  weightHint?: string;
 };
 
 export default function ItemFormFields({
@@ -24,6 +28,10 @@ export default function ItemFormFields({
   showPreview = true,
   unitLocked = false,
   unitHint,
+  specLocked = false,
+  weightLocked = false,
+  specHint,
+  weightHint,
 }: Props) {
   const barcodeFieldHint =
     barcodeHint ?? (!barcodeEditable ? '条码创建后不可修改' : undefined);
@@ -64,6 +72,7 @@ export default function ItemFormFields({
           l={form.specL}
           w={form.specW}
           h={form.specH}
+          editable={!specLocked}
           onChange={({ l, w, h }) => {
             form.setSpecL(l);
             form.setSpecW(w);
@@ -73,6 +82,7 @@ export default function ItemFormFields({
           wInput={fieldChain.propsFor('specW')}
           hInput={fieldChain.propsFor('specH')}
         />
+        {specHint ? <Text style={styles.hint}>{specHint}</Text> : null}
         <LockedSuffixField
           label="单位"
           value={form.unitN}
@@ -92,6 +102,8 @@ export default function ItemFormFields({
           suffix="Kg"
           onChange={form.setWeightN}
           placeholder="重量"
+          editable={!weightLocked}
+          hint={weightHint}
           inputRef={fieldChain.propsFor('weight').inputRef}
           returnKeyType={fieldChain.propsFor('weight').returnKeyType}
           onSubmitEditing={fieldChain.propsFor('weight').onSubmitEditing}

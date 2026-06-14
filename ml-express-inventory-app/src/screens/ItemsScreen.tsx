@@ -78,7 +78,12 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         // 云端未配置或离线时仍显示本地列表
       }
     }
-    setItems(listMode === 'pack' ? await listPackableItems(search) : await listItems(search));
+    const scope = store && hubCode ? { store, hubCode } : undefined;
+    setItems(
+      listMode === 'pack'
+        ? await listPackableItems(search, scope)
+        : await listItems(search, scope),
+    );
   }, [search, listMode, store, hubCode, operatorName]);
 
   useFocusEffect(
@@ -372,7 +377,18 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           const cardQty = resolveItemCardQty(item);
           const meta = [item.spec, item.unit, item.weight].filter(Boolean).join(' · ');
           const regionCode = resolveItemDestinationCode(item);
-          const packBarcode = item.packed ? item.parent_pack_barcode?.trim() : '';
+          const transitShipped = item.hub_transit_shipped;
+          const transitReleased = item.hub_transit_released && !transitShipped;
+          const transitPendingAtHub =
+            item.packed &&
+            !transitReleased &&
+            !transitShipped &&
+            !item.hub_arrived &&
+            regionCode &&
+            hubCode &&
+            regionCode.toUpperCase() !== hubCode.toUpperCase();
+          const packBarcode =
+            item.packed && !transitReleased ? item.parent_pack_barcode?.trim() : '';
           const signedDone = isCustomerSignedItem(item);
 
           return (
@@ -412,11 +428,17 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                           styles.statusBadge,
                           isCustomerSignedItem(item)
                             ? styles.statusSignedDone
-                            : item.hub_arrived
-                              ? styles.statusHubArrived
-                              : item.stocked_in
-                                ? styles.statusInDone
-                                : styles.statusInPending,
+                            : transitShipped
+                              ? styles.statusTransitShipped
+                              : transitReleased
+                                ? styles.statusTransitReleased
+                                : transitPendingAtHub
+                                  ? styles.statusTransitReleased
+                                  : item.hub_arrived
+                                  ? styles.statusHubArrived
+                                  : item.stocked_in
+                                    ? styles.statusInDone
+                                    : styles.statusInPending,
                         ]}
                       >
                         <Text
@@ -424,35 +446,51 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                             styles.statusText,
                             isCustomerSignedItem(item)
                               ? styles.statusSignedDoneText
-                              : item.hub_arrived
-                                ? styles.statusHubArrivedText
-                                : item.stocked_in
-                                  ? styles.statusInDoneText
-                                  : styles.statusInPendingText,
+                              : transitShipped
+                                ? styles.statusTransitShippedText
+                                : transitReleased
+                                  ? styles.statusTransitReleasedText
+                                  : transitPendingAtHub
+                                    ? styles.statusTransitReleasedText
+                                    : item.hub_arrived
+                                    ? styles.statusHubArrivedText
+                                    : item.stocked_in
+                                      ? styles.statusInDoneText
+                                      : styles.statusInPendingText,
                           ]}
                         >
                           {isCustomerSignedItem(item)
                             ? '已签收'
-                            : item.hub_arrived
-                              ? '已到站'
-                              : item.stocked_in
-                                ? '已入库'
-                                : '未入库'}
+                            : transitShipped
+                              ? '已中转'
+                              : transitReleased
+                                ? '待转出'
+                                : transitPendingAtHub
+                                  ? '待中转'
+                                  : item.hub_arrived
+                                  ? '已到站'
+                                  : item.stocked_in
+                                    ? '已入库'
+                                    : '未入库'}
                         </Text>
                       </View>
                       <View
                         style={[
                           styles.statusBadge,
-                          item.packed ? styles.statusPackDone : styles.statusPackPending,
+                          item.packed && !transitReleased
+                            ? styles.statusPackDone
+                            : styles.statusPackPending,
                         ]}
                       >
                         <Text
                           style={[
                             styles.statusText,
-                            item.packed ? styles.statusPackDoneText : styles.statusPackPendingText,
+                            item.packed && !transitReleased
+                              ? styles.statusPackDoneText
+                              : styles.statusPackPendingText,
                           ]}
                         >
-                          {item.packed ? '已打包' : '未打包'}
+                          {item.packed && !transitReleased ? '已打包' : '未打包'}
                         </Text>
                       </View>
                     </View>
@@ -568,6 +606,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         visible={packModalVisible}
         selectedItems={selectedItems}
         operatorName={operatorName ?? '工作人员'}
+        store={store}
         onClose={() => setPackModalVisible(false)}
         onSubmit={handlePackSubmit}
       />
@@ -691,6 +730,8 @@ const styles = StyleSheet.create({
   statusInDone: { backgroundColor: 'rgba(34,197,94,0.15)' },
   statusInPending: { backgroundColor: 'rgba(100,116,139,0.2)' },
   statusHubArrived: { backgroundColor: 'rgba(14,165,233,0.15)' },
+  statusTransitReleased: { backgroundColor: 'rgba(168,85,247,0.15)' },
+  statusTransitShipped: { backgroundColor: 'rgba(56,189,248,0.15)' },
   statusSignedDone: { backgroundColor: 'rgba(34,197,94,0.2)' },
   statusPackDone: { backgroundColor: 'rgba(168,85,247,0.15)' },
   statusPackPending: { backgroundColor: 'rgba(100,116,139,0.2)' },
@@ -698,6 +739,8 @@ const styles = StyleSheet.create({
   statusInDoneText: { color: '#4ade80' },
   statusInPendingText: { color: '#94a3b8' },
   statusHubArrivedText: { color: '#38bdf8' },
+  statusTransitReleasedText: { color: '#c4b5fd' },
+  statusTransitShippedText: { color: '#38bdf8' },
   statusSignedDoneText: { color: '#4ade80' },
   statusPackDoneText: { color: '#c4b5fd' },
   statusPackPendingText: { color: '#94a3b8' },

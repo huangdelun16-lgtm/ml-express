@@ -1,6 +1,7 @@
 import type { InventoryItem, PackedShipment, StockMovement } from '../types/inventory';
 import type { InventoryStoreSession } from './authService';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { generateUuid, toNullableUuid } from '../utils/uuid';
 
 export type CloudStoreItemRow = {
   id: string;
@@ -19,6 +20,10 @@ export type CloudStoreItemRow = {
   final_destination: string;
   hub_arrived_at: string | null;
   customer_signed_at: string | null;
+  packed_at: string | null;
+  packed_bundle_barcode: string;
+  hub_transit_released_at: string | null;
+  hub_transit_shipped_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -74,10 +79,7 @@ export type CloudPackRow = {
 };
 
 function cloudUuid(): string {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return generateUuid();
 }
 
 function toNullableTs(value?: string | null): string | null {
@@ -103,6 +105,14 @@ function rowToCloudItem(row: Record<string, unknown>): CloudStoreItemRow {
     final_destination: String(row.final_destination ?? ''),
     hub_arrived_at: row.hub_arrived_at ? String(row.hub_arrived_at) : null,
     customer_signed_at: row.customer_signed_at ? String(row.customer_signed_at) : null,
+    packed_at: row.packed_at ? String(row.packed_at) : null,
+    packed_bundle_barcode: String(row.packed_bundle_barcode ?? ''),
+    hub_transit_released_at: row.hub_transit_released_at
+      ? String(row.hub_transit_released_at)
+      : null,
+    hub_transit_shipped_at: row.hub_transit_shipped_at
+      ? String(row.hub_transit_shipped_at)
+      : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -162,17 +172,63 @@ export async function fetchCloudMovementsForItems(itemIds: string[]): Promise<Cl
 
 export async function fetchCloudPackedShipments(
   store: InventoryStoreSession,
+  hubCode?: string,
 ): Promise<CloudPackRow[]> {
   if (!isSupabaseConfigured()) return [];
   const storeCode = store.storeCode.trim().toUpperCase();
-  const { data, error } = await supabase
+  const hub = hubCode?.trim().toUpperCase() ?? '';
+  const packMap = new Map<string, CloudPackRow>();
+
+  const { data: ownerData, error: ownerErr } = await supabase
     .from('inventory_packed_shipments')
     .select('*, inventory_packed_shipment_items(*)')
     .eq('owner_store_code', storeCode)
     .order('created_at', { ascending: false })
     .limit(200);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => row as CloudPackRow);
+  if (ownerErr) throw new Error(ownerErr.message);
+  for (const row of ownerData ?? []) {
+    const pack = row as CloudPackRow;
+    packMap.set(pack.bundle_barcode.trim().toUpperCase(), pack);
+  }
+
+  if (hub) {
+    const { data: hubItems, error: hubItemErr } = await supabase
+      .from('inventory_store_items')
+      .select('barcode')
+      .eq('final_destination', hub)
+      .limit(500);
+    if (hubItemErr) throw new Error(hubItemErr.message);
+
+    const itemBarcodes = (hubItems ?? [])
+      .map((r) => String((r as { barcode: string }).barcode).trim())
+      .filter(Boolean);
+    if (itemBarcodes.length > 0) {
+      const { data: lineRows, error: lineErr } = await supabase
+        .from('inventory_packed_shipment_items')
+        .select('pack_id')
+        .in('item_barcode', itemBarcodes);
+      if (lineErr) throw new Error(lineErr.message);
+
+      const packIds = [
+        ...new Set(
+          (lineRows ?? []).map((r) => String((r as { pack_id: string }).pack_id)).filter(Boolean),
+        ),
+      ];
+      if (packIds.length > 0) {
+        const { data: hubPacks, error: hubPackErr } = await supabase
+          .from('inventory_packed_shipments')
+          .select('*, inventory_packed_shipment_items(*)')
+          .in('id', packIds);
+        if (hubPackErr) throw new Error(hubPackErr.message);
+        for (const row of hubPacks ?? []) {
+          const pack = row as CloudPackRow;
+          packMap.set(pack.bundle_barcode.trim().toUpperCase(), pack);
+        }
+      }
+    }
+  }
+
+  return Array.from(packMap.values());
 }
 
 export async function upsertCloudStoreItem(
@@ -190,12 +246,16 @@ export async function upsertCloudStoreItem(
     qty_on_hand: item.qty_on_hand,
     min_qty: item.min_qty ?? 0,
     note: item.note?.trim() ?? '',
-    owner_store_id: store.id,
+    owner_store_id: toNullableUuid(store.id),
     owner_store_code: item.owner_store_code?.trim() || store.storeCode,
     recipient_name: item.recipient_name?.trim() ?? '',
     final_destination: item.final_destination?.trim() ?? '',
     hub_arrived_at: toNullableTs(item.hub_arrived_at),
     customer_signed_at: toNullableTs(item.customer_signed_at),
+    packed_at: toNullableTs(item.packed_at),
+    packed_bundle_barcode: item.packed_bundle_barcode?.trim() ?? '',
+    hub_transit_released_at: toNullableTs(item.hub_transit_released_at),
+    hub_transit_shipped_at: toNullableTs(item.hub_transit_shipped_at),
     created_at: item.created_at || new Date().toISOString(),
     updated_at: item.updated_at || new Date().toISOString(),
   };
@@ -240,7 +300,7 @@ export async function insertCloudStockMovement(
     detail_address: movement.detail_address,
     packaging: movement.packaging,
     input_barcode: movement.input_barcode,
-    origin_store_id: movement.origin_store_id?.trim() || null,
+    origin_store_id: toNullableUuid(movement.origin_store_id),
     origin_store_code: movement.origin_store_code,
     origin_store_name: movement.origin_store_name,
     created_at: movement.created_at,
@@ -262,7 +322,7 @@ export async function upsertCloudPackedShipment(
     bundle_item_id: bundleCloudItemId,
     operator: pack.operator,
     note: pack.note ?? '',
-    owner_store_id: store.id,
+    owner_store_id: toNullableUuid(store.id),
     owner_store_code: pack.owner_store_code?.trim() || store.storeCode,
     transport_fee: pack.transport_fee?.trim() ?? '',
     truck_leg_destination: pack.truck_leg_destination?.trim() ?? '',
@@ -284,7 +344,7 @@ export async function upsertCloudPackedShipment(
       lines.map((line) => ({
         id: cloudUuid(),
         pack_id: packId,
-        item_id: line.cloud_item_id ?? null,
+        item_id: toNullableUuid(line.cloud_item_id),
         item_barcode: line.item_barcode,
         item_name: line.item_name,
         qty: line.qty,
@@ -319,4 +379,61 @@ export async function fetchCloudItemUpdatedAt(barcode: string): Promise<string |
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? String((data as { updated_at: string }).updated_at) : null;
+}
+
+/** 拆包：删除云端快递包登记（仅未装车出库的包） */
+export async function deleteCloudPackedShipment(bundleBarcode: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const code = bundleBarcode.trim().toUpperCase();
+  if (!code) return;
+
+  const { data: packRow, error: findErr } = await supabase
+    .from('inventory_packed_shipments')
+    .select('id, loaded_at')
+    .eq('bundle_barcode', code)
+    .maybeSingle();
+  if (findErr) throw new Error(findErr.message);
+
+  if (packRow) {
+    const loadedAt = (packRow as { loaded_at?: string | null }).loaded_at;
+    if (loadedAt?.trim()) {
+      throw new Error('该快递包云端已标记装车出库，无法拆包');
+    }
+    const packId = String((packRow as { id: string }).id);
+    const { error: lineErr } = await supabase
+      .from('inventory_packed_shipment_items')
+      .delete()
+      .eq('pack_id', packId);
+    if (lineErr) throw new Error(lineErr.message);
+    const { error: packErr } = await supabase
+      .from('inventory_packed_shipments')
+      .delete()
+      .eq('id', packId);
+    if (packErr) throw new Error(packErr.message);
+  }
+
+  const { data: trackRow } = await supabase
+    .from('inventory_pkg_tracking')
+    .select('id, status, truck_loaded_at')
+    .eq('pack_barcode', code)
+    .maybeSingle();
+  if (trackRow) {
+    const status = String((trackRow as { status: string }).status);
+    const truckLoaded = (trackRow as { truck_loaded_at?: string | null }).truck_loaded_at;
+    if (truckLoaded?.trim() || status === 'in_transit' || status === 'hub_received' || status === 'completed') {
+      throw new Error('该快递包已在运输追踪中，无法拆包');
+    }
+    await supabase.from('inventory_order_tracking').delete().eq('pack_barcode', code);
+    await supabase.from('inventory_pkg_tracking').delete().eq('pack_barcode', code);
+  }
+
+  const bundleCloudId = await getCloudItemIdByBarcode(code);
+  if (bundleCloudId) {
+    await supabase.from('inventory_stock_movements').delete().eq('item_id', bundleCloudId);
+    const { error: itemErr } = await supabase
+      .from('inventory_store_items')
+      .delete()
+      .eq('id', bundleCloudId);
+    if (itemErr) throw new Error(itemErr.message);
+  }
 }

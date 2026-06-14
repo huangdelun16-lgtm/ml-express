@@ -17,7 +17,7 @@ import PkgPickerField from '../components/PkgPickerField';
 import StockOutSuccessModal, { type StockOutSuccessData } from '../components/StockOutSuccessModal';
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { applyTruckLoadOutbound, listOutboundPackages } from '../services/inventoryService';
+import { applyTruckLoadOutbound, listOutboundPackages, syncPlatformInventoryCloud } from '../services/inventoryService';
 import type { PackedShipmentDetail } from '../types/inventory';
 import OutboundDateField from '../components/OutboundDateField';
 import { formatDisplayDate, isValidIsoDate, todayIsoDate } from '../utils/dateFormat';
@@ -29,7 +29,7 @@ import { showTaskSuccess } from '../utils/taskSuccessAlert';
 type Props = NativeStackScreenProps<RootStackParamList, 'StockOut'>;
 
 export default function StockOutScreen({ navigation }: Props) {
-  const { operatorName, store } = useAuth();
+  const { operatorName, store, hubCode } = useAuth();
   const [packs, setPacks] = useState<PackedShipmentDetail[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -47,11 +47,19 @@ export default function StockOutScreen({ navigation }: Props) {
   const loadPacks = useCallback(async () => {
     setLoadingPacks(true);
     try {
-      setPacks(await listOutboundPackages());
+      if (store && hubCode) {
+        try {
+          await syncPlatformInventoryCloud(store, hubCode);
+        } catch {
+          // 离线时仍显示本地可出库列表
+        }
+      }
+      const scope = store && hubCode ? { store, hubCode } : undefined;
+      setPacks(await listOutboundPackages(scope));
     } finally {
       setLoadingPacks(false);
     }
-  }, []);
+  }, [store, hubCode]);
 
   useFocusEffect(
     useCallback(() => {
