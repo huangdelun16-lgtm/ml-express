@@ -1,5 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
-import { getSupabaseConfigHint, isSupabaseConfigured, supabase } from './supabase';
+import {
+  getSupabaseAnonKey,
+  getSupabaseConfigHint,
+  getSupabaseUrl,
+  isSupabaseConfigured,
+  supabase,
+} from './supabase';
 
 export const TRANSIT_STATION_STORE_TYPE = 'transit_station';
 const SESSION_KEY = 'inventory_transit_session';
@@ -20,9 +26,22 @@ type DeliveryStoreRow = {
   store_name: string;
   store_type: string;
   status: string | null;
-  password: string | null;
   region: string | null;
   address: string | null;
+};
+
+type InventoryLoginPayload = {
+  email?: string;
+  hubCode?: string;
+  store?: {
+    id: string;
+    storeCode: string;
+    storeName: string;
+    region?: string;
+    address?: string;
+    storeType: string;
+  };
+  error?: string;
 };
 
 function toSession(store: DeliveryStoreRow): InventoryStoreSession {
@@ -58,6 +77,24 @@ export async function loadStoredSession(): Promise<InventoryStoreSession | null>
   }
 }
 
+function sessionFromAuthMetadata(user: {
+  app_metadata?: Record<string, unknown>;
+}): InventoryStoreSession | null {
+  const meta = user.app_metadata ?? {};
+  const id = String(meta.inventory_store_id ?? '').trim();
+  const storeCode = String(meta.inventory_store_code ?? '').trim().toUpperCase();
+  if (!id || !storeCode) return null;
+  return {
+    id,
+    storeCode,
+    storeName: String(meta.inventory_store_name ?? storeCode),
+    region: String(meta.inventory_region ?? meta.inventory_hub_code ?? '').trim(),
+    address: String(meta.inventory_address ?? '').trim(),
+    storeType: String(meta.inventory_store_type ?? TRANSIT_STATION_STORE_TYPE),
+    loggedInAt: new Date().toISOString(),
+  };
+}
+
 async function validateStoreStillAllowed(storeId: string): Promise<boolean> {
   if (!isSupabaseConfigured()) return true;
   const { data, error } = await supabase
@@ -69,15 +106,68 @@ async function validateStoreStillAllowed(storeId: string): Promise<boolean> {
   return data.store_type === TRANSIT_STATION_STORE_TYPE && (!data.status || data.status === 'active');
 }
 
+async function signInInventoryAuth(email: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(`云端登录失败：${error.message}`);
+}
+
+async function callInventoryStoreLogin(storeCode: string, password: string): Promise<InventoryLoginPayload> {
+  const url = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
+  const response = await fetch(`${url}/functions/v1/inventory-store-login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${anonKey}`,
+      apikey: anonKey,
+    },
+    body: JSON.stringify({ storeCode, password }),
+  });
+  const payload = (await response.json()) as InventoryLoginPayload;
+  if (!response.ok) {
+    throw new Error(payload.error ?? '登录失败');
+  }
+  return payload;
+}
+
 export async function restoreSession(): Promise<InventoryStoreSession | null> {
-  const stored = await loadStoredSession();
-  if (!stored) return null;
-  const ok = await validateStoreStillAllowed(stored.id);
-  if (!ok) {
+  if (!isSupabaseConfigured()) {
+    return await loadStoredSession();
+  }
+
+  const {
+    data: { session: authSession },
+  } = await supabase.auth.getSession();
+
+  if (!authSession?.user) {
     await clearSession();
     return null;
   }
-  return stored;
+
+  const fromMeta = sessionFromAuthMetadata(authSession.user);
+  const stored = await loadStoredSession();
+  const candidate = stored ?? fromMeta;
+  if (!candidate) {
+    await supabase.auth.signOut();
+    await clearSession();
+    return null;
+  }
+
+  if (fromMeta && fromMeta.id !== candidate.id) {
+    await supabase.auth.signOut();
+    await clearSession();
+    return null;
+  }
+
+  const ok = await validateStoreStillAllowed(candidate.id);
+  if (!ok) {
+    await supabase.auth.signOut();
+    await clearSession();
+    return null;
+  }
+
+  if (!stored) await saveSession(candidate);
+  return candidate;
 }
 
 export async function loginTransitStationStore(
@@ -94,31 +184,30 @@ export async function loginTransitStationStore(
     throw new Error('请填写店铺代码和密码');
   }
 
-  const { data: store, error } = await supabase
-    .from('delivery_stores')
-    .select('*')
-    .eq('store_code', code)
-    .maybeSingle();
-
-  if (error) {
-    const hint = getSupabaseConfigHint();
-    if (hint) throw new Error(hint);
-    throw new Error(`查询店铺失败：${error.message}`);
-  }
-  if (!store) {
-    throw new Error('店铺代码不存在');
-  }
-  if (store.password?.trim() !== pass) {
-    throw new Error('密码错误');
-  }
-  if (store.store_type !== TRANSIT_STATION_STORE_TYPE) {
-    throw new Error('仅 Admin 后台创建的「中转站」合伙店铺可登录本 App');
-  }
-  if (store.status && store.status !== 'active') {
-    throw new Error(`账号状态异常（${store.status}），请联系管理员`);
+  const loginPayload = await callInventoryStoreLogin(code, pass);
+  if (!loginPayload.email || !loginPayload.store) {
+    throw new Error(loginPayload.error ?? '登录失败');
   }
 
-  const session = toSession(store as DeliveryStoreRow);
+  await signInInventoryAuth(loginPayload.email, pass);
+
+  const session = toSession({
+    id: loginPayload.store.id,
+    store_code: loginPayload.store.storeCode,
+    store_name: loginPayload.store.storeName,
+    store_type: loginPayload.store.storeType,
+    status: 'active',
+    region: loginPayload.store.region ?? null,
+    address: loginPayload.store.address ?? null,
+  });
+
   await saveSession(session);
   return session;
+}
+
+export async function logoutTransitStationStore(): Promise<void> {
+  if (isSupabaseConfigured()) {
+    await supabase.auth.signOut();
+  }
+  await clearSession();
 }

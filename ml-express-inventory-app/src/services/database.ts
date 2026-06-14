@@ -54,6 +54,22 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
           qty REAL NOT NULL DEFAULT 1
         );
         CREATE INDEX IF NOT EXISTS idx_pack_created ON packed_shipments(created_at DESC);
+        CREATE TABLE IF NOT EXISTS truck_route_fees (
+          origin_code TEXT NOT NULL,
+          destination_code TEXT NOT NULL,
+          fee TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (origin_code, destination_code)
+        );
+        CREATE TABLE IF NOT EXISTS cloud_sync_queue (
+          id TEXT PRIMARY KEY NOT NULL,
+          op_type TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_cloud_sync_queue_created ON cloud_sync_queue(created_at ASC);
       `);
       await migrateInventorySchema(db);
       return db;
@@ -89,6 +105,9 @@ async function migrateInventorySchema(db: SQLite.SQLiteDatabase): Promise<void> 
   if (!moveNames.has('input_barcode')) {
     await db.execAsync(`ALTER TABLE stock_movements ADD COLUMN input_barcode TEXT DEFAULT ''`);
   }
+  if (!moveNames.has('detail_address')) {
+    await db.execAsync(`ALTER TABLE stock_movements ADD COLUMN detail_address TEXT DEFAULT ''`);
+  }
   if (!moveNames.has('origin_store_id')) {
     await db.execAsync(`ALTER TABLE stock_movements ADD COLUMN origin_store_id TEXT DEFAULT ''`);
   }
@@ -106,14 +125,92 @@ async function migrateInventorySchema(db: SQLite.SQLiteDatabase): Promise<void> 
     await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN final_destination TEXT DEFAULT ''`);
     await backfillFinalDestination(db);
   }
+  if (!itemNames.has('hub_arrived_at')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN hub_arrived_at TEXT DEFAULT ''`);
+  }
+  if (!itemNames.has('recipient_name')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN recipient_name TEXT DEFAULT ''`);
+    await backfillItemRecipientNames(db);
+  }
+  if (!itemNames.has('customer_signed_at')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN customer_signed_at TEXT DEFAULT ''`);
+  }
+  if (!itemNames.has('packed_at')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN packed_at TEXT DEFAULT ''`);
+  }
+  if (!itemNames.has('packed_bundle_barcode')) {
+    await db.execAsync(`ALTER TABLE inventory_items ADD COLUMN packed_bundle_barcode TEXT DEFAULT ''`);
+  }
 
   const packCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(packed_shipments)');
   const packNames = new Set(packCols.map((c) => c.name));
   if (!packNames.has('owner_store_code')) {
     await db.execAsync(`ALTER TABLE packed_shipments ADD COLUMN owner_store_code TEXT DEFAULT ''`);
   }
+  if (!packNames.has('transport_fee')) {
+    await db.execAsync(`ALTER TABLE packed_shipments ADD COLUMN transport_fee TEXT DEFAULT ''`);
+  }
+  if (!packNames.has('truck_leg_destination')) {
+    await db.execAsync(`ALTER TABLE packed_shipments ADD COLUMN truck_leg_destination TEXT DEFAULT ''`);
+  }
 
   await backfillItemOwnerCodes(db);
+  await backfillItemRecipientNames(db);
+  await backfillPackedItemFlags(db);
+}
+
+async function backfillPackedItemFlags(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.execAsync(
+    `UPDATE inventory_items
+     SET packed_at = updated_at
+     WHERE TRIM(COALESCE(packed_at, '')) = ''
+       AND id IN (SELECT item_id FROM packed_shipment_items)`,
+  );
+  await db.execAsync(
+    `UPDATE inventory_items
+     SET packed_bundle_barcode = (
+       SELECT p.bundle_barcode FROM packed_shipment_items psi
+       INNER JOIN packed_shipments p ON p.id = psi.pack_id
+       WHERE psi.item_id = inventory_items.id
+       ORDER BY p.created_at DESC LIMIT 1
+     )
+     WHERE TRIM(COALESCE(packed_bundle_barcode, '')) = ''
+       AND id IN (SELECT item_id FROM packed_shipment_items)`,
+  );
+  await db.execAsync(
+    `UPDATE inventory_items
+     SET packed_at = (
+       SELECT MAX(m.created_at) FROM stock_movements m
+       WHERE m.item_id = inventory_items.id AND m.type = 'out' AND m.note LIKE '打包入 %'
+     )
+     WHERE TRIM(COALESCE(packed_at, '')) = ''
+       AND qty_on_hand = 0
+       AND TRIM(COALESCE(hub_arrived_at, '')) = ''
+       AND TRIM(COALESCE(customer_signed_at, '')) = ''
+       AND EXISTS (
+         SELECT 1 FROM stock_movements m
+         WHERE m.item_id = inventory_items.id AND m.type = 'out' AND m.note LIKE '打包入 %'
+       )`,
+  );
+}
+
+async function backfillItemRecipientNames(db: SQLite.SQLiteDatabase): Promise<void> {
+  const richness = `(
+    CASE
+      WHEN TRIM(m.note) LIKE '%总费用%' THEN 0
+      WHEN TRIM(m.recipient_name) != '' OR TRIM(m.recipient_phone) != '' THEN 1
+      WHEN TRIM(m.packaging) != '' THEN 2
+      ELSE 3
+    END)`;
+  await db.execAsync(
+    `UPDATE inventory_items
+     SET recipient_name = (
+       SELECT m.recipient_name FROM stock_movements m
+       WHERE m.item_id = inventory_items.id AND m.type = 'in' AND TRIM(m.recipient_name) != ''
+       ORDER BY ${richness}, m.created_at DESC LIMIT 1
+     )
+     WHERE TRIM(COALESCE(recipient_name, '')) = ''`,
+  );
 }
 
 async function backfillFinalDestination(db: SQLite.SQLiteDatabase): Promise<void> {

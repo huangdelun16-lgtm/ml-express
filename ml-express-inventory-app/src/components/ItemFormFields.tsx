@@ -1,5 +1,6 @@
-import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { type Ref } from 'react';
+import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
+import { useFormFieldChain } from '../hooks/useFormFieldChain';
 import { DimensionSpecField, LockedSuffixField } from './StructuredItemFields';
 import type { useItemFormState } from '../hooks/useItemFormState';
 
@@ -26,6 +27,16 @@ export default function ItemFormFields({
 }: Props) {
   const barcodeFieldHint =
     barcodeHint ?? (!barcodeEditable ? '条码创建后不可修改' : undefined);
+  const fieldChain = useFormFieldChain([
+    'barcode',
+    'name',
+    'specL',
+    'specW',
+    'specH',
+    'unit',
+    'weight',
+    'note',
+  ]);
 
   return (
     <>
@@ -37,8 +48,15 @@ export default function ItemFormFields({
           editable={barcodeEditable}
           mono
           hint={barcodeFieldHint}
+          fieldProps={barcodeEditable ? fieldChain.propsFor('barcode') : undefined}
         />
-        <Field label="商品名称 *" value={form.name} onChange={form.setName} placeholder="输入商品名称" />
+        <Field
+          label="商品名称 *"
+          value={form.name}
+          onChange={form.setName}
+          placeholder="输入商品名称"
+          fieldProps={fieldChain.propsFor('name')}
+        />
       </Section>
 
       <Section title="规格参数">
@@ -51,6 +69,9 @@ export default function ItemFormFields({
             form.setSpecW(w);
             form.setSpecH(h);
           }}
+          lInput={fieldChain.propsFor('specL')}
+          wInput={fieldChain.propsFor('specW')}
+          hInput={fieldChain.propsFor('specH')}
         />
         <LockedSuffixField
           label="单位"
@@ -60,6 +81,10 @@ export default function ItemFormFields({
           placeholder="数量"
           editable={!unitLocked}
           hint={unitHint}
+          inputRef={fieldChain.propsFor('unit').inputRef}
+          returnKeyType={fieldChain.propsFor('unit').returnKeyType}
+          onSubmitEditing={fieldChain.propsFor('unit').onSubmitEditing}
+          blurOnSubmit={fieldChain.propsFor('unit').blurOnSubmit}
         />
         <LockedSuffixField
           label="重量"
@@ -67,6 +92,10 @@ export default function ItemFormFields({
           suffix="Kg"
           onChange={form.setWeightN}
           placeholder="重量"
+          inputRef={fieldChain.propsFor('weight').inputRef}
+          returnKeyType={fieldChain.propsFor('weight').returnKeyType}
+          onSubmitEditing={fieldChain.propsFor('weight').onSubmitEditing}
+          blurOnSubmit={fieldChain.propsFor('weight').blurOnSubmit}
         />
         {showPreview && (form.specStr || form.weightStr || form.unitStr) ? (
           <View style={styles.preview}>
@@ -79,7 +108,14 @@ export default function ItemFormFields({
       </Section>
 
       <Section title="其它">
-        <Field label="备注" value={form.note} onChange={form.setNote} placeholder="选填" multiline />
+        <Field
+          label="备注"
+          value={form.note}
+          onChange={form.setNote}
+          placeholder="选填"
+          multiline
+          fieldProps={fieldChain.propsFor('note', { multiline: true })}
+        />
       </Section>
     </>
   );
@@ -103,6 +139,7 @@ function Field({
   placeholder,
   hint,
   multiline,
+  fieldProps,
 }: {
   label: string;
   value: string;
@@ -112,11 +149,18 @@ function Field({
   placeholder?: string;
   hint?: string;
   multiline?: boolean;
+  fieldProps?: {
+    inputRef: Ref<TextInput>;
+    returnKeyType?: TextInputProps['returnKeyType'];
+    onSubmitEditing?: TextInputProps['onSubmitEditing'];
+    blurOnSubmit?: boolean;
+  };
 }) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        ref={fieldProps?.inputRef}
         style={[
           styles.fieldInput,
           mono && styles.mono,
@@ -129,6 +173,10 @@ function Field({
         placeholder={placeholder}
         placeholderTextColor="#94a3b8"
         multiline={multiline}
+        returnKeyType={fieldProps?.returnKeyType}
+        onSubmitEditing={fieldProps?.onSubmitEditing}
+        blurOnSubmit={fieldProps?.blurOnSubmit}
+        submitBehavior={multiline ? 'newline' : 'submit'}
       />
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>

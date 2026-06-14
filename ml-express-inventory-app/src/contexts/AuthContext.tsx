@@ -8,8 +8,8 @@ import React, {
   type ReactNode,
 } from 'react';
 import {
-  clearSession,
   loginTransitStationStore,
+  logoutTransitStationStore,
   restoreSession,
   type InventoryStoreSession,
 } from '../services/authService';
@@ -36,17 +36,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void restoreSession()
-      .then(setStore)
+      .then((session) => {
+        setStore(session);
+        if (session) {
+          const hub = resolveStoreHubCode(session);
+          void import('../services/inventoryService').then(({ syncPlatformInventoryCloud }) =>
+            syncPlatformInventoryCloud(session, hub),
+          );
+        }
+      })
       .finally(() => setReady(true));
   }, []);
+
+  useEffect(() => {
+    if (!store) {
+      void import('../services/inventoryCloudRealtime').then(({ stopInventoryCloudRealtime }) =>
+        stopInventoryCloudRealtime(),
+      );
+      return;
+    }
+    const hub = resolveStoreHubCode(store);
+    let stopped = false;
+
+    void import('../services/inventoryCloudRealtime').then(({ startInventoryCloudRealtime }) => {
+      if (stopped) return;
+      startInventoryCloudRealtime(store, hub, () => {
+        void import('../services/inventoryService').then(({ pullPlatformInventoryCloud }) =>
+          pullPlatformInventoryCloud(store, hub),
+        );
+      });
+    });
+
+    return () => {
+      stopped = true;
+      void import('../services/inventoryCloudRealtime').then(({ stopInventoryCloudRealtime }) =>
+        stopInventoryCloudRealtime(),
+      );
+    };
+  }, [store]);
 
   const login = useCallback(async (storeCode: string, password: string) => {
     const session = await loginTransitStationStore(storeCode, password);
     setStore(session);
+    const hub = resolveStoreHubCode(session);
+    void import('../services/inventoryService').then(({ syncPlatformInventoryCloud }) =>
+      syncPlatformInventoryCloud(session, hub),
+    );
   }, []);
 
   const logout = useCallback(async () => {
-    await clearSession();
+    await logoutTransitStationStore();
     setStore(null);
   }, []);
 

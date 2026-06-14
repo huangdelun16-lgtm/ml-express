@@ -15,6 +15,7 @@ import {
   focusMerchantWindow,
   playNewOrderChime,
   showNewOrderDesktopNotification,
+  speakMerchantNewOrderAlert,
   startPendingOrderTitleFlash,
   stopPendingOrderTitleFlash,
 } from '../utils/merchantOrderDesktopAlert';
@@ -46,20 +47,6 @@ const VOICE_STORAGE_KEY = 'ml-merchant-voice-alert';
 const PENDING_POLL_MS = 10_000;
 const PENDING_SELECT =
   'id,status,delivery_store_id,sender_name,receiver_name,receiver_address,receiver_phone,description,price,created_at,create_time,payment_method,cod_amount';
-
-function speakMerchantAlert(text: string, lang: string) {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  try {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang =
-      lang === 'my' ? 'my-MM' : lang === 'en' ? 'en-US' : 'zh-CN';
-    utterance.rate = 0.95;
-    window.speechSynthesis.speak(utterance);
-  } catch (e) {
-    LoggerService.warn('语音播报失败', e);
-  }
-}
 
 export function MerchantOrderProvider({
   storeId,
@@ -292,13 +279,7 @@ export function MerchantOrderProvider({
     const now = Date.now();
     if (now - lastVoiceAtRef.current < 8000) return;
     lastVoiceAtRef.current = now;
-    const text =
-      language === 'my'
-        ? `အော်ဒါအသစ် ${pendingOrders.length} ခု ရှိပါတယ်၊ လက်ခံပေးပါ`
-        : language === 'en'
-          ? `You have ${pendingOrders.length} new order(s), please accept`
-          : `您有 ${pendingOrders.length} 个新订单，请接单`;
-    speakMerchantAlert(text, language);
+    speakMerchantNewOrderAlert(pendingOrders.length, language);
   }, [pendingOrders.length, isVoiceEnabled, language]);
 
   const value: MerchantOrderContextValue = {

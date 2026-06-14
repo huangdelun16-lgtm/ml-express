@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { PackedShipmentDetail } from '../types/inventory';
+import { resolvePackOrderCount } from '../utils/itemFieldFormat';
 
 type Props = {
   visible: boolean;
@@ -11,6 +12,8 @@ type Props = {
 export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
   if (!pack) return null;
 
+  const orderCount = resolvePackOrderCount(pack);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
@@ -19,13 +22,16 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
           <Text style={styles.packageNo} selectable>
             {pack.bundle_barcode}
           </Text>
-          <Text style={styles.subtitle}>共 {pack.items.length} 个订单</Text>
+          <Text style={styles.subtitle}>共 {orderCount} 个订单</Text>
 
           <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
             {pack.items.map((line, index) => (
               <View key={line.id} style={styles.orderRow}>
                 <Text style={styles.orderIndex}>{index + 1}</Text>
                 <View style={styles.orderBody}>
+                  <Text style={styles.customerName} numberOfLines={1}>
+                    {line.customer_name?.trim() || '未登记客户'}
+                  </Text>
                   <Text style={styles.orderName} numberOfLines={2}>
                     {line.item_name}
                   </Text>
@@ -101,6 +107,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   orderBody: { flex: 1, minWidth: 0 },
+  customerName: { color: '#7dd3fc', fontSize: 13, fontWeight: '800', marginBottom: 2 },
   orderName: { color: '#f8fafc', fontSize: 14, fontWeight: '800' },
   codeRow: {
     flexDirection: 'row',

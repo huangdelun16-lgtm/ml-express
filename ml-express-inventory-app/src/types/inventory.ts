@@ -15,12 +15,22 @@ export interface InventoryItem {
   note: string;
   /** 入库登记站店铺代码（如 MUSE001、YGN002）；空表示历史数据 */
   owner_store_code?: string;
-  /** 最近一次入库登记的收件人姓名（列表查询时填充） */
+  /** 入库登记的收件人姓名（商品表持久化，列表优先展示） */
+  recipient_name?: string;
+  /** 列表展示用客户名（查询时由 recipient_name 或入库流水填充） */
   customer_name?: string;
   /** 最终目的地（入库收发信息登记，如 YGN、MDY） */
   final_destination?: string;
   /** 列表展示用，同 final_destination */
   destination?: string;
+  /** 中转到站收货时间（本站确认后写入） */
+  hub_arrived_at?: string;
+  /** 客户签收时间（目的站交付） */
+  customer_signed_at?: string;
+  /** 打包入快递包时间（持久化，避免同步清掉关联表后状态丢失） */
+  packed_at?: string;
+  /** 所属快递包包装号 */
+  packed_bundle_barcode?: string;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +39,8 @@ export interface InventoryItem {
 export interface InventoryItemListRow extends InventoryItem {
   stocked_in: boolean;
   packed: boolean;
+  hub_arrived: boolean;
+  customer_signed: boolean;
   /** 所属快递包包装号（已打包时由列表查询填充） */
   parent_pack_barcode?: string;
 }
@@ -47,6 +59,8 @@ export interface StockMovement {
   recipient_name: string;
   recipient_phone: string;
   destination: string;
+  /** 收件详细地址（与目的地地区码分开存储） */
+  detail_address: string;
   packaging: string;
   input_barcode: string;
   origin_store_id: string;
@@ -64,6 +78,10 @@ export interface PackedShipment {
   note: string;
   /** 打包操作站店铺代码 */
   owner_store_code: string;
+  /** 装车出库登记的车费（MMK） */
+  transport_fee?: string;
+  /** 装车本段运达站 */
+  truck_leg_destination?: string;
   created_at: string;
 }
 
@@ -77,6 +95,8 @@ export interface PackedShipmentItem {
   item_name: string;
   /** 订单最终目的地（来自入库流水） */
   destination: string;
+  /** 收件人 / 客户姓名（来自入库流水） */
+  customer_name: string;
   qty: number;
 }
 
@@ -120,7 +140,14 @@ export interface TrackOrderResult {
 /** 商品库订单详情（查看用） */
 export interface InventoryItemDetail extends InventoryItem {
   recipient_phone: string;
+  detail_address: string;
   packaging: string;
+  inbound_qty: number;
+  inbound_date_label: string;
+  inbound_store_name: string;
+  total_fee?: string;
+  payment_label?: string;
+  inbound_note?: string;
   /** 若为打包生成的包裹，附带打包明细 */
   pack: PackedShipmentDetail | null;
 }

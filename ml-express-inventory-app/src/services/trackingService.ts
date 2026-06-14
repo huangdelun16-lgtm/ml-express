@@ -40,6 +40,7 @@ function rowToPkg(row: Record<string, unknown>): PkgTrackingRecord {
       ? String(row.hub_received_by_store_name)
       : null,
     completed_at: row.completed_at ? String(row.completed_at) : null,
+    transport_fee: String(row.transport_fee ?? ''),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -56,6 +57,15 @@ function rowToOrder(row: Record<string, unknown>): OrderTrackingRecord {
     destination_code: String(row.destination_code ?? ''),
     qty: Number(row.qty) || 1,
     status: row.status as OrderTrackingRecord['status'],
+    recipient_name: String(row.recipient_name ?? ''),
+    recipient_phone: String(row.recipient_phone ?? ''),
+    packaging: String(row.packaging ?? ''),
+    spec: String(row.spec ?? ''),
+    weight: String(row.weight ?? ''),
+    detail_address: String(row.detail_address ?? ''),
+    inbound_note: String(row.inbound_note ?? ''),
+    inbound_store_name: String(row.inbound_store_name ?? ''),
+    inbound_at: row.inbound_at ? String(row.inbound_at) : null,
     hub_received_at: row.hub_received_at ? String(row.hub_received_at) : null,
     hub_received_by_store_code: row.hub_received_by_store_code
       ? String(row.hub_received_by_store_code)
@@ -84,6 +94,64 @@ function resolvePackLegDestination(pkg: PkgTrackingRecord): string {
 
 function isOrderProcessed(status: OrderTrackingRecord['status']): boolean {
   return status === 'hub_received' || status === 'released_at_hub';
+}
+
+async function fetchOrderTrackingChunk(
+  column: 'order_barcode' | 'express_barcode',
+  codes: string[],
+): Promise<OrderTrackingRecord[]> {
+  if (codes.length === 0) return [];
+  const { data, error } = await supabase.from('inventory_order_tracking').select('*').in(column, codes);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => rowToOrder(r as Record<string, unknown>));
+}
+
+/** 批量按入库条码查询云端订单追踪 */
+export async function fetchOrderTrackingByBarcodes(
+  orderBarcodes: string[],
+): Promise<OrderTrackingRecord[]> {
+  assertSupabaseReady();
+  const codes = [...new Set(orderBarcodes.map((c) => c.trim()).filter(Boolean))];
+  const results: OrderTrackingRecord[] = [];
+  const chunkSize = 80;
+  for (let i = 0; i < codes.length; i += chunkSize) {
+    results.push(...(await fetchOrderTrackingChunk('order_barcode', codes.slice(i, i + chunkSize))));
+  }
+  return results;
+}
+
+/** 批量按快递单号查询云端订单追踪 */
+export async function fetchOrderTrackingByExpressBarcodes(
+  expressBarcodes: string[],
+): Promise<OrderTrackingRecord[]> {
+  assertSupabaseReady();
+  const codes = [...new Set(expressBarcodes.map((c) => c.trim()).filter(Boolean))];
+  const results: OrderTrackingRecord[] = [];
+  const chunkSize = 80;
+  for (let i = 0; i < codes.length; i += chunkSize) {
+    results.push(...(await fetchOrderTrackingChunk('express_barcode', codes.slice(i, i + chunkSize))));
+  }
+  return results;
+}
+
+/** 按订单条码查询云端追踪（供到站账号补全本地 Invoice） */
+export async function getOrderTrackingByBarcode(
+  scanCode: string,
+): Promise<OrderTrackingRecord | null> {
+  assertSupabaseReady();
+  const code = scanCode.trim();
+  if (!code) return null;
+
+  const { data, error } = await supabase
+    .from('inventory_order_tracking')
+    .select('*')
+    .or(`order_barcode.eq.${code},express_barcode.eq.${code}`)
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  if (error) throw new Error(error.message);
+  if (!data?.length) return null;
+  return rowToOrder(data[0] as Record<string, unknown>);
 }
 
 async function fetchOrdersForPack(packBarcode: string): Promise<OrderTrackingRecord[]> {
@@ -145,12 +213,26 @@ export function formatPkgNotFoundHint(packBarcode: string, hubCode: string): str
   return lines.join('\n');
 }
 
+export type OrderInboundSnapshot = {
+  recipient_name: string;
+  recipient_phone: string;
+  packaging: string;
+  spec: string;
+  weight: string;
+  detail_address: string;
+  inbound_note: string;
+  inbound_store_name: string;
+  inbound_at: string | null;
+};
+
 export async function pushTruckLoadTracking(params: {
   originStore: OriginStore;
   destinationCode: string;
   outboundDate: string;
   packs: PackedShipmentDetail[];
   totalWeightKg: string;
+  orderSnapshots?: Record<string, OrderInboundSnapshot>;
+  transportFees?: Record<string, string>;
 }): Promise<void> {
   assertSupabaseReady();
 
@@ -160,6 +242,10 @@ export async function pushTruckLoadTracking(params: {
 
   for (const pack of params.packs) {
     const packLabelDest = packDestinationFromBarcode(pack.bundle_barcode) || legDest;
+    const transportFee =
+      params.transportFees?.[pack.bundle_barcode]?.trim() ||
+      params.transportFees?.[pack.bundle_barcode.toUpperCase()]?.trim() ||
+      '';
 
     const { data: pkgRow, error: pkgError } = await supabase
       .from('inventory_pkg_tracking')
@@ -174,6 +260,7 @@ export async function pushTruckLoadTracking(params: {
           leg_destination_code: legDest,
           item_count: pack.items.length,
           total_weight: pack.weight ?? '',
+          transport_fee: transportFee,
           status: 'in_transit',
           truck_outbound_date: params.outboundDate,
           truck_loaded_at: now,
@@ -197,28 +284,46 @@ export async function pushTruckLoadTracking(params: {
 
     for (const line of pack.items) {
       const orderDest = extractDestinationCode(line.destination || line.item_barcode);
+      const snap = params.orderSnapshots?.[line.item_barcode];
+
+      const { data: existingRow } = await supabase
+        .from('inventory_order_tracking')
+        .select('*')
+        .eq('order_barcode', line.item_barcode)
+        .maybeSingle();
+      const existingOrder = existingRow
+        ? rowToOrder(existingRow as Record<string, unknown>)
+        : null;
+
+      const pick = (snapVal: string | undefined, existingVal: string | undefined, fallback = '') =>
+        snapVal?.trim() || existingVal?.trim() || fallback.trim();
+
       const orderPayload = {
         pkg_tracking_id: pkgId,
         pack_barcode: pack.bundle_barcode,
         order_barcode: line.item_barcode,
-        express_barcode: line.input_barcode ?? '',
+        express_barcode: pick(line.input_barcode, existingOrder?.express_barcode),
         order_name: line.item_name,
         destination_code: orderDest,
         qty: line.qty,
         status: 'in_transit' as const,
+        recipient_name: pick(snap?.recipient_name, existingOrder?.recipient_name, line.customer_name),
+        recipient_phone: pick(snap?.recipient_phone, existingOrder?.recipient_phone),
+        packaging: pick(snap?.packaging, existingOrder?.packaging),
+        spec: pick(snap?.spec, existingOrder?.spec),
+        weight: pick(snap?.weight, existingOrder?.weight),
+        detail_address: pick(snap?.detail_address, existingOrder?.detail_address),
+        inbound_note: pick(snap?.inbound_note, existingOrder?.inbound_note),
+        inbound_store_name:
+          pick(snap?.inbound_store_name, existingOrder?.inbound_store_name, params.originStore.storeName),
+        inbound_at: snap?.inbound_at ?? existingOrder?.inbound_at ?? null,
         hub_received_at: null,
         hub_received_by_store_code: null,
         hub_received_by_store_name: null,
         updated_at: now,
       };
 
-      const { data: existing } = await supabase
-        .from('inventory_order_tracking')
-        .select('id')
-        .eq('order_barcode', line.item_barcode)
-        .maybeSingle();
-
-      if (existing) {
+      if (existingOrder) {
         const { error } = await supabase
           .from('inventory_order_tracking')
           .update(orderPayload)

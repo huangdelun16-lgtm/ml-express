@@ -1,6 +1,8 @@
 # ML Inventory（平台库存 App）
 
-独立运行的手机/平板库存管理应用，供 **Admin 后台创建的中转站合伙店铺** 使用。登录校验连接 Supabase `delivery_stores`；库存与流水仍保存在本机 SQLite。
+独立运行的手机/平板库存管理应用，供 **Admin 后台创建的中转站合伙店铺** 使用。登录校验连接 Supabase `delivery_stores`。
+
+**数据策略（Google Play / 多设备）**：业务数据迁移至 Supabase 专用表 `inventory_*`（与客户端/商家端/骑手端隔离）。详见 `docs/CLOUD_DATA_ARCHITECTURE.md`。当前版本仍以本机 SQLite 为主；完成云端同步后多部手机将显示一致。
 
 ## 功能
 
@@ -61,13 +63,14 @@ src/
   types/
 ```
 
-## 后续对接（占位）
+## 后续对接
 
-云端表结构草案见仓库根目录：
+云端表结构：
 
-`supabase/migrations/20260531120000_inventory_cloud_sync_placeholder.sql`
+- 在途追踪：`inventory_pkg_tracking` / `inventory_order_tracking`（已用）
+- 订单/流水/快递包：`inventory_store_items` 等（见 `supabase/migrations/20260615120000_inventory_platform_store_data.sql`）
 
-当前 App **不读取** 该 migration，仅作未来同步设计参考。
+旧占位文件：`supabase/migrations/20260531120000_inventory_cloud_sync_placeholder.sql`
 
 ## 构建独立安装包
 

@@ -18,12 +18,15 @@ import {
   listPackedShipmentRows,
   resyncLoadedPackToCloud,
   syncInboundHubPacksToLocal,
+  syncPlatformInventoryCloud,
 } from '../services/inventoryService';
 import { isSupabaseConfigured } from '../services/supabase';
 import { packOrderBarcodeData } from '../utils/orderBarcodeData';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
+import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { canEditOwnedRecord, resolveOwnerKeyForListItem } from '../utils/storeOwnership';
 
 function formatTime(iso: string): string {
@@ -47,6 +50,7 @@ export default function PkgScreen() {
   const load = useCallback(async () => {
     if (store && hubCode) {
       try {
+        await syncPlatformInventoryCloud(store, hubCode);
         await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? '工作人员');
       } catch {
         // 云端未配置或离线时仍显示本地列表
@@ -111,6 +115,7 @@ export default function PkgScreen() {
           const statusStyle = packStatusStyle(item.display_status);
           const statusLabel = PACK_DISPLAY_LABEL[item.display_status];
           const dest = packDestinationFromBarcode(item.bundle_barcode);
+          const orderCount = resolvePackOrderCount(item);
 
           return (
             <Pressable
@@ -148,8 +153,8 @@ export default function PkgScreen() {
                   </Text>
                 </View>
                 <View style={styles.countInline}>
-                  <Text style={styles.countText}>{item.items.length}</Text>
-                  <Text style={styles.countUnit}>件</Text>
+                  <Text style={styles.countText}>{orderCount}</Text>
+                  <Text style={styles.countUnit}>{stockUnitLabel()}</Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </View>
@@ -158,6 +163,16 @@ export default function PkgScreen() {
                 <Text style={styles.meta} numberOfLines={1}>
                   {[item.spec, item.unit, item.weight].filter(Boolean).join(' · ')}
                 </Text>
+              ) : null}
+
+              {item.loaded && item.transport_fee?.trim() ? (
+                <View style={styles.feePill}>
+                  <Text style={styles.feePillLabel}>车费</Text>
+                  <Text style={styles.feePillValue}>
+                    {item.truck_leg_destination ? `本段 ${item.truck_leg_destination} · ` : ''}
+                    {item.transport_fee} MMK
+                  </Text>
+                </View>
               ) : null}
 
               <View style={styles.noteRow}>
@@ -207,12 +222,11 @@ export default function PkgScreen() {
                 void (async () => {
                   setResyncing(true);
                   try {
-                    await resyncLoadedPackToCloud(actionPack.bundle_barcode, {
-                      id: store.id,
-                      storeCode: store.storeCode,
-                      storeName: store.storeName,
-                    });
-                    Alert.alert('已补传云端', `${actionPack.bundle_barcode} 已写入云端追踪，目的地站点可扫码收货`);
+                    await resyncLoadedPackToCloud(actionPack.bundle_barcode, store);
+                    showTaskSuccess(
+                      '补传成功',
+                      `${actionPack.bundle_barcode} 已写入云端追踪，目的地站点可扫码收货`,
+                    );
                     setActionPack(null);
                     await load();
                   } catch (e: unknown) {
@@ -356,6 +370,21 @@ const styles = StyleSheet.create({
     marginLeft: -2,
   },
   meta: { color: '#94a3b8', fontSize: 11, marginTop: 8, fontFamily: 'monospace' },
+  feePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(217,119,6,0.12)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.35)',
+  },
+  feePillLabel: { color: '#fbbf24', fontSize: 10, fontWeight: '800' },
+  feePillValue: { color: '#fde68a', fontSize: 12, fontWeight: '800' },
   noteRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

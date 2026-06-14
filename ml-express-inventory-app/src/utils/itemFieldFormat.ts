@@ -57,6 +57,56 @@ export function stockUnitLabel(): string {
   return 'Pcs';
 }
 
+export function isCustomerSignedItem(item: {
+  customer_signed?: boolean;
+  customer_signed_at?: string;
+}): boolean {
+  return item.customer_signed || Boolean(item.customer_signed_at?.trim());
+}
+
+/** 列表卡片右上角数量：
+ * - 已签收 → 0（客户已取走）
+ * - 已到站待签收 → 1（可交付，即使在快递包内）
+ * - 已打包未到站 → 0（已装包待发）
+ * - 其余按库存/入库件数
+ */
+export function resolveItemCardQty(item: {
+  qty_on_hand: number;
+  unit?: string;
+  stocked_in?: boolean;
+  packed?: boolean;
+  packed_at?: string;
+  hub_arrived?: boolean;
+  customer_signed?: boolean;
+  customer_signed_at?: string;
+}): number {
+  if (isCustomerSignedItem(item)) return 0;
+
+  if (item.hub_arrived) {
+    if (item.qty_on_hand > 0) return item.qty_on_hand;
+    return 1;
+  }
+
+  if (item.packed || Boolean(item.packed_at?.trim())) return 0;
+
+  if (item.qty_on_hand > 0) return item.qty_on_hand;
+
+  // 库存为 0 时不读 unit 字段（unit 表示订单规格「1 Pcs」，不是当前可交付件数）
+  return 0;
+}
+
+/** 快递包内含订单件数：优先包内明细行，其次包裹 unit 字段（如 2 Pcs） */
+export function resolvePackOrderCount(pack: { items: { qty?: number }[]; unit?: string }): number {
+  let fromLines = 0;
+  for (const line of pack.items) {
+    fromLines += Math.max(1, Number(line.qty) || 0);
+  }
+  if (fromLines > 0) return fromLines;
+  const unitN = Number(parseUnit(pack.unit ?? '').n);
+  if (Number.isFinite(unitN) && unitN > 0) return unitN;
+  return 0;
+}
+
 export function parseWeightKg(value: string): number {
   const n = parseWeight(value).n;
   if (!n) return 0;

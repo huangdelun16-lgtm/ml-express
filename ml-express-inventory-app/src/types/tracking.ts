@@ -26,6 +26,8 @@ export interface PkgTrackingRecord {
   hub_received_by_store_code: string | null;
   hub_received_by_store_name: string | null;
   completed_at: string | null;
+  /** 本段装车车费 MMK（由运达站承担） */
+  transport_fee: string;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +43,15 @@ export interface OrderTrackingRecord {
   destination_code: string;
   qty: number;
   status: OrderTrackingStatus;
+  recipient_name: string;
+  recipient_phone: string;
+  packaging: string;
+  spec: string;
+  weight: string;
+  detail_address: string;
+  inbound_note: string;
+  inbound_store_name: string;
+  inbound_at: string | null;
   hub_received_at: string | null;
   hub_received_by_store_code: string | null;
   hub_received_by_store_name: string | null;

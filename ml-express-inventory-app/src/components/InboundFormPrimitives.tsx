@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { type Ref } from 'react';
+import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
 
 export function InboundFormSection({
   title,
@@ -30,6 +30,10 @@ export function InboundFormField({
   multiline,
   editable = true,
   mono,
+  inputRef,
+  returnKeyType,
+  onSubmitEditing,
+  blurOnSubmit,
 }: {
   label: string;
   value: string;
@@ -39,11 +43,16 @@ export function InboundFormField({
   multiline?: boolean;
   editable?: boolean;
   mono?: boolean;
+  inputRef?: Ref<TextInput>;
+  returnKeyType?: TextInputProps['returnKeyType'];
+  onSubmitEditing?: TextInputProps['onSubmitEditing'];
+  blurOnSubmit?: boolean;
 }) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        ref={inputRef}
         style={[
           styles.input,
           multiline && styles.inputMulti,
@@ -57,6 +66,10 @@ export function InboundFormField({
         placeholderTextColor="#94a3b8"
         keyboardType={keyboard}
         multiline={multiline}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
+        blurOnSubmit={blurOnSubmit}
+        submitBehavior={multiline ? 'newline' : 'submit'}
       />
     </View>
   );

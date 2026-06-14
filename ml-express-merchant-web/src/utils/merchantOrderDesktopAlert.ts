@@ -115,6 +115,78 @@ export function stopPendingOrderTitleFlash(): void {
   }
 }
 
+/** 新订单语音文案与 TTS 语言（缅语界面无可靠 my-MM 语音，回退英语） */
+export function getMerchantNewOrderVoiceAlert(
+  count: number,
+  uiLanguage: string,
+): { text: string; voiceLang: string } {
+  if (uiLanguage === 'zh') {
+    return {
+      text: `您有 ${count} 个新订单，请接单`,
+      voiceLang: 'zh-CN',
+    };
+  }
+  const enText =
+    count === 1
+      ? 'You have 1 new order, please accept'
+      : `You have ${count} new orders, please accept`;
+  return { text: enText, voiceLang: 'en-US' };
+}
+
+function pickSpeechVoice(voiceLang: string): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const exact = voices.find((v) => v.lang === voiceLang);
+  if (exact) return exact;
+  const prefix = voiceLang.split('-')[0];
+  return (
+    voices.find((v) => v.lang.startsWith(`${prefix}-`)) ??
+    voices.find((v) => v.lang.startsWith('en')) ??
+    null
+  );
+}
+
+function speakUtteranceWhenVoicesReady(
+  utterance: SpeechSynthesisUtterance,
+  voiceLang: string,
+): void {
+  const synth = window.speechSynthesis;
+  const trySpeak = () => {
+    const voice = pickSpeechVoice(voiceLang);
+    if (voice) utterance.voice = voice;
+    synth.speak(utterance);
+  };
+  if (synth.getVoices().length > 0) {
+    trySpeak();
+    return;
+  }
+  const onVoices = () => {
+    synth.removeEventListener('voiceschanged', onVoices);
+    trySpeak();
+  };
+  synth.addEventListener('voiceschanged', onVoices);
+  window.setTimeout(() => {
+    synth.removeEventListener('voiceschanged', onVoices);
+    trySpeak();
+  }, 300);
+}
+
+/** 新订单语音播报（MerchantOrderContext / 语音开关） */
+export function speakMerchantNewOrderAlert(count: number, uiLanguage: string): void {
+  if (typeof window === 'undefined' || !window.speechSynthesis || count <= 0) return;
+  const { text, voiceLang } = getMerchantNewOrderVoiceAlert(count, uiLanguage);
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = voiceLang;
+    utterance.rate = 0.95;
+    speakUtteranceWhenVoicesReady(utterance, voiceLang);
+  } catch {
+    /* 部分浏览器拒绝或未加载语音包 */
+  }
+}
+
 /** 短提示音：后台 tab 有时比 speechSynthesis 更可靠 */
 export function playNewOrderChime(): void {
   if (typeof window === 'undefined') return;

@@ -37,6 +37,7 @@ import {
   formatInboundDateYmd,
 } from '../utils/stockInDate';
 import { canEditOwnedRecord, editDeniedMessage } from '../utils/storeOwnership';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Route = { params?: { itemId?: string } };
 
@@ -126,7 +127,7 @@ export default function ItemFormScreen({
         { ...form.payload, id: itemId, min_qty: 0 },
         { actingStore: store },
       );
-      Alert.alert('已保存', form.payload.name, [{ text: '好的', onPress: () => navigation.goBack() }]);
+      showTaskSuccess('保存成功', form.payload.name, () => navigation.goBack());
     } catch (e: unknown) {
       Alert.alert('失败', e instanceof Error ? e.message : '请重试');
     } finally {
@@ -171,7 +172,7 @@ export default function ItemFormScreen({
         },
         store,
       );
-      Alert.alert('已保存', productName.trim(), [{ text: '好的', onPress: () => navigation.goBack() }]);
+      showTaskSuccess('保存成功', productName.trim(), () => navigation.goBack());
     } catch (e: unknown) {
       Alert.alert('失败', e instanceof Error ? e.message : '请重试');
     } finally {

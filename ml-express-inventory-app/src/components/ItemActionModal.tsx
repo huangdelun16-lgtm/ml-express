@@ -1,17 +1,21 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { InventoryItem } from '../types/inventory';
+import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
+
+type ItemRow = InventoryItem | InventoryItemListRow;
 
 type Props = {
   visible: boolean;
-  item: InventoryItem | null;
+  item: ItemRow | null;
   variant?: 'item' | 'pack';
   onClose: () => void;
   onView: () => void;
   onEdit: () => void;
   onPrint?: () => void;
+  onSignDelivered?: () => void;
   canEdit?: boolean;
+  canSignDelivered?: boolean;
 };
 
 export default function ItemActionModal({
@@ -22,13 +26,16 @@ export default function ItemActionModal({
   onView,
   onEdit,
   onPrint,
+  onSignDelivered,
   canEdit = true,
+  canSignDelivered = false,
 }: Props) {
   if (!item) return null;
 
   const isPack = variant === 'pack';
   const accent = isPack ? '#a855f7' : '#2563eb';
   const dest = isPack ? packDestinationFromBarcode(item.barcode) : '';
+  const showSign = !isPack && canSignDelivered && onSignDelivered;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -55,27 +62,48 @@ export default function ItemActionModal({
             </Text>
           )}
 
-          <Pressable style={styles.btnView} onPress={onView}>
-            <Text style={styles.btnViewText}>查看</Text>
-          </Pressable>
-          {canEdit ? (
-            <Pressable style={[styles.btnEdit, isPack && styles.btnEditPack]} onPress={onEdit}>
-              <Text style={[styles.btnEditText, isPack && styles.btnEditTextPack]}>
-                {isPack ? '编辑快递包' : '编辑'}
-              </Text>
+          <View style={styles.btnRow}>
+            <Pressable style={[styles.btnView, canEdit ? styles.btnHalf : styles.btnFull]} onPress={onView}>
+              <Text style={styles.btnViewText}>查看</Text>
             </Pressable>
-          ) : (
+            {canEdit ? (
+              <Pressable
+                style={[styles.btnEdit, isPack && styles.btnEditPack, styles.btnHalf]}
+                onPress={onEdit}
+              >
+                <Text style={[styles.btnEditText, isPack && styles.btnEditTextPack]}>
+                  {isPack ? '编辑快递包' : '编辑'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {!canEdit && !isPack ? (
             <View style={styles.readonlyHint}>
               <Text style={styles.readonlyHintText}>
                 该订单由其他站点入库登记，本站仅可查看与打印
               </Text>
             </View>
-          )}
-          {onPrint ? (
-            <Pressable style={styles.btnPrint} onPress={onPrint}>
-              <Text style={styles.btnPrintText}>打印标签</Text>
-            </Pressable>
           ) : null}
+
+          {showSign || onPrint ? (
+            <View style={styles.btnRow}>
+              {showSign ? (
+                <Pressable style={[styles.btnSign, onPrint ? styles.btnHalf : styles.btnFull]} onPress={onSignDelivered}>
+                  <Text style={styles.btnSignText}>已签收</Text>
+                </Pressable>
+              ) : null}
+              {onPrint ? (
+                <Pressable
+                  style={[styles.btnPrint, showSign ? styles.btnHalf : styles.btnFull]}
+                  onPress={onPrint}
+                >
+                  <Text style={styles.btnPrintText}>打印标签</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
           <Pressable style={styles.btnCancel} onPress={onClose}>
             <Text style={styles.btnCancelText}>关闭</Text>
           </Pressable>
@@ -137,12 +165,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   subtitle: { color: '#94a3b8', fontSize: 13, marginTop: 4, marginBottom: 16 },
+  btnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  btnHalf: { flex: 1 },
+  btnFull: { flex: 1 },
   btnView: {
     backgroundColor: '#2563eb',
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-    marginBottom: 10,
   },
   btnViewText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnEdit: {
@@ -152,7 +186,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#475569',
-    marginBottom: 10,
   },
   btnEditPack: { borderColor: '#a855f7' },
   btnEditText: { color: '#e2e8f0', fontWeight: '800', fontSize: 16 },
@@ -167,12 +200,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   readonlyHintText: { color: '#94a3b8', fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  btnSign: {
+    backgroundColor: '#059669',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  btnSignText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnPrint: {
     backgroundColor: '#0ea5e9',
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-    marginBottom: 10,
   },
   btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnCancel: { paddingVertical: 10, alignItems: 'center' },

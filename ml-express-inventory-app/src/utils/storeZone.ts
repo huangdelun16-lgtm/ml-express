@@ -14,3 +14,10 @@ export function resolveStoreHubCode(store: InventoryStoreSession): string {
   if (region) return region.slice(0, 3);
   return prefix.slice(0, 3);
 }
+
+/** 装车车费路线发站展示（店铺代码字母部分，如 MUSE001 → MUSE） */
+export function resolveStoreOriginLabel(store: InventoryStoreSession): string {
+  const letters = store.storeCode.replace(/[0-9]/g, '').toUpperCase();
+  if (letters) return letters;
+  return resolveStoreHubCode(store);
+}

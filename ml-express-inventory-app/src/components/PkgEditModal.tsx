@@ -13,6 +13,7 @@ import {
 import ItemFormFields from './ItemFormFields';
 import { useItemFormState } from '../hooks/useItemFormState';
 import { useAuth } from '../contexts/AuthContext';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { updatePackedShipment } from '../services/inventoryService';
 import type { PackedShipmentListRow } from '../types/inventory';
 
@@ -59,6 +60,7 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
         },
         store,
       );
+      showTaskSuccess('保存成功', '快递包信息已更新');
       onSaved();
       onClose();
     } catch (e: unknown) {

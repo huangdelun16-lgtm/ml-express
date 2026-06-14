@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,12 +9,15 @@ import {
   View,
 } from 'react-native';
 import ScanInputBar from '../components/ScanInputBar';
-import { trackOrderByCode } from '../services/inventoryService';
+import { useAuth } from '../contexts/AuthContext';
+import { markCustomerSigned, trackOrderByCode } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { PackedShipmentDetail, TrackOrderResult } from '../types/inventory';
 import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import { ORDER_STATUS_LABEL, PKG_STATUS_LABEL } from '../types/tracking';
+import { canMarkCustomerSigned } from '../utils/customerSign';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Route = { params?: { presetCode?: string } };
 
@@ -139,13 +143,20 @@ function TrackResultPanel({
   result,
   cloudPkg,
   cloudOrder,
+  canSignDelivered,
+  signing,
+  onSignDelivered,
 }: {
   result: TrackOrderResult;
   cloudPkg: PkgTrackingDetail | null;
   cloudOrder: OrderTrackingRecord | null;
+  canSignDelivered?: boolean;
+  signing?: boolean;
+  onSignDelivered?: () => void;
 }) {
   const { detail, parentPack, truckLoad } = result;
   const activePack = detail.pack ?? parentPack;
+  const showSign = canSignDelivered && onSignDelivered;
 
   return (
     <View style={styles.result}>
@@ -232,6 +243,16 @@ function TrackResultPanel({
           ))}
         </Section>
       ) : null}
+
+      {showSign ? (
+        <Pressable
+          style={[styles.signBtn, signing && styles.signBtnDisabled]}
+          onPress={onSignDelivered}
+          disabled={signing}
+        >
+          <Text style={styles.signBtnText}>{signing ? '签收中…' : '✓ 已签收'}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -257,8 +278,10 @@ function CloudOnlyPanel({
 }
 
 export default function TrackExpressScreen({ route }: { route?: Route }) {
+  const { store, operatorName } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signing, setSigning] = useState(false);
   const [result, setResult] = useState<TrackOrderResult | null>(null);
   const [cloudPkg, setCloudPkg] = useState<PkgTrackingDetail | null>(null);
   const [cloudOrder, setCloudOrder] = useState<OrderTrackingRecord | null>(null);
@@ -299,6 +322,25 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
     if (preset) void search(preset);
   }, [route?.params?.presetCode, search]);
 
+  const canSign = Boolean(
+    result && store && canMarkCustomerSigned(store, result.detail),
+  );
+
+  const handleSign = async () => {
+    if (!result || !store) return;
+    setSigning(true);
+    try {
+      await markCustomerSigned(result.detail.id, operatorName ?? '工作人员', store);
+      const refreshed = await trackOrderByCode(result.query);
+      if (refreshed) setResult(refreshed);
+      showTaskSuccess('签收成功', `${result.detail.name} 已标记为客户已签收`);
+    } catch (e: unknown) {
+      Alert.alert('签收失败', e instanceof Error ? e.message : '请重试');
+    } finally {
+      setSigning(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.intro}>输入或扫描快递单号、入库条码，查看订单完整详情与装车状态。</Text>
@@ -338,7 +380,14 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
       ) : null}
 
       {result ? (
-        <TrackResultPanel result={result} cloudPkg={cloudPkg} cloudOrder={cloudOrder} />
+        <TrackResultPanel
+          result={result}
+          cloudPkg={cloudPkg}
+          cloudOrder={cloudOrder}
+          canSignDelivered={canSign}
+          signing={signing}
+          onSignDelivered={() => void handleSign()}
+        />
       ) : null}
       {!result && cloudPkg ? <CloudOnlyPanel pkg={cloudPkg} order={cloudOrder} /> : null}
     </ScrollView>
@@ -437,4 +486,14 @@ const styles = StyleSheet.create({
   movementType: { color: '#e2e8f0', fontSize: 14, fontWeight: '800' },
   movementMeta: { color: '#64748b', fontSize: 11, marginTop: 2 },
   movementNote: { color: '#94a3b8', fontSize: 12, marginTop: 4, lineHeight: 18 },
+  signBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  signBtnDisabled: { opacity: 0.65 },
+  signBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });

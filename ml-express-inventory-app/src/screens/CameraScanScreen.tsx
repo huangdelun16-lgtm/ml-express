@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import BarcodeScannerView from '../components/BarcodeScannerView';
-import { getItemByBarcode } from '../services/inventoryService';
+import { useAuth } from '../contexts/AuthContext';
+import { getItemByBarcode, markCustomerSigned } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItem } from '../types/inventory';
 import { PKG_STATUS_LABEL } from '../types/tracking';
+import { canMarkCustomerSigned } from '../utils/customerSign';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Nav = {
   navigate: (
@@ -22,8 +25,10 @@ type ScanResult = {
 };
 
 export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
+  const { store, operatorName } = useAuth();
   const isFocused = useIsFocused();
   const [loading, setLoading] = useState(false);
+  const [signing, setSigning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
 
   const handleScan = async (code: string) => {
@@ -58,6 +63,24 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
 
   const goHubReceive = () => {
     navigation.navigate('HubReceive');
+  };
+
+  const canSign =
+    result?.item && store && canMarkCustomerSigned(store, result.item);
+
+  const handleSign = async () => {
+    if (!result?.item || !store) return;
+    setSigning(true);
+    try {
+      await markCustomerSigned(result.item.id, operatorName ?? '工作人员', store);
+      const item = await getItemByBarcode(result.code);
+      setResult({ ...result, item });
+      showTaskSuccess('签收成功', `${result.item.name} 已标记为客户已签收`);
+    } catch (e: unknown) {
+      Alert.alert('签收失败', e instanceof Error ? e.message : '请重试');
+    } finally {
+      setSigning(false);
+    }
   };
 
   return (
@@ -103,6 +126,17 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
               <Pressable style={styles.actionPrimary} onPress={goTrack}>
                 <Text style={styles.actionPrimaryText}>追踪详情</Text>
               </Pressable>
+              {canSign ? (
+                <Pressable
+                  style={[styles.actionSign, signing && styles.actionDisabled]}
+                  onPress={() => void handleSign()}
+                  disabled={signing}
+                >
+                  <Text style={styles.actionSignText}>
+                    {signing ? '签收中…' : '已签收'}
+                  </Text>
+                </Pressable>
+              ) : null}
               <Pressable style={styles.action} onPress={goStockIn}>
                 <Text style={styles.actionText}>去入库</Text>
               </Pressable>
@@ -150,4 +184,12 @@ const styles = StyleSheet.create({
     borderColor: '#475569',
   },
   actionText: { color: '#cbd5e1', fontWeight: '700', fontSize: 13 },
+  actionSign: {
+    backgroundColor: '#059669',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  actionSignText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  actionDisabled: { opacity: 0.65 },
 });

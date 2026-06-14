@@ -6,6 +6,7 @@ export type StockInContactDraft = {
   recipientName: string;
   recipientPhone: string;
   destination: string;
+  detailAddress: string;
   packaging: string;
 };
 
@@ -13,6 +14,7 @@ const EMPTY_DRAFT: StockInContactDraft = {
   recipientName: '',
   recipientPhone: '',
   destination: '',
+  detailAddress: '',
   packaging: '',
 };
 

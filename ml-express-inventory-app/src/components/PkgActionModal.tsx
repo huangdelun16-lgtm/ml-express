@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
+import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat';
 
 type Props = {
   visible: boolean;
@@ -28,6 +29,7 @@ export default function PkgActionModal({
 
   const statusStyle = packStatusStyle(pack.display_status);
   const statusLabel = PACK_DISPLAY_LABEL[pack.display_status];
+  const orderCount = resolvePackOrderCount(pack);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -44,8 +46,14 @@ export default function PkgActionModal({
             <View style={[styles.badge, { backgroundColor: statusStyle.badgeBg }]}>
               <Text style={[styles.badgeText, { color: statusStyle.badgeText }]}>{statusLabel}</Text>
             </View>
-            <Text style={styles.countMeta}>{pack.items.length} 件</Text>
+            <Text style={styles.countMeta}>{orderCount} {stockUnitLabel()}</Text>
           </View>
+          {pack.loaded && pack.transport_fee?.trim() ? (
+            <Text style={styles.feeMeta}>
+              车费 {pack.transport_fee} MMK
+              {pack.truck_leg_destination ? ` · 本段 ${pack.truck_leg_destination}` : ''}
+            </Text>
+          ) : null}
 
           {canEdit ? (
             <Pressable style={styles.btnEdit} onPress={onEdit}>
@@ -122,6 +130,12 @@ const styles = StyleSheet.create({
   badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 12, fontWeight: '900' },
   countMeta: { color: '#94a3b8', fontSize: 13, fontWeight: '700' },
+  feeMeta: {
+    color: '#fbbf24',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
   btnEdit: {
     backgroundColor: '#0f172a',
     borderRadius: 14,

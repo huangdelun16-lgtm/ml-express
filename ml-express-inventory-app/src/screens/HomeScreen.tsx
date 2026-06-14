@@ -2,14 +2,14 @@ import React, { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import { getStats, listPackedShipmentRows } from '../services/inventoryService';
+import { getStats, listPackedShipmentRows, syncPlatformInventoryCloud } from '../services/inventoryService';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
 
 type Nav = { navigate: (name: string) => void };
 
 export default function HomeScreen({ navigation }: { navigation: Nav }) {
-  const { operatorName, storeCode, hubCode, logout } = useAuth();
+  const { operatorName, storeCode, hubCode, store, logout } = useAuth();
   const [stats, setStats] = useState({
     itemCount: 0,
     totalQty: 0,
@@ -23,9 +23,17 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
 
   const load = useCallback(async () => {
     const [s, packs] = await Promise.all([getStats(), listPackedShipmentRows()]);
-    setStats(s);
-    setRecentPacks(packs.slice(0, 3));
-  }, []);
+    if (store && hubCode) {
+      try {
+        await syncPlatformInventoryCloud(store, hubCode);
+      } catch {
+        // 离线时仍显示本地统计
+      }
+    }
+    const [statsAfter, packsAfter] = await Promise.all([getStats(), listPackedShipmentRows()]);
+    setStats(statsAfter);
+    setRecentPacks(packsAfter.slice(0, 3));
+  }, [store, hubCode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -43,7 +51,6 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     { title: '流水', icon: '📜', screen: 'Movements', color: '#7c3aed' },
     { title: '通用扫码', icon: '📷', screen: 'CameraScan', color: '#0891b2' },
     { title: '设置', icon: '⚙️', screen: 'Settings', color: '#64748b' },
-    { title: '追踪快递', icon: '🔍', screen: 'TrackExpress', color: '#0ea5e9' },
   ];
 
   return (
@@ -81,16 +88,6 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
       {stats.lowStockCount > 0 ? (
         <Text style={styles.warn}>⚠️ {stats.lowStockCount} 个 SKU 低于安全库存</Text>
       ) : null}
-
-      <Pressable style={styles.trackCard} onPress={() => navigation.navigate('TrackExpress')}>
-        <View style={styles.trackCardHeader}>
-          <Text style={styles.trackCardTitle}>🔍 追踪快递</Text>
-          <Text style={styles.trackCardMore}>立即查询 →</Text>
-        </View>
-        <Text style={styles.trackCardHint}>
-          扫描或输入快递单号、入库条码，查看订单详情、所属包裹与装车状态
-        </Text>
-      </Pressable>
 
       <Pressable style={styles.pkgCard} onPress={() => navigation.navigate('Pkg')}>
         <View style={styles.pkgCardHeader}>
@@ -172,23 +169,6 @@ const styles = StyleSheet.create({
   statValue: { color: '#fbbf24', fontSize: 20, fontWeight: '900' },
   statLabel: { color: '#94a3b8', fontSize: 12, marginTop: 4 },
   warn: { color: '#fbbf24', marginBottom: 16, fontSize: 13 },
-  trackCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0ea5e9',
-  },
-  trackCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  trackCardTitle: { color: '#f8fafc', fontSize: 18, fontWeight: '900' },
-  trackCardMore: { color: '#7dd3fc', fontSize: 13, fontWeight: '700' },
-  trackCardHint: { color: '#94a3b8', fontSize: 13, lineHeight: 20 },
   pkgCard: {
     backgroundColor: '#1e293b',
     borderRadius: 14,

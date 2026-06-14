@@ -97,43 +97,65 @@ const SECTION_CARD_TITLE: CSSProperties = {
   letterSpacing: '0.02em',
 };
 
-const WIZARD_ACTION_BAR: CSSProperties = {
+const WIZARD_BOTTOM_BAR: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 10,
-  marginBottom: 4,
+  flexShrink: 0,
+  marginTop: 0,
+  padding: '1rem clamp(1.1rem, 3.5vw, 1.5rem) max(1rem, env(safe-area-inset-bottom, 0px))',
+  borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+  background: 'linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.88) 28%, rgba(15, 23, 42, 0.98) 100%)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
 };
 
 const WIZARD_BTN_BACK: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 4,
-  padding: '10px 12px',
+  padding: '10px 14px',
   borderRadius: 10,
-  border: '1px solid rgba(255, 255, 255, 0.22)',
-  background: 'rgba(15, 23, 42, 0.35)',
+  border: '1px solid rgba(255,255,255,0.2)',
+  background: 'rgba(15,23,42,0.35)',
   color: '#e2e8f0',
   fontWeight: 700,
   fontSize: '0.88rem',
   cursor: 'pointer',
+  whiteSpace: 'nowrap',
 };
 
-const WIZARD_BTN_PRIMARY: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 6,
+const WIZARD_BTN_NEXT: CSSProperties = {
   padding: '10px 16px',
-  borderRadius: 12,
+  borderRadius: 10,
   border: 'none',
-  background: 'linear-gradient(90deg, #3b82f6, #2563eb)',
-  color: '#fff',
+  background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+  color: '#0f172a',
   fontWeight: 800,
   fontSize: '0.92rem',
   cursor: 'pointer',
-  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
-  minWidth: 108,
+  whiteSpace: 'nowrap',
+};
+
+const WIZARD_BTN_CANCEL: CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.2)',
+  background: 'rgba(255,255,255,0.1)',
+  color: 'rgba(248,250,252,0.95)',
+  fontWeight: 700,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+const WIZARD_BTN_SUBMIT: CSSProperties = {
+  padding: '10px 16px',
+  borderRadius: 10,
+  border: 'none',
+  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+  color: 'white',
+  fontWeight: 800,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  boxShadow: '0 6px 18px rgba(37, 99, 235, 0.4)',
 };
 
 const MODAL_HEADING: CSSProperties = {
@@ -478,69 +500,6 @@ const OrderModal: React.FC<OrderModalProps> = ({
           />
 
           <OrderWizardProgress currentStep={wizardStep} labels={wizardLabels} />
-
-          <div style={WIZARD_ACTION_BAR}>
-            <div style={{ flex: 1, minWidth: 72 }}>
-              {wizardStep > 0 ? (
-                <button type="button" style={WIZARD_BTN_BACK} onClick={handleWizardBack}>
-                  ← {wizardCopy.back}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  style={{ ...WIZARD_BTN_BACK, visibility: 'hidden' }}
-                  tabIndex={-1}
-                  aria-hidden
-                >
-                  ←
-                </button>
-              )}
-            </div>
-            <span
-              style={{
-                color: 'rgba(255,255,255,0.75)',
-                fontSize: '0.75rem',
-                fontWeight: 800,
-                letterSpacing: '0.06em',
-              }}
-            >
-              {wizardStep + 1} / {WIZARD_LAST_STEP + 1}
-            </span>
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-              {wizardStep < WIZARD_LAST_STEP ? (
-                <button type="button" style={WIZARD_BTN_PRIMARY} onClick={handleWizardNext}>
-                  {wizardCopy.next} →
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!confirmStepArmed || !isCalculated}
-                  onClick={handleExplicitSubmit}
-                  style={{
-                    ...WIZARD_BTN_PRIMARY,
-                    opacity: !confirmStepArmed || !isCalculated ? 0.55 : 1,
-                    cursor: !confirmStepArmed || !isCalculated ? 'not-allowed' : 'pointer',
-                  }}
-                  title={
-                    !isCalculated
-                      ? language === 'zh'
-                        ? '请先完成价格估算'
-                        : 'Complete price estimate first'
-                      : !confirmStepArmed
-                        ? language === 'zh'
-                          ? '请选择支付方式后再提交'
-                          : 'Choose payment method first'
-                        : undefined
-                  }
-                >
-                  🚚 {t.order.submit}
-                  {isCalculated
-                    ? ` · ${Math.round(calculatedPriceDetail).toLocaleString()} MMK`
-                    : ''}
-                </button>
-              )}
-            </div>
-          </div>
 
         {/* 🚀 身份识别标签 (对齐 App) */}
         {currentUser && (
@@ -1613,6 +1572,84 @@ const OrderModal: React.FC<OrderModalProps> = ({
           </div>
           )}
 
+          </div>
+
+          <div style={WIZARD_BOTTOM_BAR}>
+            <button
+              type="button"
+              onClick={handleWizardBack}
+              disabled={wizardStep === 0}
+              style={{
+                ...WIZARD_BTN_BACK,
+                cursor: wizardStep === 0 ? 'not-allowed' : 'pointer',
+                opacity: wizardStep === 0 ? 0.4 : 1,
+              }}
+            >
+              ← {wizardCopy.back}
+            </button>
+            <span
+              style={{
+                color: 'rgba(255,255,255,0.75)',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+              }}
+            >
+              {wizardStep + 1} / {WIZARD_LAST_STEP + 1}
+            </span>
+            {wizardStep < WIZARD_LAST_STEP ? (
+              <button type="button" onClick={handleWizardNext} style={WIZARD_BTN_NEXT}>
+                {wizardCopy.next} →
+              </button>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.65rem',
+                  flexWrap: 'wrap',
+                  justifyContent: 'flex-end',
+                  flex: 1,
+                  maxWidth: 'min(100%, 320px)',
+                }}
+              >
+                <button type="button" onClick={handleCancelOrder} style={WIZARD_BTN_CANCEL}>
+                  {t.order.cancel}
+                </button>
+                <button
+                  type="button"
+                  disabled={!confirmStepArmed || !isCalculated}
+                  onClick={handleExplicitSubmit}
+                  style={{
+                    ...WIZARD_BTN_SUBMIT,
+                    background: isCalculated && confirmStepArmed
+                      ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                      : 'rgba(100,116,139,0.45)',
+                    opacity: isCalculated && confirmStepArmed ? 1 : 0.75,
+                    cursor: isCalculated && confirmStepArmed ? 'pointer' : 'not-allowed',
+                    boxShadow:
+                      isCalculated && confirmStepArmed
+                        ? '0 6px 18px rgba(37, 99, 235, 0.4)'
+                        : 'none',
+                  }}
+                  title={
+                    !isCalculated
+                      ? language === 'zh'
+                        ? '请先完成价格估算'
+                        : 'Complete price estimate first'
+                      : !confirmStepArmed
+                        ? language === 'zh'
+                          ? '请选择支付方式后再提交'
+                          : 'Choose payment method first'
+                        : undefined
+                  }
+                >
+                  {t.order.submit}
+                  {isCalculated
+                    ? ` · ${Math.round(calculatedPriceDetail).toLocaleString()} MMK`
+                    : ''}
+                </button>
+              </div>
+            )}
           </div>
         </form>
       </div>

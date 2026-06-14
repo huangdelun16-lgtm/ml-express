@@ -1,68 +1,66 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
-import OrderBarcodeModal, { type OrderBarcodeData } from './OrderBarcodeModal';
+import {
+  InboundInvoiceContent,
+  InboundInvoiceFooter,
+  inboundInvoiceStyles,
+  type InboundInvoiceData,
+} from './InboundInvoiceView';
+import { useAuth } from '../contexts/AuthContext';
 import { getItemDetail } from '../services/inventoryService';
-import type { InventoryItemDetail, PackedShipmentItem } from '../types/inventory';
-import { inboundOrderBarcodeData } from '../utils/orderBarcodeData';
-import { stockUnitLabel } from '../utils/itemFieldFormat';
+import { printInboundBarcodeOnly } from '../services/printerService';
+import type { InventoryItemDetail } from '../types/inventory';
+import { canMarkCustomerSigned } from '../utils/customerSign';
+import { confirmAndMarkCustomerSigned } from '../utils/customerSignConfirm';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Props = {
   visible: boolean;
   itemId: string | null;
   onClose: () => void;
+  onSigned?: () => void;
 };
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function mapDetailToInvoice(detail: InventoryItemDetail): InboundInvoiceData {
+  return {
+    barcode: detail.barcode,
+    inputBarcode: detail.input_barcode?.trim() || undefined,
+    productName: detail.name,
+    inboundDateLabel: detail.inbound_date_label,
+    recipientName: detail.customer_name?.trim() || '—',
+    recipientPhone: detail.recipient_phone?.trim() || undefined,
+    destination: (detail.destination || detail.final_destination || '').trim(),
+    detailAddress: detail.detail_address?.trim() || undefined,
+    qty: detail.inbound_qty,
+    packaging: detail.packaging?.trim() || undefined,
+    spec: detail.spec?.trim() || undefined,
+    weight: detail.weight?.trim() || undefined,
+    totalFee: detail.total_fee,
+    paymentLabel: detail.payment_label,
+    note: detail.inbound_note,
+    storeName: detail.inbound_store_name?.trim() || undefined,
+  };
 }
 
-function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
-  const text = value === undefined || value === null ? '' : String(value).trim();
-  if (!text) return null;
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue} selectable>
-        {text}
-      </Text>
-    </View>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionBody}>{children}</View>
-    </View>
-  );
-}
-
-export default function ItemViewModal({ visible, itemId, onClose }: Props) {
+export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Props) {
+  const { store, operatorName } = useAuth();
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const [signing, setSigning] = useState(false);
 
-  const openLinePrint = (line: PackedShipmentItem) => {
-    setOrderBarcodeData(
-      inboundOrderBarcodeData({
-        name: line.item_name,
-        barcode: line.item_barcode,
-        input_barcode: line.input_barcode,
-      }),
-    );
-  };
+  const invoiceData = useMemo(
+    () => (detail ? mapDetailToInvoice(detail) : null),
+    [detail],
+  );
 
   useEffect(() => {
     if (!visible || !itemId) {
@@ -82,185 +80,94 @@ export default function ItemViewModal({ visible, itemId, onClose }: Props) {
     };
   }, [visible, itemId]);
 
-  return (
-    <>
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={styles.root}>
-        <View style={styles.header}>
-          <Pressable onPress={onClose} hitSlop={10}>
-            <Text style={styles.close}>关闭</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>查看订单</Text>
-          <View style={{ width: 48 }} />
-        </View>
+  const canSign = Boolean(
+    detail && store && canMarkCustomerSigned(store, detail),
+  );
 
+  const signDelivered = () => {
+    if (!detail || !store) return;
+    setSigning(true);
+    confirmAndMarkCustomerSigned({
+      itemId: detail.id,
+      operator: operatorName ?? '工作人员',
+      store,
+      onSuccess: () => {
+        void getItemDetail(detail.id).then((refreshed) => {
+          setDetail(refreshed);
+          onSigned?.();
+          showTaskSuccess('签收成功', `${detail.name} 已标记为客户已签收`);
+        });
+      },
+      onError: (message) => Alert.alert('签收失败', message),
+      onDismiss: () => setSigning(false),
+    });
+  };
+
+  const printLabel = async () => {
+    if (!invoiceData?.barcode) return;
+    setPrinting(true);
+    try {
+      const ok = await printInboundBarcodeOnly(invoiceData.barcode, invoiceData.inputBarcode);
+      if (!ok) {
+        Alert.alert('提示', '打印已关闭，请在设置中启用打印');
+        return;
+      }
+      Alert.alert('已发送打印', '请在系统对话框选择标签打印机');
+    } catch (e: unknown) {
+      Alert.alert('打印失败', e instanceof Error ? e.message : '请重试');
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={inboundInvoiceStyles.overlay}>
         {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color="#60a5fa" />
+          <View style={styles.centerBox}>
+            <ActivityIndicator color="#60a5fa" size="large" />
+            <Text style={styles.loadingText}>加载订单…</Text>
           </View>
-        ) : !detail ? (
-          <View style={styles.loadingBox}>
+        ) : !invoiceData ? (
+          <View style={styles.centerBox}>
             <Text style={styles.emptyText}>订单不存在或已删除</Text>
+            <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
+              <Text style={inboundInvoiceStyles.btnCloseText}>关闭</Text>
+            </Pressable>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.heroName}>{detail.name}</Text>
-            <Text style={styles.heroMeta}>
-              库存 {detail.qty_on_hand} {stockUnitLabel()}
-            </Text>
+          <View style={inboundInvoiceStyles.sheet}>
+            <ScrollView
+              contentContainerStyle={inboundInvoiceStyles.scroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <InboundInvoiceContent data={invoiceData} />
+            </ScrollView>
 
-            <Section title="收发信息">
-              <DetailRow label="客户姓名" value={detail.customer_name} />
-              <DetailRow label="联系电话" value={detail.recipient_phone} />
-              <DetailRow label="目的地" value={detail.destination} />
-              <DetailRow label="商品包装" value={detail.packaging} />
-            </Section>
-
-            <Section title="商品信息">
-              <DetailRow label="商品名称" value={detail.name} />
-              <DetailRow label="规格" value={detail.spec} />
-              <DetailRow label="单位" value={detail.unit} />
-              <DetailRow label="重量" value={detail.weight} />
-            </Section>
-
-            <Section title="条码信息">
-              <DetailRow label="快递单" value={detail.input_barcode} />
-              <DetailRow label="入库条码" value={detail.barcode} />
-            </Section>
-
-            {detail.note ? (
-              <Section title="备注">
-                <Text style={styles.noteText} selectable>
-                  {detail.note}
-                </Text>
-              </Section>
-            ) : null}
-
-            {detail.pack ? (
-              <>
-                <Section title="包裹信息">
-                  <DetailRow label="包装号" value={detail.pack.bundle_barcode} />
-                  <DetailRow label="包裹名称" value={detail.pack.bundle_name} />
-                  <DetailRow label="规格" value={detail.pack.spec} />
-                  <DetailRow label="单位" value={detail.pack.unit} />
-                  <DetailRow label="重量" value={detail.pack.weight} />
-                  <DetailRow label="打包人" value={detail.pack.operator} />
-                  <DetailRow label="打包时间" value={formatTime(detail.pack.created_at)} />
-                </Section>
-
-                <Section title={`内含商品（${detail.pack.items.length} 件）`}>
-                  {detail.pack.items.map((line) => (
-                    <View key={line.id} style={styles.packLine}>
-                      <View style={styles.packLineMain}>
-                        <Text style={styles.packLineName}>{line.item_name}</Text>
-                        {line.input_barcode ? (
-                          <Text style={styles.packLineExpress} selectable>
-                            快递单 {line.input_barcode}
-                          </Text>
-                        ) : null}
-                        <Text style={styles.packLineCode} selectable>
-                          入库 {line.item_barcode}
-                        </Text>
-                        <Text style={styles.packLineQty}>× {line.qty}</Text>
-                      </View>
-                      <Pressable
-                        style={styles.printBtn}
-                        onPress={() => openLinePrint(line)}
-                      >
-                        <Text style={styles.printBtnText}>打印标签</Text>
-                      </Pressable>
-                    </View>
-                  ))}
-                </Section>
-
-                {detail.pack.note ? (
-                  <Section title="打包备注">
-                    <Text style={styles.noteText} selectable>
-                      {detail.pack.note}
-                    </Text>
-                  </Section>
-                ) : null}
-              </>
-            ) : null}
-          </ScrollView>
+            <InboundInvoiceFooter
+              recipientPhone={invoiceData.recipientPhone}
+              printing={printing}
+              signing={signing}
+              canSignDelivered={canSign}
+              onSignDelivered={() => void signDelivered()}
+              onPrint={() => void printLabel()}
+              onClose={onClose}
+            />
+          </View>
         )}
       </View>
     </Modal>
-
-    <OrderBarcodeModal
-      visible={!!orderBarcodeData}
-      data={orderBarcodeData}
-      onClose={() => setOrderBarcodeData(null)}
-    />
-    </>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0f172a' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+const styles = {
+  centerBox: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    padding: 24,
+    gap: 16,
   },
-  close: { color: '#60a5fa', fontWeight: '700', fontSize: 16, width: 48 },
-  headerTitle: { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
-  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: '#94a3b8', fontSize: 14 },
-  content: { padding: 16, paddingBottom: 32 },
-  heroName: { color: '#f8fafc', fontSize: 22, fontWeight: '900' },
-  heroMeta: { color: '#fbbf24', fontSize: 14, fontWeight: '800', marginTop: 6, marginBottom: 16 },
-  section: { marginBottom: 14 },
-  sectionTitle: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-  },
-  sectionBody: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    gap: 8,
-  },
-  row: { gap: 2 },
-  rowLabel: { color: '#64748b', fontSize: 11, fontWeight: '700' },
-  rowValue: { color: '#e2e8f0', fontSize: 15, fontWeight: '700', fontFamily: 'monospace' },
-  noteText: { color: '#cbd5e1', fontSize: 14, lineHeight: 21 },
-  packLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-  },
-  packLineMain: { flex: 1, minWidth: 0 },
-  packLineName: { color: '#f8fafc', fontSize: 14, fontWeight: '800' },
-  packLineExpress: {
-    color: '#7dd3fc',
-    fontSize: 12,
-    marginTop: 2,
-    fontFamily: 'monospace',
-    fontWeight: '700',
-  },
-  packLineCode: { color: '#fde68a', fontSize: 12, marginTop: 2, fontFamily: 'monospace' },
-  packLineQty: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-  printBtn: {
-    backgroundColor: '#0ea5e9',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    flexShrink: 0,
-  },
-  printBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-});
+  loadingText: { color: '#94a3b8', fontSize: 14, marginTop: 12 },
+  emptyText: { color: '#e2e8f0', fontSize: 15, fontWeight: '700' as const, marginBottom: 8 },
+};

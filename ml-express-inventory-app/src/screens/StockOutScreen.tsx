@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -21,7 +21,10 @@ import { applyTruckLoadOutbound, listOutboundPackages } from '../services/invent
 import type { PackedShipmentDetail } from '../types/inventory';
 import OutboundDateField from '../components/OutboundDateField';
 import { formatDisplayDate, isValidIsoDate, todayIsoDate } from '../utils/dateFormat';
-import { sumPackageWeightsKg } from '../utils/itemFieldFormat';
+import { sanitizeNumberInput, sumPackageWeightsKg } from '../utils/itemFieldFormat';
+import { resolveStoreOriginLabel } from '../utils/storeZone';
+import { fetchTruckRouteFee, formatTruckRouteLabel } from '../utils/truckRouteFee';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StockOut'>;
 
@@ -32,9 +35,14 @@ export default function StockOutScreen({ navigation }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [destination, setDestination] = useState('');
   const [outboundDate, setOutboundDate] = useState(todayIsoDate());
+  const [transportFee, setTransportFee] = useState('');
+  const [feeLoading, setFeeLoading] = useState(false);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState<StockOutSuccessData | null>(null);
+
+  const originLabel = store ? resolveStoreOriginLabel(store) : '';
+  const routeLabel = formatTruckRouteLabel(originLabel, destination);
 
   const loadPacks = useCallback(async () => {
     setLoadingPacks(true);
@@ -50,6 +58,26 @@ export default function StockOutScreen({ navigation }: Props) {
       void loadPacks();
     }, [loadPacks]),
   );
+
+  useEffect(() => {
+    if (!store || !destination.trim()) {
+      setTransportFee('');
+      return;
+    }
+    let cancelled = false;
+    setFeeLoading(true);
+    void fetchTruckRouteFee(originLabel, destination)
+      .then((fee) => {
+        if (cancelled) return;
+        if (fee != null) setTransportFee(String(fee % 1 === 0 ? fee : fee.toFixed(2)));
+      })
+      .finally(() => {
+        if (!cancelled) setFeeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [store, originLabel, destination]);
 
   const selectedPacks = useMemo(
     () => packs.filter((p) => selectedIds.has(p.id)),
@@ -77,6 +105,7 @@ export default function StockOutScreen({ navigation }: Props) {
     setSelectedIds(new Set());
     setDestination('');
     setOutboundDate(todayIsoDate());
+    setTransportFee('');
     setNote('');
   };
 
@@ -107,10 +136,12 @@ export default function StockOutScreen({ navigation }: Props) {
         outboundDate: outboundDate.trim(),
         packs: selectedPacks,
         totalWeightKg: totalWeight,
+        transportFee: transportFee.trim(),
         note: note.trim(),
         originStore: store
           ? { id: store.id, storeCode: store.storeCode, storeName: store.storeName }
           : undefined,
+        actingStore: store ?? undefined,
       });
       const cloudHint = result.cloudSynced
         ? '已同步云端，目的地站点可扫码收货'
@@ -119,12 +150,19 @@ export default function StockOutScreen({ navigation }: Props) {
           : store
             ? '⚠️ 未同步云端，目的地站点将无法扫码收货'
             : '';
+      const destLabel = destination.trim();
       setSuccessData({
-        destination: destination.trim(),
+        destination: destLabel,
         count: result.count,
         totalWeight,
         cloudHint,
       });
+      showTaskSuccess(
+        '装车出库成功',
+        `已成功出库 ${result.count} 包，目的地 ${destLabel}${
+          totalWeight ? `，总重 ${totalWeight} Kg` : ''
+        }${cloudHint ? `\n${cloudHint}` : ''}`,
+      );
       resetForm();
       await loadPacks();
     } catch (e: unknown) {
@@ -163,29 +201,47 @@ export default function StockOutScreen({ navigation }: Props) {
 
           <OutboundDateField value={outboundDate} onChange={setOutboundDate} />
 
-          <Text style={styles.label}>出库数量</Text>
-          <View style={styles.qtyRow}>
-            <TextInput
-              style={[styles.inputReadonly, styles.qtyInput]}
-              value={packageCount > 0 ? String(packageCount) : ''}
-              editable={false}
-              placeholder="选择包装号后自动统计"
-              placeholderTextColor="#94a3b8"
-            />
-            <Text style={styles.qtyUnit}>包</Text>
+          <Text style={styles.label}>出库数据</Text>
+          <View style={styles.outboundStatsRow}>
+            <View style={styles.outboundStat}>
+              <Text style={styles.outboundStatValue}>
+                {packageCount > 0 ? String(packageCount) : '—'}
+              </Text>
+              <Text style={styles.outboundStatUnit}>包</Text>
+            </View>
+            <Text style={styles.outboundDivider}>·</Text>
+            <View style={styles.outboundStat}>
+              <Text style={styles.outboundStatValue}>
+                {totalWeight || (packageCount > 0 ? '0' : '—')}
+              </Text>
+              <Text style={styles.outboundStatUnit}>Kg</Text>
+            </View>
           </View>
+          {packageCount === 0 ? (
+            <Text style={styles.fieldHint}>选择包装号后自动统计件数与总重量</Text>
+          ) : null}
 
-          <Text style={styles.label}>总重量</Text>
-          <View style={styles.qtyRow}>
+          <Text style={styles.label}>
+            车费
+            {routeLabel ? <Text style={styles.routeHint}> · {routeLabel}</Text> : null}
+          </Text>
+          <View style={styles.feeRow}>
             <TextInput
-              style={[styles.inputReadonly, styles.qtyInput]}
-              value={totalWeight}
-              editable={false}
-              placeholder={packageCount > 0 ? '0' : '选择包装号后自动合计'}
+              style={styles.feeInput}
+              value={transportFee}
+              onChangeText={(v) => setTransportFee(sanitizeNumberInput(v))}
+              placeholder={feeLoading ? '查询中…' : routeLabel ? '路线车费' : '请先选择目的地'}
               placeholderTextColor="#94a3b8"
+              keyboardType="decimal-pad"
+              editable={!feeLoading}
             />
-            <Text style={styles.qtyUnit}>Kg</Text>
+            <Text style={styles.feeUnit}>MMK</Text>
           </View>
+          {routeLabel ? (
+            <Text style={styles.fieldHint}>
+              按发站 {originLabel} 至目的地 {destination.trim().toUpperCase()} 的路线车费自动带出，可手动修改
+            </Text>
+          ) : null}
 
           <Text style={styles.label}>备注（可选）</Text>
           <TextInput
@@ -203,6 +259,7 @@ export default function StockOutScreen({ navigation }: Props) {
             <Text style={styles.summaryLine}>
               运达 {destination || '未选目的地'} · {packageCount} 包
               {totalWeight ? ` · ${totalWeight} Kg` : ''}
+              {transportFee ? ` · 车费 ${transportFee} MMK` : ''}
             </Text>
             <Text style={styles.summaryLine}>出库日期 {formatDisplayDate(outboundDate)}</Text>
             {selectedPacks.map((pack) => (
@@ -257,6 +314,33 @@ const styles = StyleSheet.create({
   summaryLine: { color: '#e2e8f0', fontSize: 15, fontWeight: '800' },
   summaryPack: { color: '#94a3b8', fontSize: 12, marginTop: 4, fontFamily: 'monospace' },
   label: { color: '#e2e8f0', fontWeight: '700', marginBottom: 8, fontSize: 13 },
+  routeHint: { color: '#7dd3fc', fontWeight: '700' },
+  fieldHint: { color: '#64748b', fontSize: 11, lineHeight: 16, marginBottom: 12 },
+  outboundStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 4,
+    gap: 10,
+  },
+  outboundStat: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  outboundStatValue: { color: '#0f172a', fontSize: 20, fontWeight: '900' },
+  outboundStatUnit: { color: '#475569', fontSize: 14, fontWeight: '800' },
+  outboundDivider: { color: '#94a3b8', fontSize: 18, fontWeight: '300' },
+  feeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  feeInput: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    color: '#0f172a',
+    fontWeight: '700',
+  },
+  feeUnit: { color: '#94a3b8', fontWeight: '800', fontSize: 14, paddingBottom: 2 },
   input: {
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -265,18 +349,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#0f172a',
   },
-  inputReadonly: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 14,
-    fontSize: 16,
-    color: '#334155',
-    fontWeight: '700',
-  },
-  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
-  qtyInput: { flex: 1, marginBottom: 0 },
-  qtyUnit: { color: '#94a3b8', fontWeight: '800', fontSize: 14, paddingBottom: 14 },
   btn: {
     backgroundColor: '#dc2626',
     borderRadius: 12,

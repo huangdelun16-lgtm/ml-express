@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useFormFieldChain } from '../hooks/useFormFieldChain';
 import {
   Platform,
   Pressable,
@@ -89,6 +90,14 @@ export default function InboundOrderFormBody({
   qtyOnHand,
 }: Props) {
   const canEdit = editable;
+  const chainKeys = useMemo(
+    () =>
+      mode === 'stock-in'
+        ? ['product', 'specL', 'specW', 'specH', 'weight', 'name', 'phone', 'qty', 'note']
+        : ['product', 'specL', 'specW', 'specH', 'weight', 'name', 'phone', 'note'],
+    [mode],
+  );
+  const fieldChain = useFormFieldChain(chainKeys);
 
   return (
     <>
@@ -99,6 +108,10 @@ export default function InboundOrderFormBody({
           onChange={onProductNameChange}
           placeholder="输入商品名称"
           editable={canEdit}
+          inputRef={fieldChain.propsFor('product').inputRef}
+          returnKeyType={fieldChain.propsFor('product').returnKeyType}
+          onSubmitEditing={fieldChain.propsFor('product').onSubmitEditing}
+          blurOnSubmit={fieldChain.propsFor('product').blurOnSubmit}
         />
         {canEdit ? (
           <PackagingPickerField value={values.packaging} onChange={onPackagingChange} />
@@ -111,6 +124,9 @@ export default function InboundOrderFormBody({
             w={values.specW}
             h={values.specH}
             onChange={onSpecChange}
+            lInput={fieldChain.propsFor('specL')}
+            wInput={fieldChain.propsFor('specW')}
+            hInput={fieldChain.propsFor('specH')}
           />
         ) : (
           <InboundFormField label="规格（cm）" value={specStr} editable={false} />
@@ -122,6 +138,10 @@ export default function InboundOrderFormBody({
           onChange={onWeightChange}
           placeholder="重量"
           editable={canEdit}
+          inputRef={fieldChain.propsFor('weight').inputRef}
+          returnKeyType={fieldChain.propsFor('weight').returnKeyType}
+          onSubmitEditing={fieldChain.propsFor('weight').onSubmitEditing}
+          blurOnSubmit={fieldChain.propsFor('weight').blurOnSubmit}
         />
         {(specStr || weightStr) && canEdit ? (
           <View style={inboundFormStyles.preview}>
@@ -177,6 +197,10 @@ export default function InboundOrderFormBody({
           onChange={onRecipientNameChange}
           placeholder="收件人 / 联系人姓名"
           editable={canEdit}
+          inputRef={fieldChain.propsFor('name').inputRef}
+          returnKeyType={fieldChain.propsFor('name').returnKeyType}
+          onSubmitEditing={fieldChain.propsFor('name').onSubmitEditing}
+          blurOnSubmit={fieldChain.propsFor('name').blurOnSubmit}
         />
         <InboundFormField
           label="电话号码"
@@ -185,6 +209,10 @@ export default function InboundOrderFormBody({
           placeholder="09xxxxxxxxx"
           keyboard="phone-pad"
           editable={canEdit}
+          inputRef={fieldChain.propsFor('phone').inputRef}
+          returnKeyType={fieldChain.propsFor('phone').returnKeyType}
+          onSubmitEditing={fieldChain.propsFor('phone').onSubmitEditing}
+          blurOnSubmit={fieldChain.propsFor('phone').blurOnSubmit}
         />
         {canEdit ? (
           <DestinationPickerField
@@ -205,11 +233,16 @@ export default function InboundOrderFormBody({
               <Text style={styles.qtyBtnText}>−</Text>
             </Pressable>
             <TextInput
+              ref={fieldChain.propsFor('qty').inputRef}
               style={styles.qtyInput}
               keyboardType="decimal-pad"
               value={qty}
               onChangeText={onQtyChange}
               editable={canEdit}
+              returnKeyType={fieldChain.propsFor('qty').returnKeyType}
+              onSubmitEditing={fieldChain.propsFor('qty').onSubmitEditing}
+              blurOnSubmit={fieldChain.propsFor('qty').blurOnSubmit}
+              submitBehavior="submit"
             />
             <Pressable style={styles.qtyBtn} onPress={onQtyInc}>
               <Text style={styles.qtyBtnText}>+</Text>
@@ -223,6 +256,10 @@ export default function InboundOrderFormBody({
             placeholder="采购单号、供应商、批次等"
             multiline
             editable={canEdit}
+            inputRef={fieldChain.propsFor('note', { multiline: true }).inputRef}
+            returnKeyType={fieldChain.propsFor('note', { multiline: true }).returnKeyType}
+            onSubmitEditing={fieldChain.propsFor('note', { multiline: true }).onSubmitEditing}
+            blurOnSubmit={fieldChain.propsFor('note', { multiline: true }).blurOnSubmit}
           />
         </InboundFormSection>
       ) : (
@@ -242,6 +279,10 @@ export default function InboundOrderFormBody({
             placeholder="采购单号、供应商、批次等"
             multiline
             editable={canEdit}
+            inputRef={fieldChain.propsFor('note', { multiline: true }).inputRef}
+            returnKeyType={fieldChain.propsFor('note', { multiline: true }).returnKeyType}
+            onSubmitEditing={fieldChain.propsFor('note', { multiline: true }).onSubmitEditing}
+            blurOnSubmit={fieldChain.propsFor('note', { multiline: true }).blurOnSubmit}
           />
         </InboundFormSection>
       )}

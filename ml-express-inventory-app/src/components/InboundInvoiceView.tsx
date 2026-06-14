@@ -1,0 +1,259 @@
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import BarcodeImage from './BarcodeImage';
+import { stockUnitLabel } from '../utils/itemFieldFormat';
+import { callPhoneNumber } from '../utils/phoneCall';
+
+export type InboundInvoiceData = {
+  barcode: string;
+  inputBarcode?: string;
+  productName: string;
+  inboundDateLabel: string;
+  recipientName: string;
+  recipientPhone?: string;
+  destination: string;
+  detailAddress?: string;
+  qty: number;
+  packaging?: string;
+  spec?: string;
+  weight?: string;
+  totalFee?: string;
+  paymentLabel?: string;
+  note?: string;
+  storeName?: string;
+};
+
+export function InvoiceRow({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  if (!value.trim()) return null;
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowValue, highlight && styles.rowValueHighlight]} numberOfLines={4}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+export function InboundInvoiceContent({ data }: { data: InboundInvoiceData }) {
+  return (
+    <>
+      <View style={styles.invoiceHeader}>
+        <Text style={styles.invoiceBrand}>ML EXPRESS</Text>
+        <Text style={styles.invoiceTitle}>订单详情 / INVOICE</Text>
+        {data.storeName ? <Text style={styles.invoiceStore}>{data.storeName}</Text> : null}
+        <Text style={styles.invoiceDate}>{data.inboundDateLabel}</Text>
+      </View>
+
+      <View style={styles.divider} />
+
+      <InvoiceRow label="客户姓名" value={data.recipientName} />
+      {data.recipientPhone ? <InvoiceRow label="电话" value={data.recipientPhone} /> : null}
+      <InvoiceRow label="商品名称" value={data.productName} />
+      {data.packaging ? <InvoiceRow label="商品包装" value={data.packaging} /> : null}
+      <InvoiceRow label="最终目的地" value={data.destination} />
+      {data.detailAddress ? <InvoiceRow label="详细地址" value={data.detailAddress} /> : null}
+      {data.spec ? <InvoiceRow label="规格" value={data.spec} /> : null}
+      {data.weight ? <InvoiceRow label="重量" value={data.weight} /> : null}
+      <InvoiceRow label="数量" value={`${data.qty} ${stockUnitLabel()}`} />
+      {data.totalFee ? <InvoiceRow label="总费用" value={`${data.totalFee} MMK`} highlight /> : null}
+      {data.paymentLabel ? <InvoiceRow label="付款方式" value={data.paymentLabel} /> : null}
+      {data.note ? <InvoiceRow label="备注" value={data.note} /> : null}
+
+      <View style={styles.barcodeBlock}>
+        <Text style={styles.barcodeBlockTitle}>入库条码</Text>
+        {data.inputBarcode ? (
+          <Text style={styles.expressCode} selectable>快递单 {data.inputBarcode}</Text>
+        ) : null}
+        <BarcodeImage code={data.barcode} height={72} showCodeText={false} />
+        <Text style={styles.inboundCode} selectable>{data.barcode}</Text>
+      </View>
+    </>
+  );
+}
+
+export function InboundInvoiceFooter({
+  recipientPhone,
+  printing,
+  signing,
+  canSignDelivered,
+  onSignDelivered,
+  onPrint,
+  onClose,
+}: {
+  recipientPhone?: string;
+  printing?: boolean;
+  signing?: boolean;
+  canSignDelivered?: boolean;
+  onSignDelivered?: () => void;
+  onPrint: () => void;
+  onClose: () => void;
+}) {
+  const phone = recipientPhone?.trim() ?? '';
+  const showSign = canSignDelivered && onSignDelivered;
+
+  return (
+    <View style={inboundInvoiceStyles.footer}>
+      <View style={inboundInvoiceStyles.footerRow}>
+        {phone ? (
+          <Pressable
+            style={[inboundInvoiceStyles.btnCall, inboundInvoiceStyles.footerBtnHalf]}
+            onPress={() => void callPhoneNumber(phone)}
+          >
+            <Text style={inboundInvoiceStyles.btnCallText}>📞 呼叫客户</Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          style={[
+            inboundInvoiceStyles.btnPrint,
+            phone ? inboundInvoiceStyles.footerBtnHalf : inboundInvoiceStyles.footerBtnFull,
+            printing && inboundInvoiceStyles.btnDisabled,
+          ]}
+          onPress={onPrint}
+          disabled={printing}
+        >
+          <Text style={inboundInvoiceStyles.btnPrintText}>
+            {printing ? '发送中…' : '🖨 打印标签'}
+          </Text>
+        </Pressable>
+      </View>
+      {showSign ? (
+        <Pressable
+          style={[
+            inboundInvoiceStyles.btnSign,
+            signing && inboundInvoiceStyles.btnDisabled,
+          ]}
+          onPress={onSignDelivered}
+          disabled={signing}
+        >
+          <Text style={inboundInvoiceStyles.btnSignText}>
+            {signing ? '签收中…' : '✓ 已签收'}
+          </Text>
+        </Pressable>
+      ) : null}
+      <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
+        <Text style={inboundInvoiceStyles.btnCloseText}>关闭</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+export const inboundInvoiceStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.85)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#f8fafc',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '92%',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  scroll: { padding: 20, paddingBottom: 8 },
+  invoiceHeader: { alignItems: 'center', marginBottom: 12 },
+  invoiceBrand: { color: '#059669', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+  invoiceTitle: { color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 4 },
+  invoiceStore: { color: '#64748b', fontSize: 12, marginTop: 6 },
+  invoiceDate: { color: '#0f172a', fontSize: 14, fontWeight: '800', marginTop: 8 },
+  divider: { height: 1, backgroundColor: '#cbd5e1', marginVertical: 14 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+  },
+  rowLabel: { color: '#64748b', fontSize: 13, fontWeight: '600', flex: 1 },
+  rowValue: {
+    color: '#0f172a',
+    fontSize: 14,
+    fontWeight: '800',
+    flex: 1.2,
+    textAlign: 'right',
+  },
+  rowValueHighlight: { color: '#059669', fontSize: 16 },
+  barcodeBlock: {
+    marginTop: 16,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+  },
+  barcodeBlockTitle: { color: '#64748b', fontSize: 12, fontWeight: '800', marginBottom: 8 },
+  expressCode: {
+    color: '#0284c7',
+    fontSize: 13,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    marginBottom: 8,
+  },
+  inboundCode: {
+    color: '#0f172a',
+    fontSize: 17,
+    fontWeight: '900',
+    fontFamily: 'monospace',
+    marginTop: 8,
+    letterSpacing: 0.5,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    gap: 10,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  footerBtnHalf: { flex: 1 },
+  footerBtnFull: { flex: 1 },
+  btnCall: {
+    backgroundColor: '#059669',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  btnCallText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  btnPrint: {
+    backgroundColor: '#2563eb',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  btnDisabled: { opacity: 0.7 },
+  btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  btnSign: {
+    backgroundColor: '#047857',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnSignText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  btnClose: {
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  btnCloseText: { color: '#f8fafc', fontWeight: '800', fontSize: 16 },
+});
+
+const styles = inboundInvoiceStyles;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Modal,
@@ -25,8 +25,7 @@ type Props = {
   visible: boolean;
   data: OrderBarcodeData | null;
   onClose: () => void;
-  /** 须先打印才能点「完成」 */
-  requirePrintBeforeDone?: boolean;
+  /** 打包等流程：点「完成」后回调（不要求先打印） */
   onDone?: () => void;
 };
 
@@ -46,15 +45,9 @@ export default function OrderBarcodeModal({
   visible,
   data,
   onClose,
-  requirePrintBeforeDone = false,
   onDone,
 }: Props) {
   const [printing, setPrinting] = useState(false);
-  const [printed, setPrinted] = useState(false);
-
-  useEffect(() => {
-    if (visible) setPrinted(false);
-  }, [visible, data?.barcode]);
 
   const printBarcode = async () => {
     if (!data?.barcode) return;
@@ -71,7 +64,6 @@ export default function OrderBarcodeModal({
         Alert.alert('提示', '打印已关闭，请在设置中启用打印');
         return;
       }
-      setPrinted(true);
       Alert.alert('已发送打印', '请在系统对话框选择标签打印机');
     } catch (e: unknown) {
       Alert.alert('打印失败', e instanceof Error ? e.message : '请重试');
@@ -81,10 +73,6 @@ export default function OrderBarcodeModal({
   };
 
   const finish = () => {
-    if (requirePrintBeforeDone && !printed) {
-      Alert.alert('提示', '请先点击「打印 Barcode」完成打印');
-      return;
-    }
     onDone?.();
     onClose();
   };
@@ -124,13 +112,8 @@ export default function OrderBarcodeModal({
           >
             <Text style={styles.btnPrintText}>{printing ? '发送中…' : '🖨 打印 Barcode'}</Text>
           </Pressable>
-          <Pressable
-            style={[styles.btnClose, requirePrintBeforeDone && !printed && styles.btnCloseDisabled]}
-            onPress={finish}
-          >
-            <Text style={styles.btnCloseText}>
-              {requirePrintBeforeDone && !printed ? '完成（请先打印）' : '关闭'}
-            </Text>
+          <Pressable style={styles.btnClose} onPress={finish}>
+            <Text style={styles.btnCloseText}>{onDone ? '完成' : '关闭'}</Text>
           </Pressable>
         </View>
       </View>
@@ -212,6 +195,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#475569',
   },
-  btnCloseDisabled: { opacity: 0.55 },
   btnCloseText: { color: '#cbd5e1', fontWeight: '700', fontSize: 15 },
 });

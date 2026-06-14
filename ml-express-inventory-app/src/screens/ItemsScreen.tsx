@@ -11,6 +11,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import ItemActionModal from '../components/ItemActionModal';
 import ItemViewModal from '../components/ItemViewModal';
+import PaidStampWatermark from '../components/PaidStampWatermark';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import PackExpressModal from '../components/PackExpressModal';
 import RegionFilterBar from '../components/RegionFilterBar';
@@ -21,10 +22,18 @@ import {
   createPackedShipment,
   listItems,
   listPackableItems,
+  syncInboundHubPacksToLocal,
+  syncPlatformInventoryCloud,
 } from '../services/inventoryService';
+import { canMarkCustomerSigned } from '../utils/customerSign';
+import { confirmAndMarkCustomerSigned } from '../utils/customerSignConfirm';
 import { canEditOwnedRecord, resolveOwnerKeyForListItem } from '../utils/storeOwnership';
 import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
-import { stockUnitLabel } from '../utils/itemFieldFormat';
+import {
+  isCustomerSignedItem,
+  resolveItemCardQty,
+  stockUnitLabel,
+} from '../utils/itemFieldFormat';
 import {
   collectItemDestinationCodes,
   formatMixedRegionPackConfirmMessage,
@@ -33,6 +42,7 @@ import {
 import { isExpressPackItem } from '../utils/packItem';
 import { inboundOrderBarcodeData, packOrderBarcodeData } from '../utils/orderBarcodeData';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Nav = {
   navigate: (name: string, params?: { itemId?: string }) => void;
@@ -41,7 +51,7 @@ type Nav = {
 type ListMode = 'normal' | 'pack' | 'print';
 
 export default function ItemsScreen({ navigation }: { navigation: Nav }) {
-  const { operatorName, store } = useAuth();
+  const { operatorName, store, hubCode } = useAuth();
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<InventoryItemListRow[]>([]);
   const [listMode, setListMode] = useState<ListMode>('normal');
@@ -49,7 +59,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchPrinting, setBatchPrinting] = useState(false);
   const [packModalVisible, setPackModalVisible] = useState(false);
-  const [actionItem, setActionItem] = useState<InventoryItem | null>(null);
+  const [actionItem, setActionItem] = useState<InventoryItemListRow | null>(null);
   const [viewItemId, setViewItemId] = useState<string | null>(null);
   const [orderBarcodeRequireDone, setOrderBarcodeRequireDone] = useState(false);
   const [packSuccessInfo, setPackSuccessInfo] = useState<{
@@ -60,8 +70,16 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
 
   const load = useCallback(async () => {
+    if (store && hubCode) {
+      try {
+        await syncPlatformInventoryCloud(store, hubCode);
+        await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? '工作人员');
+      } catch {
+        // 云端未配置或离线时仍显示本地列表
+      }
+    }
     setItems(listMode === 'pack' ? await listPackableItems(search) : await listItems(search));
-  }, [search, listMode]);
+  }, [search, listMode, store, hubCode, operatorName]);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,7 +98,17 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const displayedItems = useMemo(() => {
     let list = items.filter((i) => !isExpressPackItem(i));
     if (filterRegion) list = list.filter((i) => resolveItemDestinationCode(i) === filterRegion);
-    return list;
+    return [...list].sort((a, b) => {
+      const aSigned = isCustomerSignedItem(a) ? 1 : 0;
+      const bSigned = isCustomerSignedItem(b) ? 1 : 0;
+      if (aSigned !== bSigned) return aSigned - bSigned;
+      if (aSigned === 1) {
+        const aTs = a.customer_signed_at?.trim() || a.updated_at;
+        const bTs = b.customer_signed_at?.trim() || b.updated_at;
+        return new Date(aTs).getTime() - new Date(bTs).getTime();
+      }
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
   }, [items, filterRegion]);
 
   const selectedItems = useMemo(
@@ -197,6 +225,12 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       barcode: bundleItem.barcode,
       count: packedCount,
     });
+    showTaskSuccess(
+      '打包成功',
+      `快递包：${bundleItem.name}\n包装号：${bundleItem.barcode}\n已合并 ${packedCount} 个商品`,
+    );
+    setSelectedIds(new Set());
+    await load();
     openPackBarcode(
       {
         name: bundleItem.name,
@@ -247,24 +281,11 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   };
 
   const handlePackPrintDone = () => {
-    const info = packSuccessInfo;
     setOrderBarcodeData(null);
     setOrderBarcodeRequireDone(false);
     setPackSuccessInfo(null);
-    if (!info) return;
-    Alert.alert(
-      '打包成功',
-      `快递包：${info.name}\n包装号：${info.barcode}\n已合并 ${info.count} 个商品`,
-      [
-        {
-          text: '好的',
-          onPress: () => {
-            exitSelectMode();
-            void load();
-          },
-        },
-      ],
-    );
+    exitSelectMode();
+    void load();
   };
 
   return (
@@ -348,9 +369,11 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         }
         renderItem={({ item }) => {
           const selected = selectedIds.has(item.id);
+          const cardQty = resolveItemCardQty(item);
           const meta = [item.spec, item.unit, item.weight].filter(Boolean).join(' · ');
           const regionCode = resolveItemDestinationCode(item);
           const packBarcode = item.packed ? item.parent_pack_barcode?.trim() : '';
+          const signedDone = isCustomerSignedItem(item);
 
           return (
             <Pressable
@@ -367,10 +390,13 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                 <SelectCheck selected={selected} accent={selectAccent} />
               ) : null}
               <View style={styles.cardBody}>
+                {signedDone ? <PaidStampWatermark /> : null}
                 <View style={styles.cardTop}>
                   <View style={styles.cardMain}>
                     <Text style={styles.topLine} numberOfLines={1}>
-                      <Text style={styles.customer}>{item.customer_name || '未登记客户'}</Text>
+                      <Text style={styles.customer}>
+                        {item.customer_name?.trim() || item.recipient_name?.trim() || '未登记客户'}
+                      </Text>
                       {regionCode ? (
                         <Text style={styles.destination}> · {regionCode}</Text>
                       ) : item.destination ? (
@@ -384,16 +410,34 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                       <View
                         style={[
                           styles.statusBadge,
-                          item.stocked_in ? styles.statusInDone : styles.statusInPending,
+                          isCustomerSignedItem(item)
+                            ? styles.statusSignedDone
+                            : item.hub_arrived
+                              ? styles.statusHubArrived
+                              : item.stocked_in
+                                ? styles.statusInDone
+                                : styles.statusInPending,
                         ]}
                       >
                         <Text
                           style={[
                             styles.statusText,
-                            item.stocked_in ? styles.statusInDoneText : styles.statusInPendingText,
+                            isCustomerSignedItem(item)
+                              ? styles.statusSignedDoneText
+                              : item.hub_arrived
+                                ? styles.statusHubArrivedText
+                                : item.stocked_in
+                                  ? styles.statusInDoneText
+                                  : styles.statusInPendingText,
                           ]}
                         >
-                          {item.stocked_in ? '已入库' : '未入库'}
+                          {isCustomerSignedItem(item)
+                            ? '已签收'
+                            : item.hub_arrived
+                              ? '已到站'
+                              : item.stocked_in
+                                ? '已入库'
+                                : '未入库'}
                         </Text>
                       </View>
                       <View
@@ -414,7 +458,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                     </View>
                   </View>
                   <View style={styles.qtyBox}>
-                    <Text style={styles.qty}>{item.qty_on_hand}</Text>
+                    <Text style={styles.qty}>{cardQty}</Text>
                     <Text style={styles.unit}>{stockUnitLabel()}</Text>
                   </View>
                 </View>
@@ -487,12 +531,37 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           navigation.navigate('ItemForm', { itemId: id });
         }}
         onPrint={actionItem ? () => handleItemPrint(actionItem) : undefined}
+        canSignDelivered={
+          !!actionItem &&
+          !!store &&
+          !isExpressPackItem(actionItem) &&
+          canMarkCustomerSigned(store, actionItem)
+        }
+        onSignDelivered={
+          actionItem && store
+            ? () => {
+                const item = actionItem;
+                confirmAndMarkCustomerSigned({
+                  itemId: item.id,
+                  operator: operatorName ?? '工作人员',
+                  store,
+                  onSuccess: () => {
+                    setActionItem(null);
+                    showTaskSuccess('签收成功', `${item.name} 已标记为客户已签收`);
+                    void load();
+                  },
+                  onError: (message) => Alert.alert('签收失败', message),
+                });
+              }
+            : undefined
+        }
       />
 
       <ItemViewModal
         visible={!!viewItemId}
         itemId={viewItemId}
         onClose={() => setViewItemId(null)}
+        onSigned={() => void load()}
       />
 
       <PackExpressModal
@@ -506,7 +575,6 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       <OrderBarcodeModal
         visible={!!orderBarcodeData}
         data={orderBarcodeData}
-        requirePrintBeforeDone={orderBarcodeRequireDone}
         onClose={closeOrderBarcode}
         onDone={orderBarcodeRequireDone ? handlePackPrintDone : undefined}
       />
@@ -611,7 +679,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkMark: { color: '#fff', fontWeight: '900', fontSize: 12 },
-  cardBody: { flex: 1, minWidth: 0 },
+  cardBody: { flex: 1, minWidth: 0, position: 'relative' },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   cardMain: { flex: 1, minWidth: 0 },
   topLine: { fontSize: 12, lineHeight: 16 },
@@ -622,11 +690,15 @@ const styles = StyleSheet.create({
   statusBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   statusInDone: { backgroundColor: 'rgba(34,197,94,0.15)' },
   statusInPending: { backgroundColor: 'rgba(100,116,139,0.2)' },
+  statusHubArrived: { backgroundColor: 'rgba(14,165,233,0.15)' },
+  statusSignedDone: { backgroundColor: 'rgba(34,197,94,0.2)' },
   statusPackDone: { backgroundColor: 'rgba(168,85,247,0.15)' },
   statusPackPending: { backgroundColor: 'rgba(100,116,139,0.2)' },
   statusText: { fontSize: 10, fontWeight: '900' },
   statusInDoneText: { color: '#4ade80' },
   statusInPendingText: { color: '#94a3b8' },
+  statusHubArrivedText: { color: '#38bdf8' },
+  statusSignedDoneText: { color: '#4ade80' },
   statusPackDoneText: { color: '#c4b5fd' },
   statusPackPendingText: { color: '#94a3b8' },
   tagRow: {
