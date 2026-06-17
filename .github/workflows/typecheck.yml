@@ -1,6 +1,6 @@
 name: Typecheck
 
-# 对 6 个子项目跑 `tsc --noEmit`，以「基线门禁」方式挡住新增类型错误。
+# 对 7 个子项目跑 `tsc --noEmit`，以「基线门禁」方式挡住新增类型错误。
 # 基线见 scripts/typecheck-baselines.json：clean 项目必须 0 错误；
 # RN 项目暂以现有错误数为基线（不允许变多），修复后请下调基线。
 
@@ -28,6 +28,7 @@ jobs:
           - "ml-express-client"
           - "ml-express-merchant-app"
           - "ml-express-mobile-app"
+          - "ml-express-inventory-app"
     steps:
       - uses: actions/checkout@v4
 

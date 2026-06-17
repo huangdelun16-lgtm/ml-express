@@ -138,7 +138,7 @@ export default function LoginScreen() {
 
         <Text style={styles.footer}>
           店铺类型须为「中转站」{'\n'}
-          库存数据仍保存在本机，登录仅用于身份校验
+          登录后将签发店铺 JWT，用于云端同步（P4 安全策略）
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -4,10 +4,14 @@
   "main": "index.js",
   "private": true,
   "scripts": {
+    "sync:shared": "node -e \"console.log('inventory-app: no shared sync')\"",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "deploy:inventory-login": "cd .. && supabase functions deploy inventory-store-login"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -32,6 +36,7 @@
     "@babel/core": "^7.20.0",
     "@types/react": "~19.1.10",
     "babel-preset-expo": "~54.0.11",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
   }
 }

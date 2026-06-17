@@ -62,7 +62,28 @@ export function startInventoryCloudRealtime(
       {
         event: '*',
         schema: 'public',
-        table: 'inventory_stock_movements',
+        table: 'inventory_pkg_tracking',
+        filter: `origin_store_code=eq.${storeCode}`,
+      },
+      trigger,
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_pkg_tracking',
+        filter: `leg_destination_code=eq.${hub}`,
+      },
+      trigger,
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_pkg_tracking',
+        filter: `destination_code=eq.${hub}`,
       },
       trigger,
     )

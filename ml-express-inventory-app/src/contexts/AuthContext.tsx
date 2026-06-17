@@ -11,9 +11,13 @@ import {
   loginTransitStationStore,
   logoutTransitStationStore,
   restoreSession,
+  saveSession,
+  clearSession,
+  inventorySessionFromAuthMetadata,
   type InventoryStoreSession,
 } from '../services/authService';
 import { resolveStoreHubCode } from '../utils/storeZone';
+import { isSupabaseConfigured, supabase } from '../services/supabase';
 
 type AuthContextValue = {
   ready: boolean;
@@ -46,6 +50,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
       .finally(() => setReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, authSession) => {
+      if (event === 'SIGNED_OUT') {
+        setStore(null);
+        void clearSession();
+        return;
+      }
+      if (event === 'TOKEN_REFRESHED' && authSession?.user) {
+        const fromMeta = inventorySessionFromAuthMetadata(authSession.user);
+        if (fromMeta) {
+          setStore((prev) => {
+            const merged = prev ? { ...prev, ...fromMeta } : fromMeta;
+            void saveSession(merged);
+            return merged;
+          });
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {

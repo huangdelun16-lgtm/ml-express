@@ -62,8 +62,9 @@ export default function HubReceiveScreen() {
       if (store && pkg.status !== 'in_transit') {
         try {
           await importInboundPackToLocal(pkg, store, operatorName ?? '工作人员');
-        } catch {
-          // 本地同步失败不阻断分拨流程
+        } catch (e: unknown) {
+          const syncErr = e instanceof Error ? e.message : '同步打包列表失败';
+          setError(`订单已确认，但写入打包列表失败：${syncErr}`);
         }
       }
       const total = pkg.item_count;
@@ -175,7 +176,7 @@ export default function HubReceiveScreen() {
         return;
       }
 
-      const order = await getOrderTrackingByBarcode(code);
+      const order = await getOrderTrackingByBarcode(code, hubCode);
       if (!order) {
         setError(formatOrderNotFoundHint(code, hubCode));
         setActivePack(null);

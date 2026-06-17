@@ -192,7 +192,7 @@ export default function ItemFormScreen({
         name,
         barcode,
         destination: destination || undefined,
-        customerName: recipientName || undefined,
+        customer_name: recipientName || undefined,
       }),
     );
   };

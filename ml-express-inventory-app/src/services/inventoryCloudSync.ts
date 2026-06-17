@@ -1,4 +1,5 @@
 import type { InventoryStoreSession } from './authService';
+import { ensureInventoryCloudAuth } from './authService';
 import { getDatabase, newId, nowIso } from './database';
 import {
   fetchCloudMovementsForItems,
@@ -23,6 +24,33 @@ import {
 import { processCloudSyncQueue } from './inventoryCloudQueue';
 
 let syncInFlight: Promise<void> | null = null;
+let syncDirty = false;
+const packMergeChains = new Map<string, Promise<void>>();
+const itemMergeChains = new Map<string, Promise<void>>();
+
+function runWithPackMergeLock(bundleBarcode: string, fn: () => Promise<void>): Promise<void> {
+  const key = bundleBarcode.trim().toUpperCase();
+  const previous = packMergeChains.get(key) ?? Promise.resolve();
+  const next = previous.then(fn, fn);
+  packMergeChains.set(key, next);
+  return next.finally(() => {
+    if (packMergeChains.get(key) === next) {
+      packMergeChains.delete(key);
+    }
+  });
+}
+
+function runWithItemMergeLock(barcode: string, fn: () => Promise<void>): Promise<void> {
+  const key = barcode.trim().toUpperCase();
+  const previous = itemMergeChains.get(key) ?? Promise.resolve();
+  const next = previous.then(fn, fn);
+  itemMergeChains.set(key, next);
+  return next.finally(() => {
+    if (itemMergeChains.get(key) === next) {
+      itemMergeChains.delete(key);
+    }
+  });
+}
 
 function tsMs(value: string | undefined | null): number {
   if (!value?.trim()) return 0;
@@ -50,6 +78,10 @@ async function hasHubStationInboundMovement(itemId: string): Promise<boolean> {
 }
 
 async function mergeCloudItem(row: CloudStoreItemRow): Promise<void> {
+  return runWithItemMergeLock(row.barcode, () => mergeCloudItemCore(row));
+}
+
+async function mergeCloudItemCore(row: CloudStoreItemRow): Promise<void> {
   const db = await getDatabase();
   const local = await db.getFirstAsync<Record<string, unknown>>(
     'SELECT * FROM inventory_items WHERE barcode = ?',
@@ -239,6 +271,10 @@ async function mergeCloudMovement(row: CloudMovementRow, localItemId: string): P
 }
 
 async function mergeCloudPack(row: CloudPackRow): Promise<void> {
+  return runWithPackMergeLock(row.bundle_barcode, () => mergeCloudPackCore(row));
+}
+
+async function mergeCloudPackCore(row: CloudPackRow): Promise<void> {
   const db = await getDatabase();
   const existing = await db.getFirstAsync<{ id: string }>(
     'SELECT id FROM packed_shipments WHERE bundle_barcode = ?',
@@ -737,22 +773,27 @@ export async function syncPlatformInventoryFromCloud(
   hubCode: string,
 ): Promise<void> {
   if (!isSupabaseConfigured()) return;
+  await ensureInventoryCloudAuth();
   if (syncInFlight) {
+    syncDirty = true;
     await syncInFlight;
     return;
   }
 
-  syncInFlight = (async () => {
-    await processCloudSyncQueue(store);
-    await pullPlatformInventoryFromCloud(store, hubCode);
-    await pushLocalItemsForStore(store, hubCode);
-  })();
+  do {
+    syncDirty = false;
+    syncInFlight = (async () => {
+      await processCloudSyncQueue(store);
+      await pullPlatformInventoryFromCloud(store, hubCode);
+      await pushLocalItemsForStore(store, hubCode);
+    })();
 
-  try {
-    await syncInFlight;
-  } finally {
-    syncInFlight = null;
-  }
+    try {
+      await syncInFlight;
+    } finally {
+      syncInFlight = null;
+    }
+  } while (syncDirty);
 }
 
 export async function pushItemAndMovementToCloud(

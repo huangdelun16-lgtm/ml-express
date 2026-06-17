@@ -10,8 +10,10 @@ import {
 } from './storeOwnership';
 
 type CloudItemRef = {
+  barcode?: string;
   owner_store_code: string;
   final_destination: string;
+  destination?: string;
   hub_arrived_at?: string | null;
   customer_signed_at?: string | null;
   hub_transit_released_at?: string | null;
@@ -131,7 +133,11 @@ export function shouldMergeCloudItemToLocal(
   const hub = hubCode.trim().toUpperCase();
   if (!hub) return isLocalInboundItem(row.owner_store_code ?? '', store);
 
-  const destKey = extractDestinationCode(row.final_destination ?? '');
+  const destKey = resolveItemDestinationCode({
+    barcode: row.barcode ?? '',
+    final_destination: row.final_destination ?? '',
+    destination: row.destination ?? row.final_destination ?? '',
+  });
   const localInbound = isLocalInboundItem(row.owner_store_code ?? '', store);
   const isFinalDestHere = Boolean(destKey && destKey === hub);
   const isTransitElsewhere = Boolean(destKey && destKey !== hub);

@@ -221,20 +221,50 @@ export async function enqueueCloudSync(payload: CloudSyncQueuePayload): Promise<
 }
 
 export async function getCloudSyncPendingCount(storeCode?: string): Promise<number> {
+  const snapshot = await getCloudSyncQueueSnapshot(storeCode ?? '');
+  return snapshot.pending;
+}
+
+export type CloudSyncQueueSnapshot = {
+  pending: number;
+  lastError: string | null;
+  oldestType: string | null;
+};
+
+export async function getCloudSyncQueueSnapshot(
+  storeCode: string,
+): Promise<CloudSyncQueueSnapshot> {
   const db = await getDatabase();
-  const rows = await db.getAllAsync<{ payload: string }>('SELECT payload FROM cloud_sync_queue');
-  if (!storeCode?.trim()) return rows.length;
+  const rows = await db.getAllAsync<{
+    payload: string;
+    last_error: string;
+    op_type: string;
+  }>('SELECT payload, last_error, op_type FROM cloud_sync_queue ORDER BY created_at ASC');
+
   const code = storeCode.trim().toUpperCase();
-  let count = 0;
+  if (!code) {
+    return { pending: rows.length, lastError: null, oldestType: rows[0]?.op_type ?? null };
+  }
+
+  let pending = 0;
+  let lastError: string | null = null;
+  let oldestType: string | null = null;
+
   for (const row of rows) {
     try {
       const payload = JSON.parse(row.payload) as CloudSyncQueuePayload;
-      if (payload.store.storeCode.trim().toUpperCase() === code) count += 1;
+      if (payload.store.storeCode.trim().toUpperCase() !== code) continue;
+      pending += 1;
+      if (!oldestType) oldestType = row.op_type;
+      const err = String(row.last_error ?? '').trim();
+      if (err && !lastError) lastError = err;
     } catch {
-      count += 1;
+      pending += 1;
+      if (!oldestType) oldestType = row.op_type;
     }
   }
-  return count;
+
+  return { pending, lastError, oldestType };
 }
 
 /** 按序重试离线队列；失败项保留并停止后续（保证顺序） */

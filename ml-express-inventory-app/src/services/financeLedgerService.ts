@@ -1,7 +1,7 @@
 import { getHubTransportFeePaidBarcodeSet } from './hubTransportFeeService';
 import type { InventoryStoreSession } from './authService';
 import { getDatabase } from './database';
-import { listInboundPackages } from './trackingService';
+import { listInboundPackages, listOutboundPackagesFromOrigin } from './trackingService';
 import type { FinanceLedgerEntry, FinanceLedgerResult, FinanceLedgerSummary } from '../types/financeLedger';
 import type { StockMovement } from '../types/inventory';
 import { destinationCodesMatch, normalizeDestinationCode } from '../utils/destinationCode';
@@ -213,11 +213,14 @@ function buildTransportEntry(params: {
   originLabel: string;
   occurredAt: string;
   paid?: boolean;
+  direction?: 'inbound' | 'outbound';
 }): FinanceLedgerEntry {
+  const direction = params.direction ?? 'inbound';
   return {
     id: params.id,
     category: 'transport_cost',
-    title: '运输成本 · 装车车费',
+    title:
+      direction === 'outbound' ? '运输成本 · 发运车费' : '运输成本 · 装车车费',
     subtitle: `${params.originLabel} → ${params.legDest} · ${params.packBarcode}`,
     amount: params.paid ? 0 : params.fee,
     amountDisplay: params.paid
@@ -231,6 +234,130 @@ function buildTransportEntry(params: {
     destination: params.legDest,
     originLabel: params.originLabel,
   };
+}
+
+async function collectLocalTransportEntries(params: {
+  store: InventoryStoreSession;
+  hub: string;
+  transportSeen: Set<string>;
+  transportPaidBarcodes: Set<string>;
+}): Promise<FinanceLedgerEntry[]> {
+  const { store, hub, transportSeen, transportPaidBarcodes } = params;
+  const db = await getDatabase();
+  const currentKey = ownershipKeyFromStoreCode(store.storeCode);
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `SELECT p.id, p.bundle_barcode, p.bundle_name, p.transport_fee, p.truck_leg_destination,
+            p.owner_store_code, p.bundle_item_id, p.created_at, i.qty_on_hand
+     FROM packed_shipments p
+     LEFT JOIN inventory_items i ON i.id = p.bundle_item_id
+     ORDER BY p.created_at DESC
+     LIMIT 300`,
+  );
+
+  const { getLatestTruckLoadMovement } = await import('./inventoryService');
+  const out: FinanceLedgerEntry[] = [];
+
+  for (const row of rows) {
+    const qty = Number(row.qty_on_hand);
+    const loaded = Number.isFinite(qty) && qty <= 0;
+    if (!loaded) continue;
+
+    const packBarcode = String(row.bundle_barcode ?? '').trim().toUpperCase();
+    if (!packBarcode || transportSeen.has(packBarcode)) continue;
+
+    let legDest = normalizeDestinationCode(String(row.truck_leg_destination ?? ''));
+    let fee = parseAmount(String(row.transport_fee ?? ''));
+    let occurredAt = String(row.created_at ?? '');
+
+    const bundleItemId = String(row.bundle_item_id ?? '');
+    if (bundleItemId) {
+      const movement = await getLatestTruckLoadMovement(bundleItemId);
+      if (movement) {
+        if (fee <= 0) fee = parseAmount(parseTransportFeeFromLoadNote(movement.note));
+        if (!legDest) legDest = normalizeDestinationCode(movement.destination ?? '');
+        if (!occurredAt) occurredAt = movement.created_at;
+      }
+    }
+
+    if (!legDest) continue;
+
+    const ownerKey = ownershipKeyFromStoreCode(String(row.owner_store_code ?? ''));
+    const isInboundLeg = destinationCodesMatch(legDest, hub);
+    const isOutboundFromHere =
+      ownerKey === currentKey && !destinationCodesMatch(legDest, hub);
+
+    if (!isInboundLeg && !isOutboundFromHere) continue;
+
+    transportSeen.add(packBarcode);
+    const originLabel = ownershipLabelFromKey(ownerKey);
+    const paid = transportPaidBarcodes.has(packBarcode);
+
+    out.push(
+      buildTransportEntry({
+        id: `transport:pack:${String(row.id)}`,
+        packBarcode,
+        packName: String(row.bundle_name ?? packBarcode),
+        fee,
+        legDest,
+        originLabel,
+        occurredAt,
+        paid,
+        direction: isOutboundFromHere ? 'outbound' : 'inbound',
+      }),
+    );
+  }
+
+  return out;
+}
+
+function collectCloudTransportEntry(params: {
+  pkg: {
+    pack_barcode: string;
+    pack_name: string;
+    transport_fee: string;
+    leg_destination_code: string;
+    destination_code: string;
+    origin_store_code: string;
+    origin_store_name: string;
+    truck_loaded_at: string | null;
+    updated_at: string;
+  };
+  hub: string;
+  currentStore: InventoryStoreSession;
+  transportSeen: Set<string>;
+  transportPaidBarcodes: Set<string>;
+}): FinanceLedgerEntry | null {
+  const { pkg, hub, currentStore, transportSeen, transportPaidBarcodes } = params;
+  const legDest = normalizeDestinationCode(pkg.leg_destination_code || pkg.destination_code);
+  if (!legDest) return null;
+
+  const packBarcode = pkg.pack_barcode.trim().toUpperCase();
+  if (!packBarcode || transportSeen.has(packBarcode)) return null;
+
+  const currentKey = ownershipKeyFromStoreCode(currentStore.storeCode);
+  const originKey = ownershipKeyFromStoreCode(pkg.origin_store_code);
+  const isInboundLeg = destinationCodesMatch(legDest, hub);
+  const isOutboundFromHere = originKey === currentKey && !destinationCodesMatch(legDest, hub);
+
+  if (!isInboundLeg && !isOutboundFromHere) return null;
+
+  transportSeen.add(packBarcode);
+  const fee = parseAmount(pkg.transport_fee);
+  const originLabel =
+    pkg.origin_store_name.trim() || ownershipLabelFromKey(originKey);
+  const paid = transportPaidBarcodes.has(packBarcode);
+
+  return buildTransportEntry({
+    id: `transport:cloud:${packBarcode}`,
+    packBarcode: pkg.pack_barcode,
+    packName: pkg.pack_name || pkg.pack_barcode,
+    fee,
+    legDest,
+    originLabel,
+    occurredAt: pkg.truck_loaded_at || pkg.updated_at,
+    paid,
+    direction: isOutboundFromHere ? 'outbound' : 'inbound',
+  });
 }
 
 function buildStockOpEntry(movement: StockMovement): FinanceLedgerEntry {
@@ -321,83 +448,42 @@ export async function listFinanceLedger(
     }
   }
 
-  const transportRows = await db.getAllAsync<Record<string, unknown>>(
-    `SELECT m.id, m.item_name, m.operator, m.note, m.created_at, m.destination,
-            p.bundle_barcode, p.bundle_name, p.transport_fee, p.truck_leg_destination,
-            p.owner_store_code
-     FROM stock_movements m
-     INNER JOIN packed_shipments p ON p.bundle_item_id = m.item_id
-     WHERE m.type = 'out' AND m.note LIKE '%装车出库%'
-     ORDER BY m.created_at DESC
-     LIMIT 200`,
-  );
-
-  for (const row of transportRows) {
-    const legDest = normalizeDestinationCode(
-      String(row.truck_leg_destination ?? row.destination ?? ''),
-    );
-    if (!legDest || !destinationCodesMatch(legDest, hub)) continue;
-
-    const packBarcode = String(row.bundle_barcode ?? '').trim().toUpperCase();
-    if (!packBarcode || transportSeen.has(packBarcode)) continue;
-    transportSeen.add(packBarcode);
-
-    const feeFromCol = parseAmount(String(row.transport_fee ?? ''));
-    const feeFromNote = parseAmount(parseTransportFeeFromLoadNote(String(row.note ?? '')));
-    const fee = feeFromCol > 0 ? feeFromCol : feeFromNote;
-    const originKey = ownershipKeyFromStoreCode(String(row.owner_store_code ?? ''));
-    const originLabel = ownershipLabelFromKey(originKey);
-    const paid = transportPaidBarcodes.has(packBarcode);
-
-    entries.push(
-      buildTransportEntry({
-        id: `transport:local:${String(row.id)}`,
-        packBarcode,
-        packName: String(row.bundle_name ?? row.item_name ?? packBarcode),
-        fee,
-        legDest,
-        originLabel,
-        occurredAt: String(row.created_at),
-        paid,
-      }),
-    );
-  }
+  const localTransport = await collectLocalTransportEntries({
+    store,
+    hub,
+    transportSeen,
+    transportPaidBarcodes,
+  });
+  entries.push(...localTransport);
 
   try {
-    const cloudPkgs = await listInboundPackages(hub, [
-      'in_transit',
-      'hub_received',
-      'completed',
-    ]);
-    for (const pkg of cloudPkgs) {
-      const legDest = normalizeDestinationCode(
-        pkg.leg_destination_code || pkg.destination_code,
-      );
-      if (!destinationCodesMatch(legDest, hub)) continue;
+    const cloudStatuses = ['in_transit', 'hub_received', 'completed', 'split_at_hub'] as const;
+    const inboundPkgs = await listInboundPackages(hub, [...cloudStatuses]);
+    const outboundPkgs = await listOutboundPackagesFromOrigin(store.storeCode, [...cloudStatuses]);
 
-      const packBarcode = pkg.pack_barcode.trim().toUpperCase();
-      if (!packBarcode || transportSeen.has(packBarcode)) continue;
-      transportSeen.add(packBarcode);
+    for (const pkg of inboundPkgs) {
+      const entry = collectCloudTransportEntry({
+        pkg,
+        hub,
+        currentStore: store,
+        transportSeen,
+        transportPaidBarcodes,
+      });
+      if (entry) entries.push(entry);
+    }
 
-      const fee = parseAmount(pkg.transport_fee);
-      const originLabel =
-        pkg.origin_store_name.trim() ||
-        ownershipLabelFromKey(ownershipKeyFromStoreCode(pkg.origin_store_code));
-      const paid = transportPaidBarcodes.has(packBarcode);
+    for (const pkg of outboundPkgs) {
+      const entry = collectCloudTransportEntry({
+        pkg,
+        hub,
+        currentStore: store,
+        transportSeen,
+        transportPaidBarcodes,
+      });
+      if (entry) entries.push(entry);
+    }
 
-      entries.push(
-        buildTransportEntry({
-          id: `transport:cloud:${packBarcode}`,
-          packBarcode: pkg.pack_barcode,
-          packName: pkg.pack_name || pkg.pack_barcode,
-          fee,
-          legDest,
-          originLabel,
-          occurredAt: pkg.truck_loaded_at || pkg.updated_at,
-          paid,
-        }),
-      );
-
+    for (const pkg of inboundPkgs) {
       for (const order of pkg.orders) {
         if (!order.inbound_note?.trim()) continue;
         const parsed = parseInboundMovementNote(order.inbound_note);

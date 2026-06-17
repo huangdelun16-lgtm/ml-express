@@ -125,14 +125,35 @@ export async function fetchCloudStoreItems(
   if (!isSupabaseConfigured()) return [];
   const storeCode = store.storeCode.trim().toUpperCase();
   const hub = hubCode.trim().toUpperCase();
-  const { data, error } = await supabase
+  const itemMap = new Map<string, CloudStoreItemRow>();
+
+  const { data: ownerData, error: ownerErr } = await supabase
     .from('inventory_store_items')
     .select('*')
-    .or(`owner_store_code.eq.${storeCode},final_destination.eq.${hub}`)
+    .eq('owner_store_code', storeCode)
     .order('updated_at', { ascending: false })
     .limit(800);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => rowToCloudItem(row as Record<string, unknown>));
+  if (ownerErr) throw new Error(ownerErr.message);
+  for (const row of ownerData ?? []) {
+    const item = rowToCloudItem(row as Record<string, unknown>);
+    itemMap.set(item.id, item);
+  }
+
+  if (hub) {
+    const { data: destData, error: destErr } = await supabase
+      .from('inventory_store_items')
+      .select('*')
+      .eq('final_destination', hub)
+      .order('updated_at', { ascending: false })
+      .limit(800);
+    if (destErr) throw new Error(destErr.message);
+    for (const row of destData ?? []) {
+      const item = rowToCloudItem(row as Record<string, unknown>);
+      itemMap.set(item.id, item);
+    }
+  }
+
+  return Array.from(itemMap.values());
 }
 
 export async function fetchCloudMovementsForItems(itemIds: string[]): Promise<CloudMovementRow[]> {

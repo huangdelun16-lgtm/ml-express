@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { INVENTORY_RELOGIN_HINT, isInventoryCloudAuthError } from '../utils/cloudAuthErrors';
 import {
   getSupabaseAnonKey,
   getSupabaseConfigHint,
@@ -10,6 +11,18 @@ import {
 export const TRANSIT_STATION_STORE_TYPE = 'transit_station';
 const SESSION_KEY = 'inventory_transit_session';
 
+/** P4：云端 JWT 无效或缺少 inventory_* metadata 时需重新登录 */
+export class InventoryAuthRequiredError extends Error {
+  constructor(message = INVENTORY_RELOGIN_HINT) {
+    super(message);
+    this.name = 'InventoryAuthRequiredError';
+  }
+}
+
+export function isInventoryAuthRequiredError(error: unknown): boolean {
+  return error instanceof InventoryAuthRequiredError;
+}
+
 export type InventoryStoreSession = {
   id: string;
   storeCode: string;
@@ -18,6 +31,8 @@ export type InventoryStoreSession = {
   address: string;
   storeType: string;
   loggedInAt: string;
+  /** P4 JWT app_metadata.inventory_hub_code，优先于 region 推断 */
+  hubCode?: string;
 };
 
 type DeliveryStoreRow = {
@@ -44,16 +59,24 @@ type InventoryLoginPayload = {
   error?: string;
 };
 
-function toSession(store: DeliveryStoreRow): InventoryStoreSession {
+function toSession(store: DeliveryStoreRow, hubCode?: string): InventoryStoreSession {
+  const hub = hubCode?.trim().toUpperCase() || '';
   return {
     id: store.id,
     storeCode: store.store_code,
     storeName: store.store_name,
-    region: store.region?.trim() ?? '',
+    region: hub || (store.region?.trim() ?? ''),
     address: store.address?.trim() ?? '',
     storeType: store.store_type,
     loggedInAt: new Date().toISOString(),
+    hubCode: hub || undefined,
   };
+}
+
+export function inventorySessionFromAuthMetadata(user: {
+  app_metadata?: Record<string, unknown>;
+}): InventoryStoreSession | null {
+  return sessionFromAuthMetadata(user);
 }
 
 export async function saveSession(session: InventoryStoreSession): Promise<void> {
@@ -84,14 +107,16 @@ function sessionFromAuthMetadata(user: {
   const id = String(meta.inventory_store_id ?? '').trim();
   const storeCode = String(meta.inventory_store_code ?? '').trim().toUpperCase();
   if (!id || !storeCode) return null;
+  const hubCode = String(meta.inventory_hub_code ?? '').trim().toUpperCase();
   return {
     id,
     storeCode,
     storeName: String(meta.inventory_store_name ?? storeCode),
-    region: String(meta.inventory_region ?? meta.inventory_hub_code ?? '').trim(),
+    region: hubCode || String(meta.inventory_region ?? '').trim(),
     address: String(meta.inventory_address ?? '').trim(),
     storeType: String(meta.inventory_store_type ?? TRANSIT_STATION_STORE_TYPE),
     loggedInAt: new Date().toISOString(),
+    hubCode: hubCode || undefined,
   };
 }
 
@@ -109,6 +134,50 @@ async function validateStoreStillAllowed(storeId: string): Promise<boolean> {
 async function signInInventoryAuth(email: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(`云端登录失败：${error.message}`);
+}
+
+/** 同步 / 写云端前校验：必须已登录且 JWT 含 inventory_store_id + hub_code */
+export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession> {
+  if (!isSupabaseConfigured()) {
+    throw new InventoryAuthRequiredError(getSupabaseConfigHint() || '未配置 Supabase');
+  }
+
+  const {
+    data: { session },
+    error: sessionErr,
+  } = await supabase.auth.getSession();
+  if (sessionErr || !session?.user) {
+    throw new InventoryAuthRequiredError();
+  }
+
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  const user = userErr ? session.user : userData?.user ?? session.user;
+
+  const fromMeta = sessionFromAuthMetadata(user);
+  if (!fromMeta?.hubCode) {
+    throw new InventoryAuthRequiredError(
+      '云端 JWT 缺少 inventory_hub_code。请退出后重新登录以更新店铺权限。',
+    );
+  }
+
+  const { error: probeErr } = await supabase
+    .from('delivery_stores')
+    .select('id')
+    .eq('id', fromMeta.id)
+    .maybeSingle();
+  if (probeErr && isInventoryCloudAuthError(probeErr)) {
+    throw new InventoryAuthRequiredError(probeErr.message);
+  }
+
+  const ok = await validateStoreStillAllowed(fromMeta.id);
+  if (!ok) {
+    throw new InventoryAuthRequiredError('店铺账号已停用或非中转站类型');
+  }
+
+  const stored = await loadStoredSession();
+  const merged = stored ? { ...stored, ...fromMeta } : fromMeta;
+  await saveSession(merged);
+  return merged;
 }
 
 async function callInventoryStoreLogin(storeCode: string, password: string): Promise<InventoryLoginPayload> {
@@ -135,39 +204,13 @@ export async function restoreSession(): Promise<InventoryStoreSession | null> {
     return await loadStoredSession();
   }
 
-  const {
-    data: { session: authSession },
-  } = await supabase.auth.getSession();
-
-  if (!authSession?.user) {
-    await clearSession();
-    return null;
-  }
-
-  const fromMeta = sessionFromAuthMetadata(authSession.user);
-  const stored = await loadStoredSession();
-  const candidate = stored ?? fromMeta;
-  if (!candidate) {
+  try {
+    return await ensureInventoryCloudAuth();
+  } catch {
     await supabase.auth.signOut();
     await clearSession();
     return null;
   }
-
-  if (fromMeta && fromMeta.id !== candidate.id) {
-    await supabase.auth.signOut();
-    await clearSession();
-    return null;
-  }
-
-  const ok = await validateStoreStillAllowed(candidate.id);
-  if (!ok) {
-    await supabase.auth.signOut();
-    await clearSession();
-    return null;
-  }
-
-  if (!stored) await saveSession(candidate);
-  return candidate;
 }
 
 export async function loginTransitStationStore(
@@ -191,18 +234,7 @@ export async function loginTransitStationStore(
 
   await signInInventoryAuth(loginPayload.email, pass);
 
-  const session = toSession({
-    id: loginPayload.store.id,
-    store_code: loginPayload.store.storeCode,
-    store_name: loginPayload.store.storeName,
-    store_type: loginPayload.store.storeType,
-    status: 'active',
-    region: loginPayload.store.region ?? null,
-    address: loginPayload.store.address ?? null,
-  });
-
-  await saveSession(session);
-  return session;
+  return await ensureInventoryCloudAuth();
 }
 
 export async function logoutTransitStationStore(): Promise<void> {

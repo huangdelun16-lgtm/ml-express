@@ -16,8 +16,13 @@ function inventoryAuthEmail(storeCode: string): string {
 function resolveHubCode(region: string | null | undefined, storeCode: string): string {
   const reg = (region ?? "").trim().toUpperCase();
   if (reg && PACK_HUB_CODES.includes(reg)) return reg;
-  const prefix = storeCode.replace(/[0-9]/g, "").toUpperCase().slice(0, 3);
+
+  const letters = storeCode.replace(/[0-9]/g, "").toUpperCase();
+  if (letters.startsWith("MUSE") || letters === "MSE" || letters === "MUS") return "MSE";
+
+  const prefix = letters.slice(0, 3);
   if (PACK_HUB_CODES.includes(prefix)) return prefix;
+  if (reg && PACK_HUB_CODES.includes(reg.slice(0, 3))) return reg.slice(0, 3);
   if (reg) return reg.slice(0, 3);
   return prefix;
 }

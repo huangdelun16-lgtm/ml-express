@@ -791,11 +791,16 @@ export async function getItemByBarcode(barcode: string): Promise<InventoryItem |
   const code = barcode.trim();
   if (!code) return null;
   const db = await getDatabase();
-  const row = await db.getFirstAsync<Record<string, unknown>>(
-    'SELECT * FROM inventory_items WHERE barcode = ? OR input_barcode = ?',
-    [code, code],
+  const byBarcode = await db.getFirstAsync<Record<string, unknown>>(
+    'SELECT * FROM inventory_items WHERE barcode = ?',
+    [code],
   );
-  return row ? rowToItem(row) : null;
+  if (byBarcode) return rowToItem(byBarcode);
+  const byInput = await db.getFirstAsync<Record<string, unknown>>(
+    'SELECT * FROM inventory_items WHERE TRIM(input_barcode) = ? ORDER BY updated_at DESC LIMIT 1',
+    [code],
+  );
+  return byInput ? rowToItem(byInput) : null;
 }
 
 export async function upsertItem(
@@ -1726,19 +1731,20 @@ export async function cancelPackedShipment(
   }
 
   const { listPkgTrackingStatusMap } = await import('./trackingService');
+  let cloudStatus: import('../types/tracking').PkgTrackingStatus | null = null;
   try {
     const statusMap = await listPkgTrackingStatusMap([pack.bundle_barcode]);
-    const cloud = statusMap[pack.bundle_barcode.trim().toUpperCase()];
-    if (
-      cloud === 'in_transit' ||
-      cloud === 'hub_received' ||
-      cloud === 'completed' ||
-      cloud === 'split_at_hub'
-    ) {
-      throw new Error('该快递包已在运输中或已到站，无法拆包');
-    }
-  } catch (e: unknown) {
-    if (e instanceof Error && e.message.includes('无法拆包')) throw e;
+    cloudStatus = statusMap[pack.bundle_barcode.trim().toUpperCase()] ?? null;
+  } catch {
+    throw new Error('无法连接云端校验拆包状态，请检查网络后重试');
+  }
+  if (
+    cloudStatus === 'in_transit' ||
+    cloudStatus === 'hub_received' ||
+    cloudStatus === 'completed' ||
+    cloudStatus === 'split_at_hub'
+  ) {
+    throw new Error('该快递包已在运输中或已到站，无法拆包');
   }
 
   if (actingStore) {
@@ -1836,6 +1842,15 @@ export async function resyncLoadedPackToCloud(
     pack.transport_fee?.trim() ||
     parseTransportFeeFromLoadNote(movement.note) ||
     '';
+  const { listPkgTrackingStatusMap } = await import('./trackingService');
+  const { PKG_STATUS_LABEL } = await import('../types/tracking');
+  const statusMap = await listPkgTrackingStatusMap([pack.bundle_barcode]);
+  const cloudStatus = statusMap[pack.bundle_barcode.trim().toUpperCase()];
+  if (cloudStatus && cloudStatus !== 'in_transit') {
+    throw new Error(
+      `快递包云端已是「${PKG_STATUS_LABEL[cloudStatus]}」，无需补传装车数据`,
+    );
+  }
   const originStore: OriginStoreRef = {
     id: actingStore.id,
     storeCode: actingStore.storeCode,
@@ -1864,7 +1879,9 @@ export async function deliverLocalHubOrderToInventory(params: {
   const { resolveOrderDestinationCode } = await import('../utils/orderDestination');
   const hub = params.hubCode.trim().toUpperCase();
   const orderDest = resolveOrderDestinationCode(params.order);
-  if (orderDest !== hub) return;
+  if (orderDest !== hub) {
+    throw new Error(`订单目的地为 ${orderDest || '未知'}，非本站 ${hub}，无法确认入库`);
+  }
 
   const hubArrivedAt =
     params.order.hub_received_at?.trim() ||
@@ -3219,7 +3236,9 @@ export async function listMovements(limit = 100): Promise<StockMovement[]> {
   return rows.map(rowToMovement);
 }
 
-export async function getStats(): Promise<{
+export async function getStats(
+  scope?: { store: InventoryStoreSession; hubCode: string },
+): Promise<{
   itemCount: number;
   totalQty: number;
   lowStockCount: number;
@@ -3247,13 +3266,29 @@ export async function getStats(): Promise<{
   const packRow = await db.getFirstAsync<{ c: number }>(
     'SELECT COUNT(*) as c FROM packed_shipments',
   );
+
+  let itemCount = items?.c ?? 0;
+  let totalQty = items?.q ?? 0;
+  let lowStockCount = items?.low ?? 0;
+  let packCount = packRow?.c ?? 0;
+
+  if (scope) {
+    const visibleItems = await listItems(undefined, scope);
+    itemCount = visibleItems.length;
+    totalQty = visibleItems.reduce((sum, item) => sum + item.qty_on_hand, 0);
+    lowStockCount = visibleItems.filter(
+      (item) => item.min_qty > 0 && item.qty_on_hand <= item.min_qty,
+    ).length;
+    packCount = (await listPackedShipments(undefined, scope)).length;
+  }
+
   return {
-    itemCount: items?.c ?? 0,
-    totalQty: items?.q ?? 0,
-    lowStockCount: items?.low ?? 0,
+    itemCount,
+    totalQty,
+    lowStockCount,
     todayIn: inRow?.n ?? 0,
     todayOut: outRow?.n ?? 0,
-    packCount: packRow?.c ?? 0,
+    packCount,
   };
 }
 

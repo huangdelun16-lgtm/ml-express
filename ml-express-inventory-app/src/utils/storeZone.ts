@@ -1,8 +1,12 @@
 import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
 import type { InventoryStoreSession } from '../services/authService';
 
-/** 从店铺 region 或 store_code 解析本站服务区域码（如 YGN、MDY、MSE） */
+/** 从店铺 region / JWT hubCode / store_code 解析本站服务区域码（如 YGN、MDY、MSE） */
 export function resolveStoreHubCode(store: InventoryStoreSession): string {
+  const fromJwt = store.hubCode?.trim().toUpperCase() ?? '';
+  if (fromJwt && (PACK_DESTINATION_OPTIONS as readonly string[]).includes(fromJwt)) {
+    return fromJwt;
+  }
   const region = store.region?.trim().toUpperCase() ?? '';
   if (region && (PACK_DESTINATION_OPTIONS as readonly string[]).includes(region)) {
     return region;

@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { getStats, listPackedShipmentRows, syncPlatformInventoryCloud } from '../services/inventoryService';
+import { getCloudSyncQueueSnapshot } from '../services/inventoryCloudQueue';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
 
@@ -20,19 +21,26 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
   });
   const [recentPacks, setRecentPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncPending, setSyncPending] = useState(0);
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
-    const [s, packs] = await Promise.all([getStats(), listPackedShipmentRows(undefined, scope)]);
     if (store && hubCode) {
       try {
         await syncPlatformInventoryCloud(store, hubCode);
       } catch {
         // 离线时仍显示本地统计
       }
+      const snapshot = await getCloudSyncQueueSnapshot(store.storeCode);
+      setSyncPending(snapshot.pending);
+    } else {
+      setSyncPending(0);
     }
-    const packsAfter = await listPackedShipmentRows(undefined, scope);
-    setStats({ ...s, packCount: packsAfter.length });
+    const [s, packsAfter] = await Promise.all([
+      getStats(scope),
+      listPackedShipmentRows(undefined, scope),
+    ]);
+    setStats(s);
     setRecentPacks(packsAfter.slice(0, 3));
   }, [store, hubCode]);
 
@@ -88,6 +96,11 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
       </View>
       {stats.lowStockCount > 0 ? (
         <Text style={styles.warn}>⚠️ {stats.lowStockCount} 个 SKU 低于安全库存</Text>
+      ) : null}
+      {syncPending > 0 ? (
+        <Text style={styles.syncWarn}>
+          ⏳ {syncPending} 项待上传云端 · 设置页可「立即同步」
+        </Text>
       ) : null}
 
       <Pressable style={styles.pkgCard} onPress={() => navigation.navigate('Pkg')}>
@@ -170,6 +183,7 @@ const styles = StyleSheet.create({
   statValue: { color: '#fbbf24', fontSize: 20, fontWeight: '900' },
   statLabel: { color: '#94a3b8', fontSize: 12, marginTop: 4 },
   warn: { color: '#fbbf24', marginBottom: 16, fontSize: 13 },
+  syncWarn: { color: '#a78bfa', marginBottom: 16, fontSize: 13, fontWeight: '700' },
   pkgCard: {
     backgroundColor: '#1e293b',
     borderRadius: 14,

@@ -15,7 +15,10 @@ import {
   savePrinterSettings,
   type PrinterSettings,
 } from '../services/printerService';
-import { clearAllTestData } from '../services/inventoryService';
+import { clearAllTestData, syncPlatformInventoryCloud } from '../services/inventoryService';
+import { getCloudSyncQueueSnapshot } from '../services/inventoryCloudQueue';
+import { isInventoryCloudAuthError, INVENTORY_RELOGIN_HINT } from '../utils/cloudAuthErrors';
+import { isInventoryAuthRequiredError } from '../services/authService';
 import { resolveStoreHubCode } from '../utils/storeZone';
 
 const WIDTH_OPTIONS: PrinterSettings['labelWidthMm'][] = [40, 50, 60, 80];
@@ -44,12 +47,27 @@ export default function SettingsScreen() {
   const { operatorName, storeCode, store, hubCode, logout } = useAuth();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [syncPending, setSyncPending] = useState(0);
+  const [syncLastError, setSyncLastError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
 
+  const refreshSyncQueue = async () => {
+    if (!storeCode) {
+      setSyncPending(0);
+      setSyncLastError(null);
+      return;
+    }
+    const snapshot = await getCloudSyncQueueSnapshot(storeCode);
+    setSyncPending(snapshot.pending);
+    setSyncLastError(snapshot.lastError);
+  };
+
   useEffect(() => {
     void getPrinterSettings().then(setSettings);
-  }, []);
+    void refreshSyncQueue();
+  }, [storeCode]);
 
   const updatePrinter = async (patch: Partial<PrinterSettings>) => {
     if (!settings) return;
@@ -125,6 +143,52 @@ export default function SettingsScreen() {
           · 手机相机：点输入框右侧「扫码」{'\n'}
           · 通用扫码：首页「通用扫码」查看本地 + 云端状态
         </Text>
+      </SectionCard>
+
+      <SectionCard title="云端同步" accent="#7c3aed">
+        <Text style={styles.muted}>
+          离线或网络失败时，入库/打包/装车操作会进入本机队列，联网后自动重试。
+        </Text>
+        <Text style={styles.syncStat}>
+          待上传：{syncPending} 项
+          {syncLastError ? ` · 最近失败：${syncLastError}` : ''}
+        </Text>
+        <Pressable
+          style={[styles.syncBtn, syncing && styles.dangerBtnDisabled]}
+          disabled={syncing || !store}
+          onPress={() => {
+            if (!store) return;
+            void (async () => {
+              setSyncing(true);
+              try {
+                await syncPlatformInventoryCloud(store, hub);
+                await refreshSyncQueue();
+                Alert.alert('同步完成', syncPending > 0 ? '已重试离线队列并拉取云端' : '已与云端对齐');
+              } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : '同步失败';
+                const needsRelogin =
+                  isInventoryAuthRequiredError(e) || isInventoryCloudAuthError(e);
+                Alert.alert(
+                  needsRelogin ? '请重新登录' : '同步失败',
+                  needsRelogin ? msg || INVENTORY_RELOGIN_HINT : msg,
+                  needsRelogin
+                    ? [
+                        { text: '取消', style: 'cancel' },
+                        {
+                          text: '退出并重新登录',
+                          onPress: () => void logout(),
+                        },
+                      ]
+                    : [{ text: 'OK' }],
+                );
+              } finally {
+                setSyncing(false);
+              }
+            })();
+          }}
+        >
+          <Text style={styles.syncBtnText}>{syncing ? '同步中…' : '立即同步云端'}</Text>
+        </Pressable>
       </SectionCard>
 
       <SectionCard title="测试数据" accent="#991b1b">
@@ -299,5 +363,13 @@ const styles = StyleSheet.create({
   },
   dangerBtnDisabled: { opacity: 0.6 },
   dangerBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  syncStat: { color: '#c4b5fd', fontSize: 13, fontWeight: '700', marginTop: 10, marginBottom: 10 },
+  syncBtn: {
+    backgroundColor: '#6d28d9',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  syncBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   link: { color: '#60a5fa', fontWeight: '700', marginTop: 10 },
 });

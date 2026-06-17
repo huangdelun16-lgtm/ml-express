@@ -195,7 +195,7 @@ function EmptyState({ tab }: { tab: TabKey }) {
   const hints: Record<TabKey, string> = {
     all: '入库、装车、到站后会产生财务与操作记录',
     income: '外站发往本站的到付/预付订单会显示在这里',
-    transport: '发往本站的装车车费会记为运输成本',
+    transport: '本站发运或到站包裹的装车车费会记为运输成本',
     ops: '入库、出库等库存操作记录',
   };
   return (
