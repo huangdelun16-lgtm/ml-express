@@ -8,7 +8,7 @@ type SettingCategory = 'general' | 'pricing' | 'notification' | 'automation' | '
 
 type SettingFieldType = 'text' | 'number' | 'textarea' | 'switch' | 'select';
 
-type PricingGroup = 'client' | 'courier' | 'cross_border';
+type PricingGroup = 'client' | 'courier';
 
 interface SettingDefinition {
   key: string;
@@ -192,47 +192,6 @@ const settingDefinitions: SettingDefinition[] = [
     type: 'number',
     defaultValue: 0,
     suffix: 'MMK/单'
-  },
-  {
-    key: 'pricing.cross_border.base_fee',
-    label: '跨境起步价 (MMK)',
-    description: 'Inventory App 入库「费用计算」中总费用的基础部分，与同城跑腿计费独立。',
-    category: 'pricing',
-    pricingGroup: 'cross_border',
-    type: 'number',
-    defaultValue: 2000,
-    suffix: 'MMK',
-    helpText: 'Inventory 入库总费用 = 本领区跨境起步价 × 重量(kg)（按订单「最终目的地」对应领区读取）'
-  },
-  {
-    key: 'pricing.cross_border.free_weight_kg',
-    label: '免费重量 (kg)',
-    description: '该重量以内仅收起步价，超出部分按每公斤附加费计费。',
-    category: 'pricing',
-    pricingGroup: 'cross_border',
-    type: 'number',
-    defaultValue: 1,
-    suffix: 'kg'
-  },
-  {
-    key: 'pricing.cross_border.weight_surcharge',
-    label: '超重每公斤费用 (MMK)',
-    description: '超出免费重量后，每公斤增加的跨境物流费用。',
-    category: 'pricing',
-    pricingGroup: 'cross_border',
-    type: 'number',
-    defaultValue: 200,
-    suffix: 'MMK/公斤'
-  },
-  {
-    key: 'pricing.cross_border.per_piece_fee',
-    label: '每件附加费 (MMK)',
-    description: '同一入库单中，第 2 件起每件额外收取的费用（第 1 件不计）。',
-    category: 'pricing',
-    pricingGroup: 'cross_border',
-    type: 'number',
-    defaultValue: 0,
-    suffix: 'MMK/件'
   },
   {
     key: 'notification.sms_enabled',
@@ -455,21 +414,10 @@ const SystemSettings: React.FC = () => {
       // 特殊处理计费规则的领区化 Key
       if (setting.settings_key.startsWith('pricing.')) {
         const parts = setting.settings_key.split('.');
-        if (parts.length === 4 && parts[2] === 'cross_border') {
-          const region = parts[1];
-          if (region !== selectedRegion) return;
-          const actualKey = `pricing.cross_border.${parts[3]}`;
-          def = definitionMap[actualKey];
-          settingsKey = actualKey;
-        } else if (parts.length === 3 && parts[1] === 'cross_border') {
-          const actualKey = `pricing.cross_border.${parts[2]}`;
-          if (mergedValues[actualKey] === definitionMap[actualKey]?.defaultValue) {
-            def = definitionMap[actualKey];
-            settingsKey = actualKey;
-          } else {
-            return;
-          }
-        } else if (parts.length === 3) {
+        if (parts[2] === 'cross_border' || parts[1] === 'cross_border') {
+          return;
+        }
+        if (parts.length === 3) {
           const region = parts[1];
           const actualKey = `pricing.${parts[2]}`;
           if (region === selectedRegion) {
@@ -622,12 +570,7 @@ const SystemSettings: React.FC = () => {
       // 如果是计费规则，保存带区域前缀的 key
       let settingsKey = def.key;
       if (def.category === 'pricing') {
-        if (def.key.startsWith('pricing.cross_border.')) {
-          const field = def.key.replace('pricing.cross_border.', '');
-          settingsKey = `pricing.${selectedRegion}.cross_border.${field}`;
-        } else {
-          settingsKey = `pricing.${selectedRegion}.${def.key.replace('pricing.', '')}`;
-        }
+        settingsKey = `pricing.${selectedRegion}.${def.key.replace('pricing.', '')}`;
       }
 
       payload.push({
@@ -666,11 +609,6 @@ const SystemSettings: React.FC = () => {
 
   const pricingCourierDefinitions = useMemo(
     () => settingDefinitions.filter(d => d.category === 'pricing' && d.pricingGroup === 'courier'),
-    []
-  );
-
-  const pricingCrossBorderDefinitions = useMemo(
-    () => settingDefinitions.filter(d => d.category === 'pricing' && d.pricingGroup === 'cross_border'),
     []
   );
 
@@ -940,19 +878,6 @@ const SystemSettings: React.FC = () => {
                     </p>
                   </div>
                   {pricingCourierDefinitions.map(renderSettingCard)}
-
-                  <div className="sys-settings__section-banner sys-settings__section-banner--cross-border">
-                    <h3>
-                      <span>🌏</span> 跨境物流
-                    </h3>
-                    <p>
-                      控制 Inventory App 入库页「费用计算」中的<strong>总费用</strong>（与上方同城跑腿计费无关）。
-                      当前领区：
-                      <strong> {REGIONS.find((r) => r.id === selectedRegion)?.name ?? selectedRegion}</strong>
-                      。保存后 App 下拉同步或重新进入入库第三步即可生效。
-                    </p>
-                  </div>
-                  {pricingCrossBorderDefinitions.map(renderSettingCard)}
                 </>
               ) : (
                 currentDefinitions.map(renderSettingCard)

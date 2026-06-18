@@ -7,6 +7,8 @@ type Props = {
   hint?: string;
   value: string;
   onChange: (v: string) => void;
+  /** 可选目的地列表；默认全部 PACK_DESTINATION_OPTIONS */
+  options?: readonly string[];
 };
 
 export default function DestinationPickerField({
@@ -14,8 +16,10 @@ export default function DestinationPickerField({
   hint,
   value,
   onChange,
+  options,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const choices = options ?? PACK_DESTINATION_OPTIONS;
 
   return (
     <View style={styles.field}>
@@ -28,7 +32,7 @@ export default function DestinationPickerField({
       </Pressable>
       {open ? (
         <View style={styles.panel}>
-          {PACK_DESTINATION_OPTIONS.map((opt) => {
+          {choices.map((opt) => {
             const active = value === opt;
             return (
               <Pressable

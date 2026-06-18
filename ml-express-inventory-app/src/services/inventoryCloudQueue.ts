@@ -1,7 +1,9 @@
 import type { InventoryItem, StockMovement } from '../types/inventory';
 import type { InventoryStoreSession } from './authService';
+import { requestAutoCloudSync } from './cloudAutoSync';
 import { getDatabase, newId, nowIso } from './database';
 import { isSupabaseConfigured } from './supabase';
+import { resolveStoreHubCode } from '../utils/storeZone';
 
 export type TruckLoadQueueOrigin = { id: string; storeCode: string; storeName: string };
 
@@ -317,6 +319,8 @@ export function scheduleCloudSync(payload: CloudSyncQueuePayload): void {
       await executeCloudSyncOp(payload);
     } catch {
       await enqueueCloudSync(payload);
+      const hub = resolveStoreHubCode(payload.store);
+      if (hub) requestAutoCloudSync(payload.store, hub);
     }
   })();
 }

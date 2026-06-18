@@ -22,6 +22,7 @@ import {
   type OrderInboundSnapshot,
 } from './trackingService';
 import { processCloudSyncQueue } from './inventoryCloudQueue';
+import { pushLocalTransportFeePaymentsToCloud } from './hubTransportFeeService';
 
 let syncInFlight: Promise<void> | null = null;
 let syncDirty = false;
@@ -773,7 +774,7 @@ export async function syncPlatformInventoryFromCloud(
   hubCode: string,
 ): Promise<void> {
   if (!isSupabaseConfigured()) return;
-  await ensureInventoryCloudAuth();
+  const activeStore = await ensureInventoryCloudAuth();
   if (syncInFlight) {
     syncDirty = true;
     await syncInFlight;
@@ -783,9 +784,10 @@ export async function syncPlatformInventoryFromCloud(
   do {
     syncDirty = false;
     syncInFlight = (async () => {
-      await processCloudSyncQueue(store);
-      await pullPlatformInventoryFromCloud(store, hubCode);
-      await pushLocalItemsForStore(store, hubCode);
+      await processCloudSyncQueue(activeStore);
+      await pullPlatformInventoryFromCloud(activeStore, hubCode);
+      await pushLocalItemsForStore(activeStore, hubCode);
+      await pushLocalTransportFeePaymentsToCloud();
     })();
 
     try {

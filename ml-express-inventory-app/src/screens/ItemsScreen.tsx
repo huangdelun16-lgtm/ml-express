@@ -18,12 +18,12 @@ import RegionFilterBar from '../components/RegionFilterBar';
 import { useAuth } from '../contexts/AuthContext';
 import type { BatchPrintEntry, LabelPrintPayload } from '../services/printerService';
 import { printBatchLabels } from '../services/printerService';
+import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import {
   createPackedShipment,
   listItems,
   listPackableItems,
   syncInboundHubPacksToLocal,
-  syncPlatformInventoryCloud,
 } from '../services/inventoryService';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { confirmAndMarkCustomerSigned } from '../utils/customerSignConfirm';
@@ -71,8 +71,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
   const load = useCallback(async () => {
     if (store && hubCode) {
+      requestAutoCloudSync(store, hubCode);
       try {
-        await syncPlatformInventoryCloud(store, hubCode);
         await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? '工作人员');
       } catch {
         // 云端未配置或离线时仍显示本地列表

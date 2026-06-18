@@ -2,7 +2,8 @@ import React, { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import { getStats, listPackedShipmentRows, syncPlatformInventoryCloud } from '../services/inventoryService';
+import { getStats, listPackedShipmentRows } from '../services/inventoryService';
+import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import { getCloudSyncQueueSnapshot } from '../services/inventoryCloudQueue';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
@@ -26,11 +27,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
     if (store && hubCode) {
-      try {
-        await syncPlatformInventoryCloud(store, hubCode);
-      } catch {
-        // 离线时仍显示本地统计
-      }
+      requestAutoCloudSync(store, hubCode);
       const snapshot = await getCloudSyncQueueSnapshot(store.storeCode);
       setSyncPending(snapshot.pending);
     } else {

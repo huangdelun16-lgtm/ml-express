@@ -17,12 +17,13 @@ import PkgPickerField from '../components/PkgPickerField';
 import StockOutSuccessModal, { type StockOutSuccessData } from '../components/StockOutSuccessModal';
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { applyTruckLoadOutbound, listOutboundPackages, syncPlatformInventoryCloud } from '../services/inventoryService';
+import { requestAutoCloudSync } from '../services/cloudAutoSync';
+import { applyTruckLoadOutbound, listOutboundPackages } from '../services/inventoryService';
 import type { PackedShipmentDetail } from '../types/inventory';
 import OutboundDateField from '../components/OutboundDateField';
 import { formatDisplayDate, isValidIsoDate, todayIsoDate } from '../utils/dateFormat';
 import { sanitizeNumberInput, sumPackageWeightsKg } from '../utils/itemFieldFormat';
-import { resolveStoreOriginLabel } from '../utils/storeZone';
+import { resolveStoreOriginLabel, listOutboundDestinationOptions, isOwnStationOutboundDestination } from '../utils/storeZone';
 import { fetchTruckRouteFee, formatTruckRouteLabel } from '../utils/truckRouteFee';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
@@ -43,16 +44,23 @@ export default function StockOutScreen({ navigation }: Props) {
 
   const originLabel = store ? resolveStoreOriginLabel(store) : '';
   const routeLabel = formatTruckRouteLabel(originLabel, destination);
+  const outboundDestinationOptions = useMemo(
+    () => listOutboundDestinationOptions(store),
+    [store],
+  );
+
+  useEffect(() => {
+    if (store && destination && isOwnStationOutboundDestination(destination, store)) {
+      setDestination('');
+      setTransportFee('');
+    }
+  }, [store, destination]);
 
   const loadPacks = useCallback(async () => {
     setLoadingPacks(true);
     try {
       if (store && hubCode) {
-        try {
-          await syncPlatformInventoryCloud(store, hubCode);
-        } catch {
-          // 离线时仍显示本地可出库列表
-        }
+        requestAutoCloudSync(store, hubCode);
       }
       const scope = store && hubCode ? { store, hubCode } : undefined;
       setPacks(await listOutboundPackages(scope));
@@ -125,6 +133,10 @@ export default function StockOutScreen({ navigation }: Props) {
   const submit = async () => {
     if (!destination.trim()) {
       Alert.alert('提示', '请选择目的地');
+      return;
+    }
+    if (store && isOwnStationOutboundDestination(destination, store)) {
+      Alert.alert('提示', '目的地不能为本站，请选择其他中转站');
       return;
     }
     if (selectedPacks.length === 0) {
@@ -202,9 +214,10 @@ export default function StockOutScreen({ navigation }: Props) {
 
           <DestinationPickerField
             label="目的地"
-            hint="本段卡车运达的中转站或终点站"
+            hint="本段卡车运达的中转站或终点站（不可选择本站）"
             value={destination}
             onChange={setDestination}
+            options={outboundDestinationOptions}
           />
 
           <OutboundDateField value={outboundDate} onChange={setOutboundDate} />

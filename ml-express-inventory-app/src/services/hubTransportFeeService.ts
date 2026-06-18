@@ -1,4 +1,5 @@
 import type { InventoryStoreSession } from './authService';
+import { upsertCloudTransportFeePayment } from './inventoryCloudApi';
 import { getDatabase, nowIso } from './database';
 
 export function parseTransportFeeAmount(raw: string | undefined | null): number {
@@ -34,6 +35,31 @@ export async function getHubTransportFeePaidBarcodeSet(): Promise<Set<string>> {
     'SELECT pack_barcode FROM hub_transport_fee_payments',
   );
   return new Set(rows.map((r) => normalizePackBarcode(r.pack_barcode)).filter(Boolean));
+}
+
+export async function getAllHubTransportFeePayments(): Promise<
+  Array<{
+    pack_barcode: string;
+    fee: string;
+    leg_destination: string;
+    origin_store_code: string;
+    operator: string;
+    store_code: string;
+    paid_at: string;
+  }>
+> {
+  const db = await getDatabase();
+  return await db.getAllAsync<{
+    pack_barcode: string;
+    fee: string;
+    leg_destination: string;
+    origin_store_code: string;
+    operator: string;
+    store_code: string;
+    paid_at: string;
+  }>(
+    'SELECT pack_barcode, fee, leg_destination, origin_store_code, operator, store_code, paid_at FROM hub_transport_fee_payments',
+  );
 }
 
 export async function markHubTransportFeePaid(params: {
@@ -73,4 +99,38 @@ export async function markHubTransportFeePaid(params: {
       paidAt,
     ],
   );
+
+  try {
+    await upsertCloudTransportFeePayment({
+      packBarcode: code,
+      fee: String(feeAmount),
+      legDestination: params.legDestination,
+      originStoreCode: params.originStoreCode,
+      operator: params.operator,
+      storeCode: params.store.storeCode,
+      paidAt,
+    });
+  } catch {
+    // 本地已登记；云端同步失败时不阻断支付操作
+  }
+}
+
+/** 将本机已登记的车费支付记录推送到云端（登录/同步时调用） */
+export async function pushLocalTransportFeePaymentsToCloud(): Promise<void> {
+  const rows = await getAllHubTransportFeePayments();
+  for (const row of rows) {
+    try {
+      await upsertCloudTransportFeePayment({
+        packBarcode: row.pack_barcode,
+        fee: row.fee,
+        legDestination: row.leg_destination,
+        originStoreCode: row.origin_store_code,
+        operator: row.operator,
+        storeCode: row.store_code,
+        paidAt: row.paid_at,
+      });
+    } catch {
+      // 单条失败不阻断其余记录
+    }
+  }
 }

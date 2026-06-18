@@ -11,7 +11,8 @@
     "web": "expo start --web",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "deploy:inventory-login": "cd .. && supabase functions deploy inventory-store-login"
+    "deploy:inventory-login": "cd .. && supabase functions deploy inventory-store-login",
+    "deploy:inventory-change-password": "cd .. && supabase functions deploy inventory-change-password"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

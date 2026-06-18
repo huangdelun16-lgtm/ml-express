@@ -23,6 +23,7 @@ const MODULE_ICONS: Record<string, string> = {
   merchant_reconciliation: '🧾',
   settings: '⚙️',
   metric_management: '📑',
+  cross_border_logistics: '🚚',
 };
 
 const MODULE_ROUTES: Record<string, string> = {
@@ -40,6 +41,7 @@ const MODULE_ROUTES: Record<string, string> = {
   courier_performance: '/admin/courier-performance',
   merchant_reconciliation: '/admin/merchant-reconciliation',
   metric_management: '/admin/metric-management',
+  cross_border_logistics: '/admin/cross-border-logistics',
 };
 
 function isModulePathActive(pathname: string, moduleId: string): boolean {
@@ -353,6 +355,16 @@ const AdminShellLayout: React.FC = () => {
               ? 'Metric management'
               : 'မီတྲိစီမံခန့်ခွဲမှု',
         roles: ['admin', 'manager', 'finance'],
+      },
+      {
+        id: 'cross_border_logistics',
+        title:
+          language === 'zh'
+            ? '跨境物流'
+            : language === 'en'
+              ? 'Cross-border logistics'
+              : 'နိုင်ငံရပ်ခြားပို့ဆောင်ရေး',
+        roles: ['admin', 'manager', 'operator', 'finance'],
       },
     ],
     [language],

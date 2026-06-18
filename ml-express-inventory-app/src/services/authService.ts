@@ -243,3 +243,59 @@ export async function logoutTransitStationStore(): Promise<void> {
   }
   await clearSession();
 }
+
+function inventoryAuthEmail(storeCode: string): string {
+  return `inventory+${storeCode.trim().toLowerCase()}@inventory.mlexpress.internal`;
+}
+
+/** 修改 Inventory 登录密码（同步 delivery_stores + Supabase Auth） */
+export async function changeInventoryPassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    throw new Error(getSupabaseConfigHint() || '未配置 Supabase');
+  }
+
+  const current = currentPassword.trim();
+  const next = newPassword.trim();
+  if (!current || !next) {
+    throw new Error('请填写当前密码和新密码');
+  }
+  if (next.length < 6) {
+    throw new Error('新密码至少 6 位');
+  }
+  if (current === next) {
+    throw new Error('新密码不能与当前密码相同');
+  }
+
+  const session = await ensureInventoryCloudAuth();
+  const {
+    data: { session: authSession },
+    error: sessionErr,
+  } = await supabase.auth.getSession();
+  if (sessionErr || !authSession?.access_token) {
+    throw new InventoryAuthRequiredError();
+  }
+
+  const url = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
+  const response = await fetch(`${url}/functions/v1/inventory-change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authSession.access_token}`,
+      apikey: anonKey,
+    },
+    body: JSON.stringify({ currentPassword: current, newPassword: next }),
+  });
+
+  const payload = (await response.json()) as { ok?: boolean; error?: string };
+  if (!response.ok) {
+    throw new Error(payload.error ?? '修改密码失败');
+  }
+
+  const email = inventoryAuthEmail(session.storeCode);
+  await signInInventoryAuth(email, next);
+  await ensureInventoryCloudAuth();
+}

@@ -1538,6 +1538,13 @@ export async function applyTruckLoadOutbound(params: {
 }): Promise<{ count: number; cloudSynced: boolean; cloudError?: string }> {
   if (params.packs.length === 0) throw new Error('请至少选择一个包装号');
 
+  if (params.actingStore) {
+    const { isOwnStationOutboundDestination } = await import('../utils/storeZone');
+    if (isOwnStationOutboundDestination(params.destination, params.actingStore)) {
+      throw new Error('目的地不能为本站，请选择其他中转站');
+    }
+  }
+
   const { listPkgTrackingStatusMap } = await import('./trackingService');
   let cloudStatusMap: Record<string, import('../types/tracking').PkgTrackingStatus> = {};
   try {

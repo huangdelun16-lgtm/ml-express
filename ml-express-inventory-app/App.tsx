@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import CloudAutoSyncRunner from './src/components/CloudAutoSyncRunner';
 import LoginScreen from './src/screens/LoginScreen';
 import { getDatabase } from './src/services/database';
 
@@ -36,6 +37,7 @@ function Root() {
 
   return isAuthenticated ? (
     <NavigationContainer>
+      <CloudAutoSyncRunner />
       <AppNavigator />
     </NavigationContainer>
   ) : (

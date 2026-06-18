@@ -257,6 +257,10 @@ export async function upsertCloudStoreItem(
   item: InventoryItem,
 ): Promise<string> {
   if (!isSupabaseConfigured()) return item.id;
+  const storeCode = store.storeCode.trim().toUpperCase();
+  const itemOwnerCode = (item.owner_store_code?.trim() || storeCode).toUpperCase();
+  const ownedByThisStore = itemOwnerCode === storeCode;
+
   const payload = {
     barcode: item.barcode.trim(),
     input_barcode: item.input_barcode?.trim() ?? '',
@@ -267,7 +271,7 @@ export async function upsertCloudStoreItem(
     qty_on_hand: item.qty_on_hand,
     min_qty: item.min_qty ?? 0,
     note: item.note?.trim() ?? '',
-    owner_store_id: toNullableUuid(store.id),
+    owner_store_id: ownedByThisStore ? toNullableUuid(store.id) : null,
     owner_store_code: item.owner_store_code?.trim() || store.storeCode,
     recipient_name: item.recipient_name?.trim() ?? '',
     final_destination: item.final_destination?.trim() ?? '',
@@ -457,4 +461,33 @@ export async function deleteCloudPackedShipment(bundleBarcode: string): Promise<
       .eq('id', bundleCloudId);
     if (itemErr) throw new Error(itemErr.message);
   }
+}
+
+export async function upsertCloudTransportFeePayment(params: {
+  packBarcode: string;
+  fee: string;
+  legDestination: string;
+  originStoreCode: string;
+  operator: string;
+  storeCode: string;
+  paidAt: string;
+}): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const packBarcode = params.packBarcode.trim().toUpperCase();
+  if (!packBarcode) throw new Error('包装号无效');
+
+  const { error } = await supabase.from('inventory_hub_transport_fee_payments').upsert(
+    {
+      pack_barcode: packBarcode,
+      fee: params.fee.trim(),
+      leg_destination_code: params.legDestination.trim().toUpperCase(),
+      origin_store_code: params.originStoreCode.trim().toUpperCase(),
+      operator: params.operator.trim(),
+      store_code: params.storeCode.trim().toUpperCase(),
+      paid_at: params.paidAt,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'pack_barcode' },
+  );
+  if (error) throw new Error(error.message);
 }

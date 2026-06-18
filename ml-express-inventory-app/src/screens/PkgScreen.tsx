@@ -14,12 +14,12 @@ import PkgActionModal from '../components/PkgActionModal';
 import PkgEditModal from '../components/PkgEditModal';
 import PkgOrdersModal from '../components/PkgOrdersModal';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
+import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import {
   cancelPackedShipment,
   listPackedShipmentRows,
   resyncLoadedPackToCloud,
   syncInboundHubPacksToLocal,
-  syncPlatformInventoryCloud,
 } from '../services/inventoryService';
 import { isSupabaseConfigured } from '../services/supabase';
 import { packOrderBarcodeData } from '../utils/orderBarcodeData';
@@ -51,8 +51,8 @@ export default function PkgScreen() {
 
   const load = useCallback(async () => {
     if (store && hubCode) {
+      requestAutoCloudSync(store, hubCode);
       try {
-        await syncPlatformInventoryCloud(store, hubCode);
         await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? '工作人员');
       } catch {
         // 云端未配置或离线时仍显示本地列表

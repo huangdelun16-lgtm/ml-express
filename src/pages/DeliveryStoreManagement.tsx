@@ -94,7 +94,6 @@ const STORE_TYPES = [
   { value: 'grocery', label: '杂货店' },
   { value: 'hardware_store', label: '五金店' },
   { value: 'supermarket', label: '超市' },
-  { value: 'transit_station', label: '中转站' },
   { value: 'other', label: '其它' }
 ];
 
@@ -539,7 +538,7 @@ const DeliveryStoreManagement: React.FC = () => {
 
   /** 当前城市店铺列表；有 ?q= 时按店名/编码全局筛选（便于全局搜索直达） */
   const stores = useMemo(() => {
-    let filtered = allStores;
+    let filtered = allStores.filter((store) => store.store_type !== 'transit_station');
     if (storeListSearchQ) {
       filtered = allStores.filter(
         (store) =>

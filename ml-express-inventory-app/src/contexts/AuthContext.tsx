@@ -44,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStore(session);
         if (session) {
           const hub = resolveStoreHubCode(session);
-          void import('../services/inventoryService').then(({ syncPlatformInventoryCloud }) =>
-            syncPlatformInventoryCloud(session, hub),
+          void import('../services/cloudAutoSync').then(({ requestAutoCloudSync }) =>
+            requestAutoCloudSync(session, hub, { force: true }),
           );
         }
       })
@@ -107,8 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = await loginTransitStationStore(storeCode, password);
     setStore(session);
     const hub = resolveStoreHubCode(session);
-    void import('../services/inventoryService').then(({ syncPlatformInventoryCloud }) =>
-      syncPlatformInventoryCloud(session, hub),
+    void import('../services/cloudAutoSync').then(({ requestAutoCloudSync }) =>
+      requestAutoCloudSync(session, hub, { force: true }),
     );
   }, []);
 

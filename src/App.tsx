@@ -17,6 +17,7 @@ import AdminReportsPage from './pages/AdminReportsPage';
 import CourierPerformancePage from './pages/CourierPerformancePage';
 import MerchantReconciliationExportPage from './pages/MerchantReconciliationExportPage';
 import ImportMetricDraftsPage from './pages/ImportMetricDraftsPage';
+import CrossBorderLogisticsPage from './pages/CrossBorderLogisticsPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AbnormalAlertManager from './components/AbnormalAlertManager';
@@ -227,6 +228,17 @@ function App() {
                       permissionId={['personal_expenses', 'metric_management']}
                     >
                       <Navigate to="/admin/metric-management?openPersonal=1" replace />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="cross-border-logistics"
+                  element={
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'operator', 'finance']}
+                      permissionId="cross_border_logistics"
+                    >
+                      <CrossBorderLogisticsPage />
                     </ProtectedRoute>
                   }
                 />

@@ -305,6 +305,7 @@ const AccountManagement: React.FC = () => {
     { id: 'courier_performance', name: '骑手绩效', icon: '🚴' },
     { id: 'merchant_reconciliation', name: '商家对账', icon: '📋' },
     { id: 'metric_management', name: '指标管理', icon: '📑' },
+    { id: 'cross_border_logistics', name: '跨境物流', icon: '🚚' },
     { id: 'product_price', name: '商品价格', icon: '💲' },
     { id: 'personal_expenses', name: '个人开销', icon: '🧾' },
   ];
