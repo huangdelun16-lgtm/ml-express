@@ -36,6 +36,17 @@ function transportStatusClass(status: string): string {
   return 'cbl-status-pill cbl-status-pill--gray';
 }
 
+function formatInboundDate(isEn: boolean, value?: string | null): string {
+  if (!value?.trim()) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(isEn ? 'en-US' : 'zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
 const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer }) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
@@ -141,6 +152,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer })
                 <table className="cbl-table cbl-table--customer-items">
                   <thead>
                     <tr>
+                      <th>{isEn ? 'Inbound date' : '入库日期'}</th>
                       <th>{isEn ? 'Product' : '商品名称'}</th>
                       <th>{isEn ? 'Express' : '快递单'}</th>
                       <th>{isEn ? 'Inbound' : '入库单'}</th>
@@ -158,6 +170,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer })
                   <tbody>
                     {items.map((item) => (
                       <tr key={item.id}>
+                        <td className="cbl-dim">{formatInboundDate(isEn, item.inboundAt)}</td>
                         <td className="cbl-customer-col-product">
                           <span className="cbl-customer-product-name">{item.productName}</span>
                         </td>

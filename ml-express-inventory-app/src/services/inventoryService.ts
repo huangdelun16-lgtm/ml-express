@@ -114,6 +114,9 @@ const HUB_TRANSIT_SHIPPED_SUBQUERY = `CASE WHEN TRIM(COALESCE(i.hub_transit_ship
 const CUSTOMER_SIGNED_SUBQUERY = `CASE WHEN TRIM(COALESCE(i.customer_signed_at, '')) != '' THEN 1 ELSE 0 END`;
 const ITEM_LIST_SELECT = `i.*, ${CUSTOMER_NAME_SELECT}, ${DESTINATION_SELECT}, ${STOCKED_IN_SUBQUERY} AS stocked_in, ${PACKED_SUBQUERY} AS packed, ${HUB_ARRIVED_SUBQUERY} AS hub_arrived, ${HUB_TRANSIT_RELEASED_SUBQUERY} AS hub_transit_released, ${HUB_TRANSIT_SHIPPED_SUBQUERY} AS hub_transit_shipped, ${CUSTOMER_SIGNED_SUBQUERY} AS customer_signed, ${PARENT_PACK_BARCODE_SUBQUERY} AS parent_pack_barcode`;
 const NOT_EXPRESS_PACK_CLAUSE = `UPPER(i.barcode) NOT LIKE 'PKG%'`;
+const NOT_ALREADY_PACKED_CLAUSE = `AND NOT EXISTS (SELECT 1 FROM packed_shipment_items psi WHERE psi.item_id = i.id)
+  AND TRIM(COALESCE(i.packed_at, '')) = ''
+  AND TRIM(COALESCE(i.packed_bundle_barcode, '')) = ''`;
 
 function persistFinalDestinationCode(raw: string): string {
   const normalized = normalizePackDestination(raw);
@@ -1067,6 +1070,7 @@ export async function listPackableItems(
          INNER JOIN stock_movements m ON m.item_id = i.id AND m.type = 'in'
          WHERE i.qty_on_hand > 0
            AND ${NOT_EXPRESS_PACK_CLAUSE}
+           ${NOT_ALREADY_PACKED_CLAUSE}
            AND (i.barcode LIKE ? OR i.input_barcode LIKE ? OR i.name LIKE ? OR i.spec LIKE ?
              OR i.final_destination LIKE ? OR ${CUSTOMER_NAME_SUBQUERY} LIKE ? OR ${DESTINATION_FALLBACK_SUBQUERY} LIKE ?)
          ORDER BY i.updated_at DESC`,
@@ -1077,6 +1081,7 @@ export async function listPackableItems(
          INNER JOIN stock_movements m ON m.item_id = i.id AND m.type = 'in'
          WHERE i.qty_on_hand > 0
            AND ${NOT_EXPRESS_PACK_CLAUSE}
+           ${NOT_ALREADY_PACKED_CLAUSE}
          ORDER BY i.updated_at DESC`,
       );
   const items = rows.map(rowToListItem);
@@ -1116,15 +1121,20 @@ export async function createPackedShipment(params: {
       [id],
     );
     if (!hasIn?.c) throw new Error(`${item.name} 未入库，无法打包`);
-    const inInboundPack = await db.getFirstAsync<{ bundle_barcode: string }>(
+    if (item.packed_at?.trim() || item.packed_bundle_barcode?.trim()) {
+      throw new Error(
+        `${item.name} 已打包入 ${item.packed_bundle_barcode || '快递包'}，不可重复打包`,
+      );
+    }
+    const inAnyPack = await db.getFirstAsync<{ bundle_barcode: string }>(
       `SELECT p.bundle_barcode FROM packed_shipment_items psi
        INNER JOIN packed_shipments p ON p.id = psi.pack_id
-       WHERE psi.item_id = ?`,
-      [id],
+       WHERE psi.item_id = ? OR UPPER(TRIM(psi.item_barcode)) = UPPER(TRIM(?))`,
+      [id, item.barcode],
     );
-    if (inInboundPack?.bundle_barcode) {
+    if (inAnyPack?.bundle_barcode) {
       throw new Error(
-        `${item.name} 仍在 inbound 包裹 ${inInboundPack.bundle_barcode} 中，请先「释放中转」`,
+        `${item.name} 已在快递包 ${inAnyPack.bundle_barcode} 中，请先拆包后再打包`,
       );
     }
     picked.push(item);

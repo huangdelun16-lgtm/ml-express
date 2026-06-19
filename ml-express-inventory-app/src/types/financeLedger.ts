@@ -3,6 +3,8 @@ export type FinanceLedgerCategory =
   | 'order_prepaid'
   | 'order_collected'
   | 'transport_cost'
+  | 'manual_income'
+  | 'manual_expense'
   | 'stock_op';
 
 export interface FinanceLedgerEntry {
@@ -17,15 +19,28 @@ export interface FinanceLedgerEntry {
   itemName: string;
   destination?: string;
   originLabel?: string;
+  originKey?: string;
+  transportFee?: number;
+  paid?: boolean;
+  transportDirection?: 'inbound' | 'outbound';
 }
 
 export interface FinanceLedgerSummary {
-  /** 到付待收（目的站尚未签收） */
+  /** 到付待收（本站目的待收，与 Admin 待入账一致） */
   codPendingTotal: number;
-  /** 预付 / 到付已签收 */
+  /** 已收（预付 + 本站签收，与 Admin 已收 MMK 一致） */
   collectedTotal: number;
-  /** 本站应付运输成本（装车车费） */
+  /** 待支付运输成本（未付装车车费） */
   transportCostTotal: number;
+  /** 已支付运输成本 */
+  transportPaidTotal: number;
+  transportUnpaidTotal: number;
+  /** 本站待收订单款（不含发站在途到付） */
+  pendingInflowTotal: number;
+  /** 代收应转给发站（对账单明细，不计入待支付车费） */
+  agencyPayableTotal: number;
+  manualIncomeTotal: number;
+  manualExpenseTotal: number;
 }
 
 export interface FinanceLedgerResult {

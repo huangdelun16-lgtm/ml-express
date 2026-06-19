@@ -55,6 +55,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     { title: '到站收货', icon: '✅', screen: 'HubReceive', color: '#0d9488' },
     { title: '在途追踪', icon: '🛰️', screen: 'ShipmentTrack', color: '#0284c7' },
     { title: '流水', icon: '📜', screen: 'Movements', color: '#7c3aed' },
+    { title: '跨境财务', icon: '🌏', screen: 'CrossBorderFinance', color: '#0ea5e9' },
     { title: '通用扫码', icon: '📷', screen: 'CameraScan', color: '#0891b2' },
     { title: '设置', icon: '⚙️', screen: 'Settings', color: '#64748b' },
   ];

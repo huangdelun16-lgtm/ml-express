@@ -2,6 +2,7 @@ import { getHubTransportFeePaidBarcodeSet } from './hubTransportFeeService';
 import type { InventoryStoreSession } from './authService';
 import { getDatabase } from './database';
 import { listInboundPackages, listOutboundPackagesFromOrigin } from './trackingService';
+import { isSupabaseConfigured, supabase } from './supabase';
 import type { FinanceLedgerEntry, FinanceLedgerResult, FinanceLedgerSummary } from '../types/financeLedger';
 import type { StockMovement } from '../types/inventory';
 import { destinationCodesMatch, normalizeDestinationCode } from '../utils/destinationCode';
@@ -12,6 +13,10 @@ import {
   ownershipKeyFromStoreCode,
   ownershipLabelFromKey,
 } from '../utils/storeOwnership';
+import {
+  buildCrossBorderFinanceSummary,
+  buildStationReconciliationSummary,
+} from '../utils/stationReconciliation';
 
 function parseAmount(raw: string | undefined | null): number {
   if (!raw?.trim()) return 0;
@@ -85,6 +90,8 @@ function buildOrderLedgerEntry(params: {
     params.movement.origin_store_name.trim() ||
     ownershipLabelFromKey(ownershipKeyFromStoreCode(params.movement.origin_store_code));
 
+  const originKey = ownershipKeyFromStoreCode(params.movement.origin_store_code);
+
   const customer = params.customerName.trim() || params.movement.recipient_name.trim() || '未登记客户';
 
   if (payment === '预付') {
@@ -100,6 +107,7 @@ function buildOrderLedgerEntry(params: {
       itemName: params.movement.item_name,
       destination: dest,
       originLabel,
+      originKey,
     };
   }
 
@@ -117,6 +125,7 @@ function buildOrderLedgerEntry(params: {
         itemName: params.movement.item_name,
         destination: dest,
         originLabel,
+        originKey,
       };
     }
     return {
@@ -131,6 +140,7 @@ function buildOrderLedgerEntry(params: {
       itemName: params.movement.item_name,
       destination: dest,
       originLabel,
+      originKey,
     };
   }
 
@@ -147,6 +157,7 @@ function buildOrderLedgerEntry(params: {
       itemName: params.movement.item_name,
       destination: dest,
       originLabel,
+      originKey,
     };
   }
 
@@ -182,6 +193,7 @@ function buildLocalOriginInboundEntry(
       itemName: movement.item_name,
       destination: dest,
       originLabel: ownershipLabelFromKey(currentKey),
+      originKey: currentKey,
     };
   }
 
@@ -198,6 +210,7 @@ function buildLocalOriginInboundEntry(
       itemName: movement.item_name,
       destination: dest,
       originLabel: ownershipLabelFromKey(currentKey),
+      originKey: currentKey,
     };
   }
 
@@ -211,6 +224,7 @@ function buildTransportEntry(params: {
   fee: number;
   legDest: string;
   originLabel: string;
+  originKey: string;
   occurredAt: string;
   paid?: boolean;
   direction?: 'inbound' | 'outbound';
@@ -222,6 +236,9 @@ function buildTransportEntry(params: {
     title:
       direction === 'outbound' ? '运输成本 · 发运车费' : '运输成本 · 装车车费',
     subtitle: `${params.originLabel} → ${params.legDest} · ${params.packBarcode}`,
+    transportFee: params.fee,
+    paid: params.paid ?? false,
+    transportDirection: direction,
     amount: params.paid ? 0 : params.fee,
     amountDisplay: params.paid
       ? '已支付'
@@ -233,7 +250,54 @@ function buildTransportEntry(params: {
     itemName: params.packName,
     destination: params.legDest,
     originLabel: params.originLabel,
+    originKey: params.originKey,
   };
+}
+
+async function loadLatestTruckLoadMovementsByItemIds(
+  itemIds: string[],
+): Promise<Map<string, StockMovement>> {
+  const ids = [...new Set(itemIds.map((id) => String(id).trim()).filter(Boolean))];
+  if (!ids.length) return new Map();
+
+  const db = await getDatabase();
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `SELECT * FROM stock_movements
+     WHERE item_id IN (${placeholders})
+       AND type = 'out'
+       AND note LIKE '%装车出库%'
+     ORDER BY created_at DESC`,
+    ids,
+  );
+
+  const map = new Map<string, StockMovement>();
+  for (const row of rows) {
+    const itemId = String(row.item_id ?? '');
+    if (!itemId || map.has(itemId)) continue;
+    map.set(itemId, movementRowToPartial(row));
+  }
+  return map;
+}
+
+async function loadCustomerSignedMap(barcodes: string[]): Promise<Map<string, boolean>> {
+  const codes = [...new Set(barcodes.map((b) => String(b).trim()).filter(Boolean))];
+  if (!codes.length) return new Map();
+
+  const db = await getDatabase();
+  const placeholders = codes.map(() => '?').join(',');
+  const rows = await db.getAllAsync<{ barcode: string; customer_signed_at: string }>(
+    `SELECT barcode, customer_signed_at FROM inventory_items WHERE barcode IN (${placeholders})`,
+    codes,
+  );
+
+  const map = new Map<string, boolean>();
+  for (const row of rows) {
+    const key = String(row.barcode ?? '').trim().toUpperCase();
+    if (!key) continue;
+    map.set(key, Boolean(String(row.customer_signed_at ?? '').trim()));
+  }
+  return map;
 }
 
 async function collectLocalTransportEntries(params: {
@@ -254,13 +318,18 @@ async function collectLocalTransportEntries(params: {
      LIMIT 300`,
   );
 
-  const { getLatestTruckLoadMovement } = await import('./inventoryService');
+  const loadedRows = rows.filter((row) => {
+    const qty = Number(row.qty_on_hand);
+    return Number.isFinite(qty) && qty <= 0;
+  });
+  const bundleItemIds = loadedRows
+    .map((row) => String(row.bundle_item_id ?? '').trim())
+    .filter(Boolean);
+  const truckLoadByItemId = await loadLatestTruckLoadMovementsByItemIds(bundleItemIds);
+
   const out: FinanceLedgerEntry[] = [];
 
-  for (const row of rows) {
-    const qty = Number(row.qty_on_hand);
-    const loaded = Number.isFinite(qty) && qty <= 0;
-    if (!loaded) continue;
+  for (const row of loadedRows) {
 
     const packBarcode = String(row.bundle_barcode ?? '').trim().toUpperCase();
     if (!packBarcode || transportSeen.has(packBarcode)) continue;
@@ -271,7 +340,7 @@ async function collectLocalTransportEntries(params: {
 
     const bundleItemId = String(row.bundle_item_id ?? '');
     if (bundleItemId) {
-      const movement = await getLatestTruckLoadMovement(bundleItemId);
+      const movement = truckLoadByItemId.get(bundleItemId);
       if (movement) {
         if (fee <= 0) fee = parseAmount(parseTransportFeeFromLoadNote(movement.note));
         if (!legDest) legDest = normalizeDestinationCode(movement.destination ?? '');
@@ -300,6 +369,7 @@ async function collectLocalTransportEntries(params: {
         fee,
         legDest,
         originLabel,
+        originKey: ownerKey,
         occurredAt,
         paid,
         direction: isOutboundFromHere ? 'outbound' : 'inbound',
@@ -354,6 +424,7 @@ function collectCloudTransportEntry(params: {
     fee,
     legDest,
     originLabel,
+    originKey,
     occurredAt: pkg.truck_loaded_at || pkg.updated_at,
     paid,
     direction: isOutboundFromHere ? 'outbound' : 'inbound',
@@ -383,19 +454,107 @@ function buildStockOpEntry(movement: StockMovement): FinanceLedgerEntry {
   };
 }
 
-function summarize(entries: FinanceLedgerEntry[]): FinanceLedgerSummary {
-  let codPendingTotal = 0;
-  let collectedTotal = 0;
-  let transportCostTotal = 0;
-
+function summarize(
+  entries: FinanceLedgerEntry[],
+  storeCode: string,
+  hubCode: string,
+): FinanceLedgerSummary {
+  const reconciliation = buildStationReconciliationSummary(entries, storeCode, hubCode);
+  let manualIncome = 0;
+  let manualExpense = 0;
   for (const e of entries) {
     const amt = e.amount ?? 0;
-    if (e.category === 'order_income_cod') codPendingTotal += amt;
-    if (e.category === 'order_prepaid' || e.category === 'order_collected') collectedTotal += amt;
-    if (e.category === 'transport_cost') transportCostTotal += amt;
+    if (e.category === 'manual_income') manualIncome += amt;
+    if (e.category === 'manual_expense') manualExpense += amt;
   }
+  return {
+    codPendingTotal: reconciliation.pendingInflowTotal,
+    collectedTotal: reconciliation.collectedTotal,
+    transportCostTotal: reconciliation.transportUnpaidTotal,
+    transportPaidTotal: reconciliation.transportPaidTotal,
+    transportUnpaidTotal: reconciliation.transportUnpaidTotal,
+    pendingInflowTotal: reconciliation.pendingInflowTotal,
+    agencyPayableTotal: reconciliation.agencyPayableTotal,
+    manualIncomeTotal: Math.round(manualIncome),
+    manualExpenseTotal: Math.round(manualExpense),
+  };
+}
 
-  return { codPendingTotal, collectedTotal, transportCostTotal };
+async function fetchCloudCrossBorderManualEntries(): Promise<FinanceLedgerEntry[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const { data, error } = await supabase
+      .from('cross_border_manual_entries')
+      .select('id, entry_date, kind, amount, category, note, created_by, created_at')
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) return [];
+    const out: FinanceLedgerEntry[] = [];
+    for (const row of data || []) {
+      const amount = Math.round(Number(row.amount) || 0);
+      const isIncome = row.kind === 'income';
+      const subtitle = [row.category, row.note]
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+        .join(' · ');
+      out.push({
+        id: `manual:${row.id}`,
+        category: isIncome ? 'manual_income' : 'manual_expense',
+        title: isIncome ? '其它收入' : '其它支出',
+        subtitle: subtitle || 'Admin 登记',
+        amount,
+        amountDisplay: isIncome
+          ? `+${formatMmk(amount)}`
+          : amount > 0
+            ? `−${formatMmk(amount)}`
+            : '0 MMK',
+        occurredAt: row.created_at || `${row.entry_date}T12:00:00.000Z`,
+        barcode: '',
+        itemName: String(row.category || '').trim() || (isIncome ? '其它收入' : '其它支出'),
+        originLabel: String(row.created_by || '').trim() || 'Admin',
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function summarizeCrossBorder(
+  entries: FinanceLedgerEntry[],
+  storeCode: string,
+  hubCode: string,
+): FinanceLedgerSummary {
+  const crossBorder = buildCrossBorderFinanceSummary(entries, storeCode, hubCode);
+  return {
+    codPendingTotal: crossBorder.pendingInflowTotal,
+    collectedTotal: crossBorder.collectedTotal,
+    transportCostTotal: crossBorder.transportUnpaidTotal,
+    transportPaidTotal: crossBorder.transportPaidTotal,
+    transportUnpaidTotal: crossBorder.transportUnpaidTotal,
+    pendingInflowTotal: crossBorder.pendingInflowTotal,
+    agencyPayableTotal: crossBorder.agencyPayableTotal,
+    manualIncomeTotal: crossBorder.manualIncomeTotal,
+    manualExpenseTotal: crossBorder.manualExpenseTotal,
+  };
+}
+
+export async function listCrossBorderFinance(
+  store: InventoryStoreSession,
+  hubCode: string,
+): Promise<FinanceLedgerResult> {
+  const result = await listFinanceLedger(store, hubCode);
+  const financeEntries = result.entries.filter((e) => {
+    if (e.category === 'stock_op') return false;
+    // 车费仅计入运达站：发站 outbound 不在跨境财务展示
+    if (e.category === 'transport_cost' && e.transportDirection === 'outbound') return false;
+    return true;
+  });
+  return {
+    entries: financeEntries,
+    summary: summarizeCrossBorder(financeEntries, store.storeCode, hubCode),
+  };
 }
 
 export async function listFinanceLedger(
@@ -483,6 +642,19 @@ export async function listFinanceLedger(
       if (entry) entries.push(entry);
     }
 
+    const cloudOrderBarcodes: string[] = [];
+    for (const pkg of inboundPkgs) {
+      for (const order of pkg.orders) {
+        if (!order.inbound_note?.trim()) continue;
+        const parsed = parseInboundMovementNote(order.inbound_note);
+        if (!parsed.totalFee && !parsed.paymentLabel) continue;
+        const orderDest = order.destination_code || '';
+        if (orderDest && !destinationCodesMatch(orderDest, hub)) continue;
+        if (order.order_barcode) cloudOrderBarcodes.push(order.order_barcode);
+      }
+    }
+    const cloudSignedMap = await loadCustomerSignedMap(cloudOrderBarcodes);
+
     for (const pkg of inboundPkgs) {
       for (const order of pkg.orders) {
         if (!order.inbound_note?.trim()) continue;
@@ -516,11 +688,8 @@ export async function listFinanceLedger(
           created_at: order.inbound_at || pkg.truck_loaded_at || pkg.created_at,
         };
 
-        const localItem = await db.getFirstAsync<{ customer_signed_at: string }>(
-          'SELECT customer_signed_at FROM inventory_items WHERE barcode = ?',
-          [order.order_barcode],
-        );
-        const customerSigned = Boolean(localItem?.customer_signed_at?.trim());
+        const signedKey = String(order.order_barcode ?? '').trim().toUpperCase();
+        const customerSigned = cloudSignedMap.get(signedKey) ?? false;
 
         const entry = buildOrderLedgerEntry({
           movement: pseudoMovement,
@@ -538,6 +707,13 @@ export async function listFinanceLedger(
     // 离线时仅展示本地流水
   }
 
+  try {
+    const manualEntries = await fetchCloudCrossBorderManualEntries();
+    entries.push(...manualEntries);
+  } catch {
+    // 云端其它开销可选
+  }
+
   const opRows = await db.getAllAsync<Record<string, unknown>>(
     `SELECT * FROM stock_movements ORDER BY created_at DESC LIMIT 80`,
   );
@@ -549,5 +725,5 @@ export async function listFinanceLedger(
 
   entries.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
 
-  return { entries, summary: summarize(entries) };
+  return { entries, summary: summarize(entries, store.storeCode, hub) };
 }

@@ -58,6 +58,16 @@ export type StationReconciliationDetail = StationReconciliationSummary & {
   };
 };
 
+export type CrossBorderStationSummary = {
+  collectedTotal: number;
+  transportUnpaidTotal: number;
+  transportPaidTotal: number;
+  pendingInflowTotal: number;
+  agencyPayableTotal: number;
+  manualIncomeTotal: number;
+  manualExpenseTotal: number;
+};
+
 export type InventoryTransitStoreFinance = {
   ledgerEntryCount: number;
   codPendingTotal: number;
@@ -70,6 +80,7 @@ export type InventoryTransitStoreFinance = {
   codAgencyTotal?: number;
   codAgencyByOrigin?: FinanceOriginAttributionGroup[];
   reconciliation?: StationReconciliationSummary;
+  crossBorderSummary?: CrossBorderStationSummary;
 };
 
 export type InventoryTransitStore = {
@@ -96,6 +107,8 @@ export type InventoryPackRow = {
   item_count: number;
   total_weight?: string | null;
   status: 'in_transit' | 'hub_received' | 'split_at_hub' | 'completed' | 'cancelled';
+  display_status?: 'pending_load' | 'loaded' | 'arrived' | 'completed' | null;
+  display_status_label?: string | null;
   transport_fee?: number | null;
   truck_outbound_date?: string | null;
   truck_loaded_at?: string | null;
@@ -148,6 +161,7 @@ export type InventoryCustomerExpressItem = {
   transportStatus: string;
   paymentLabel: string;
   ownerStoreCode: string;
+  inboundAt: string;
   updatedAt: string;
 };
 
@@ -159,7 +173,58 @@ export type InventoryConsoleData = {
   recentPacks: InventoryPackRow[];
   packStatusFilter: string;
   transportFeeTotal?: number;
+  crossBorderFinance?: CrossBorderFinance;
   warnings?: string[];
+};
+
+export type CrossBorderExpenseCategory =
+  | 'transport_unpaid'
+  | 'transport_paid'
+  | 'pending_inflow'
+  | 'collected'
+  | 'agency_remit'
+  | 'manual_income'
+  | 'manual_expense';
+
+export type CrossBorderExpenseRow = {
+  id: string;
+  category: CrossBorderExpenseCategory;
+  title: string;
+  subtitle: string;
+  amount: number;
+  amountDisplay: string;
+  occurredAt: string;
+  barcode: string;
+  itemName: string;
+  destination?: string;
+  originLabel?: string;
+  stationCode: string;
+  stationName: string;
+  statusLabel: string;
+};
+
+export type CrossBorderFinanceSummary = {
+  entryCount: number;
+  collectedTotal: number;
+  transportUnpaidTotal: number;
+  transportPaidTotal: number;
+  pendingInflowTotal: number;
+  transportRegisteredTotal: number;
+  manualIncomeTotal: number;
+  manualExpenseTotal: number;
+};
+
+export type CrossBorderManualEntryDraft = {
+  entry_date: string;
+  kind: 'income' | 'expense';
+  amount: number;
+  category: string;
+  note: string;
+};
+
+export type CrossBorderFinance = {
+  summary: CrossBorderFinanceSummary;
+  entries: CrossBorderExpenseRow[];
 };
 
 export type PackStatusFilter = 'active' | 'in_transit' | 'hub_received' | 'completed' | 'all';
@@ -232,6 +297,7 @@ export async function fetchInventoryConsoleData(
 ): Promise<InventoryConsoleData> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('packStatus', packStatus);
+  url.searchParams.set('section', 'all');
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -245,6 +311,73 @@ export async function fetchInventoryConsoleData(
   }
 
   return payload as InventoryConsoleData;
+}
+
+type ConsoleSectionResponse = InventoryConsoleData & {
+  section?: string;
+  warnings?: string[];
+};
+
+async function fetchInventoryConsoleSection(
+  section: 'overview' | 'finance' | 'packs',
+  packStatus?: PackStatusFilter,
+): Promise<ConsoleSectionResponse> {
+  const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
+  url.searchParams.set('section', section);
+  if (packStatus) url.searchParams.set('packStatus', packStatus);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载失败 (${response.status})`);
+  }
+  return payload as ConsoleSectionResponse;
+}
+
+export async function fetchInventoryConsoleOverview(): Promise<{
+  transitStores: InventoryTransitStore[];
+  stats: InventoryConsoleStats;
+  transportFeeTotal?: number;
+  warnings?: string[];
+}> {
+  const payload = await fetchInventoryConsoleSection('overview');
+  return {
+    transitStores: payload.transitStores ?? [],
+    stats: payload.stats!,
+    transportFeeTotal: payload.transportFeeTotal,
+    warnings: payload.warnings,
+  };
+}
+
+export async function fetchInventoryConsoleFinance(): Promise<{
+  transitStores: InventoryTransitStore[];
+  crossBorderFinance?: InventoryConsoleData['crossBorderFinance'];
+  warnings?: string[];
+}> {
+  const payload = await fetchInventoryConsoleSection('finance');
+  return {
+    transitStores: payload.transitStores ?? [],
+    crossBorderFinance: payload.crossBorderFinance,
+    warnings: payload.warnings,
+  };
+}
+
+export async function fetchInventoryConsolePacks(
+  packStatus: PackStatusFilter = 'active',
+): Promise<{
+  recentPacks: InventoryPackRow[];
+  packStatusFilter?: string;
+  warnings?: string[];
+}> {
+  const payload = await fetchInventoryConsoleSection('packs', packStatus);
+  return {
+    recentPacks: payload.recentPacks ?? [],
+    packStatusFilter: payload.packStatusFilter,
+    warnings: payload.warnings,
+  };
 }
 
 export async function fetchInventoryCustomerSummaries(): Promise<{
@@ -341,4 +474,20 @@ export async function createCrossBorderAccount(
     throw new Error(payload.error || `创建失败 (${response.status})`);
   }
   return payload as CreateCrossBorderAccountResult;
+}
+
+export async function createCrossBorderManualEntry(
+  draft: CrossBorderManualEntryDraft,
+): Promise<void> {
+  const response = await fetch('/.netlify/functions/inventory-admin-cross-border-entry', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `保存失败 (${response.status})`);
+  }
 }

@@ -2,12 +2,21 @@
  * Admin 跨境物流 / Inventory App 控制台数据
  * 使用 Service Role 读取 inventory_* 表（绕过 Inventory JWT RLS）
  * 需已通过 admin Cookie 认证
+ *
+ * section 参数拆分加载（减轻首屏）：
+ * - overview：账号列表 + 统计 + 车费合计
+ * - finance：中转站财务 + 跨境财务（单次 loadFinanceDataset）
+ * - packs：运输明细（packStatus）
  */
 
 const { createClient } = require('@supabase/supabase-js');
 const { verifyAdminToken } = require('./verify-admin');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { aggregateFinanceForTransitStores } = require('./utils/inventoryFinanceAggregate');
+const {
+  PACK_DISPLAY_LABEL,
+  resolvePackDisplayStatusFromTracking,
+} = require('./utils/packDisplayStatus');
 
 function getAdminTokenFromEvent(event) {
   const cookieHeader = event.headers?.cookie || event.headers?.Cookie || '';
@@ -73,7 +82,32 @@ async function sumAllTransportFees(supabase) {
   return Math.round(total);
 }
 
-function normalizePackRow(row) {
+async function loadPackedQtyByBarcode(supabase, barcodes) {
+  const codes = [...new Set(barcodes.map((b) => String(b || '').trim()).filter(Boolean))];
+  if (!codes.length) return {};
+
+  const { data, error } = await supabase
+    .from('inventory_packed_shipments')
+    .select('bundle_barcode, item:inventory_store_items(qty_on_hand)')
+    .in('bundle_barcode', codes);
+
+  if (error) {
+    console.warn('inventory-admin-data: packed shipments lookup failed', error.message);
+    return {};
+  }
+
+  const map = {};
+  for (const row of data || []) {
+    const code = String(row.bundle_barcode || '').trim().toUpperCase();
+    const qty = row.item?.qty_on_hand;
+    if (code && typeof qty === 'number' && Number.isFinite(qty)) {
+      map[code] = qty;
+    }
+  }
+  return map;
+}
+
+function normalizePackRow(row, qtyOnHand) {
   const leg = String(row.leg_destination_code || '').trim().toUpperCase();
   const finalDest = String(row.destination_code || '').trim().toUpperCase();
   const feeRaw = row.transport_fee;
@@ -83,6 +117,8 @@ function normalizePackRow(row) {
   } else if (feeRaw != null && String(feeRaw).trim()) {
     transportFee = parseSettingsValue(feeRaw);
   }
+
+  const displayStatus = resolvePackDisplayStatusFromTracking(row, qtyOnHand);
 
   return {
     id: row.id,
@@ -95,6 +131,13 @@ function normalizePackRow(row) {
     item_count: row.item_count ?? 0,
     total_weight: row.total_weight ?? null,
     status: row.status,
+    display_status: displayStatus,
+    display_status_label:
+      row.status === 'cancelled'
+        ? '已取消'
+        : displayStatus
+          ? PACK_DISPLAY_LABEL[displayStatus]
+          : null,
     transport_fee: transportFee,
     truck_outbound_date: row.truck_outbound_date ?? null,
     truck_loaded_at: row.truck_loaded_at ?? null,
@@ -124,6 +167,181 @@ function parseSettingsValue(raw) {
     if ('amount' in raw) return parseSettingsValue(raw.amount);
   }
   return 0;
+}
+
+function emptyStoreFinance() {
+  return {
+    ledgerEntryCount: 0,
+    codPendingTotal: 0,
+    collectedTotal: 0,
+    transportCostTotal: 0,
+    collectedLocalTotal: 0,
+    collectedAgencyTotal: 0,
+    collectedAgencyByOrigin: [],
+    codLocalTotal: 0,
+    codAgencyTotal: 0,
+    codAgencyByOrigin: [],
+    reconciliation: {
+      originPrepaid: 0,
+      originCodTransit: 0,
+      destLocalCollected: 0,
+      destPendingLocal: 0,
+      destPendingAgency: 0,
+      destPendingTotal: 0,
+      destPendingAgencyByOrigin: [],
+      destAgencyCollected: 0,
+      destAgencyCollectedByOrigin: [],
+      transportOutbound: 0,
+      transportInbound: 0,
+      transportCostTotal: 0,
+      agencyPayableTotal: 0,
+      ownRetainTotal: 0,
+      inflowTotal: 0,
+      outflowTotal: 0,
+      pendingInflowTotal: 0,
+      transportUnpaidTotal: 0,
+      transportPaidTotal: 0,
+      transportInboundUnpaid: 0,
+      transportInboundPaid: 0,
+      netCashFlow: 0,
+      netPositionHint: 0,
+    },
+  };
+}
+
+async function loadTransitStores(supabase) {
+  const { data, error } = await supabase
+    .from('delivery_stores')
+    .select('id, store_name, store_code, region, address, phone, status, store_type, created_at')
+    .eq('store_type', 'transit_station')
+    .order('store_code', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function loadStats(supabase) {
+  return {
+    storeItemsTotal: await safeCount(supabase, 'inventory_store_items'),
+    storeItemsInStock: await safeCount(supabase, 'inventory_store_items', [['gt', 'qty_on_hand', 0]]),
+    packsInTransit: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'in_transit']]),
+    packsHubReceived: await safeCount(supabase, 'inventory_pkg_tracking', [
+      ['eq', 'status', 'hub_received'],
+    ]),
+    packsCompleted: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'completed']]),
+    packsCancelled: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'cancelled']]),
+    ordersInTransit: await safeCount(supabase, 'inventory_order_tracking', [
+      ['eq', 'status', 'in_transit'],
+    ]),
+    ordersHubReceived: await safeCount(supabase, 'inventory_order_tracking', [
+      ['eq', 'status', 'hub_received'],
+    ]),
+  };
+}
+
+async function loadRecentPacks(supabase, packStatus, warnings) {
+  let packsQuery = supabase
+    .from('inventory_pkg_tracking')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(500);
+
+  if (packStatus === 'in_transit') {
+    packsQuery = packsQuery.eq('status', 'in_transit');
+  } else if (packStatus === 'hub_received') {
+    packsQuery = packsQuery.eq('status', 'hub_received');
+  } else if (packStatus === 'completed') {
+    packsQuery = packsQuery.eq('status', 'completed');
+  } else if (packStatus === 'active') {
+    packsQuery = packsQuery.in('status', ['in_transit', 'hub_received', 'split_at_hub']);
+  }
+
+  const { data: packRows, error: packsErr } = await packsQuery;
+  if (packsErr) {
+    console.warn('inventory-admin-data: packs query failed', packsErr.message);
+    warnings.push(`包裹追踪表暂不可用：${packsErr.message}`);
+    return [];
+  }
+
+  const barcodes = (packRows || []).map((r) => r.pack_barcode);
+  const qtyByBarcode = await loadPackedQtyByBarcode(supabase, barcodes);
+  return (packRows || []).map((row) => {
+    const code = String(row.pack_barcode || '').trim().toUpperCase();
+    const qtyOnHand = qtyByBarcode[code];
+    return normalizePackRow(row, qtyOnHand);
+  });
+}
+
+function attachFinanceToStores(storesList, financeByStoreCode) {
+  return storesList.map((store) => {
+    const code = String(store.store_code || '').trim().toUpperCase();
+    const finance = financeByStoreCode[code] || emptyStoreFinance();
+    return { ...store, finance };
+  });
+}
+
+async function handleOverview(supabase, warnings) {
+  const storesList = await loadTransitStores(supabase);
+  const stats = await loadStats(supabase);
+  const transportFeeTotal = await sumAllTransportFees(supabase);
+  return {
+    ok: true,
+    at: new Date().toISOString(),
+    section: 'overview',
+    transitStores: storesList,
+    stats,
+    transportFeeTotal,
+    warnings,
+  };
+}
+
+async function handleFinance(supabase, warnings) {
+  const storesList = await loadTransitStores(supabase);
+  const { financeByStoreCode, crossBorderFinance, warnings: financeWarnings } =
+    await aggregateFinanceForTransitStores(supabase, storesList);
+  warnings.push(...financeWarnings);
+  return {
+    ok: true,
+    at: new Date().toISOString(),
+    section: 'finance',
+    transitStores: attachFinanceToStores(storesList, financeByStoreCode),
+    crossBorderFinance,
+    warnings,
+  };
+}
+
+async function handlePacks(supabase, packStatus, warnings) {
+  const recentPacks = await loadRecentPacks(supabase, packStatus, warnings);
+  return {
+    ok: true,
+    at: new Date().toISOString(),
+    section: 'packs',
+    recentPacks,
+    packStatusFilter: packStatus,
+    warnings,
+  };
+}
+
+/** 兼容旧版：一次返回全部（较慢） */
+async function handleAll(supabase, packStatus, warnings) {
+  const storesList = await loadTransitStores(supabase);
+  const { financeByStoreCode, crossBorderFinance, warnings: financeWarnings } =
+    await aggregateFinanceForTransitStores(supabase, storesList);
+  warnings.push(...financeWarnings);
+  const stats = await loadStats(supabase);
+  const recentPacks = await loadRecentPacks(supabase, packStatus, warnings);
+  const transportFeeTotal = await sumAllTransportFees(supabase);
+  return {
+    ok: true,
+    at: new Date().toISOString(),
+    section: 'all',
+    transitStores: attachFinanceToStores(storesList, financeByStoreCode),
+    stats,
+    recentPacks,
+    transportFeeTotal,
+    crossBorderFinance,
+    packStatusFilter: packStatus,
+    warnings,
+  };
 }
 
 exports.handler = async (event) => {
@@ -175,123 +393,25 @@ exports.handler = async (event) => {
   });
 
   const packStatus = (event.queryStringParameters?.packStatus || 'active').toLowerCase();
+  const section = String(event.queryStringParameters?.section || 'overview').toLowerCase();
   const warnings = [];
 
   try {
-    const { data: transitStores, error: storesErr } = await supabase
-      .from('delivery_stores')
-      .select('id, store_name, store_code, region, address, phone, status, store_type, created_at')
-      .eq('store_type', 'transit_station')
-      .order('store_code', { ascending: true });
-
-    if (storesErr) throw storesErr;
-
-    const storesList = transitStores || [];
-    const { financeByStoreCode, warnings: financeWarnings } = await aggregateFinanceForTransitStores(
-      supabase,
-      storesList,
-    );
-    warnings.push(...financeWarnings);
-
-    const transitStoresWithFinance = storesList.map((store) => {
-      const code = String(store.store_code || '').trim().toUpperCase();
-      const finance = financeByStoreCode[code] || {
-        ledgerEntryCount: 0,
-        codPendingTotal: 0,
-        collectedTotal: 0,
-        transportCostTotal: 0,
-        collectedLocalTotal: 0,
-        collectedAgencyTotal: 0,
-        collectedAgencyByOrigin: [],
-        codLocalTotal: 0,
-        codAgencyTotal: 0,
-        codAgencyByOrigin: [],
-        reconciliation: {
-          originPrepaid: 0,
-          originCodTransit: 0,
-          destLocalCollected: 0,
-          destPendingLocal: 0,
-          destPendingAgency: 0,
-          destPendingTotal: 0,
-          destPendingAgencyByOrigin: [],
-          destAgencyCollected: 0,
-          destAgencyCollectedByOrigin: [],
-          transportOutbound: 0,
-          transportInbound: 0,
-          transportCostTotal: 0,
-          agencyPayableTotal: 0,
-          ownRetainTotal: 0,
-          inflowTotal: 0,
-          outflowTotal: 0,
-          pendingInflowTotal: 0,
-          transportUnpaidTotal: 0,
-          transportPaidTotal: 0,
-          transportInboundUnpaid: 0,
-          transportInboundPaid: 0,
-          netCashFlow: 0,
-          netPositionHint: 0,
-        },
-      };
-      return { ...store, finance };
-    });
-
-    const stats = {
-      storeItemsTotal: await safeCount(supabase, 'inventory_store_items'),
-      storeItemsInStock: await safeCount(supabase, 'inventory_store_items', [['gt', 'qty_on_hand', 0]]),
-      packsInTransit: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'in_transit']]),
-      packsHubReceived: await safeCount(supabase, 'inventory_pkg_tracking', [
-        ['eq', 'status', 'hub_received'],
-      ]),
-      packsCompleted: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'completed']]),
-      packsCancelled: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'cancelled']]),
-      ordersInTransit: await safeCount(supabase, 'inventory_order_tracking', [
-        ['eq', 'status', 'in_transit'],
-      ]),
-      ordersHubReceived: await safeCount(supabase, 'inventory_order_tracking', [
-        ['eq', 'status', 'hub_received'],
-      ]),
-    };
-
-    let recentPacks = [];
-    let packsQuery = supabase
-      .from('inventory_pkg_tracking')
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .limit(500);
-
-    if (packStatus === 'in_transit') {
-      packsQuery = packsQuery.eq('status', 'in_transit');
-    } else if (packStatus === 'hub_received') {
-      packsQuery = packsQuery.eq('status', 'hub_received');
-    } else if (packStatus === 'completed') {
-      packsQuery = packsQuery.eq('status', 'completed');
-    } else if (packStatus === 'active') {
-      packsQuery = packsQuery.in('status', ['in_transit', 'hub_received', 'split_at_hub']);
-    }
-
-    const { data: packRows, error: packsErr } = await packsQuery;
-    if (packsErr) {
-      console.warn('inventory-admin-data: packs query failed', packsErr.message);
-      warnings.push(`包裹追踪表暂不可用：${packsErr.message}`);
+    let body;
+    if (section === 'finance') {
+      body = await handleFinance(supabase, warnings);
+    } else if (section === 'packs') {
+      body = await handlePacks(supabase, packStatus, warnings);
+    } else if (section === 'all') {
+      body = await handleAll(supabase, packStatus, warnings);
     } else {
-      recentPacks = (packRows || []).map(normalizePackRow);
+      body = await handleOverview(supabase, warnings);
     }
-
-    const transportFeeTotal = await sumAllTransportFees(supabase);
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        ok: true,
-        at: new Date().toISOString(),
-        transitStores: transitStoresWithFinance,
-        stats,
-        recentPacks,
-        transportFeeTotal,
-        packStatusFilter: packStatus,
-        warnings,
-      }),
+      body: JSON.stringify(body),
     };
   } catch (error) {
     console.error('inventory-admin-data error:', error);

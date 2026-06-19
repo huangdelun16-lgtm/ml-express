@@ -221,6 +221,159 @@
   font-weight: 600;
 }
 
+.cbl-card--finance-expense {
+  margin-bottom: 20px;
+}
+
+.cbl-expense-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.cbl-expense-summary__item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.cbl-expense-summary__item--total {
+  background: linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%);
+  border-color: #fecaca;
+}
+
+.cbl-expense-summary__item--total strong {
+  color: #dc2626;
+}
+
+.cbl-expense-summary__item--muted strong {
+  color: #64748b;
+}
+
+.cbl-expense-summary__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.cbl-expense-summary__item strong {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.cbl-expense-summary__in {
+  color: #059669 !important;
+}
+
+.cbl-manual-entry-modal {
+  max-width: 440px;
+  width: 100%;
+}
+
+.cbl-manual-entry-form {
+  padding: 0 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cbl-manual-entry-kind {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cbl-manual-entry-kind__btn {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.cbl-manual-entry-kind__btn--on {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.cbl-manual-entry-kind__btn--income.cbl-manual-entry-kind__btn--on {
+  border-color: #059669;
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.cbl-manual-entry-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cbl-manual-entry-field span {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.cbl-manual-entry-field input,
+.cbl-manual-entry-field textarea {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  color: #0f172a;
+  background: #fff;
+}
+
+.cbl-manual-entry-field textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.cbl-expense-type {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.cbl-expense-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cbl-expense-detail__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cbl-expense-detail__sub {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.cbl-table--expense td {
+  vertical-align: top;
+}
+
+.cbl-badge--red {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
 .cbl-pagination {
   display: flex;
   flex-wrap: wrap;
@@ -805,6 +958,23 @@
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+
+.cbl-customer-name-btn__name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cbl-customer-name-btn__phone {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .cbl-customer-name-btn:hover {
@@ -1179,6 +1349,19 @@
   font-size: 1rem;
   font-weight: 700;
   color: var(--cbl-text);
+}
+
+.cbl-card__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.cbl-card__status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
 }
 
 .cbl-card__body {

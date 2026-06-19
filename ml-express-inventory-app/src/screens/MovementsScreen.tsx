@@ -11,8 +11,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
+import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import { listFinanceLedger } from '../services/financeLedgerService';
-import type { FinanceLedgerCategory, FinanceLedgerEntry } from '../types/financeLedger';
+import { syncPlatformInventoryFromCloud } from '../services/inventoryCloudSync';
+import { isSupabaseConfigured } from '../services/supabase';
+import type { FinanceLedgerCategory, FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 
 type TabKey = 'all' | 'income' | 'transport' | 'ops';
 
@@ -60,6 +63,20 @@ const CATEGORY_META: Record<FinanceLedgerCategory, CategoryMeta> = {
     pillBg: 'rgba(248,113,113,0.18)',
     shortLabel: '车费',
   },
+  manual_income: {
+    icon: '📈',
+    accent: '#34d399',
+    tint: 'rgba(52,211,153,0.12)',
+    pillBg: 'rgba(52,211,153,0.18)',
+    shortLabel: '其它收入',
+  },
+  manual_expense: {
+    icon: '📉',
+    accent: '#f87171',
+    tint: 'rgba(248,113,113,0.12)',
+    pillBg: 'rgba(248,113,113,0.18)',
+    shortLabel: '其它支出',
+  },
   stock_op: {
     icon: '📋',
     accent: '#94a3b8',
@@ -68,15 +85,6 @@ const CATEGORY_META: Record<FinanceLedgerCategory, CategoryMeta> = {
     shortLabel: '操作',
   },
 };
-
-function formatMmk(n: number): string {
-  if (n <= 0) return '0';
-  return n % 1 === 0 ? String(n) : n.toFixed(2);
-}
-
-function formatMmkWithUnit(n: number): string {
-  return `${formatMmk(n)} MMK`;
-}
 
 function formatWhen(iso: string): { primary: string; secondary: string } {
   const d = new Date(iso);
@@ -162,35 +170,6 @@ function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
   );
 }
 
-function SummaryBar({
-  label,
-  value,
-  prefix,
-  accent,
-  icon,
-  tint,
-}: {
-  label: string;
-  value: string;
-  prefix?: string;
-  accent: string;
-  icon: string;
-  tint: string;
-}) {
-  return (
-    <View style={[styles.statBar, { borderColor: accent, backgroundColor: tint }]}>
-      <View style={[styles.statBarIconWrap, { backgroundColor: `${accent}22` }]}>
-        <Text style={styles.statBarIcon}>{icon}</Text>
-      </View>
-      <Text style={styles.statBarLabel}>{label}</Text>
-      <Text style={[styles.statBarValue, { color: accent }]} numberOfLines={1}>
-        {prefix}{value}
-        <Text style={styles.statBarUnit}> MMK</Text>
-      </Text>
-    </View>
-  );
-}
-
 function EmptyState({ tab }: { tab: TabKey }) {
   const hints: Record<TabKey, string> = {
     all: '入库、装车、到站后会产生财务与操作记录',
@@ -208,32 +187,59 @@ function EmptyState({ tab }: { tab: TabKey }) {
 }
 
 export default function MovementsScreen() {
-  const { store, hubCode, operatorName } = useAuth();
+  const { store, hubCode } = useAuth();
   const [tab, setTab] = useState<TabKey>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [entries, setEntries] = useState<FinanceLedgerEntry[]>([]);
-  const [summary, setSummary] = useState({
-    codPendingTotal: 0,
-    collectedTotal: 0,
-    transportCostTotal: 0,
-  });
 
-  const load = useCallback(async () => {
-    if (!store || !hubCode) {
-      setEntries([]);
-      setLoading(false);
-      return;
-    }
-    try {
-      const result = await listFinanceLedger(store, hubCode);
-      setEntries(result.entries);
-      setSummary(result.summary);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [store, hubCode]);
+  const applyLedgerResult = useCallback((result: FinanceLedgerResult) => {
+    setEntries(result.entries);
+  }, []);
+
+  const load = useCallback(
+    async (options?: { awaitSync?: boolean }) => {
+      if (!store || !hubCode) {
+        setEntries([]);
+        setLoading(false);
+        return;
+      }
+
+      requestAutoCloudSync(store, hubCode, options?.awaitSync ? { force: true } : undefined);
+
+      try {
+        const result = await listFinanceLedger(store, hubCode);
+        applyLedgerResult(result);
+      } finally {
+        setLoading(false);
+        if (!options?.awaitSync) setRefreshing(false);
+      }
+
+      if (!isSupabaseConfigured()) {
+        if (options?.awaitSync) setRefreshing(false);
+        return;
+      }
+
+      const syncAndRefresh = async () => {
+        try {
+          await syncPlatformInventoryFromCloud(store, hubCode);
+          const result = await listFinanceLedger(store, hubCode);
+          applyLedgerResult(result);
+        } catch {
+          // 离线时保留本地流水
+        } finally {
+          if (options?.awaitSync) setRefreshing(false);
+        }
+      };
+
+      if (options?.awaitSync) {
+        await syncAndRefresh();
+      } else {
+        void syncAndRefresh();
+      }
+    },
+    [store, hubCode, applyLedgerResult],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -244,15 +250,10 @@ export default function MovementsScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    void load();
+    void load({ awaitSync: true });
   };
 
   const displayed = useMemo(() => filterByTab(entries, tab), [entries, tab]);
-
-  const netEstimate = useMemo(
-    () => summary.codPendingTotal + summary.collectedTotal - summary.transportCostTotal,
-    [summary],
-  );
 
   const tabCounts = useMemo(
     () => ({
@@ -275,60 +276,6 @@ export default function MovementsScreen() {
 
   const listHeader = (
     <View style={styles.headerBlock}>
-      <View style={styles.heroCard}>
-        <View style={styles.heroGlow} />
-        <View style={styles.heroTop}>
-          <View>
-            <Text style={styles.heroLabel}>财务流水</Text>
-            <Text style={styles.heroHub}>
-              {operatorName ?? '本站'} · 区域 {hubCode}
-            </Text>
-          </View>
-          <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>{displayed.length} 条</Text>
-          </View>
-        </View>
-
-        <View style={styles.netRow}>
-          <Text style={styles.netLabel}>预估结余</Text>
-          <Text
-            style={[
-              styles.netValue,
-              netEstimate >= 0 ? styles.netPositive : styles.netNegative,
-            ]}
-          >
-            {netEstimate >= 0 ? '+' : '−'}{formatMmkWithUnit(Math.abs(netEstimate))}
-          </Text>
-          <Text style={styles.netHint}>待收 + 已收 − 运输成本</Text>
-        </View>
-
-        <View style={styles.statsStack}>
-          <SummaryBar
-            label="到付代收"
-            value={formatMmk(summary.codPendingTotal)}
-            prefix="+"
-            accent="#34d399"
-            icon="💵"
-            tint="rgba(52,211,153,0.08)"
-          />
-          <SummaryBar
-            label="已收金额"
-            value={formatMmk(summary.collectedTotal)}
-            accent="#60a5fa"
-            icon="✓"
-            tint="rgba(96,165,250,0.08)"
-          />
-          <SummaryBar
-            label="运输成本"
-            value={formatMmk(summary.transportCostTotal)}
-            prefix="−"
-            accent="#f87171"
-            icon="🚚"
-            tint="rgba(248,113,113,0.08)"
-          />
-        </View>
-      </View>
-
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -398,85 +345,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   loadingText: { color: '#94a3b8', marginTop: 14, fontSize: 14, fontWeight: '600' },
   headerBlock: { paddingTop: 4 },
-  heroCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    overflow: 'hidden',
-  },
-  heroGlow: {
-    position: 'absolute',
-    top: -40,
-    right: -30,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(124,58,237,0.22)',
-  },
-  heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  heroLabel: { color: '#f8fafc', fontSize: 20, fontWeight: '900' },
-  heroHub: { color: '#94a3b8', fontSize: 13, marginTop: 4, fontWeight: '600' },
-  heroBadge: {
-    backgroundColor: 'rgba(124,58,237,0.25)',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(167,139,250,0.35)',
-  },
-  heroBadgeText: { color: '#c4b5fd', fontSize: 12, fontWeight: '800' },
-  netRow: {
-    backgroundColor: '#0f172a',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  netLabel: { color: '#64748b', fontSize: 12, fontWeight: '700' },
-  netValue: { fontSize: 26, fontWeight: '900', marginTop: 4 },
-  netPositive: { color: '#fbbf24' },
-  netNegative: { color: '#f87171' },
-  netHint: { color: '#475569', fontSize: 11, marginTop: 6 },
-  statsStack: { gap: 8 },
-  statBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    gap: 10,
-  },
-  statBarIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statBarIcon: { fontSize: 16 },
-  statBarLabel: {
-    flex: 1,
-    color: '#e2e8f0',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  statBarValue: {
-    fontSize: 16,
-    fontWeight: '900',
-    textAlign: 'right',
-    maxWidth: '42%',
-  },
-  statBarUnit: { fontSize: 11, fontWeight: '700', color: '#94a3b8' },
   tabScroll: {
     paddingBottom: 10,
     gap: 8,

@@ -57,9 +57,19 @@ function pickInboundMovement(movements) {
 }
 
 function customerKey(name, phone) {
-  const n = String(name || '').trim() || '未登记客户';
-  const p = String(phone || '').trim() || '—';
+  const n = normalizeCustomerName(name);
+  const p = normalizeCustomerPhone(phone);
   return `${n}__${p}`;
+}
+
+function normalizeCustomerName(name) {
+  return String(name || '').trim() || '未登记客户';
+}
+
+function normalizeCustomerPhone(phone) {
+  const p = String(phone || '').trim();
+  if (!p || p === '—' || p === '-') return '—';
+  return p;
 }
 
 function normalizeOwnerKey(key) {
@@ -139,10 +149,11 @@ function derivePaymentStatus(paymentLabel, customerSigned) {
 function buildExpressItemRow(item, inbound) {
   const parsed = parseInboundMovementNote(inbound?.note);
   const customerName =
-    String(item.recipient_name || '').trim() ||
-    String(inbound?.recipient_name || '').trim() ||
-    '未登记客户';
-  const phone = String(inbound?.recipient_phone || '').trim();
+    normalizeCustomerName(
+      String(item.recipient_name || '').trim() ||
+        String(inbound?.recipient_name || '').trim(),
+    );
+  const phone = normalizeCustomerPhone(inbound?.recipient_phone);
   const destination =
     String(item.final_destination || '').trim() ||
     String(inbound?.destination || '').trim();
@@ -174,6 +185,7 @@ function buildExpressItemRow(item, inbound) {
     transportStatus: deriveTransportStatus(item, inbound, destination),
     paymentLabel: parsed.paymentLabel || '',
     ownerStoreCode: String(item.owner_store_code || '').trim(),
+    inboundAt: inbound?.created_at || '',
     updatedAt: item.updated_at || inbound?.created_at || '',
   };
 }
@@ -232,12 +244,14 @@ async function loadExpressItemsDataset(supabase) {
 function aggregateCustomerSummaries(rows) {
   const map = {};
   for (const row of rows) {
-    const key = row.customerKey;
+    const name = normalizeCustomerName(row.customerName);
+    const phone = normalizeCustomerPhone(row.customerPhone);
+    const key = customerKey(name, phone);
     if (!map[key]) {
       map[key] = {
         customerKey: key,
-        customerName: row.customerName,
-        customerPhone: row.customerPhone || '—',
+        customerName: name,
+        customerPhone: phone,
         totalPieces: 0,
         totalWeightKg: 0,
         totalFee: 0,
@@ -270,13 +284,18 @@ async function fetchCustomerSummaries(supabase) {
 
 async function fetchCustomerItems(supabase, customerName, customerPhone) {
   const { rows, warnings } = await loadExpressItemsDataset(supabase);
-  const key = customerKey(customerName, customerPhone);
+  const targetName = normalizeCustomerName(customerName);
+  const targetPhone = normalizeCustomerPhone(customerPhone);
   const items = rows
-    .filter((r) => r.customerKey === key)
+    .filter(
+      (r) =>
+        normalizeCustomerName(r.customerName) === targetName &&
+        normalizeCustomerPhone(r.customerPhone) === targetPhone,
+    )
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   return {
-    customerName: String(customerName || '').trim() || '未登记客户',
-    customerPhone: String(customerPhone || '').trim() || '—',
+    customerName: targetName,
+    customerPhone: targetPhone,
     items,
     warnings,
   };

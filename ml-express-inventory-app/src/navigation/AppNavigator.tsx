@@ -6,6 +6,7 @@ import StockOutScreen from '../screens/StockOutScreen';
 import ItemsScreen from '../screens/ItemsScreen';
 import ItemFormScreen from '../screens/ItemFormScreen';
 import MovementsScreen from '../screens/MovementsScreen';
+import CrossBorderFinanceScreen from '../screens/CrossBorderFinanceScreen';
 import CameraScanScreen from '../screens/CameraScanScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import PkgScreen from '../screens/PkgScreen';
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   Items: undefined;
   ItemForm: { itemId?: string } | undefined;
   Movements: undefined;
+  CrossBorderFinance: undefined;
   CameraScan: undefined;
   Settings: undefined;
   Pkg: undefined;
@@ -50,6 +52,11 @@ export default function AppNavigator() {
       <Stack.Screen name="TrackExpress" component={TrackExpressScreen} options={{ title: '追踪快递' }} />
       <Stack.Screen name="ItemForm" component={ItemFormScreen} options={{ title: '商品' }} />
       <Stack.Screen name="Movements" component={MovementsScreen} options={{ title: '流水' }} />
+      <Stack.Screen
+        name="CrossBorderFinance"
+        component={CrossBorderFinanceScreen}
+        options={{ title: '跨境财务' }}
+      />
       <Stack.Screen name="CameraScan" component={CameraScanScreen} options={{ title: '通用扫码' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: '设置' }} />
     </Stack.Navigator>

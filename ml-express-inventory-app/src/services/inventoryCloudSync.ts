@@ -353,6 +353,19 @@ async function mergeCloudPackCore(row: CloudPackRow): Promise<void> {
       'SELECT id FROM inventory_items WHERE barcode = ?',
       [line.item_barcode],
     );
+    const itemId = localItem?.id ?? '';
+    const itemBarcode = String(line.item_barcode ?? '').trim();
+    if (itemId || itemBarcode) {
+      await db.runAsync(
+        `DELETE FROM packed_shipment_items
+         WHERE pack_id != ?
+           AND (
+             (? != '' AND item_id = ?)
+             OR (? != '' AND UPPER(TRIM(item_barcode)) = UPPER(TRIM(?)))
+           )`,
+        [packId, itemId, itemId, itemBarcode, itemBarcode],
+      );
+    }
     await db.runAsync(
       `INSERT INTO packed_shipment_items (id, pack_id, item_id, item_barcode, item_name, qty)
        VALUES (?, ?, ?, ?, ?, ?)`,
