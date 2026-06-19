@@ -93,6 +93,8 @@ async function mergeCloudItemCore(row: CloudStoreItemRow): Promise<void> {
 
   if (local && localUpdated > cloudUpdated) return;
 
+  const localSigned = local ? String(local.customer_signed_at ?? '').trim() : '';
+
   const localQty = local ? Number(local.qty_on_hand) || 0 : 0;
   const cloudQty = Number(row.qty_on_hand) || 0;
   const localTransitReleased = local
@@ -143,13 +145,19 @@ async function mergeCloudItemCore(row: CloudStoreItemRow): Promise<void> {
   }
 
   const hubArrived = emptyTs(row.hub_arrived_at);
-  const signedAt = emptyTs(row.customer_signed_at);
-  const packedAt =
+  let signedAt = emptyTs(row.customer_signed_at);
+  let packedAt =
     cloudPackedAt ||
     (local ? String(local.packed_at ?? '').trim() : '');
-  const packedBundle =
+  let packedBundle =
     cloudPackedBundle ||
     (local ? String(local.packed_bundle_barcode ?? '').trim() : '');
+  if (localSigned) {
+    signedAt = localSigned;
+    row.qty_on_hand = 0;
+    packedAt = '';
+    packedBundle = '';
+  }
   const transitReleasedAt =
     localTransitReleased || emptyTs(row.hub_transit_released_at);
   const transitShippedAt =
@@ -406,6 +414,12 @@ async function syncPackedFlagsFromPackLines(
       itemId = found?.id ?? '';
     }
     if (!itemId) continue;
+
+    const signedRow = await db.getFirstAsync<{ v: string }>(
+      'SELECT customer_signed_at AS v FROM inventory_items WHERE id = ?',
+      [itemId],
+    );
+    if (signedRow?.v?.trim()) continue;
 
     await db.runAsync(
       `UPDATE inventory_items

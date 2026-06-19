@@ -263,7 +263,7 @@ async function maybeFinalizePkg(pkgId: string, packBarcode: string): Promise<voi
       updated_at: now,
     })
     .eq('id', pkgId)
-    .eq('status', 'hub_received');
+    .in('status', ['hub_received', 'completed']);
 
   if (error) throw new Error(error.message);
 }
@@ -616,9 +616,14 @@ async function applyOrderHubReceived(
 
   const dest = hubCode.trim().toUpperCase();
   const orderDest = resolveOrderDestinationCode(order);
-  if (orderDest !== dest) {
+  const legDest = resolvePackLegDestination(pkg);
+  if (orderDest === dest) {
+    // 本站最终目的地：到站交付
+  } else if (legDest === dest) {
+    // 经本站中转：在本站扫码「入库」登记到站
+  } else {
     throw new Error(
-      `该订单目的地为 ${orderDest || '未知'}，本站为 ${dest}。非本站订单请使用「释放待转出」`,
+      `该订单目的地为 ${orderDest || '未知'}，本段运达站为 ${legDest || '未知'}，本站为 ${dest}`,
     );
   }
   if (pkg.status === 'in_transit') {
@@ -686,25 +691,84 @@ export async function confirmOrderInPackById(
   return applyOrderHubReceived(rowToOrder(data as Record<string, unknown>), store, hubCode);
 }
 
+/** 中转站重新打包后：云端订单从 released_at_hub 挂到新快递包，避免同步时重复释放恢复 */
+export async function markHubTransitOrdersRepacked(
+  lines: { order_barcode: string }[],
+  newPackBarcode: string,
+  hubCode: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const hub = hubCode.trim().toUpperCase();
+  const packCode = newPackBarcode.trim().toUpperCase();
+  if (!hub || !packCode || lines.length === 0) return;
+
+  const now = new Date().toISOString();
+  const { data: pkgRow } = await supabase
+    .from('inventory_pkg_tracking')
+    .select('id')
+    .eq('pack_barcode', packCode)
+    .maybeSingle();
+
+  for (const line of lines) {
+    const orderCode = line.order_barcode.trim().toUpperCase();
+    if (!orderCode) continue;
+
+    const { data: orderRow, error: fetchError } = await supabase
+      .from('inventory_order_tracking')
+      .select('id, destination_code, status')
+      .eq('order_barcode', orderCode)
+      .eq('status', 'released_at_hub')
+      .maybeSingle();
+    if (fetchError) throw new Error(fetchError.message);
+    if (!orderRow) continue;
+
+    const dest = resolveOrderDestinationCode({
+      destination_code: String((orderRow as { destination_code?: string }).destination_code ?? ''),
+      order_barcode: orderCode,
+    });
+    if (!dest || dest === hub) continue;
+
+    const { error } = await supabase
+      .from('inventory_order_tracking')
+      .update({
+        pack_barcode: packCode,
+        pkg_tracking_id: (pkgRow as { id?: string } | null)?.id ?? null,
+        status: 'in_transit',
+        hub_received_at: null,
+        hub_received_by_store_code: null,
+        hub_received_by_store_name: null,
+        updated_at: now,
+      })
+      .eq('id', String((orderRow as { id: string }).id));
+    if (error) throw new Error(error.message);
+  }
+}
+
 /** 释放非本站订单，供中转站重新打包转出 */
 export async function releaseTransitOrdersAtHub(
   packBarcode: string,
   store: InventoryStoreSession,
   hubCode: string,
+  options?: { allowCompleted?: boolean },
 ): Promise<PkgTrackingDetail> {
   const pkg = await getPkgTrackingDetail(packBarcode);
   if (!pkg) throw new Error('未找到该快递包追踪记录');
 
   const hub = hubCode.trim().toUpperCase();
-  if (pkg.status !== 'hub_received') {
+  const packOk =
+    pkg.status === 'hub_received' ||
+    (options?.allowCompleted && pkg.status === 'completed');
+  if (!packOk) {
     throw new Error('请先确认快递包到站，再释放待转出订单');
   }
 
   const toRelease = pkg.orders.filter(
-    (o) => o.status === 'in_transit' && resolveOrderDestinationCode(o) !== hub,
+    (o) =>
+      (o.status === 'in_transit' || o.status === 'hub_received') &&
+      resolveOrderDestinationCode(o) !== hub,
   );
   if (toRelease.length === 0) {
-    throw new Error('没有可释放的待转出订单（本站订单请逐单「确认」交付）');
+    throw new Error('没有可释放的待转出订单（本站订单请逐单「入库」）');
   }
 
   const now = new Date().toISOString();

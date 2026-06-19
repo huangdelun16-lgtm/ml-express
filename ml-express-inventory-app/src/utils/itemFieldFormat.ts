@@ -79,6 +79,7 @@ export function resolveItemCardQty(item: {
   hub_arrived?: boolean;
   hub_transit_released?: boolean;
   hub_transit_released_at?: string;
+  hub_transit_hub_inbound?: boolean;
   hub_transit_shipped?: boolean;
   hub_transit_shipped_at?: string;
   customer_signed?: boolean;
@@ -94,6 +95,11 @@ export function resolveItemCardQty(item: {
   const transitReleased =
     item.hub_transit_released || Boolean(item.hub_transit_released_at?.trim());
 
+  // 经本站中转：弹窗「入库」后已有本站库存（尚未释放待转出时也展示件数）
+  if (item.hub_transit_hub_inbound && item.qty_on_hand > 0) {
+    return item.qty_on_hand;
+  }
+
   if (transitReleased) {
     if (item.qty_on_hand > 0) return item.qty_on_hand;
     const specN = Math.max(1, parseInt(parseUnit(item.unit ?? '').n, 10) || 1);
@@ -106,7 +112,8 @@ export function resolveItemCardQty(item: {
   }
 
   if (item.packed || Boolean(item.packed_at?.trim())) {
-    // 中转站已确认到站、在 inbound 包内待转出：展示本站库存
+    // 已打入新快递包待发：库存应为 0，避免同步异常时仍显示可打包件数
+    if (!transitReleased) return 0;
     if (item.qty_on_hand > 0) return item.qty_on_hand;
     return 0;
   }

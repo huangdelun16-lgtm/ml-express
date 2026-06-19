@@ -15,6 +15,16 @@ import { ORDER_STATUS_LABEL, PKG_STATUS_LABEL } from '../types/tracking';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { formatTransportFeeDisplay, parseTransportFeeAmount } from '../services/hubTransportFeeService';
 
+function hubOrderStatusLabel(
+  line: PkgTrackingDetail['orders'][number],
+  hubCode: string,
+): string {
+  const orderDest = resolveOrderDestinationCode(line);
+  const isLocal = orderDest === hubCode;
+  if (line.status === 'hub_received' && !isLocal) return '本站已入库';
+  return ORDER_STATUS_LABEL[line.status];
+}
+
 type Props = {
   visible: boolean;
   pack: PkgTrackingDetail | null;
@@ -22,13 +32,11 @@ type Props = {
   store: InventoryStoreSession | null;
   loading: boolean;
   confirmingOrderId: string | null;
-  releasing: boolean;
   payingTransportFee: boolean;
   transportFeePaid: boolean;
   onClose: () => void;
   onConfirmPack: () => void;
   onConfirmOrder: (orderId: string) => void;
-  onReleaseTransit: () => void;
   onPayTransportFee: () => void;
 };
 
@@ -39,13 +47,11 @@ export default function HubReceiveOrdersModal({
   store,
   loading,
   confirmingOrderId,
-  releasing,
   payingTransportFee,
   transportFeePaid,
   onClose,
   onConfirmPack,
   onConfirmOrder,
-  onReleaseTransit,
   onPayTransportFee,
 }: Props) {
   const { height: windowHeight } = useWindowDimensions();
@@ -67,9 +73,6 @@ export default function HubReceiveOrdersModal({
   const packDone = pack.status === 'completed' || pack.status === 'split_at_hub';
   const needsPackConfirm = pack.status === 'in_transit';
 
-  const transitPending = pack.orders.filter(
-    (o) => o.status === 'in_transit' && resolveOrderDestinationCode(o) !== hubCode,
-  );
   const ordersAllProcessed = pack.orders.every((o) => o.status !== 'in_transit');
   const legDest = pack.leg_destination_code || pack.destination_code || hubCode;
   const feeDisplay = formatTransportFeeDisplay(pack.transport_fee);
@@ -147,8 +150,7 @@ export default function HubReceiveOrdersModal({
               const canInbound =
                 packReceived &&
                 pack.status === 'hub_received' &&
-                line.status === 'in_transit' &&
-                isLocal;
+                line.status === 'in_transit';
               const isConfirming = confirmingOrderId === line.id;
 
               return (
@@ -183,7 +185,7 @@ export default function HubReceiveOrdersModal({
                         style={[styles.orderStatus, isDone && styles.orderStatusDone]}
                         numberOfLines={1}
                       >
-                        {ORDER_STATUS_LABEL[line.status]}
+                        {hubOrderStatusLabel(line, hubCode)}
                       </Text>
                     </View>
                     {line.recipient_name?.trim() ? (
@@ -216,10 +218,6 @@ export default function HubReceiveOrdersModal({
                     <View style={styles.doneMark}>
                       <Text style={styles.doneMarkText}>✓</Text>
                     </View>
-                  ) : !isLocal && line.status === 'in_transit' && packReceived ? (
-                    <View style={styles.transitMark}>
-                      <Text style={styles.transitMarkText}>中转</Text>
-                    </View>
                   ) : null}
                 </View>
               );
@@ -227,18 +225,6 @@ export default function HubReceiveOrdersModal({
           </ScrollView>
 
           <View style={styles.footerBlock}>
-            {transitPending.length > 0 && pack.status === 'hub_received' ? (
-              <Pressable
-                style={[styles.transitBtn, (releasing || loading) && styles.btnBusy]}
-                onPress={onReleaseTransit}
-                disabled={releasing || loading}
-              >
-                <Text style={styles.transitBtnText}>
-                  {releasing ? '释放中…' : `释放中转 · ${transitPending.length}`}
-                </Text>
-              </Pressable>
-            ) : null}
-
             {canPayTransportFee ? (
               <Pressable
                 style={[styles.payFeeBtn, (payingTransportFee || loading) && styles.btnBusy]}
@@ -255,7 +241,7 @@ export default function HubReceiveOrdersModal({
               </View>
             ) : null}
 
-            {loading && !confirmingOrderId && !releasing && !payingTransportFee ? (
+            {loading && !confirmingOrderId && !payingTransportFee ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator color="#38bdf8" size="small" />
               </View>

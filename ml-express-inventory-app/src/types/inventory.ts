@@ -46,6 +46,8 @@ export interface InventoryItemListRow extends InventoryItem {
   hub_arrived: boolean;
   hub_transit_released: boolean;
   hub_transit_shipped: boolean;
+  /** 经本站中转：已在本站「入库」登记（中转站到站流水） */
+  hub_transit_hub_inbound?: boolean;
   customer_signed: boolean;
   /** 所属快递包包装号（已打包时由列表查询填充） */
   parent_pack_barcode?: string;

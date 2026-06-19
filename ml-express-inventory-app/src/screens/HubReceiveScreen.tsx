@@ -12,9 +12,9 @@ import ScanInputBar from '../components/ScanInputBar';
 import HubReceiveOrdersModal from '../components/HubReceiveOrdersModal';
 import { useAuth } from '../contexts/AuthContext';
 import {
+  deliverHubOrderInboundAtStation,
   importInboundPackToLocal,
-  releaseHubTransitOrders,
-  deliverLocalHubOrderToInventory,
+  maybeAutoReleaseTransitAfterAllInbound,
 } from '../services/inventoryService';
 import {
   isHubTransportFeePaid,
@@ -33,7 +33,6 @@ import {
 } from '../services/trackingService';
 import type { PkgTrackingDetail } from '../types/tracking';
 import { ORDER_STATUS_LABEL, PKG_STATUS_LABEL } from '../types/tracking';
-import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
@@ -45,7 +44,6 @@ export default function HubReceiveScreen() {
   const [ordersModalVisible, setOrdersModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
-  const [releasing, setReleasing] = useState(false);
   const [payingTransportFee, setPayingTransportFee] = useState(false);
   const [transportFeePaid, setTransportFeePaid] = useState(false);
   const [message, setMessage] = useState('');
@@ -72,9 +70,9 @@ export default function HubReceiveScreen() {
       if (pkg.status === 'split_at_hub') {
         const released = pkg.orders.filter((o) => o.status === 'released_at_hub').length;
         setMessage(
-          `分拨完成，${released} 个中转已释放。请支付车费后完成`,
+          `分拨完成，${released} 个中转订单已加入「快递明细」待重新打包。请支付车费后完成`,
         );
-        showTaskSuccess('分拨完成', `请支付本段车费后关闭窗口`);
+        showTaskSuccess('分拨完成', '请至「快递明细」重新打包中转订单');
         return;
       }
 
@@ -87,6 +85,31 @@ export default function HubReceiveScreen() {
       setMessage(`已处理 ${pkg.received_order_count}/${total} 个订单，请在弹窗中继续分拨`);
     },
     [store, operatorName, refreshTransportFeePaid],
+  );
+
+  const finishInboundFlow = useCallback(
+    async (pkg: PkgTrackingDetail) => {
+      await applyOrderSuccess(pkg);
+      if (!store) return;
+
+      const { releasedCount } = await maybeAutoReleaseTransitAfterAllInbound({
+        packBarcode: pkg.pack_barcode,
+        store,
+        hubCode,
+        operator: operatorName ?? '工作人员',
+      });
+      if (releasedCount > 0) {
+        const updated = await getPkgTrackingDetail(pkg.pack_barcode);
+        if (updated) {
+          setActivePack(updated);
+          setMessage(
+            `全部订单已入库，${releasedCount} 个中转订单已加入「快递明细」待重新打包`,
+          );
+          showTaskSuccess('分拨完成', '请至「快递明细」重新打包中转订单');
+        }
+      }
+    },
+    [applyOrderSuccess, store, hubCode, operatorName],
   );
 
   const openPackOrdersModal = useCallback(
@@ -150,11 +173,11 @@ export default function HubReceiveScreen() {
       }
       setActivePack(updated);
       setMessage(
-        `✓ 快递包 ${updated.pack_barcode} 已确认到站并同步至「打包」列表。本站订单点「确认入库」，中转订单点「释放中转」`,
+        `✓ 快递包 ${updated.pack_barcode} 已确认到站并同步至「打包」列表。请逐单点「入库」完成分拨`,
       );
       showTaskSuccess(
         '到站收货成功',
-        `快递包已出现在「打包」页。请在订单列表中分拨 ${updated.item_count} 个订单`,
+        `请在弹窗中为每个订单（含中转订单）点「入库」`,
       );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '确认失败');
@@ -195,19 +218,17 @@ export default function HubReceiveScreen() {
       }
 
       openPackOrdersModal(detail);
-      const orderDest = resolveOrderDestinationCode(order);
-      const isLocal = orderDest === hubCode;
 
       if (detail.status === 'in_transit') {
         setMessage(
-          `已识别入库单 ${order.order_barcode}，所属包裹 ${detail.pack_barcode}。\n请先点「确认快递包到站收货」，再${isLocal ? '确认入库' : '释放中转'}`,
+          `已识别入库单 ${order.order_barcode}，所属包裹 ${detail.pack_barcode}。\n请先点「确认到站收货」，再在弹窗中点「入库」`,
         );
         return;
       }
 
-      if (isLocal && order.status === 'in_transit') {
+      if (order.status === 'in_transit') {
         const { order: confirmed, pkg } = await confirmOrderInPackById(order.id, store, hubCode);
-        await deliverLocalHubOrderToInventory({
+        await deliverHubOrderInboundAtStation({
           order: confirmed,
           pkg,
           store,
@@ -215,15 +236,8 @@ export default function HubReceiveScreen() {
           operator: operatorName ?? '工作人员',
         });
         showTaskSuccess('入库成功', `订单 ${confirmed.order_barcode} 已确认入库`);
-        await applyOrderSuccess(pkg);
+        await finishInboundFlow(pkg);
         setScan('');
-        return;
-      }
-
-      if (!isLocal && order.status === 'in_transit') {
-        setMessage(
-          `入库单 ${order.order_barcode} 需中转至 ${orderDest || '下一站'}，请在弹窗中点「释放中转订单」`,
-        );
         return;
       }
 
@@ -243,7 +257,7 @@ export default function HubReceiveScreen() {
     setLoading(true);
     try {
       const { order, pkg } = await confirmOrderHubReceived(code, store, hubCode);
-      await deliverLocalHubOrderToInventory({
+      await deliverHubOrderInboundAtStation({
         order,
         pkg,
         store,
@@ -251,37 +265,12 @@ export default function HubReceiveScreen() {
         operator: operatorName ?? '工作人员',
       });
       showTaskSuccess('入库成功', `订单 ${order.order_barcode} 已确认入库`);
-      await applyOrderSuccess(pkg);
+      await finishInboundFlow(pkg);
       setScan('');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '确认失败');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleReleaseTransit = async () => {
-    if (!store || !activePack) return;
-    setReleasing(true);
-    setError('');
-    try {
-      const { releasedCount } = await releaseHubTransitOrders({
-        packBarcode: activePack.pack_barcode,
-        store,
-        hubCode,
-        operator: operatorName ?? '工作人员',
-      });
-      showTaskSuccess(
-        '中转释放成功',
-        `已释放 ${releasedCount} 个中转订单，请至「快递明细」重新打包`,
-      );
-      const updated = await getPkgTrackingDetail(activePack.pack_barcode);
-      if (updated) await applyOrderSuccess(updated);
-      else setMessage(`已释放 ${releasedCount} 个中转订单`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '释放失败');
-    } finally {
-      setReleasing(false);
     }
   };
 
@@ -291,7 +280,7 @@ export default function HubReceiveScreen() {
     setConfirmingOrderId(orderId);
     try {
       const { order, pkg } = await confirmOrderInPackById(orderId, store, hubCode);
-      await deliverLocalHubOrderToInventory({
+      await deliverHubOrderInboundAtStation({
         order,
         pkg,
         store,
@@ -299,7 +288,7 @@ export default function HubReceiveScreen() {
         operator: operatorName ?? '工作人员',
       });
       showTaskSuccess('入库成功', `订单 ${order.order_barcode} 已确认入库`);
-      await applyOrderSuccess(pkg);
+      await finishInboundFlow(pkg);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '确认失败');
     } finally {
@@ -378,7 +367,7 @@ export default function HubReceiveScreen() {
           {store.storeCode} · {store.storeName}
         </Text>
         <Text style={styles.zoneHint}>
-          先扫快递包 PKG 确认到站；也可直接扫入库单定位包裹。本站订单「确认入库」，中转订单「释放」后支付车费
+          先扫快递包 PKG 确认到站；包内每个订单（含经本站中转的）均点「入库」。全部入库后中转订单自动进入「快递明细」待重新打包
         </Text>
       </View>
 
@@ -429,13 +418,11 @@ export default function HubReceiveScreen() {
         store={store}
         loading={loading}
         confirmingOrderId={confirmingOrderId}
-        releasing={releasing}
         payingTransportFee={payingTransportFee}
         transportFeePaid={transportFeePaid}
         onClose={() => setOrdersModalVisible(false)}
         onConfirmPack={() => void handleConfirmPack()}
         onConfirmOrder={(orderId) => void handleConfirmOrder(orderId)}
-        onReleaseTransit={() => void handleReleaseTransit()}
         onPayTransportFee={handlePayTransportFee}
       />
     </ScrollView>
