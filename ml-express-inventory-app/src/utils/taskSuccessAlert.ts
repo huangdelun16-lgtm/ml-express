@@ -7,6 +7,6 @@ export function showTaskSuccess(
   onOk?: () => void,
 ): void {
   Alert.alert(title, message?.trim() || undefined, [
-    { text: '好的', onPress: onOk },
+    { text: 'OK', onPress: onOk },
   ]);
 }

@@ -13,6 +13,7 @@ import PkgScreen from '../screens/PkgScreen';
 import TrackExpressScreen from '../screens/TrackExpressScreen';
 import HubReceiveScreen from '../screens/HubReceiveScreen';
 import ShipmentTrackScreen from '../screens/ShipmentTrackScreen';
+import { useTranslation } from '../i18n';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -33,32 +34,38 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const screenOptions = {
-  headerStyle: { backgroundColor: '#0f172a' },
+  headerStyle: { backgroundColor: '#020617' },
   headerTintColor: '#f8fafc',
   headerTitleStyle: { fontWeight: '800' as const },
-  contentStyle: { backgroundColor: '#0f172a' },
+  contentStyle: { backgroundColor: '#020617' },
 };
 
 export default function AppNavigator() {
+  const { t, language } = useTranslation();
+
   return (
-    <Stack.Navigator screenOptions={screenOptions}>
-      <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'ML Inventory' }} />
-      <Stack.Screen name="StockIn" component={StockInScreen} options={{ title: '入库' }} />
-      <Stack.Screen name="StockOut" component={StockOutScreen} options={{ title: '装车出库' }} />
-      <Stack.Screen name="HubReceive" component={HubReceiveScreen} options={{ title: '到站收货' }} />
-      <Stack.Screen name="ShipmentTrack" component={ShipmentTrackScreen} options={{ title: '在途追踪' }} />
-      <Stack.Screen name="Items" component={ItemsScreen} options={{ title: '快递明细' }} />
-      <Stack.Screen name="Pkg" component={PkgScreen} options={{ title: '打包' }} />
-      <Stack.Screen name="TrackExpress" component={TrackExpressScreen} options={{ title: '追踪快递' }} />
-      <Stack.Screen name="ItemForm" component={ItemFormScreen} options={{ title: '商品' }} />
-      <Stack.Screen name="Movements" component={MovementsScreen} options={{ title: '流水' }} />
+    <Stack.Navigator key={language} screenOptions={screenOptions}>
+      <Stack.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen name="StockIn" component={StockInScreen} options={{ title: t.nav.stockIn }} />
+      <Stack.Screen name="StockOut" component={StockOutScreen} options={{ title: t.nav.stockOut }} />
+      <Stack.Screen name="HubReceive" component={HubReceiveScreen} options={{ title: t.nav.hubReceive }} />
+      <Stack.Screen name="ShipmentTrack" component={ShipmentTrackScreen} options={{ title: t.nav.shipmentTrack }} />
+      <Stack.Screen name="Items" component={ItemsScreen} options={{ title: t.nav.items }} />
+      <Stack.Screen name="Pkg" component={PkgScreen} options={{ title: t.nav.pkg }} />
+      <Stack.Screen name="TrackExpress" component={TrackExpressScreen} options={{ title: t.nav.trackExpress }} />
+      <Stack.Screen name="ItemForm" component={ItemFormScreen} options={{ title: t.nav.itemForm }} />
+      <Stack.Screen name="Movements" component={MovementsScreen} options={{ title: t.nav.movements }} />
       <Stack.Screen
         name="CrossBorderFinance"
         component={CrossBorderFinanceScreen}
-        options={{ title: '跨境财务' }}
+        options={{ title: t.nav.crossBorderFinance }}
       />
-      <Stack.Screen name="CameraScan" component={CameraScanScreen} options={{ title: '通用扫码' }} />
-      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: '设置' }} />
+      <Stack.Screen name="CameraScan" component={CameraScanScreen} options={{ title: t.nav.cameraScan }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t.nav.settings }} />
     </Stack.Navigator>
   );
 }

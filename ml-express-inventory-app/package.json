@@ -1,6 +1,6 @@
 {
   "name": "ml-express-inventory-app",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "main": "index.js",
   "private": true,
   "scripts": {
@@ -23,6 +23,7 @@
     "@supabase/supabase-js": "^2.108.1",
     "expo": "~54.0.12",
     "expo-camera": "~17.0.10",
+    "expo-constants": "~18.0.13",
     "expo-print": "^15.0.8",
     "expo-secure-store": "^15.0.7",
     "expo-splash-screen": "~0.29.20",

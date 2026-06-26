@@ -26,13 +26,21 @@ import { pushLocalTransportFeePaymentsToCloud } from './hubTransportFeeService';
 
 let syncInFlight: Promise<void> | null = null;
 let syncDirty = false;
-const packMergeChains = new Map<string, Promise<void>>();
+const packMergeChains = new Map<string, Promise<unknown>>();
 const itemMergeChains = new Map<string, Promise<void>>();
 
 function runWithPackMergeLock(bundleBarcode: string, fn: () => Promise<void>): Promise<void> {
+  return withPackedShipmentBarcodeLock(bundleBarcode, fn);
+}
+
+/** 同一快递包条码的本地写入串行化（云合并与到站导入共用） */
+export function withPackedShipmentBarcodeLock<T>(
+  bundleBarcode: string,
+  fn: () => Promise<T>,
+): Promise<T> {
   const key = bundleBarcode.trim().toUpperCase();
   const previous = packMergeChains.get(key) ?? Promise.resolve();
-  const next = previous.then(fn, fn);
+  const next = previous.then(() => fn(), () => fn());
   packMergeChains.set(key, next);
   return next.finally(() => {
     if (packMergeChains.get(key) === next) {
@@ -67,6 +75,17 @@ function emptyTs(value?: string | null): string {
 const HUB_STATION_INBOUND_NOTE_SQL = `(
   note LIKE '%中转站到站%' OR note LIKE '%中转站释放%' OR note LIKE '%到站交付%'
 )`;
+
+async function hasHubTransitInboundAtStation(itemId: string): Promise<boolean> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ c: number }>(
+    `SELECT COUNT(*) AS c FROM stock_movements
+     WHERE item_id = ? AND type = 'in'
+       AND (note LIKE '%中转站到站%' OR note LIKE '%中转站释放%')`,
+    [itemId],
+  );
+  return Number(row?.c) > 0;
+}
 
 async function hasHubStationInboundMovement(itemId: string): Promise<boolean> {
   const db = await getDatabase();
@@ -285,9 +304,10 @@ async function mergeCloudPack(row: CloudPackRow): Promise<void> {
 
 async function mergeCloudPackCore(row: CloudPackRow): Promise<void> {
   const db = await getDatabase();
+  const bundleBarcode = row.bundle_barcode.trim().toUpperCase();
   const existing = await db.getFirstAsync<{ id: string }>(
-    'SELECT id FROM packed_shipments WHERE bundle_barcode = ?',
-    [row.bundle_barcode],
+    'SELECT id FROM packed_shipments WHERE UPPER(TRIM(bundle_barcode)) = ?',
+    [bundleBarcode],
   );
 
   let packId = existing?.id ?? row.id;
@@ -319,8 +339,8 @@ async function mergeCloudPackCore(row: CloudPackRow): Promise<void> {
   } else {
     let bundleItemId = '';
     const bundleItem = await db.getFirstAsync<{ id: string }>(
-      'SELECT id FROM inventory_items WHERE barcode = ?',
-      [row.bundle_barcode],
+      'SELECT id FROM inventory_items WHERE UPPER(TRIM(barcode)) = ?',
+      [bundleBarcode],
     );
     if (bundleItem?.id) {
       bundleItemId = bundleItem.id;
@@ -331,7 +351,7 @@ async function mergeCloudPackCore(row: CloudPackRow): Promise<void> {
         `INSERT INTO inventory_items
          (id, barcode, name, spec, unit, weight, qty_on_hand, min_qty, note, owner_store_code, created_at, updated_at)
          VALUES (?, ?, ?, '', '1 Pcs', '', 0, 0, '', ?, ?, ?)`,
-        [bundleItemId, row.bundle_barcode, row.bundle_name, row.owner_store_code, ts, ts],
+        [bundleItemId, bundleBarcode, row.bundle_name, row.owner_store_code, ts, ts],
       );
     }
     await db.runAsync(
@@ -342,7 +362,7 @@ async function mergeCloudPackCore(row: CloudPackRow): Promise<void> {
       [
         packId,
         bundleItemId,
-        row.bundle_barcode,
+        bundleBarcode,
         row.bundle_name,
         row.operator,
         row.note,
@@ -388,7 +408,7 @@ async function mergeCloudPackCore(row: CloudPackRow): Promise<void> {
     );
   }
 
-  await syncPackedFlagsFromPackLines(packId, row.bundle_barcode, row.created_at || nowIso());
+  await syncPackedFlagsFromPackLines(packId, bundleBarcode, row.created_at || nowIso());
 }
 
 /** 合并云端快递包后，同步订单打包标记与库存（多设备一致） */
@@ -421,6 +441,13 @@ async function syncPackedFlagsFromPackLines(
     );
     if (signedRow?.v?.trim()) continue;
 
+    const releasedRow = await db.getFirstAsync<{ v: string }>(
+      'SELECT hub_transit_released_at AS v FROM inventory_items WHERE id = ?',
+      [itemId],
+    );
+    if (releasedRow?.v?.trim()) continue;
+    if (await hasHubTransitInboundAtStation(itemId)) continue;
+
     await db.runAsync(
       `UPDATE inventory_items
        SET packed_at = CASE WHEN TRIM(COALESCE(packed_at, '')) = '' THEN ? ELSE packed_at END,
@@ -440,16 +467,10 @@ async function syncPackedFlagsFromPackLines(
       [itemId],
     );
     const hubInbound = await hasHubStationInboundMovement(itemId);
-    const releasedRow = await db.getFirstAsync<{ v: string }>(
-      'SELECT hub_transit_released_at AS v FROM inventory_items WHERE id = ?',
-      [itemId],
-    );
-    const transitReleased = Boolean(releasedRow?.v?.trim());
     if (
       Number(qtyRow?.qty_on_hand) > 0 &&
       Number(packOut?.c) > 0 &&
-      !hubInbound &&
-      !transitReleased
+      !hubInbound
     ) {
       await db.runAsync(
         'UPDATE inventory_items SET qty_on_hand = 0, updated_at = ? WHERE id = ?',
@@ -692,6 +713,9 @@ export async function pullPlatformInventoryFromCloud(
     await import('./inventoryService');
   await pruneItemsOutsideExpressDetailsScope(store, hubCode);
   await prunePacksOutsideExpressDetailsScope(store, hubCode);
+
+  const { consolidateDuplicatePackedShipments } = await import('./inventoryService');
+  await consolidateDuplicatePackedShipments();
 }
 
 /** 通过 Edge Function（Service Role）清空本站可见范围云端测试数据 */

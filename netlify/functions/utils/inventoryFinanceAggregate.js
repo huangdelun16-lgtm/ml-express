@@ -861,23 +861,42 @@ function buildAllFinanceEntries(store, dataset) {
   return entries;
 }
 
-function computeFinanceForStore(store, dataset) {
-  const entries = buildAllFinanceEntries(store, dataset);
+function computeFinanceFromCachedEntries(store, allEntries, financeEntries) {
   const hubCode = hubCodeForRegion(store.region);
-  const financeEntries = filterCrossBorderFinanceEntries(entries);
   const crossBorderSummary = buildCrossBorderFinanceSummary(
     financeEntries,
     store.store_code,
     hubCode,
   );
   return {
-    ...summarize(entries),
-    ...buildFinanceAttribution(entries, store.store_code),
-    reconciliation: buildReconciliationSummary(entries, store.store_code, hubCode, {
+    ...summarize(allEntries),
+    ...buildFinanceAttribution(allEntries, store.store_code),
+    reconciliation: buildReconciliationSummary(allEntries, store.store_code, hubCode, {
       includeEntries: false,
     }),
     crossBorderSummary,
   };
+}
+
+function buildStoreFinanceEntriesCache(transitStores, dataset) {
+  const cache = new Map();
+  for (const store of transitStores || []) {
+    const code = String(store.store_code || '').trim().toUpperCase();
+    if (!code) continue;
+    const allEntries = buildAllFinanceEntries(store, dataset);
+    cache.set(code, {
+      store,
+      allEntries,
+      financeEntries: filterCrossBorderFinanceEntries(allEntries),
+    });
+  }
+  return cache;
+}
+
+function computeFinanceForStore(store, dataset) {
+  const allEntries = buildAllFinanceEntries(store, dataset);
+  const financeEntries = filterCrossBorderFinanceEntries(allEntries);
+  return computeFinanceFromCachedEntries(store, allEntries, financeEntries);
 }
 
 function groupEntriesByOrigin(entries, localLabel = '本站发出') {
@@ -930,96 +949,86 @@ function buildFinanceBreakdowns(entries) {
   };
 }
 
+function pushQueryWarning(warnings, label, error) {
+  if (error) {
+    warnings.push(`${label}：${error.message}`);
+  }
+}
+
 async function loadFinanceDataset(supabase) {
   const warnings = [];
 
-  const { data: movementRows, error: movErr } = await supabase
-    .from('inventory_stock_movements')
-    .select(
-      'id, barcode, type, note, destination, origin_store_code, recipient_name, item_name, created_at, item:inventory_store_items!inner(final_destination, recipient_name, customer_signed_at, barcode)',
-    )
-    .eq('type', 'in')
-    .order('created_at', { ascending: false })
-    .limit(800);
+  const [
+    movementsResult,
+    opResult,
+    packagesResult,
+    ordersResult,
+    packedResult,
+    transportPayResult,
+    manualResult,
+  ] = await Promise.all([
+    supabase
+      .from('inventory_stock_movements')
+      .select(
+        'id, barcode, type, note, destination, origin_store_code, recipient_name, item_name, created_at, item:inventory_store_items!inner(final_destination, recipient_name, customer_signed_at, barcode)',
+      )
+      .eq('type', 'in')
+      .order('created_at', { ascending: false })
+      .limit(800),
+    supabase
+      .from('inventory_stock_movements')
+      .select(
+        'id, type, note, barcode, item_name, qty, operator, destination, origin_store_name, created_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(120),
+    supabase
+      .from('inventory_pkg_tracking')
+      .select(
+        'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, truck_loaded_at, updated_at, status',
+      )
+      .in('status', ['in_transit', 'hub_received', 'completed', 'split_at_hub']),
+    supabase
+      .from('inventory_order_tracking')
+      .select(
+        'pack_barcode, order_barcode, order_name, destination_code, inbound_note, inbound_at, recipient_name',
+      )
+      .order('inbound_at', { ascending: false })
+      .limit(2000),
+    supabase
+      .from('inventory_packed_shipments')
+      .select(
+        'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, loaded_at, item:inventory_store_items(qty_on_hand)',
+      )
+      .order('created_at', { ascending: false })
+      .limit(400),
+    supabase.from('inventory_hub_transport_fee_payments').select('pack_barcode'),
+    supabase
+      .from('cross_border_manual_entries')
+      .select('id, entry_date, kind, amount, currency, category, note, created_by, created_at')
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(500),
+  ]);
 
-  if (movErr) {
-    warnings.push(`财务流水读取失败：${movErr.message}`);
-  }
+  pushQueryWarning(warnings, '财务流水读取失败', movementsResult.error);
+  pushQueryWarning(warnings, '库存操作流水读取失败', opResult.error);
+  pushQueryWarning(warnings, '包裹追踪读取失败', packagesResult.error);
+  pushQueryWarning(warnings, '订单追踪读取失败', ordersResult.error);
+  pushQueryWarning(warnings, '本地包裹读取失败', packedResult.error);
+  pushQueryWarning(warnings, '车费支付记录读取失败', transportPayResult.error);
+  pushQueryWarning(warnings, '其它开销读取失败', manualResult.error);
 
-  const movements = movementRows || [];
-
-  const { data: opRows, error: opErr } = await supabase
-    .from('inventory_stock_movements')
-    .select(
-      'id, type, note, barcode, item_name, qty, operator, destination, origin_store_name, created_at',
-    )
-    .order('created_at', { ascending: false })
-    .limit(120);
-
-  if (opErr) {
-    warnings.push(`库存操作流水读取失败：${opErr.message}`);
-  }
-
-  const { data: packageRows, error: pkgErr } = await supabase
-    .from('inventory_pkg_tracking')
-    .select(
-      'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, truck_loaded_at, updated_at, status',
-    )
-    .in('status', ['in_transit', 'hub_received', 'completed', 'split_at_hub']);
-
-  if (pkgErr) {
-    warnings.push(`包裹追踪读取失败：${pkgErr.message}`);
-  }
-
-  const { data: orderRows, error: ordErr } = await supabase
-    .from('inventory_order_tracking')
-    .select('pack_barcode, order_barcode, order_name, destination_code, inbound_note, inbound_at, recipient_name')
-    .order('inbound_at', { ascending: false })
-    .limit(2000);
-
-  if (ordErr) {
-    warnings.push(`订单追踪读取失败：${ordErr.message}`);
-  }
-
-  const { data: packedRows, error: packedErr } = await supabase
-    .from('inventory_packed_shipments')
-    .select(
-      'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, loaded_at, item:inventory_store_items(qty_on_hand)',
-    )
-    .order('created_at', { ascending: false })
-    .limit(400);
-
-  if (packedErr) {
-    warnings.push(`本地包裹读取失败：${packedErr.message}`);
-  }
+  const movements = movementsResult.data || [];
+  const orderRows = ordersResult.data || [];
 
   const transportPaidBarcodes = new Set();
-  const { data: transportPaymentRows, error: transportPayErr } = await supabase
-    .from('inventory_hub_transport_fee_payments')
-    .select('pack_barcode');
-
-  if (transportPayErr) {
-    warnings.push(`车费支付记录读取失败：${transportPayErr.message}`);
-  } else {
-    for (const row of transportPaymentRows || []) {
-      const code = String(row.pack_barcode || '').trim().toUpperCase();
-      if (code) transportPaidBarcodes.add(code);
-    }
+  for (const row of transportPayResult.data || []) {
+    const code = String(row.pack_barcode || '').trim().toUpperCase();
+    if (code) transportPaidBarcodes.add(code);
   }
 
-  let manualEntries = [];
-  const { data: manualRows, error: manualErr } = await supabase
-    .from('cross_border_manual_entries')
-    .select('id, entry_date, kind, amount, currency, category, note, created_by, created_at')
-    .order('entry_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(500);
-
-  if (manualErr) {
-    warnings.push(`其它开销读取失败：${manualErr.message}`);
-  } else {
-    manualEntries = manualRows || [];
-  }
+  const manualEntries = manualResult.error ? [] : manualResult.data || [];
 
   const ordersByPack = {};
   for (const order of orderRows || []) {
@@ -1052,10 +1061,10 @@ async function loadFinanceDataset(supabase) {
   return {
     dataset: {
       movements,
-      opMovements: opRows || [],
-      packages: packageRows || [],
+      opMovements: opResult.data || [],
+      packages: packagesResult.data || [],
       ordersByPack,
-      packedShipments: packedRows || [],
+      packedShipments: packedResult.data || [],
       itemsByBarcode,
       transportPaidBarcodes,
       manualEntries,
@@ -1121,7 +1130,7 @@ function mapManualToCrossBorderExpense(row) {
   };
 }
 
-function aggregateCrossBorderExpenses(transitStores, dataset) {
+function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
   const entries = [];
   const transportSeen = new Set();
 
@@ -1134,8 +1143,11 @@ function aggregateCrossBorderExpenses(transitStores, dataset) {
     const hubCode = hubCodeForRegion(store.region);
     if (!hubCode) continue;
 
-    const allEntries = buildAllFinanceEntries(store, dataset);
-    const financeEntries = filterCrossBorderFinanceEntries(allEntries);
+    const code = String(store.store_code || '').trim().toUpperCase();
+    const cached = entriesCache.get(code);
+    if (!cached) continue;
+
+    const { financeEntries } = cached;
     const storeSummary = buildCrossBorderFinanceSummary(
       financeEntries,
       store.store_code,
@@ -1216,15 +1228,18 @@ function aggregateCrossBorderExpenses(transitStores, dataset) {
 
 async function aggregateFinanceForTransitStores(supabase, transitStores) {
   const { dataset, warnings } = await loadFinanceDataset(supabase);
+  const entriesCache = buildStoreFinanceEntriesCache(transitStores, dataset);
 
   const financeByStoreCode = {};
-  for (const store of transitStores || []) {
-    const code = String(store.store_code || '').trim().toUpperCase();
-    if (!code) continue;
-    financeByStoreCode[code] = computeFinanceForStore(store, dataset);
+  for (const [code, cached] of entriesCache) {
+    financeByStoreCode[code] = computeFinanceFromCachedEntries(
+      cached.store,
+      cached.allEntries,
+      cached.financeEntries,
+    );
   }
 
-  const crossBorderFinance = aggregateCrossBorderExpenses(transitStores, dataset);
+  const crossBorderFinance = aggregateCrossBorderExpenses(transitStores, entriesCache, dataset);
 
   return { financeByStoreCode, crossBorderFinance, warnings };
 }

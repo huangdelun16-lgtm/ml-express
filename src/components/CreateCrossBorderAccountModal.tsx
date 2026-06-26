@@ -12,9 +12,12 @@ import {
 } from '../utils/crossBorderHubs';
 import {
   createCrossBorderAccount,
+  fetchCrossBorderAccountDetail,
+  updateCrossBorderAccount,
   type CrossBorderAccountDraft,
   type CreateCrossBorderAccountResult,
   type InventoryTransitStore,
+  type UpdateCrossBorderAccountResult,
 } from '../services/inventoryConsoleService';
 import '../styles/adminStoreCreateForm.css';
 import '../styles/crossBorderLogistics.css';
@@ -26,6 +29,8 @@ type Props = {
   onClose: () => void;
   existingStores: InventoryTransitStore[];
   onCreated: (result: CreateCrossBorderAccountResult) => void;
+  editStoreCode?: string | null;
+  onUpdated?: (result: UpdateCrossBorderAccountResult) => void;
 };
 
 const CreateCrossBorderAccountModal: React.FC<Props> = ({
@@ -33,12 +38,17 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
   onClose,
   existingStores,
   onCreated,
+  editStoreCode = null,
+  onUpdated,
 }) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
+  const isEditMode = Boolean(editStoreCode);
 
   const [regionId, setRegionId] = useState('mandalay');
   const [form, setForm] = useState<CrossBorderAccountDraft | null>(null);
+  const [accountStatus, setAccountStatus] = useState('active');
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -85,18 +95,58 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
     if (!open) return;
     setError(null);
     setShowMapModal(false);
-    setRegionId('mandalay');
-    applyRegionDefaults('mandalay');
-  }, [open, applyRegionDefaults]);
 
-  if (!open || !form) return null;
+    if (editStoreCode) {
+      setLoadingDetail(true);
+      setForm(null);
+      fetchCrossBorderAccountDetail(editStoreCode)
+        .then((detail) => {
+          setRegionId(detail.region);
+          setAccountStatus(detail.status || 'active');
+          setForm({
+            store_name: detail.store_name,
+            store_code: detail.store_code,
+            region: detail.region,
+            hubCode: detail.hubCode,
+            address: detail.address,
+            latitude: detail.latitude,
+            longitude: detail.longitude,
+            phone: detail.phone,
+            email: detail.email,
+            manager_name: detail.manager_name,
+            manager_phone: detail.manager_phone,
+            operating_hours: detail.operating_hours,
+            password: '',
+            notes: detail.notes,
+            service_area_radius: detail.service_area_radius,
+            capacity: detail.capacity,
+            facilities: detail.facilities,
+            cod_settlement_day: detail.cod_settlement_day,
+          });
+          setMapCenter({ lat: detail.latitude, lng: detail.longitude });
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : isEn ? 'Load failed' : '加载失败');
+        })
+        .finally(() => setLoadingDetail(false));
+      return;
+    }
+
+    setRegionId('mandalay');
+    setAccountStatus('active');
+    applyRegionDefaults('mandalay');
+  }, [open, editStoreCode, applyRegionDefaults, isEn]);
+
+  if (!open) return null;
 
   const handleRegionChange = (value: string) => {
+    if (isEditMode) return;
     setRegionId(value);
     applyRegionDefaults(value);
   };
 
   const openMapPicker = () => {
+    if (!form) return;
     setMapCenter({ lat: form.latitude, lng: form.longitude });
     setShowMapModal(true);
   };
@@ -110,20 +160,57 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form) return;
     setSubmitting(true);
     setError(null);
     try {
+      if (isEditMode) {
+        const result = await updateCrossBorderAccount({
+          store_code: form.store_code,
+          store_name: form.store_name,
+          address: form.address,
+          latitude: form.latitude,
+          longitude: form.longitude,
+          phone: form.phone,
+          email: form.email,
+          manager_name: form.manager_name,
+          manager_phone: form.manager_phone,
+          operating_hours: form.operating_hours,
+          notes: form.notes,
+          service_area_radius: form.service_area_radius,
+          capacity: form.capacity,
+          facilities: form.facilities,
+          cod_settlement_day: form.cod_settlement_day,
+          status: accountStatus,
+          ...(form.password.trim() ? { password: form.password.trim() } : {}),
+        });
+        onUpdated?.(result);
+        onClose();
+        return;
+      }
+
       const result = await createCrossBorderAccount(form);
       onCreated(result);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建失败');
+      setError(
+        err instanceof Error
+          ? err.message
+          : isEditMode
+            ? isEn
+              ? 'Save failed'
+              : '保存失败'
+            : isEn
+              ? 'Create failed'
+              : '创建失败',
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const mapModal = showMapModal
+  const mapModal =
+    showMapModal && form
     ? createPortal(
         <div
           className="store-form-map-overlay"
@@ -298,7 +385,7 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
         className="store-form-overlay cbl-create-overlay"
         role="presentation"
         onClick={(e) => {
-          if (e.target === e.currentTarget && !submitting) onClose();
+          if (e.target === e.currentTarget && !submitting && !loadingDetail) onClose();
         }}
       >
         <div
@@ -311,12 +398,22 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
             <div className="cbl-create-modal__banner-row">
               <div>
                 <h2 id="cbl-create-title" className="cbl-create-modal__title">
-                  {isEn ? 'Create cross-border account' : '创建跨境账号'}
+                  {isEditMode
+                    ? isEn
+                      ? 'Edit cross-border account'
+                      : '编辑跨境账号'
+                    : isEn
+                      ? 'Create cross-border account'
+                      : '创建跨境账号'}
                 </h2>
                 <p className="cbl-create-modal__sub">
-                  {isEn
-                    ? 'Inventory App login: store code + password. Fill in station details below.'
-                    : '用于 Inventory App 登录（店铺代码 + 密码）。请确认站点资料后创建。'}
+                  {isEditMode
+                    ? isEn
+                      ? 'Update station details. Login store code and region cannot be changed.'
+                      : '修改站点资料。登录店铺代码与区域不可更改。'
+                    : isEn
+                      ? 'Inventory App login: store code + password. Fill in station details below.'
+                      : '用于 Inventory App 登录（店铺代码 + 密码）。请确认站点资料后创建。'}
                 </p>
               </div>
               <button
@@ -339,6 +436,12 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
                 </div>
               )}
 
+              {loadingDetail && !form ? (
+                <div className="cbl-empty" style={{ padding: '2rem 0' }}>
+                  {isEn ? 'Loading account…' : '加载账号信息…'}
+                </div>
+              ) : form ? (
+                <>
               <section className="cbl-create-section">
                 <h3 className="cbl-create-section__title">
                   {isEn ? 'Region' : '区域与登录'}
@@ -349,6 +452,7 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
                     <select
                       value={regionId}
                       onChange={(e) => handleRegionChange(e.target.value)}
+                      disabled={isEditMode}
                     >
                       {CROSS_BORDER_HUBS.map((h) => (
                         <option key={h.regionId} value={h.regionId}>
@@ -361,6 +465,18 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
                     <label>{isEn ? 'Login store code' : '登录店铺代码'} *</label>
                     <input value={form.store_code} readOnly />
                   </div>
+                  {isEditMode && (
+                    <div className="cbl-create-field">
+                      <label>{isEn ? 'Status' : '账号状态'}</label>
+                      <select
+                        value={accountStatus}
+                        onChange={(e) => setAccountStatus(e.target.value)}
+                      >
+                        <option value="active">{isEn ? 'Active' : '启用'}</option>
+                        <option value="inactive">{isEn ? 'Inactive' : '停用'}</option>
+                      </select>
+                    </div>
+                  )}
                   <div className="cbl-create-field cbl-create-field--full">
                     <label>{isEn ? 'Station name' : '站点名称'} *</label>
                     <input
@@ -445,16 +561,25 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
 
               <section className="cbl-create-section">
                 <h3 className="cbl-create-section__title">
-                  {isEn ? 'Inventory App password' : 'Inventory 登录密码'}
+                  {isEditMode
+                    ? isEn
+                      ? 'Inventory App password (optional)'
+                      : 'Inventory 登录密码（可选）'
+                    : isEn
+                      ? 'Inventory App password'
+                      : 'Inventory 登录密码'}
                 </h3>
                 <div className="cbl-create-field">
-                  <label>{isEn ? 'Password' : '登录密码'} *</label>
+                  <label>
+                    {isEn ? 'Password' : '登录密码'}
+                    {isEditMode ? (isEn ? ' (leave blank to keep)' : '（留空则不修改）') : ' *'}
+                  </label>
                   <div className="cbl-create-password-row">
                     <input
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      required
-                      minLength={6}
+                      required={!isEditMode}
+                      minLength={isEditMode ? undefined : 6}
                     />
                     <button
                       type="button"
@@ -467,9 +592,13 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
                     </button>
                   </div>
                   <p className="cbl-create-hint">
-                    {isEn
-                      ? 'Station staff uses store code + this password in Inventory App.'
-                      : '站点人员在 Inventory App 使用店铺代码 + 此密码登录。'}
+                    {isEditMode
+                      ? isEn
+                        ? 'Only fill in when resetting the station login password.'
+                        : '仅在需要重置站点登录密码时填写。'
+                      : isEn
+                        ? 'Station staff uses store code + this password in Inventory App.'
+                        : '站点人员在 Inventory App 使用店铺代码 + 此密码登录。'}
                   </p>
                 </div>
                 <div className="cbl-create-field" style={{ marginTop: 10 }}>
@@ -481,6 +610,8 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
                   />
                 </div>
               </section>
+                </>
+              ) : null}
             </div>
 
             <div className="cbl-create-modal__foot">
@@ -488,22 +619,30 @@ const CreateCrossBorderAccountModal: React.FC<Props> = ({
                 type="button"
                 className="store-form-btn store-form-btn--ghost"
                 onClick={onClose}
-                disabled={submitting}
+                disabled={submitting || loadingDetail}
               >
                 {isEn ? 'Cancel' : '取消'}
               </button>
               <button
                 type="submit"
                 className="store-form-btn store-form-btn--primary"
-                disabled={submitting}
+                disabled={submitting || loadingDetail || !form}
               >
                 {submitting
-                  ? isEn
-                    ? 'Creating…'
-                    : '创建中…'
-                  : isEn
-                    ? 'Create account'
-                    : '创建账号'}
+                  ? isEditMode
+                    ? isEn
+                      ? 'Saving…'
+                      : '保存中…'
+                    : isEn
+                      ? 'Creating…'
+                      : '创建中…'
+                  : isEditMode
+                    ? isEn
+                      ? 'Save changes'
+                      : '保存修改'
+                    : isEn
+                      ? 'Create account'
+                      : '创建账号'}
               </button>
             </div>
           </form>

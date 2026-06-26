@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
+  Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -10,28 +13,43 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
+import { LOGIN_LOGO } from '../constants/branding';
+import { INVENTORY_SUPPORT_URL } from '../constants/support';
+import LanguageSelector from '../components/LanguageSelector';
+import { useTranslation } from '../i18n';
 import { getSupabaseConfigHint, isSupabaseConfigured } from '../services/supabase';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+/** login-logo.png 裁剪后宽高比（透明底 PNG） */
+const LOGIN_LOGO_ASPECT = 618 / 705;
+/** 登录页 LOGO 最大宽度（约为原先 340 的一半） */
+const LOGO_MAX_WIDTH = 170;
+
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const { login } = useAuth();
+  const { t } = useTranslation();
   const [storeCode, setStoreCode] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [storeFocused, setStoreFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   const onSubmit = async () => {
     setError('');
     if (!storeCode.trim() || !password.trim()) {
-      setError('请填写店铺代码和密码');
+      setError(t.login.fillFields);
       return;
     }
     setLoading(true);
     try {
       await login(storeCode.trim().toUpperCase(), password);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '登录失败，请重试');
+      setError(e instanceof Error ? e.message : t.login.loginFailed);
     } finally {
       setLoading(false);
     }
@@ -39,215 +57,319 @@ export default function LoginScreen() {
 
   const configured = isSupabaseConfigured();
   const configHint = getSupabaseConfigHint();
+  const logoWidth = Math.min(SCREEN_WIDTH - 32, LOGO_MAX_WIDTH);
+  const logoHeight = logoWidth / LOGIN_LOGO_ASPECT;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        bounces={false}
+    <View style={styles.root}>
+      <View style={styles.bgOrbTop} pointerEvents="none" />
+      <View style={styles.bgOrbBottom} pointerEvents="none" />
+      <View style={styles.bgGrid} pointerEvents="none" />
+
+      <LanguageSelector />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.hero}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoEmoji}>📦</Text>
-          </View>
-          <Text style={styles.brand}>ML Inventory</Text>
-          <Text style={styles.tagline}>中转站库存管理</Text>
-          <View style={styles.pill}>
-            <Text style={styles.pillText}>仅中转站合伙店铺可登录</Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>店铺登录</Text>
-          <Text style={styles.cardSub}>
-            使用 Admin 后台「新增合伙店铺」创建的中转站账号
-          </Text>
-
-          {!configured ? (
-            <View style={styles.warnBox}>
-              <Text style={styles.warnTitle}>未连接服务器</Text>
-              <Text style={styles.warnText}>
-                {configHint || '请在 .env 中配置 Supabase 后重启 Expo（npx expo start -c）。'}
-              </Text>
-            </View>
-          ) : null}
-
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.field}>
-            <Text style={styles.label}>店铺代码</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="如 MDY001"
-              placeholderTextColor="#94a3b8"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              value={storeCode}
-              onChangeText={(v) => setStoreCode(v.toUpperCase())}
-              editable={!loading}
-              returnKeyType="next"
-            />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>登录密码</Text>
-            <View style={styles.passwordRow}>
-              <TextInput
-                style={[styles.input, styles.passwordInput]}
-                placeholder="请输入店铺密码"
-                placeholderTextColor="#94a3b8"
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={password}
-                onChangeText={setPassword}
-                editable={!loading}
-                returnKeyType="done"
-                onSubmitEditing={() => void onSubmit()}
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.hero}>
+            <View style={[styles.logoFrame, { width: logoWidth, height: logoHeight }]}>
+              <View style={styles.logoGlow} pointerEvents="none" />
+              <Image
+                source={LOGIN_LOGO}
+                style={[styles.logo, { width: logoWidth, height: logoHeight }]}
+                resizeMode="contain"
+                accessibilityLabel="ML Inventory"
               />
-              <Pressable
-                style={styles.eyeBtn}
-                onPress={() => setShowPassword((v) => !v)}
-                accessibilityLabel={showPassword ? '隐藏密码' : '显示密码'}
-              >
-                <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>
-              </Pressable>
             </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{t.login.cardTitle}</Text>
+
+            <Text style={styles.accountNote}>{t.login.accountAccess}</Text>
+
+            {!configured ? (
+              <View style={styles.warnBox}>
+                <Text style={styles.warnTitle}>{t.login.serverOffline}</Text>
+                <Text style={styles.warnText}>
+                  {configHint || t.login.supabaseHint}
+                </Text>
+              </View>
+            ) : null}
+
+            {error ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.field}>
+              <Text style={styles.label}>{t.login.storeCode}</Text>
+              <TextInput
+                style={[styles.input, storeFocused && styles.inputFocused]}
+                placeholder={t.login.storeCodePlaceholder}
+                placeholderTextColor="#64748b"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                value={storeCode}
+                onChangeText={(v) => setStoreCode(v.toUpperCase())}
+                editable={!loading}
+                returnKeyType="next"
+                onFocus={() => setStoreFocused(true)}
+                onBlur={() => setStoreFocused(false)}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>{t.login.password}</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.passwordInput,
+                    passwordFocused && styles.inputFocused,
+                  ]}
+                  placeholder={t.login.passwordPlaceholder}
+                  placeholderTextColor="#64748b"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!loading}
+                  returnKeyType="done"
+                  onSubmitEditing={() => void onSubmit()}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                />
+                <Pressable
+                  style={styles.eyeBtn}
+                  onPress={() => setShowPassword((v) => !v)}
+                  accessibilityLabel={showPassword ? t.common.hide : t.common.show}
+                >
+                  <Text style={styles.eyeText}>{showPassword ? t.common.hide : t.common.show}</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Pressable
+              style={[styles.btn, (loading || !configured) && styles.btnDisabled]}
+              onPress={() => void onSubmit()}
+              disabled={loading || !configured}
+            >
+              <View style={styles.btnInner}>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnText}>{t.login.submit}</Text>
+                )}
+              </View>
+            </Pressable>
           </View>
 
           <Pressable
-            style={[styles.btn, (loading || !configured) && styles.btnDisabled]}
-            onPress={() => void onSubmit()}
-            disabled={loading || !configured}
+            style={styles.supportLink}
+            onPress={() => void Linking.openURL(INVENTORY_SUPPORT_URL)}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.btnText}>登录库存系统</Text>
-            )}
+            <Text style={styles.supportLinkText}>{t.login.supportLink}</Text>
           </Pressable>
-        </View>
 
-        <Text style={styles.footer}>
-          店铺类型须为「中转站」{'\n'}
-          登录后将签发店铺 JWT，用于云端同步（P4 安全策略）
-        </Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <Text style={styles.footer}>{t.login.footer}</Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0f172a' },
+  root: {
+    flex: 1,
+    backgroundColor: '#020617',
+  },
+  flex: { flex: 1 },
+  bgOrbTop: {
+    position: 'absolute',
+    top: -120,
+    left: -80,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: 'rgba(14, 165, 233, 0.14)',
+  },
+  bgOrbBottom: {
+    position: 'absolute',
+    bottom: -100,
+    right: -60,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+  },
+  bgGrid: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 320,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(56, 189, 248, 0.06)',
+  },
   scroll: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 32,
   },
-  hero: { alignItems: 'center', marginBottom: 28 },
-  logoBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: 'rgba(37,99,235,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(96,165,250,0.35)',
+  hero: {
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 14,
   },
-  logoEmoji: { fontSize: 36 },
-  brand: { color: '#f8fafc', fontSize: 28, fontWeight: '900', letterSpacing: 0.5 },
-  tagline: { color: '#94a3b8', fontSize: 15, marginTop: 6, fontWeight: '600' },
-  pill: {
-    marginTop: 12,
-    backgroundColor: 'rgba(168,85,247,0.12)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(168,85,247,0.3)',
+  logoFrame: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
   },
-  pillText: { color: '#c4b5fd', fontSize: 12, fontWeight: '800' },
+  logoGlow: {
+    position: 'absolute',
+    top: '10%',
+    left: '15%',
+    right: '15%',
+    height: '50%',
+    borderRadius: 60,
+    backgroundColor: 'rgba(14, 165, 233, 0.1)',
+  },
+  logo: {
+    backgroundColor: 'transparent',
+  },
   card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 20,
-    padding: 20,
+    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    borderRadius: 24,
+    padding: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    borderColor: 'rgba(56, 189, 248, 0.14)',
+    shadowColor: '#0ea5e9',
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
-  cardTitle: { color: '#f8fafc', fontSize: 20, fontWeight: '900' },
-  cardSub: { color: '#64748b', fontSize: 13, marginTop: 6, lineHeight: 20, marginBottom: 16 },
+  cardTitle: {
+    color: '#f8fafc',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    marginBottom: 10,
+  },
+  accountNote: {
+    color: '#94a3b8',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
   warnBox: {
-    backgroundColor: 'rgba(251,191,36,0.1)',
-    borderRadius: 10,
+    backgroundColor: 'rgba(251, 191, 36, 0.08)',
+    borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.35)',
+    borderColor: 'rgba(251, 191, 36, 0.28)',
   },
   warnTitle: { color: '#fbbf24', fontSize: 13, fontWeight: '800', marginBottom: 4 },
   warnText: { color: '#fde68a', fontSize: 12, lineHeight: 18 },
   errorBox: {
-    backgroundColor: 'rgba(248,113,113,0.12)',
-    borderRadius: 10,
+    backgroundColor: 'rgba(248, 113, 113, 0.1)',
+    borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.35)',
+    borderColor: 'rgba(248, 113, 113, 0.3)',
   },
   errorText: { color: '#fca5a5', fontSize: 13, fontWeight: '600', lineHeight: 20 },
   field: { marginBottom: 14 },
-  label: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  label: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+    marginLeft: 2,
+  },
   input: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 15 : 13,
     fontSize: 16,
-    color: '#0f172a',
+    color: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(148, 163, 184, 0.18)',
+  },
+  inputFocused: {
+    borderColor: 'rgba(56, 189, 248, 0.55)',
+    backgroundColor: 'rgba(14, 165, 233, 0.08)',
   },
   passwordRow: { flexDirection: 'row', alignItems: 'center' },
-  passwordInput: { flex: 1, paddingRight: 48 },
+  passwordInput: { flex: 1, paddingRight: 56 },
   eyeBtn: {
     position: 'absolute',
-    right: 4,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    right: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  eyeText: { fontSize: 18 },
+  eyeText: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   btn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 14,
+    borderRadius: 16,
+    marginTop: 8,
+    overflow: 'hidden',
+    backgroundColor: '#0284c7',
+    shadowColor: '#0ea5e9',
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  btnInner: {
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 6,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
-  btnDisabled: { opacity: 0.55 },
-  btnText: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  btnDisabled: { opacity: 0.5, shadowOpacity: 0 },
+  btnText: {
+    color: '#fff',
+    fontWeight: '900',
+    fontSize: 16,
+    letterSpacing: 0.4,
+  },
   footer: {
-    color: '#64748b',
-    fontSize: 12,
+    color: '#475569',
+    fontSize: 11,
     textAlign: 'center',
-    lineHeight: 18,
-    marginTop: 24,
+    lineHeight: 17,
+    marginTop: 12,
+    letterSpacing: 0.2,
+  },
+  supportLink: {
+    marginTop: 16,
+    alignSelf: 'center',
+    paddingVertical: 4,
+  },
+  supportLinkText: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

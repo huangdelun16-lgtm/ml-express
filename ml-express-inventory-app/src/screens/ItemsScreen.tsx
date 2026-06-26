@@ -43,6 +43,7 @@ import { isExpressPackItem } from '../utils/packItem';
 import { inboundOrderBarcodeData, packOrderBarcodeData } from '../utils/orderBarcodeData';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
+import { useTranslation } from '../i18n';
 
 type Nav = {
   navigate: (name: string, params?: { itemId?: string }) => void;
@@ -52,6 +53,7 @@ type ListMode = 'normal' | 'pack' | 'print';
 
 export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const { operatorName, store, hubCode } = useAuth();
+  const { t, fmt } = useTranslation();
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<InventoryItemListRow[]>([]);
   const [listMode, setListMode] = useState<ListMode>('normal');
@@ -298,7 +300,9 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       <View style={styles.toolbar}>
         <TextInput
           style={styles.search}
-          placeholder={listMode === 'pack' ? '搜索客户名 / 目的地 / 商品' : '搜索客户名 / 目的地 / 商品名'}
+          placeholder={
+            listMode === 'pack' ? t.items.searchPack : t.items.searchList
+          }
           placeholderTextColor="#94a3b8"
           value={search}
           onChangeText={setSearch}
@@ -317,7 +321,13 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       <View style={styles.actionRow}>
         {listMode === 'normal' ? (
           <>
-            <Pressable style={styles.packBtn} onPress={() => setListMode('pack')}>
+            <Pressable
+              style={styles.packBtn}
+              onPress={() => {
+                setFilterRegion('');
+                setListMode('pack');
+              }}
+            >
               <Text style={styles.packBtnText}>📦 打包快递</Text>
             </Pressable>
             <Pressable style={styles.printSelectBtn} onPress={() => setListMode('print')}>
@@ -366,10 +376,10 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         ListEmptyComponent={
           <Text style={styles.empty}>
             {listMode === 'pack'
-              ? '暂无可打包商品（需曾入库且库存 > 0）'
+              ? t.items.noPackable
               : filterRegion
-                ? `暂无 ${filterRegion} 地区的商品`
-                : '暂无商品，可扫码入库自动建档或点「新建」'}
+                ? fmt(t.items.noRegion, { region: filterRegion })
+                : t.items.empty}
           </Text>
         }
         renderItem={({ item }) => {

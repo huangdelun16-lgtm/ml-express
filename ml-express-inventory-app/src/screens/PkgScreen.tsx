@@ -24,7 +24,8 @@ import {
 import { isSupabaseConfigured } from '../services/supabase';
 import { packOrderBarcodeData } from '../utils/orderBarcodeData';
 import type { PackedShipmentListRow } from '../types/inventory';
-import { PACK_DISPLAY_LABEL, packStatusStyle, canEditPackedShipment } from '../utils/packDisplayStatus';
+import { getPackStatusLabel, useTranslation } from '../i18n';
+import { packStatusStyle, canEditPackedShipment } from '../utils/packDisplayStatus';
 import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
@@ -39,6 +40,7 @@ function formatTime(iso: string): string {
 
 export default function PkgScreen() {
   const { store, hubCode, operatorName } = useAuth();
+  const { t, language } = useTranslation();
   const [search, setSearch] = useState('');
   const [packs, setPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -90,7 +92,7 @@ export default function PkgScreen() {
     <View style={styles.root}>
       <TextInput
         style={styles.search}
-        placeholder="搜索包裹名 / 包装号 / 打包人"
+        placeholder={t.pkg.search}
         placeholderTextColor="#64748b"
         value={search}
         onChangeText={setSearch}
@@ -109,13 +111,11 @@ export default function PkgScreen() {
         }}
         refreshing={refreshing}
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            暂无包裹{'\n'}本站打包或「到站收货」确认完成后会出现在这里
-          </Text>
+          <Text style={styles.empty}>{t.pkg.empty}</Text>
         }
         renderItem={({ item }) => {
           const statusStyle = packStatusStyle(item.display_status);
-          const statusLabel = PACK_DISPLAY_LABEL[item.display_status];
+          const statusLabel = getPackStatusLabel(language, item.display_status);
           const dest = packDestinationFromBarcode(item.bundle_barcode);
           const orderCount = resolvePackOrderCount(item);
 
@@ -149,7 +149,7 @@ export default function PkgScreen() {
 
               <View style={styles.barcodeRow}>
                 <View style={styles.barcodePill}>
-                  <Text style={styles.barcodeLabel}>包装号</Text>
+                  <Text style={styles.barcodeLabel}>{t.pkg.packNo}</Text>
                   <Text style={styles.barcodeValue} numberOfLines={1}>
                     {item.bundle_barcode}
                   </Text>
@@ -169,7 +169,7 @@ export default function PkgScreen() {
 
               {item.loaded && item.transport_fee?.trim() ? (
                 <View style={styles.feePill}>
-                  <Text style={styles.feePillLabel}>车费</Text>
+                  <Text style={styles.feePillLabel}>{t.pkg.transportFee}</Text>
                   <Text style={styles.feePillValue}>
                     {item.truck_leg_destination ? `本段 ${item.truck_leg_destination} · ` : ''}
                     {item.transport_fee} MMK
@@ -178,7 +178,9 @@ export default function PkgScreen() {
               ) : null}
 
               <View style={styles.noteRow}>
-                <Text style={styles.noteText}>打包人：{item.operator || '—'}</Text>
+                <Text style={styles.noteText}>
+                  {t.pkg.packer}：{item.operator || '—'}
+                </Text>
                 <Text style={styles.noteSep}>·</Text>
                 <Text style={styles.footer}>{formatTime(item.created_at)}</Text>
               </View>

@@ -28,7 +28,7 @@ import AdminShellLayout, { STANDALONE_IMPORT_ADMIN_PATHS } from './layouts/Admin
 
 const standaloneImportPaths = STANDALONE_IMPORT_ADMIN_PATHS as readonly string[];
 
-/** 指标管理全屏页：不叠放全局搜索与底部待办条 */
+/** 全屏独立模块（指标管理、跨境物流）：不叠放全局搜索与底部待办条 */
 const AdminFloatingChrome: React.FC = () => {
   const { pathname } = useLocation();
   if (standaloneImportPaths.includes(pathname)) return null;

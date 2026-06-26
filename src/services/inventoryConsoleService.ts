@@ -214,6 +214,13 @@ export type CrossBorderFinanceSummary = {
   manualExpenseTotal: number;
 };
 
+export type CrossBorderFinancePagination = {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
 export type CrossBorderManualEntryDraft = {
   entry_date: string;
   kind: 'income' | 'expense';
@@ -225,6 +232,7 @@ export type CrossBorderManualEntryDraft = {
 export type CrossBorderFinance = {
   summary: CrossBorderFinanceSummary;
   entries: CrossBorderExpenseRow[];
+  pagination?: CrossBorderFinancePagination;
 };
 
 export type PackStatusFilter = 'active' | 'in_transit' | 'hub_received' | 'completed' | 'all';
@@ -294,10 +302,14 @@ export async function fetchStoreFinanceDetail(storeCode: string): Promise<StoreF
 
 export async function fetchInventoryConsoleData(
   packStatus: PackStatusFilter = 'active',
+  financePage = 1,
+  financePageSize = 10,
 ): Promise<InventoryConsoleData> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('packStatus', packStatus);
   url.searchParams.set('section', 'all');
+  url.searchParams.set('financePage', String(financePage));
+  url.searchParams.set('financePageSize', String(financePageSize));
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -321,10 +333,15 @@ type ConsoleSectionResponse = InventoryConsoleData & {
 async function fetchInventoryConsoleSection(
   section: 'overview' | 'finance' | 'packs',
   packStatus?: PackStatusFilter,
+  financePagination?: { page: number; pageSize: number },
 ): Promise<ConsoleSectionResponse> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', section);
   if (packStatus) url.searchParams.set('packStatus', packStatus);
+  if (financePagination) {
+    url.searchParams.set('financePage', String(financePagination.page));
+    url.searchParams.set('financePageSize', String(financePagination.pageSize));
+  }
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -352,12 +369,18 @@ export async function fetchInventoryConsoleOverview(): Promise<{
   };
 }
 
-export async function fetchInventoryConsoleFinance(): Promise<{
+export async function fetchInventoryConsoleFinance(
+  financePage = 1,
+  financePageSize = 10,
+): Promise<{
   transitStores: InventoryTransitStore[];
   crossBorderFinance?: InventoryConsoleData['crossBorderFinance'];
   warnings?: string[];
 }> {
-  const payload = await fetchInventoryConsoleSection('finance');
+  const payload = await fetchInventoryConsoleSection('finance', undefined, {
+    page: financePage,
+    pageSize: financePageSize,
+  });
   return {
     transitStores: payload.transitStores ?? [],
     crossBorderFinance: payload.crossBorderFinance,
@@ -458,6 +481,73 @@ export type CreateCrossBorderAccountResult = {
     authEmail: string;
   };
 };
+
+export type CrossBorderAccountDetail = CrossBorderAccountDraft & {
+  id: string;
+  status: string;
+  created_at?: string;
+};
+
+export type UpdateCrossBorderAccountPayload = {
+  store_code: string;
+  store_name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  phone: string;
+  email: string;
+  manager_name: string;
+  manager_phone: string;
+  operating_hours: string;
+  notes: string;
+  service_area_radius: number;
+  capacity: number;
+  facilities: string[];
+  cod_settlement_day: CrossBorderAccountDraft['cod_settlement_day'];
+  status: string;
+  password?: string;
+};
+
+export type UpdateCrossBorderAccountResult = {
+  ok: boolean;
+  store: InventoryTransitStore;
+  hubCode?: string;
+  login?: CreateCrossBorderAccountResult['login'];
+};
+
+export async function fetchCrossBorderAccountDetail(
+  storeCode: string,
+): Promise<CrossBorderAccountDetail> {
+  const url = new URL('/.netlify/functions/inventory-admin-update-account', window.location.origin);
+  url.searchParams.set('storeCode', storeCode);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载账号失败 (${response.status})`);
+  }
+  return payload.store as CrossBorderAccountDetail;
+}
+
+export async function updateCrossBorderAccount(
+  payload: UpdateCrossBorderAccountPayload,
+): Promise<UpdateCrossBorderAccountResult> {
+  const response = await fetch('/.netlify/functions/inventory-admin-update-account', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `保存失败 (${response.status})`);
+  }
+  return body as UpdateCrossBorderAccountResult;
+}
 
 export async function createCrossBorderAccount(
   draft: CrossBorderAccountDraft,

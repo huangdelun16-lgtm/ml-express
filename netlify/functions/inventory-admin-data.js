@@ -4,8 +4,8 @@
  * 需已通过 admin Cookie 认证
  *
  * section 参数拆分加载（减轻首屏）：
- * - overview：账号列表 + 统计 + 车费合计
- * - finance：中转站财务 + 跨境财务（单次 loadFinanceDataset）
+ * - overview：账号列表 + 统计 + 车费合计（优先 inventory_admin_overview_stats RPC）
+ * - finance：中转站财务 + 跨境财务（financePage / financePageSize 分页明细）
  * - packs：运输明细（packStatus）
  */
 
@@ -64,22 +64,72 @@ function parseTransportFeeAmount(raw) {
 }
 
 async function sumAllTransportFees(supabase) {
-  const { data, error } = await supabase
+  const { data, error } = await supabase.rpc('inventory_admin_transport_fee_total');
+  if (!error && data != null) {
+    return Math.round(Number(data) || 0);
+  }
+
+  if (error) {
+    console.warn(
+      'inventory-admin-data: transport fee RPC failed, falling back',
+      error.message,
+    );
+  }
+
+  const { data: rows, error: scanErr } = await supabase
     .from('inventory_pkg_tracking')
     .select('transport_fee')
     .neq('status', 'cancelled')
     .limit(3000);
 
-  if (error) {
-    console.warn('inventory-admin-data: transport fee sum failed', error.message);
+  if (scanErr) {
+    console.warn('inventory-admin-data: transport fee sum failed', scanErr.message);
     return 0;
   }
 
   let total = 0;
-  for (const row of data || []) {
+  for (const row of rows || []) {
     total += parseTransportFeeAmount(row.transport_fee);
   }
   return Math.round(total);
+}
+
+function normalizeOverviewStats(raw) {
+  const n = (key) => Math.max(0, Number(raw?.[key]) || 0);
+  return {
+    stats: {
+      storeItemsTotal: n('storeItemsTotal'),
+      storeItemsInStock: n('storeItemsInStock'),
+      packsInTransit: n('packsInTransit'),
+      packsHubReceived: n('packsHubReceived'),
+      packsCompleted: n('packsCompleted'),
+      packsCancelled: n('packsCancelled'),
+      ordersInTransit: n('ordersInTransit'),
+      ordersHubReceived: n('ordersHubReceived'),
+    },
+    transportFeeTotal: Math.round(n('transportFeeTotal')),
+  };
+}
+
+/** P3：优先单次 RPC；失败时回退到并行 count + 车费 SUM */
+async function loadOverviewSnapshot(supabase) {
+  const { data, error } = await supabase.rpc('inventory_admin_overview_stats');
+  if (!error && data && typeof data === 'object') {
+    return normalizeOverviewStats(data);
+  }
+
+  if (error) {
+    console.warn(
+      'inventory-admin-data: overview stats RPC failed, falling back',
+      error.message,
+    );
+  }
+
+  const [stats, transportFeeTotal] = await Promise.all([
+    loadStats(supabase),
+    sumAllTransportFees(supabase),
+  ]);
+  return { stats, transportFeeTotal };
 }
 
 async function loadPackedQtyByBarcode(supabase, barcodes) {
@@ -220,21 +270,35 @@ async function loadTransitStores(supabase) {
 }
 
 async function loadStats(supabase) {
+  const [
+    storeItemsTotal,
+    storeItemsInStock,
+    packsInTransit,
+    packsHubReceived,
+    packsCompleted,
+    packsCancelled,
+    ordersInTransit,
+    ordersHubReceived,
+  ] = await Promise.all([
+    safeCount(supabase, 'inventory_store_items'),
+    safeCount(supabase, 'inventory_store_items', [['gt', 'qty_on_hand', 0]]),
+    safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'in_transit']]),
+    safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'hub_received']]),
+    safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'completed']]),
+    safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'cancelled']]),
+    safeCount(supabase, 'inventory_order_tracking', [['eq', 'status', 'in_transit']]),
+    safeCount(supabase, 'inventory_order_tracking', [['eq', 'status', 'hub_received']]),
+  ]);
+
   return {
-    storeItemsTotal: await safeCount(supabase, 'inventory_store_items'),
-    storeItemsInStock: await safeCount(supabase, 'inventory_store_items', [['gt', 'qty_on_hand', 0]]),
-    packsInTransit: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'in_transit']]),
-    packsHubReceived: await safeCount(supabase, 'inventory_pkg_tracking', [
-      ['eq', 'status', 'hub_received'],
-    ]),
-    packsCompleted: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'completed']]),
-    packsCancelled: await safeCount(supabase, 'inventory_pkg_tracking', [['eq', 'status', 'cancelled']]),
-    ordersInTransit: await safeCount(supabase, 'inventory_order_tracking', [
-      ['eq', 'status', 'in_transit'],
-    ]),
-    ordersHubReceived: await safeCount(supabase, 'inventory_order_tracking', [
-      ['eq', 'status', 'hub_received'],
-    ]),
+    storeItemsTotal,
+    storeItemsInStock,
+    packsInTransit,
+    packsHubReceived,
+    packsCompleted,
+    packsCancelled,
+    ordersInTransit,
+    ordersHubReceived,
   };
 }
 
@@ -279,22 +343,52 @@ function attachFinanceToStores(storesList, financeByStoreCode) {
   });
 }
 
+function parseFinancePagination(query) {
+  const page = parseInt(query?.financePage || '1', 10);
+  const pageSize = parseInt(query?.financePageSize || '10', 10);
+  return {
+    page: Number.isFinite(page) && page > 0 ? page : 1,
+    pageSize: Number.isFinite(pageSize) && pageSize > 0 ? Math.min(100, pageSize) : 10,
+  };
+}
+
+function paginateCrossBorderFinance(crossBorderFinance, page, pageSize) {
+  const allEntries = crossBorderFinance?.entries || [];
+  const totalItems = crossBorderFinance?.summary?.entryCount ?? allEntries.length;
+  const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 10));
+  const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
+  const safePage = Math.min(Math.max(1, Number(page) || 1), totalPages);
+  const start = (safePage - 1) * safePageSize;
+
+  return {
+    summary: crossBorderFinance.summary,
+    entries: allEntries.slice(start, start + safePageSize),
+    pagination: {
+      page: safePage,
+      pageSize: safePageSize,
+      totalItems,
+      totalPages,
+    },
+  };
+}
+
 async function handleOverview(supabase, warnings) {
-  const storesList = await loadTransitStores(supabase);
-  const stats = await loadStats(supabase);
-  const transportFeeTotal = await sumAllTransportFees(supabase);
+  const [storesList, snapshot] = await Promise.all([
+    loadTransitStores(supabase),
+    loadOverviewSnapshot(supabase),
+  ]);
   return {
     ok: true,
     at: new Date().toISOString(),
     section: 'overview',
     transitStores: storesList,
-    stats,
-    transportFeeTotal,
+    stats: snapshot.stats,
+    transportFeeTotal: snapshot.transportFeeTotal,
     warnings,
   };
 }
 
-async function handleFinance(supabase, warnings) {
+async function handleFinance(supabase, warnings, financePagination) {
   const storesList = await loadTransitStores(supabase);
   const { financeByStoreCode, crossBorderFinance, warnings: financeWarnings } =
     await aggregateFinanceForTransitStores(supabase, storesList);
@@ -304,7 +398,11 @@ async function handleFinance(supabase, warnings) {
     at: new Date().toISOString(),
     section: 'finance',
     transitStores: attachFinanceToStores(storesList, financeByStoreCode),
-    crossBorderFinance,
+    crossBorderFinance: paginateCrossBorderFinance(
+      crossBorderFinance,
+      financePagination.page,
+      financePagination.pageSize,
+    ),
     warnings,
   };
 }
@@ -322,23 +420,31 @@ async function handlePacks(supabase, packStatus, warnings) {
 }
 
 /** 兼容旧版：一次返回全部（较慢） */
-async function handleAll(supabase, packStatus, warnings) {
+async function handleAll(supabase, packStatus, warnings, financePagination) {
   const storesList = await loadTransitStores(supabase);
-  const { financeByStoreCode, crossBorderFinance, warnings: financeWarnings } =
-    await aggregateFinanceForTransitStores(supabase, storesList);
+  const [
+    { financeByStoreCode, crossBorderFinance, warnings: financeWarnings },
+    snapshot,
+    recentPacks,
+  ] = await Promise.all([
+    aggregateFinanceForTransitStores(supabase, storesList),
+    loadOverviewSnapshot(supabase),
+    loadRecentPacks(supabase, packStatus, warnings),
+  ]);
   warnings.push(...financeWarnings);
-  const stats = await loadStats(supabase);
-  const recentPacks = await loadRecentPacks(supabase, packStatus, warnings);
-  const transportFeeTotal = await sumAllTransportFees(supabase);
   return {
     ok: true,
     at: new Date().toISOString(),
     section: 'all',
     transitStores: attachFinanceToStores(storesList, financeByStoreCode),
-    stats,
+    stats: snapshot.stats,
     recentPacks,
-    transportFeeTotal,
-    crossBorderFinance,
+    transportFeeTotal: snapshot.transportFeeTotal,
+    crossBorderFinance: paginateCrossBorderFinance(
+      crossBorderFinance,
+      financePagination.page,
+      financePagination.pageSize,
+    ),
     packStatusFilter: packStatus,
     warnings,
   };
@@ -394,16 +500,17 @@ exports.handler = async (event) => {
 
   const packStatus = (event.queryStringParameters?.packStatus || 'active').toLowerCase();
   const section = String(event.queryStringParameters?.section || 'overview').toLowerCase();
+  const financePagination = parseFinancePagination(event.queryStringParameters);
   const warnings = [];
 
   try {
     let body;
     if (section === 'finance') {
-      body = await handleFinance(supabase, warnings);
+      body = await handleFinance(supabase, warnings, financePagination);
     } else if (section === 'packs') {
       body = await handlePacks(supabase, packStatus, warnings);
     } else if (section === 'all') {
-      body = await handleAll(supabase, packStatus, warnings);
+      body = await handleAll(supabase, packStatus, warnings, financePagination);
     } else {
       body = await handleOverview(supabase, warnings);
     }

@@ -122,6 +122,21 @@ const NOT_EXPRESS_PACK_CLAUSE = `UPPER(i.barcode) NOT LIKE 'PKG%'`;
 const NOT_ALREADY_PACKED_CLAUSE = `AND NOT EXISTS (SELECT 1 FROM packed_shipment_items psi WHERE psi.item_id = i.id)
   AND TRIM(COALESCE(i.packed_at, '')) = ''
   AND TRIM(COALESCE(i.packed_bundle_barcode, '')) = ''`;
+const HUB_TRANSIT_HUB_INBOUND_EXISTS = `EXISTS (
+  SELECT 1 FROM stock_movements m
+  WHERE m.item_id = i.id AND m.type = 'in'
+    AND (m.note LIKE '%中转站到站%' OR m.note LIKE '%中转站释放%')
+)`;
+/** 可打包：常规未装包，或经本站中转已入库/已释放待转出（可重新打包装车） */
+const PACKABLE_AT_HUB_TRANSIT_CLAUSE = `AND (
+  (
+    NOT EXISTS (SELECT 1 FROM packed_shipment_items psi WHERE psi.item_id = i.id)
+    AND TRIM(COALESCE(i.packed_at, '')) = ''
+    AND TRIM(COALESCE(i.packed_bundle_barcode, '')) = ''
+  )
+  OR TRIM(COALESCE(i.hub_transit_released_at, '')) != ''
+  OR ${HUB_TRANSIT_HUB_INBOUND_EXISTS}
+)`;
 
 function persistFinalDestinationCode(raw: string): string {
   const normalized = normalizePackDestination(raw);
@@ -1079,7 +1094,7 @@ export async function listPackableItems(
          INNER JOIN stock_movements m ON m.item_id = i.id AND m.type = 'in'
          WHERE i.qty_on_hand > 0
            AND ${NOT_EXPRESS_PACK_CLAUSE}
-           ${NOT_ALREADY_PACKED_CLAUSE}
+           ${PACKABLE_AT_HUB_TRANSIT_CLAUSE}
            AND (i.barcode LIKE ? OR i.input_barcode LIKE ? OR i.name LIKE ? OR i.spec LIKE ?
              OR i.final_destination LIKE ? OR ${CUSTOMER_NAME_SUBQUERY} LIKE ? OR ${DESTINATION_FALLBACK_SUBQUERY} LIKE ?)
          ORDER BY i.updated_at DESC`,
@@ -1090,7 +1105,7 @@ export async function listPackableItems(
          INNER JOIN stock_movements m ON m.item_id = i.id AND m.type = 'in'
          WHERE i.qty_on_hand > 0
            AND ${NOT_EXPRESS_PACK_CLAUSE}
-           ${NOT_ALREADY_PACKED_CLAUSE}
+           ${PACKABLE_AT_HUB_TRANSIT_CLAUSE}
          ORDER BY i.updated_at DESC`,
       );
   const items = rows.map(rowToListItem);
@@ -1098,9 +1113,35 @@ export async function listPackableItems(
   const { isVisibleInExpressDetailsList } = await import('../utils/expressDetailsVisibility');
   return items.filter((item) => {
     if (!isVisibleInExpressDetailsList(item, scope.store, scope.hubCode)) return false;
-    if (item.packed && !item.hub_transit_released) return false;
+    const transitRepack =
+      item.hub_transit_released || Boolean(item.hub_transit_hub_inbound);
+    if (item.packed && !transitRepack) return false;
     return true;
   });
+}
+
+/** 中转站：解绑 inbound 包残留关联，允许重新打包 */
+async function prepareHubTransitItemForRepack(item: InventoryItem): Promise<boolean> {
+  const released = Boolean(item.hub_transit_released_at?.trim());
+  const hubInbound = await hasHubTransitInboundAtStation(item.id);
+  if (!released && !hubInbound) return false;
+
+  const db = await getDatabase();
+  const ts = nowIso();
+  await db.runAsync('DELETE FROM packed_shipment_items WHERE item_id = ? OR item_barcode = ?', [
+    item.id,
+    item.barcode,
+  ]);
+  await db.runAsync(
+    `UPDATE inventory_items
+     SET packed_at = '', packed_bundle_barcode = ?,
+         hub_transit_released_at = CASE
+           WHEN TRIM(COALESCE(hub_transit_released_at, '')) = '' THEN ? ELSE hub_transit_released_at END,
+         updated_at = ?
+     WHERE id = ?`,
+    ['', ts, ts, ts, item.id],
+  );
+  return true;
 }
 
 export async function createPackedShipment(params: {
@@ -1122,7 +1163,7 @@ export async function createPackedShipment(params: {
   const db = await getDatabase();
   const picked: InventoryItem[] = [];
   for (const id of ids) {
-    const item = await getItemById(id);
+    let item = await getItemById(id);
     if (!item) throw new Error('商品不存在或已删除');
     if (item.qty_on_hand < 1) throw new Error(`${item.name} 库存不足，无法打包`);
     const hasIn = await db.getFirstAsync<{ c: number }>(
@@ -1130,21 +1171,29 @@ export async function createPackedShipment(params: {
       [id],
     );
     if (!hasIn?.c) throw new Error(`${item.name} 未入库，无法打包`);
-    if (item.packed_at?.trim() || item.packed_bundle_barcode?.trim()) {
-      throw new Error(
-        `${item.name} 已打包入 ${item.packed_bundle_barcode || '快递包'}，不可重复打包`,
-      );
+
+    const repackPrepared = await prepareHubTransitItemForRepack(item);
+    if (repackPrepared) {
+      item = (await getItemById(id))!;
     }
-    const inAnyPack = await db.getFirstAsync<{ bundle_barcode: string }>(
-      `SELECT p.bundle_barcode FROM packed_shipment_items psi
-       INNER JOIN packed_shipments p ON p.id = psi.pack_id
-       WHERE psi.item_id = ? OR UPPER(TRIM(psi.item_barcode)) = UPPER(TRIM(?))`,
-      [id, item.barcode],
-    );
-    if (inAnyPack?.bundle_barcode) {
-      throw new Error(
-        `${item.name} 已在快递包 ${inAnyPack.bundle_barcode} 中，请先拆包后再打包`,
+
+    if (!repackPrepared) {
+      if (item.packed_at?.trim() || item.packed_bundle_barcode?.trim()) {
+        throw new Error(
+          `${item.name} 已打包入 ${item.packed_bundle_barcode || '快递包'}，不可重复打包`,
+        );
+      }
+      const inAnyPack = await db.getFirstAsync<{ bundle_barcode: string }>(
+        `SELECT p.bundle_barcode FROM packed_shipment_items psi
+         INNER JOIN packed_shipments p ON p.id = psi.pack_id
+         WHERE psi.item_id = ? OR UPPER(TRIM(psi.item_barcode)) = UPPER(TRIM(?))`,
+        [id, item.barcode],
       );
+      if (inAnyPack?.bundle_barcode) {
+        throw new Error(
+          `${item.name} 已在快递包 ${inAnyPack.bundle_barcode} 中，请先拆包后再打包`,
+        );
+      }
     }
     picked.push(item);
   }
@@ -1458,6 +1507,14 @@ export async function listPackedShipments(
   scope?: { store: InventoryStoreSession; hubCode: string },
 ): Promise<PackedShipmentDetail[]> {
   const db = await getDatabase();
+  const dupRow = await db.getFirstAsync<{ bc: string }>(
+    `SELECT UPPER(TRIM(bundle_barcode)) AS bc FROM packed_shipments
+     WHERE TRIM(bundle_barcode) != ''
+     GROUP BY UPPER(TRIM(bundle_barcode)) HAVING COUNT(*) > 1 LIMIT 1`,
+  );
+  if (dupRow?.bc) {
+    await consolidateDuplicatePackedShipments();
+  }
   const q = search?.trim();
   const rows = q
     ? await db.getAllAsync<Record<string, unknown>>(
@@ -2008,7 +2065,7 @@ export async function deliverLocalHubOrderToInventory(params: {
 }
 
 /** 中转站确认快递包到站：为非本站目的地订单登记本站库存（待释放后重新打包） */
-async function hasHubTransitInboundAtStation(itemId: string): Promise<boolean> {
+export async function hasHubTransitInboundAtStation(itemId: string): Promise<boolean> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ c: number }>(
     `SELECT COUNT(*) AS c FROM stock_movements
@@ -2132,7 +2189,7 @@ export async function importInboundPackToLocal(
   if (legDest && legDest !== hub) return false;
 
   const db = await getDatabase();
-  const existing = await getPackedShipmentByBarcode(detail.pack_barcode);
+  const packBarcode = detail.pack_barcode.trim().toUpperCase();
   const packNote = `到站收货 · ${detail.origin_store_code} → ${detail.destination_code}`;
   const hubOrigin: OriginStoreRef = {
     id: store.id,
@@ -2143,24 +2200,29 @@ export async function importInboundPackToLocal(
   const transportFee = detail.transport_fee?.trim() || '';
   const legDestPersist = legDest || detail.destination_code?.trim().toUpperCase() || '';
 
-  let packId: string;
+  let packId = '';
   let created = false;
 
-  if (existing) {
-    packId = existing.id;
-    if (transportFee || legDestPersist) {
-      await db.runAsync(
-        `UPDATE packed_shipments SET transport_fee = ?, truck_leg_destination = ? WHERE id = ?`,
-        [transportFee, legDestPersist, packId],
-      );
+  const { withPackedShipmentBarcodeLock } = await import('./inventoryCloudSync');
+  await withPackedShipmentBarcodeLock(packBarcode, async () => {
+    const existing = await getPackedShipmentByBarcode(packBarcode);
+    if (existing) {
+      packId = existing.id;
+      if (transportFee || legDestPersist) {
+        await db.runAsync(
+          `UPDATE packed_shipments SET transport_fee = ?, truck_leg_destination = ? WHERE id = ?`,
+          [transportFee, legDestPersist, packId],
+        );
+      }
+      return;
     }
-  } else {
-    let bundleItem = await getItemByBarcode(detail.pack_barcode);
+
+    let bundleItem = await getItemByBarcode(packBarcode);
     if (!bundleItem) {
       bundleItem = await upsertItem(
         {
-          barcode: detail.pack_barcode,
-          name: detail.pack_name?.trim() || detail.pack_barcode,
+          barcode: packBarcode,
+          name: detail.pack_name?.trim() || packBarcode,
           spec: '',
           unit: `${detail.item_count} Pcs`,
           weight: detail.total_weight?.trim() || '',
@@ -2174,7 +2236,7 @@ export async function importInboundPackToLocal(
 
     if (bundleItem.qty_on_hand < 1) {
       await applyStockMovement({
-        barcode: detail.pack_barcode,
+        barcode: packBarcode,
         type: 'in',
         qty: 1,
         operator,
@@ -2183,7 +2245,7 @@ export async function importInboundPackToLocal(
         originStore: hubOrigin,
         inboundAt: detail.hub_received_at ?? undefined,
       });
-      bundleItem = (await getItemByBarcode(detail.pack_barcode))!;
+      bundleItem = (await getItemByBarcode(packBarcode))!;
     }
 
     packId = newId();
@@ -2195,8 +2257,8 @@ export async function importInboundPackToLocal(
       [
         packId,
         bundleItem.id,
-        detail.pack_barcode,
-        detail.pack_name?.trim() || detail.pack_barcode,
+        packBarcode,
+        detail.pack_name?.trim() || packBarcode,
         operator,
         packNote,
         store.storeCode,
@@ -2206,7 +2268,9 @@ export async function importInboundPackToLocal(
       ],
     );
     created = true;
-  }
+  });
+
+  if (!packId) return false;
 
   const originOwnerCode = detail.origin_store_code?.trim() || store.storeCode;
   const originStore: OriginStoreRef = {
@@ -2424,11 +2488,13 @@ export async function importInboundPackToLocal(
   }
 
   await maybeAutoReleaseTransitAfterAllInbound({
-    packBarcode: detail.pack_barcode,
+    packBarcode: packBarcode,
     store,
     hubCode: hub,
     operator,
   });
+
+  await consolidateDuplicatePackedShipments();
 
   return created;
 }
@@ -2587,6 +2653,7 @@ export async function syncInboundHubPacksToLocal(
   await reconcileHubTransitStockAtStation(store);
   await pruneItemsOutsideExpressDetailsScope(store, hubCode);
   await prunePacksOutsideExpressDetailsScope(store, hubCode);
+  await consolidateDuplicatePackedShipments();
   return imported;
 }
 
@@ -3331,6 +3398,81 @@ async function deletePackCascadeLocal(packId: string): Promise<void> {
   if (pack?.bundle_item_id) {
     await deleteItemCascadeLocal(pack.bundle_item_id);
   }
+}
+
+/** 合并本地重复快递包（同 bundle_barcode 多条 packed_shipments，常见于云同步与到站导入并发） */
+export async function consolidateDuplicatePackedShipments(): Promise<number> {
+  const db = await getDatabase();
+  const groups = await db.getAllAsync<{ bc: string }>(
+    `SELECT UPPER(TRIM(bundle_barcode)) AS bc FROM packed_shipments
+     WHERE TRIM(bundle_barcode) != ''
+     GROUP BY UPPER(TRIM(bundle_barcode)) HAVING COUNT(*) > 1`,
+  );
+  let merged = 0;
+  for (const { bc } of groups) {
+    const packs = await db.getAllAsync<{
+      id: string;
+      bundle_item_id: string;
+      created_at: string;
+    }>(
+      `SELECT id, bundle_item_id, created_at FROM packed_shipments
+       WHERE UPPER(TRIM(bundle_barcode)) = ?`,
+      [bc],
+    );
+    if (packs.length < 2) continue;
+
+    const scored = await Promise.all(
+      packs.map(async (pack) => {
+        const row = await db.getFirstAsync<{ c: number }>(
+          'SELECT COUNT(*) AS c FROM packed_shipment_items WHERE pack_id = ?',
+          [pack.id],
+        );
+        const itemCount = Number(row?.c) || 0;
+        const createdMs = new Date(pack.created_at).getTime();
+        return {
+          pack,
+          itemCount,
+          createdMs: Number.isNaN(createdMs) ? 0 : createdMs,
+        };
+      }),
+    );
+    scored.sort((a, b) => {
+      if (b.itemCount !== a.itemCount) return b.itemCount - a.itemCount;
+      return b.createdMs - a.createdMs;
+    });
+    const keeper = scored[0].pack;
+
+    await db.runAsync('UPDATE packed_shipments SET bundle_barcode = ? WHERE id = ?', [bc, keeper.id]);
+    await db.runAsync('UPDATE inventory_items SET barcode = ? WHERE id = ?', [
+      bc,
+      keeper.bundle_item_id,
+    ]);
+
+    for (const { pack } of scored.slice(1)) {
+      const lines = await db.getAllAsync<{ id: string; item_barcode: string }>(
+        'SELECT id, item_barcode FROM packed_shipment_items WHERE pack_id = ?',
+        [pack.id],
+      );
+      for (const line of lines) {
+        const dup = await db.getFirstAsync<{ c: number }>(
+          `SELECT COUNT(*) AS c FROM packed_shipment_items
+           WHERE pack_id = ? AND UPPER(TRIM(item_barcode)) = UPPER(TRIM(?))`,
+          [keeper.id, line.item_barcode],
+        );
+        if (Number(dup?.c)) {
+          await db.runAsync('DELETE FROM packed_shipment_items WHERE id = ?', [line.id]);
+        } else {
+          await db.runAsync('UPDATE packed_shipment_items SET pack_id = ? WHERE id = ?', [
+            keeper.id,
+            line.id,
+          ]);
+        }
+      }
+      await deletePackCascadeLocal(pack.id);
+      merged += 1;
+    }
+  }
+  return merged;
 }
 
 /** 移除本机不应出现在快递明细的订单（其它地区残留缓存） */

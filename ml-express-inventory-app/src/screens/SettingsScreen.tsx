@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from '../i18n';
 import {
   getPrinterSettings,
   savePrinterSettings,
@@ -84,6 +86,7 @@ function QuickAction({
 
 export default function SettingsScreen() {
   const { operatorName, storeCode, store, hubCode, logout } = useAuth();
+  const { t, fmt } = useTranslation();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
   const [clearing, setClearing] = useState(false);
   const [syncPending, setSyncPending] = useState(0);
@@ -119,7 +122,7 @@ export default function SettingsScreen() {
     return (
       <View style={styles.loadingRoot}>
         <ActivityIndicator size="large" color="#38bdf8" />
-        <Text style={styles.loadingText}>加载设置…</Text>
+        <Text style={styles.loadingText}>{t.settings.loading}</Text>
       </View>
     );
   }
@@ -132,7 +135,9 @@ export default function SettingsScreen() {
             <Text style={styles.heroAvatarText}>{hub?.slice(0, 2) ?? '站'}</Text>
           </View>
           <View style={styles.heroInfo}>
-            <Text style={styles.heroName} numberOfLines={1}>{operatorName ?? '中转站'}</Text>
+            <Text style={styles.heroName} numberOfLines={1}>
+              {operatorName ?? t.common.transitHub}
+            </Text>
             <View style={styles.heroTags}>
               {storeCode ? (
                 <View style={styles.tag}>
@@ -141,7 +146,7 @@ export default function SettingsScreen() {
               ) : null}
               {hub ? (
                 <View style={[styles.tag, styles.tagHub]}>
-                  <Text style={styles.tagHubText}>区域 {hub}</Text>
+                  <Text style={styles.tagHubText}>{fmt(t.settings.regionTag, { hub })}</Text>
                 </View>
               ) : null}
             </View>
@@ -150,32 +155,36 @@ export default function SettingsScreen() {
             ) : null}
           </View>
           <Pressable style={styles.logoutChip} onPress={() => void logout()}>
-            <Text style={styles.logoutChipText}>退出</Text>
+            <Text style={styles.logoutChipText}>{t.common.logout}</Text>
           </Pressable>
         </View>
 
         <View style={styles.quickRow}>
           <QuickAction
             icon="🔐"
-            label="修改密码"
+            label={t.settings.changePassword}
             accent="#10b981"
             onPress={() => setPasswordModalVisible(true)}
           />
         </View>
       </View>
 
+      <SectionCard icon="🌐" title={t.language.title} accent="#0ea5e9">
+        <LanguageSwitcherRow />
+      </SectionCard>
+
       {syncPending > 0 ? (
         <View style={styles.syncBanner}>
           <Text style={styles.syncBannerText}>
-            ⏳ {syncPending} 项待上传
+            {fmt(t.settings.syncBanner, { count: syncPending })}
             {syncLastError ? ` · ${syncLastError}` : ''}
           </Text>
         </View>
       ) : null}
 
-      <SectionCard icon="🖨️" title="标签打印" accent="#3b82f6">
+      <SectionCard icon="🖨️" title={t.settings.labelPrint} accent="#3b82f6">
         <View style={styles.switchRow}>
-          <Text style={styles.fieldLabel}>启用打印</Text>
+          <Text style={styles.fieldLabel}>{t.settings.enablePrint}</Text>
           <Switch
             value={settings.enabled}
             onValueChange={(v) => updatePrinter({ enabled: v })}
@@ -183,7 +192,7 @@ export default function SettingsScreen() {
             thumbColor="#fff"
           />
         </View>
-        <Text style={styles.fieldLabel}>标签宽度 (mm)</Text>
+        <Text style={styles.fieldLabel}>{t.settings.labelWidth}</Text>
         <View style={styles.chips}>
           {WIDTH_OPTIONS.map((w) => (
             <Pressable
@@ -197,7 +206,7 @@ export default function SettingsScreen() {
             </Pressable>
           ))}
         </View>
-        <Text style={styles.fieldLabel}>每次打印份数</Text>
+        <Text style={styles.fieldLabel}>{t.settings.copies}</Text>
         <TextInput
           style={styles.copiesInput}
           keyboardType="number-pad"
@@ -209,18 +218,18 @@ export default function SettingsScreen() {
         />
       </SectionCard>
 
-      <SectionCard icon="🧪" title="测试数据" accent="#ef4444">
+      <SectionCard icon="🧪" title={t.settings.testData} accent="#ef4444">
         <Pressable
           style={[styles.actionBtn, styles.actionBtnDanger, clearing && styles.btnDisabled]}
           disabled={clearing}
           onPress={() => {
             Alert.alert(
-              '清空全部订单',
-              '将删除本机所有入库订单、快递包、流水，并清空云端库存与追踪。确定继续？',
+              t.settings.clearAllTitle,
+              t.settings.clearAllMessage,
               [
-                { text: '取消', style: 'cancel' },
+                { text: t.common.cancel, style: 'cancel' },
                 {
-                  text: '全部删除',
+                  text: t.common.deleteAll,
                   style: 'destructive',
                   onPress: () => {
                     void (async () => {
@@ -228,16 +237,19 @@ export default function SettingsScreen() {
                       try {
                         const result = await clearAllTestData(store ?? undefined, hub);
                         const edgePart = result.cloudEdge
-                          ? `\n云端：${result.cloudEdge.items} 商品、${result.cloudEdge.packs} 包裹`
+                          ? `\nCloud: ${result.cloudEdge.items} items, ${result.cloudEdge.packs} packs`
                           : result.cloudEdgeError
-                            ? `\n云端：${result.cloudEdgeError}`
+                            ? `\nCloud: ${result.cloudEdgeError}`
                             : '';
                         Alert.alert(
-                          '已清空',
-                          `本机：${result.local.items} 商品、${result.local.packs} 包裹、${result.local.movements} 条流水${edgePart}`,
+                          t.common.cleared,
+                          `Local: ${result.local.items} items, ${result.local.packs} packs, ${result.local.movements} movements${edgePart}`,
                         );
                       } catch (e: unknown) {
-                        Alert.alert('失败', e instanceof Error ? e.message : '请重试');
+                        Alert.alert(
+                          t.common.fail,
+                          e instanceof Error ? e.message : t.common.loading,
+                        );
                       } finally {
                         setClearing(false);
                       }
@@ -248,17 +260,21 @@ export default function SettingsScreen() {
             );
           }}
         >
-          <Text style={styles.actionBtnText}>{clearing ? '清空中…' : '清空全部订单（测试）'}</Text>
+          <Text style={styles.actionBtnText}>
+            {clearing ? t.settings.clearing : t.settings.clearAllBtn}
+          </Text>
         </Pressable>
       </SectionCard>
 
-      <Text style={styles.footer}>ML Inventory v1.0 · Market Link Express</Text>
+      <Text style={styles.footer}>{t.settings.footer}</Text>
 
       <ChangePasswordModal
         visible={passwordModalVisible}
         storeCode={storeCode}
         onClose={() => setPasswordModalVisible(false)}
-        onSuccess={() => Alert.alert('密码已更新', '当前会话已刷新，下次登录请使用新密码。')}
+        onSuccess={() =>
+          Alert.alert(t.settings.passwordUpdated, t.settings.passwordUpdatedMsg)
+        }
       />
     </ScrollView>
   );

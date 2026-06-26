@@ -6,7 +6,13 @@ import { useResponsive } from '../hooks/useResponsive';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
 
 /** 全屏独立模块：不使用通用后台侧栏/顶栏，由页面自带布局 */
-export const STANDALONE_IMPORT_ADMIN_PATHS = ['/admin/metric-management'] as const;
+export const STANDALONE_ADMIN_MODULE_PATHS = [
+  '/admin/metric-management',
+  '/admin/cross-border-logistics',
+] as const;
+
+/** @deprecated 使用 STANDALONE_ADMIN_MODULE_PATHS */
+export const STANDALONE_IMPORT_ADMIN_PATHS = STANDALONE_ADMIN_MODULE_PATHS;
 
 const MODULE_ICONS: Record<string, string> = {
   city_packages: '📦',
@@ -450,7 +456,9 @@ const AdminShellLayout: React.FC = () => {
   };
 
   const pathname = location.pathname;
-  const isStandaloneImportModule = (STANDALONE_IMPORT_ADMIN_PATHS as readonly string[]).includes(pathname);
+  const isStandaloneImportModule = (STANDALONE_ADMIN_MODULE_PATHS as readonly string[]).includes(
+    pathname,
+  );
 
   if (isStandaloneImportModule) {
     return <Outlet />;

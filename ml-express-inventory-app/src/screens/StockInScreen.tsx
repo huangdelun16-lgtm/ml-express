@@ -45,6 +45,7 @@ import {
 } from '../utils/crossBorderPricing';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
+import { useTranslation } from '../i18n';
 
 type Route = { params?: { presetBarcode?: string } };
 type Step = 1 | 2 | 3;
@@ -52,12 +53,6 @@ type Step = 1 | 2 | 3;
 type Props = {
   route?: Route;
   navigation: NativeStackNavigationProp<RootStackParamList, 'StockIn'>;
-};
-
-const STEP_LABELS: Record<Step, string> = {
-  1: '扫码识别',
-  2: '客户信息',
-  3: '费用计算',
 };
 
 function ScanRefBanner({ code, hint }: { code: string; hint?: string }) {
@@ -79,6 +74,12 @@ function ScanRefBanner({ code, hint }: { code: string; hint?: string }) {
 
 export default function StockInScreen({ route, navigation }: Props) {
   const { operatorName, store } = useAuth();
+  const { t } = useTranslation();
+  const stepLabels: Record<Step, string> = {
+    1: t.stockIn.step1,
+    2: t.stockIn.step2,
+    3: t.stockIn.step3,
+  };
   const [step, setStep] = useState<Step>(1);
   const [scan, setScan] = useState('');
   const [item, setItem] = useState<InventoryItem | null>(null);
@@ -370,7 +371,12 @@ export default function StockInScreen({ route, navigation }: Props) {
     }
   };
 
-  const primaryLabel = step === 3 ? (loading ? '处理中…' : '确认入库') : '下一步';
+  const primaryLabel =
+    step === 3
+      ? loading
+        ? t.common.loading
+        : t.stockIn.submit
+      : t.stockIn.next;
   const primaryAction = step === 3 ? () => void submit() : goNext;
 
   return (
@@ -379,7 +385,7 @@ export default function StockInScreen({ route, navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>📥 入库</Text>
+        <Text style={styles.title}>{t.stockIn.title}</Text>
         <View style={styles.stepRow}>
           {([1, 2, 3] as Step[]).map((n) => (
             <View key={n} style={styles.stepItem}>
@@ -387,7 +393,7 @@ export default function StockInScreen({ route, navigation }: Props) {
                 <Text style={[styles.stepDotText, step >= n && styles.stepDotTextActive]}>{n}</Text>
               </View>
               <Text style={[styles.stepLabel, step === n && styles.stepLabelActive]}>
-                {STEP_LABELS[n]}
+                {stepLabels[n]}
               </Text>
             </View>
           ))}
@@ -610,7 +616,7 @@ export default function StockInScreen({ route, navigation }: Props) {
 
       <View style={styles.footer}>
         <Pressable style={styles.cancelBtn} onPress={handleCancel}>
-          <Text style={styles.cancelBtnText}>取消</Text>
+          <Text style={styles.cancelBtnText}>{t.stockIn.cancel}</Text>
         </Pressable>
         <Pressable
           style={[styles.nextBtn, loading && styles.nextBtnDisabled]}

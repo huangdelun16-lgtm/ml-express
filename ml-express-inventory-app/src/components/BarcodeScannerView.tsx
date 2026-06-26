@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  ActivityIndicator,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +13,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { BARCODE_SCAN_TYPES } from '../constants/barcodeScan';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { useTranslation } from '../i18n';
 
 type Props = {
   onScan: (code: string) => void;
@@ -25,32 +28,52 @@ type Props = {
 
 export default function BarcodeScannerView({
   onScan,
-  title = '对准条码',
-  subtitle = '支持快递单、入库条码、PKG 包装号',
-  manualPlaceholder = '或手动输入后按回车',
+  title,
+  subtitle,
+  manualPlaceholder,
   style,
   active = true,
   compact = false,
 }: Props) {
+  const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
-  const [torch, setTorch] = useState(false);
-  const [manual, setManual] = useState('');
-  const [flash, setFlash] = useState<string | null>(null);
+  const [torch, setTorch] = React.useState(false);
+  const [manual, setManual] = React.useState('');
+  const [flash, setFlash] = React.useState<string | null>(null);
+  const autoRequestedRef = useRef(false);
   const { handleScan, reset, locked } = useBarcodeScanner((code) => {
     setFlash(code);
     onScan(code);
     setTimeout(() => setFlash(null), 900);
   });
 
+  useEffect(() => {
+    if (!active || !permission || permission.granted) return;
+    if (autoRequestedRef.current) return;
+    autoRequestedRef.current = true;
+    void requestPermission();
+  }, [active, permission, requestPermission]);
+
+  useEffect(() => {
+    if (permission?.granted) {
+      autoRequestedRef.current = false;
+    }
+  }, [permission?.granted]);
+
   const submitManual = () => {
     const ok = handleScan(manual);
     if (ok) setManual('');
   };
 
+  const resolvedTitle = title ?? t.scanner.aimTitle;
+  const resolvedSubtitle = subtitle ?? t.scanner.aimSubtitle;
+  const resolvedManualPlaceholder = manualPlaceholder ?? t.scanner.manualPlaceholder;
+
   if (!permission) {
     return (
       <View style={[styles.center, style]}>
-        <Text style={styles.hint}>检查相机权限…</Text>
+        <ActivityIndicator color="#38bdf8" />
+        <Text style={styles.hint}>{t.scanner.checkingPermission}</Text>
       </View>
     );
   }
@@ -58,10 +81,23 @@ export default function BarcodeScannerView({
   if (!permission.granted) {
     return (
       <View style={[styles.center, style]}>
-        <Text style={styles.hint}>需要相机权限才能扫码</Text>
-        <Pressable style={styles.btn} onPress={() => void requestPermission()}>
-          <Text style={styles.btnText}>授予权限</Text>
-        </Pressable>
+        <Text style={styles.permissionTitle}>{t.scanner.permissionTitle}</Text>
+        <Text style={styles.hint}>{t.scanner.permissionBody}</Text>
+        {permission.canAskAgain ? (
+          <Pressable
+            style={styles.permissionBtn}
+            onPress={() => void requestPermission()}
+          >
+            <Text style={styles.permissionBtnText}>{t.scanner.continueBtn}</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={styles.permissionBtn}
+            onPress={() => void Linking.openSettings()}
+          >
+            <Text style={styles.permissionBtnText}>{t.scanner.openSettingsBtn}</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -82,8 +118,8 @@ export default function BarcodeScannerView({
         )}
 
         <View style={styles.overlay} pointerEvents="none">
-          <Text style={styles.overlayTitle}>{title}</Text>
-          <Text style={styles.overlaySub}>{subtitle}</Text>
+          <Text style={styles.overlayTitle}>{resolvedTitle}</Text>
+          <Text style={styles.overlaySub}>{resolvedSubtitle}</Text>
           <View style={styles.frame}>
             <View style={[styles.corner, styles.cTL]} />
             <View style={[styles.corner, styles.cTR]} />
@@ -101,7 +137,7 @@ export default function BarcodeScannerView({
           style={[styles.torchBtn, torch && styles.torchOn]}
           onPress={() => setTorch((v) => !v)}
         >
-          <Text style={styles.torchText}>{torch ? '💡 关灯' : '🔦 补光'}</Text>
+          <Text style={styles.torchText}>{torch ? t.scanner.torchOff : t.scanner.torchOn}</Text>
         </Pressable>
       </View>
 
@@ -109,7 +145,7 @@ export default function BarcodeScannerView({
         <View style={styles.panel}>
           <TextInput
             style={styles.input}
-            placeholder={manualPlaceholder}
+            placeholder={resolvedManualPlaceholder}
             placeholderTextColor="#94a3b8"
             value={manual}
             onChangeText={setManual}
@@ -120,10 +156,10 @@ export default function BarcodeScannerView({
           />
           <View style={styles.panelActions}>
             <Pressable style={styles.secondaryBtn} onPress={reset}>
-              <Text style={styles.secondaryBtnText}>重新识别</Text>
+              <Text style={styles.secondaryBtnText}>{t.scanner.rescan}</Text>
             </Pressable>
-            <Pressable style={styles.btn} onPress={submitManual}>
-              <Text style={styles.btnText}>确认输入</Text>
+            <Pressable style={styles.primaryBtn} onPress={submitManual}>
+              <Text style={styles.primaryBtnText}>{t.scanner.confirmInput}</Text>
             </Pressable>
           </View>
         </View>
@@ -201,14 +237,14 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   panelActions: { flexDirection: 'row', gap: 10 },
-  btn: {
+  primaryBtn: {
     flex: 1,
     backgroundColor: '#2563eb',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  btnText: { color: '#fff', fontWeight: '800' },
+  primaryBtnText: { color: '#fff', fontWeight: '800' },
   secondaryBtn: {
     paddingHorizontal: 14,
     borderRadius: 10,
@@ -218,6 +254,29 @@ const styles = StyleSheet.create({
     borderColor: '#475569',
   },
   secondaryBtnText: { color: '#94a3b8', fontWeight: '700' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
-  hint: { color: '#94a3b8', fontSize: 14, textAlign: 'center' },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 14,
+    backgroundColor: '#0f172a',
+  },
+  permissionTitle: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  hint: { color: '#94a3b8', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  permissionBtn: {
+    alignSelf: 'center',
+    minWidth: 168,
+    backgroundColor: '#2563eb',
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  permissionBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

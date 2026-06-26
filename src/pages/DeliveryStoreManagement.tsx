@@ -536,17 +536,18 @@ const DeliveryStoreManagement: React.FC = () => {
     return minDistance <= 50 ? closestCity : null;
   };
 
-  /** 当前城市店铺列表；有 ?q= 时按店名/编码全局筛选（便于全局搜索直达） */
+  /** 合伙店铺列表（不含 Inventory 中转站，中转站由「跨境物流」独立管理） */
   const stores = useMemo(() => {
-    let filtered = allStores.filter((store) => store.store_type !== 'transit_station');
+    const merchantStores = allStores.filter((store) => store.store_type !== 'transit_station');
+    let filtered: DeliveryStore[];
     if (storeListSearchQ) {
-      filtered = allStores.filter(
+      filtered = merchantStores.filter(
         (store) =>
           (store.store_name || '').toLowerCase().includes(storeListSearchQ) ||
-          (store.store_code || '').toLowerCase().includes(storeListSearchQ)
+          (store.store_code || '').toLowerCase().includes(storeListSearchQ),
       );
     } else {
-      filtered = allStores.filter((store) => {
+      filtered = merchantStores.filter((store) => {
         const regionCity = regionToCityKey(store.region);
         if (regionCity) return regionCity === selectedCity;
         const storeCity = getStoreCity(store);
@@ -614,7 +615,7 @@ const DeliveryStoreManagement: React.FC = () => {
     email: '',
     manager_name: '',
     manager_phone: '',
-    store_type: 'restaurant' as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
+    store_type: 'restaurant' as DeliveryStore['store_type'],
     operating_hours: DEFAULT_OPERATING_HOURS,
     service_area_radius: 5, // 保留默认值，但不在表单中显示
     capacity: 1000, // 保留默认值，但不在表单中显示
@@ -939,7 +940,7 @@ const DeliveryStoreManagement: React.FC = () => {
       email: store.email || '',
       manager_name: store.manager_name,
       manager_phone: store.manager_phone,
-      store_type: store.store_type as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
+      store_type: store.store_type as DeliveryStore['store_type'],
       operating_hours: formatOperatingHours(
         parseOperatingHours(store.operating_hours).open,
         parseOperatingHours(store.operating_hours).close,
@@ -1534,7 +1535,7 @@ const DeliveryStoreManagement: React.FC = () => {
       email: '',
       manager_name: '',
       manager_phone: '',
-      store_type: 'restaurant' as 'restaurant' | 'drinks_snacks' | 'breakfast' | 'cake_shop' | 'tea_shop' | 'flower_shop' | 'clothing_store' | 'grocery' | 'hardware_store' | 'supermarket' | 'transit_station' | 'other',
+      store_type: 'restaurant' as DeliveryStore['store_type'],
       operating_hours: DEFAULT_OPERATING_HOURS,
       service_area_radius: 5,
       capacity: 1000,
@@ -1594,9 +1595,14 @@ const DeliveryStoreManagement: React.FC = () => {
       >
         <div>
           <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700 }}>合伙店铺</h1>
-          <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>管理合伙店铺位置和信息</p>
+          <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>
+            管理 City 配送合伙店铺位置与商品
+          </p>
+          <p style={{ margin: '8px 0 0 0', opacity: 0.72, fontSize: '0.88rem', lineHeight: 1.5 }}>
+            Inventory 中转站登录账号已独立至「跨境物流」，请在该模块创建与管理。
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end', flexWrap: 'wrap' }}>
           <button
             onClick={() => navigate('/admin/dashboard')}
             style={{
@@ -2480,9 +2486,7 @@ const DeliveryStoreManagement: React.FC = () => {
                         loadStoragePackages(store);
                       }}
                       style={{
-                        background: store.store_type === 'transit_station' 
-                          ? 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)'
-                          : 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
+                        background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
                         color: 'white',
                         border: 'none',
                         padding: '6px 12px',
@@ -2493,25 +2497,19 @@ const DeliveryStoreManagement: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
-                        boxShadow: store.store_type === 'transit_station'
-                          ? '0 2px 6px rgba(155, 89, 182, 0.3)'
-                          : '0 2px 6px rgba(230, 126, 34, 0.3)',
-                        transition: 'all 0.3s ease'
+                        boxShadow: '0 2px 6px rgba(230, 126, 34, 0.3)',
+                        transition: 'all 0.3s ease',
                       }}
                       onMouseOver={(e) => {
                         e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = store.store_type === 'transit_station'
-                          ? '0 4px 8px rgba(155, 89, 182, 0.4)'
-                          : '0 4px 8px rgba(230, 126, 34, 0.4)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(230, 126, 34, 0.4)';
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = store.store_type === 'transit_station'
-                          ? '0 2px 6px rgba(155, 89, 182, 0.3)'
-                          : '0 2px 6px rgba(230, 126, 34, 0.3)';
+                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(230, 126, 34, 0.3)';
                       }}
                     >
-                      {store.store_type === 'transit_station' ? '中转包裹' : '入库'}
+                      入库
                     </button>
                     <button
                       onClick={(e) => {
