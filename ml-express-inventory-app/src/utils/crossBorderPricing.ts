@@ -9,6 +9,7 @@ const PRICING_REGION_IDS = new Set([
   'taunggyi',
   'lashio',
   'muse',
+  'ruili',
 ]);
 
 /** 最终目的地代码 → Admin 计费规则领区 ID */
@@ -19,6 +20,7 @@ const DESTINATION_TO_PRICING_REGION: Record<string, string> = {
   TGI: 'taunggyi',
   LSO: 'lashio',
   MSE: 'muse',
+  RUI: 'ruili',
   NPW: 'naypyidaw',
 };
 

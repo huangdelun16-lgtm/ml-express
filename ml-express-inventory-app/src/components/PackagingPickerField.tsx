@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PACKAGING_OPTIONS } from '../constants/packagingOptions';
+import { useTranslation } from '../i18n';
 
 type Props = {
   label?: string;
@@ -8,19 +9,17 @@ type Props = {
   onChange: (v: string) => void;
 };
 
-export default function PackagingPickerField({
-  label = '商品包装',
-  value,
-  onChange,
-}: Props) {
+export default function PackagingPickerField({ label, value, onChange }: Props) {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t.forms.packaging;
   const [open, setOpen] = useState(false);
 
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{resolvedLabel}</Text>
       <Pressable style={styles.trigger} onPress={() => setOpen((v) => !v)}>
         <Text style={[styles.triggerText, !value && styles.placeholder]}>
-          {value || '点击选择包装类型'}
+          {value || t.forms.selectPackaging}
         </Text>
         <Text style={styles.chevron}>{open ? '▲' : '▼'}</Text>
       </Pressable>

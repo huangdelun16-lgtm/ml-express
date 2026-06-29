@@ -1,4 +1,5 @@
 import type { InventoryStoreSession } from './authService';
+import { svc } from '../errors/serviceError';
 import { upsertCloudTransportFeePayment } from './inventoryCloudApi';
 import { getDatabase, nowIso } from './database';
 
@@ -71,10 +72,10 @@ export async function markHubTransportFeePaid(params: {
   store: InventoryStoreSession;
 }): Promise<void> {
   const code = normalizePackBarcode(params.packBarcode);
-  if (!code) throw new Error('包装号无效');
+  if (!code) throw svc('invalidPackBarcode');
 
   const feeAmount = parseTransportFeeAmount(params.fee);
-  if (feeAmount <= 0) throw new Error('该快递包未登记车费，无法支付');
+  if (feeAmount <= 0) throw svc('packNoTransportFee');
 
   const db = await getDatabase();
   const paidAt = nowIso();

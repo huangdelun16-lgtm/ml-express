@@ -582,10 +582,10 @@ const SystemSettings: React.FC = () => {
       });
     }
 
-    const ok = await systemSettingsService.upsertSettings(payload);
+    const result = await systemSettingsService.upsertSettings(payload);
 
-    if (!ok) {
-      setErrorMessage('保存失败，请检查网络或稍后重试。');
+    if (!result.ok) {
+      setErrorMessage(result.error ? `保存失败：${result.error}` : '保存失败，请检查网络或稍后重试。');
       setSaving(false);
       return;
     }

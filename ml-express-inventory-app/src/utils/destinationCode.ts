@@ -9,6 +9,7 @@ export function normalizeDestinationCode(code: string): string {
   if (packed) return packed;
   const key = normalizeOwnerKey(raw);
   if (key === 'MUSE') return 'MSE';
+  if (key === 'RUILI') return 'RUI';
   return key || raw.slice(0, 3);
 }
 

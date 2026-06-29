@@ -515,6 +515,13 @@ export type UpdateCrossBorderAccountResult = {
   login?: CreateCrossBorderAccountResult['login'];
 };
 
+export type DeleteCrossBorderAccountResult = {
+  ok: boolean;
+  storeCode: string;
+  storeName: string;
+  authDeleted?: boolean;
+};
+
 export async function fetchCrossBorderAccountDetail(
   storeCode: string,
 ): Promise<CrossBorderAccountDetail> {
@@ -547,6 +554,23 @@ export async function updateCrossBorderAccount(
     throw new Error(body.error || `保存失败 (${response.status})`);
   }
   return body as UpdateCrossBorderAccountResult;
+}
+
+export async function deleteCrossBorderAccount(
+  storeCode: string,
+): Promise<DeleteCrossBorderAccountResult> {
+  const url = new URL('/.netlify/functions/inventory-admin-delete-account', window.location.origin);
+  url.searchParams.set('storeCode', storeCode.trim());
+
+  const response = await fetch(url.toString(), {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `删除失败 (${response.status})`);
+  }
+  return body as DeleteCrossBorderAccountResult;
 }
 
 export async function createCrossBorderAccount(

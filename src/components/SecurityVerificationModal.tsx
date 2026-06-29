@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { verifyCurrentUserPassword } from '../services/authService';
+
+/** 须高于 .cbl-create-overlay / .store-form-overlay (10050) */
+const SECURITY_MODAL_Z_INDEX = 10200;
 
 interface SecurityVerificationModalProps {
   visible: boolean;
@@ -56,30 +60,38 @@ const SecurityVerificationModal: React.FC<SecurityVerificationModalProps> = ({
     }
   };
 
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.75)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10000,
-      backdropFilter: 'blur(8px)'
-    }}>
-      <div style={{
-        backgroundColor: '#1e293b',
-        borderRadius: '20px',
-        padding: '2rem',
-        width: '90%',
-        maxWidth: '400px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        color: 'white'
-      }}>
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: SECURITY_MODAL_Z_INDEX,
+        backdropFilter: 'blur(8px)',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !loading) onClose();
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: '#1e293b',
+          borderRadius: '20px',
+          padding: '2rem',
+          width: '90%',
+          maxWidth: '400px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          color: 'white',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div style={{ 
             fontSize: '3rem', 
@@ -166,7 +178,8 @@ const SecurityVerificationModal: React.FC<SecurityVerificationModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

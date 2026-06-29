@@ -9,38 +9,46 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
+import { getPkgStatusLabel, useTranslation } from '../i18n';
 import {
   listInboundPackages,
   listOutboundPackagesFromOrigin,
 } from '../services/trackingService';
 import type { PkgTrackingDetail } from '../types/tracking';
-import { PKG_STATUS_LABEL } from '../types/tracking';
 import { resolveStoreHubCode } from '../utils/storeZone';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 
 type Tab = 'inbound' | 'outbound';
 
 type Nav = { navigate: (name: string, params?: { presetCode?: string }) => void };
 
 function PackTrackCard({ item, onPress }: { item: PkgTrackingDetail; onPress?: () => void }) {
+  const { t, fmt } = useTranslation();
   const content = (
     <View style={styles.card}>
       <View style={styles.cardTop}>
         <Text style={styles.barcode} numberOfLines={1}>
           {item.pack_barcode}
         </Text>
-        <Text style={styles.status}>{PKG_STATUS_LABEL[item.status]}</Text>
+        <Text style={styles.status}>{getPkgStatusLabel(t, item.status)}</Text>
       </View>
       <Text style={styles.route}>
-        {item.origin_store_code} → {item.destination_code}
+        {item.origin_store_code} → {regionDisplayLabel(item.destination_code)}
       </Text>
       <Text style={styles.meta}>
-        {item.item_count} 件
+        {fmt(t.common.itemsCount, { count: item.item_count })}
         {item.received_order_count > 0
-          ? ` · 已确认 ${item.received_order_count}/${item.item_count} 单`
+          ? ` · ${fmt(t.common.confirmedOrders, {
+              done: item.received_order_count,
+              total: item.item_count,
+            })}`
           : ''}
       </Text>
       {item.hub_received_by_store_code ? (
-        <Text style={styles.meta}>到站：{item.hub_received_by_store_code}</Text>
+        <Text style={styles.meta}>
+          {t.common.arrivedAt}
+          {item.hub_received_by_store_code}
+        </Text>
       ) : null}
     </View>
   );
@@ -52,6 +60,7 @@ function PackTrackCard({ item, onPress }: { item: PkgTrackingDetail; onPress?: (
 }
 
 export default function ShipmentTrackScreen({ navigation }: { navigation: Nav }) {
+  const { t, fmt } = useTranslation();
   const { store } = useAuth();
   const hubCode = store ? resolveStoreHubCode(store) : '';
   const [tab, setTab] = useState<Tab>('inbound');
@@ -81,9 +90,12 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
     <View style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {store?.storeCode} · 区域 {hubCode}
+          {fmt(t.crossBorderFinance.heroHub, {
+            name: store?.storeCode ?? '',
+            hub: regionDisplayLabel(hubCode),
+          })}
         </Text>
-        <Text style={styles.headerSub}>云端实时追踪装车发出与到站进度</Text>
+        <Text style={styles.headerSub}>{t.shipmentTrack.headerSub}</Text>
       </View>
 
       <View style={styles.tabs}>
@@ -92,7 +104,7 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
           onPress={() => setTab('inbound')}
         >
           <Text style={[styles.tabText, tab === 'inbound' && styles.tabTextOn]}>
-            本站待收 ({inbound.length})
+            {fmt(t.shipmentTrack.tabInbound, { count: inbound.length })}
           </Text>
         </Pressable>
         <Pressable
@@ -100,7 +112,7 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
           onPress={() => setTab('outbound')}
         >
           <Text style={[styles.tabText, tab === 'outbound' && styles.tabTextOn]}>
-            本站发出 ({outbound.length})
+            {fmt(t.shipmentTrack.tabOutbound, { count: outbound.length })}
           </Text>
         </Pressable>
       </View>
@@ -122,8 +134,8 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
         ListEmptyComponent={
           <Text style={styles.empty}>
             {tab === 'inbound'
-              ? `暂无发往 ${hubCode} 的在途包裹`
-              : '暂无本站发出的在途包裹'}
+              ? fmt(t.shipmentTrack.emptyInbound, { hub: regionDisplayLabel(hubCode) })
+              : t.shipmentTrack.emptyOutbound}
           </Text>
         }
         renderItem={({ item }) => (

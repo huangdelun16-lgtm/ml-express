@@ -1,0 +1,150 @@
+import type { FinanceLedgerCategory } from '../types/financeLedger';
+import type { OrderTrackingStatus, PkgTrackingStatus } from '../types/tracking';
+import { extractDestinationCode } from '../utils/inboundBarcode';
+import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { ownershipLabelFromKey, toComparableOwnerKey } from '../utils/storeOwnership';
+import { fmt } from './format';
+import type { TranslationDict } from './translations';
+
+export function formatTimeAgo(
+  iso: string,
+  t: TranslationDict,
+): { primary: string; secondary: string } {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return { primary: iso, secondary: '' };
+  }
+  const now = new Date();
+  const pad = (x: number) => String(x).padStart(2, '0');
+  const full = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return { primary: t.common.timeJustNow, secondary: full };
+  if (diffMin < 60) {
+    return { primary: fmt(t.common.timeMinutesAgo, { n: diffMin }), secondary: full };
+  }
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) {
+    return { primary: fmt(t.common.timeHoursAgo, { n: diffHr }), secondary: full };
+  }
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) {
+    return { primary: fmt(t.common.timeDaysAgo, { n: diffDay }), secondary: full };
+  }
+  return { primary: full, secondary: '' };
+}
+
+export function getPkgStatusLabel(t: TranslationDict, status: PkgTrackingStatus): string {
+  return t.tracking.pkgStatus[status];
+}
+
+export function getOrderStatusLabel(t: TranslationDict, status: OrderTrackingStatus): string {
+  return t.tracking.orderStatus[status];
+}
+
+export function getLedgerCategoryLabel(t: TranslationDict, category: FinanceLedgerCategory): string {
+  return t.ledgerCategory[category];
+}
+
+export function getEditDeniedMessage(
+  t: TranslationDict,
+  ownerRef: string | null | undefined,
+): string {
+  const ownerKey = toComparableOwnerKey(ownerRef);
+  if (!ownerKey) {
+    return t.serviceErrors.editDeniedUnknownOwner;
+  }
+  const label = ownershipLabelFromKey(ownerKey);
+  return fmt(t.serviceErrors.editDeniedOtherStore, { owner: label });
+}
+
+/** 到站扫码查不到包裹时的说明文案 */
+export function formatPkgNotFoundHint(
+  t: TranslationDict,
+  packBarcode: string,
+  hubCode: string,
+): string {
+  const h = t.hubReceiveHints;
+  const packDest = packDestinationFromBarcode(packBarcode);
+  const hub = hubCode.trim().toUpperCase();
+  const lines = [h.title, '', h.stepsLead, h.step1, h.step2, h.step3, h.step4];
+  if (packDest && hub && packDest !== hub) {
+    lines.push('', fmt(h.destMismatch, { packDest, hub }));
+  } else if (packDest) {
+    lines.push('', fmt(h.destOnly, { packDest }));
+  }
+  lines.push('', h.resyncTip);
+  return lines.join('\n');
+}
+
+/** 到站扫码入库单/快递单查不到时的说明 */
+export function formatOrderNotFoundHint(
+  t: TranslationDict,
+  scanCode: string,
+  hubCode: string,
+): string {
+  const h = t.orderReceiveHints;
+  const dest = extractDestinationCode(scanCode);
+  const hub = hubCode.trim().toUpperCase();
+  const lines = [h.title, '', h.scanHint, '', h.stepsLead, h.step1, h.step2, h.step3];
+  if (dest && hub && dest !== hub) {
+    lines.push('', fmt(h.destMismatch, { dest, hub }));
+  }
+  lines.push('', h.manualTip);
+  return lines.join('\n');
+}
+
+export function getTransportFeeDisplay(t: TranslationDict, raw: string | undefined | null): string {
+  if (!raw?.trim()) return t.hubReceive.feeNotRegistered;
+  const n = Number(raw.replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(n) || n <= 0) return t.hubReceive.feeNotRegistered;
+  return `${n % 1 === 0 ? n : n.toFixed(2)} MMK`;
+}
+
+export const LEDGER_CATEGORY_STYLE: Record<
+  FinanceLedgerCategory,
+  { icon: string; accent: string; tint: string; pillBg: string }
+> = {
+  order_income_cod: {
+    icon: '💵',
+    accent: '#34d399',
+    tint: 'rgba(52,211,153,0.12)',
+    pillBg: 'rgba(52,211,153,0.18)',
+  },
+  order_prepaid: {
+    icon: '✓',
+    accent: '#60a5fa',
+    tint: 'rgba(96,165,250,0.12)',
+    pillBg: 'rgba(96,165,250,0.18)',
+  },
+  order_collected: {
+    icon: '✅',
+    accent: '#2dd4bf',
+    tint: 'rgba(45,212,191,0.12)',
+    pillBg: 'rgba(45,212,191,0.18)',
+  },
+  transport_cost: {
+    icon: '🚚',
+    accent: '#f87171',
+    tint: 'rgba(248,113,113,0.12)',
+    pillBg: 'rgba(248,113,113,0.18)',
+  },
+  manual_income: {
+    icon: '📈',
+    accent: '#34d399',
+    tint: 'rgba(52,211,153,0.12)',
+    pillBg: 'rgba(52,211,153,0.18)',
+  },
+  manual_expense: {
+    icon: '📉',
+    accent: '#f87171',
+    tint: 'rgba(248,113,113,0.12)',
+    pillBg: 'rgba(248,113,113,0.18)',
+  },
+  stock_op: {
+    icon: '📋',
+    accent: '#94a3b8',
+    tint: 'rgba(148,163,184,0.1)',
+    pillBg: 'rgba(148,163,184,0.15)',
+  },
+};

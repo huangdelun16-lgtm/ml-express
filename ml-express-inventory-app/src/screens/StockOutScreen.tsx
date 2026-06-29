@@ -17,7 +17,9 @@ import PkgPickerField from '../components/PkgPickerField';
 import StockOutSuccessModal, { type StockOutSuccessData } from '../components/StockOutSuccessModal';
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { requestAutoCloudSync } from '../services/cloudAutoSync';
+import { useTranslation, resolveAppError } from '../i18n';
+import { awaitForceCloudSync, requestAutoCloudSync } from '../services/cloudAutoSync';
+import { getCloudSyncQueueSnapshot } from '../services/inventoryCloudQueue';
 import { applyTruckLoadOutbound, listOutboundPackages } from '../services/inventoryService';
 import type { PackedShipmentDetail } from '../types/inventory';
 import OutboundDateField from '../components/OutboundDateField';
@@ -25,12 +27,12 @@ import { formatDisplayDate, isValidIsoDate, todayIsoDate } from '../utils/dateFo
 import { sanitizeNumberInput, sumPackageWeightsKg } from '../utils/itemFieldFormat';
 import { resolveStoreOriginLabel, listOutboundDestinationOptions, isOwnStationOutboundDestination } from '../utils/storeZone';
 import { fetchTruckRouteFee, formatTruckRouteLabel } from '../utils/truckRouteFee';
-import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StockOut'>;
 
 export default function StockOutScreen({ navigation }: Props) {
-  const { operatorName, store, hubCode } = useAuth();
+  const { t, fmt } = useTranslation();
+  const { operatorName, store, hubCode, hasShiftOperator } = useAuth();
   const [packs, setPacks] = useState<PackedShipmentDetail[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -41,6 +43,7 @@ export default function StockOutScreen({ navigation }: Props) {
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState<StockOutSuccessData | null>(null);
+  const [retryingSync, setRetryingSync] = useState(false);
 
   const originLabel = store ? resolveStoreOriginLabel(store) : '';
   const routeLabel = formatTruckRouteLabel(originLabel, destination);
@@ -130,28 +133,72 @@ export default function StockOutScreen({ navigation }: Props) {
     navigation.navigate('Home');
   }, [navigation]);
 
+  const handleGoResync = useCallback(() => {
+    setSuccessData(null);
+    navigation.navigate('Pkg');
+  }, [navigation]);
+
+  const handleGoSyncSettings = useCallback(() => {
+    setSuccessData(null);
+    navigation.navigate('Settings');
+  }, [navigation]);
+
+  const handleRetrySync = useCallback(async () => {
+    if (!store || !hubCode || !successData) return;
+    setRetryingSync(true);
+    try {
+      await awaitForceCloudSync(store, hubCode);
+      const snap = await getCloudSyncQueueSnapshot(store.storeCode);
+      if (snap.pendingTruckLoad === 0 && snap.highestPriorityType !== 'truck_load') {
+        setSuccessData({ ...successData, cloudStatus: 'synced', cloudError: undefined });
+      } else {
+        Alert.alert(
+          t.common.fail,
+          fmt(t.settings.cloudSync.impactTruckLoad, {
+            count: snap.pendingTruckLoad || snap.pending,
+          }),
+        );
+      }
+    } catch (e: unknown) {
+      Alert.alert(t.common.fail, resolveAppError(t, e));
+    } finally {
+      setRetryingSync(false);
+    }
+  }, [store, hubCode, successData, t]);
+
   const submit = async () => {
+    if (!hasShiftOperator) {
+      Alert.alert(t.settings.operator.requiredTitle, t.settings.operator.requiredHint, [
+        { text: t.common.close },
+        { text: t.nav.settings, onPress: () => navigation.navigate('Settings') },
+      ]);
+      return;
+    }
     if (!destination.trim()) {
-      Alert.alert('提示', '请选择目的地');
+      Alert.alert(t.common.tip, t.stockOut.alertSelectDest);
       return;
     }
     if (store && isOwnStationOutboundDestination(destination, store)) {
-      Alert.alert('提示', '目的地不能为本站，请选择其他中转站');
+      Alert.alert(t.common.tip, t.stockOut.alertOwnStation);
       return;
     }
     if (selectedPacks.length === 0) {
-      Alert.alert('提示', '请至少选择一个包装号');
+      Alert.alert(t.common.tip, t.stockOut.alertSelectPack);
       return;
     }
     if (!isValidIsoDate(outboundDate)) {
-      Alert.alert('提示', '请选择有效的出库日期');
+      Alert.alert(t.common.tip, t.stockOut.alertInvalidDate);
+      return;
+    }
+    if (!transportFee.trim() || Number(transportFee) <= 0) {
+      Alert.alert(t.common.tip, t.stockOut.alertTransportFee);
       return;
     }
 
     setLoading(true);
     try {
       const result = await applyTruckLoadOutbound({
-        operator: operatorName ?? '工作人员',
+        operator: operatorName ?? t.common.operator,
         destination: destination.trim(),
         outboundDate: outboundDate.trim(),
         packs: selectedPacks,
@@ -163,34 +210,39 @@ export default function StockOutScreen({ navigation }: Props) {
           : undefined,
         actingStore: store ?? undefined,
       });
-      const cloudHint = result.cloudSynced
-        ? '已同步云端，目的地站点可扫码收货'
+      const cloudStatus = result.cloudSynced
+        ? ('synced' as const)
         : result.cloudError
-          ? `⚠️ 云端同步失败：${result.cloudError}\n目的地站点将无法扫码收货，请修复后补传云端`
+          ? ('failed' as const)
           : store
-            ? '⚠️ 未同步云端，目的地站点将无法扫码收货'
-            : '';
+            ? ('skipped' as const)
+            : ('synced' as const);
       const destLabel = destination.trim();
       setSuccessData({
         destination: destLabel,
         count: result.count,
         totalWeight,
-        cloudHint,
+        cloudStatus,
+        cloudError: result.cloudError
+          ? resolveAppError(t, new Error(result.cloudError))
+          : undefined,
+        packBarcodes: selectedPacks.map((p) => p.bundle_barcode),
       });
-      showTaskSuccess(
-        '装车出库成功',
-        `已成功出库 ${result.count} 包，目的地 ${destLabel}${
-          totalWeight ? `，总重 ${totalWeight} Kg` : ''
-        }${cloudHint ? `\n${cloudHint}` : ''}`,
-      );
       resetForm();
       await loadPacks();
     } catch (e: unknown) {
-      Alert.alert('失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
   };
+
+  const summaryWeightPart = totalWeight
+    ? fmt(t.stockOut.summaryWeight, { weight: totalWeight })
+    : '';
+  const summaryFeePart = transportFee
+    ? fmt(t.stockOut.summaryFee, { fee: transportFee })
+    : '';
 
   return (
     <KeyboardAvoidingView
@@ -198,10 +250,8 @@ export default function StockOutScreen({ navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>🚚 装车出库</Text>
-        <Text style={styles.subtitle}>
-          先选 PKG 包装号，再选本段运达站（可与包装号标注的最终目的地不同，如经 MDY 中转）
-        </Text>
+        <Text style={styles.title}>{t.stockOut.title}</Text>
+        <Text style={styles.subtitle}>{t.stockOut.subtitle}</Text>
 
         <View style={styles.formCard}>
           <PkgPickerField
@@ -213,8 +263,8 @@ export default function StockOutScreen({ navigation }: Props) {
           />
 
           <DestinationPickerField
-            label="目的地"
-            hint="本段卡车运达的中转站或终点站（不可选择本站）"
+            label={t.stockOut.destination}
+            hint={t.stockOut.destinationHint}
             value={destination}
             onChange={setDestination}
             options={outboundDestinationOptions}
@@ -222,13 +272,13 @@ export default function StockOutScreen({ navigation }: Props) {
 
           <OutboundDateField value={outboundDate} onChange={setOutboundDate} />
 
-          <Text style={styles.label}>出库数据</Text>
+          <Text style={styles.label}>{t.stockOut.outboundData}</Text>
           <View style={styles.outboundStatsRow}>
             <View style={styles.outboundStat}>
               <Text style={styles.outboundStatValue}>
                 {packageCount > 0 ? String(packageCount) : '—'}
               </Text>
-              <Text style={styles.outboundStatUnit}>包</Text>
+              <Text style={styles.outboundStatUnit}>{t.stockOut.packUnit}</Text>
             </View>
             <Text style={styles.outboundDivider}>·</Text>
             <View style={styles.outboundStat}>
@@ -239,11 +289,11 @@ export default function StockOutScreen({ navigation }: Props) {
             </View>
           </View>
           {packageCount === 0 ? (
-            <Text style={styles.fieldHint}>选择包装号后自动统计件数与总重量</Text>
+            <Text style={styles.fieldHint}>{t.stockOut.selectPackHint}</Text>
           ) : null}
 
           <Text style={styles.label}>
-            车费
+            {t.stockOut.transportFee} *
             {routeLabel ? <Text style={styles.routeHint}> · {routeLabel}</Text> : null}
           </Text>
           <View style={styles.feeRow}>
@@ -251,7 +301,13 @@ export default function StockOutScreen({ navigation }: Props) {
               style={styles.feeInput}
               value={transportFee}
               onChangeText={(v) => setTransportFee(sanitizeNumberInput(v))}
-              placeholder={feeLoading ? '查询中…' : routeLabel ? '路线车费' : '请先选择目的地'}
+              placeholder={
+                feeLoading
+                  ? t.stockOut.feeLoading
+                  : routeLabel
+                    ? t.stockOut.feeRoute
+                    : t.stockOut.feeSelectDest
+              }
               placeholderTextColor="#94a3b8"
               keyboardType="decimal-pad"
               editable={!feeLoading}
@@ -260,29 +316,37 @@ export default function StockOutScreen({ navigation }: Props) {
           </View>
           {routeLabel ? (
             <Text style={styles.fieldHint}>
-              按发站 {originLabel} 至目的地 {destination.trim().toUpperCase()} 的路线车费自动带出，可手动修改
+              {fmt(t.stockOut.feeAutoHint, {
+                origin: originLabel,
+                dest: destination.trim().toUpperCase(),
+              })}
             </Text>
           ) : null}
 
-          <Text style={styles.label}>备注（可选）</Text>
+          <Text style={styles.label}>{t.stockOut.noteOptional}</Text>
           <TextInput
             style={styles.input}
             value={note}
             onChangeText={setNote}
-            placeholder="车牌、司机、班次等"
+            placeholder={t.stockOut.notePlaceholder}
             placeholderTextColor="#94a3b8"
           />
         </View>
 
         {selectedPacks.length > 0 ? (
           <View style={styles.summary}>
-            <Text style={styles.summaryTitle}>装车摘要</Text>
+            <Text style={styles.summaryTitle}>{t.stockOut.summaryTitle}</Text>
             <Text style={styles.summaryLine}>
-              运达 {destination || '未选目的地'} · {packageCount} 包
-              {totalWeight ? ` · ${totalWeight} Kg` : ''}
-              {transportFee ? ` · 车费 ${transportFee} MMK` : ''}
+              {fmt(t.stockOut.summaryLine, {
+                dest: destination || t.stockOut.noDest,
+                count: packageCount,
+                weight: summaryWeightPart,
+                fee: summaryFeePart,
+              })}
             </Text>
-            <Text style={styles.summaryLine}>出库日期 {formatDisplayDate(outboundDate)}</Text>
+            <Text style={styles.summaryLine}>
+              {fmt(t.stockOut.summaryDate, { date: formatDisplayDate(outboundDate) })}
+            </Text>
             {selectedPacks.map((pack) => (
               <Text key={pack.id} style={styles.summaryPack} numberOfLines={1}>
                 · {pack.bundle_barcode}
@@ -297,7 +361,9 @@ export default function StockOutScreen({ navigation }: Props) {
           onPress={submit}
           disabled={loading || selectedPacks.length === 0}
         >
-          <Text style={styles.btnText}>{loading ? '处理中…' : '确认装车出库'}</Text>
+          <Text style={styles.btnText}>
+            {loading ? t.common.processing : t.stockOut.submit}
+          </Text>
         </Pressable>
       </ScrollView>
 
@@ -305,6 +371,10 @@ export default function StockOutScreen({ navigation }: Props) {
         visible={!!successData}
         data={successData}
         onDone={handleSuccessDone}
+        onGoResync={handleGoResync}
+        onRetrySync={() => void handleRetrySync()}
+        onGoSyncSettings={handleGoSyncSettings}
+        retrying={retryingSync}
       />
     </KeyboardAvoidingView>
   );

@@ -14,17 +14,62 @@ import {
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
-import { useTranslation } from '../i18n';
+import { formatTimeAgo, resolveAppError, useTranslation } from '../i18n';
+import type { TranslationDict } from '../i18n/translations';
 import {
+  getBluetoothCapabilityHint,
   getPrinterSettings,
+  pickIosLabelPrinter,
   savePrinterSettings,
+  type PrinterConnectionMode,
   type PrinterSettings,
 } from '../services/printerService';
 import { clearAllTestData } from '../services/inventoryService';
-import { getCloudSyncQueueSnapshot } from '../services/inventoryCloudQueue';
+import {
+  getCloudSyncStatus,
+  runManualCloudSync,
+  type CloudSyncStatus,
+} from '../services/cloudSyncStatus';
 import { resolveStoreHubCode } from '../utils/storeZone';
+import { regionDisplayLabel } from '../constants/destinationOptions';
+import { resolveSyncErrorMessage, syncImpactMessage } from '../utils/cloudSyncSla';
+
+function SyncStatusRow({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'warn' | 'err' }) {
+  const valueColor =
+    tone === 'ok' ? '#6ee7b7' : tone === 'warn' ? '#fcd34d' : tone === 'err' ? '#fca5a5' : '#e2e8f0';
+  return (
+    <View style={styles.syncRow}>
+      <Text style={styles.syncLabel}>{label}</Text>
+      <Text style={[styles.syncValue, { color: valueColor }]} numberOfLines={3}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function connectionLabel(t: TranslationDict, status: CloudSyncStatus): { text: string; tone: 'ok' | 'warn' | 'err' } {
+  const { connection } = status;
+  if (!connection.configured) {
+    return { text: t.settings.cloudSync.notConfigured, tone: 'err' };
+  }
+  if (!connection.authenticated) {
+    return { text: t.settings.cloudSync.authRequired, tone: 'warn' };
+  }
+  return { text: t.settings.cloudSync.connected, tone: 'ok' };
+}
+
+function opTypeLabel(t: TranslationDict, op: string | null): string {
+  if (op === 'item_and_movement') return t.settings.cloudSync.opItem;
+  if (op === 'packed_shipment') return t.settings.cloudSync.opPack;
+  if (op === 'truck_load') return t.settings.cloudSync.opTruckLoad;
+  return op ?? '—';
+}
 
 const WIDTH_OPTIONS: PrinterSettings['labelWidthMm'][] = [40, 50, 60, 80];
+const CONNECTION_OPTIONS: { mode: PrinterConnectionMode; labelKey: 'connectionSystem' | 'connectionBluetooth' }[] = [
+  { mode: 'system', labelKey: 'connectionSystem' },
+  { mode: 'bluetooth', labelKey: 'connectionBluetooth' },
+];
 
 function SectionCard({
   icon,
@@ -85,31 +130,32 @@ function QuickAction({
 }
 
 export default function SettingsScreen() {
-  const { operatorName, storeCode, store, hubCode, logout } = useAuth();
-  const { t, fmt } = useTranslation();
+  const { operatorName, storeCode, store, hubCode, logout, hasShiftOperator, updateShiftOperator } = useAuth();
+  const { t, fmt, language } = useTranslation();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
   const [clearing, setClearing] = useState(false);
-  const [syncPending, setSyncPending] = useState(0);
-  const [syncLastError, setSyncLastError] = useState<string | null>(null);
+  const [cloudSync, setCloudSync] = useState<CloudSyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [pickingPrinter, setPickingPrinter] = useState(false);
+  const [operatorDraft, setOperatorDraft] = useState('');
+  const [savingOperator, setSavingOperator] = useState(false);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
 
-  const refreshSyncQueue = async () => {
-    if (!storeCode) {
-      setSyncPending(0);
-      setSyncLastError(null);
-      return;
-    }
-    const snapshot = await getCloudSyncQueueSnapshot(storeCode);
-    setSyncPending(snapshot.pending);
-    setSyncLastError(snapshot.lastError);
+  const refreshCloudSync = async () => {
+    const status = await getCloudSyncStatus(store);
+    setCloudSync(status);
   };
 
   useEffect(() => {
     void getPrinterSettings().then(setSettings);
-    void refreshSyncQueue();
-  }, [storeCode]);
+    void refreshCloudSync();
+  }, [storeCode, store?.id]);
+
+  useEffect(() => {
+    setOperatorDraft(hasShiftOperator ? (operatorName ?? '') : '');
+  }, [hasShiftOperator, operatorName, storeCode]);
 
   const updatePrinter = async (patch: Partial<PrinterSettings>) => {
     if (!settings) return;
@@ -132,7 +178,7 @@ export default function SettingsScreen() {
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.heroAvatar}>
-            <Text style={styles.heroAvatarText}>{hub?.slice(0, 2) ?? '站'}</Text>
+            <Text style={styles.heroAvatarText}>{hub?.slice(0, 2) ?? t.common.thisStation.slice(0, 1)}</Text>
           </View>
           <View style={styles.heroInfo}>
             <Text style={styles.heroName} numberOfLines={1}>
@@ -146,7 +192,7 @@ export default function SettingsScreen() {
               ) : null}
               {hub ? (
                 <View style={[styles.tag, styles.tagHub]}>
-                  <Text style={styles.tagHubText}>{fmt(t.settings.regionTag, { hub })}</Text>
+                  <Text style={styles.tagHubText}>{fmt(t.settings.regionTag, { hub: regionDisplayLabel(hub) })}</Text>
                 </View>
               ) : null}
             </View>
@@ -173,14 +219,182 @@ export default function SettingsScreen() {
         <LanguageSwitcherRow />
       </SectionCard>
 
-      {syncPending > 0 ? (
-        <View style={styles.syncBanner}>
-          <Text style={styles.syncBannerText}>
-            {fmt(t.settings.syncBanner, { count: syncPending })}
-            {syncLastError ? ` · ${syncLastError}` : ''}
+      <SectionCard icon="👤" title={t.settings.operator.title} accent="#10b981">
+        <Text style={styles.fieldLabel}>{t.settings.operator.nameLabel}</Text>
+        <TextInput
+          style={styles.operatorInput}
+          value={operatorDraft}
+          onChangeText={setOperatorDraft}
+          placeholder={t.settings.operator.namePlaceholder}
+          placeholderTextColor="#64748b"
+          autoCapitalize="words"
+          autoCorrect={false}
+        />
+        <Text style={styles.hintText}>{t.settings.operator.nameHint}</Text>
+        {!hasShiftOperator && store ? (
+          <Text style={styles.operatorWarn}>{t.settings.operator.storeFallback}</Text>
+        ) : null}
+        <Pressable
+          style={[
+            styles.actionBtn,
+            styles.actionBtnPrimary,
+            (savingOperator || !operatorDraft.trim() || !store) && styles.btnDisabled,
+          ]}
+          disabled={savingOperator || !operatorDraft.trim() || !store}
+          onPress={() => {
+            if (!store || !operatorDraft.trim()) return;
+            void (async () => {
+              setSavingOperator(true);
+              try {
+                await updateShiftOperator(operatorDraft);
+                Alert.alert(t.common.success, t.settings.operator.saved);
+              } catch (e: unknown) {
+                Alert.alert(t.common.fail, resolveAppError(t, e));
+              } finally {
+                setSavingOperator(false);
+              }
+            })();
+          }}
+        >
+          <Text style={styles.actionBtnPrimaryText}>
+            {savingOperator ? t.common.processing : t.settings.operator.save}
           </Text>
-        </View>
-      ) : null}
+        </Pressable>
+      </SectionCard>
+
+      <SectionCard
+        icon="☁️"
+        title={t.settings.cloudSync.title}
+        accent="#8b5cf6"
+        badge={cloudSync && cloudSync.pending > 0 ? String(cloudSync.pending) : undefined}
+      >
+        {cloudSync ? (
+          <>
+            <SyncStatusRow
+              label={t.settings.cloudSync.connectionStatus}
+              value={connectionLabel(t, cloudSync).text}
+              tone={connectionLabel(t, cloudSync).tone}
+            />
+            {!cloudSync.connection.authenticated && cloudSync.connection.errorCode ? (
+              <Text style={styles.hintText}>
+                {resolveAppError(t, new Error(cloudSync.connection.errorCode))}
+              </Text>
+            ) : null}
+            <SyncStatusRow
+              label={t.settings.cloudSync.pending}
+              value={
+                cloudSync.pending > 0
+                  ? fmt(t.settings.cloudSync.pendingCount, { count: cloudSync.pending })
+                  : t.settings.cloudSync.pendingNone
+              }
+              tone={cloudSync.pending > 0 ? 'warn' : 'ok'}
+            />
+            {cloudSync.pending > 0 ? (
+              <>
+                {cloudSync.pendingTruckLoad > 0 ? (
+                  <Text style={styles.hintText}>
+                    {fmt(t.settings.cloudSync.priorityTruck, { count: cloudSync.pendingTruckLoad })}
+                  </Text>
+                ) : null}
+                {cloudSync.pendingPack > 0 ? (
+                  <Text style={styles.hintText}>
+                    {fmt(t.settings.cloudSync.priorityPack, { count: cloudSync.pendingPack })}
+                  </Text>
+                ) : null}
+                {cloudSync.pendingItem > 0 ? (
+                  <Text style={styles.hintText}>
+                    {fmt(t.settings.cloudSync.priorityItem, { count: cloudSync.pendingItem })}
+                  </Text>
+                ) : null}
+                {syncImpactMessage(t, cloudSync.highestPriorityType, cloudSync.pending) ? (
+                  <View style={styles.syncBanner}>
+                    <Text style={styles.syncBannerLabel}>{t.settings.cloudSync.slaImpactTitle}</Text>
+                    <Text style={styles.syncBannerText}>
+                      {syncImpactMessage(t, cloudSync.highestPriorityType, cloudSync.pending)}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            ) : null}
+            {cloudSync.pending > 0 && cloudSync.oldestOpType ? (
+              <Text style={styles.hintText}>{opTypeLabel(t, cloudSync.oldestOpType)}</Text>
+            ) : null}
+            <SyncStatusRow
+              label={t.settings.cloudSync.lastSync}
+              value={
+                cloudSync.lastSync
+                  ? `${formatTimeAgo(cloudSync.lastSync.at, t).primary} · ${
+                      cloudSync.lastSync.ok
+                        ? t.settings.cloudSync.lastSyncOk
+                        : t.settings.cloudSync.lastSyncFailed
+                    }`
+                  : t.settings.cloudSync.lastSyncNever
+              }
+              tone={
+                !cloudSync.lastSync
+                  ? undefined
+                  : cloudSync.lastSync.ok
+                    ? 'ok'
+                    : 'err'
+              }
+            />
+            {cloudSync.lastSync?.at ? (
+              <Text style={styles.hintText}>{formatTimeAgo(cloudSync.lastSync.at, t).secondary}</Text>
+            ) : null}
+            {cloudSync.queueError ? (
+              <>
+                <SyncStatusRow
+                  label={t.settings.cloudSync.queueError}
+                  value={resolveSyncErrorMessage(t, cloudSync.queueError)}
+                  tone="err"
+                />
+              </>
+            ) : null}
+            {cloudSync.lastSync?.error && !cloudSync.queueError ? (
+              <SyncStatusRow
+                label={t.settings.cloudSync.lastSyncFailed}
+                value={resolveSyncErrorMessage(t, cloudSync.lastSync.error)}
+                tone="err"
+              />
+            ) : null}
+          </>
+        ) : (
+          <ActivityIndicator color="#a78bfa" />
+        )}
+        <Pressable
+          style={[
+            styles.actionBtn,
+            styles.actionBtnPrimary,
+            (syncing || !store || !hub) && styles.btnDisabled,
+          ]}
+          disabled={syncing || !store || !hub}
+          onPress={() => {
+            if (!store || !hub) return;
+            void (async () => {
+              setSyncing(true);
+              try {
+                const result = await runManualCloudSync(store, hub);
+                await refreshCloudSync();
+                Alert.alert(
+                  t.settings.cloudSync.syncSuccess,
+                  result.pending > 0
+                    ? fmt(t.settings.cloudSync.syncSuccessWithPending, { count: result.pending })
+                    : t.settings.cloudSync.syncSuccess,
+                );
+              } catch (e: unknown) {
+                await refreshCloudSync();
+                Alert.alert(t.common.fail, resolveAppError(t, e));
+              } finally {
+                setSyncing(false);
+              }
+            })();
+          }}
+        >
+          <Text style={styles.actionBtnPrimaryText}>
+            {syncing ? t.settings.cloudSync.syncing : t.settings.cloudSync.syncNow}
+          </Text>
+        </Pressable>
+      </SectionCard>
 
       <SectionCard icon="🖨️" title={t.settings.labelPrint} accent="#3b82f6">
         <View style={styles.switchRow}>
@@ -192,6 +406,55 @@ export default function SettingsScreen() {
             thumbColor="#fff"
           />
         </View>
+        <Text style={styles.fieldLabel}>{t.settings.connectionMode}</Text>
+        <View style={styles.chips}>
+          {CONNECTION_OPTIONS.map(({ mode, labelKey }) => (
+            <Pressable
+              key={mode}
+              style={[styles.chip, settings.connectionMode === mode && styles.chipOn]}
+              onPress={() => void updatePrinter({ connectionMode: mode })}
+            >
+              <Text style={[styles.chipText, settings.connectionMode === mode && styles.chipTextOn]}>
+                {t.settings[labelKey]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {settings.connectionMode === 'bluetooth' ? (
+          <>
+            <Text style={styles.hintText}>{getBluetoothCapabilityHint(language)}</Text>
+            <Text style={styles.hintText}>{t.settings.bluetoothPairHint}</Text>
+            {Platform.OS === 'ios' ? (
+              <>
+                <Text style={styles.fieldLabel}>{t.settings.iosSelectPrinter}</Text>
+                <Text style={styles.hintText}>
+                  {settings.iosPrinterName
+                    ? fmt(t.settings.iosPrinterSelected, { name: settings.iosPrinterName })
+                    : t.settings.iosPrinterNotSelected}
+                </Text>
+                <Pressable
+                  style={[styles.actionBtn, styles.actionBtnPrimary, pickingPrinter && styles.btnDisabled]}
+                  disabled={pickingPrinter}
+                  onPress={() => {
+                    void (async () => {
+                      setPickingPrinter(true);
+                      try {
+                        const next = await pickIosLabelPrinter();
+                        setSettings(next);
+                      } catch (e: unknown) {
+                        Alert.alert(t.settings.printFailed, resolveAppError(t, e));
+                      } finally {
+                        setPickingPrinter(false);
+                      }
+                    })();
+                  }}
+                >
+                  <Text style={styles.actionBtnPrimaryText}>{t.settings.iosSelectPrinter}</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </>
+        ) : null}
         <Text style={styles.fieldLabel}>{t.settings.labelWidth}</Text>
         <View style={styles.chips}>
           {WIDTH_OPTIONS.map((w) => (
@@ -239,7 +502,7 @@ export default function SettingsScreen() {
                         const edgePart = result.cloudEdge
                           ? `\nCloud: ${result.cloudEdge.items} items, ${result.cloudEdge.packs} packs`
                           : result.cloudEdgeError
-                            ? `\nCloud: ${result.cloudEdgeError}`
+                            ? `\nCloud: ${resolveAppError(t, new Error(result.cloudEdgeError))}`
                             : '';
                         Alert.alert(
                           t.common.cleared,
@@ -248,7 +511,7 @@ export default function SettingsScreen() {
                       } catch (e: unknown) {
                         Alert.alert(
                           t.common.fail,
-                          e instanceof Error ? e.message : t.common.loading,
+                          resolveAppError(t, e),
                         );
                       } finally {
                         setClearing(false);
@@ -361,6 +624,21 @@ const styles = StyleSheet.create({
   },
   quickActionEmoji: { fontSize: 20 },
   quickActionLabel: { color: '#f1f5f9', fontWeight: '800', fontSize: 14 },
+  syncRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 10,
+  },
+  syncLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '700', flex: 1 },
+  syncValue: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontWeight: '800',
+    flex: 1.2,
+    textAlign: 'right',
+  },
   syncBanner: {
     backgroundColor: '#4c1d95',
     borderRadius: 12,
@@ -369,7 +647,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#6d28d9',
   },
-  syncBannerText: { color: '#e9d5ff', fontSize: 13, fontWeight: '700' },
+  syncBannerLabel: { color: '#c4b5fd', fontSize: 11, fontWeight: '800', marginBottom: 4 },
+  syncBannerText: { color: '#e9d5ff', fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  operatorInput: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 8,
+    fontWeight: '700',
+    color: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  operatorWarn: {
+    color: '#fcd34d',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 10,
+    fontWeight: '700',
+  },
   sectionCard: { marginBottom: 14 },
   sectionHead: {
     flexDirection: 'row',
@@ -406,7 +703,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 12,
   },
-  fieldLabel: { color: '#f1f5f9', fontWeight: '800', fontSize: 14 },
+  fieldLabel: { color: '#f1f5f9', fontWeight: '800', fontSize: 14, marginBottom: 8 },
+  hintText: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   chip: {
     paddingHorizontal: 16,
@@ -437,6 +735,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionBtnDanger: { backgroundColor: '#b91c1c' },
+  actionBtnPrimary: { backgroundColor: '#2563eb', marginBottom: 8 },
+  actionBtnPrimaryText: { color: '#fff', fontWeight: '900', fontSize: 15 },
   actionBtnText: { color: '#fff', fontWeight: '900', fontSize: 15 },
   btnDisabled: { opacity: 0.55 },
   footer: {

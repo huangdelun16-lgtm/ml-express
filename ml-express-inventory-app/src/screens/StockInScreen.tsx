@@ -45,7 +45,7 @@ import {
 } from '../utils/crossBorderPricing';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
-import { useTranslation } from '../i18n';
+import { fmt, resolveAppError, useTranslation } from '../i18n';
 
 type Route = { params?: { presetBarcode?: string } };
 type Step = 1 | 2 | 3;
@@ -56,17 +56,18 @@ type Props = {
 };
 
 function ScanRefBanner({ code, hint }: { code: string; hint?: string }) {
+  const { t } = useTranslation();
   const trimmed = code.trim();
   if (!trimmed) {
     return (
       <View style={styles.scanBannerEmpty}>
-        <Text style={styles.scanBannerEmptyText}>未关联快递单 / 入库条码（可在上一步扫码）</Text>
+        <Text style={styles.scanBannerEmptyText}>{t.stockIn.noBarcodeBanner}</Text>
       </View>
     );
   }
   return (
     <View style={styles.scanBanner}>
-      <Text style={styles.scanBannerLabel}>{hint ?? '关联条码'}</Text>
+      <Text style={styles.scanBannerLabel}>{hint ?? t.stockIn.linkedBarcode}</Text>
       <Text style={styles.scanBannerValue} selectable>{trimmed}</Text>
     </View>
   );
@@ -74,7 +75,7 @@ function ScanRefBanner({ code, hint }: { code: string; hint?: string }) {
 
 export default function StockInScreen({ route, navigation }: Props) {
   const { operatorName, store } = useAuth();
-  const { t } = useTranslation();
+  const { t, fmt } = useTranslation();
   const stepLabels: Record<Step, string> = {
     1: t.stockIn.step1,
     2: t.stockIn.step2,
@@ -177,8 +178,9 @@ export default function StockInScreen({ route, navigation }: Props) {
     setDetailAddress(prefill.detailAddress);
     setQty(String(prefill.qty));
     setNote(prefill.note);
-    const label = prefill.matchLabel === 'express' ? '快递单' : '入库单';
-    setLookupHint(`已匹配${label}记录，已自动填入相关信息`);
+    const label =
+      prefill.matchLabel === 'express' ? t.trackExpress.matchExpress : t.trackExpress.matchInbound;
+    setLookupHint(fmt(t.stockIn.matchedRecord, { type: label }));
   };
 
   const resolveBarcode = async (code: string) => {
@@ -241,15 +243,15 @@ export default function StockInScreen({ route, navigation }: Props) {
     }
     if (step === 2) {
       if (!recipientName.trim()) {
-        Alert.alert('提示', '请填写姓名');
+        Alert.alert(t.common.tip, t.stockIn.alertName);
         return;
       }
       if (!productName.trim()) {
-        Alert.alert('提示', '请填写商品名称');
+        Alert.alert(t.common.tip, t.stockIn.alertItemName);
         return;
       }
       if (!packaging) {
-        Alert.alert('提示', '请选择商品包装');
+        Alert.alert(t.common.tip, t.itemForm.alertPackaging);
         return;
       }
       setStep(3);
@@ -268,35 +270,35 @@ export default function StockInScreen({ route, navigation }: Props) {
     setTotalFeeManual(false);
   };
 
-  const validateStep3Required = (): string | null => {
-    const missing: string[] = [];
-    if (!destination.trim()) missing.push('最终目的地');
-    if (!weightFilled) missing.push('重量');
-    const n = Number(qty);
-    if (!Number.isFinite(n) || n <= 0) missing.push('数量');
-    if (!paymentSelected) missing.push('付款方式（到付或预付）');
-    if (missing.length === 0) return null;
-    return `请完善以下必填项：\n${missing.map((m) => `· ${m}`).join('\n')}`;
-  };
-
   const buildNote = () => {
     const parts: string[] = [];
-    if (totalFee.trim()) parts.push(`总费用 ${totalFee.trim()} MMK`);
-    if (payCod) parts.push('到付');
-    if (payPrepaid) parts.push('预付');
+    if (totalFee.trim()) parts.push(`${t.stockIn.totalFee} ${totalFee.trim()} MMK`);
+    if (payCod) parts.push(t.stockIn.cod);
+    if (payPrepaid) parts.push(t.stockIn.prepaid);
     if (note.trim()) parts.push(note.trim());
     return parts.join(' · ');
   };
 
-  const paymentLabel = payCod ? '到付' : payPrepaid ? '预付' : '';
+  const paymentLabel = payCod ? t.stockIn.cod : payPrepaid ? t.stockIn.prepaid : '';
 
   const submit = async () => {
-    const step3Error = validateStep3Required();
-    if (step3Error) {
-      Alert.alert('提示', step3Error);
+    if (!destination.trim()) {
+      Alert.alert(t.common.tip, t.stockIn.alertDestination);
+      return;
+    }
+    if (!weightFilled) {
+      Alert.alert(t.common.tip, t.stockIn.alertWeight);
       return;
     }
     const n = Number(qty);
+    if (!Number.isFinite(n) || n <= 0) {
+      Alert.alert(t.common.tip, t.stockIn.alertQty);
+      return;
+    }
+    if (!paymentSelected) {
+      Alert.alert(t.common.tip, t.stockIn.paymentRequired);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -318,7 +320,7 @@ export default function StockInScreen({ route, navigation }: Props) {
         barcode,
         type: 'in',
         qty: n,
-        operator: operatorName ?? '工作人员',
+        operator: operatorName ?? t.common.operator,
         note: fullNote,
         recipientName: recipientName.trim(),
         recipientPhone: recipientPhone.trim(),
@@ -360,12 +362,9 @@ export default function StockInScreen({ route, navigation }: Props) {
       });
 
       resetWizard();
-      showTaskSuccess(
-        '入库成功',
-        `${trimmedProduct} 已登记入库\n入库条码：${barcode}`,
-      );
+      showTaskSuccess(t.stockIn.inboundSuccess, `${trimmedProduct}\n${barcode}`);
     } catch (e: unknown) {
-      Alert.alert('失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -406,22 +405,22 @@ export default function StockInScreen({ route, navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         {step === 1 ? (
-          <InboundFormSection title="扫码识别（可选）" accent="#3b82f6">
+          <InboundFormSection title={t.stockIn.step1Title} accent="#3b82f6">
             <ScanInputBar
               value={scan}
               onChangeText={setScan}
               onSubmit={(code) => void resolveBarcode(code)}
               busy={scanLoading}
               cameraScan={{
-                title: '扫快递单 / 入库条码',
-                subtitle: '识别后自动填充后续步骤',
+                title: t.stockIn.step1Label,
+                subtitle: t.trackExpress.cameraSubtitle,
               }}
-              placeholder="快递单 / 入库条码"
+              placeholder={t.stockIn.step1Placeholder}
             />
             {lookupHint ? <Text style={styles.lookupHint}>{lookupHint}</Text> : null}
             {item ? (
               <Text style={styles.lookupMeta}>
-                {item.name} · 库存 {item.qty_on_hand} {stockUnitLabel()}（本次将生成新入库条码）
+                {item.name} · {fmt(t.common.stockQty, { qty: item.qty_on_hand })} {stockUnitLabel()}
               </Text>
             ) : null}
 
@@ -435,20 +434,20 @@ export default function StockInScreen({ route, navigation }: Props) {
 
         {step === 2 ? (
           <>
-            <ScanRefBanner code={scan} hint="扫码 / 输入的条码" />
-            <InboundFormSection title="客户信息" accent="#0891b2">
+            <ScanRefBanner code={scan} hint={t.stockIn.scannedBarcode} />
+            <InboundFormSection title={t.stockIn.customerSection} accent="#0891b2">
               <InboundFormField
-                label="姓名 *"
+                label={t.stockIn.nameRequired}
                 value={recipientName}
                 onChange={setRecipientName}
-                placeholder="收件人 / 联系人姓名"
+                placeholder={t.stockIn.nameRequired.replace(' *', '')}
                 inputRef={step2Chain.propsFor('name').inputRef}
                 returnKeyType={step2Chain.propsFor('name').returnKeyType}
                 onSubmitEditing={step2Chain.propsFor('name').onSubmitEditing}
                 blurOnSubmit={step2Chain.propsFor('name').blurOnSubmit}
               />
               <InboundFormField
-                label="电话号码"
+                label={t.stockIn.phone}
                 value={recipientPhone}
                 onChange={setRecipientPhone}
                 placeholder="09xxxxxxxxx"
@@ -459,10 +458,10 @@ export default function StockInScreen({ route, navigation }: Props) {
                 blurOnSubmit={step2Chain.propsFor('phone').blurOnSubmit}
               />
               <InboundFormField
-                label="商品名称 *"
+                label={t.stockIn.itemNameRequired}
                 value={productName}
                 onChange={setProductName}
-                placeholder="输入商品名称"
+                placeholder={t.stockIn.itemNameRequired.replace(' *', '')}
                 inputRef={step2Chain.propsFor('product').inputRef}
                 returnKeyType={step2Chain.propsFor('product').returnKeyType}
                 onSubmitEditing={step2Chain.propsFor('product').onSubmitEditing}
@@ -475,11 +474,11 @@ export default function StockInScreen({ route, navigation }: Props) {
 
         {step === 3 ? (
           <>
-            <ScanRefBanner code={scan} hint="扫码 / 输入的条码" />
-            <InboundFormSection title="费用计算" accent="#059669">
+            <ScanRefBanner code={scan} hint={t.stockIn.scannedBarcode} />
+            <InboundFormSection title={t.stockIn.feeSection} accent="#059669">
               <DestinationPickerField
-                label="最终目的地"
-                hint="订单最终送达地区，全程不变；总费用按此地领区跨境起步价计费"
+                label={t.stockIn.finalDest}
+                hint={t.stockOut.destinationHint}
                 value={destination}
                 onChange={(v) => {
                   setDestination(v);
@@ -487,10 +486,10 @@ export default function StockInScreen({ route, navigation }: Props) {
                 }}
               />
               <InboundFormField
-                label="详细地址"
+                label={t.stockIn.detailAddress}
                 value={detailAddress}
                 onChange={setDetailAddress}
-                placeholder="街道、门牌、小区等具体地址"
+                placeholder={t.stockIn.detailAddress}
                 multiline
                 inputRef={step3Chain.propsFor('detail', { multiline: true }).inputRef}
                 returnKeyType={step3Chain.propsFor('detail', { multiline: true }).returnKeyType}
@@ -511,21 +510,21 @@ export default function StockInScreen({ route, navigation }: Props) {
                 hInput={step3Chain.propsFor('specH')}
               />
               <LockedSuffixField
-                label="重量 *"
+                label={t.stockIn.weightRequired}
                 value={weightN}
                 suffix="Kg"
                 onChange={(v) => {
                   setWeightN(v);
                   setTotalFeeManual(false);
                 }}
-                placeholder="重量"
+                placeholder={t.stockIn.weightRequired.replace(' *', '')}
                 inputRef={step3Chain.propsFor('weight').inputRef}
                 returnKeyType={step3Chain.propsFor('weight').returnKeyType}
                 onSubmitEditing={step3Chain.propsFor('weight').onSubmitEditing}
                 blurOnSubmit={step3Chain.propsFor('weight').blurOnSubmit}
               />
               <View style={styles.qtyRow}>
-                <Text style={styles.qtyLabel}>数量 *</Text>
+                <Text style={styles.qtyLabel}>{t.stockIn.qtyRequired}</Text>
                 <View style={styles.qtyControls}>
                   <Pressable
                     style={styles.qtyBtn}
@@ -554,55 +553,46 @@ export default function StockInScreen({ route, navigation }: Props) {
                 </View>
               </View>
               <View style={styles.payRow}>
-                <Text style={styles.payLabel}>付款方式 *</Text>
+                <Text style={styles.payLabel}>{t.stockIn.paymentRequired}</Text>
                 <View style={styles.payChecks}>
                   <Pressable
                     style={[styles.payCheck, payCod && styles.payCheckOn]}
                     onPress={toggleCod}
                   >
-                    <Text style={[styles.payCheckText, payCod && styles.payCheckTextOn]}>到付</Text>
+                    <Text style={[styles.payCheckText, payCod && styles.payCheckTextOn]}>{t.stockIn.cod}</Text>
                   </Pressable>
                   <Pressable
                     style={[styles.payCheck, payPrepaid && styles.payCheckOn]}
                     onPress={togglePrepaid}
                   >
                     <Text style={[styles.payCheckText, payPrepaid && styles.payCheckTextOn]}>
-                      预付
+                      {t.stockIn.prepaid}
                     </Text>
                   </Pressable>
                 </View>
               </View>
               <InboundFormField
-                label="总费用"
+                label={t.stockIn.totalFee}
                 value={totalFee}
                 onChange={(v) => {
                   setTotalFeeManual(true);
                   setTotalFee(sanitizeNumberInput(v));
                 }}
-                placeholder="金额（MMK）"
+                placeholder={t.manualEntry.amount}
                 keyboard="decimal-pad"
                 inputRef={step3Chain.propsFor('totalFee').inputRef}
                 returnKeyType={step3Chain.propsFor('totalFee').returnKeyType}
                 onSubmitEditing={step3Chain.propsFor('totalFee').onSubmitEditing}
                 blurOnSubmit={step3Chain.propsFor('totalFee').blurOnSubmit}
               />
-              {!canAutoTotalFee && !totalFeeManual ? (
-                <Text style={styles.feeHint}>
-                  选择最终目的地、填写重量并选择付款方式后，总费用 = 该目的地领区跨境起步价 × 重量
-                </Text>
-              ) : null}
-              {feeFormulaHint && canAutoTotalFee ? (
-                <Text style={styles.feeHint}>
-                  {totalFeeManual
-                    ? '已手动修改，改重量/数量/付款方式不会自动重算'
-                    : `按 Admin 跨境物流自动计算：${feeFormulaHint}`}
-                </Text>
+              {feeFormulaHint && canAutoTotalFee && !totalFeeManual ? (
+                <Text style={styles.feeHint}>{feeFormulaHint}</Text>
               ) : null}
               <InboundFormField
-                label="备注（可选）"
+                label={t.stockIn.noteOptional}
                 value={note}
                 onChange={setNote}
-                placeholder="其它说明"
+                placeholder={t.manualEntry.notePlaceholder}
                 multiline
                 inputRef={step3Chain.propsFor('note', { multiline: true }).inputRef}
                 returnKeyType={step3Chain.propsFor('note', { multiline: true }).returnKeyType}

@@ -2,6 +2,7 @@ import React, { type Ref } from 'react';
 import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
 import { useFormFieldChain } from '../hooks/useFormFieldChain';
 import { DimensionSpecField, LockedSuffixField } from './StructuredItemFields';
+import { useTranslation } from '../i18n';
 import type { useItemFormState } from '../hooks/useItemFormState';
 
 type FormState = ReturnType<typeof useItemFormState>;
@@ -22,7 +23,7 @@ type Props = {
 
 export default function ItemFormFields({
   form,
-  barcodeLabel = '条码 *',
+  barcodeLabel,
   barcodeEditable = true,
   barcodeHint,
   showPreview = true,
@@ -33,8 +34,10 @@ export default function ItemFormFields({
   specHint,
   weightHint,
 }: Props) {
+  const { t, fmt } = useTranslation();
+  const resolvedBarcodeLabel = barcodeLabel ?? `${t.trackExpress.inboundBarcode} *`;
   const barcodeFieldHint =
-    barcodeHint ?? (!barcodeEditable ? '条码创建后不可修改' : undefined);
+    barcodeHint ?? (!barcodeEditable ? t.itemForm.alertBarcode : undefined);
   const fieldChain = useFormFieldChain([
     'barcode',
     'name',
@@ -48,9 +51,9 @@ export default function ItemFormFields({
 
   return (
     <>
-      <Section title="基本信息">
+      <Section title={t.itemForm.basicInfo}>
         <Field
-          label={barcodeLabel}
+          label={resolvedBarcodeLabel}
           value={form.barcode}
           onChange={form.setBarcode}
           editable={barcodeEditable}
@@ -59,15 +62,15 @@ export default function ItemFormFields({
           fieldProps={barcodeEditable ? fieldChain.propsFor('barcode') : undefined}
         />
         <Field
-          label="商品名称 *"
+          label={t.stockIn.itemNameRequired}
           value={form.name}
           onChange={form.setName}
-          placeholder="输入商品名称"
+          placeholder={t.stockIn.itemNameRequired.replace(' *', '')}
           fieldProps={fieldChain.propsFor('name')}
         />
       </Section>
 
-      <Section title="规格参数">
+      <Section title={t.itemForm.specSection}>
         <DimensionSpecField
           l={form.specL}
           w={form.specW}
@@ -84,11 +87,11 @@ export default function ItemFormFields({
         />
         {specHint ? <Text style={styles.hint}>{specHint}</Text> : null}
         <LockedSuffixField
-          label="单位"
+          label={t.trackExpress.unit}
           value={form.unitN}
           suffix="Pcs"
           onChange={form.setUnitN}
-          placeholder="数量"
+          placeholder={t.stockIn.qtyRequired.replace(' *', '')}
           editable={!unitLocked}
           hint={unitHint}
           inputRef={fieldChain.propsFor('unit').inputRef}
@@ -97,11 +100,11 @@ export default function ItemFormFields({
           blurOnSubmit={fieldChain.propsFor('unit').blurOnSubmit}
         />
         <LockedSuffixField
-          label="重量"
+          label={t.trackExpress.weight}
           value={form.weightN}
           suffix="Kg"
           onChange={form.setWeightN}
-          placeholder="重量"
+          placeholder={t.trackExpress.weight}
           editable={!weightLocked}
           hint={weightHint}
           inputRef={fieldChain.propsFor('weight').inputRef}
@@ -111,20 +114,30 @@ export default function ItemFormFields({
         />
         {showPreview && (form.specStr || form.weightStr || form.unitStr) ? (
           <View style={styles.preview}>
-            <Text style={styles.previewTitle}>预览</Text>
-            {form.specStr ? <Text style={styles.previewLine}>规格 {form.specStr}</Text> : null}
-            <Text style={styles.previewLine}>单位 {form.unitStr}</Text>
-            {form.weightStr ? <Text style={styles.previewLine}>重量 {form.weightStr}</Text> : null}
+            <Text style={styles.previewTitle}>{t.itemForm.specSection}</Text>
+            {form.specStr ? (
+              <Text style={styles.previewLine}>
+                {t.trackExpress.spec} {form.specStr}
+              </Text>
+            ) : null}
+            <Text style={styles.previewLine}>
+              {t.trackExpress.unit} {form.unitStr}
+            </Text>
+            {form.weightStr ? (
+              <Text style={styles.previewLine}>
+                {t.trackExpress.weight} {form.weightStr}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </Section>
 
-      <Section title="其它">
+      <Section title={t.itemForm.note}>
         <Field
-          label="备注"
+          label={t.itemForm.note}
           value={form.note}
           onChange={form.setNote}
-          placeholder="选填"
+          placeholder={t.manualEntry.notePlaceholder}
           multiline
           fieldProps={fieldChain.propsFor('note', { multiline: true })}
         />

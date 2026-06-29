@@ -27,6 +27,13 @@ describe('resolveStoreHubCode', () => {
   it('falls back to region when hubCode missing', () => {
     expect(resolveStoreHubCode(session({ storeCode: 'YGN002', region: 'YGN' }))).toBe('YGN');
   });
+
+  it('normalizes RUILI hub and store codes to RUI', () => {
+    expect(
+      resolveStoreHubCode(session({ storeCode: 'RUILI001', hubCode: 'RUILI' })),
+    ).toBe('RUI');
+    expect(resolveStoreHubCode(session({ storeCode: 'RUILI001', region: 'ruili' }))).toBe('RUI');
+  });
 });
 
 describe('listOutboundDestinationOptions', () => {
@@ -44,6 +51,14 @@ describe('listOutboundDestinationOptions', () => {
     );
     expect(opts).not.toContain('MSE');
     expect(opts).toContain('MDY');
+  });
+
+  it('excludes RUI for RUILI station', () => {
+    const opts = listOutboundDestinationOptions(
+      session({ storeCode: 'RUILI001', region: 'ruili', hubCode: 'RUI' }),
+    );
+    expect(opts).not.toContain('RUI');
+    expect(opts).toContain('MSE');
   });
 });
 
@@ -64,5 +79,11 @@ describe('isOwnStationOutboundDestination', () => {
         session({ storeCode: 'MUSE001', hubCode: 'MSE' }),
       ),
     ).toBe(true);
+  });
+
+  it('matches RUI and RUILI for ruili hub', () => {
+    const ruili = session({ storeCode: 'RUILI001', hubCode: 'RUI' });
+    expect(isOwnStationOutboundDestination('RUI', ruili)).toBe(true);
+    expect(isOwnStationOutboundDestination('RUILI', ruili)).toBe(true);
   });
 });

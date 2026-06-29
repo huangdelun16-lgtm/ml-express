@@ -13,6 +13,10 @@ function inventoryAuthEmail(storeCode: string): string {
   return `inventory+${storeCode.trim().toLowerCase()}@inventory.mlexpress.internal`;
 }
 
+function createInventorySessionId(): string {
+  return `SESS_INV_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function resolveHubCode(region: string | null | undefined, storeCode: string): string {
   const reg = (region ?? "").trim().toUpperCase();
   if (reg && PACK_HUB_CODES.includes(reg)) return reg;
@@ -110,6 +114,18 @@ Deno.serve(async (req) => {
     }
 
     const hubCode = resolveHubCode(store.region, store.store_code);
+    const sessionId = createInventorySessionId();
+    const { error: sessionError } = await supabaseAdmin
+      .from("delivery_stores")
+      .update({ current_session_id: sessionId })
+      .eq("id", store.id);
+    if (sessionError) {
+      return new Response(JSON.stringify({ error: sessionError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const email = inventoryAuthEmail(store.store_code);
     const appMetadata = {
       inventory_store_id: store.id,
@@ -152,6 +168,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         email,
+        sessionId,
         store: {
           id: store.id,
           storeCode: String(store.store_code).trim().toUpperCase(),

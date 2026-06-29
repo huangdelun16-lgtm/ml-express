@@ -3,10 +3,10 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { useIsFocused } from '@react-navigation/native';
 import BarcodeScannerView from '../components/BarcodeScannerView';
 import { useAuth } from '../contexts/AuthContext';
+import { getPkgStatusLabel, resolveAppError, useTranslation } from '../i18n';
 import { getItemByBarcode, markCustomerSigned } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItem } from '../types/inventory';
-import { PKG_STATUS_LABEL } from '../types/tracking';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
@@ -25,6 +25,7 @@ type ScanResult = {
 };
 
 export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
+  const { t, fmt } = useTranslation();
   const { store, operatorName } = useAuth();
   const isFocused = useIsFocused();
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
       setResult({
         code,
         item,
-        cloudStatus: pkg ? PKG_STATUS_LABEL[pkg.status] : null,
+        cloudStatus: pkg ? getPkgStatusLabel(t, pkg.status) : null,
         cloudRoute: pkg ? `${pkg.origin_store_code} → ${pkg.destination_code}` : null,
       });
     } finally {
@@ -72,12 +73,18 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
     if (!result?.item || !store) return;
     setSigning(true);
     try {
-      await markCustomerSigned(result.item.id, operatorName ?? '工作人员', store);
+      await markCustomerSigned(result.item.id, operatorName ?? t.common.operator, store);
       const item = await getItemByBarcode(result.code);
       setResult({ ...result, item });
-      showTaskSuccess('签收成功', `${result.item.name} 已标记为客户已签收`);
+      showTaskSuccess(
+        t.common.signSuccess,
+        fmt(t.common.signMarked, { name: result.item.name }),
+      );
     } catch (e: unknown) {
-      Alert.alert('签收失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(
+        t.common.signFailed,
+        resolveAppError(t, e),
+      );
     } finally {
       setSigning(false);
     }
@@ -90,8 +97,8 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
           active={isFocused}
           compact
           onScan={(code) => void handleScan(code)}
-          title="通用扫码"
-          subtitle="扫完自动查询本地与云端状态"
+          title={t.cameraScan.title}
+          subtitle={t.cameraScan.subtitle}
         />
       </View>
 
@@ -99,10 +106,10 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
         {loading ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator color="#38bdf8" />
-            <Text style={styles.loadingText}>查询中…</Text>
+            <Text style={styles.loadingText}>{t.common.querying}</Text>
           </View>
         ) : !result ? (
-          <Text style={styles.placeholder}>扫码后在此显示结果与快捷操作</Text>
+          <Text style={styles.placeholder}>{t.cameraScan.placeholder}</Text>
         ) : (
           <>
             <Text style={styles.code} selectable>
@@ -110,21 +117,22 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
             </Text>
             <Text style={styles.meta}>
               {result.item
-                ? `本地：${result.item.name} · 库存 ${result.item.qty_on_hand}`
-                : '本地：未建档'}
+                ? `${t.common.localPrefix}${result.item.name} · ${fmt(t.common.stockQty, { qty: result.item.qty_on_hand })}`
+                : t.common.localNotFound}
             </Text>
             {result.cloudStatus ? (
               <Text style={styles.meta}>
-                云端：{result.cloudStatus}
+                {t.common.cloudPrefix}
+                {result.cloudStatus}
                 {result.cloudRoute ? ` · ${result.cloudRoute}` : ''}
               </Text>
             ) : (
-              <Text style={styles.meta}>云端：无在途记录</Text>
+              <Text style={styles.meta}>{t.common.cloudNoRecord}</Text>
             )}
 
             <View style={styles.actions}>
               <Pressable style={styles.actionPrimary} onPress={goTrack}>
-                <Text style={styles.actionPrimaryText}>追踪详情</Text>
+                <Text style={styles.actionPrimaryText}>{t.cameraScan.trackDetail}</Text>
               </Pressable>
               {canSign ? (
                 <Pressable
@@ -133,16 +141,16 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
                   disabled={signing}
                 >
                   <Text style={styles.actionSignText}>
-                    {signing ? '签收中…' : '已签收'}
+                    {signing ? t.common.signInProgress : t.common.signed}
                   </Text>
                 </Pressable>
               ) : null}
               <Pressable style={styles.action} onPress={goStockIn}>
-                <Text style={styles.actionText}>去入库</Text>
+                <Text style={styles.actionText}>{t.cameraScan.goStockIn}</Text>
               </Pressable>
               {result.code.toUpperCase().startsWith('PKG') ? (
                 <Pressable style={styles.action} onPress={goHubReceive}>
-                  <Text style={styles.actionText}>到站收货</Text>
+                  <Text style={styles.actionText}>{t.cameraScan.goHubReceive}</Text>
                 </Pressable>
               ) : null}
             </View>

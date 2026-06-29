@@ -1,7 +1,9 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { fmt, getPackStatusLabel, useTranslation } from '../i18n';
 import type { PackedShipmentListRow } from '../types/inventory';
-import { PACK_DISPLAY_LABEL, packStatusStyle } from '../utils/packDisplayStatus';
+import { regionDisplayLabel } from '../constants/destinationOptions';
+import { packStatusStyle } from '../utils/packDisplayStatus';
 import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat';
 
 type Props = {
@@ -31,10 +33,12 @@ export default function PkgActionModal({
   canUnpack = false,
   unpacking = false,
 }: Props) {
+  const { t, fmt, language } = useTranslation();
+
   if (!pack) return null;
 
   const statusStyle = packStatusStyle(pack.display_status);
-  const statusLabel = PACK_DISPLAY_LABEL[pack.display_status];
+  const statusLabel = getPackStatusLabel(language, pack.display_status);
   const orderCount = resolvePackOrderCount(pack);
 
   return (
@@ -56,8 +60,10 @@ export default function PkgActionModal({
           </View>
           {pack.loaded && pack.transport_fee?.trim() ? (
             <Text style={styles.feeMeta}>
-              车费 {pack.transport_fee} MMK
-              {pack.truck_leg_destination ? ` · 本段 ${pack.truck_leg_destination}` : ''}
+              {t.pkg.transportFee} {pack.transport_fee} MMK
+              {pack.truck_leg_destination
+                ? ` · ${fmt(t.pkg.legPrefix, { dest: regionDisplayLabel(pack.truck_leg_destination) })}`
+                : ''}
             </Text>
           ) : null}
 
@@ -65,7 +71,7 @@ export default function PkgActionModal({
             <View style={styles.dualBtnRow}>
               {canEdit ? (
                 <Pressable style={[styles.dualBtn, styles.dualBtnEdit]} onPress={onEdit}>
-                  <Text style={styles.btnEditText}>编辑快递包</Text>
+                  <Text style={styles.btnEditText}>{t.itemForm.editTitle}</Text>
                 </Pressable>
               ) : null}
               {onViewOrders && orderCount > 0 ? (
@@ -73,15 +79,13 @@ export default function PkgActionModal({
                   style={[styles.dualBtn, styles.dualBtnOrders, !canEdit && styles.dualBtnFull]}
                   onPress={onViewOrders}
                 >
-                  <Text style={styles.btnOrdersText}>查看内含订单</Text>
+                  <Text style={styles.btnOrdersText}>{t.hubReceive.modalTitle}</Text>
                 </Pressable>
               ) : null}
             </View>
           ) : (
             <View style={styles.readonlyHint}>
-              <Text style={styles.readonlyHintText}>
-                该快递包由其他站点打包登记，本站仅可查看与打印
-              </Text>
+              <Text style={styles.readonlyHintText}>{t.items.cannotEditBody}</Text>
             </View>
           )}
           {canUnpack && onUnpack ? (
@@ -91,20 +95,20 @@ export default function PkgActionModal({
               disabled={unpacking}
             >
               <Text style={styles.btnUnpackText}>
-                {unpacking ? '拆包中…' : '拆包取消'}
+                {unpacking ? t.common.processing : t.pkg.unpackTitle}
               </Text>
             </Pressable>
           ) : null}
           <Pressable style={styles.btnPrint} onPress={onPrint}>
-            <Text style={styles.btnPrintText}>打印标签</Text>
+            <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
           </Pressable>
           {onResyncCloud ? (
             <Pressable style={styles.btnResync} onPress={onResyncCloud}>
-              <Text style={styles.btnResyncText}>补传云端（到站可扫码）</Text>
+              <Text style={styles.btnResyncText}>{t.pkg.resyncSuccess}</Text>
             </Pressable>
           ) : null}
           <Pressable style={styles.btnCancel} onPress={onClose}>
-            <Text style={styles.btnCancelText}>关闭</Text>
+            <Text style={styles.btnCancelText}>{t.common.close}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

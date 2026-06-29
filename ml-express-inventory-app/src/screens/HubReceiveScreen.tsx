@@ -8,9 +8,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import ScanInputBar from '../components/ScanInputBar';
 import HubReceiveOrdersModal from '../components/HubReceiveOrdersModal';
 import { useAuth } from '../contexts/AuthContext';
+import { getOrderStatusLabel, getPkgStatusLabel, getTransportFeeDisplay, formatOrderNotFoundHint, formatPkgNotFoundHint, resolveAppError, useTranslation } from '../i18n';
 import {
   deliverHubOrderInboundAtStation,
   importInboundPackToLocal,
@@ -19,26 +21,28 @@ import {
 import {
   isHubTransportFeePaid,
   markHubTransportFeePaid,
-  formatTransportFeeDisplay,
 } from '../services/hubTransportFeeService';
 import { isSupabaseConfigured, getSupabaseConfigHint } from '../services/supabase';
+import { ensureHubReceiveCloudReady } from '../services/hubReceiveGate';
+import { probeCloudConnection } from '../services/cloudSyncStatus';
 import {
   confirmOrderHubReceived,
   confirmOrderInPackById,
   confirmPkgHubReceived,
-  formatOrderNotFoundHint,
-  formatPkgNotFoundHint,
   getOrderTrackingByBarcode,
   getPkgTrackingDetail,
 } from '../services/trackingService';
 import type { PkgTrackingDetail } from '../types/tracking';
-import { ORDER_STATUS_LABEL, PKG_STATUS_LABEL } from '../types/tracking';
 import { resolveStoreHubCode } from '../utils/storeZone';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 export default function HubReceiveScreen() {
-  const { store, operatorName } = useAuth();
+  const { t, fmt } = useTranslation();
+  const { store, operatorName, hasShiftOperator } = useAuth();
   const hubCode = store ? resolveStoreHubCode(store) : '';
+  const operator = operatorName ?? t.common.operator;
+  const [cloudConnected, setCloudConnected] = useState<boolean | null>(null);
   const [scan, setScan] = useState('');
   const [activePack, setActivePack] = useState<PkgTrackingDetail | null>(null);
   const [ordersModalVisible, setOrdersModalVisible] = useState(false);
@@ -53,38 +57,75 @@ export default function HubReceiveScreen() {
     setTransportFeePaid(await isHubTransportFeePaid(packBarcode));
   }, []);
 
+  const refreshCloudStatus = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      setCloudConnected(false);
+      return;
+    }
+    const conn = await probeCloudConnection();
+    setCloudConnected(conn.authenticated);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshCloudStatus();
+    }, [refreshCloudStatus]),
+  );
+
+  const preflightHubReceive = useCallback(async (): Promise<boolean> => {
+    if (!hasShiftOperator) {
+      Alert.alert(t.settings.operator.requiredTitle, t.settings.operator.requiredHint);
+      return false;
+    }
+    const gate = await ensureHubReceiveCloudReady();
+    if (!gate.ok) {
+      setError(
+        gate.reason === 'notConfigured'
+          ? getSupabaseConfigHint() || t.hubReceive.supabaseMissing
+          : t.hubReceive.cloudOfflineBlock,
+      );
+      setCloudConnected(false);
+      return false;
+    }
+    setCloudConnected(true);
+    return true;
+  }, [hasShiftOperator, t]);
+
   const applyOrderSuccess = useCallback(
     async (pkg: PkgTrackingDetail) => {
       setActivePack(pkg);
       await refreshTransportFeePaid(pkg.pack_barcode);
       if (store && pkg.status !== 'in_transit') {
         try {
-          await importInboundPackToLocal(pkg, store, operatorName ?? '工作人员');
+          await importInboundPackToLocal(pkg, store, operator);
         } catch (e: unknown) {
-          const syncErr = e instanceof Error ? e.message : '同步打包列表失败';
-          setError(`订单已确认，但写入打包列表失败：${syncErr}`);
+          const syncErr = resolveAppError(t, e);
+          setError(fmt(t.hubReceive.orderConfirmedSyncFailed, { err: syncErr }));
         }
       }
       const total = pkg.item_count;
 
       if (pkg.status === 'split_at_hub') {
         const released = pkg.orders.filter((o) => o.status === 'released_at_hub').length;
-        setMessage(
-          `分拨完成，${released} 个中转订单已加入「快递明细」待重新打包。请支付车费后完成`,
-        );
-        showTaskSuccess('分拨完成', '请至「快递明细」重新打包中转订单');
+        setMessage(fmt(t.hubReceive.splitDoneDetail, { count: released }));
+        showTaskSuccess(t.hubReceive.splitDone, t.hubReceive.splitDoneMsg);
         return;
       }
 
       if (pkg.status === 'completed' && store) {
-        setMessage(`全部订单已处理，请支付车费后完成`);
-        showTaskSuccess('收货完成', `请支付本段车费后关闭窗口`);
+        setMessage(t.hubReceive.allProcessed);
+        showTaskSuccess(t.hubReceive.receiveDone, t.hubReceive.receiveDoneMsg);
         return;
       }
 
-      setMessage(`已处理 ${pkg.received_order_count}/${total} 个订单，请在弹窗中继续分拨`);
+      setMessage(
+        fmt(t.hubReceive.processedProgress, {
+          done: pkg.received_order_count,
+          total,
+        }),
+      );
     },
-    [store, operatorName, refreshTransportFeePaid],
+    [store, operator, refreshTransportFeePaid, t, fmt],
   );
 
   const finishInboundFlow = useCallback(
@@ -96,20 +137,18 @@ export default function HubReceiveScreen() {
         packBarcode: pkg.pack_barcode,
         store,
         hubCode,
-        operator: operatorName ?? '工作人员',
+        operator,
       });
       if (releasedCount > 0) {
         const updated = await getPkgTrackingDetail(pkg.pack_barcode);
         if (updated) {
           setActivePack(updated);
-          setMessage(
-            `全部订单已入库，${releasedCount} 个中转订单已加入「快递明细」待重新打包`,
-          );
-          showTaskSuccess('分拨完成', '请至「快递明细」重新打包中转订单');
+          setMessage(fmt(t.hubReceive.allInboundReleased, { count: releasedCount }));
+          showTaskSuccess(t.hubReceive.splitDone, t.hubReceive.splitDoneMsg);
         }
       }
     },
-    [applyOrderSuccess, store, hubCode, operatorName],
+    [applyOrderSuccess, store, hubCode, operator, t, fmt],
   );
 
   const openPackOrdersModal = useCallback(
@@ -125,18 +164,12 @@ export default function HubReceiveScreen() {
     if (!store) return;
     setError('');
     setMessage('');
+    if (!(await preflightHubReceive())) return;
     setLoading(true);
     try {
-      if (!isSupabaseConfigured()) {
-        setError(getSupabaseConfigHint() || '本机未配置 Supabase，无法查询云端追踪');
-        setActivePack(null);
-        setOrdersModalVisible(false);
-        return;
-      }
-
       const detail = await getPkgTrackingDetail(code);
       if (!detail) {
-        setError(formatPkgNotFoundHint(code, hubCode));
+        setError(formatPkgNotFoundHint(t, code, hubCode));
         setActivePack(null);
         setOrdersModalVisible(false);
         return;
@@ -145,15 +178,22 @@ export default function HubReceiveScreen() {
       openPackOrdersModal(detail);
 
       if (detail.status === 'in_transit') {
-        const leg = detail.leg_destination_code || detail.destination_code;
         setMessage(
-          `已识别快递包 ${detail.pack_barcode}，请在弹窗中确认到站并分拨 ${detail.item_count} 个订单`,
+          fmt(t.hubReceive.packIdentified, {
+            barcode: detail.pack_barcode,
+            count: detail.item_count,
+          }),
         );
       } else {
-        setMessage(`已打开快递包 ${detail.pack_barcode}，内含 ${detail.item_count} 个订单待分拨`);
+        setMessage(
+          fmt(t.hubReceive.packOpened, {
+            barcode: detail.pack_barcode,
+            count: detail.item_count,
+          }),
+        );
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '查询失败');
+      setError(resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -161,26 +201,22 @@ export default function HubReceiveScreen() {
 
   const handleConfirmPack = async () => {
     if (!store || !activePack) return;
+    if (!(await preflightHubReceive())) return;
     setLoading(true);
     setError('');
     try {
       const updated = await confirmPkgHubReceived(activePack.pack_barcode, store, hubCode);
       try {
-        await importInboundPackToLocal(updated, store, operatorName ?? '工作人员');
+        await importInboundPackToLocal(updated, store, operator);
       } catch (e: unknown) {
-        const syncErr = e instanceof Error ? e.message : '同步打包列表失败';
-        setError(`到站已确认，但写入打包列表失败：${syncErr}`);
+        const syncErr = resolveAppError(t, e);
+        setError(fmt(t.hubReceive.packConfirmedSyncFailed, { err: syncErr }));
       }
       setActivePack(updated);
-      setMessage(
-        `✓ 快递包 ${updated.pack_barcode} 已确认到站并同步至「打包」列表。请逐单点「入库」完成分拨`,
-      );
-      showTaskSuccess(
-        '到站收货成功',
-        `请在弹窗中为每个订单（含中转订单）点「入库」`,
-      );
+      setMessage(fmt(t.hubReceive.packConfirmed, { barcode: updated.pack_barcode }));
+      showTaskSuccess(t.hubReceive.packConfirmSuccess, t.hubReceive.packConfirmSuccessMsg);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '确认失败');
+      setError(resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -190,18 +226,12 @@ export default function HubReceiveScreen() {
     if (!store) return;
     setError('');
     setMessage('');
+    if (!(await preflightHubReceive())) return;
     setLoading(true);
     try {
-      if (!isSupabaseConfigured()) {
-        setError(getSupabaseConfigHint() || '本机未配置 Supabase，无法查询云端追踪');
-        setActivePack(null);
-        setOrdersModalVisible(false);
-        return;
-      }
-
       const order = await getOrderTrackingByBarcode(code, hubCode);
       if (!order) {
-        setError(formatOrderNotFoundHint(code, hubCode));
+        setError(formatOrderNotFoundHint(t, code, hubCode));
         setActivePack(null);
         setOrdersModalVisible(false);
         return;
@@ -210,7 +240,10 @@ export default function HubReceiveScreen() {
       const detail = await getPkgTrackingDetail(order.pack_barcode);
       if (!detail) {
         setError(
-          `已找到入库单 ${order.order_barcode}，但关联快递包 ${order.pack_barcode} 未同步云端。\n\n请确认发站已在「装车出库」完成并提示「已同步云端」。`,
+          fmt(t.hubReceive.orderPackMissing, {
+            order: order.order_barcode,
+            pack: order.pack_barcode,
+          }),
         );
         setActivePack(null);
         setOrdersModalVisible(false);
@@ -221,7 +254,10 @@ export default function HubReceiveScreen() {
 
       if (detail.status === 'in_transit') {
         setMessage(
-          `已识别入库单 ${order.order_barcode}，所属包裹 ${detail.pack_barcode}。\n请先点「确认到站收货」，再在弹窗中点「入库」`,
+          fmt(t.hubReceive.orderLookupFound, {
+            order: order.order_barcode,
+            pack: detail.pack_barcode,
+          }),
         );
         return;
       }
@@ -233,19 +269,25 @@ export default function HubReceiveScreen() {
           pkg,
           store,
           hubCode,
-          operator: operatorName ?? '工作人员',
+          operator,
         });
-        showTaskSuccess('入库成功', `订单 ${confirmed.order_barcode} 已确认入库`);
+        showTaskSuccess(
+          t.hubReceive.inboundSuccess,
+          fmt(t.hubReceive.inboundSuccessMsg, { barcode: confirmed.order_barcode }),
+        );
         await finishInboundFlow(pkg);
         setScan('');
         return;
       }
 
       setMessage(
-        `入库单 ${order.order_barcode} 已处理（${ORDER_STATUS_LABEL[order.status]}）`,
+        fmt(t.hubReceive.orderProcessed, {
+          barcode: order.order_barcode,
+          status: getOrderStatusLabel(t, order.status),
+        }),
       );
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '查询失败');
+      setError(resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -254,6 +296,7 @@ export default function HubReceiveScreen() {
   const handleOrderScan = async (code: string) => {
     if (!store) return;
     setError('');
+    if (!(await preflightHubReceive())) return;
     setLoading(true);
     try {
       const { order, pkg } = await confirmOrderHubReceived(code, store, hubCode);
@@ -262,13 +305,16 @@ export default function HubReceiveScreen() {
         pkg,
         store,
         hubCode,
-        operator: operatorName ?? '工作人员',
+        operator,
       });
-      showTaskSuccess('入库成功', `订单 ${order.order_barcode} 已确认入库`);
+      showTaskSuccess(
+        t.hubReceive.inboundSuccess,
+        fmt(t.hubReceive.inboundSuccessMsg, { barcode: order.order_barcode }),
+      );
       await finishInboundFlow(pkg);
       setScan('');
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '确认失败');
+      setError(resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -277,6 +323,7 @@ export default function HubReceiveScreen() {
   const handleConfirmOrder = async (orderId: string) => {
     if (!store) return;
     setError('');
+    if (!(await preflightHubReceive())) return;
     setConfirmingOrderId(orderId);
     try {
       const { order, pkg } = await confirmOrderInPackById(orderId, store, hubCode);
@@ -285,12 +332,15 @@ export default function HubReceiveScreen() {
         pkg,
         store,
         hubCode,
-        operator: operatorName ?? '工作人员',
+        operator,
       });
-      showTaskSuccess('入库成功', `订单 ${order.order_barcode} 已确认入库`);
+      showTaskSuccess(
+        t.hubReceive.inboundSuccess,
+        fmt(t.hubReceive.inboundSuccessMsg, { barcode: order.order_barcode }),
+      );
       await finishInboundFlow(pkg);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '确认失败');
+      setError(resolveAppError(t, e));
     } finally {
       setConfirmingOrderId(null);
     }
@@ -298,16 +348,21 @@ export default function HubReceiveScreen() {
 
   const handlePayTransportFee = () => {
     if (!store || !activePack) return;
-    const feeDisplay = formatTransportFeeDisplay(activePack.transport_fee);
+    const feeDisplay = getTransportFeeDisplay(t, activePack.transport_fee);
     const legDest = activePack.leg_destination_code || activePack.destination_code || hubCode;
 
     Alert.alert(
-      '确认支付车费',
-      `快递包 ${activePack.pack_barcode}\n路线 ${activePack.origin_store_code} → ${legDest}\n车费 ${feeDisplay}\n\n确认已向发站支付本段车费？`,
+      t.common.confirmPayFee,
+      fmt(t.hubReceive.payFeeAlertBody, {
+        barcode: activePack.pack_barcode,
+        origin: activePack.origin_store_code,
+        dest: legDest,
+        fee: feeDisplay,
+      }),
       [
-        { text: '取消', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: '确认支付',
+          text: t.common.confirmPay,
           onPress: () => {
             setPayingTransportFee(true);
             setError('');
@@ -318,15 +373,18 @@ export default function HubReceiveScreen() {
                   fee: activePack.transport_fee,
                   legDestination: legDest,
                   originStoreCode: activePack.origin_store_code,
-                  operator: operatorName ?? '工作人员',
+                  operator,
                   store,
                 });
                 setTransportFeePaid(true);
-                showTaskSuccess('支付成功', `已登记车费 ${feeDisplay}`);
-                setMessage(`✓ ${activePack.pack_barcode} 车费已支付`);
+                showTaskSuccess(
+                  t.hubReceive.paySuccess,
+                  fmt(t.hubReceive.paySuccessMsg, { fee: feeDisplay }),
+                );
+                setMessage(fmt(t.hubReceive.feePaidMsg, { barcode: activePack.pack_barcode }));
                 setOrdersModalVisible(false);
               } catch (e: unknown) {
-                setError(e instanceof Error ? e.message : '支付失败');
+                setError(resolveAppError(t, e));
               } finally {
                 setPayingTransportFee(false);
               }
@@ -354,21 +412,34 @@ export default function HubReceiveScreen() {
   if (!store) {
     return (
       <View style={styles.center}>
-        <Text style={styles.hint}>请先登录中转站账号</Text>
+        <Text style={styles.hint}>{t.common.loginHubFirst}</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {cloudConnected === false ? (
+        <View style={styles.cloudWarnBox}>
+          <Text style={styles.cloudWarnTitle}>{t.hubReceive.cloudRequiredTitle}</Text>
+          <Text style={styles.cloudWarnText}>{t.hubReceive.cloudRequiredHint}</Text>
+        </View>
+      ) : null}
+      {!hasShiftOperator ? (
+        <View style={styles.operatorWarnBox}>
+          <Text style={styles.operatorWarnTitle}>{t.settings.operator.requiredTitle}</Text>
+          <Text style={styles.operatorWarnText}>{t.settings.operator.requiredHint}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.zoneCard}>
-        <Text style={styles.zoneTitle}>本站服务区域 · {hubCode || '未设置'}</Text>
+        <Text style={styles.zoneTitle}>
+          {fmt(t.hubReceive.zoneTitle, { hub: hubCode ? regionDisplayLabel(hubCode) : t.common.notSet })}
+        </Text>
         <Text style={styles.zoneSub}>
           {store.storeCode} · {store.storeName}
         </Text>
-        <Text style={styles.zoneHint}>
-          先扫快递包 PKG 确认到站；包内每个订单（含经本站中转的）均点「入库」。全部入库后中转订单自动进入「快递明细」待重新打包
-        </Text>
+        <Text style={styles.zoneHint}>{t.hubReceive.zoneHint}</Text>
       </View>
 
       <ScanInputBar
@@ -377,11 +448,11 @@ export default function HubReceiveScreen() {
         onSubmit={onSubmit}
         busy={loading}
         cameraScan={{
-          title: '扫包裹或入库单',
-          subtitle: 'PKG 包装号，或包内入库单/快递单条码',
+          title: t.hubReceive.cameraTitle,
+          subtitle: t.hubReceive.cameraSubtitle,
         }}
-        placeholder="扫描 PKG 或入库单条码"
-        label="📦 扫描快递包 / 入库单"
+        placeholder={t.hubReceive.scanPlaceholder}
+        label={t.hubReceive.scanLabel}
       />
 
       {loading && !ordersModalVisible ? (
@@ -405,8 +476,8 @@ export default function HubReceiveScreen() {
         <Pressable style={styles.reopenBtn} onPress={() => setOrdersModalVisible(true)}>
           <Text style={styles.reopenBtnTitle}>{activePack.pack_barcode}</Text>
           <Text style={styles.reopenBtnSub}>
-            {PKG_STATUS_LABEL[activePack.status]} · 进度{' '}
-            {activePack.received_order_count}/{activePack.item_count} · 点击继续分拨
+            {getPkgStatusLabel(t, activePack.status)} · {t.common.progress}{' '}
+            {activePack.received_order_count}/{activePack.item_count} · {t.common.continueDispatch}
           </Text>
         </Pressable>
       ) : null}
@@ -445,6 +516,26 @@ const styles = StyleSheet.create({
   zoneTitle: { color: '#7dd3fc', fontSize: 16, fontWeight: '900' },
   zoneSub: { color: '#94a3b8', fontSize: 13, marginTop: 4 },
   zoneHint: { color: '#64748b', fontSize: 12, lineHeight: 18, marginTop: 8 },
+  cloudWarnBox: {
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.45)',
+  },
+  cloudWarnTitle: { color: '#fcd34d', fontWeight: '900', fontSize: 14 },
+  cloudWarnText: { color: '#fde68a', fontSize: 12, lineHeight: 18, marginTop: 6 },
+  operatorWarnBox: {
+    backgroundColor: 'rgba(14,165,233,0.1)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(14,165,233,0.35)',
+  },
+  operatorWarnTitle: { color: '#7dd3fc', fontWeight: '900', fontSize: 14 },
+  operatorWarnText: { color: '#bae6fd', fontSize: 12, lineHeight: 18, marginTop: 6 },
   loadingBox: { alignItems: 'center', paddingVertical: 12 },
   errorBox: {
     backgroundColor: 'rgba(248,113,113,0.12)',

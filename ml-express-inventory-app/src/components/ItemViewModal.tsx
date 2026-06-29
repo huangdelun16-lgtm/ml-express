@@ -15,6 +15,7 @@ import {
   type InboundInvoiceData,
 } from './InboundInvoiceView';
 import { useAuth } from '../contexts/AuthContext';
+import { resolvePrintError, useTranslation } from '../i18n';
 import { getItemDetail } from '../services/inventoryService';
 import { printInboundBarcodeOnly } from '../services/printerService';
 import type { InventoryItemDetail } from '../types/inventory';
@@ -52,6 +53,7 @@ function mapDetailToInvoice(detail: InventoryItemDetail): InboundInvoiceData {
 
 export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Props) {
   const { store, operatorName } = useAuth();
+  const { t } = useTranslation();
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -109,12 +111,12 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
     try {
       const ok = await printInboundBarcodeOnly(invoiceData.barcode, invoiceData.inputBarcode);
       if (!ok) {
-        Alert.alert('提示', '打印已关闭，请在设置中启用打印');
+        Alert.alert(t.common.tip, t.settings.printDisabled);
         return;
       }
-      Alert.alert('已发送打印', '请在系统对话框选择标签打印机');
+      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
     } catch (e: unknown) {
-      Alert.alert('打印失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
     } finally {
       setPrinting(false);
     }

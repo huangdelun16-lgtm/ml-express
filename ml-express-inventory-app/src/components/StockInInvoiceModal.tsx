@@ -13,6 +13,7 @@ import {
   inboundInvoiceStyles,
   type InboundInvoiceData,
 } from './InboundInvoiceView';
+import { resolvePrintError, useTranslation } from '../i18n';
 import { printInboundBarcodeOnly } from '../services/printerService';
 
 export type StockInInvoiceData = InboundInvoiceData;
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export default function StockInInvoiceModal({ visible, data, onClose }: Props) {
+  const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
 
   const printLabel = async () => {
@@ -32,12 +34,12 @@ export default function StockInInvoiceModal({ visible, data, onClose }: Props) {
     try {
       const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode);
       if (!ok) {
-        Alert.alert('提示', '打印已关闭，请在设置中启用打印');
+        Alert.alert(t.common.tip, t.settings.printDisabled);
         return;
       }
-      Alert.alert('已发送打印', '请在系统对话框选择标签打印机');
+      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
     } catch (e: unknown) {
-      Alert.alert('打印失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
     } finally {
       setPrinting(false);
     }

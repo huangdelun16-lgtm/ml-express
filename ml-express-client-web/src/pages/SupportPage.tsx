@@ -6,19 +6,23 @@ import { useLanguage } from '../contexts/LanguageContext';
 const copy = {
   zh: {
     title: 'ML Inventory 应用支持',
-    subtitle: 'MARKET LINK EXPRESS 中转站库存管理 App 技术支持与账号说明',
+    subtitle: 'MARKET LINK EXPRESS 商业物流 App · 技术支持与合作伙伴开通',
     sections: [
       {
         heading: '应用用途',
-        body: 'ML Inventory 供 MARKET LINK EXPRESS 跨境物流合作中转站工作人员使用，用于入库、打包、装车出库、条码扫描与云端库存同步。',
+        body: 'ML Inventory 是可在 App Store 下载的商业物流 App，帮助物流中转站完成入库、打包、装车出库、条码扫描与云端库存同步。适用于 MARKET LINK EXPRESS 合作网络内的独立站点。',
       },
       {
-        heading: '如何获取登录账号',
-        body: '本 App 不提供公开注册。合作中转站由 MARKET LINK 管理员在后台「跨境物流」模块创建店铺代码与密码，并交给站点负责人使用。',
+        heading: '如何登录',
+        body: '已在合作网络内的站点，使用 MARKET LINK 分配的店铺代码与密码登录 App 即可。每个站点拥有独立账号，用于管理本站库存与物流操作。',
+      },
+      {
+        heading: '申请成为合作站点（公开受理）',
+        body: '尚未加入 MARKET LINK 物流网络的独立中转站/物流站点，可通过下方联系方式提交合作申请。审核通过后，我们将为您的站点开通店铺代码与密码，即可在 App Store 下载 ML Inventory 并使用。',
       },
       {
         heading: '联系我们',
-        body: '如需开通账号、重置密码或报告故障，请通过以下方式联系：',
+        body: '账号开通、密码重置、合作申请或技术故障，请通过以下方式联系：',
         items: [
           '电话：(+95) 09788848928',
           '邮箱：marketlink982@gmail.com',
@@ -32,23 +36,28 @@ const copy = {
       },
     ],
     contactLink: '更多联系方式',
+    privacyLink: 'ML Inventory 隐私政策',
     homeLink: '返回首页',
   },
   en: {
     title: 'ML Inventory App Support',
-    subtitle: 'Technical support and account information for MARKET LINK EXPRESS transit inventory app',
+    subtitle: 'Business logistics app · Support & partner station onboarding',
     sections: [
       {
         heading: 'About the app',
-        body: 'ML Inventory is used by authorized MARKET LINK EXPRESS cross-border transit station staff for inbound stock, packing, outbound loading, barcode scanning, and cloud inventory sync.',
+        body: 'ML Inventory is a business logistics app available on the App Store. It helps independent transit stations manage inbound stock, packing, truck loading, barcode scanning, and cloud inventory sync within the MARKET LINK EXPRESS partner network.',
       },
       {
-        heading: 'How to get an account',
-        body: 'Public sign-up is not available. Partner transit stations receive a store code and password from MARKET LINK administrators via the Cross-border Logistics admin console.',
+        heading: 'How to sign in',
+        body: 'Stations already enrolled in our network sign in with the store code and password issued to their station. Each station has its own account for inventory and logistics operations.',
+      },
+      {
+        heading: 'Request partner station access (open to businesses)',
+        body: 'Independent transit or logistics stations not yet on the MARKET LINK network may apply to join using the contact details below. After approval, we provision a store code and password so you can download ML Inventory from the App Store and sign in.',
       },
       {
         heading: 'Contact us',
-        body: 'For account provisioning, password reset, or technical issues, please contact:',
+        body: 'For onboarding, password reset, partnership inquiries, or technical support:',
         items: [
           'Phone: (+95) 09788848928',
           'Email: marketlink982@gmail.com',
@@ -62,23 +71,28 @@ const copy = {
       },
     ],
     contactLink: 'More contact options',
+    privacyLink: 'ML Inventory Privacy Policy',
     homeLink: 'Back to home',
   },
   my: {
     title: 'ML Inventory App Support',
-    subtitle: 'MARKET LINK EXPRESS transit inventory app — support & accounts',
+    subtitle: 'Business logistics · Support & partner onboarding',
     sections: [
       {
         heading: 'About the app',
-        body: 'ML Inventory is for authorized MARKET LINK EXPRESS transit station staff: inbound, packing, outbound, barcode scan, and cloud sync.',
+        body: 'ML Inventory is a business logistics app on the App Store for transit stations: inbound, packing, outbound, barcode scan, and cloud sync.',
       },
       {
-        heading: 'How to get an account',
-        body: 'No public registration. Store code and password are issued by MARKET LINK administrators to partner stations.',
+        heading: 'Sign in',
+        body: 'Enrolled stations sign in with their issued store code and password.',
+      },
+      {
+        heading: 'Request partner access',
+        body: 'Independent logistics stations may apply to join the MARKET LINK network via the contact details below. After approval, a store code will be issued.',
       },
       {
         heading: 'Contact us',
-        body: 'For accounts, password reset, or issues:',
+        body: 'For onboarding, support, or password reset:',
         items: [
           'Phone: (+95) 09788848928',
           'Email: marketlink982@gmail.com',
@@ -91,6 +105,7 @@ const copy = {
       },
     ],
     contactLink: 'More contact options',
+    privacyLink: 'ML Inventory Privacy Policy',
     homeLink: 'Back to home',
   },
 };
@@ -186,6 +201,12 @@ export default function SupportPage() {
         </div>
 
         <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Link
+            to="/ml-inventory/privacy"
+            style={{ color: '#c4b5fd', fontWeight: 700, textDecoration: 'none' }}
+          >
+            {t.privacyLink} →
+          </Link>
           <Link
             to="/"
             state={{ landingScrollTo: 'landing-contact' }}

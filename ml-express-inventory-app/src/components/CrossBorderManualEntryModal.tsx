@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { resolveAppError, useTranslation } from '../i18n';
 import { createCrossBorderManualEntry } from '../services/crossBorderManualEntryService';
 import type { CrossBorderManualEntryKind } from '../services/crossBorderManualEntryService';
 
@@ -35,6 +36,7 @@ export default function CrossBorderManualEntryModal({
   onClose,
   onSaved,
 }: Props) {
+  const { t } = useTranslation();
   const [kind, setKind] = useState<CrossBorderManualEntryKind>('expense');
   const [entryDate, setEntryDate] = useState(todayIsoDate());
   const [amount, setAmount] = useState('');
@@ -66,18 +68,18 @@ export default function CrossBorderManualEntryModal({
   const handleSubmit = async () => {
     const numeric = Number(amount.replace(/[^\d.]/g, ''));
     if (!Number.isFinite(numeric) || numeric <= 0) {
-      setError('请填写大于 0 的金额');
+      setError(t.manualEntry.amountInvalid);
       return;
     }
     if (!entryDate.trim()) {
-      setError('请选择日期');
+      setError(t.manualEntry.dateRequired);
       return;
     }
 
     setSubmitting(true);
     setError('');
     try {
-      const createdBy = `${storeCode} · ${operatorName || '工作人员'}`.trim();
+      const createdBy = `${storeCode} · ${operatorName || t.common.operator}`.trim();
       await createCrossBorderManualEntry({
         entry_date: entryDate.trim(),
         kind,
@@ -89,7 +91,7 @@ export default function CrossBorderManualEntryModal({
       onSaved();
       handleClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '保存失败');
+      setError(resolveAppError(t, e));
     } finally {
       setSubmitting(false);
     }
@@ -104,8 +106,8 @@ export default function CrossBorderManualEntryModal({
         <Pressable style={styles.backdrop} onPress={handleClose} />
         <View style={styles.sheet}>
           <View style={styles.handle} />
-          <Text style={styles.title}>其它开销</Text>
-          <Text style={styles.subtitle}>登记跨境物流相关的收入或支出（同步至云端）</Text>
+          <Text style={styles.title}>{t.manualEntry.title}</Text>
+          <Text style={styles.subtitle}>{t.manualEntry.subtitle}</Text>
 
           <View style={styles.kindRow}>
             <Pressable
@@ -114,7 +116,7 @@ export default function CrossBorderManualEntryModal({
               disabled={submitting}
             >
               <Text style={[styles.kindBtnText, kind === 'expense' && styles.kindBtnTextOn]}>
-                支出
+                {t.manualEntry.expense}
               </Text>
             </Pressable>
             <Pressable
@@ -123,13 +125,13 @@ export default function CrossBorderManualEntryModal({
               disabled={submitting}
             >
               <Text style={[styles.kindBtnText, kind === 'income' && styles.kindBtnTextOnIncome]}>
-                收入
+                {t.manualEntry.income}
               </Text>
             </Pressable>
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={styles.label}>日期</Text>
+            <Text style={styles.label}>{t.manualEntry.date}</Text>
             <TextInput
               style={styles.input}
               value={entryDate}
@@ -139,7 +141,7 @@ export default function CrossBorderManualEntryModal({
               editable={!submitting}
             />
 
-            <Text style={styles.label}>金额 (MMK)</Text>
+            <Text style={styles.label}>{t.manualEntry.amount}</Text>
             <TextInput
               style={styles.input}
               value={amount}
@@ -150,22 +152,22 @@ export default function CrossBorderManualEntryModal({
               editable={!submitting}
             />
 
-            <Text style={styles.label}>分类</Text>
+            <Text style={styles.label}>{t.manualEntry.category}</Text>
             <TextInput
               style={styles.input}
               value={category}
               onChangeText={setCategory}
-              placeholder="如：办公、燃油…"
+              placeholder={t.manualEntry.categoryPlaceholder}
               placeholderTextColor="#64748b"
               editable={!submitting}
             />
 
-            <Text style={styles.label}>备注</Text>
+            <Text style={styles.label}>{t.manualEntry.note}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={note}
               onChangeText={setNote}
-              placeholder="可选说明"
+              placeholder={t.manualEntry.notePlaceholder}
               placeholderTextColor="#64748b"
               multiline
               editable={!submitting}
@@ -176,7 +178,7 @@ export default function CrossBorderManualEntryModal({
 
           <View style={styles.actions}>
             <Pressable style={styles.cancelBtn} onPress={handleClose} disabled={submitting}>
-              <Text style={styles.cancelText}>取消</Text>
+              <Text style={styles.cancelText}>{t.common.cancel}</Text>
             </Pressable>
             <Pressable
               style={[styles.saveBtn, submitting && styles.saveBtnDisabled]}
@@ -186,7 +188,7 @@ export default function CrossBorderManualEntryModal({
               {submitting ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.saveText}>保存</Text>
+                <Text style={styles.saveText}>{t.common.save}</Text>
               )}
             </Pressable>
           </View>

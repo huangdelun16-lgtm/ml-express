@@ -20,6 +20,7 @@ export const PRICING_REGION_IDS = [
   "taunggyi",
   "lashio",
   "muse",
+  "ruili",
 ] as const;
 
 export type PricingRegionId = (typeof PRICING_REGION_IDS)[number];
@@ -35,6 +36,9 @@ export const PACKAGE_PREFIX_TO_REGION: Record<string, string> = {
   TGI: "taunggyi",
   LSO: "lashio",
   MUSE: "muse",
+  MSE: "muse",
+  RUILI: "ruili",
+  RUI: "ruili",
 };
 
 /** pricing.base_fee 这类「全局」键（2 段）；pricing.{region}.base_fee 为领区键（3 段） */
@@ -123,6 +127,9 @@ function normalizePackageRegionField(raw?: string | null): string | null {
     tgi: "taunggyi",
     lso: "lashio",
     muse: "muse",
+    mse: "muse",
+    ruili: "ruili",
+    rui: "ruili",
   };
   const mapped = aliases[s];
   return mapped && PRICING_REGION_ID_SET.has(mapped) ? mapped : null;

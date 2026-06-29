@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from '../i18n';
 import {
   formatDisplayDate,
   isValidIsoDate,
@@ -23,13 +24,14 @@ type Props = {
   onChange: (isoDate: string) => void;
 };
 
-const QUICK_OPTIONS = [
-  { key: 'yesterday', label: '昨天', offset: -1 },
-  { key: 'today', label: '今天', offset: 0 },
-  { key: 'tomorrow', label: '明天', offset: 1 },
-] as const;
-
-export default function OutboundDateField({ label = '出库日期', value, onChange }: Props) {
+export default function OutboundDateField({ label, value, onChange }: Props) {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t.forms.outboundDate;
+  const quickOptions = [
+    { key: 'yesterday', label: t.forms.yesterday, offset: -1 },
+    { key: 'today', label: t.forms.today, offset: 0 },
+    { key: 'tomorrow', label: t.forms.tomorrow, offset: 1 },
+  ] as const;
   const [showPicker, setShowPicker] = useState(false);
   const [draftDate, setDraftDate] = useState<Date>(() => parseIsoDate(value) ?? new Date());
 
@@ -61,10 +63,10 @@ export default function OutboundDateField({ label = '出库日期', value, onCha
 
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label} *</Text>
+      <Text style={styles.label}>{resolvedLabel} *</Text>
 
       <View style={styles.quickRow}>
-        {QUICK_OPTIONS.map((opt) => {
+        {quickOptions.map((opt) => {
           const iso = offsetFromTodayIsoDate(opt.offset);
           const active = value === iso;
           return (
@@ -85,13 +87,13 @@ export default function OutboundDateField({ label = '出库日期', value, onCha
           <View style={{ flex: 1 }}>
             <Text style={styles.triggerDate}>{displayText}</Text>
             <Text style={styles.triggerHint}>
-              {isValidIsoDate(value) ? '点击打开日历选择' : '请选择有效日期'}
+              {isValidIsoDate(value) ? t.forms.outboundDate : t.common.notSet}
             </Text>
           </View>
         </View>
         {isToday ? (
           <View style={styles.todayBadge}>
-            <Text style={styles.todayBadgeText}>今</Text>
+            <Text style={styles.todayBadgeText}>{t.forms.today}</Text>
           </View>
         ) : null}
       </Pressable>
@@ -100,7 +102,7 @@ export default function OutboundDateField({ label = '出库日期', value, onCha
         <Modal visible={showPicker} transparent animationType="fade" onRequestClose={() => setShowPicker(false)}>
           <Pressable style={styles.overlay} onPress={() => setShowPicker(false)}>
             <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-              <Text style={styles.sheetTitle}>选择出库日期</Text>
+              <Text style={styles.sheetTitle}>{t.forms.outboundDate}</Text>
               <DateTimePicker
                 value={draftDate}
                 mode="date"
@@ -111,10 +113,10 @@ export default function OutboundDateField({ label = '出库日期', value, onCha
               />
               <View style={styles.sheetActions}>
                 <Pressable style={styles.sheetGhost} onPress={() => setShowPicker(false)}>
-                  <Text style={styles.sheetGhostText}>取消</Text>
+                  <Text style={styles.sheetGhostText}>{t.common.cancel}</Text>
                 </Pressable>
                 <Pressable style={styles.sheetPrimary} onPress={confirmIos}>
-                  <Text style={styles.sheetPrimaryText}>确定</Text>
+                  <Text style={styles.sheetPrimaryText}>{t.common.confirm}</Text>
                 </Pressable>
               </View>
             </Pressable>

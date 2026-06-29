@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { resolveAppError, useTranslation } from '../i18n';
 import { changeInventoryPassword } from '../services/authService';
 import {
   evaluatePasswordStrength,
@@ -36,6 +37,7 @@ function RequirementRow({ ok, text }: { ok: boolean; text: string }) {
 }
 
 export default function ChangePasswordModal({ visible, storeCode, onClose, onSuccess }: Props) {
+  const { t } = useTranslation();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -91,15 +93,15 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
   const handleSubmit = async () => {
     setError('');
     if (!requirements.minLength) {
-      setError('新密码至少 6 位');
+      setError(t.changePassword.tooShort);
       return;
     }
     if (!requirements.matches) {
-      setError('两次输入的新密码不一致');
+      setError(t.changePassword.mismatch);
       return;
     }
     if (!requirements.different) {
-      setError('新密码不能与当前密码相同');
+      setError(t.changePassword.wrongCurrent);
       return;
     }
 
@@ -110,7 +112,7 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
       onSuccess?.();
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '修改失败');
+      setError(resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -137,8 +139,8 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
                 <Text style={styles.headerIconText}>🔐</Text>
               </View>
               <View style={styles.headerText}>
-                <Text style={styles.title}>修改登录密码</Text>
-                <Text style={styles.sub}>同步更新店铺密码与云端登录凭证</Text>
+                <Text style={styles.title}>{t.changePassword.title}</Text>
+                <Text style={styles.sub}>{t.settings.passwordUpdatedMsg}</Text>
               </View>
               <Pressable
                 style={styles.closeBtn}
@@ -151,7 +153,7 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
             </View>
 
             <View style={styles.storeChip}>
-              <Text style={styles.storeChipLabel}>店铺代码</Text>
+              <Text style={styles.storeChipLabel}>{t.login.storeCode}</Text>
               <Text style={styles.storeChipValue}>{storeCode ?? '—'}</Text>
             </View>
 
@@ -168,7 +170,7 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
               ) : null}
 
               <View style={styles.fieldBlock}>
-                <Text style={styles.label}>当前密码</Text>
+                <Text style={styles.label}>{t.changePassword.current}</Text>
                 <View style={styles.inputShell}>
                   <Text style={styles.inputIcon}>🔑</Text>
                   <TextInput
@@ -178,7 +180,7 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
                     secureTextEntry={!showPasswords}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    placeholder="输入当前密码"
+                    placeholder={t.changePassword.current}
                     placeholderTextColor="#94a3b8"
                     editable={!loading}
                   />
@@ -187,9 +189,9 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
 
               <View style={styles.fieldBlock}>
                 <View style={styles.labelRow}>
-                  <Text style={styles.label}>新密码</Text>
+                  <Text style={styles.label}>{t.changePassword.new}</Text>
                   <Pressable style={styles.genBtn} onPress={handleGenerate} disabled={loading}>
-                    <Text style={styles.genBtnText}>随机生成</Text>
+                    <Text style={styles.genBtnText}>{t.common.confirm}</Text>
                   </Pressable>
                 </View>
                 <View style={styles.inputShell}>
@@ -201,7 +203,7 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
                     secureTextEntry={!showPasswords}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    placeholder="至少 6 位"
+                    placeholder={t.changePassword.tooShort}
                     placeholderTextColor="#94a3b8"
                     editable={!loading}
                   />
@@ -223,7 +225,7 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
               </View>
 
               <View style={styles.fieldBlock}>
-                <Text style={styles.label}>确认新密码</Text>
+                <Text style={styles.label}>{t.changePassword.confirm}</Text>
                 <View style={styles.inputShell}>
                   <Text style={styles.inputIcon}>✓</Text>
                   <TextInput
@@ -233,7 +235,7 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
                     secureTextEntry={!showPasswords}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    placeholder="再次输入新密码"
+                    placeholder={t.changePassword.confirm}
                     placeholderTextColor="#94a3b8"
                     editable={!loading}
                   />
@@ -246,21 +248,23 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
                 disabled={loading}
               >
                 <Text style={styles.showToggleText}>
-                  {showPasswords ? '🙈 隐藏密码' : '👁 显示密码'}
+                  {showPasswords
+                    ? `🙈 ${t.common.hide}`
+                    : `👁 ${t.common.show}`}
                 </Text>
               </Pressable>
 
               <View style={styles.reqCard}>
-                <Text style={styles.reqTitle}>密码要求</Text>
-                <RequirementRow ok={requirements.minLength} text="至少 6 个字符" />
-                <RequirementRow ok={requirements.matches} text="两次新密码输入一致" />
-                <RequirementRow ok={requirements.different} text="新密码不同于当前密码" />
+                <Text style={styles.reqTitle}>{t.changePassword.title}</Text>
+                <RequirementRow ok={requirements.minLength} text={t.changePassword.tooShort} />
+                <RequirementRow ok={requirements.matches} text={t.changePassword.mismatch} />
+                <RequirementRow ok={requirements.different} text={t.changePassword.wrongCurrent} />
               </View>
             </ScrollView>
 
             <View style={styles.footer}>
               <Pressable style={styles.ghostBtn} onPress={handleClose} disabled={loading}>
-                <Text style={styles.ghostBtnText}>取消</Text>
+                <Text style={styles.ghostBtnText}>{t.common.cancel}</Text>
               </Pressable>
               <Pressable
                 style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
@@ -270,7 +274,7 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.primaryBtnText}>确认修改</Text>
+                  <Text style={styles.primaryBtnText}>{t.changePassword.submit}</Text>
                 )}
               </Pressable>
             </View>

@@ -11,83 +11,22 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  formatTimeAgo,
+  getCrossBorderCategoryLabel,
+  LEDGER_CATEGORY_STYLE,
+  useTranslation,
+} from '../i18n';
 import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import { listCrossBorderFinance } from '../services/financeLedgerService';
 import { syncPlatformInventoryFromCloud } from '../services/inventoryCloudSync';
 import { isSupabaseConfigured } from '../services/supabase';
 import type { FinanceLedgerCategory, FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
 
 type TabKey = 'all' | 'transport' | 'agency' | 'pending' | 'manual';
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'transport', label: '车费' },
-  { key: 'agency', label: '代转' },
-  { key: 'pending', label: '待入账' },
-  { key: 'manual', label: '其它' },
-];
-
-type CategoryMeta = {
-  icon: string;
-  accent: string;
-  tint: string;
-  pillBg: string;
-  shortLabel: string;
-};
-
-const CATEGORY_META: Record<FinanceLedgerCategory, CategoryMeta> = {
-  order_income_cod: {
-    icon: '💵',
-    accent: '#34d399',
-    tint: 'rgba(52,211,153,0.12)',
-    pillBg: 'rgba(52,211,153,0.18)',
-    shortLabel: '待收',
-  },
-  order_prepaid: {
-    icon: '✓',
-    accent: '#60a5fa',
-    tint: 'rgba(96,165,250,0.12)',
-    pillBg: 'rgba(96,165,250,0.18)',
-    shortLabel: '预付',
-  },
-  order_collected: {
-    icon: '✅',
-    accent: '#2dd4bf',
-    tint: 'rgba(45,212,191,0.12)',
-    pillBg: 'rgba(45,212,191,0.18)',
-    shortLabel: '已签收',
-  },
-  transport_cost: {
-    icon: '🚚',
-    accent: '#f87171',
-    tint: 'rgba(248,113,113,0.12)',
-    pillBg: 'rgba(248,113,113,0.18)',
-    shortLabel: '车费',
-  },
-  manual_income: {
-    icon: '📈',
-    accent: '#34d399',
-    tint: 'rgba(52,211,153,0.12)',
-    pillBg: 'rgba(52,211,153,0.18)',
-    shortLabel: '其它收入',
-  },
-  manual_expense: {
-    icon: '📉',
-    accent: '#f87171',
-    tint: 'rgba(248,113,113,0.12)',
-    pillBg: 'rgba(248,113,113,0.18)',
-    shortLabel: '其它支出',
-  },
-  stock_op: {
-    icon: '📋',
-    accent: '#94a3b8',
-    tint: 'rgba(148,163,184,0.1)',
-    pillBg: 'rgba(148,163,184,0.15)',
-    shortLabel: '操作',
-  },
-};
 
 function formatMmk(n: number): string {
   if (n <= 0) return '0';
@@ -96,25 +35,6 @@ function formatMmk(n: number): string {
 
 function formatMmkWithUnit(n: number): string {
   return `${formatMmk(n)} MMK`;
-}
-
-function formatWhen(iso: string): { primary: string; secondary: string } {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return { primary: iso, secondary: '' };
-  }
-  const now = new Date();
-  const pad = (x: number) => String(x).padStart(2, '0');
-  const full = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return { primary: '刚刚', secondary: full };
-  if (diffMin < 60) return { primary: `${diffMin} 分钟前`, secondary: full };
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return { primary: `${diffHr} 小时前`, secondary: full };
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return { primary: `${diffDay} 天前`, secondary: full };
-  return { primary: full, secondary: '' };
 }
 
 function isAgencyEntry(entry: FinanceLedgerEntry, currentKey: string): boolean {
@@ -150,30 +70,31 @@ function filterByTab(
 }
 
 function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
-  const meta = CATEGORY_META[item.category];
-  const when = formatWhen(item.occurredAt);
+  const { t } = useTranslation();
+  const style = LEDGER_CATEGORY_STYLE[item.category];
+  const when = formatTimeAgo(item.occurredAt, t);
 
   return (
-    <View style={[styles.ledgerRow, { borderLeftColor: meta.accent }]}>
-      <View style={[styles.iconCircle, { backgroundColor: meta.tint }]}>
-        <Text style={styles.iconEmoji}>{meta.icon}</Text>
+    <View style={[styles.ledgerRow, { borderLeftColor: style.accent }]}>
+      <View style={[styles.iconCircle, { backgroundColor: style.tint }]}>
+        <Text style={styles.iconEmoji}>{style.icon}</Text>
       </View>
       <View style={styles.ledgerBody}>
         <View style={styles.ledgerTitleRow}>
           <Text style={styles.ledgerName} numberOfLines={1}>
             {item.itemName || item.barcode || item.title}
           </Text>
-          <View style={[styles.amountPill, { backgroundColor: meta.pillBg }]}>
-            <Text style={[styles.amountText, { color: meta.accent }]} numberOfLines={1}>
+          <View style={[styles.amountPill, { backgroundColor: style.pillBg }]}>
+            <Text style={[styles.amountText, { color: style.accent }]} numberOfLines={1}>
               {item.amountDisplay}
             </Text>
           </View>
         </View>
         <View style={styles.tagRow}>
-          <Text style={[styles.typeTag, { color: meta.accent, backgroundColor: meta.tint }]}>
-            {meta.shortLabel}
+          <Text style={[styles.typeTag, { color: style.accent, backgroundColor: style.tint }]}>
+            {getCrossBorderCategoryLabel(t, item.category)}
           </Text>
-          {item.destination ? <Text style={styles.destTag}>→ {item.destination}</Text> : null}
+          {item.destination ? <Text style={styles.destTag}>→ {regionDisplayLabel(item.destination)}</Text> : null}
         </View>
         {item.subtitle ? (
           <Text style={styles.ledgerSubtitle} numberOfLines={2}>{item.subtitle}</Text>
@@ -222,6 +143,7 @@ function SummaryBar({
 }
 
 export default function CrossBorderFinanceScreen() {
+  const { t, fmt } = useTranslation();
   const { store, hubCode, operatorName } = useAuth();
   const [tab, setTab] = useState<TabKey>('all');
   const [loading, setLoading] = useState(true);
@@ -237,6 +159,17 @@ export default function CrossBorderFinanceScreen() {
     manualExpenseTotal: 0,
   });
   const [manualModalVisible, setManualModalVisible] = useState(false);
+
+  const tabs = useMemo(
+    (): { key: TabKey; label: string }[] => [
+      { key: 'all', label: t.crossBorderFinance.tabAll },
+      { key: 'transport', label: t.crossBorderFinance.tabTransport },
+      { key: 'agency', label: t.crossBorderFinance.tabAgency },
+      { key: 'pending', label: t.crossBorderFinance.tabPending },
+      { key: 'manual', label: t.crossBorderFinance.tabManual },
+    ],
+    [t],
+  );
 
   const currentKey = store ? ownershipKeyFromStoreCode(store.storeCode) : '';
 
@@ -282,7 +215,7 @@ export default function CrossBorderFinanceScreen() {
           const result = await listCrossBorderFinance(store, hubCode);
           applyFinanceResult(result);
         } catch {
-          // 离线时保留本地数据
+          // offline: keep local data
         } finally {
           if (options?.awaitSync) setRefreshing(false);
         }
@@ -338,7 +271,7 @@ export default function CrossBorderFinanceScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyIcon}>🔐</Text>
-        <Text style={styles.emptyTitle}>请先登录店铺账号</Text>
+        <Text style={styles.emptyTitle}>{t.common.loginStoreFirst}</Text>
       </View>
     );
   }
@@ -349,9 +282,12 @@ export default function CrossBorderFinanceScreen() {
         <View style={styles.heroGlow} />
         <View style={styles.heroTop}>
           <View style={styles.heroTitleBlock}>
-            <Text style={styles.heroLabel}>跨境财务</Text>
+            <Text style={styles.heroLabel}>{t.crossBorderFinance.title}</Text>
             <Text style={styles.heroHub}>
-              {operatorName ?? '本站'} · 区域 {hubCode}
+              {fmt(t.crossBorderFinance.heroHub, {
+                name: operatorName ?? t.common.thisStation,
+                hub: regionDisplayLabel(hubCode),
+              })}
             </Text>
           </View>
           <View style={styles.heroActions}>
@@ -359,16 +295,18 @@ export default function CrossBorderFinanceScreen() {
               style={styles.addManualBtn}
               onPress={() => setManualModalVisible(true)}
             >
-              <Text style={styles.addManualBtnText}>+ 其它开销</Text>
+              <Text style={styles.addManualBtnText}>{t.crossBorderFinance.addManual}</Text>
             </Pressable>
             <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>{displayed.length} 条</Text>
+              <Text style={styles.heroBadgeText}>
+                {fmt(t.common.recordsCount, { count: displayed.length })}
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.netRow}>
-          <Text style={styles.netLabel}>结余</Text>
+          <Text style={styles.netLabel}>{t.crossBorderFinance.balance}</Text>
           <Text
             style={[
               styles.netValue,
@@ -377,12 +315,12 @@ export default function CrossBorderFinanceScreen() {
           >
             {netBalance >= 0 ? '+' : '−'}{formatMmkWithUnit(Math.abs(netBalance))}
           </Text>
-          <Text style={styles.netHint}>已收 + 其它收入 − 已付车费 − 其它支出</Text>
+          <Text style={styles.netHint}>{t.crossBorderFinance.balanceFormula}</Text>
         </View>
 
         <View style={styles.statsStack}>
           <SummaryBar
-            label="已收"
+            label={t.crossBorderFinance.collected}
             value={formatMmk(summary.collectedTotal)}
             prefix="+"
             accent="#60a5fa"
@@ -390,7 +328,7 @@ export default function CrossBorderFinanceScreen() {
             tint="rgba(96,165,250,0.08)"
           />
           <SummaryBar
-            label="待付车费"
+            label={t.crossBorderFinance.transportUnpaid}
             value={formatMmk(summary.transportUnpaidTotal)}
             prefix="−"
             accent="#f87171"
@@ -398,14 +336,14 @@ export default function CrossBorderFinanceScreen() {
             tint="rgba(248,113,113,0.08)"
           />
           <SummaryBar
-            label="已付车费"
+            label={t.crossBorderFinance.transportPaid}
             value={formatMmk(summary.transportPaidTotal)}
             accent="#a78bfa"
             icon="✅"
             tint="rgba(167,139,250,0.1)"
           />
           <SummaryBar
-            label="待入账"
+            label={t.crossBorderFinance.pendingInflow}
             value={formatMmk(summary.pendingInflowTotal)}
             prefix="+"
             accent="#34d399"
@@ -416,7 +354,7 @@ export default function CrossBorderFinanceScreen() {
 
         <View style={styles.statsStack}>
           <SummaryBar
-            label="其它收入"
+            label={t.crossBorderFinance.manualIncome}
             value={formatMmk(summary.manualIncomeTotal)}
             prefix="+"
             accent="#34d399"
@@ -424,7 +362,7 @@ export default function CrossBorderFinanceScreen() {
             tint="rgba(52,211,153,0.08)"
           />
           <SummaryBar
-            label="其它支出"
+            label={t.crossBorderFinance.manualExpense}
             value={formatMmk(summary.manualExpenseTotal)}
             prefix="−"
             accent="#f87171"
@@ -435,10 +373,12 @@ export default function CrossBorderFinanceScreen() {
 
         {summary.agencyPayableTotal > 0 ? (
           <Text style={styles.agencyHint}>
-            代收应转 {formatMmkWithUnit(summary.agencyPayableTotal)}（代转 tab 查看明细）
+            {fmt(t.crossBorderFinance.agencyHint, {
+              amount: formatMmkWithUnit(summary.agencyPayableTotal),
+            })}
           </Text>
         ) : null}
-        <Text style={styles.syncHint}>先显示本地数据 · 后台自动同步 · 下拉强制同步</Text>
+        <Text style={styles.syncHint}>{t.crossBorderFinance.syncHint}</Text>
       </View>
 
       <ScrollView
@@ -446,16 +386,16 @@ export default function CrossBorderFinanceScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabScroll}
       >
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          const count = tabCounts[t.key];
+        {tabs.map((tabItem) => {
+          const active = tab === tabItem.key;
+          const count = tabCounts[tabItem.key];
           return (
             <Pressable
-              key={t.key}
+              key={tabItem.key}
               style={[styles.tab, active && styles.tabOn]}
-              onPress={() => setTab(t.key)}
+              onPress={() => setTab(tabItem.key)}
             >
-              <Text style={[styles.tabText, active && styles.tabTextOn]}>{t.label}</Text>
+              <Text style={[styles.tabText, active && styles.tabTextOn]}>{tabItem.label}</Text>
               {count > 0 ? (
                 <View style={[styles.tabCount, active && styles.tabCountOn]}>
                   <Text style={[styles.tabCountText, active && styles.tabCountTextOn]}>
@@ -470,7 +410,7 @@ export default function CrossBorderFinanceScreen() {
 
       {!loading && displayed.length > 0 ? (
         <Text style={styles.sectionTitle}>
-          {TABS.find((t) => t.key === tab)?.label} · {displayed.length}
+          {tabs.find((tabItem) => tabItem.key === tab)?.label} · {displayed.length}
         </Text>
       ) : null}
     </View>
@@ -481,7 +421,7 @@ export default function CrossBorderFinanceScreen() {
       {loading && entries.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color="#a78bfa" size="large" />
-          <Text style={styles.loadingText}>正在汇总跨境财务…</Text>
+          <Text style={styles.loadingText}>{t.crossBorderFinance.loading}</Text>
         </View>
       ) : (
         <FlatList
@@ -493,10 +433,8 @@ export default function CrossBorderFinanceScreen() {
             !loading ? (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyIcon}>📭</Text>
-                <Text style={styles.emptyTitle}>暂无记录</Text>
-                <Text style={styles.emptyHint}>
-                  装车、到站签收或点击「+ 其它开销」登记后会出现明细
-                </Text>
+                <Text style={styles.emptyTitle}>{t.crossBorderFinance.emptyTitle}</Text>
+                <Text style={styles.emptyHint}>{t.crossBorderFinance.emptyHint}</Text>
               </View>
             ) : null
           }
@@ -515,7 +453,7 @@ export default function CrossBorderFinanceScreen() {
       <CrossBorderManualEntryModal
         visible={manualModalVisible}
         storeCode={store.storeCode}
-        operatorName={operatorName ?? '工作人员'}
+        operatorName={operatorName ?? t.common.operator}
         onClose={() => setManualModalVisible(false)}
         onSaved={() => void load()}
       />

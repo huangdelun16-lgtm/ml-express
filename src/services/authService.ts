@@ -443,9 +443,16 @@ export async function verifyCurrentUserPassword(password: string): Promise<{ suc
       })
     });
 
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `验证服务不可用 (${response.status})，请检查网络或稍后重试`,
+      };
+    }
+
     const result = await response.json();
     return {
-      success: result.success,
+      success: Boolean(result.success),
       error: result.error
     };
   } catch (error) {

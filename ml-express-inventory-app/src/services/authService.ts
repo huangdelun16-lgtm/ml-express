@@ -1,8 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
-import { INVENTORY_RELOGIN_HINT, isInventoryCloudAuthError } from '../utils/cloudAuthErrors';
+import { svc } from '../errors/serviceError';
+import { isInventoryCloudAuthError } from '../utils/cloudAuthErrors';
 import {
   getSupabaseAnonKey,
-  getSupabaseConfigHint,
   getSupabaseUrl,
   isSupabaseConfigured,
   supabase,
@@ -10,12 +10,23 @@ import {
 
 export const TRANSIT_STATION_STORE_TYPE = 'transit_station';
 const SESSION_KEY = 'inventory_transit_session';
+const DEVICE_SESSION_KEY = 'inventory_device_session_id';
+const SESSION_KICKED_FLAG_KEY = 'inventory_session_kicked';
 
 /** P4：云端 JWT 无效或缺少 inventory_* metadata 时需重新登录 */
 export class InventoryAuthRequiredError extends Error {
-  constructor(message = INVENTORY_RELOGIN_HINT) {
-    super(message);
+  readonly code: import('../errors/serviceError').ServiceErrorCode;
+
+  readonly params?: Record<string, string | number>;
+
+  constructor(
+    code: import('../errors/serviceError').ServiceErrorCode = 'authSessionExpired',
+    params?: Record<string, string | number>,
+  ) {
+    super(code);
     this.name = 'InventoryAuthRequiredError';
+    this.code = code;
+    this.params = params;
   }
 }
 
@@ -48,6 +59,7 @@ type DeliveryStoreRow = {
 type InventoryLoginPayload = {
   email?: string;
   hubCode?: string;
+  sessionId?: string;
   store?: {
     id: string;
     storeCode: string;
@@ -85,6 +97,47 @@ export async function saveSession(session: InventoryStoreSession): Promise<void>
 
 export async function clearSession(): Promise<void> {
   await SecureStore.deleteItemAsync(SESSION_KEY);
+}
+
+export async function saveDeviceSessionId(sessionId: string): Promise<void> {
+  await SecureStore.setItemAsync(DEVICE_SESSION_KEY, sessionId.trim());
+}
+
+export async function loadDeviceSessionId(): Promise<string | null> {
+  const raw = await SecureStore.getItemAsync(DEVICE_SESSION_KEY);
+  return raw?.trim() || null;
+}
+
+export async function clearDeviceSessionId(): Promise<void> {
+  await SecureStore.deleteItemAsync(DEVICE_SESSION_KEY);
+}
+
+export async function markSessionKicked(): Promise<void> {
+  await SecureStore.setItemAsync(SESSION_KICKED_FLAG_KEY, '1');
+}
+
+export async function consumeSessionKickedFlag(): Promise<boolean> {
+  const raw = await SecureStore.getItemAsync(SESSION_KICKED_FLAG_KEY);
+  if (!raw) return false;
+  await SecureStore.deleteItemAsync(SESSION_KICKED_FLAG_KEY);
+  return true;
+}
+
+/** 校验本机 sessionId 是否仍为云端记录的活跃会话（单设备登录） */
+export async function verifyDeviceSessionStillActive(storeId: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return true;
+
+  const localSessionId = await loadDeviceSessionId();
+  if (!localSessionId) return true;
+
+  const { data, error } = await supabase
+    .from('delivery_stores')
+    .select('current_session_id')
+    .eq('id', storeId)
+    .maybeSingle();
+  if (error || !data?.current_session_id) return true;
+
+  return data.current_session_id === localSessionId;
 }
 
 export async function loadStoredSession(): Promise<InventoryStoreSession | null> {
@@ -133,13 +186,13 @@ async function validateStoreStillAllowed(storeId: string): Promise<boolean> {
 
 async function signInInventoryAuth(email: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(`云端登录失败：${error.message}`);
+  if (error) throw svc('cloudLoginFailed', { detail: error.message });
 }
 
 /** 同步 / 写云端前校验：必须已登录且 JWT 含 inventory_store_id + hub_code */
 export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession> {
   if (!isSupabaseConfigured()) {
-    throw new InventoryAuthRequiredError(getSupabaseConfigHint() || '未配置 Supabase');
+    throw new InventoryAuthRequiredError('supabaseNotConfigured');
   }
 
   const {
@@ -155,9 +208,7 @@ export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession>
 
   const fromMeta = sessionFromAuthMetadata(user);
   if (!fromMeta?.hubCode) {
-    throw new InventoryAuthRequiredError(
-      '云端 JWT 缺少 inventory_hub_code。请退出后重新登录以更新店铺权限。',
-    );
+    throw new InventoryAuthRequiredError('authJwtMissingHubCode');
   }
 
   const { error: probeErr } = await supabase
@@ -166,12 +217,12 @@ export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession>
     .eq('id', fromMeta.id)
     .maybeSingle();
   if (probeErr && isInventoryCloudAuthError(probeErr)) {
-    throw new InventoryAuthRequiredError(probeErr.message);
+    throw new InventoryAuthRequiredError('authSessionExpired');
   }
 
   const ok = await validateStoreStillAllowed(fromMeta.id);
   if (!ok) {
-    throw new InventoryAuthRequiredError('店铺账号已停用或非中转站类型');
+    throw new InventoryAuthRequiredError('storeDisabled');
   }
 
   const stored = await loadStoredSession();
@@ -194,7 +245,7 @@ async function callInventoryStoreLogin(storeCode: string, password: string): Pro
   });
   const payload = (await response.json()) as InventoryLoginPayload;
   if (!response.ok) {
-    throw new Error(payload.error ?? '登录失败');
+    throw svc('loginFailed');
   }
   return payload;
 }
@@ -205,10 +256,20 @@ export async function restoreSession(): Promise<InventoryStoreSession | null> {
   }
 
   try {
-    return await ensureInventoryCloudAuth();
+    const session = await ensureInventoryCloudAuth();
+    const active = await verifyDeviceSessionStillActive(session.id);
+    if (!active) {
+      await markSessionKicked();
+      await supabase.auth.signOut();
+      await clearSession();
+      await clearDeviceSessionId();
+      return null;
+    }
+    return session;
   } catch {
     await supabase.auth.signOut();
     await clearSession();
+    await clearDeviceSessionId();
     return null;
   }
 }
@@ -218,21 +279,25 @@ export async function loginTransitStationStore(
   password: string,
 ): Promise<InventoryStoreSession> {
   if (!isSupabaseConfigured()) {
-    throw new Error(getSupabaseConfigHint() || '未配置 Supabase');
+    throw svc('supabaseNotConfigured');
   }
 
   const code = storeCode.trim().toUpperCase();
   const pass = password.trim();
   if (!code || !pass) {
-    throw new Error('请填写店铺代码和密码');
+    throw svc('fillStoreCodePassword');
   }
 
   const loginPayload = await callInventoryStoreLogin(code, pass);
   if (!loginPayload.email || !loginPayload.store) {
-    throw new Error(loginPayload.error ?? '登录失败');
+    throw svc('loginFailed');
   }
 
   await signInInventoryAuth(loginPayload.email, pass);
+
+  if (loginPayload.sessionId) {
+    await saveDeviceSessionId(loginPayload.sessionId);
+  }
 
   return await ensureInventoryCloudAuth();
 }
@@ -242,6 +307,7 @@ export async function logoutTransitStationStore(): Promise<void> {
     await supabase.auth.signOut();
   }
   await clearSession();
+  await clearDeviceSessionId();
 }
 
 function inventoryAuthEmail(storeCode: string): string {
@@ -254,19 +320,19 @@ export async function changeInventoryPassword(
   newPassword: string,
 ): Promise<void> {
   if (!isSupabaseConfigured()) {
-    throw new Error(getSupabaseConfigHint() || '未配置 Supabase');
+    throw svc('supabaseNotConfigured');
   }
 
   const current = currentPassword.trim();
   const next = newPassword.trim();
   if (!current || !next) {
-    throw new Error('请填写当前密码和新密码');
+    throw svc('fillCurrentNewPassword');
   }
   if (next.length < 6) {
-    throw new Error('新密码至少 6 位');
+    throw svc('newPasswordMinLength');
   }
   if (current === next) {
-    throw new Error('新密码不能与当前密码相同');
+    throw svc('newPasswordSameAsCurrent');
   }
 
   const session = await ensureInventoryCloudAuth();
@@ -292,7 +358,7 @@ export async function changeInventoryPassword(
 
   const payload = (await response.json()) as { ok?: boolean; error?: string };
   if (!response.ok) {
-    throw new Error(payload.error ?? '修改密码失败');
+    throw svc('changePasswordFailed');
   }
 
   const email = inventoryAuthEmail(session.storeCode);

@@ -18,14 +18,16 @@ import { formatInboundDateLabel } from '../utils/stockInDate';
 import { resolvePackDisplayStatus, canEditPackedShipment, canSelectPackedShipmentForTruckLoad } from '../utils/packDisplayStatus';
 import { todayIsoDate } from '../utils/dateFormat';
 import { buildPackageNumberBody, formatPackageSequence } from '../utils/packageNumber';
-import { customerSignDeniedMessage, canMarkCustomerSigned } from '../utils/customerSign';
+import { customerSignDeniedError, canMarkCustomerSigned } from '../utils/customerSign';
+import { svc, isServiceError } from '../errors/serviceError';
 import {
   canEditOwnedRecord,
-  editDeniedMessage,
   inferOwnerKeyFromItem,
   isPackContentLockedForStore,
   normalizeOwnerKey,
   ownershipKeyFromStoreCode,
+  ownershipLabelFromKey,
+  toComparableOwnerKey,
 } from '../utils/storeOwnership';
 import {
   pushTruckLoadToCloud,
@@ -727,7 +729,9 @@ export function assertCanEditItem(
   ownerStoreCode: string | null | undefined,
 ): void {
   if (!canEditOwnedRecord(actingStore, ownerStoreCode)) {
-    throw new Error(editDeniedMessage(ownerStoreCode));
+    const ownerKey = toComparableOwnerKey(ownerStoreCode);
+    if (!ownerKey) throw svc('editDeniedUnknownOwner');
+    throw svc('editDeniedOtherStore', { owner: ownershipLabelFromKey(ownerKey) });
   }
 }
 
@@ -749,7 +753,7 @@ export async function assertCanEditPackById(
 
 async function assertPackedShipmentEditable(packId: string): Promise<void> {
   const pack = await getPackedShipmentById(packId);
-  if (!pack) throw new Error('包裹不存在');
+  if (!pack) throw svc('packNotFound');
 
   let cloudStatus: import('../types/tracking').PkgTrackingStatus | null = null;
   try {
@@ -761,7 +765,7 @@ async function assertPackedShipmentEditable(packId: string): Promise<void> {
   }
 
   if (!canEditPackedShipment({ loaded: pack.loaded, cloud_status: cloudStatus })) {
-    throw new Error('该快递包已装车出库或目的地站点已确认到站，不可再修改');
+    throw svc('packNotEditableLoaded');
   }
 }
 
@@ -922,7 +926,7 @@ export async function applyStockMovement(params: {
   syncToCloud?: boolean;
 }): Promise<{ item: InventoryItem; movement: StockMovement }> {
   const qty = Math.abs(params.qty);
-  if (qty <= 0) throw new Error('数量必须大于 0');
+  if (qty <= 0) throw svc('qtyMustBePositive');
 
   const db = await getDatabase();
   let item = await getItemByBarcode(params.barcode);
@@ -947,13 +951,13 @@ export async function applyStockMovement(params: {
     );
   }
 
-  if (!item) throw new Error('未找到该条码商品，请先在商品库建档或扫码入库时填写名称');
+  if (!item) throw svc('itemNotFoundByBarcode');
 
   const before = item.qty_on_hand;
   let after = before;
   if (params.type === 'in') after = before + qty;
   else if (params.type === 'out') {
-    if (before < qty) throw new Error(`库存不足：当前 ${before}，需要出库 ${qty}`);
+    if (before < qty) throw svc('insufficientStock', { current: before, need: qty });
     after = before - qty;
   } else after = qty;
 
@@ -1158,19 +1162,19 @@ export async function createPackedShipment(params: {
   };
 }): Promise<{ bundleItem: InventoryItem; pack: PackedShipment }> {
   const ids = [...new Set(params.itemIds)];
-  if (ids.length === 0) throw new Error('请至少选择一个入库商品');
+  if (ids.length === 0) throw svc('selectAtLeastOneItem');
 
   const db = await getDatabase();
   const picked: InventoryItem[] = [];
   for (const id of ids) {
     let item = await getItemById(id);
-    if (!item) throw new Error('商品不存在或已删除');
-    if (item.qty_on_hand < 1) throw new Error(`${item.name} 库存不足，无法打包`);
+    if (!item) throw svc('itemNotFoundOrDeleted');
+    if (item.qty_on_hand < 1) throw svc('itemInsufficientPack', { name: item.name });
     const hasIn = await db.getFirstAsync<{ c: number }>(
       `SELECT COUNT(*) as c FROM stock_movements WHERE item_id = ? AND type = 'in'`,
       [id],
     );
-    if (!hasIn?.c) throw new Error(`${item.name} 未入库，无法打包`);
+    if (!hasIn?.c) throw svc('itemNotInboundPack', { name: item.name });
 
     const repackPrepared = await prepareHubTransitItemForRepack(item);
     if (repackPrepared) {
@@ -1179,9 +1183,10 @@ export async function createPackedShipment(params: {
 
     if (!repackPrepared) {
       if (item.packed_at?.trim() || item.packed_bundle_barcode?.trim()) {
-        throw new Error(
-          `${item.name} 已打包入 ${item.packed_bundle_barcode || '快递包'}，不可重复打包`,
-        );
+        throw svc('itemAlreadyPacked', {
+          name: item.name,
+          pack: item.packed_bundle_barcode || 'PKG',
+        });
       }
       const inAnyPack = await db.getFirstAsync<{ bundle_barcode: string }>(
         `SELECT p.bundle_barcode FROM packed_shipment_items psi
@@ -1190,9 +1195,7 @@ export async function createPackedShipment(params: {
         [id, item.barcode],
       );
       if (inAnyPack?.bundle_barcode) {
-        throw new Error(
-          `${item.name} 已在快递包 ${inAnyPack.bundle_barcode} 中，请先拆包后再打包`,
-        );
+        throw svc('itemPackedInOther', { name: item.name, pack: inAnyPack.bundle_barcode });
       }
     }
     picked.push(item);
@@ -1357,8 +1360,8 @@ export async function generatePackageNumber(
   itemCount: number,
 ): Promise<string> {
   const dest = destination.trim();
-  if (!dest) throw new Error('请选择目的地');
-  if (itemCount <= 0) throw new Error('请至少选择一个入库商品');
+  if (!dest) throw svc('selectDestination');
+  if (itemCount <= 0) throw svc('selectAtLeastOneItem');
   const body = buildPackageNumberBody(dest, itemCount);
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ n: number }>(
@@ -1378,7 +1381,7 @@ export async function generatePackageNumber(
     if (!taken?.c && !itemTaken) return candidate;
     seq += 1;
   }
-  throw new Error('无法生成包装号，请重试');
+  throw svc('cannotGeneratePackNo');
 }
 
 function rowToPackedShipmentItem(row: Record<string, unknown>): PackedShipmentItem {
@@ -1575,7 +1578,7 @@ export async function updatePackedShipment(
 ): Promise<void> {
   const db = await getDatabase();
   const name = params.bundle_name.trim();
-  if (!name) throw new Error('快递包名称不能为空');
+  if (!name) throw svc('packNameRequired');
 
   if (actingStore) {
     await assertCanEditPackById(actingStore, packId);
@@ -1586,7 +1589,7 @@ export async function updatePackedShipment(
     'SELECT bundle_item_id, bundle_barcode FROM packed_shipments WHERE id = ?',
     [packId],
   );
-  if (!row) throw new Error('包裹不存在');
+  if (!row) throw svc('packNotFound');
 
   await db.runAsync('UPDATE packed_shipments SET bundle_name = ? WHERE id = ?', [name, packId]);
 
@@ -1625,12 +1628,12 @@ export async function applyTruckLoadOutbound(params: {
   originStore?: OriginStoreRef;
   actingStore?: InventoryStoreSession;
 }): Promise<{ count: number; cloudSynced: boolean; cloudError?: string }> {
-  if (params.packs.length === 0) throw new Error('请至少选择一个包装号');
+  if (params.packs.length === 0) throw svc('selectAtLeastOnePack');
 
   if (params.actingStore) {
     const { isOwnStationOutboundDestination } = await import('../utils/storeZone');
     if (isOwnStationOutboundDestination(params.destination, params.actingStore)) {
-      throw new Error('目的地不能为本站，请选择其他中转站');
+      throw svc('destCannotBeOwnStation');
     }
   }
 
@@ -1645,15 +1648,15 @@ export async function applyTruckLoadOutbound(params: {
   for (const pack of params.packs) {
     const cloud = cloudStatusMap[pack.bundle_barcode.trim().toUpperCase()] ?? null;
     if (!canSelectPackedShipmentForTruckLoad({ loaded: pack.loaded, cloud_status: cloud })) {
-      const label =
+      const code =
         cloud === 'hub_received' || cloud === 'completed' || cloud === 'split_at_hub'
-          ? '目的地站点已确认到站'
+          ? 'packCannotTruckLoadHubReceived'
           : cloud === 'in_transit'
-            ? '已在运输途中'
+            ? 'packCannotTruckLoadInTransit'
             : pack.loaded
-              ? '已装车出库'
-              : '不可重复装车';
-      throw new Error(`${pack.bundle_barcode} ${label}，无法再次装车出库`);
+              ? 'packCannotTruckLoadOutbound'
+              : 'packCannotTruckLoadDuplicate';
+      throw svc(code, { barcode: pack.bundle_barcode });
     }
   }
 
@@ -1721,7 +1724,11 @@ export async function applyTruckLoadOutbound(params: {
       });
       cloudSynced = true;
     } catch (e: unknown) {
-      cloudError = e instanceof Error ? e.message : '云端同步失败';
+      cloudError = isServiceError(e)
+        ? e.code
+        : e instanceof Error
+          ? e.message
+          : 'cloudSyncFailed';
       await enqueueCloudSync({
         type: 'truck_load',
         store: cloudStore,
@@ -1820,10 +1827,10 @@ export async function cancelPackedShipment(
   actingStore?: InventoryStoreSession,
 ): Promise<{ restoredCount: number }> {
   const pack = await getPackedShipmentById(packId);
-  if (!pack) throw new Error('快递包不存在');
+  if (!pack) throw svc('packNotFoundGeneric');
 
   if (pack.loaded || pack.bundle_qty_on_hand <= 0) {
-    throw new Error('已装车出库的快递包不能拆包');
+    throw svc('loadedPackCannotUnpack');
   }
 
   const { listPkgTrackingStatusMap } = await import('./trackingService');
@@ -1832,7 +1839,7 @@ export async function cancelPackedShipment(
     const statusMap = await listPkgTrackingStatusMap([pack.bundle_barcode]);
     cloudStatus = statusMap[pack.bundle_barcode.trim().toUpperCase()] ?? null;
   } catch {
-    throw new Error('无法连接云端校验拆包状态，请检查网络后重试');
+    throw svc('cannotVerifyUnpackCloud');
   }
   if (
     cloudStatus === 'in_transit' ||
@@ -1840,7 +1847,7 @@ export async function cancelPackedShipment(
     cloudStatus === 'completed' ||
     cloudStatus === 'split_at_hub'
   ) {
-    throw new Error('该快递包已在运输中或已到站，无法拆包');
+    throw svc('packInTransitCannotUnpack');
   }
 
   if (actingStore) {
@@ -1908,8 +1915,8 @@ export async function cancelPackedShipment(
     const { deleteCloudPackedShipment } = await import('./inventoryCloudApi');
     await deleteCloudPackedShipment(pack.bundle_barcode);
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '云端拆包失败';
-    if (msg.includes('无法拆包')) throw e;
+    const msg = isServiceError(e) ? e.code : e instanceof Error ? e.message : 'cloudUnpackFailed';
+    if (msg.includes('cloudPack') || msg.includes('无法拆包') || msg.includes('unpack')) throw e;
     // 离线或未同步云端时仍完成本地拆包
   }
 
@@ -1922,15 +1929,15 @@ export async function resyncLoadedPackToCloud(
   actingStore: InventoryStoreSession,
 ): Promise<void> {
   const pack = await getPackedShipmentByBarcode(packBarcode);
-  if (!pack) throw new Error('未找到该快递包');
-  if (!pack.loaded) throw new Error('该包裹尚未装车出库，请先在「装车出库」完成操作');
+  if (!pack) throw svc('packNotFoundResync');
+  if (!pack.loaded) throw svc('packNotLoadedYet');
 
   const movement = await getLatestTruckLoadMovement(pack.bundle_item_id);
-  if (!movement) throw new Error('未找到装车出库记录');
+  if (!movement) throw svc('truckLoadRecordNotFound');
 
   const truckLoad = parseTruckLoadFromMovement(movement);
   if (!truckLoad?.destination?.trim()) {
-    throw new Error('无法解析装车目的地，请重新装车出库');
+    throw svc('cannotParseTruckDest');
   }
 
   const orderSnapshots = await buildOrderInboundSnapshots([pack]);
@@ -1939,13 +1946,10 @@ export async function resyncLoadedPackToCloud(
     parseTransportFeeFromLoadNote(movement.note) ||
     '';
   const { listPkgTrackingStatusMap } = await import('./trackingService');
-  const { PKG_STATUS_LABEL } = await import('../types/tracking');
   const statusMap = await listPkgTrackingStatusMap([pack.bundle_barcode]);
   const cloudStatus = statusMap[pack.bundle_barcode.trim().toUpperCase()];
   if (cloudStatus && cloudStatus !== 'in_transit') {
-    throw new Error(
-      `快递包云端已是「${PKG_STATUS_LABEL[cloudStatus]}」，无需补传装车数据`,
-    );
+    throw svc('cloudPkgAlreadyStatus', { statusKey: cloudStatus });
   }
   const originStore: OriginStoreRef = {
     id: actingStore.id,
@@ -1976,7 +1980,7 @@ export async function deliverLocalHubOrderToInventory(params: {
   const hub = params.hubCode.trim().toUpperCase();
   const orderDest = resolveOrderDestinationCode(params.order);
   if (orderDest !== hub) {
-    throw new Error(`订单目的地为 ${orderDest || '未知'}，非本站 ${hub}，无法确认入库`);
+    throw svc('orderDestNotThisHub', { orderDest: orderDest || '?', hub });
   }
 
   let item = await getItemByBarcode(params.order.order_barcode);
@@ -2944,7 +2948,7 @@ export async function deliverHubOrderInboundAtStation(params: {
     });
     return;
   }
-  throw new Error(`无法识别订单目的地（${params.order.order_barcode}）`);
+  throw svc('cannotResolveOrderDest', { barcode: params.order.order_barcode });
 }
 
 /** 包内订单全部「入库」后，自动释放中转订单至快递明细待重新打包 */
@@ -3189,10 +3193,10 @@ export async function markCustomerSigned(
   actingStore?: InventoryStoreSession,
 ): Promise<void> {
   const item = await getItemById(itemId);
-  if (!item) throw new Error('订单不存在或已删除');
+  if (!item) throw svc('orderNotFoundOrDeleted');
 
   if (actingStore && !canMarkCustomerSigned(actingStore, item)) {
-    throw new Error(customerSignDeniedMessage(actingStore, item));
+    throw customerSignDeniedError(actingStore, item);
   }
 
   const db = await getDatabase();
@@ -3244,7 +3248,7 @@ export async function updateItemInboundProfile(
 ): Promise<void> {
   await assertCanEditItemById(actingStore, itemId);
   const item = await getItemById(itemId);
-  if (!item) throw new Error('订单不存在或已删除');
+  if (!item) throw svc('orderNotFoundOrDeleted');
 
   const finalDest = persistFinalDestinationCode(params.destination);
 
@@ -3529,7 +3533,7 @@ export async function cancelInventoryItem(
 ): Promise<void> {
   const db = await getDatabase();
   const item = await getItemById(id);
-  if (!item) throw new Error('订单不存在或已删除');
+  if (!item) throw svc('orderNotFoundOrDeleted');
 
   if (actingStore) {
     await assertCanEditItemById(actingStore, id);
@@ -3690,7 +3694,11 @@ export async function clearAllTestData(
     const { clearAllCloudTestDataViaEdge } = await import('./inventoryCloudSync');
     cloudEdge = await clearAllCloudTestDataViaEdge();
   } catch (e: unknown) {
-    cloudEdgeError = e instanceof Error ? e.message : '云端清空失败';
+    cloudEdgeError = isServiceError(e)
+      ? e.code
+      : e instanceof Error
+        ? e.message
+        : 'cloudClearFailed';
   }
 
   let cloudPlatform: { items: number; packs: number } | null = null;
@@ -3700,7 +3708,11 @@ export async function clearAllTestData(
       const { clearAllCloudPlatformInventory } = await import('./inventoryCloudSync');
       cloudPlatform = await clearAllCloudPlatformInventory(store, hubCode);
     } catch (e: unknown) {
-      cloudPlatformError = e instanceof Error ? e.message : '云端库存清空失败';
+      cloudPlatformError = isServiceError(e)
+        ? e.code
+        : e instanceof Error
+          ? e.message
+          : 'cloudInventoryClearFailed';
     }
   }
 
@@ -3711,7 +3723,11 @@ export async function clearAllTestData(
       const { clearAllCloudTracking } = await import('./trackingService');
       cloud = await clearAllCloudTracking();
     } catch (e: unknown) {
-      cloudError = e instanceof Error ? e.message : '云端追踪清空失败';
+      cloudError = isServiceError(e)
+        ? e.code
+        : e instanceof Error
+          ? e.message
+          : 'cloudTrackingClearFailed';
     }
   }
 

@@ -13,6 +13,7 @@ import DestinationPickerField from './DestinationPickerField';
 import PackagingPickerField from './PackagingPickerField';
 import { InboundFormField, InboundFormSection, inboundFormStyles } from './InboundFormPrimitives';
 import { DimensionSpecField, LockedSuffixField } from './StructuredItemFields';
+import { useTranslation } from '../i18n';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 
 export type InboundOrderFormBodyValues = {
@@ -89,6 +90,7 @@ export default function InboundOrderFormBody({
   onQtyInc,
   qtyOnHand,
 }: Props) {
+  const { t } = useTranslation();
   const canEdit = editable;
   const chainKeys = useMemo(
     () =>
@@ -101,12 +103,12 @@ export default function InboundOrderFormBody({
 
   return (
     <>
-      <InboundFormSection title="商品信息" accent="#059669">
+      <InboundFormSection title={t.trackExpress.sectionItemInfo} accent="#059669">
         <InboundFormField
-          label="商品名称 *"
+          label={t.stockIn.itemNameRequired}
           value={values.productName}
           onChange={onProductNameChange}
-          placeholder="输入商品名称"
+          placeholder={t.stockIn.itemNameRequired.replace(' *', '')}
           editable={canEdit}
           inputRef={fieldChain.propsFor('product').inputRef}
           returnKeyType={fieldChain.propsFor('product').returnKeyType}
@@ -116,7 +118,7 @@ export default function InboundOrderFormBody({
         {canEdit ? (
           <PackagingPickerField value={values.packaging} onChange={onPackagingChange} />
         ) : (
-          <InboundFormField label="商品包装" value={values.packaging} editable={false} />
+          <InboundFormField label={t.forms.packaging} value={values.packaging} editable={false} />
         )}
         {canEdit ? (
           <DimensionSpecField
@@ -129,14 +131,14 @@ export default function InboundOrderFormBody({
             hInput={fieldChain.propsFor('specH')}
           />
         ) : (
-          <InboundFormField label="规格（cm）" value={specStr} editable={false} />
+          <InboundFormField label={t.trackExpress.spec} value={specStr} editable={false} />
         )}
         <LockedSuffixField
-          label="重量"
+          label={t.trackExpress.weight}
           value={values.weightN}
           suffix="Kg"
           onChange={onWeightChange}
-          placeholder="重量"
+          placeholder={t.trackExpress.weight}
           editable={canEdit}
           inputRef={fieldChain.propsFor('weight').inputRef}
           returnKeyType={fieldChain.propsFor('weight').returnKeyType}
@@ -145,23 +147,23 @@ export default function InboundOrderFormBody({
         />
         {(specStr || weightStr) && canEdit ? (
           <View style={inboundFormStyles.preview}>
-            <Text style={inboundFormStyles.previewTitle}>规格 / 重量预览</Text>
+            <Text style={inboundFormStyles.previewTitle}>{t.itemForm.specSection}</Text>
             {specStr ? <Text style={inboundFormStyles.previewLine}>{specStr}</Text> : null}
             {weightStr ? <Text style={inboundFormStyles.previewLine}>{weightStr}</Text> : null}
           </View>
         ) : null}
         <View style={inboundFormStyles.barcodeBox}>
           <Text style={inboundFormStyles.barcodeLabel}>
-            {barcodeCaption ?? (mode === 'edit' ? '入库条码' : '入库条码（自动生成）')}
+            {barcodeCaption ?? t.trackExpress.inboundBarcode}
           </Text>
           <Text style={inboundFormStyles.barcodeValue}>{barcodeText}</Text>
         </View>
       </InboundFormSection>
 
-      <InboundFormSection title="收发信息" accent="#0891b2">
+      <InboundFormSection title={t.trackExpress.sectionShipInfo} accent="#0891b2">
         {inboundDateLabel && inboundDateYmd ? (
           <View style={inboundFormStyles.field}>
-            <Text style={inboundFormStyles.label}>入库日期 *</Text>
+            <Text style={inboundFormStyles.label}>{t.forms.inboundDate} *</Text>
             {mode === 'stock-in' && canEdit && onOpenDatePicker ? (
               <>
                 <Pressable style={inboundFormStyles.dateBtn} onPress={onOpenDatePicker}>
@@ -179,7 +181,7 @@ export default function InboundOrderFormBody({
                 ) : null}
                 {Platform.OS === 'ios' && showDatePicker && onCloseDatePicker ? (
                   <Pressable style={styles.dateDoneBtn} onPress={onCloseDatePicker}>
-                    <Text style={styles.dateDoneText}>确定日期</Text>
+                    <Text style={styles.dateDoneText}>{t.common.confirm}</Text>
                   </Pressable>
                 ) : null}
               </>
@@ -192,10 +194,10 @@ export default function InboundOrderFormBody({
           </View>
         ) : null}
         <InboundFormField
-          label="姓名 *"
+          label={t.stockIn.nameRequired}
           value={values.recipientName}
           onChange={onRecipientNameChange}
-          placeholder="收件人 / 联系人姓名"
+          placeholder={t.stockIn.nameRequired.replace(' *', '')}
           editable={canEdit}
           inputRef={fieldChain.propsFor('name').inputRef}
           returnKeyType={fieldChain.propsFor('name').returnKeyType}
@@ -203,7 +205,7 @@ export default function InboundOrderFormBody({
           blurOnSubmit={fieldChain.propsFor('name').blurOnSubmit}
         />
         <InboundFormField
-          label="电话号码"
+          label={t.stockIn.phone}
           value={values.recipientPhone}
           onChange={onRecipientPhoneChange}
           placeholder="09xxxxxxxxx"
@@ -216,18 +218,18 @@ export default function InboundOrderFormBody({
         />
         {canEdit ? (
           <DestinationPickerField
-            label="最终目的地"
-            hint="订单最终送达地区，全程不变；入库条码前缀取所选地区码"
+            label={t.stockIn.finalDest}
+            hint={t.stockOut.destinationHint}
             value={values.destination}
             onChange={onDestinationChange}
           />
         ) : (
-          <InboundFormField label="最终目的地" value={values.destination} editable={false} />
+          <InboundFormField label={t.stockIn.finalDest} value={values.destination} editable={false} />
         )}
       </InboundFormSection>
 
       {mode === 'stock-in' && qty !== undefined && onQtyChange && onQtyDec && onQtyInc ? (
-        <InboundFormSection title="入库数量" accent="#059669">
+        <InboundFormSection title={t.stockIn.qtyRequired.replace(' *', '')} accent="#059669">
           <View style={styles.qtyRow}>
             <Pressable style={styles.qtyBtn} onPress={onQtyDec}>
               <Text style={styles.qtyBtnText}>−</Text>
@@ -250,10 +252,10 @@ export default function InboundOrderFormBody({
             <Text style={styles.qtyUnit}>{stockUnitLabel()}</Text>
           </View>
           <InboundFormField
-            label="备注（可选）"
+            label={t.stockIn.noteOptional}
             value={values.note}
             onChange={onNoteChange}
-            placeholder="采购单号、供应商、批次等"
+            placeholder={t.manualEntry.notePlaceholder}
             multiline
             editable={canEdit}
             inputRef={fieldChain.propsFor('note', { multiline: true }).inputRef}
@@ -263,20 +265,20 @@ export default function InboundOrderFormBody({
           />
         </InboundFormSection>
       ) : (
-        <InboundFormSection title="其它" accent="#64748b">
+        <InboundFormSection title={t.itemForm.note} accent="#64748b">
           {qtyOnHand !== undefined ? (
             <View style={styles.stockRow}>
-              <Text style={styles.stockLabel}>当前库存</Text>
+              <Text style={styles.stockLabel}>{t.common.progress}</Text>
               <Text style={styles.stockValue}>
                 {qtyOnHand} {stockUnitLabel()}
               </Text>
             </View>
           ) : null}
           <InboundFormField
-            label="备注（可选）"
+            label={t.stockIn.noteOptional}
             value={values.note}
             onChange={onNoteChange}
-            placeholder="采购单号、供应商、批次等"
+            placeholder={t.manualEntry.notePlaceholder}
             multiline
             editable={canEdit}
             inputRef={fieldChain.propsFor('note', { multiline: true }).inputRef}

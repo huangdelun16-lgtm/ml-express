@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import BarcodeImage from './BarcodeImage';
+import { resolvePrintError, useTranslation } from '../i18n';
 import { printInboundBarcodeOnly } from '../services/printerService';
 
 export type StockInSuccessData = {
@@ -29,6 +30,7 @@ type Props = {
 };
 
 export default function StockInSuccessModal({ visible, data, onDone }: Props) {
+  const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
 
   const printBarcode = async () => {
@@ -37,12 +39,12 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
     try {
       const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode);
       if (!ok) {
-        Alert.alert('提示', '打印已关闭，请在设置中启用打印');
+        Alert.alert(t.common.tip, t.settings.printDisabled);
         return;
       }
-      Alert.alert('已发送打印', '请在系统对话框选择标签打印机');
+      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
     } catch (e: unknown) {
-      Alert.alert('打印失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
     } finally {
       setPrinting(false);
     }
@@ -59,22 +61,27 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
           <View style={styles.iconCircle}>
             <Text style={styles.icon}>✓</Text>
           </View>
-          <Text style={styles.title}>订单入库完成</Text>
+          <Text style={styles.title}>{t.stockIn.inboundSuccess}</Text>
           <Text style={styles.summary}>
-            「{data.productName}」已登记入库，库存 +{data.qty}。入库条码已生成，可在「快递明细」查看与打包。
+            {data.productName} · +{data.qty}
           </Text>
 
           <View style={styles.infoBox}>
-            <InfoRow label="入库日期" value={data.inboundDateLabel} />
-            <InfoRow label="收件人" value={data.recipientName} />
-            <InfoRow label="最终目的地" value={data.destination} />
-            {meta ? <InfoRow label="规格 / 重量" value={meta} /> : null}
+            <InfoRow label={t.forms.inboundDate} value={data.inboundDateLabel} />
+            <InfoRow label={t.stockIn.nameRequired.replace(' *', '')} value={data.recipientName} />
+            <InfoRow label={t.stockIn.finalDest} value={data.destination} />
+            {meta ? (
+              <InfoRow
+                label={`${t.trackExpress.spec} / ${t.trackExpress.weight}`}
+                value={meta}
+              />
+            ) : null}
           </View>
 
           <View style={styles.barcodeSection}>
             {data.inputBarcode ? (
               <Text style={styles.inputCodeText} selectable>
-                快递单 {data.inputBarcode}
+                {t.trackExpress.expressNo} {data.inputBarcode}
               </Text>
             ) : null}
             <BarcodeImage code={data.barcode} height={80} showCodeText={false} />
@@ -88,10 +95,12 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
             onPress={printBarcode}
             disabled={printing}
           >
-            <Text style={styles.btnPrintText}>{printing ? '发送中…' : '🖨 打印 Barcode'}</Text>
+            <Text style={styles.btnPrintText}>
+              {printing ? t.items.printing : t.itemForm.printLabel}
+            </Text>
           </Pressable>
           <Pressable style={styles.btnDone} onPress={onDone}>
-            <Text style={styles.btnDoneText}>返回首页</Text>
+            <Text style={styles.btnDoneText}>{t.nav.home}</Text>
           </Pressable>
         </View>
       </View>

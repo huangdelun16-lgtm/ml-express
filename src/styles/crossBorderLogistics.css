@@ -2218,6 +2218,14 @@
   vertical-align: middle;
 }
 
+.cbl-table--accounts__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .cbl-account-mgmt-modal .cbl-table--accounts__edit {
   white-space: nowrap;
   min-width: 68px;
@@ -2242,6 +2250,42 @@
 .cbl-account-mgmt-modal .cbl-table--accounts__edit:active:not(:disabled) {
   background: #eff6ff;
   transform: translateY(0);
+}
+
+.cbl-account-mgmt-modal .cbl-table--accounts__delete {
+  white-space: nowrap;
+  min-width: 68px;
+  padding: 6px 14px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #b91c1c;
+  background: #ffffff;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.cbl-account-mgmt-modal .cbl-table--accounts__delete:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #991b1b;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.14);
+  transform: none;
+}
+
+.cbl-account-mgmt-modal .cbl-table--accounts__delete:active:not(:disabled) {
+  background: #fee2e2;
+  transform: translateY(0);
+}
+
+.cbl-account-mgmt-modal .cbl-table--accounts__delete:disabled,
+.cbl-account-mgmt-modal .cbl-table--accounts__edit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cbl-account-mgmt-modal__alert {
+  margin: 0 22px;
 }
 
 .cbl-btn--sm {

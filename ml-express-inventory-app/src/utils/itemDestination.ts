@@ -1,4 +1,4 @@
-import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
+import { PACK_DESTINATION_OPTIONS, regionDisplayLabel } from '../constants/destinationOptions';
 import { extractDestinationCode } from './inboundBarcode';
 import { isExpressPackItem } from './packItem';
 import { packDestinationFromBarcode } from './packageNumber';
@@ -44,6 +44,6 @@ export function collectItemDestinationCodes(
 /** 跨地区打包确认文案 */
 export function formatMixedRegionPackConfirmMessage(codes: string[]): string {
   if (codes.length < 2) return '';
-  const parts = codes.map((code) => `${code} 地区`);
+  const parts = codes.map((code) => `${regionDisplayLabel(code)} 地区`);
   return `是否将 ${parts.join(' 和 ')} 订单打包在一个快递包中？`;
 }

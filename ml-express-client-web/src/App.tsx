@@ -9,6 +9,7 @@ import './App.css';
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
 const SupportPage = lazy(() => import('./pages/SupportPage'));
+const InventoryPrivacyPage = lazy(() => import('./pages/InventoryPrivacyPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const DeleteAccountPage = lazy(() => import('./pages/DeleteAccountPage'));
 const CityMallPage = lazy(() => import('./pages/CityMallPage'));
@@ -136,6 +137,7 @@ function App() {
                   <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                   <Route path="/terms-of-service" element={<TermsOfServicePage />} />
                   <Route path="/support" element={<SupportPage />} />
+                  <Route path="/ml-inventory/privacy" element={<InventoryPrivacyPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/delete-account" element={<DeleteAccountPage />} />
                   <Route path="/mall" element={<CityMallPage />} />

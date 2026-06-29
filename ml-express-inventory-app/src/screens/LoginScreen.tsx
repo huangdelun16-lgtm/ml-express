@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
   KeyboardAvoidingView,
@@ -16,9 +17,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { LOGIN_LOGO } from '../constants/branding';
-import { INVENTORY_SUPPORT_URL } from '../constants/support';
+import { INVENTORY_PRIVACY_URL, INVENTORY_SUPPORT_URL } from '../constants/support';
 import LanguageSelector from '../components/LanguageSelector';
-import { useTranslation } from '../i18n';
+import { resolveAppError, useTranslation } from '../i18n';
+import { consumeSessionKickedFlag } from '../services/authService';
 import { getSupabaseConfigHint, isSupabaseConfigured } from '../services/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -39,6 +41,15 @@ export default function LoginScreen() {
   const [storeFocused, setStoreFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
+  useEffect(() => {
+    void consumeSessionKickedFlag().then((kicked) => {
+      if (!kicked) return;
+      Alert.alert(t.auth.sessionKickedTitle, t.auth.sessionKickedMessage, [
+        { text: t.common.ok },
+      ]);
+    });
+  }, [t.auth.sessionKickedMessage, t.auth.sessionKickedTitle, t.common.ok]);
+
   const onSubmit = async () => {
     setError('');
     if (!storeCode.trim() || !password.trim()) {
@@ -49,7 +60,7 @@ export default function LoginScreen() {
     try {
       await login(storeCode.trim().toUpperCase(), password);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t.login.loginFailed);
+      setError(resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -181,7 +192,21 @@ export default function LoginScreen() {
             style={styles.supportLink}
             onPress={() => void Linking.openURL(INVENTORY_SUPPORT_URL)}
           >
-            <Text style={styles.supportLinkText}>{t.login.supportLink}</Text>
+            <Text style={styles.supportLinkText}>{t.login.partnerAccessLink}</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.secondaryLink}
+            onPress={() => void Linking.openURL(INVENTORY_SUPPORT_URL)}
+          >
+            <Text style={styles.secondaryLinkText}>{t.login.supportLink}</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.secondaryLink}
+            onPress={() => void Linking.openURL(INVENTORY_PRIVACY_URL)}
+          >
+            <Text style={styles.secondaryLinkText}>{t.login.privacyLink}</Text>
           </Pressable>
 
           <Text style={styles.footer}>{t.login.footer}</Text>
@@ -369,7 +394,18 @@ const styles = StyleSheet.create({
   supportLinkText: {
     color: '#38bdf8',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
+  secondaryLink: {
+    marginTop: 8,
+    alignSelf: 'center',
+    paddingVertical: 2,
+  },
+  secondaryLinkText: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '600',
     textDecorationLine: 'underline',
   },
 });

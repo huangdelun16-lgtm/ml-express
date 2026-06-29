@@ -13,6 +13,7 @@ import {
 import ItemFormFields from './ItemFormFields';
 import { useItemFormState } from '../hooks/useItemFormState';
 import { useAuth } from '../contexts/AuthContext';
+import { resolveAppError, useTranslation } from '../i18n';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { updatePackedShipment } from '../services/inventoryService';
 import type { PackedShipmentListRow } from '../types/inventory';
@@ -30,6 +31,7 @@ type Props = {
 
 export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props) {
   const { store } = useAuth();
+  const { t } = useTranslation();
   const form = useItemFormState();
   const [saving, setSaving] = React.useState(false);
 
@@ -59,12 +61,12 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
   const save = async () => {
     if (!pack) return;
     if (!form.payload.name.trim()) {
-      Alert.alert('提示', '快递包名称必填');
+      Alert.alert(t.common.tip, t.itemForm.alertName);
       return;
     }
     setSaving(true);
     try {
-      if (!store) throw new Error('未登录');
+      if (!store) throw new Error(t.common.notLoggedIn);
       await updatePackedShipment(
         pack.id,
         {
@@ -75,11 +77,11 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
         },
         store,
       );
-      showTaskSuccess('保存成功', '快递包信息已更新');
+      showTaskSuccess(t.itemForm.saveSuccess, pack.bundle_barcode);
       onSaved();
       onClose();
     } catch (e: unknown) {
-      Alert.alert('保存失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.common.fail, resolveAppError(t, e));
     } finally {
       setSaving(false);
     }
@@ -92,21 +94,23 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={10}>
-            <Text style={styles.cancel}>取消</Text>
+            <Text style={styles.cancel}>{t.common.cancel}</Text>
           </Pressable>
-          <Text style={styles.title}>编辑快递包</Text>
+          <Text style={styles.title}>{t.itemForm.editTitle}</Text>
           <Pressable onPress={() => void save()} hitSlop={10} disabled={saving}>
-            <Text style={[styles.save, saving && styles.saveDisabled]}>{saving ? '保存中…' : '保存'}</Text>
+            <Text style={[styles.save, saving && styles.saveDisabled]}>
+              {saving ? t.itemForm.saving : t.common.save}
+            </Text>
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text style={styles.hint}>包装号创建后不可修改，仅可调整名称与规格参数。</Text>
+          <Text style={styles.hint}>{t.itemForm.alertBarcode}</Text>
           <ItemFormFields
             form={form}
-            barcodeLabel="包装号"
+            barcodeLabel={t.items.packNo}
             barcodeEditable={false}
             unitLocked
-            unitHint="件数与打包时一致，不可修改"
+            unitHint={t.stockOut.packUnit}
             specLocked={contentLocked}
             weightLocked={contentLocked}
             specHint={contentLockHint}

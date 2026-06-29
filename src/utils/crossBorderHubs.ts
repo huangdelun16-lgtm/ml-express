@@ -10,6 +10,7 @@ export type CrossBorderHub = {
 
 export const CROSS_BORDER_HUBS: CrossBorderHub[] = [
   { regionId: 'muse', nameZh: '木姐', nameEn: 'Muse', prefix: 'MUSE', hubCode: 'MSE', lat: 23.9833, lng: 97.9 },
+  { regionId: 'ruili', nameZh: '瑞丽', nameEn: 'Ruili', prefix: 'RUILI', hubCode: 'RUI', lat: 24.0177, lng: 97.8559 },
   { regionId: 'mandalay', nameZh: '曼德勒', nameEn: 'Mandalay', prefix: 'MDY', hubCode: 'MDY', lat: 21.9588, lng: 96.0891 },
   { regionId: 'maymyo', nameZh: '彬乌伦', nameEn: 'Pyin Oo Lwin', prefix: 'POL', hubCode: 'POL', lat: 22.0333, lng: 96.4667 },
   { regionId: 'yangon', nameZh: '仰光', nameEn: 'Yangon', prefix: 'YGN', hubCode: 'YGN', lat: 16.8661, lng: 96.1951 },
@@ -42,7 +43,9 @@ export function buildCrossBorderAccountDraft(
   isEn = false,
 ) {
   const hub =
-    CROSS_BORDER_HUBS.find((h) => h.regionId === regionId) ?? CROSS_BORDER_HUBS[1];
+    CROSS_BORDER_HUBS.find((h) => h.regionId === regionId) ??
+    CROSS_BORDER_HUBS.find((h) => h.regionId === 'mandalay') ??
+    CROSS_BORDER_HUBS[0];
   const regionStores = existingStores.filter(
     (s) =>
       s.region === regionId ||

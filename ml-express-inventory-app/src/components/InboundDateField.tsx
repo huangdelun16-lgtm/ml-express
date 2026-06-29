@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from '../i18n';
 import {
   formatInboundDateLabel,
   formatInboundDateYmd,
@@ -32,17 +33,18 @@ function isSameMyanmarDay(a: Date, b: Date): boolean {
   return formatInboundDateYmd(a) === formatInboundDateYmd(b);
 }
 
-const QUICK_OPTIONS = [
-  { key: 'yesterday', label: '昨天', offset: -1 },
-  { key: 'today', label: '今天', offset: 0 },
-] as const;
-
 export default function InboundDateField({
-  label = '入库日期',
+  label,
   value,
   onChange,
   maximumDate = todayInMyanmar(),
 }: Props) {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t.forms.inboundDate;
+  const quickOptions = [
+    { key: 'yesterday', label: t.forms.yesterday, offset: -1 },
+    { key: 'today', label: t.forms.today, offset: 0 },
+  ] as const;
   const [showPicker, setShowPicker] = useState(false);
   const [draftDate, setDraftDate] = useState<Date>(value);
 
@@ -79,10 +81,10 @@ export default function InboundDateField({
 
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label} *</Text>
+      <Text style={styles.label}>{resolvedLabel} *</Text>
 
       <View style={styles.quickRow}>
-        {QUICK_OPTIONS.map((opt) => {
+        {quickOptions.map((opt) => {
           const candidate = offsetMyanmarDate(today, opt.offset);
           const disabled = candidate.getTime() > maximumDate.getTime();
           const active = isSameMyanmarDay(value, candidate);
@@ -113,17 +115,16 @@ export default function InboundDateField({
         </View>
         {isToday ? (
           <View style={styles.todayBadge}>
-            <Text style={styles.todayBadgeText}>今</Text>
+            <Text style={styles.todayBadgeText}>{t.forms.today}</Text>
           </View>
         ) : null}
       </Pressable>
-      <Text style={styles.hint}>点击打开日历，不可选择未来日期</Text>
 
       {Platform.OS === 'ios' ? (
         <Modal visible={showPicker} transparent animationType="fade" onRequestClose={() => setShowPicker(false)}>
           <Pressable style={styles.overlay} onPress={() => setShowPicker(false)}>
             <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-              <Text style={styles.sheetTitle}>选择入库日期</Text>
+              <Text style={styles.sheetTitle}>{t.forms.inboundDate}</Text>
               <DateTimePicker
                 value={draftDate}
                 mode="date"
@@ -135,10 +136,10 @@ export default function InboundDateField({
               />
               <View style={styles.sheetActions}>
                 <Pressable style={styles.sheetGhost} onPress={() => setShowPicker(false)}>
-                  <Text style={styles.sheetGhostText}>取消</Text>
+                  <Text style={styles.sheetGhostText}>{t.common.cancel}</Text>
                 </Pressable>
                 <Pressable style={styles.sheetPrimary} onPress={confirmIos}>
-                  <Text style={styles.sheetPrimaryText}>确定</Text>
+                  <Text style={styles.sheetPrimaryText}>{t.common.confirm}</Text>
                 </Pressable>
               </View>
             </Pressable>
@@ -217,7 +218,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   todayBadgeText: { color: '#fff', fontWeight: '900', fontSize: 12 },
-  hint: { color: '#64748b', fontSize: 11, marginTop: 8 },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15,23,42,0.65)',

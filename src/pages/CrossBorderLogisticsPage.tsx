@@ -473,6 +473,10 @@ const CrossBorderLogisticsPage: React.FC = () => {
     load();
   };
 
+  const handleAccountDeleted = () => {
+    load();
+  };
+
   const closeFinanceDetail = () => setFinanceModalStore(null);
 
   const hubTitle = isEn ? 'Cross-border logistics' : '跨境物流';
@@ -1111,6 +1115,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
         isEn={isEn}
         onCreated={handleCreated}
         onUpdated={handleAccountUpdated}
+        onDeleted={handleAccountDeleted}
       />
 
       <CrossBorderPricingModal

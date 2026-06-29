@@ -11,18 +11,19 @@ import {
 } from 'react-native';
 import type { InventoryStoreSession } from '../services/authService';
 import type { PkgTrackingDetail } from '../types/tracking';
-import { ORDER_STATUS_LABEL, PKG_STATUS_LABEL } from '../types/tracking';
+import { getOrderStatusLabel, getPkgStatusLabel, getTransportFeeDisplay, useTranslation } from '../i18n';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
-import { formatTransportFeeDisplay, parseTransportFeeAmount } from '../services/hubTransportFeeService';
+import { parseTransportFeeAmount } from '../services/hubTransportFeeService';
 
 function hubOrderStatusLabel(
   line: PkgTrackingDetail['orders'][number],
   hubCode: string,
+  t: ReturnType<typeof useTranslation>['t'],
 ): string {
   const orderDest = resolveOrderDestinationCode(line);
   const isLocal = orderDest === hubCode;
-  if (line.status === 'hub_received' && !isLocal) return '本站已入库';
-  return ORDER_STATUS_LABEL[line.status];
+  if (line.status === 'hub_received' && !isLocal) return t.tracking.hubInboundDone;
+  return getOrderStatusLabel(t, line.status);
 }
 
 type Props = {
@@ -54,6 +55,7 @@ export default function HubReceiveOrdersModal({
   onConfirmOrder,
   onPayTransportFee,
 }: Props) {
+  const { t, fmt } = useTranslation();
   const { height: windowHeight } = useWindowDimensions();
 
   const layout = useMemo(() => {
@@ -75,7 +77,7 @@ export default function HubReceiveOrdersModal({
 
   const ordersAllProcessed = pack.orders.every((o) => o.status !== 'in_transit');
   const legDest = pack.leg_destination_code || pack.destination_code || hubCode;
-  const feeDisplay = formatTransportFeeDisplay(pack.transport_fee);
+  const feeDisplay = getTransportFeeDisplay(t, pack.transport_fee);
   const feeAmount = parseTransportFeeAmount(pack.transport_fee);
   const canPayTransportFee =
     packReceived &&
@@ -95,16 +97,16 @@ export default function HubReceiveOrdersModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
       <View style={styles.overlay}>
         {canDismiss ? (
-          <Pressable style={styles.backdrop} onPress={handleDismiss} accessibilityLabel="关闭" />
+          <Pressable style={styles.backdrop} onPress={handleDismiss} accessibilityLabel={t.common.close} />
         ) : (
           <View style={styles.backdrop} />
         )}
         <View style={[styles.card, { maxHeight: layout.cardMax }]}>
           <View style={styles.headerBlock}>
             <View style={styles.titleRow}>
-              <Text style={styles.title}>内含订单</Text>
+              <Text style={styles.title}>{t.hubReceive.modalTitle}</Text>
               <View style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>{PKG_STATUS_LABEL[pack.status]}</Text>
+                <Text style={styles.statusBadgeText}>{getPkgStatusLabel(t, pack.status)}</Text>
               </View>
               <Text style={styles.progress}>
                 {pack.received_order_count}/{pack.item_count}
@@ -117,7 +119,7 @@ export default function HubReceiveOrdersModal({
               </Text>
               <Text style={styles.feeInline}>{feeDisplay}</Text>
               {transportFeePaid ? (
-                <Text style={styles.feePaidChip}>已付</Text>
+                <Text style={styles.feePaidChip}>{t.common.paid}</Text>
               ) : null}
             </View>
 
@@ -128,7 +130,7 @@ export default function HubReceiveOrdersModal({
                 disabled={loading}
               >
                 <Text style={styles.packConfirmBtnText}>
-                  {loading ? '处理中…' : '确认到站收货'}
+                  {loading ? t.common.processing : t.hubReceive.modalConfirmPack}
                 </Text>
               </Pressable>
             ) : null}
@@ -185,7 +187,7 @@ export default function HubReceiveOrdersModal({
                         style={[styles.orderStatus, isDone && styles.orderStatusDone]}
                         numberOfLines={1}
                       >
-                        {hubOrderStatusLabel(line, hubCode)}
+                        {hubOrderStatusLabel(line, hubCode, t)}
                       </Text>
                     </View>
                     {line.recipient_name?.trim() ? (
@@ -211,7 +213,7 @@ export default function HubReceiveOrdersModal({
                       disabled={isConfirming || loading}
                     >
                       <Text style={styles.inboundBtnText}>
-                        {isConfirming ? '…' : '入库'}
+                        {isConfirming ? '…' : t.hubReceive.modalInbound}
                       </Text>
                     </Pressable>
                   ) : isDone ? (
@@ -232,12 +234,14 @@ export default function HubReceiveOrdersModal({
                 disabled={payingTransportFee || loading}
               >
                 <Text style={styles.payFeeBtnText}>
-                  {payingTransportFee ? '处理中…' : `支付车费 ${feeDisplay}`}
+                  {payingTransportFee
+                    ? t.common.processing
+                    : fmt(t.hubReceive.modalPayFee, { fee: feeDisplay })}
                 </Text>
               </Pressable>
             ) : transportFeePaid ? (
               <View style={styles.feePaidRow}>
-                <Text style={styles.feePaidText}>车费已付</Text>
+                <Text style={styles.feePaidText}>{t.common.feePaid}</Text>
               </View>
             ) : null}
 
@@ -254,10 +258,10 @@ export default function HubReceiveOrdersModal({
             >
               <Text style={styles.closeBtnText}>
                 {needsFeePayment
-                  ? '请先支付车费'
+                  ? t.common.payFeeFirst
                   : packDone || transportFeePaid
-                    ? '完成'
-                    : '关闭'}
+                    ? t.common.done
+                    : t.common.close}
               </Text>
             </Pressable>
           </View>

@@ -1,4 +1,5 @@
 import type { SystemSetting } from '../services/supabase';
+import { parsePricingSettingValue } from '../services/_shared/pricing';
 
 export const CROSS_BORDER_PRICING_REGIONS = [
   { id: 'mandalay', name: '曼德勒', nameEn: 'Mandalay', prefix: 'MDY' },
@@ -8,6 +9,7 @@ export const CROSS_BORDER_PRICING_REGIONS = [
   { id: 'taunggyi', name: '东枝', nameEn: 'Taunggyi', prefix: 'TGI' },
   { id: 'lashio', name: '腊戌', nameEn: 'Lashio', prefix: 'LSO' },
   { id: 'muse', name: '木姐', nameEn: 'Muse', prefix: 'MUSE' },
+  { id: 'ruili', name: '瑞丽', nameEn: 'Ruili', prefix: 'RUILI' },
 ] as const;
 
 export type CrossBorderPricingFieldKey =
@@ -96,13 +98,13 @@ export function mergeCrossBorderSettingsFromDb(
       if (parts[1] !== selectedRegion) return;
       const key = `pricing.cross_border.${parts[3]}` as CrossBorderPricingFieldKey;
       if (key in defaults) {
-        const numeric = Number(setting.settings_value);
+        const numeric = parsePricingSettingValue(setting.settings_value);
         if (Number.isFinite(numeric)) merged[key] = numeric;
       }
     } else if (parts.length === 3 && parts[0] === 'pricing' && parts[1] === 'cross_border') {
       const key = `pricing.cross_border.${parts[2]}` as CrossBorderPricingFieldKey;
       if (key in defaults && merged[key] === defaults[key]) {
-        const numeric = Number(setting.settings_value);
+        const numeric = parsePricingSettingValue(setting.settings_value);
         if (Number.isFinite(numeric)) merged[key] = numeric;
       }
     }

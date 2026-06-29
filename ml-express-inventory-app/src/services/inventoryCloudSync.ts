@@ -1,6 +1,8 @@
 import type { InventoryStoreSession } from './authService';
+import { svc } from '../errors/serviceError';
 import { ensureInventoryCloudAuth } from './authService';
 import { getDatabase, newId, nowIso } from './database';
+import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import {
   fetchCloudMovementsForItems,
   fetchCloudPackedShipments,
@@ -504,11 +506,12 @@ async function bundleItemLoadedAt(bundleItemId: string, fallbackTs: string): Pro
 async function pushLocalItemsForStore(store: InventoryStoreSession, hubCode: string): Promise<void> {
   const db = await getDatabase();
   const storeCode = store.storeCode.trim().toUpperCase();
+  const ownerKey = ownershipKeyFromStoreCode(storeCode);
   const hub = hubCode.trim().toUpperCase();
   const rows = await db.getAllAsync<Record<string, unknown>>(
     `SELECT * FROM inventory_items
-     WHERE UPPER(owner_store_code) = ? OR UPPER(final_destination) = ?`,
-    [storeCode, hub],
+     WHERE UPPER(owner_store_code) IN (?, ?) OR UPPER(final_destination) = ?`,
+    [storeCode, ownerKey, hub],
   );
   for (const row of rows) {
     const item: InventoryItem = {
@@ -734,7 +737,7 @@ export async function clearAllCloudTestDataViaEdge(): Promise<{
     data: { session },
   } = await supabase.auth.getSession();
   if (!session?.access_token) {
-    throw new Error('请先登录后再清空云端数据');
+    throw svc('loginRequiredBeforeClear');
   }
 
   const response = await fetch(`${getSupabaseUrl()}/functions/v1/inventory-clear-test-data`, {
@@ -756,7 +759,7 @@ export async function clearAllCloudTestDataViaEdge(): Promise<{
   };
 
   if (!response.ok) {
-    throw new Error(payload.error ?? '云端清空失败');
+    throw svc('cloudClearRemoteFailed');
   }
 
   return {

@@ -46,9 +46,8 @@ export async function awaitForceCloudSync(
   store: InventoryStoreSession,
   hubCode: string,
 ): Promise<void> {
-  if (!isSupabaseConfigured()) return;
-  cancelAutoCloudSyncDebounce();
-  await runAutoCloudSync(store, hubCode, true);
+  const { runManualCloudSync } = await import('./cloudSyncStatus');
+  await runManualCloudSync(store, hubCode);
 }
 
 async function runAutoCloudSync(
@@ -65,8 +64,13 @@ async function runAutoCloudSync(
   }
 
   lastFullSyncAt = Date.now();
-  inflight = syncPlatformInventoryCloud(store, hubCode).finally(() => {
-    inflight = null;
-  });
+  inflight = syncPlatformInventoryCloud(store, hubCode)
+    .then(async () => {
+      const { recordAutoCloudSyncResult } = await import('./cloudSyncStatus');
+      await recordAutoCloudSyncResult(store);
+    })
+    .finally(() => {
+      inflight = null;
+    });
   await inflight.catch(() => undefined);
 }

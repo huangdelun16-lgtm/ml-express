@@ -36,7 +36,8 @@ import {
   formatInboundDateLabel,
   formatInboundDateYmd,
 } from '../utils/stockInDate';
-import { canEditOwnedRecord, editDeniedMessage } from '../utils/storeOwnership';
+import { getEditDeniedMessage, resolveAppError, useTranslation } from '../i18n';
+import { canEditOwnedRecord } from '../utils/storeOwnership';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Route = { params?: { itemId?: string } };
@@ -49,6 +50,7 @@ export default function ItemFormScreen({
   navigation: { goBack: () => void };
 }) {
   const { operatorName, store } = useAuth();
+  const { t } = useTranslation();
   const itemId = route.params?.itemId;
   const isEdit = !!itemId;
   const form = useItemFormState();
@@ -117,19 +119,19 @@ export default function ItemFormScreen({
 
   const saveNew = async () => {
     if (!form.payload.barcode || !form.payload.name) {
-      Alert.alert('提示', '条码和商品名称必填');
+      Alert.alert(t.common.tip, `${t.itemForm.alertBarcode} / ${t.itemForm.alertName}`);
       return;
     }
     setLoading(true);
     try {
-      if (!store) throw new Error('未登录');
+      if (!store) throw new Error(t.common.notLoggedIn);
       await upsertItem(
         { ...form.payload, id: itemId, min_qty: 0 },
         { actingStore: store },
       );
-      showTaskSuccess('保存成功', form.payload.name, () => navigation.goBack());
+      showTaskSuccess(t.itemForm.saveSuccess, form.payload.name, () => navigation.goBack());
     } catch (e: unknown) {
-      Alert.alert('失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -138,19 +140,19 @@ export default function ItemFormScreen({
   const saveEdit = async () => {
     if (!itemId || !store) return;
     if (!recipientName.trim()) {
-      Alert.alert('提示', '请填写姓名');
+      Alert.alert(t.common.tip, t.itemForm.alertCustomer);
       return;
     }
     if (!destination.trim()) {
-      Alert.alert('提示', '请选择最终目的地');
+      Alert.alert(t.common.tip, t.itemForm.alertDestination);
       return;
     }
     if (!productName.trim()) {
-      Alert.alert('提示', '请填写商品名称');
+      Alert.alert(t.common.tip, t.itemForm.alertName);
       return;
     }
     if (!packaging) {
-      Alert.alert('提示', '请选择商品包装');
+      Alert.alert(t.common.tip, t.itemForm.alertPackaging);
       return;
     }
 
@@ -172,9 +174,9 @@ export default function ItemFormScreen({
         },
         store,
       );
-      showTaskSuccess('保存成功', productName.trim(), () => navigation.goBack());
+      showTaskSuccess(t.itemForm.saveSuccess, productName.trim(), () => navigation.goBack());
     } catch (e: unknown) {
-      Alert.alert('失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -184,7 +186,7 @@ export default function ItemFormScreen({
     const name = isEdit ? productName : form.payload.name;
     const barcode = isEdit ? inboundBarcode : form.payload.barcode;
     if (!barcode || !name) {
-      Alert.alert('提示', '请先填写条码和商品名称');
+      Alert.alert(t.common.tip, t.itemForm.alertBarcode);
       return;
     }
     setOrderBarcodeData(
@@ -200,24 +202,24 @@ export default function ItemFormScreen({
   const cancelOrder = () => {
     if (!itemId) return;
     Alert.alert(
-      '取消订单',
-      '确定要取消此订单吗？删除后不可恢复。若为包裹，内含商品库存将退回。',
+      t.itemForm.cancelOrderTitle,
+      t.itemForm.cancelOrderBody,
       [
-        { text: '返回', style: 'cancel' },
+        { text: t.itemForm.cancelOrderBack, style: 'cancel' },
         {
-          text: '确定取消',
+          text: t.itemForm.cancelOrderConfirm,
           style: 'destructive',
           onPress: () => {
             void (async () => {
               setLoading(true);
               try {
-                if (!store) throw new Error('未登录');
-                await cancelInventoryItem(itemId, operatorName ?? '工作人员', store);
-                Alert.alert('已取消', '订单已删除', [
-                  { text: '好的', onPress: () => navigation.goBack() },
+                if (!store) throw new Error(t.common.notLoggedIn);
+                await cancelInventoryItem(itemId, operatorName ?? t.common.operator, store);
+                Alert.alert(t.itemForm.cancelOrderDone, '', [
+                  { text: t.common.ok, onPress: () => navigation.goBack() },
                 ]);
               } catch (e: unknown) {
-                Alert.alert('失败', e instanceof Error ? e.message : '请重试');
+                Alert.alert(t.common.fail, resolveAppError(t, e));
               } finally {
                 setLoading(false);
               }
@@ -235,17 +237,15 @@ export default function ItemFormScreen({
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
-          <Text style={styles.title}>{isEdit ? '编辑商品' : '新建商品'}</Text>
+          <Text style={styles.title}>{isEdit ? t.itemForm.editTitle : t.itemForm.newTitle}</Text>
           <Text style={styles.subtitle}>
-            {isEdit
-              ? '字段与入库页一致，可修改商品与收发资料'
-              : '填写条码与名称，规格参数只需改数字'}
+            {isEdit ? t.itemForm.specSection : t.itemForm.basicInfo}
           </Text>
         </View>
 
         {isEdit && !editable ? (
           <View style={styles.readonlyBanner}>
-            <Text style={styles.readonlyBannerText}>{editDeniedMessage(ownerCode)}</Text>
+            <Text style={styles.readonlyBannerText}>{getEditDeniedMessage(t, ownerCode)}</Text>
           </View>
         ) : null}
 
@@ -295,11 +295,11 @@ export default function ItemFormScreen({
               onPress={() => void (isEdit ? saveEdit() : saveNew())}
               disabled={loading}
             >
-              <Text style={styles.btnText}>{loading ? '保存中…' : '保存商品'}</Text>
+              <Text style={styles.btnText}>{loading ? t.itemForm.saving : t.itemForm.save}</Text>
             </Pressable>
           ) : null}
           <Pressable style={styles.btnGhost} onPress={openPrintLabel}>
-            <Text style={styles.btnGhostText}>🖨 打印标签</Text>
+            <Text style={styles.btnGhostText}>{t.itemForm.printLabel}</Text>
           </Pressable>
           {isEdit && editable ? (
             <Pressable
@@ -307,7 +307,7 @@ export default function ItemFormScreen({
               onPress={cancelOrder}
               disabled={loading}
             >
-              <Text style={styles.btnDangerText}>取消订单</Text>
+              <Text style={styles.btnDangerText}>{t.itemForm.cancelOrder}</Text>
             </Pressable>
           ) : null}
         </View>

@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import BarcodeImage from './BarcodeImage';
+import { resolvePrintError, useTranslation } from '../i18n';
 import type { LabelPrintPayload } from '../services/printerService';
 import { printBarcodeLabel, printInboundBarcodeOnly } from '../services/printerService';
 
@@ -47,6 +48,7 @@ export default function OrderBarcodeModal({
   onClose,
   onDone,
 }: Props) {
+  const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
 
   const printBarcode = async () => {
@@ -61,12 +63,12 @@ export default function OrderBarcodeModal({
               data.inputBarcode?.trim() || undefined,
             );
       if (!ok) {
-        Alert.alert('提示', '打印已关闭，请在设置中启用打印');
+        Alert.alert(t.common.tip, t.settings.printDisabled);
         return;
       }
-      Alert.alert('已发送打印', '请在系统对话框选择标签打印机');
+      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
     } catch (e: unknown) {
-      Alert.alert('打印失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
     } finally {
       setPrinting(false);
     }
@@ -110,7 +112,9 @@ export default function OrderBarcodeModal({
             onPress={() => void printBarcode()}
             disabled={printing}
           >
-            <Text style={styles.btnPrintText}>{printing ? '发送中…' : '🖨 打印 Barcode'}</Text>
+            <Text style={styles.btnPrintText}>
+              {printing ? t.settings.sendingPrint : t.settings.labelPrintAction}
+            </Text>
           </Pressable>
           <Pressable style={styles.btnClose} onPress={finish}>
             <Text style={styles.btnCloseText}>{onDone ? '完成' : '关闭'}</Text>

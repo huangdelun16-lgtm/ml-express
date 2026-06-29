@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from '../i18n';
 import BarcodeScannerView from './BarcodeScannerView';
 
 type Props = {
@@ -14,9 +15,10 @@ export default function PhoneBarcodeScanModal({
   visible,
   onClose,
   onScanned,
-  title = '手机扫码',
+  title,
   subtitle,
 }: Props) {
+  const { t } = useTranslation();
   const handleScanned = (code: string) => {
     onScanned(code);
     onClose();
@@ -27,16 +29,16 @@ export default function PhoneBarcodeScanModal({
       <View style={styles.root}>
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={10}>
-            <Text style={styles.close}>关闭</Text>
+            <Text style={styles.close}>{t.common.close}</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>{title}</Text>
+          <Text style={styles.headerTitle}>{title ?? t.scanInput.phoneScan}</Text>
           <View style={{ width: 48 }} />
         </View>
         <BarcodeScannerView
           active={visible}
           onScan={handleScanned}
-          title="将条码放入框内"
-          subtitle={subtitle ?? '识别后自动填入并关闭'}
+          title={t.forms.scanAim}
+          subtitle={subtitle ?? t.forms.scanAutoFill}
         />
       </View>
     </Modal>

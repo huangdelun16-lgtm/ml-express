@@ -6,7 +6,8 @@ import type {
   PkgTrackingStatus,
 } from '../types/tracking';
 import type { InventoryStoreSession } from './authService';
-import { getSupabaseConfigHint, isSupabaseConfigured, supabase } from './supabase';
+import { svc } from '../errors/serviceError';
+import { isSupabaseConfigured, supabase } from './supabase';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
@@ -270,57 +271,8 @@ async function maybeFinalizePkg(pkgId: string, packBarcode: string): Promise<voi
 
 function assertSupabaseReady(): void {
   if (!isSupabaseConfigured()) {
-    throw new Error(getSupabaseConfigHint() || '未配置 Supabase，无法同步云端追踪');
+    throw svc('supabaseTrackingNotConfigured');
   }
-}
-
-/** 到站扫码查不到包裹时的说明文案 */
-export function formatPkgNotFoundHint(packBarcode: string, hubCode: string): string {
-  const packDest = packDestinationFromBarcode(packBarcode);
-  const hub = hubCode.trim().toUpperCase();
-  const lines = [
-    '云端未找到该快递包追踪记录。',
-    '',
-    '请确认发站已完成以下步骤：',
-    '1. 在「装车出库」选中该包裹并提交',
-    '2. 成功提示中含「已同步云端」',
-    '3. 发站与本站使用同一 Supabase 项目（.env 配置一致）',
-    '4. 已执行数据库迁移 inventory_pkg_tracking',
-  ];
-  if (packDest && hub && packDest !== hub) {
-    lines.push(
-      '',
-      `包装号标注目的地 ${packDest}，本站 ${hub}。若为本段运达站，请确认发站装车时目的地选 ${hub}`,
-    );
-  } else if (packDest) {
-    lines.push('', `包装号目的地：${packDest}`);
-  }
-  lines.push('', '若发站已装车但未同步，可在发站「打包快递」页对该包裹「补传云端」。');
-  return lines.join('\n');
-}
-
-/** 到站扫码入库单/快递单查不到时的说明 */
-export function formatOrderNotFoundHint(scanCode: string, hubCode: string): string {
-  const dest = extractDestinationCode(scanCode);
-  const hub = hubCode.trim().toUpperCase();
-  const lines = [
-    '云端未找到该订单追踪记录。',
-    '',
-    '您扫描的可能是入库单或快递单，而非快递包 PKG 号。',
-    '',
-    '建议操作：',
-    '1. 优先扫描快递包条码（PKG 开头）',
-    '2. 或确认发站已装车出库并「已同步云端」',
-    '3. 发站与本站 Supabase 配置一致',
-  ];
-  if (dest && hub && dest !== hub) {
-    lines.push(
-      '',
-      `条码前缀 ${dest} 表示订单最终目的地，本站为 ${hub}。若为本站中转，请先扫所属 PKG 确认到站。`,
-    );
-  }
-  lines.push('', '也可在弹窗订单列表中手动点「确认入库」或「释放中转」。');
-  return lines.join('\n');
 }
 
 export type OrderInboundSnapshot = {
@@ -347,7 +299,7 @@ export async function pushTruckLoadTracking(params: {
   assertSupabaseReady();
 
   const legDest = params.destinationCode.trim().toUpperCase();
-  if (!legDest) throw new Error('请填写本段装车运达站');
+  if (!legDest) throw svc('legDestRequired');
   const now = new Date().toISOString();
 
   for (const pack of params.packs) {
@@ -394,7 +346,7 @@ export async function pushTruckLoadTracking(params: {
         .select('id')
         .single();
       if (pkgError || !data) {
-        throw new Error(pkgError?.message ?? '同步快递包追踪失败');
+        throw svc('pkgSyncFailed');
       }
       pkgRow = data as { id: string };
     } else {
@@ -419,7 +371,7 @@ export async function pushTruckLoadTracking(params: {
         .select('id')
         .single();
       if (pkgError || !data) {
-        throw new Error(pkgError?.message ?? '同步快递包追踪失败');
+        throw svc('pkgSyncFailed');
       }
       pkgRow = data as { id: string };
     }
@@ -574,19 +526,20 @@ export async function confirmPkgHubReceived(
   hubCode: string,
 ): Promise<PkgTrackingDetail> {
   const detail = await getPkgTrackingDetail(packBarcode);
-  if (!detail) throw new Error('未找到该快递包追踪记录，请确认已从发站装车出库并同步云端');
+  if (!detail) throw svc('pkgNotFoundNeedLoad');
 
   const dest = hubCode.trim().toUpperCase();
   const legDest = resolvePackLegDestination(detail);
   if (legDest !== dest) {
-    throw new Error(
-      `该包裹本段运达站为 ${legDest || detail.destination_code}，本站服务区域为 ${dest}`,
-    );
+    throw svc('pkgLegDestMismatch', {
+      legDest: legDest || detail.destination_code,
+      hub: dest,
+    });
   }
   if (detail.status === 'completed' || detail.status === 'split_at_hub') {
-    throw new Error('该快递包已分拨完成');
+    throw svc('pkgSplitCompleted');
   }
-  if (detail.status === 'cancelled') throw new Error('该快递包已取消');
+  if (detail.status === 'cancelled') throw svc('pkgCancelled');
   if (detail.status === 'hub_received') return detail;
 
   const now = new Date().toISOString();
@@ -612,7 +565,7 @@ async function applyOrderHubReceived(
   hubCode: string,
 ): Promise<{ order: OrderTrackingRecord; pkg: PkgTrackingDetail }> {
   const pkg = await getPkgTrackingDetail(order.pack_barcode);
-  if (!pkg) throw new Error('关联快递包追踪记录不存在');
+  if (!pkg) throw svc('linkedPkgNotFound');
 
   const dest = hubCode.trim().toUpperCase();
   const orderDest = resolveOrderDestinationCode(order);
@@ -622,18 +575,20 @@ async function applyOrderHubReceived(
   } else if (legDest === dest) {
     // 经本站中转：在本站扫码「入库」登记到站
   } else {
-    throw new Error(
-      `该订单目的地为 ${orderDest || '未知'}，本段运达站为 ${legDest || '未知'}，本站为 ${dest}`,
-    );
+    throw svc('orderDestLegMismatch', {
+      orderDest: orderDest || '?',
+      legDest: legDest || '?',
+      hub: dest,
+    });
   }
   if (pkg.status === 'in_transit') {
-    throw new Error('请先扫描快递包条码并确认到站收货，再逐单确认订单');
+    throw svc('scanPkgFirstBeforeOrders');
   }
   if (order.status === 'hub_received') {
     return { order, pkg };
   }
   if (order.status === 'released_at_hub') {
-    throw new Error('该订单已释放待转出，请至「快递明细」重新打包');
+    throw svc('orderReleasedRepack');
   }
 
   const now = new Date().toISOString();
@@ -663,13 +618,13 @@ export async function confirmOrderHubReceived(
   hubCode: string,
 ): Promise<{ order: OrderTrackingRecord; pkg: PkgTrackingDetail }> {
   const code = scanCode.trim();
-  if (!code) throw new Error('请扫描订单条码');
+  if (!code) throw svc('scanOrderBarcode');
 
   const rows = await fetchOrderTrackingRowsByScanCode(code, 5);
-  if (!rows.length) throw new Error('未找到该订单追踪记录');
+  if (!rows.length) throw svc('orderNotFound');
 
   const order = await pickOrderTrackingForHubScan(rows, hubCode);
-  if (!order) throw new Error('未找到该订单追踪记录');
+  if (!order) throw svc('orderNotFound');
   return applyOrderHubReceived(order, store, hubCode);
 }
 
@@ -686,7 +641,7 @@ export async function confirmOrderInPackById(
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  if (!data) throw new Error('未找到该订单追踪记录');
+  if (!data) throw svc('orderNotFound');
 
   return applyOrderHubReceived(rowToOrder(data as Record<string, unknown>), store, hubCode);
 }
@@ -752,14 +707,14 @@ export async function releaseTransitOrdersAtHub(
   options?: { allowCompleted?: boolean },
 ): Promise<PkgTrackingDetail> {
   const pkg = await getPkgTrackingDetail(packBarcode);
-  if (!pkg) throw new Error('未找到该快递包追踪记录');
+  if (!pkg) throw svc('pkgNotFoundNeedLoad');
 
   const hub = hubCode.trim().toUpperCase();
   const packOk =
     pkg.status === 'hub_received' ||
     (options?.allowCompleted && pkg.status === 'completed');
   if (!packOk) {
-    throw new Error('请先确认快递包到站，再释放待转出订单');
+    throw svc('scanPkgBeforeRelease');
   }
 
   const toRelease = pkg.orders.filter(
@@ -768,7 +723,7 @@ export async function releaseTransitOrdersAtHub(
       resolveOrderDestinationCode(o) !== hub,
   );
   if (toRelease.length === 0) {
-    throw new Error('没有可释放的待转出订单（本站订单请逐单「入库」）');
+    throw svc('noOrdersToRelease');
   }
 
   const now = new Date().toISOString();

@@ -192,6 +192,7 @@ const AdminShellLayout: React.FC = () => {
     if (currentUserRegion === 'yangon' || currentUser.startsWith('YGN')) return 'YGN';
     if (currentUserRegion === 'mandalay' || currentUser.startsWith('MDY')) return 'MDY';
     if (currentUserRegion === 'maymyo' || currentUser.startsWith('POL')) return 'POL';
+    if (currentUserRegion === 'ruili' || currentUser.startsWith('RUILI')) return 'RUILI';
     return '';
   };
   const workRegion = getWorkRegion();

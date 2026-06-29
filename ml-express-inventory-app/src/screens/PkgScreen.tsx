@@ -24,10 +24,11 @@ import {
 import { isSupabaseConfigured } from '../services/supabase';
 import { packOrderBarcodeData } from '../utils/orderBarcodeData';
 import type { PackedShipmentListRow } from '../types/inventory';
-import { getPackStatusLabel, useTranslation } from '../i18n';
+import { fmt, getPackStatusLabel, resolveAppError, useTranslation } from '../i18n';
 import { packStatusStyle, canEditPackedShipment } from '../utils/packDisplayStatus';
 import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { canEditOwnedRecord, resolveOwnerKeyForListItem } from '../utils/storeOwnership';
 
@@ -40,7 +41,7 @@ function formatTime(iso: string): string {
 
 export default function PkgScreen() {
   const { store, hubCode, operatorName } = useAuth();
-  const { t, language } = useTranslation();
+  const { t, fmt, language } = useTranslation();
   const [search, setSearch] = useState('');
   const [packs, setPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,7 +56,7 @@ export default function PkgScreen() {
     if (store && hubCode) {
       requestAutoCloudSync(store, hubCode);
       try {
-        await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? '工作人员');
+        await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);
       } catch {
         // 云端未配置或离线时仍显示本地列表
       }
@@ -127,7 +128,10 @@ export default function PkgScreen() {
                 pressed && styles.cardPressed,
               ]}
               onPress={() => setActionPack(item)}
-              accessibilityLabel={`快递包 ${item.bundle_name}，${statusLabel}`}
+              accessibilityLabel={fmt(t.pkg.a11yPack, {
+                barcode: item.bundle_name,
+                status: statusLabel,
+              })}
             >
               <View style={styles.cardTop}>
                 <View style={styles.titleBlock}>
@@ -171,7 +175,9 @@ export default function PkgScreen() {
                 <View style={styles.feePill}>
                   <Text style={styles.feePillLabel}>{t.pkg.transportFee}</Text>
                   <Text style={styles.feePillValue}>
-                    {item.truck_leg_destination ? `本段 ${item.truck_leg_destination} · ` : ''}
+                    {item.truck_leg_destination
+                      ? fmt(t.pkg.legPrefix, { dest: regionDisplayLabel(item.truck_leg_destination) })
+                      : ''}
                     {item.transport_fee} MMK
                   </Text>
                 </View>
@@ -223,12 +229,12 @@ export default function PkgScreen() {
         onUnpack={() => {
           if (!actionPack || !store || unpacking) return;
           Alert.alert(
-            '拆包取消',
-            `确定拆包 ${actionPack.bundle_barcode}？\n内含订单将退回库存，可重新勾选打包。`,
+            t.pkg.unpackTitle,
+            fmt(t.pkg.unpackBody, { barcode: actionPack.bundle_barcode }),
             [
-              { text: '取消', style: 'cancel' },
+              { text: t.common.cancel, style: 'cancel' },
               {
-                text: '确认拆包',
+                text: t.common.confirm,
                 style: 'destructive',
                 onPress: () => {
                   void (async () => {
@@ -236,17 +242,20 @@ export default function PkgScreen() {
                     try {
                       const { restoredCount } = await cancelPackedShipment(
                         actionPack.id,
-                        operatorName ?? '工作人员',
+                        operatorName ?? t.common.operator,
                         store,
                       );
                       showTaskSuccess(
-                        '拆包成功',
-                        `已取消快递包 ${actionPack.bundle_barcode}，${restoredCount} 个订单已退回可打包列表`,
+                        t.pkg.unpackSuccess,
+                        `${actionPack.bundle_barcode} · ${restoredCount}`,
                       );
                       setActionPack(null);
                       await load();
                     } catch (e: unknown) {
-                      Alert.alert('拆包失败', e instanceof Error ? e.message : '请重试');
+                      Alert.alert(
+                        t.pkg.unpackFailed,
+                        resolveAppError(t, e),
+                      );
                     } finally {
                       setUnpacking(false);
                     }
@@ -280,13 +289,16 @@ export default function PkgScreen() {
                   try {
                     await resyncLoadedPackToCloud(actionPack.bundle_barcode, store);
                     showTaskSuccess(
-                      '补传成功',
-                      `${actionPack.bundle_barcode} 已写入云端追踪，目的地站点可扫码收货`,
+                      t.pkg.resyncSuccess,
+                      `${actionPack.bundle_barcode} · ${t.stockOut.cloudSynced}`,
                     );
                     setActionPack(null);
                     await load();
                   } catch (e: unknown) {
-                    Alert.alert('补传失败', e instanceof Error ? e.message : '请重试');
+                    Alert.alert(
+                      t.pkg.resyncFailed,
+                      resolveAppError(t, e),
+                    );
                   } finally {
                     setResyncing(false);
                   }

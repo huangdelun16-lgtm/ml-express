@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from '../i18n';
 import PhoneBarcodeScanModal from './PhoneBarcodeScanModal';
 import { normalizeScanCode, vibrateScanSuccess } from '../utils/barcodeScan';
 
@@ -27,16 +28,20 @@ export default function ScanInputBar({
   value,
   onChangeText,
   onSubmit,
-  placeholder = '扫描或输入条码后按回车',
-  autoFocus = true,
-  label = '📱 扫码 / 手动输入',
+  placeholder,
+  autoFocus = false,
+  label,
   hint,
   busy = false,
   cameraScan,
   onScanPress,
 }: Props) {
+  const { t } = useTranslation();
   const inputRef = useRef<TextInput>(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+  const resolvedLabel = label ?? t.scanInput.defaultLabel;
+  const resolvedPlaceholder = placeholder ?? t.scanInput.defaultPlaceholder;
 
   const cameraOpts = typeof cameraScan === 'object' ? cameraScan : {};
   const showCamera = Boolean(cameraScan);
@@ -66,12 +71,12 @@ export default function ScanInputBar({
   };
 
   const defaultHint = showCamera || onScanPress
-    ? '扫码枪保持聚焦自动回车；或点右侧「扫码」打开手机相机'
-    : 'USB/WiFi/蓝牙扫码枪请保持此框聚焦，扫完会自动回车';
+    ? t.scanInput.hintWithCamera
+    : t.scanInput.hintGunOnly;
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{resolvedLabel}</Text>
       <View style={styles.inputRow}>
         <View style={styles.inputShell}>
           <TextInput
@@ -79,7 +84,7 @@ export default function ScanInputBar({
             style={[styles.input, (showCamera || onScanPress) && styles.inputWithScan]}
             value={value}
             onChangeText={onChangeText}
-            placeholder={placeholder}
+            placeholder={resolvedPlaceholder}
             placeholderTextColor="#94a3b8"
             autoCapitalize="none"
             autoCorrect={false}
@@ -93,7 +98,7 @@ export default function ScanInputBar({
               style={styles.clearBtn}
               onPress={() => onChangeText('')}
               hitSlop={8}
-              accessibilityLabel="清空"
+              accessibilityLabel={t.scanInput.clear}
             >
               <Text style={styles.clearText}>×</Text>
             </Pressable>
@@ -108,10 +113,10 @@ export default function ScanInputBar({
             ]}
             onPress={openScan}
             disabled={busy}
-            accessibilityLabel="扫码"
+            accessibilityLabel={t.scanInput.scanBtn}
           >
             <Text style={styles.scanIcon}>📷</Text>
-            <Text style={styles.scanText}>扫码</Text>
+            <Text style={styles.scanText}>{t.scanInput.scanBtn}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -122,7 +127,7 @@ export default function ScanInputBar({
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
           onScanned={submitCode}
-          title={cameraOpts.title ?? '手机扫码'}
+          title={cameraOpts.title ?? t.scanInput.phoneScan}
           subtitle={cameraOpts.subtitle}
         />
       ) : null}

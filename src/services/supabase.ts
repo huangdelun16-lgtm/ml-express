@@ -473,13 +473,13 @@ export const packageService = {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('获取包裹列表失败:', error);
-        console.error('错误详情:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
+        const offline =
+          error.message?.includes('Failed to fetch') ||
+          error.message?.includes('NetworkError') ||
+          error.message?.includes('offline');
+        if (!offline) {
+          console.warn('获取包裹列表失败:', error.message || error);
+        }
         return [];
       }
       
@@ -1156,25 +1156,26 @@ export const trackingService = {
   }
 };
 
+function formatSystemSettingsError(error: { message?: string; details?: string; hint?: string; code?: string } | null): string {
+  if (!error) return '未知错误';
+  const parts = [error.message, error.details, error.hint].filter(Boolean);
+  return parts.join(' · ') || error.code || '未知错误';
+}
+
 export const systemSettingsService = {
   async getAllSettings(): Promise<SystemSetting[]> {
-    try {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('*')
-        .order('category', { ascending: true })
-        .order('settings_key', { ascending: true });
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('*')
+      .order('category', { ascending: true })
+      .order('settings_key', { ascending: true });
 
-      if (error) {
-        console.error('获取系统设置失败:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (err) {
-      console.error('获取系统设置异常:', err);
-      return [];
+    if (error) {
+      console.error('获取系统设置失败:', error);
+      throw new Error(formatSystemSettingsError(error));
     }
+
+    return data || [];
   },
 
   async getSettingsByKeys(keys: string[]): Promise<SystemSetting[]> {
@@ -1221,29 +1222,37 @@ export const systemSettingsService = {
     }
   },
 
-  async upsertSettings(settings: Array<Omit<SystemSetting, 'id'>>): Promise<boolean> {
-    if (!settings.length) return true;
+  async upsertSettings(
+    settings: Array<Omit<SystemSetting, 'id'>>,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!settings.length) return { ok: true };
 
-    try {
-      const payload = settings.map(setting => ({
-        ...setting,
-        updated_at: new Date().toISOString()
-      }));
+    const payload = settings.map((setting) => ({
+      ...setting,
+      settings_value: setting.settings_value,
+      updated_at: new Date().toISOString(),
+    }));
 
-      const { error } = await supabase
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert(payload, { onConflict: 'settings_key' });
+
+    if (!error) return { ok: true };
+
+    console.warn('批量更新系统设置失败，尝试逐条写入:', error);
+
+    for (const row of payload) {
+      const { error: rowError } = await supabase
         .from('system_settings')
-        .upsert(payload, { onConflict: 'settings_key' });
+        .upsert(row, { onConflict: 'settings_key' });
 
-      if (error) {
-        console.error('批量更新系统设置失败:', error);
-        return false;
+      if (rowError) {
+        console.error(`更新系统设置 ${row.settings_key} 失败:`, rowError);
+        return { ok: false, error: formatSystemSettingsError(rowError) };
       }
-
-      return true;
-    } catch (err) {
-      console.error('批量更新系统设置异常:', err);
-      return false;
     }
+
+    return { ok: true };
   },
 
   // 获取计费规则（合并算法见 /shared/src/pricing.ts；默认值与错误处理保留本地）

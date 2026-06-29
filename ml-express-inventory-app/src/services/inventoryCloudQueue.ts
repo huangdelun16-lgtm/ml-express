@@ -1,9 +1,13 @@
 import type { InventoryItem, StockMovement } from '../types/inventory';
-import type { InventoryStoreSession } from './authService';
+import { isServiceError, svc } from '../errors/serviceError';
+import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
 import { requestAutoCloudSync } from './cloudAutoSync';
 import { getDatabase, newId, nowIso } from './database';
 import { isSupabaseConfigured } from './supabase';
 import { resolveStoreHubCode } from '../utils/storeZone';
+import { queueOpPriority } from '../utils/cloudSyncSla';
+
+export type CloudSyncOpType = 'truck_load' | 'packed_shipment' | 'item_and_movement';
 
 export type TruckLoadQueueOrigin = { id: string; storeCode: string; storeName: string };
 
@@ -99,7 +103,10 @@ async function loadMovement(movementId: string): Promise<StockMovement | null> {
   return row ? rowToMovement(row) : null;
 }
 
-export async function executeCloudSyncOp(payload: CloudSyncQueuePayload): Promise<void> {
+export async function executeCloudSyncOp(
+  payload: CloudSyncQueuePayload,
+  store: InventoryStoreSession,
+): Promise<void> {
   const {
     pushItemAndMovementToCloud,
     pushPackedShipmentToCloud,
@@ -109,17 +116,17 @@ export async function executeCloudSyncOp(payload: CloudSyncQueuePayload): Promis
   switch (payload.type) {
     case 'item_and_movement': {
       const item = await loadItem(payload.itemId);
-      if (!item) throw new Error('本地商品不存在');
+      if (!item) throw svc('localItemNotFound');
       let movement: StockMovement | undefined;
       if (payload.movementId) {
         const m = await loadMovement(payload.movementId);
         if (m) movement = m;
       }
-      await pushItemAndMovementToCloud(payload.store, item, movement);
+      await pushItemAndMovementToCloud(store, item, movement);
       return;
     }
     case 'packed_shipment':
-      await pushPackedShipmentToCloud(payload.store, payload.packId);
+      await pushPackedShipmentToCloud(store, payload.packId);
       return;
     case 'truck_load': {
       const {
@@ -131,10 +138,10 @@ export async function executeCloudSyncOp(payload: CloudSyncQueuePayload): Promis
         const pack = await getPackedShipmentByBarcode(bc);
         if (pack) packs.push(pack);
       }
-      if (packs.length === 0) throw new Error('本地快递包不存在');
+      if (packs.length === 0) throw svc('localPackNotFound');
       const orderSnapshots = await buildOrderInboundSnapshots(packs);
       await pushTruckLoadToCloud({
-        store: payload.store,
+        store,
         originStore: payload.originStore,
         destinationCode: payload.destinationCode,
         outboundDate: payload.outboundDate,
@@ -146,7 +153,7 @@ export async function executeCloudSyncOp(payload: CloudSyncQueuePayload): Promis
       return;
     }
     default:
-      throw new Error('未知同步类型');
+      throw svc('unknownSyncType');
   }
 }
 
@@ -220,6 +227,11 @@ export async function enqueueCloudSync(payload: CloudSyncQueuePayload): Promise<
      VALUES (?, ?, ?, ?, 0, '')`,
     [newId(), payload.type, JSON.stringify(payload), nowIso()],
   );
+
+  if (payload.type === 'truck_load') {
+    const hub = resolveStoreHubCode(payload.store);
+    if (hub) requestAutoCloudSync(payload.store, hub, { force: true });
+  }
 }
 
 export async function getCloudSyncPendingCount(storeCode?: string): Promise<number> {
@@ -231,7 +243,21 @@ export type CloudSyncQueueSnapshot = {
   pending: number;
   lastError: string | null;
   oldestType: string | null;
+  highestPriorityType: CloudSyncOpType | null;
+  pendingTruckLoad: number;
+  pendingPack: number;
+  pendingItem: number;
 };
+
+function sortQueueRows<
+  T extends { op_type: string; created_at: string; payload: string },
+>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const byPriority = queueOpPriority(a.op_type) - queueOpPriority(b.op_type);
+    if (byPriority !== 0) return byPriority;
+    return a.created_at.localeCompare(b.created_at);
+  });
+}
 
 export async function getCloudSyncQueueSnapshot(
   storeCode: string,
@@ -241,35 +267,80 @@ export async function getCloudSyncQueueSnapshot(
     payload: string;
     last_error: string;
     op_type: string;
-  }>('SELECT payload, last_error, op_type FROM cloud_sync_queue ORDER BY created_at ASC');
+    created_at: string;
+  }>(
+    'SELECT payload, last_error, op_type, created_at FROM cloud_sync_queue ORDER BY created_at ASC',
+  );
 
   const code = storeCode.trim().toUpperCase();
+  const empty: CloudSyncQueueSnapshot = {
+    pending: 0,
+    lastError: null,
+    oldestType: null,
+    highestPriorityType: null,
+    pendingTruckLoad: 0,
+    pendingPack: 0,
+    pendingItem: 0,
+  };
   if (!code) {
-    return { pending: rows.length, lastError: null, oldestType: rows[0]?.op_type ?? null };
+    return {
+      ...empty,
+      pending: rows.length,
+      oldestType: (rows[0]?.op_type as CloudSyncOpType) ?? null,
+      highestPriorityType: (rows[0]?.op_type as CloudSyncOpType) ?? null,
+    };
   }
 
   let pending = 0;
   let lastError: string | null = null;
-  let oldestType: string | null = null;
+  let oldestType: CloudSyncOpType | null = null;
+  let pendingTruckLoad = 0;
+  let pendingPack = 0;
+  let pendingItem = 0;
+  const matched: typeof rows = [];
 
   for (const row of rows) {
     try {
       const payload = JSON.parse(row.payload) as CloudSyncQueuePayload;
       if (payload.store.storeCode.trim().toUpperCase() !== code) continue;
+      matched.push(row);
       pending += 1;
-      if (!oldestType) oldestType = row.op_type;
+      if (row.op_type === 'truck_load') pendingTruckLoad += 1;
+      else if (row.op_type === 'packed_shipment') pendingPack += 1;
+      else pendingItem += 1;
       const err = String(row.last_error ?? '').trim();
       if (err && !lastError) lastError = err;
     } catch {
+      matched.push(row);
       pending += 1;
-      if (!oldestType) oldestType = row.op_type;
+      pendingItem += 1;
     }
   }
 
-  return { pending, lastError, oldestType };
+  const sorted = sortQueueRows(matched);
+  if (sorted[0]) {
+    oldestType = sorted[0].op_type as CloudSyncOpType;
+  }
+
+  return {
+    pending,
+    lastError,
+    oldestType,
+    highestPriorityType:
+      pendingTruckLoad > 0
+        ? 'truck_load'
+        : pendingPack > 0
+          ? 'packed_shipment'
+          : pendingItem > 0
+            ? 'item_and_movement'
+            : null,
+    pendingTruckLoad,
+    pendingPack,
+    pendingItem,
+  };
 }
 
-/** 按序重试离线队列；失败项保留并停止后续（保证顺序） */
+/** 按业务优先级 + 时间序重试离线队列；失败项保留并停止后续 */
 export async function processCloudSyncQueue(store: InventoryStoreSession): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
 
@@ -278,12 +349,25 @@ export async function processCloudSyncQueue(store: InventoryStoreSession): Promi
     id: string;
     payload: string;
     attempts: number;
-  }>('SELECT id, payload, attempts FROM cloud_sync_queue ORDER BY created_at ASC');
+    op_type: string;
+    created_at: string;
+  }>(
+    'SELECT id, payload, attempts, op_type, created_at FROM cloud_sync_queue ORDER BY created_at ASC',
+  );
 
   const storeCode = store.storeCode.trim().toUpperCase();
+  const storeRows = rows.filter((row) => {
+    try {
+      const payload = JSON.parse(row.payload) as CloudSyncQueuePayload;
+      return payload.store.storeCode.trim().toUpperCase() === storeCode;
+    } catch {
+      return true;
+    }
+  });
+  const ordered = sortQueueRows(storeRows);
   let processed = 0;
 
-  for (const row of rows) {
+  for (const row of ordered) {
     let payload: CloudSyncQueuePayload;
     try {
       payload = JSON.parse(row.payload) as CloudSyncQueuePayload;
@@ -292,14 +376,16 @@ export async function processCloudSyncQueue(store: InventoryStoreSession): Promi
       continue;
     }
 
-    if (payload.store.storeCode.trim().toUpperCase() !== storeCode) continue;
-
     try {
-      await executeCloudSyncOp(payload);
+      await executeCloudSyncOp(payload, store);
       await db.runAsync('DELETE FROM cloud_sync_queue WHERE id = ?', [row.id]);
       processed += 1;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '同步失败';
+      const msg = isServiceError(e)
+        ? e.code
+        : e instanceof Error
+          ? e.message
+          : 'syncFailed';
       await db.runAsync(
         'UPDATE cloud_sync_queue SET attempts = ?, last_error = ? WHERE id = ?',
         [Number(row.attempts) + 1, msg, row.id],
@@ -316,7 +402,8 @@ export function scheduleCloudSync(payload: CloudSyncQueuePayload): void {
   if (!isSupabaseConfigured()) return;
   void (async () => {
     try {
-      await executeCloudSyncOp(payload);
+      const authStore = await ensureInventoryCloudAuth();
+      await executeCloudSyncOp(payload, authStore);
     } catch {
       await enqueueCloudSync(payload);
       const hub = resolveStoreHubCode(payload.store);

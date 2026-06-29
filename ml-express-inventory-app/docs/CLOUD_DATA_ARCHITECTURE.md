@@ -52,20 +52,42 @@ Realtime：订阅 `inventory_store_items` / `inventory_packed_shipments` 变更�
 
 ## 部署
 
-```bash
-# 在项目根目录
-supabase db push
-# 或手动执行 supabase/migrations/20260615120000_inventory_platform_store_data.sql
-# P4 RLS：supabase/migrations/20260617120000_inventory_rls_by_delivery_store.sql
+完整步骤见 **`docs/DEPLOYMENT.md`**（数据库 migration、Edge Functions、EAS 构建、发布后 smoke test）。
 
-# 部署 Inventory 登录 Edge Function（P4 必需）
-supabase functions deploy inventory-store-login
+```bash
+# 仓库根目录 — 数据库
+supabase db push
+
+# inventory-app 目录 — Edge Functions
+npm run deploy:inventory-functions
 ```
+
+关键 migration / Function：
+
+| 资源 | 文件 / 命令 |
+|------|-------------|
+| 平台表 | `20260615120000_inventory_platform_store_data.sql` |
+| P4 RLS | `20260617120000_inventory_rls_by_delivery_store.sql` |
+| 单设备登录 | `20260621120000_inventory_single_device_session.sql` |
+| 登录 | `inventory-store-login` |
+| 改密 | `inventory-change-password` |
+
+若 `db push` 因 migration 历史不一致失败，在 Dashboard SQL Editor 手动执行上述 SQL（见 DEPLOYMENT.md 方式 B）。
+
+**当前仓库已知情况（2026-06-21）**：远程存在本地无文件的 migration 版本 `20260402`，会导致 `db push` 报错。可选修复（需 DBA 确认后执行）：
+
+```bash
+supabase migration repair --status reverted 20260402
+supabase db push
+```
+
+单设备登录最小 SQL 见：`docs/sql/single_device_session.sql`
 
 ### P4 认证说明
 
 1. App 登录调用 `inventory-store-login` 校验 `delivery_stores` 密码（Service Role，不暴露密码给 anon）。
 2. 为店铺创建/更新 Supabase Auth 用户（`inventory+{store_code}@inventory.mlexpress.internal`）。
 3. JWT `app_metadata` 写入 `inventory_store_id`、`inventory_store_code`、`inventory_hub_code`。
-4. 所有 `inventory_*` 表 RLS 仅允许 `authenticated` 且 metadata 匹配的读写。
-5. **P4 上线后需重新登录**；未部署 Edge Function 或 migration 时云端同步将失败。
+4. 登录时写入 `delivery_stores.current_session_id`，客户端监控单设备踢下线。
+5. 所有 `inventory_*` 表 RLS 仅允许 `authenticated` 且 metadata 匹配的读写。
+6. **P4 / 单设备上线后需重新登录**；未部署 Edge Function 或 migration 时云端同步将失败。

@@ -1,10 +1,14 @@
 /** 与 Inventory App destinationOptions / truckRouteFee 一致 */
-export const INVENTORY_HUB_CODES = ['MSE', 'LSO', 'POL', 'MDY', 'YGN', 'TGI'] as const;
+export const INVENTORY_HUB_CODES = ['MSE', 'RUI', 'LSO', 'POL', 'MDY', 'YGN', 'TGI'] as const;
 
 export type InventoryTruckRoutePair = { origin: string; destination: string };
 
 /** 跨境常用装车路线（App 发站码可能是 MUSE 或 MSE） */
 export const DEFAULT_INVENTORY_TRUCK_ROUTES: InventoryTruckRoutePair[] = [
+  { origin: 'RUILI', destination: 'MSE' },
+  { origin: 'RUI', destination: 'MSE' },
+  { origin: 'RUILI', destination: 'MDY' },
+  { origin: 'RUI', destination: 'MDY' },
   { origin: 'MUSE', destination: 'MDY' },
   { origin: 'MSE', destination: 'MDY' },
   { origin: 'MDY', destination: 'YGN' },

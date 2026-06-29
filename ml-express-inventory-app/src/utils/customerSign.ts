@@ -1,5 +1,6 @@
 import type { InventoryStoreSession } from '../services/authService';
 import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
+import { svc, type ServiceError } from '../errors/serviceError';
 import { resolveStoreHubCode } from './storeZone';
 import {
   isAdminStore,
@@ -45,33 +46,42 @@ export function canMarkCustomerSigned(
   return true;
 }
 
-export function customerSignDeniedMessage(
+export function customerSignDeniedError(
   store: InventoryStoreSession,
   item: SignableItem,
-): string {
+): ServiceError {
   if (item.barcode.trim().toUpperCase().startsWith('PKG')) {
-    return '快递包不可标记客户签收，请对具体订单操作。';
+    return svc('signDeniedPkg');
   }
   if (!item.hub_arrived_at?.trim()) {
-    return '仅「已到站」订单可标记签收。';
+    return svc('signDeniedNotArrived');
   }
   if (item.customer_signed_at?.trim()) {
-    return '该订单已签收。';
+    return svc('signDeniedAlready');
   }
 
   const originKey = resolveOwnerKeyForListItem(item);
   const currentKey = ownershipKeyFromStoreCode(store.storeCode);
   if (currentKey === 'MUSE' && originKey === 'MUSE') {
-    return '木姐 MUSE 账号不可签收本站发出订单，请在目的站签收。';
+    return svc('signDeniedMuseOrigin');
   }
 
   const hubKey = resolveHubKeyForStore(store);
   const destKey = resolveItemDestinationKey(item);
   if (destKey && hubKey && destKey !== hubKey) {
-    const destLabel = ownershipLabelFromKey(destKey);
-    const hubLabel = ownershipLabelFromKey(hubKey);
-    return `该订单目的地为 ${destLabel}，本站为 ${hubLabel}，无法签收。`;
+    return svc('signDeniedWrongHub', {
+      dest: ownershipLabelFromKey(destKey),
+      hub: ownershipLabelFromKey(hubKey),
+    });
   }
 
-  return '当前账号无法签收该订单。';
+  return svc('signDeniedGeneric');
+}
+
+/** @deprecated Use customerSignDeniedError + resolveAppError in UI */
+export function customerSignDeniedMessage(
+  store: InventoryStoreSession,
+  item: SignableItem,
+): string {
+  return customerSignDeniedError(store, item).message;
 }

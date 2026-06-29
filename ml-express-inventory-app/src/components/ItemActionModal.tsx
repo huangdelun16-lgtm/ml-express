@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from '../i18n';
 import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 
@@ -30,6 +31,8 @@ export default function ItemActionModal({
   canEdit = true,
   canSignDelivered = false,
 }: Props) {
+  const { t } = useTranslation();
+
   if (!item) return null;
 
   const isPack = variant === 'pack';
@@ -44,7 +47,7 @@ export default function ItemActionModal({
           <View style={[styles.accent, { backgroundColor: accent }]} />
           {isPack ? (
             <View style={styles.packTypeRow}>
-              <Text style={styles.packTypeLabel}>快递包</Text>
+              <Text style={styles.packTypeLabel}>{t.nav.pkg}</Text>
               {dest ? <Text style={styles.packDest}>→ {dest}</Text> : null}
             </View>
           ) : null}
@@ -57,14 +60,14 @@ export default function ItemActionModal({
             </Text>
           ) : (
             <Text style={styles.subtitle} numberOfLines={1}>
-              {item.customer_name || '未登记客户'}
+              {item.customer_name || t.items.noCustomer}
               {item.destination ? ` · ${item.destination}` : ''}
             </Text>
           )}
 
           <View style={styles.btnRow}>
             <Pressable style={[styles.btnView, canEdit ? styles.btnHalf : styles.btnFull]} onPress={onView}>
-              <Text style={styles.btnViewText}>查看</Text>
+              <Text style={styles.btnViewText}>{t.common.show}</Text>
             </Pressable>
             {canEdit ? (
               <Pressable
@@ -72,7 +75,7 @@ export default function ItemActionModal({
                 onPress={onEdit}
               >
                 <Text style={[styles.btnEditText, isPack && styles.btnEditTextPack]}>
-                  {isPack ? '编辑快递包' : '编辑'}
+                  {t.itemForm.editTitle}
                 </Text>
               </Pressable>
             ) : null}
@@ -80,9 +83,7 @@ export default function ItemActionModal({
 
           {!canEdit && !isPack ? (
             <View style={styles.readonlyHint}>
-              <Text style={styles.readonlyHintText}>
-                该订单由其他站点入库登记，本站仅可查看与打印
-              </Text>
+              <Text style={styles.readonlyHintText}>{t.items.cannotEditBody}</Text>
             </View>
           ) : null}
 
@@ -90,7 +91,7 @@ export default function ItemActionModal({
             <View style={styles.btnRow}>
               {showSign ? (
                 <Pressable style={[styles.btnSign, onPrint ? styles.btnHalf : styles.btnFull]} onPress={onSignDelivered}>
-                  <Text style={styles.btnSignText}>已签收</Text>
+                  <Text style={styles.btnSignText}>{t.common.signedMark}</Text>
                 </Pressable>
               ) : null}
               {onPrint ? (
@@ -98,14 +99,14 @@ export default function ItemActionModal({
                   style={[styles.btnPrint, showSign ? styles.btnHalf : styles.btnFull]}
                   onPress={onPrint}
                 >
-                  <Text style={styles.btnPrintText}>打印标签</Text>
+                  <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
                 </Pressable>
               ) : null}
             </View>
           ) : null}
 
           <Pressable style={styles.btnCancel} onPress={onClose}>
-            <Text style={styles.btnCancelText}>关闭</Text>
+            <Text style={styles.btnCancelText}>{t.common.close}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

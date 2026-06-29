@@ -17,6 +17,7 @@ import { getCloudSyncQueueSnapshot } from '../services/inventoryCloudQueue';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { packStatusStyle } from '../utils/packDisplayStatus';
 import { LOGIN_LOGO } from '../constants/branding';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 import { getPackStatusLabel, useTranslation } from '../i18n';
 
 type Nav = { navigate: (name: string) => void };
@@ -133,7 +134,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
           {hubCode ? (
             <View style={styles.chip}>
               <Text style={styles.chipLabel}>{t.common.region}</Text>
-              <Text style={styles.chipValue}>{hubCode}</Text>
+              <Text style={styles.chipValue}>{regionDisplayLabel(hubCode)}</Text>
             </View>
           ) : null}
           <View style={styles.chipMuted}>

@@ -8,13 +8,14 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import CloudAutoSyncRunner from './src/components/CloudAutoSyncRunner';
+import InventorySessionMonitor from './src/components/InventorySessionMonitor';
 import LoginScreen from './src/screens/LoginScreen';
 import { getDatabase } from './src/services/database';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Root() {
-  const { ready, isAuthenticated } = useAuth();
+  const { ready, isAuthenticated, store, logout } = useAuth();
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
@@ -39,6 +40,9 @@ function Root() {
 
   return isAuthenticated ? (
     <NavigationContainer>
+      {store ? (
+        <InventorySessionMonitor storeId={store.id} onKicked={() => void logout()} />
+      ) : null}
       <CloudAutoSyncRunner />
       <AppNavigator />
     </NavigationContainer>

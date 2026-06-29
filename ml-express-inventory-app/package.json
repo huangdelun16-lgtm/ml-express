@@ -11,8 +11,11 @@
     "web": "expo start --web",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "deploy:inventory-login": "cd .. && supabase functions deploy inventory-store-login",
-    "deploy:inventory-change-password": "cd .. && supabase functions deploy inventory-change-password"
+    "deploy:inventory-login": "cd .. && supabase functions deploy inventory-store-login --project-ref uopkyuluxnrewvlmutam",
+    "deploy:inventory-change-password": "cd .. && supabase functions deploy inventory-change-password --project-ref uopkyuluxnrewvlmutam",
+    "deploy:inventory-clear-test-data": "cd .. && supabase functions deploy inventory-clear-test-data --project-ref uopkyuluxnrewvlmutam",
+    "deploy:inventory-functions": "npm run deploy:inventory-login && npm run deploy:inventory-change-password",
+    "deploy:inventory-db": "cd .. && supabase db push --linked"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -32,7 +35,8 @@
     "react": "19.1.0",
     "react-native": "0.81.4",
     "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0"
+    "react-native-screens": "~4.16.0",
+    "react-native-thermal-printer": "^2.3.6"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { svc } from '../errors/serviceError';
 import type { InventoryStoreSession } from '../services/authService';
 import { getItemDetail, markCustomerSigned } from '../services/inventoryService';
 
@@ -6,6 +7,7 @@ type ConfirmSignParams = {
   itemId: string;
   operator: string;
   store: InventoryStoreSession;
+  resolveError?: (error: unknown) => string;
   onSuccess?: () => void;
   onError?: (message: string) => void;
   /** 弹窗关闭或流程结束（含用户点取消） */
@@ -24,7 +26,7 @@ export function confirmAndMarkCustomerSigned(params: ConfirmSignParams): void {
   void (async () => {
     try {
       const detail = await getItemDetail(params.itemId);
-      if (!detail) throw new Error('订单不存在或已删除');
+      if (!detail) throw svc('orderNotFoundOrDeleted');
 
       if (detail.payment_label === '到付') {
         const feeRaw = detail.total_fee?.trim();
@@ -39,7 +41,7 @@ export function confirmAndMarkCustomerSigned(params: ConfirmSignParams): void {
               onPress: () => {
                 void executeSign(params)
                   .catch((e: unknown) => {
-                    params.onError?.(e instanceof Error ? e.message : '请重试');
+                    params.onError?.(params.resolveError?.(e) ?? '请重试');
                   })
                   .finally(() => params.onDismiss?.());
               },
@@ -51,7 +53,7 @@ export function confirmAndMarkCustomerSigned(params: ConfirmSignParams): void {
 
       await executeSign(params);
     } catch (e: unknown) {
-      params.onError?.(e instanceof Error ? e.message : '请重试');
+      params.onError?.(params.resolveError?.(e) ?? '请重试');
     } finally {
       params.onDismiss?.();
     }

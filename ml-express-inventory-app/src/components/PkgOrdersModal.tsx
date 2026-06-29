@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from '../i18n';
 import type { PackedShipmentDetail } from '../types/inventory';
 import { resolvePackOrderCount } from '../utils/itemFieldFormat';
 
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
+  const { t, fmt: format } = useTranslation();
   if (!pack) return null;
 
   const orderCount = resolvePackOrderCount(pack);
@@ -18,11 +20,11 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>内含订单</Text>
+          <Text style={styles.title}>{t.forms.ordersInPack}</Text>
           <Text style={styles.packageNo} selectable>
             {pack.bundle_barcode}
           </Text>
-          <Text style={styles.subtitle}>共 {orderCount} 个订单</Text>
+          <Text style={styles.subtitle}>{format(t.forms.orderCount, { count: orderCount })}</Text>
 
           <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
             {pack.items.map((line, index) => (
@@ -30,20 +32,20 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
                 <Text style={styles.orderIndex}>{index + 1}</Text>
                 <View style={styles.orderBody}>
                   <Text style={styles.customerName} numberOfLines={1}>
-                    {line.customer_name?.trim() || '未登记客户'}
+                    {line.customer_name?.trim() || t.items.noCustomer}
                   </Text>
                   <Text style={styles.orderName} numberOfLines={2}>
                     {line.item_name}
                   </Text>
                   <View style={styles.codeRow}>
                     <View style={styles.tagBlue}>
-                      <Text style={styles.tagBlueLabel}>快递单</Text>
+                      <Text style={styles.tagBlueLabel}>{t.items.expressNo}</Text>
                       <Text style={styles.tagBlueValue} numberOfLines={1} selectable>
                         {line.input_barcode || '—'}
                       </Text>
                     </View>
                     <View style={styles.tagYellow}>
-                      <Text style={styles.tagYellowLabel}>入库单</Text>
+                      <Text style={styles.tagYellowLabel}>{t.forms.inboundSlip}</Text>
                       <Text style={styles.tagYellowValue} numberOfLines={1} selectable>
                         {line.item_barcode}
                       </Text>
@@ -55,7 +57,7 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
           </ScrollView>
 
           <Pressable style={styles.btn} onPress={onClose}>
-            <Text style={styles.btnText}>关闭</Text>
+            <Text style={styles.btnText}>{t.common.close}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

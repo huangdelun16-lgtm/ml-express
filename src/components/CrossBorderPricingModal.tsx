@@ -40,10 +40,13 @@ const CrossBorderPricingModal: React.FC<Props> = ({ open, onClose }) => {
     try {
       const data = await systemSettingsService.getAllSettings();
       setLoadedSettings(data);
-      setValues(mergeCrossBorderSettingsFromDb(data, selectedRegion));
-      setHasChanges(false);
-    } catch {
-      setErrorMessage(isEn ? 'Failed to load pricing.' : '加载计费配置失败。');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      setErrorMessage(
+        isEn
+          ? `Failed to load pricing.${msg ? ` ${msg}` : ''}`
+          : `加载计费配置失败${msg ? `：${msg}` : '，请检查网络后重试。'}`,
+      );
     } finally {
       setLoading(false);
     }
@@ -61,7 +64,7 @@ const CrossBorderPricingModal: React.FC<Props> = ({ open, onClose }) => {
   }, [open, selectedRegion, loadedSettings]);
 
   const handleValueChange = (key: CrossBorderPricingFieldKey, raw: string) => {
-    setValues((prev) => ({ ...prev, [key]: raw }));
+    setValues((prev) => ({ ...prev, [key]: raw as unknown as number }));
     setHasChanges(true);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -72,36 +75,48 @@ const CrossBorderPricingModal: React.FC<Props> = ({ open, onClose }) => {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const parsed = defaultCrossBorderPricingValues();
-    for (const def of CROSS_BORDER_PRICING_FIELDS) {
-      const numeric = Number(values[def.key]);
-      if (!Number.isFinite(numeric)) {
+    try {
+      const parsed = defaultCrossBorderPricingValues();
+      for (const def of CROSS_BORDER_PRICING_FIELDS) {
+        const numeric = Number(values[def.key]);
+        if (!Number.isFinite(numeric)) {
+          setErrorMessage(
+            isEn
+              ? `"${def.labelEn}" must be a number.`
+              : `字段「${def.label}」需要填写数字。`,
+          );
+          return;
+        }
+        parsed[def.key] = numeric;
+      }
+
+      const payload = buildCrossBorderPricingPayload(parsed, selectedRegion);
+      const result = await systemSettingsService.upsertSettings(payload);
+
+      if (!result.ok) {
         setErrorMessage(
           isEn
-            ? `"${def.labelEn}" must be a number.`
-            : `字段「${def.label}」需要填写数字。`,
+            ? `Save failed.${result.error ? ` ${result.error}` : ' Check network and retry.'}`
+            : `保存失败${result.error ? `：${result.error}` : '，请检查网络或稍后重试。'}`,
         );
-        setSaving(false);
         return;
       }
-      parsed[def.key] = numeric;
-    }
 
-    const payload = buildCrossBorderPricingPayload(parsed, selectedRegion);
-    const ok = await systemSettingsService.upsertSettings(payload);
-
-    if (!ok) {
-      setErrorMessage(isEn ? 'Save failed. Check network and retry.' : '保存失败，请检查网络或稍后重试。');
+      const refreshed = await systemSettingsService.getAllSettings();
+      setLoadedSettings(refreshed);
+      setValues(mergeCrossBorderSettingsFromDb(refreshed, selectedRegion));
+      setHasChanges(false);
+      setSuccessMessage(isEn ? 'Pricing saved.' : '跨境计费已保存。');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      setErrorMessage(
+        isEn
+          ? `Save failed.${msg ? ` ${msg}` : ''}`
+          : `保存失败${msg ? `：${msg}` : '，请检查网络或稍后重试。'}`,
+      );
+    } finally {
       setSaving(false);
-      return;
     }
-
-    const refreshed = await systemSettingsService.getAllSettings();
-    setLoadedSettings(refreshed);
-    setValues(mergeCrossBorderSettingsFromDb(refreshed, selectedRegion));
-    setHasChanges(false);
-    setSuccessMessage(isEn ? 'Pricing saved.' : '跨境计费已保存。');
-    setSaving(false);
   };
 
   const handleSave = () => {

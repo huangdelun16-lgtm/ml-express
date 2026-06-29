@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { fmt, useTranslation } from '../i18n';
 import type { PackedShipmentDetail } from '../types/inventory';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 
@@ -13,13 +14,15 @@ type Props = {
 };
 
 export default function PkgPickerField({
-  label = 'PKG',
+  label,
   packs,
   selectedIds,
   loading = false,
   onToggle,
   onClear,
 }: Props) {
+  const { t, fmt } = useTranslation();
+  const resolvedLabel = label ?? 'PKG';
   const [open, setOpen] = useState(false);
 
   const selectedPacks = useMemo(
@@ -30,10 +33,10 @@ export default function PkgPickerField({
   return (
     <View style={styles.field}>
       <View style={styles.labelRow}>
-        <Text style={styles.label}>{label} *</Text>
+        <Text style={styles.label}>{resolvedLabel} *</Text>
         {selectedIds.size > 0 ? (
           <Pressable onPress={onClear} hitSlop={8}>
-            <Text style={styles.clear}>清空</Text>
+            <Text style={styles.clear}>{t.forms.clearSelection}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -45,10 +48,10 @@ export default function PkgPickerField({
       >
         <Text style={[styles.triggerText, selectedIds.size === 0 && styles.placeholder]} numberOfLines={1}>
           {loading
-            ? '加载中…'
+            ? t.common.loading
             : selectedIds.size > 0
-              ? `已选 ${selectedIds.size} 个包装号`
-              : '点击选择包装号（可多选）'}
+              ? fmt(t.forms.selectedCount, { count: selectedIds.size })
+              : t.stockOut.selectPackHint}
         </Text>
         <Text style={styles.chevron}>{open ? '▲' : '▼'}</Text>
       </Pressable>
@@ -73,7 +76,7 @@ export default function PkgPickerField({
         <View style={styles.panel}>
           <ScrollView style={styles.panelScroll} nestedScrollEnabled>
             {packs.length === 0 ? (
-              <Text style={styles.empty}>暂无可出库包裹，请先在商品库打包</Text>
+              <Text style={styles.empty}>{t.forms.noPacks}</Text>
             ) : (
               packs.map((pack) => {
                 const packDest = packDestinationFromBarcode(pack.bundle_barcode);
@@ -103,7 +106,9 @@ export default function PkgPickerField({
             )}
           </ScrollView>
           <Pressable style={styles.doneBtn} onPress={() => setOpen(false)}>
-            <Text style={styles.doneBtnText}>完成选择 ({selectedIds.size})</Text>
+            <Text style={styles.doneBtnText}>
+              {t.forms.finishSelect} ({selectedIds.size})
+            </Text>
           </Pressable>
         </View>
       ) : null}

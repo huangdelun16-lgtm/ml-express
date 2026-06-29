@@ -11,99 +11,19 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  formatTimeAgo,
+  getLedgerCategoryLabel,
+  LEDGER_CATEGORY_STYLE,
+  useTranslation,
+} from '../i18n';
 import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import { listFinanceLedger } from '../services/financeLedgerService';
 import { syncPlatformInventoryFromCloud } from '../services/inventoryCloudSync';
 import { isSupabaseConfigured } from '../services/supabase';
-import type { FinanceLedgerCategory, FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
+import type { FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 
 type TabKey = 'all' | 'income' | 'transport' | 'ops';
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'income', label: '订单收入' },
-  { key: 'transport', label: '运输成本' },
-  { key: 'ops', label: '操作记录' },
-];
-
-type CategoryMeta = {
-  icon: string;
-  accent: string;
-  tint: string;
-  pillBg: string;
-  shortLabel: string;
-};
-
-const CATEGORY_META: Record<FinanceLedgerCategory, CategoryMeta> = {
-  order_income_cod: {
-    icon: '💵',
-    accent: '#34d399',
-    tint: 'rgba(52,211,153,0.12)',
-    pillBg: 'rgba(52,211,153,0.18)',
-    shortLabel: '到付待收',
-  },
-  order_prepaid: {
-    icon: '✓',
-    accent: '#60a5fa',
-    tint: 'rgba(96,165,250,0.12)',
-    pillBg: 'rgba(96,165,250,0.18)',
-    shortLabel: '已付款',
-  },
-  order_collected: {
-    icon: '✅',
-    accent: '#2dd4bf',
-    tint: 'rgba(45,212,191,0.12)',
-    pillBg: 'rgba(45,212,191,0.18)',
-    shortLabel: '已签收',
-  },
-  transport_cost: {
-    icon: '🚚',
-    accent: '#f87171',
-    tint: 'rgba(248,113,113,0.12)',
-    pillBg: 'rgba(248,113,113,0.18)',
-    shortLabel: '车费',
-  },
-  manual_income: {
-    icon: '📈',
-    accent: '#34d399',
-    tint: 'rgba(52,211,153,0.12)',
-    pillBg: 'rgba(52,211,153,0.18)',
-    shortLabel: '其它收入',
-  },
-  manual_expense: {
-    icon: '📉',
-    accent: '#f87171',
-    tint: 'rgba(248,113,113,0.12)',
-    pillBg: 'rgba(248,113,113,0.18)',
-    shortLabel: '其它支出',
-  },
-  stock_op: {
-    icon: '📋',
-    accent: '#94a3b8',
-    tint: 'rgba(148,163,184,0.1)',
-    pillBg: 'rgba(148,163,184,0.15)',
-    shortLabel: '操作',
-  },
-};
-
-function formatWhen(iso: string): { primary: string; secondary: string } {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return { primary: iso, secondary: '' };
-  }
-  const now = new Date();
-  const pad = (x: number) => String(x).padStart(2, '0');
-  const full = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return { primary: '刚刚', secondary: full };
-  if (diffMin < 60) return { primary: `${diffMin} 分钟前`, secondary: full };
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return { primary: `${diffHr} 小时前`, secondary: full };
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return { primary: `${diffDay} 天前`, secondary: full };
-  return { primary: full, secondary: '' };
-}
 
 function filterByTab(entries: FinanceLedgerEntry[], tab: TabKey): FinanceLedgerEntry[] {
   if (tab === 'all') return entries;
@@ -126,13 +46,14 @@ function countForTab(entries: FinanceLedgerEntry[], tab: TabKey): number {
 }
 
 function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
-  const meta = CATEGORY_META[item.category];
-  const when = formatWhen(item.occurredAt);
+  const { t } = useTranslation();
+  const style = LEDGER_CATEGORY_STYLE[item.category];
+  const when = formatTimeAgo(item.occurredAt, t);
 
   return (
-    <View style={[styles.ledgerRow, { borderLeftColor: meta.accent }]}>
-      <View style={[styles.iconCircle, { backgroundColor: meta.tint }]}>
-        <Text style={styles.iconEmoji}>{meta.icon}</Text>
+    <View style={[styles.ledgerRow, { borderLeftColor: style.accent }]}>
+      <View style={[styles.iconCircle, { backgroundColor: style.tint }]}>
+        <Text style={styles.iconEmoji}>{style.icon}</Text>
       </View>
 
       <View style={styles.ledgerBody}>
@@ -140,16 +61,16 @@ function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
           <Text style={styles.ledgerName} numberOfLines={1}>
             {item.itemName || item.barcode}
           </Text>
-          <View style={[styles.amountPill, { backgroundColor: meta.pillBg }]}>
-            <Text style={[styles.amountText, { color: meta.accent }]} numberOfLines={1}>
+          <View style={[styles.amountPill, { backgroundColor: style.pillBg }]}>
+            <Text style={[styles.amountText, { color: style.accent }]} numberOfLines={1}>
               {item.amountDisplay}
             </Text>
           </View>
         </View>
 
         <View style={styles.tagRow}>
-          <Text style={[styles.typeTag, { color: meta.accent, backgroundColor: meta.tint }]}>
-            {meta.shortLabel}
+          <Text style={[styles.typeTag, { color: style.accent, backgroundColor: style.tint }]}>
+            {getLedgerCategoryLabel(t, item.category)}
           </Text>
           {item.destination ? (
             <Text style={styles.destTag}>→ {item.destination}</Text>
@@ -171,27 +92,39 @@ function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
 }
 
 function EmptyState({ tab }: { tab: TabKey }) {
+  const { t } = useTranslation();
   const hints: Record<TabKey, string> = {
-    all: '入库、装车、到站后会产生财务与操作记录',
-    income: '外站发往本站的到付/预付订单会显示在这里',
-    transport: '本站发运或到站包裹的装车车费会记为运输成本',
-    ops: '入库、出库等库存操作记录',
+    all: t.movements.emptyAll,
+    income: t.movements.emptyIncome,
+    transport: t.movements.emptyTransport,
+    ops: t.movements.emptyOps,
   };
   return (
     <View style={styles.emptyBox}>
       <Text style={styles.emptyIcon}>📭</Text>
-      <Text style={styles.emptyTitle}>暂无记录</Text>
+      <Text style={styles.emptyTitle}>{t.movements.emptyTitle}</Text>
       <Text style={styles.emptyHint}>{hints[tab]}</Text>
     </View>
   );
 }
 
 export default function MovementsScreen() {
+  const { t } = useTranslation();
   const { store, hubCode } = useAuth();
   const [tab, setTab] = useState<TabKey>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [entries, setEntries] = useState<FinanceLedgerEntry[]>([]);
+
+  const tabs = useMemo(
+    (): { key: TabKey; label: string }[] => [
+      { key: 'all', label: t.movements.tabAll },
+      { key: 'income', label: t.movements.tabIncome },
+      { key: 'transport', label: t.movements.tabTransport },
+      { key: 'ops', label: t.movements.tabOps },
+    ],
+    [t],
+  );
 
   const applyLedgerResult = useCallback((result: FinanceLedgerResult) => {
     setEntries(result.entries);
@@ -269,7 +202,7 @@ export default function MovementsScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyIcon}>🔐</Text>
-        <Text style={styles.emptyTitle}>请先登录店铺账号</Text>
+        <Text style={styles.emptyTitle}>{t.common.loginStoreFirst}</Text>
       </View>
     );
   }
@@ -281,16 +214,16 @@ export default function MovementsScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabScroll}
       >
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          const count = tabCounts[t.key];
+        {tabs.map((tabItem) => {
+          const active = tab === tabItem.key;
+          const count = tabCounts[tabItem.key];
           return (
             <Pressable
-              key={t.key}
+              key={tabItem.key}
               style={[styles.tab, active && styles.tabOn]}
-              onPress={() => setTab(t.key)}
+              onPress={() => setTab(tabItem.key)}
             >
-              <Text style={[styles.tabText, active && styles.tabTextOn]}>{t.label}</Text>
+              <Text style={[styles.tabText, active && styles.tabTextOn]}>{tabItem.label}</Text>
               {count > 0 ? (
                 <View style={[styles.tabCount, active && styles.tabCountOn]}>
                   <Text style={[styles.tabCountText, active && styles.tabCountTextOn]}>
@@ -305,7 +238,7 @@ export default function MovementsScreen() {
 
       {!loading && displayed.length > 0 ? (
         <Text style={styles.sectionTitle}>
-          {TABS.find((t) => t.key === tab)?.label} · {displayed.length}
+          {tabs.find((tabItem) => tabItem.key === tab)?.label} · {displayed.length}
         </Text>
       ) : null}
     </View>
@@ -316,7 +249,7 @@ export default function MovementsScreen() {
       {loading && entries.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color="#a78bfa" size="large" />
-          <Text style={styles.loadingText}>正在汇总流水…</Text>
+          <Text style={styles.loadingText}>{t.movements.loading}</Text>
         </View>
       ) : (
         <FlatList

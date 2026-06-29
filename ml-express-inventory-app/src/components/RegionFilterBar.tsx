@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
+import { PACK_DESTINATION_OPTIONS, regionDisplayLabel } from '../constants/destinationOptions';
+import { useTranslation } from '../i18n';
 
 type Props = {
   value: string;
@@ -8,14 +9,15 @@ type Props = {
 };
 
 export default function RegionFilterBar({ value, onChange }: Props) {
+  const { t } = useTranslation();
   const options: { code: string; label: string }[] = [
-    { code: '', label: '全部' },
-    ...PACK_DESTINATION_OPTIONS.map((code) => ({ code, label: code })),
+    { code: '', label: t.common.all },
+    ...PACK_DESTINATION_OPTIONS.map((code) => ({ code, label: regionDisplayLabel(code) })),
   ];
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>筛选地区</Text>
+      <Text style={styles.title}>{t.forms.filterRegion}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

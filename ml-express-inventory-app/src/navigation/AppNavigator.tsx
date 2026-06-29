@@ -44,7 +44,7 @@ export default function AppNavigator() {
   const { t, language } = useTranslation();
 
   return (
-    <Stack.Navigator key={language} screenOptions={screenOptions}>
+      <Stack.Navigator key={language} screenOptions={screenOptions}>
       <Stack.Screen
         name="Home"
         component={HomeScreen}

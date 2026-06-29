@@ -44,7 +44,10 @@ const AbnormalAlertManager: React.FC = () => {
         }
         setAbnormalCount(abnormal.length);
       } catch (error) {
-        console.error('检测异常订单失败:', error);
+        const msg = error instanceof Error ? error.message : '';
+        if (!msg.includes('Failed to fetch') && !msg.includes('offline')) {
+          console.warn('检测异常订单失败:', msg || error);
+        }
       }
     };
 

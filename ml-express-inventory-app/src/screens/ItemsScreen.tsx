@@ -42,8 +42,9 @@ import {
 import { isExpressPackItem } from '../utils/packItem';
 import { inboundOrderBarcodeData, packOrderBarcodeData } from '../utils/orderBarcodeData';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
-import { useTranslation } from '../i18n';
+import { resolveAppError, resolvePrintError, useTranslation } from '../i18n';
 
 type Nav = {
   navigate: (name: string, params?: { itemId?: string }) => void;
@@ -75,7 +76,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     if (store && hubCode) {
       requestAutoCloudSync(store, hubCode);
       try {
-        await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? '工作人员');
+        await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);
       } catch {
         // 云端未配置或离线时仍显示本地列表
       }
@@ -167,7 +168,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
   const handleBatchPrint = async () => {
     if (selectedIds.size === 0) {
-      Alert.alert('提示', '请先勾选要打印标签的商品');
+      Alert.alert(t.common.tip, t.items.alertSelectPrint);
       return;
     }
     setBatchPrinting(true);
@@ -175,14 +176,14 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       const entries = selectedItems.map(toBatchPrintEntry);
       const ok = await printBatchLabels(entries);
       if (!ok) {
-        Alert.alert('提示', '打印已关闭，请在设置中启用打印');
+        Alert.alert(t.common.tip, t.settings.printDisabled);
         return;
       }
-      Alert.alert('已发送打印', `共 ${entries.length} 个标签已发送到打印机`, [
-        { text: '好的', onPress: exitSelectMode },
+      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody, [
+        { text: t.common.ok, onPress: exitSelectMode },
       ]);
     } catch (e: unknown) {
-      Alert.alert('打印失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
     } finally {
       setBatchPrinting(false);
     }
@@ -190,16 +191,16 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
   const openPackModal = () => {
     if (selectedIds.size === 0) {
-      Alert.alert('提示', '请先勾选要打包的入库商品');
+      Alert.alert(t.common.tip, t.items.alertSelectPack);
       return;
     }
 
     const regionCodes = collectItemDestinationCodes(selectedItems);
     const confirmMessage = formatMixedRegionPackConfirmMessage(regionCodes);
     if (confirmMessage) {
-      Alert.alert('跨地区打包', confirmMessage, [
-        { text: '取消', style: 'cancel' },
-        { text: '确认打包', onPress: () => setPackModalVisible(true) },
+      Alert.alert(t.items.alertMixedRegion, t.items.alertMixedRegionBody, [
+        { text: t.common.cancel, style: 'cancel' },
+        { text: t.common.confirm, onPress: () => setPackModalVisible(true) },
       ]);
       return;
     }
@@ -216,9 +217,9 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     note: string;
   }) => {
     const packedCount = selectedIds.size;
-    if (!store) throw new Error('未登录，无法打包');
+    if (!store) throw new Error(t.common.notLoggedIn);
     const { bundleItem } = await createPackedShipment({
-      operator: operatorName ?? '工作人员',
+      operator: operatorName ?? t.common.operator,
       originStore: {
         id: store.id,
         storeCode: store.storeCode,
@@ -233,8 +234,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       count: packedCount,
     });
     showTaskSuccess(
-      '打包成功',
-      `快递包：${bundleItem.name}\n包装号：${bundleItem.barcode}\n已合并 ${packedCount} 个商品`,
+      t.items.packSuccess,
+      `${bundleItem.name}\n${bundleItem.barcode}`,
     );
     setSelectedIds(new Set());
     await load();
@@ -311,7 +312,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         />
         {listMode === 'normal' ? (
           <Pressable style={styles.addBtn} onPress={() => navigation.navigate('ItemForm')}>
-            <Text style={styles.addText}>+ 新建</Text>
+            <Text style={styles.addText}>{t.items.newBtn}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -328,31 +329,31 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                 setListMode('pack');
               }}
             >
-              <Text style={styles.packBtnText}>📦 打包快递</Text>
+              <Text style={styles.packBtnText}>{t.items.packBtn}</Text>
             </Pressable>
             <Pressable style={styles.printSelectBtn} onPress={() => setListMode('print')}>
-              <Text style={styles.printSelectBtnText}>☑ 多选</Text>
+              <Text style={styles.printSelectBtnText}>{t.items.multiSelect}</Text>
             </Pressable>
           </>
         ) : listMode === 'pack' ? (
           <>
             <Pressable style={styles.ghostBtn} onPress={exitSelectMode}>
-              <Text style={styles.ghostBtnText}>取消</Text>
+              <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
             </Pressable>
-            <Text style={styles.packHint}>勾选曾入库的商品，合并为一个快递包</Text>
+            <Text style={styles.packHint}>{t.items.packHint}</Text>
             <Pressable
               style={[styles.packBtn, selectedIds.size === 0 && styles.packBtnDisabled]}
               onPress={openPackModal}
             >
-              <Text style={styles.packBtnText}>下一步 ({selectedIds.size})</Text>
+              <Text style={styles.packBtnText}>{fmt(t.items.nextStep, { count: selectedIds.size })}</Text>
             </Pressable>
           </>
         ) : (
           <>
             <Pressable style={styles.ghostBtn} onPress={exitSelectMode}>
-              <Text style={styles.ghostBtnText}>取消</Text>
+              <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
             </Pressable>
-            <Text style={styles.packHint}>勾选要打印标签的商品</Text>
+            <Text style={styles.packHint}>{t.items.printHint}</Text>
             <Pressable
               style={[
                 styles.printBtn,
@@ -362,7 +363,9 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
               disabled={batchPrinting}
             >
               <Text style={styles.printBtnText}>
-                {batchPrinting ? '发送中…' : `🖨 打印标签 (${selectedIds.size})`}
+                {batchPrinting
+                  ? t.items.printing
+                  : fmt(t.items.printLabels, { count: selectedIds.size })}
               </Text>
             </Pressable>
           </>
@@ -378,7 +381,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
             {listMode === 'pack'
               ? t.items.noPackable
               : filterRegion
-                ? fmt(t.items.noRegion, { region: filterRegion })
+                ? fmt(t.items.noRegion, { region: regionDisplayLabel(filterRegion) })
                 : t.items.empty}
           </Text>
         }
@@ -421,10 +424,10 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                   <View style={styles.cardMain}>
                     <Text style={styles.topLine} numberOfLines={1}>
                       <Text style={styles.customer}>
-                        {item.customer_name?.trim() || item.recipient_name?.trim() || '未登记客户'}
+                        {item.customer_name?.trim() || item.recipient_name?.trim() || t.items.noCustomer}
                       </Text>
                       {regionCode ? (
-                        <Text style={styles.destination}> · {regionCode}</Text>
+                        <Text style={styles.destination}> · {regionDisplayLabel(regionCode)}</Text>
                       ) : item.destination ? (
                         <Text style={styles.destination}> · {item.destination}</Text>
                       ) : null}
@@ -470,18 +473,18 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                           ]}
                         >
                           {isCustomerSignedItem(item)
-                            ? '已签收'
+                            ? t.items.statusSigned
                             : transitShipped
-                              ? '已中转'
+                              ? t.items.statusTransferred
                               : transitReleased
-                                ? '待转出'
+                                ? t.items.statusPendingOut
                                 : transitPendingAtHub
-                                  ? '待中转'
+                                  ? t.items.statusPendingTransit
                                   : item.hub_arrived
-                                  ? '已到站'
+                                  ? t.items.statusArrived
                                   : item.stocked_in
-                                    ? '已入库'
-                                    : '未入库'}
+                                    ? t.items.statusInbound
+                                    : t.items.statusNotInbound}
                         </Text>
                       </View>
                       <View
@@ -500,7 +503,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                               : styles.statusPackPendingText,
                           ]}
                         >
-                          {item.packed && !transitReleased ? '已打包' : '未打包'}
+                          {item.packed && !transitReleased ? t.items.statusPacked : t.items.statusNotPacked}
                         </Text>
                       </View>
                     </View>
@@ -514,7 +517,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                 <View style={styles.tagRow}>
                   {packBarcode ? (
                     <View style={styles.tagPurple}>
-                      <Text style={styles.tagPurpleLabel}>包装号</Text>
+                      <Text style={styles.tagPurpleLabel}>{t.items.packNo}</Text>
                       <Text style={styles.tagPurpleValue} numberOfLines={1}>
                         {packBarcode}
                       </Text>
@@ -522,7 +525,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                   ) : null}
                   {item.input_barcode ? (
                     <View style={styles.tagBlue}>
-                      <Text style={styles.tagBlueLabel}>快递单</Text>
+                      <Text style={styles.tagBlueLabel}>{t.items.expressNo}</Text>
                       <Text style={styles.tagBlueValue} numberOfLines={1}>
                         {item.input_barcode}
                       </Text>
@@ -534,7 +537,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                       !item.input_barcode && !packBarcode && styles.tagYellowFull,
                     ]}
                   >
-                    <Text style={styles.tagYellowLabel}>入库</Text>
+                    <Text style={styles.tagYellowLabel}>{t.items.inbound}</Text>
                     <Text style={styles.tagYellowValue} numberOfLines={1}>
                       {item.barcode}
                     </Text>
@@ -571,7 +574,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           if (!actionItem || !store) return;
           const ownerKey = resolveOwnerKeyForListItem(actionItem);
           if (!canEditOwnedRecord(store, ownerKey)) {
-            Alert.alert('无法编辑', '该订单仅可由入库登记区域或 Admin 账号编辑');
+            Alert.alert(t.items.cannotEdit, t.items.cannotEditBody);
             return;
           }
           const id = actionItem.id;
@@ -591,14 +594,18 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                 const item = actionItem;
                 confirmAndMarkCustomerSigned({
                   itemId: item.id,
-                  operator: operatorName ?? '工作人员',
+                  operator: operatorName ?? t.common.operator,
                   store,
+                  resolveError: (e) => resolveAppError(t, e),
                   onSuccess: () => {
                     setActionItem(null);
-                    showTaskSuccess('签收成功', `${item.name} 已标记为客户已签收`);
+                    showTaskSuccess(
+                      t.common.signSuccess,
+                      fmt(t.common.signMarked, { name: item.name }),
+                    );
                     void load();
                   },
-                  onError: (message) => Alert.alert('签收失败', message),
+                  onError: (message) => Alert.alert(t.common.signFailed, message),
                 });
               }
             : undefined
@@ -615,7 +622,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       <PackExpressModal
         visible={packModalVisible}
         selectedItems={selectedItems}
-        operatorName={operatorName ?? '工作人员'}
+        operatorName={operatorName ?? t.common.operator}
         store={store}
         onClose={() => setPackModalVisible(false)}
         onSubmit={handlePackSubmit}

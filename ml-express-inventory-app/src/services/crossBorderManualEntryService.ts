@@ -1,3 +1,4 @@
+import { svc } from '../errors/serviceError';
 import { isSupabaseConfigured, supabase } from './supabase';
 
 export type CrossBorderManualEntryKind = 'income' | 'expense';
@@ -15,17 +16,17 @@ export async function createCrossBorderManualEntry(
   draft: CrossBorderManualEntryDraft,
 ): Promise<void> {
   if (!isSupabaseConfigured()) {
-    throw new Error('未配置云端，无法登记其它开销');
+    throw svc('cloudNotConfiguredManual');
   }
 
   const amount = Math.round(Number(draft.amount));
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error('金额须大于 0');
+    throw svc('amountMustBePositive');
   }
 
   const entryDate = draft.entry_date.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
-    throw new Error('日期格式无效');
+    throw svc('invalidDateFormat');
   }
 
   const now = new Date().toISOString();
@@ -40,5 +41,5 @@ export async function createCrossBorderManualEntry(
     updated_at: now,
   });
 
-  if (error) throw new Error(error.message || '保存失败');
+  if (error) throw error.message ? new Error(error.message) : svc('saveFailed');
 }

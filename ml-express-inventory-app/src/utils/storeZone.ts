@@ -1,22 +1,19 @@
-import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
+import { normalizePackDestination, PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
 import type { InventoryStoreSession } from '../services/authService';
 import { destinationCodesMatch } from './destinationCode';
 
-/** 从店铺 region / JWT hubCode / store_code 解析本站服务区域码（如 YGN、MDY、MSE） */
+/** 从店铺 region / JWT hubCode / store_code 解析本站服务区域码（如 YGN、MDY、MSE、RUI） */
 export function resolveStoreHubCode(store: InventoryStoreSession): string {
-  const fromJwt = store.hubCode?.trim().toUpperCase() ?? '';
-  if (fromJwt && (PACK_DESTINATION_OPTIONS as readonly string[]).includes(fromJwt)) {
-    return fromJwt;
-  }
+  const fromJwt = normalizePackDestination(store.hubCode ?? '');
+  if (fromJwt) return fromJwt;
+  const regionNorm = normalizePackDestination(store.region ?? '');
+  if (regionNorm) return regionNorm;
   const region = store.region?.trim().toUpperCase() ?? '';
-  if (region && (PACK_DESTINATION_OPTIONS as readonly string[]).includes(region)) {
-    return region;
-  }
   const prefix = store.storeCode.replace(/[0-9]/g, '').toUpperCase();
   if (prefix && (PACK_DESTINATION_OPTIONS as readonly string[]).includes(prefix.slice(0, 3))) {
     return prefix.slice(0, 3);
   }
-  if (region) return region.slice(0, 3);
+  if (region) return normalizePackDestination(region) || region.slice(0, 3);
   return prefix.slice(0, 3);
 }
 

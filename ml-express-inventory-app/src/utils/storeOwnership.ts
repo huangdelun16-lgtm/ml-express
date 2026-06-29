@@ -4,14 +4,17 @@ import { extractDestinationCode } from './inboundBarcode';
 import { packDestinationFromBarcode } from './packageNumber';
 
 /** 木姐区域：店铺 MUSE* 与入库条码前缀 MSE/MUS 视为同一归属 */
+/** 瑞丽区域：店铺 RUILI* 与入库条码前缀 RUI 视为同一归属 */
 export function normalizeOwnerKey(key: string): string {
   const code = key.trim().toUpperCase();
   if (!code) return '';
   if (code.startsWith('ADMIN')) return 'ADMIN';
   if (code.startsWith('MUSE') || code === 'MSE' || code === 'MUS') return 'MUSE';
+  if (code.startsWith('RUILI') || code === 'RUI') return 'RUILI';
   const letters = code.replace(/[0-9]/g, '');
   const token = letters.length >= 3 ? letters.slice(0, 3) : code.slice(0, 3);
   if (token === 'MSE' || token === 'MUS') return 'MUSE';
+  if (token === 'RUI') return 'RUILI';
   return token;
 }
 
@@ -23,6 +26,7 @@ export function ownershipKeyFromStoreCode(storeCode: string): string {
 export function ownershipLabelFromKey(key: string): string {
   const k = normalizeOwnerKey(key);
   if (k === 'MUSE') return '木姐 MUSE';
+  if (k === 'RUILI') return '瑞丽 RUILI';
   if (k === 'ADMIN') return 'Admin';
   return k;
 }
@@ -51,6 +55,7 @@ export function inferOwnerKeyFromItem(item: {
     return normalizeOwnerKey(prefix3);
   }
   if (prefix3 === 'MSE' || prefix3 === 'MUS') return 'MUSE';
+  if (prefix3 === 'RUI') return 'RUILI';
   if (/^[A-Z]{3}$/.test(prefix3)) return normalizeOwnerKey(prefix3);
 
   if (item.destination?.trim()) {
@@ -71,7 +76,7 @@ export function resolveOwnerKeyForListItem(item: {
   return inferOwnerKeyFromItem(item);
 }
 
-function toComparableOwnerKey(ownerRef: string | null | undefined): string {
+export function toComparableOwnerKey(ownerRef: string | null | undefined): string {
   const raw = ownerRef?.trim();
   if (!raw) return '';
   if (/^\d/.test(raw) || raw.length > 5) {

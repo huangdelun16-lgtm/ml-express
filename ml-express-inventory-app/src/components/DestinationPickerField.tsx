@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
+import { PACK_DESTINATION_OPTIONS, regionDisplayLabel } from '../constants/destinationOptions';
+import { useTranslation } from '../i18n';
 
 type Props = {
   label?: string;
@@ -12,21 +13,23 @@ type Props = {
 };
 
 export default function DestinationPickerField({
-  label = '目的地',
+  label,
   hint,
   value,
   onChange,
   options,
 }: Props) {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t.forms.destination;
   const [open, setOpen] = useState(false);
   const choices = options ?? PACK_DESTINATION_OPTIONS;
 
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label} *</Text>
+      <Text style={styles.label}>{resolvedLabel} *</Text>
       <Pressable style={styles.trigger} onPress={() => setOpen((v) => !v)}>
         <Text style={[styles.triggerText, !value && styles.placeholder]}>
-          {value || '点击选择目的地'}
+          {value ? regionDisplayLabel(value) : t.forms.selectDestination}
         </Text>
         <Text style={styles.chevron}>{open ? '▲' : '▼'}</Text>
       </Pressable>
@@ -43,7 +46,7 @@ export default function DestinationPickerField({
                   setOpen(false);
                 }}
               >
-                <Text style={[styles.optionText, active && styles.optionTextOn]}>{opt}</Text>
+                <Text style={[styles.optionText, active && styles.optionTextOn]}>{regionDisplayLabel(opt)}</Text>
                 {active ? <Text style={styles.check}>✓</Text> : null}
               </Pressable>
             );

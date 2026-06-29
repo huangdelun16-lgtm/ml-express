@@ -10,22 +10,30 @@ import {
 } from 'react-native';
 import ScanInputBar from '../components/ScanInputBar';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  fmt,
+  getOrderStatusLabel,
+  getPkgStatusLabel,
+  resolveAppError,
+  useTranslation,
+} from '../i18n';
+import type { TranslationDict } from '../i18n/translations';
 import { markCustomerSigned, trackOrderByCode } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { PackedShipmentDetail, TrackOrderResult } from '../types/inventory';
 import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
-import { ORDER_STATUS_LABEL, PKG_STATUS_LABEL } from '../types/tracking';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Route = { params?: { presetCode?: string } };
 
-const MATCH_LABEL: Record<TrackOrderResult['matchType'], string> = {
-  express: '快递单',
-  inbound: '入库条码',
-  package: '包装号',
-};
+function getMatchLabel(t: TranslationDict, matchType: TrackOrderResult['matchType']): string {
+  if (matchType === 'express') return t.trackExpress.matchExpress;
+  if (matchType === 'inbound') return t.trackExpress.matchInbound;
+  return t.trackExpress.matchPackage;
+}
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -57,42 +65,44 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function LoadStatusBadge({ loaded }: { loaded: boolean }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.statusBadge, loaded ? styles.statusLoaded : styles.statusPending]}>
       <Text style={[styles.statusText, loaded ? styles.statusLoadedText : styles.statusPendingText]}>
-        {loaded ? '已装车' : '未装车'}
+        {loaded ? t.trackExpress.loaded : t.trackExpress.notLoaded}
       </Text>
     </View>
   );
 }
 
 function PackSection({ pack, title }: { pack: PackedShipmentDetail; title: string }) {
+  const { t, fmt } = useTranslation();
   return (
     <>
       <Section title={title}>
         <View style={styles.packHeader}>
-          <DetailRow label="包装号" value={pack.bundle_barcode} />
+          <DetailRow label={t.trackExpress.packNo} value={pack.bundle_barcode} />
           <LoadStatusBadge loaded={pack.loaded} />
         </View>
-        <DetailRow label="包裹名称" value={pack.bundle_name} />
-        <DetailRow label="规格" value={pack.spec} />
-        <DetailRow label="单位" value={pack.unit} />
-        <DetailRow label="重量" value={pack.weight} />
-        <DetailRow label="打包人" value={pack.operator} />
-        <DetailRow label="打包时间" value={formatTime(pack.created_at)} />
+        <DetailRow label={t.trackExpress.packName} value={pack.bundle_name} />
+        <DetailRow label={t.trackExpress.spec} value={pack.spec} />
+        <DetailRow label={t.trackExpress.unit} value={pack.unit} />
+        <DetailRow label={t.trackExpress.weight} value={pack.weight} />
+        <DetailRow label={t.trackExpress.packer} value={pack.operator} />
+        <DetailRow label={t.trackExpress.packTime} value={formatTime(pack.created_at)} />
       </Section>
 
-      <Section title={`内含商品（${pack.items.length} 件）`}>
+      <Section title={fmt(t.trackExpress.sectionPackItems, { count: pack.items.length })}>
         {pack.items.map((line) => (
           <View key={line.id} style={styles.packLine}>
             <Text style={styles.packLineName}>{line.item_name}</Text>
             {line.input_barcode ? (
               <Text style={styles.packLineCode} selectable>
-                快递单 {line.input_barcode}
+                {t.trackExpress.expressNo} {line.input_barcode}
               </Text>
             ) : null}
             <Text style={styles.packLineCode} selectable>
-              入库 {line.item_barcode}
+              {t.trackExpress.inboundLabel} {line.item_barcode}
             </Text>
             <Text style={styles.packLineQty}>× {line.qty}</Text>
           </View>
@@ -109,28 +119,32 @@ function CloudTrackSection({
   pkg: PkgTrackingDetail | null;
   order: OrderTrackingRecord | null;
 }) {
+  const { t, fmt } = useTranslation();
   if (!pkg) return null;
   return (
-    <Section title="云端在途位置">
-      <DetailRow label="快递包" value={pkg.pack_barcode} />
-      <DetailRow label="在途状态" value={PKG_STATUS_LABEL[pkg.status]} />
-      <DetailRow label="发站" value={`${pkg.origin_store_code} ${pkg.origin_store_name}`} />
-      <DetailRow label="目的地" value={pkg.destination_code} />
+    <Section title={t.trackExpress.sectionCloud}>
+      <DetailRow label={t.trackExpress.cloudPkg} value={pkg.pack_barcode} />
+      <DetailRow label={t.trackExpress.transitStatus} value={getPkgStatusLabel(t, pkg.status)} />
+      <DetailRow label={t.trackExpress.origin} value={`${pkg.origin_store_code} ${pkg.origin_store_name}`} />
+      <DetailRow label={t.trackExpress.destination} value={regionDisplayLabel(pkg.destination_code)} />
       <DetailRow
-        label="订单进度"
-        value={`${pkg.received_order_count}/${pkg.item_count} 已确认`}
+        label={t.trackExpress.orderProgress}
+        value={fmt(t.trackExpress.orderProgressValue, {
+          done: pkg.received_order_count,
+          total: pkg.item_count,
+        })}
       />
       {pkg.hub_received_by_store_code ? (
-        <DetailRow label="到站站点" value={pkg.hub_received_by_store_code} />
+        <DetailRow label={t.trackExpress.hubStation} value={pkg.hub_received_by_store_code} />
       ) : null}
       {order ? (
-        <DetailRow label="本单状态" value={ORDER_STATUS_LABEL[order.status]} />
+        <DetailRow label={t.trackExpress.orderStatus} value={getOrderStatusLabel(t, order.status)} />
       ) : null}
       {pkg.orders.map((line) => (
         <View key={line.id} style={styles.packLine}>
           <Text style={styles.packLineName}>{line.order_name}</Text>
           <Text style={styles.packLineCode}>
-            {ORDER_STATUS_LABEL[line.status]}
+            {getOrderStatusLabel(t, line.status)}
             {line.express_barcode ? ` · ${line.express_barcode}` : ''} · {line.order_barcode}
           </Text>
         </View>
@@ -154,14 +168,23 @@ function TrackResultPanel({
   signing?: boolean;
   onSignDelivered?: () => void;
 }) {
+  const { t, fmt } = useTranslation();
   const { detail, parentPack, truckLoad } = result;
   const activePack = detail.pack ?? parentPack;
   const showSign = canSignDelivered && onSignDelivered;
 
+  const movementTypeLabel = (type: string) => {
+    if (type === 'in') return t.common.inbound;
+    if (type === 'out') return t.common.outbound;
+    return t.common.adjust;
+  };
+
   return (
     <View style={styles.result}>
       <View style={styles.matchBanner}>
-        <Text style={styles.matchLabel}>匹配类型：{MATCH_LABEL[result.matchType]}</Text>
+        <Text style={styles.matchLabel}>
+          {fmt(t.trackExpress.matchType, { type: getMatchLabel(t, result.matchType) })}
+        </Text>
         <Text style={styles.matchQuery} selectable>
           {result.query}
         </Text>
@@ -169,67 +192,67 @@ function TrackResultPanel({
 
       <Text style={styles.heroName}>{detail.name}</Text>
       <Text style={styles.heroMeta}>
-        库存 {detail.qty_on_hand} {stockUnitLabel()}
+        {fmt(t.common.stockQty, { qty: detail.qty_on_hand })} {stockUnitLabel()}
       </Text>
 
       {activePack ? (
         <View style={styles.loadRow}>
-          <Text style={styles.loadLabel}>装车状态</Text>
+          <Text style={styles.loadLabel}>{t.trackExpress.loadStatus}</Text>
           <LoadStatusBadge loaded={activePack.loaded} />
         </View>
       ) : null}
 
       {truckLoad ? (
-        <Section title="装车出库记录">
-          <DetailRow label="出库日期" value={truckLoad.outboundDate} />
-          <DetailRow label="目的地" value={truckLoad.destination} />
-          <DetailRow label="操作人" value={truckLoad.operator} />
-          <DetailRow label="记录时间" value={formatTime(truckLoad.created_at)} />
+        <Section title={t.trackExpress.sectionTruckLoad}>
+          <DetailRow label={t.trackExpress.outboundDate} value={truckLoad.outboundDate} />
+          <DetailRow label={t.trackExpress.destination} value={regionDisplayLabel(truckLoad.destination)} />
+          <DetailRow label={t.trackExpress.operator} value={truckLoad.operator} />
+          <DetailRow label={t.trackExpress.recordTime} value={formatTime(truckLoad.created_at)} />
         </Section>
       ) : activePack && !activePack.loaded ? (
         <View style={styles.pendingHint}>
-          <Text style={styles.pendingHintText}>包裹已打包，尚未装车出库</Text>
+          <Text style={styles.pendingHintText}>{t.trackExpress.pendingPackHint}</Text>
         </View>
       ) : null}
 
-      <Section title="收发信息">
-        <DetailRow label="客户姓名" value={detail.customer_name} />
-        <DetailRow label="联系电话" value={detail.recipient_phone} />
-        <DetailRow label="目的地" value={detail.destination} />
-        <DetailRow label="商品包装" value={detail.packaging} />
+      <Section title={t.trackExpress.sectionShipInfo}>
+        <DetailRow label={t.trackExpress.customerName} value={detail.customer_name} />
+        <DetailRow label={t.trackExpress.phone} value={detail.recipient_phone} />
+        <DetailRow label={t.trackExpress.destination} value={regionDisplayLabel(detail.destination ?? '')} />
+        <DetailRow label={t.trackExpress.packaging} value={detail.packaging} />
       </Section>
 
-      <Section title="商品信息">
-        <DetailRow label="商品名称" value={detail.name} />
-        <DetailRow label="规格" value={detail.spec} />
-        <DetailRow label="单位" value={detail.unit} />
-        <DetailRow label="重量" value={detail.weight} />
+      <Section title={t.trackExpress.sectionItemInfo}>
+        <DetailRow label={t.trackExpress.itemName} value={detail.name} />
+        <DetailRow label={t.trackExpress.spec} value={detail.spec} />
+        <DetailRow label={t.trackExpress.unit} value={detail.unit} />
+        <DetailRow label={t.trackExpress.weight} value={detail.weight} />
       </Section>
 
-      <Section title="条码信息">
-        <DetailRow label="快递单" value={detail.input_barcode} />
-        <DetailRow label="入库条码" value={detail.barcode} />
+      <Section title={t.trackExpress.sectionBarcode}>
+        <DetailRow label={t.trackExpress.expressNo} value={detail.input_barcode} />
+        <DetailRow label={t.trackExpress.inboundBarcode} value={detail.barcode} />
       </Section>
 
       {detail.note ? (
-        <Section title="备注">
+        <Section title={t.trackExpress.sectionNote}>
           <Text style={styles.noteText} selectable>
             {detail.note}
           </Text>
         </Section>
       ) : null}
 
-      {detail.pack ? <PackSection pack={detail.pack} title="包裹信息" /> : null}
-      {parentPack ? <PackSection pack={parentPack} title="所属 PKG" /> : null}
+      {detail.pack ? <PackSection pack={detail.pack} title={t.trackExpress.sectionPack} /> : null}
+      {parentPack ? <PackSection pack={parentPack} title={t.trackExpress.sectionParentPkg} /> : null}
 
       <CloudTrackSection pkg={cloudPkg} order={cloudOrder} />
 
       {result.recentMovements.length > 0 ? (
-        <Section title="最近流水">
+        <Section title={t.trackExpress.sectionMovements}>
           {result.recentMovements.map((m) => (
             <View key={m.id} style={styles.movementLine}>
               <Text style={styles.movementType}>
-                {m.type === 'in' ? '入库' : m.type === 'out' ? '出库' : '调整'} · {m.qty}
+                {movementTypeLabel(m.type)} · {m.qty}
               </Text>
               <Text style={styles.movementMeta}>
                 {formatTime(m.created_at)} · {m.operator}
@@ -250,7 +273,9 @@ function TrackResultPanel({
           onPress={onSignDelivered}
           disabled={signing}
         >
-          <Text style={styles.signBtnText}>{signing ? '签收中…' : '✓ 已签收'}</Text>
+          <Text style={styles.signBtnText}>
+            {signing ? t.common.signInProgress : t.common.signedMark}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -264,10 +289,11 @@ function CloudOnlyPanel({
   pkg: PkgTrackingDetail;
   order: OrderTrackingRecord | null;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.result}>
       <View style={styles.matchBanner}>
-        <Text style={styles.matchLabel}>云端追踪（跨站包裹）</Text>
+        <Text style={styles.matchLabel}>{t.trackExpress.cloudOnly}</Text>
         <Text style={styles.matchQuery} selectable>
           {pkg.pack_barcode}
         </Text>
@@ -278,6 +304,7 @@ function CloudOnlyPanel({
 }
 
 export default function TrackExpressScreen({ route }: { route?: Route }) {
+  const { t, fmt } = useTranslation();
   const { store, operatorName } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -330,12 +357,18 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
     if (!result || !store) return;
     setSigning(true);
     try {
-      await markCustomerSigned(result.detail.id, operatorName ?? '工作人员', store);
+      await markCustomerSigned(result.detail.id, operatorName ?? t.common.operator, store);
       const refreshed = await trackOrderByCode(result.query);
       if (refreshed) setResult(refreshed);
-      showTaskSuccess('签收成功', `${result.detail.name} 已标记为客户已签收`);
+      showTaskSuccess(
+        t.common.signSuccess,
+        fmt(t.common.signMarked, { name: result.detail.name }),
+      );
     } catch (e: unknown) {
-      Alert.alert('签收失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(
+        t.common.signFailed,
+        resolveAppError(t, e),
+      );
     } finally {
       setSigning(false);
     }
@@ -343,7 +376,7 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.intro}>输入或扫描快递单号、入库条码，查看订单完整详情与装车状态。</Text>
+      <Text style={styles.intro}>{t.trackExpress.intro}</Text>
 
       <ScanInputBar
         value={code}
@@ -351,10 +384,10 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
         onSubmit={search}
         busy={loading}
         cameraScan={{
-          title: '追踪扫码',
-          subtitle: '支持快递单、入库条码、PKG 包装号',
+          title: t.trackExpress.cameraTitle,
+          subtitle: t.trackExpress.cameraSubtitle,
         }}
-        placeholder="快递单 / 入库条码 / 包装号"
+        placeholder={t.trackExpress.placeholder}
       />
 
       <Pressable
@@ -362,20 +395,20 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
         onPress={() => void search(code)}
         disabled={loading}
       >
-        <Text style={styles.searchBtnText}>查询</Text>
+        <Text style={styles.searchBtnText}>{t.common.query}</Text>
       </Pressable>
 
       {loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator color="#38bdf8" />
-          <Text style={styles.loadingText}>查询中…</Text>
+          <Text style={styles.loadingText}>{t.common.querying}</Text>
         </View>
       ) : null}
 
       {notFound ? (
         <View style={styles.notFound}>
-          <Text style={styles.notFoundTitle}>未找到订单</Text>
-          <Text style={styles.notFoundHint}>请确认快递单或入库条码是否正确，或先去入库建档。</Text>
+          <Text style={styles.notFoundTitle}>{t.trackExpress.notFoundTitle}</Text>
+          <Text style={styles.notFoundHint}>{t.trackExpress.notFoundHint}</Text>
         </View>
       ) : null}
 

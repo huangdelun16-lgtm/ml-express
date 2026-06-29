@@ -2,16 +2,18 @@
 
 独立运行的手机/平板库存管理应用，供 **Admin 后台创建的中转站合伙店铺** 使用。登录校验连接 Supabase `delivery_stores`。
 
-**数据策略（Google Play / 多设备）**：业务数据迁移至 Supabase 专用表 `inventory_*`（与客户端/商家端/骑手端隔离）。详见 `docs/CLOUD_DATA_ARCHITECTURE.md`。当前版本仍以本机 SQLite 为主；完成云端同步后多部手机将显示一致。
+**数据策略**：业务数据以 Supabase `inventory_*` 表为权威来源，本机 SQLite 作缓存与离线队列（与客户端/商家端/骑手端隔离）。详见 `docs/CLOUD_DATA_ARCHITECTURE.md`。登录后自动云同步；**每部手机本地列表可能短暂不一致**，换机后请在设置中「立即同步」。
 
 ## 功能
 
 - **中转站店铺登录**（店铺代码 + 密码，须 `store_type = transit_station`）
-- 商品建档、搜索、安全库存预警
-- 入库 / 出库流水
-- **扫码枪**：USB / Wi-Fi / 蓝牙 HID 键盘模式（入库/出库页聚焦输入框）
-- **相机扫码**：查询商品并跳转入库/出库
+- **单设备登录**（同一账号仅一台手机在线，后登录踢掉先登录）
+- 入库、快递明细、打包、装车出库、到站签收、在途追踪、流水、跨境会计
+- 中 / 英 / 缅 三语界面
+- **扫码枪**：USB / Wi-Fi / 蓝牙 HID 键盘模式
+- **相机扫码**：查询商品并快捷跳转
 - **标签打印**：HTML 系统打印（标签机型号待定，设置页可配置宽度与份数）
+- **云端同步**：离线队列、Realtime 拉取、设置页强制同步
 
 ## 环境要求
 
@@ -72,7 +74,24 @@ src/
 
 旧占位文件：`supabase/migrations/20260531120000_inventory_cloud_sync_placeholder.sql`
 
-## 构建独立安装包
+## 生产部署
+
+**完整清单（migration、Edge Functions、EAS、验收）**：[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+
+```bash
+# 1. 数据库（仓库根目录）
+cd .. && supabase db push
+
+# 2. Edge Functions
+npm run deploy:inventory-functions
+
+# 3. EAS 生产包
+eas build --platform ios --profile production
+```
+
+Bundle ID：`com.mlexpress.inventory`
+
+## 本地原生构建
 
 ```bash
 npx expo prebuild
@@ -80,5 +99,3 @@ npx expo run:android
 # 或
 npx expo run:ios
 ```
-
-Bundle ID：`com.mlexpress.inventory`

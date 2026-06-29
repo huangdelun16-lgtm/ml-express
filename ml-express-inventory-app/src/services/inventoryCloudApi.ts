@@ -1,6 +1,9 @@
 import type { InventoryItem, PackedShipment, StockMovement } from '../types/inventory';
-import type { InventoryStoreSession } from './authService';
+import { normalizePackDestination } from '../constants/destinationOptions';
+import { svc } from '../errors/serviceError';
+import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { generateUuid, toNullableUuid } from '../utils/uuid';
 
 export type CloudStoreItemRow = {
@@ -253,13 +256,17 @@ export async function fetchCloudPackedShipments(
 }
 
 export async function upsertCloudStoreItem(
-  store: InventoryStoreSession,
+  _store: InventoryStoreSession,
   item: InventoryItem,
 ): Promise<string> {
   if (!isSupabaseConfigured()) return item.id;
-  const storeCode = store.storeCode.trim().toUpperCase();
-  const itemOwnerCode = (item.owner_store_code?.trim() || storeCode).toUpperCase();
-  const ownedByThisStore = itemOwnerCode === storeCode;
+  const authStore = await ensureInventoryCloudAuth();
+  const authStoreCode = authStore.storeCode.trim().toUpperCase();
+  const itemOwnerRaw = item.owner_store_code?.trim() || authStoreCode;
+  const ownedByAuthStore =
+    ownershipKeyFromStoreCode(itemOwnerRaw) === ownershipKeyFromStoreCode(authStoreCode);
+  const finalDestRaw = item.final_destination?.trim() ?? '';
+  const finalDestination = normalizePackDestination(finalDestRaw) || finalDestRaw;
 
   const payload = {
     barcode: item.barcode.trim(),
@@ -271,10 +278,10 @@ export async function upsertCloudStoreItem(
     qty_on_hand: item.qty_on_hand,
     min_qty: item.min_qty ?? 0,
     note: item.note?.trim() ?? '',
-    owner_store_id: ownedByThisStore ? toNullableUuid(store.id) : null,
-    owner_store_code: item.owner_store_code?.trim() || store.storeCode,
+    owner_store_id: ownedByAuthStore ? toNullableUuid(authStore.id) : null,
+    owner_store_code: ownedByAuthStore ? authStore.storeCode : itemOwnerRaw,
     recipient_name: item.recipient_name?.trim() ?? '',
-    final_destination: item.final_destination?.trim() ?? '',
+    final_destination: finalDestination,
     hub_arrived_at: toNullableTs(item.hub_arrived_at),
     customer_signed_at: toNullableTs(item.customer_signed_at),
     packed_at: toNullableTs(item.packed_at),
@@ -289,7 +296,7 @@ export async function upsertCloudStoreItem(
     .upsert(payload, { onConflict: 'barcode' })
     .select('id')
     .single();
-  if (error || !data) throw new Error(error?.message ?? '同步商品失败');
+  if (error || !data) throw error?.message ? new Error(error.message) : svc('syncItemFailed');
   return String((data as { id: string }).id);
 }
 
@@ -334,21 +341,27 @@ export async function insertCloudStockMovement(
 }
 
 export async function upsertCloudPackedShipment(
-  store: InventoryStoreSession,
+  _store: InventoryStoreSession,
   pack: PackedShipment,
   bundleCloudItemId: string | null,
   lines: { item_barcode: string; item_name: string; qty: number; cloud_item_id?: string | null }[],
   loadedAt: string | null,
 ): Promise<string> {
   if (!isSupabaseConfigured()) return pack.id;
+  const authStore = await ensureInventoryCloudAuth();
+  const authStoreCode = authStore.storeCode.trim().toUpperCase();
+  const packOwnerRaw = pack.owner_store_code?.trim() || authStoreCode;
+  const ownedByAuthStore =
+    ownershipKeyFromStoreCode(packOwnerRaw) === ownershipKeyFromStoreCode(authStoreCode);
+
   const payload = {
     bundle_barcode: pack.bundle_barcode,
     bundle_name: pack.bundle_name,
     bundle_item_id: bundleCloudItemId,
     operator: pack.operator,
     note: pack.note ?? '',
-    owner_store_id: toNullableUuid(store.id),
-    owner_store_code: pack.owner_store_code?.trim() || store.storeCode,
+    owner_store_id: ownedByAuthStore ? toNullableUuid(authStore.id) : null,
+    owner_store_code: ownedByAuthStore ? authStore.storeCode : packOwnerRaw,
     transport_fee: pack.transport_fee?.trim() ?? '',
     truck_leg_destination: pack.truck_leg_destination?.trim() ?? '',
     loaded_at: loadedAt,
@@ -360,7 +373,7 @@ export async function upsertCloudPackedShipment(
     .upsert(payload, { onConflict: 'bundle_barcode' })
     .select('id')
     .single();
-  if (error || !data) throw new Error(error?.message ?? '同步快递包失败');
+  if (error || !data) throw error?.message ? new Error(error.message) : svc('syncPackFailed');
   const packId = String((data as { id: string }).id);
 
   await supabase.from('inventory_packed_shipment_items').delete().eq('pack_id', packId);
@@ -422,7 +435,7 @@ export async function deleteCloudPackedShipment(bundleBarcode: string): Promise<
   if (packRow) {
     const loadedAt = (packRow as { loaded_at?: string | null }).loaded_at;
     if (loadedAt?.trim()) {
-      throw new Error('该快递包云端已标记装车出库，无法拆包');
+      throw svc('cloudPackAlreadyLoaded');
     }
     const packId = String((packRow as { id: string }).id);
     const { error: lineErr } = await supabase
@@ -446,7 +459,7 @@ export async function deleteCloudPackedShipment(bundleBarcode: string): Promise<
     const status = String((trackRow as { status: string }).status);
     const truckLoaded = (trackRow as { truck_loaded_at?: string | null }).truck_loaded_at;
     if (truckLoaded?.trim() || status === 'in_transit' || status === 'hub_received' || status === 'completed') {
-      throw new Error('该快递包已在运输追踪中，无法拆包');
+      throw svc('cloudPackInTrackingCannotUnpack');
     }
     await supabase.from('inventory_order_tracking').delete().eq('pack_barcode', code);
     await supabase.from('inventory_pkg_tracking').delete().eq('pack_barcode', code);
@@ -474,7 +487,7 @@ export async function upsertCloudTransportFeePayment(params: {
 }): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const packBarcode = params.packBarcode.trim().toUpperCase();
-  if (!packBarcode) throw new Error('包装号无效');
+  if (!packBarcode) throw svc('invalidPackBarcode');
 
   const { error } = await supabase.from('inventory_hub_transport_fee_payments').upsert(
     {

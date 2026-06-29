@@ -1,6 +1,7 @@
 import React, { type Ref } from 'react';
 import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
 import { sanitizeNumberInput } from '../utils/itemFieldFormat';
+import { useTranslation } from '../i18n';
 
 type DimInputProps = {
   inputRef?: Ref<TextInput>;
@@ -30,6 +31,7 @@ export function DimensionSpecField({
   wInput,
   hInput,
 }: DimProps) {
+  const { t } = useTranslation();
   const set = (key: 'l' | 'w' | 'h', v: string) => {
     onChange({ l, w, h, [key]: sanitizeNumberInput(v) });
   };
@@ -37,16 +39,16 @@ export function DimensionSpecField({
   return (
     <View style={styles.block}>
       <View style={styles.specHead}>
-        <Text style={styles.label}>规格</Text>
+        <Text style={styles.label}>{t.forms.spec}</Text>
         <Text style={styles.specUnit}>cm</Text>
       </View>
       <View style={styles.specCard}>
         <View style={styles.specRow}>
-          <DimCell label="长" value={l} onChange={(v) => set('l', v)} editable={editable} input={lInput} />
+          <DimCell label={t.forms.length} value={l} onChange={(v) => set('l', v)} editable={editable} input={lInput} />
           <Text style={styles.times}>×</Text>
-          <DimCell label="宽" value={w} onChange={(v) => set('w', v)} editable={editable} input={wInput} />
+          <DimCell label={t.forms.width} value={w} onChange={(v) => set('w', v)} editable={editable} input={wInput} />
           <Text style={styles.times}>×</Text>
-          <DimCell label="高" value={h} onChange={(v) => set('h', v)} editable={editable} input={hInput} />
+          <DimCell label={t.forms.height} value={h} onChange={(v) => set('h', v)} editable={editable} input={hInput} />
         </View>
       </View>
     </View>

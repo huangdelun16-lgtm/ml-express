@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import CreateCrossBorderAccountModal from './CreateCrossBorderAccountModal';
 import {
+  deleteCrossBorderAccount,
   type CreateCrossBorderAccountResult,
+  type DeleteCrossBorderAccountResult,
   type InventoryTransitStore,
   type UpdateCrossBorderAccountResult,
 } from '../services/inventoryConsoleService';
@@ -16,6 +18,7 @@ type Props = {
   isEn: boolean;
   onCreated: (result: CreateCrossBorderAccountResult) => void;
   onUpdated?: (result: UpdateCrossBorderAccountResult) => void;
+  onDeleted?: (result: DeleteCrossBorderAccountResult) => void;
 };
 
 function hubLabel(regionId: string | undefined, isEn: boolean): string {
@@ -44,9 +47,12 @@ const CrossBorderAccountManagementModal: React.FC<Props> = ({
   isEn,
   onCreated,
   onUpdated,
+  onDeleted,
 }) => {
   const [showCreate, setShowCreate] = useState(false);
   const [editStoreCode, setEditStoreCode] = useState<string | null>(null);
+  const [deletingCode, setDeletingCode] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const accountFormOpen = showCreate || Boolean(editStoreCode);
 
@@ -60,6 +66,27 @@ const CrossBorderAccountManagementModal: React.FC<Props> = ({
   const handleUpdated = (result: UpdateCrossBorderAccountResult) => {
     onUpdated?.(result);
     setEditStoreCode(null);
+  };
+
+  const handleDelete = async (store: InventoryTransitStore) => {
+    const confirmMessage = isEn
+      ? `Confirm delete account "${store.store_name}" (${store.store_code})?\n\nThis cannot be undone. The transit station and Inventory App login will be removed.`
+      : `确认删除账号「${store.store_name}」（${store.store_code}）吗？\n\n此操作不可撤销，将删除该中转站及 Inventory App 登录权限。`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setActionError(null);
+    setDeletingCode(store.store_code);
+    try {
+      const result = await deleteCrossBorderAccount(store.store_code);
+      if (editStoreCode === store.store_code) {
+        setEditStoreCode(null);
+      }
+      onDeleted?.(result);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : isEn ? 'Delete failed' : '删除失败');
+    } finally {
+      setDeletingCode(null);
+    }
   };
 
   return createPortal(
@@ -113,6 +140,12 @@ const CrossBorderAccountManagementModal: React.FC<Props> = ({
             </span>
           </div>
 
+          {actionError ? (
+            <div className="cbl-alert cbl-alert--error cbl-account-mgmt-modal__alert">
+              {actionError}
+            </div>
+          ) : null}
+
           <div className="cbl-account-mgmt-modal__body">
             {stores.length ? (
               <div className="cbl-table-wrap">
@@ -156,13 +189,30 @@ const CrossBorderAccountManagementModal: React.FC<Props> = ({
                         </td>
                         <td className="cbl-dim">{formatDate(store.created_at, isEn)}</td>
                         <td>
-                          <button
-                            type="button"
-                            className="cbl-btn cbl-btn--sm cbl-table--accounts__edit"
-                            onClick={() => setEditStoreCode(store.store_code)}
-                          >
-                            {isEn ? 'Edit' : '编辑'}
-                          </button>
+                          <div className="cbl-table--accounts__actions">
+                            <button
+                              type="button"
+                              className="cbl-btn cbl-btn--sm cbl-table--accounts__edit"
+                              onClick={() => setEditStoreCode(store.store_code)}
+                              disabled={Boolean(deletingCode)}
+                            >
+                              {isEn ? 'Edit' : '编辑'}
+                            </button>
+                            <button
+                              type="button"
+                              className="cbl-btn cbl-btn--sm cbl-table--accounts__delete"
+                              onClick={() => void handleDelete(store)}
+                              disabled={deletingCode === store.store_code}
+                            >
+                              {deletingCode === store.store_code
+                                ? isEn
+                                  ? 'Deleting…'
+                                  : '删除中…'
+                                : isEn
+                                  ? 'Delete'
+                                  : '删除'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -90,10 +90,20 @@ async function syncInventoryAuthUser(supabaseAdmin, store, options = {}) {
   return { email, hubCode };
 }
 
+async function deleteInventoryAuthUser(supabaseAdmin, storeCode) {
+  const email = inventoryAuthEmail(storeCode);
+  const existing = await findUserByEmail(supabaseAdmin, email);
+  if (!existing) return { deleted: false, email };
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(existing.id);
+  if (error) throw new Error(error.message);
+  return { deleted: true, email };
+}
+
 module.exports = {
   TRANSIT_STATION_STORE_TYPE,
   getAdminTokenFromEvent,
   inventoryAuthEmail,
   resolveHubCode,
   syncInventoryAuthUser,
+  deleteInventoryAuthUser,
 };

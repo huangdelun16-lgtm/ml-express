@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 200" font-family="Arial, Helvetica, sans-serif">
+  <rect width="900" height="200" fill="#0f172a" rx="12"/>
+  <text x="450" y="32" text-anchor="middle" fill="#f8fafc" font-size="18" font-weight="bold">Truck Load (Stock Out) Workflow</text>
+  <text x="450" y="52" text-anchor="middle" fill="#94a3b8" font-size="12">Origin hub - send PKG to next station</text>
+  <rect x="20" y="80" width="130" height="56" rx="8" fill="#1e293b" stroke="#475569"/>
+  <text x="85" y="102" text-anchor="middle" fill="#f8fafc" font-weight="bold" font-size="11">Packing screen</text>
+  <text x="85" y="120" text-anchor="middle" fill="#94a3b8" font-size="10">PKG = Not loaded</text>
+  <rect x="170" y="80" width="130" height="56" rx="8" fill="#1e293b" stroke="#475569"/>
+  <text x="235" y="102" text-anchor="middle" fill="#f8fafc" font-weight="bold" font-size="11">Truck load</text>
+  <text x="235" y="120" text-anchor="middle" fill="#94a3b8" font-size="10">Home menu</text>
+  <rect x="320" y="80" width="130" height="56" rx="8" fill="#1e293b" stroke="#475569"/>
+  <text x="385" y="102" text-anchor="middle" fill="#f8fafc" font-weight="bold" font-size="11">Select PKG(s)</text>
+  <text x="385" y="120" text-anchor="middle" fill="#94a3b8" font-size="10">Multi-select OK</text>
+  <rect x="470" y="80" width="130" height="56" rx="8" fill="#1e293b" stroke="#475569"/>
+  <text x="535" y="102" text-anchor="middle" fill="#f8fafc" font-weight="bold" font-size="11">Destination hub</text>
+  <text x="535" y="120" text-anchor="middle" fill="#94a3b8" font-size="10">Not this hub</text>
+  <rect x="620" y="80" width="130" height="56" rx="8" fill="#1e293b" stroke="#475569"/>
+  <text x="685" y="102" text-anchor="middle" fill="#f8fafc" font-weight="bold" font-size="11">Transport fee</text>
+  <text x="685" y="120" text-anchor="middle" fill="#94a3b8" font-size="10">Auto from route</text>
+  <rect x="770" y="80" width="110" height="56" rx="8" fill="#1e293b" stroke="#34d399" stroke-width="2"/>
+  <text x="825" y="102" text-anchor="middle" fill="#34d399" font-weight="bold" font-size="11">Confirm</text>
+  <text x="825" y="120" text-anchor="middle" fill="#86efac" font-size="10">Synced to cloud</text>
+  <line x1="150" y1="108" x2="170" y2="108" stroke="#f87171" stroke-width="2"/>
+  <line x1="300" y1="108" x2="320" y2="108" stroke="#f87171" stroke-width="2"/>
+  <line x1="450" y1="108" x2="470" y2="108" stroke="#f87171" stroke-width="2"/>
+  <line x1="600" y1="108" x2="620" y2="108" stroke="#f87171" stroke-width="2"/>
+  <line x1="750" y1="108" x2="770" y2="108" stroke="#f87171" stroke-width="2"/>
+  <rect x="120" y="150" width="660" height="36" rx="8" fill="#422006" stroke="#fbbf24"/>
+  <text x="450" y="172" text-anchor="middle" fill="#fde68a" font-size="11">Next hub cannot scan until you see Synced to cloud</text>
+</svg>

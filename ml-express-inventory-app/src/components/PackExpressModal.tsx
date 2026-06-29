@@ -19,6 +19,7 @@ import type { InventoryStoreSession } from '../services/authService';
 import type { InventoryItem } from '../types/inventory';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { aggregatePackSpecFromItems, sumPackageWeightsKg } from '../utils/itemFieldFormat';
+import { fmt, resolveAppError, useTranslation } from '../i18n';
 import {
   isPackContentLockedForStore,
   packContentLockHint,
@@ -40,8 +41,8 @@ type Props = {
   }) => Promise<void>;
 };
 
-function formatPackNote(items: InventoryItem[], operatorName: string): string {
-  return `打包人：${operatorName}\n包含 ${items.length} 件`;
+function formatPackNote(items: InventoryItem[], operatorName: string, t: ReturnType<typeof useTranslation>['t']): string {
+  return `${t.trackExpress.packer}：${operatorName}\n${fmt(t.common.itemsCount, { count: items.length })}`;
 }
 
 function guessDestination(items: InventoryItem[]): string {
@@ -62,6 +63,7 @@ export default function PackExpressModal({
   onClose,
   onSubmit,
 }: Props) {
+  const { t, fmt } = useTranslation();
   const form = useItemFormState();
   const [loading, setLoading] = React.useState(false);
   const [destination, setDestination] = React.useState('');
@@ -87,7 +89,7 @@ export default function PackExpressModal({
   );
   const autoFillHint = bundleContentLocked
     ? contentLockHint
-    : '已从已选订单入库登记自动汇总规格与重量';
+    : t.stockOut.selectPackHint;
 
   useEffect(() => {
     if (!visible || selectedItems.length === 0) return;
@@ -107,21 +109,22 @@ export default function PackExpressModal({
         const packageNo = await generatePackageNumber(destination, selectedItems.length);
         if (cancelled) return;
         const names = selectedItems.map((i) => i.name).slice(0, 3).join('、');
-        const suffix = selectedItems.length > 3 ? ` 等${selectedItems.length}件` : '';
+        const suffix =
+          selectedItems.length > 3 ? ` · ${fmt(t.common.itemsCount, { count: selectedItems.length })}` : '';
         const packCount = String(Math.max(1, selectedItems.length));
         form.reset({
           barcode: packageNo,
-          name: `快递包-${names}${suffix}`,
+          name: `${t.nav.pkg}-${names}${suffix}`,
           specL: packSpec.l,
           specW: packSpec.w,
           specH: packSpec.h,
           unitN: packCount,
           weightN: totalWeightN,
-          note: formatPackNote(selectedItems, operatorName),
+          note: formatPackNote(selectedItems, operatorName, t),
         });
       } catch (e: unknown) {
         if (!cancelled) {
-          Alert.alert('提示', e instanceof Error ? e.message : '无法生成包装号');
+          Alert.alert(t.common.tip, resolveAppError(t, e));
         }
       }
     })();
@@ -133,11 +136,11 @@ export default function PackExpressModal({
 
   const save = async () => {
     if (!destination) {
-      Alert.alert('提示', '请选择目的地');
+      Alert.alert(t.common.tip, t.itemForm.alertDestination);
       return;
     }
     if (!form.payload.barcode || !form.payload.name) {
-      Alert.alert('提示', '包装号和名称必填');
+      Alert.alert(t.common.tip, `${t.itemForm.alertBarcode} / ${t.itemForm.alertName}`);
       return;
     }
     setLoading(true);
@@ -145,7 +148,7 @@ export default function PackExpressModal({
       await onSubmit(form.payload);
       onClose();
     } catch (e: unknown) {
-      Alert.alert('打包失败', e instanceof Error ? e.message : '请重试');
+      Alert.alert(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -159,17 +162,19 @@ export default function PackExpressModal({
       >
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={10}>
-            <Text style={styles.cancel}>取消</Text>
+            <Text style={styles.cancel}>{t.common.cancel}</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>打包快递</Text>
+          <Text style={styles.headerTitle}>{t.items.packBtn}</Text>
           <View style={{ width: 48 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.subtitle}>填写快递包裹信息（与新建商品相同）</Text>
+          <Text style={styles.subtitle}>{t.items.packHint}</Text>
 
           <View style={styles.selectedBox}>
-            <Text style={styles.selectedTitle}>已选 {selectedItems.length} 个入库商品</Text>
+            <Text style={styles.selectedTitle}>
+              {fmt(t.forms.selectedCount, { count: selectedItems.length })}
+            </Text>
             {selectedItems.map((item) => (
               <Text key={item.id} style={styles.selectedLine}>
                 · {item.customer_name ? `${item.customer_name} · ` : ''}
@@ -185,11 +190,11 @@ export default function PackExpressModal({
 
           <ItemFormFields
             form={form}
-            barcodeLabel="包装号 *"
+            barcodeLabel={`${t.items.packNo} *`}
             barcodeEditable={false}
-            barcodeHint="PKG + 年份 + 目的地 + 件数 + 流水号（如 PKG26YGN20001）"
+            barcodeHint={t.pkg.packNo}
             unitLocked
-            unitHint={`已选 ${selectedItems.length} 个包裹，自动填写 ${selectedItems.length} Pcs`}
+            unitHint={fmt(t.forms.selectedCount, { count: selectedItems.length })}
             specLocked={bundleContentLocked}
             weightLocked={bundleContentLocked}
             specHint={autoFillHint}
@@ -197,7 +202,7 @@ export default function PackExpressModal({
           />
 
           <Pressable style={[styles.btn, loading && styles.btnDisabled]} onPress={save} disabled={loading}>
-            <Text style={styles.btnText}>{loading ? '打包中…' : '确认打包'}</Text>
+            <Text style={styles.btnText}>{loading ? t.common.processing : t.common.confirm}</Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
