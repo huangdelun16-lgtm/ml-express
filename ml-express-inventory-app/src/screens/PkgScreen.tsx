@@ -53,16 +53,21 @@ export default function PkgScreen() {
   const [unpacking, setUnpacking] = useState(false);
 
   const load = useCallback(async () => {
+    const scope = store && hubCode ? { store, hubCode } : undefined;
+    setPacks(await listPackedShipmentRows(search, scope));
+
     if (store && hubCode) {
       requestAutoCloudSync(store, hubCode);
-      try {
-        await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);
-      } catch {
-        // 云端未配置或离线时仍显示本地列表
-      }
+      void (async () => {
+        try {
+          await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);
+          setPacks(await listPackedShipmentRows(search, scope));
+        } catch {
+          // 弱网/离线：保留已展示的本地列表
+        }
+      })();
     }
-    setPacks(await listPackedShipmentRows(search, store && hubCode ? { store, hubCode } : undefined));
-  }, [search, store, hubCode, operatorName]);
+  }, [search, store, hubCode, operatorName, t.common.operator]);
 
   useFocusEffect(
     useCallback(() => {

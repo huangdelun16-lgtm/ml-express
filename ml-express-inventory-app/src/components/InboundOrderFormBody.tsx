@@ -205,7 +205,7 @@ export default function InboundOrderFormBody({
           blurOnSubmit={fieldChain.propsFor('name').blurOnSubmit}
         />
         <InboundFormField
-          label={t.stockIn.phone}
+          label={t.stockIn.phoneRequired}
           value={values.recipientPhone}
           onChange={onRecipientPhoneChange}
           placeholder="09xxxxxxxxx"

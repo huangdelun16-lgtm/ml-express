@@ -8,7 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import ItemActionModal from '../components/ItemActionModal';
 import ItemViewModal from '../components/ItemViewModal';
 import PaidStampWatermark from '../components/PaidStampWatermark';
@@ -21,13 +22,16 @@ import { printBatchLabels } from '../services/printerService';
 import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import {
   createPackedShipment,
+  canEditItemCustomerProfileForStore,
   listItems,
   listPackableItems,
   syncInboundHubPacksToLocal,
 } from '../services/inventoryService';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { confirmAndMarkCustomerSigned } from '../utils/customerSignConfirm';
-import { canEditOwnedRecord, resolveOwnerKeyForListItem } from '../utils/storeOwnership';
+import {
+  canEditItemCustomerProfile,
+} from '../utils/itemCustomerProfileEdit';
 import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
 import {
   isCustomerSignedItem,
@@ -44,15 +48,20 @@ import { inboundOrderBarcodeData, packOrderBarcodeData } from '../utils/orderBar
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
-import { resolveAppError, resolvePrintError, useTranslation } from '../i18n';
+import { resolveAppError, resolvePrintError, useTranslation, getItemCustomerProfileEditDeniedMessage } from '../i18n';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Nav = {
-  navigate: (name: string, params?: { itemId?: string }) => void;
+  navigate: (name: keyof RootStackParamList, params?: object) => void;
 };
+
+type ItemsRoute = RouteProp<RootStackParamList, 'Items'>;
 
 type ListMode = 'normal' | 'pack' | 'print';
 
 export default function ItemsScreen({ navigation }: { navigation: Nav }) {
+  const route = useRoute<ItemsRoute>();
+  const incompleteOnly = route.params?.incompleteOnly ?? false;
   const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
   const [search, setSearch] = useState('');
@@ -63,6 +72,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [batchPrinting, setBatchPrinting] = useState(false);
   const [packModalVisible, setPackModalVisible] = useState(false);
   const [actionItem, setActionItem] = useState<InventoryItemListRow | null>(null);
+  const [actionCanEdit, setActionCanEdit] = useState(false);
   const [viewItemId, setViewItemId] = useState<string | null>(null);
   const [orderBarcodeRequireDone, setOrderBarcodeRequireDone] = useState(false);
   const [packSuccessInfo, setPackSuccessInfo] = useState<{
@@ -73,21 +83,29 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
 
   const load = useCallback(async () => {
-    if (store && hubCode) {
-      requestAutoCloudSync(store, hubCode);
-      try {
-        await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);
-      } catch {
-        // 云端未配置或离线时仍显示本地列表
-      }
-    }
     const scope = store && hubCode ? { store, hubCode } : undefined;
     setItems(
       listMode === 'pack'
         ? await listPackableItems(search, scope)
         : await listItems(search, scope),
     );
-  }, [search, listMode, store, hubCode, operatorName]);
+
+    if (store && hubCode) {
+      requestAutoCloudSync(store, hubCode);
+      void (async () => {
+        try {
+          await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);
+          setItems(
+            listMode === 'pack'
+              ? await listPackableItems(search, scope)
+              : await listItems(search, scope),
+          );
+        } catch {
+          // 弱网/离线：保留已展示的本地列表
+        }
+      })();
+    }
+  }, [search, listMode, store, hubCode, operatorName, t.common.operator]);
 
   useFocusEffect(
     useCallback(() => {
@@ -103,9 +121,37 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     setSelectedIds(new Set());
   }, [listMode, filterRegion]);
 
+  useEffect(() => {
+    if (!actionItem || !store) {
+      setActionCanEdit(false);
+      return;
+    }
+    if (isExpressPackItem(actionItem)) {
+      setActionCanEdit(false);
+      return;
+    }
+    const syncOk = canEditItemCustomerProfile(store, actionItem, hubCode ?? undefined);
+    if (!syncOk) {
+      setActionCanEdit(false);
+      return;
+    }
+    void (async () => {
+      const ok = await canEditItemCustomerProfileForStore(store, actionItem.id, hubCode ?? undefined);
+      setActionCanEdit(ok);
+    })();
+  }, [actionItem, store, hubCode]);
+
   const displayedItems = useMemo(() => {
     let list = items.filter((i) => !isExpressPackItem(i));
     if (filterRegion) list = list.filter((i) => resolveItemDestinationCode(i) === filterRegion);
+    if (incompleteOnly) {
+      list = list.filter((item) => {
+        if (isCustomerSignedItem(item)) return false;
+        const name = item.customer_name?.trim() || item.recipient_name?.trim();
+        const dest = (item.final_destination || item.destination || '').trim();
+        return !name || !dest;
+      });
+    }
     return [...list].sort((a, b) => {
       const aSigned = isCustomerSignedItem(a) ? 1 : 0;
       const bSigned = isCustomerSignedItem(b) ? 1 : 0;
@@ -117,7 +163,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       }
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
-  }, [items, filterRegion]);
+  }, [items, filterRegion, incompleteOnly]);
 
   const selectedItems = useMemo(
     () => displayedItems.filter((i) => selectedIds.has(i.id)),
@@ -316,6 +362,12 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           </Pressable>
         ) : null}
       </View>
+
+      {incompleteOnly ? (
+        <View style={styles.incompleteBanner}>
+          <Text style={styles.incompleteBannerText}>{t.items.incompleteFilterBanner}</Text>
+        </View>
+      ) : null}
 
       <RegionFilterBar value={filterRegion} onChange={setFilterRegion} />
 
@@ -565,16 +617,14 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           setViewItemId(actionItem.id);
           setActionItem(null);
         }}
-        canEdit={
-          !!actionItem &&
-          !!store &&
-          canEditOwnedRecord(store, resolveOwnerKeyForListItem(actionItem))
-        }
+        canEdit={!!actionItem && actionCanEdit}
         onEdit={() => {
           if (!actionItem || !store) return;
-          const ownerKey = resolveOwnerKeyForListItem(actionItem);
-          if (!canEditOwnedRecord(store, ownerKey)) {
-            Alert.alert(t.items.cannotEdit, t.items.cannotEditBody);
+          if (!actionCanEdit) {
+            Alert.alert(
+              t.items.cannotEdit,
+              getItemCustomerProfileEditDeniedMessage(t, actionItem, store, hubCode ?? undefined),
+            );
             return;
           }
           const id = actionItem.id;
@@ -654,6 +704,16 @@ function SelectCheck({ selected, accent }: { selected: boolean; accent: string }
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
   toolbar: { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 8 },
+  incompleteBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.35)',
+  },
+  incompleteBannerText: { color: '#fde68a', fontSize: 12, lineHeight: 18, fontWeight: '600' },
   search: {
     flex: 1,
     backgroundColor: '#fff',

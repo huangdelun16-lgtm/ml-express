@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { cancelAutoCloudSyncDebounce, requestAutoCloudSync } from '../services/cloudAutoSync';
+import { cancelAutoCloudSyncDebounce, invalidateCloudReachabilityCache, requestAutoCloudSync } from '../services/cloudAutoSync';
+import { isCloudReachable } from '../utils/networkReachability';
 import { isSupabaseConfigured } from '../services/supabase';
 import { resolveStoreHubCode } from '../utils/storeZone';
 
@@ -21,10 +22,15 @@ export default function CloudAutoSyncRunner() {
     const hub = resolveStoreHubCode(store);
     if (!hub) return;
 
-    requestAutoCloudSync(store, hub, { force: true });
+    void isCloudReachable({ force: true }).then((reachable) => {
+      if (reachable) requestAutoCloudSync(store, hub, { force: true });
+    });
 
     const onAppState = (next: AppStateStatus) => {
-      if (next === 'active') requestAutoCloudSync(store, hub);
+      if (next === 'active') {
+        invalidateCloudReachabilityCache();
+        requestAutoCloudSync(store, hub);
+      }
     };
     const sub = AppState.addEventListener('change', onAppState);
 

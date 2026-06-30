@@ -1,5 +1,6 @@
 import type { InventoryStoreSession } from './authService';
 import { syncPlatformInventoryCloud } from './inventoryService';
+import { isCloudReachable } from '../utils/networkReachability';
 import { isSupabaseConfigured } from './supabase';
 
 const DEBOUNCE_MS = 2500;
@@ -9,6 +10,8 @@ const MIN_INTERVAL_MS = 45_000;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let inflight: Promise<void> | null = null;
 let lastFullSyncAt = 0;
+
+export { invalidateCloudReachabilityCache } from '../utils/networkReachability';
 
 export function cancelAutoCloudSyncDebounce(): void {
   if (debounceTimer) {
@@ -55,6 +58,8 @@ async function runAutoCloudSync(
   hubCode: string,
   force: boolean,
 ): Promise<void> {
+  if (!(await isCloudReachable({ force }))) return;
+
   const now = Date.now();
   if (!force && now - lastFullSyncAt < MIN_INTERVAL_MS) return;
 

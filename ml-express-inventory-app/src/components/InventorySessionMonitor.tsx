@@ -6,6 +6,7 @@ import {
   markSessionKicked,
   verifyDeviceSessionStillActive,
 } from '../services/authService';
+import { isCloudReachable } from '../utils/networkReachability';
 import { isSupabaseConfigured, supabase } from '../services/supabase';
 
 type Props = {
@@ -50,6 +51,7 @@ export default function InventorySessionMonitor({ storeId, onKicked }: Props) {
 
     const checkSession = async () => {
       if (kickedRef.current) return;
+      if (!(await isCloudReachable())) return;
       const active = await verifyDeviceSessionStillActive(storeId);
       if (!active) handleKicked();
     };

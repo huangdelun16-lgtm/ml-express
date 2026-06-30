@@ -14,6 +14,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { getStats, listPackedShipmentRows } from '../services/inventoryService';
 import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import { getCloudSyncQueueSnapshot } from '../services/inventoryCloudQueue';
+import { isSupabaseConfigured } from '../services/supabase';
+import { isCloudReachable } from '../utils/networkReachability';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { packStatusStyle } from '../utils/packDisplayStatus';
 import { LOGIN_LOGO } from '../constants/branding';
@@ -44,22 +46,29 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
   const [recentPacks, setRecentPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [syncPending, setSyncPending] = useState(0);
+  const [cloudOffline, setCloudOffline] = useState(false);
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
     if (store && hubCode) {
-      requestAutoCloudSync(store, hubCode);
       const snapshot = await getCloudSyncQueueSnapshot(store.storeCode);
       setSyncPending(snapshot.pending);
+      requestAutoCloudSync(store, hubCode);
     } else {
       setSyncPending(0);
+      setCloudOffline(false);
     }
+
     const [s, packsAfter] = await Promise.all([
       getStats(scope),
       listPackedShipmentRows(undefined, scope),
     ]);
     setStats(s);
     setRecentPacks(packsAfter.slice(0, 3));
+
+    if (store && hubCode && isSupabaseConfigured()) {
+      void isCloudReachable().then((ok) => setCloudOffline(!ok));
+    }
   }, [store, hubCode]);
 
   useFocusEffect(
@@ -77,6 +86,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     { title: t.home.tileShipmentTrack, icon: '🛰️', screen: 'ShipmentTrack', color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)' },
     { title: t.home.tileMovements, icon: '📜', screen: 'Movements', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
     { title: t.home.tileFinance, icon: '🌏', screen: 'CrossBorderFinance', color: '#38bdf8', bg: 'rgba(56,189,248,0.12)' },
+    { title: t.home.tileOpsHealth, icon: '🩺', screen: 'OpsHealth', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
     { title: t.home.tileScan, icon: '📷', screen: 'CameraScan', color: '#06b6d4', bg: 'rgba(6,182,212,0.12)' },
     { title: t.home.tileSettings, icon: '⚙️', screen: 'Settings', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
   ];
@@ -140,6 +150,11 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
           <View style={styles.chipMuted}>
             <Text style={styles.chipMutedText}>{t.home.localCloud}</Text>
           </View>
+          {cloudOffline ? (
+            <View style={styles.chipOffline}>
+              <Text style={styles.chipOfflineText}>{t.home.offlineChip}</Text>
+            </View>
+          ) : null}
           {syncPending > 0 ? (
             <Pressable
               style={styles.chipSync}
@@ -396,6 +411,19 @@ const styles = StyleSheet.create({
   },
   chipSyncText: {
     color: '#c4b5fd',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  chipOffline: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+  },
+  chipOfflineText: {
+    color: '#fcd34d',
     fontSize: 11,
     fontWeight: '800',
   },

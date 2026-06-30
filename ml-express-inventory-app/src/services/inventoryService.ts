@@ -21,6 +21,11 @@ import { buildPackageNumberBody, formatPackageSequence } from '../utils/packageN
 import { customerSignDeniedError, canMarkCustomerSigned } from '../utils/customerSign';
 import { svc, isServiceError } from '../errors/serviceError';
 import {
+  canEditItemCustomerProfile,
+  canEditItemCustomerProfileAsync,
+  isItemCustomerProfileLockedAsync,
+} from '../utils/itemCustomerProfileEdit';
+import {
   canEditOwnedRecord,
   inferOwnerKeyFromItem,
   isPackContentLockedForStore,
@@ -735,6 +740,34 @@ export function assertCanEditItem(
   }
 }
 
+export async function assertCanEditItemCustomerProfile(
+  actingStore: InventoryStoreSession,
+  itemId: string,
+  hubCode?: string,
+): Promise<void> {
+  const item = await getItemById(itemId);
+  if (!item) throw svc('orderNotFoundOrDeleted');
+
+  if (await isItemCustomerProfileLockedAsync(item)) {
+    throw svc('editDeniedHubReceived');
+  }
+
+  if (!canEditItemCustomerProfile(actingStore, item, hubCode)) {
+    const owner = await resolveItemOwnerStoreCode(itemId);
+    assertCanEditItem(actingStore, owner);
+  }
+}
+
+export async function canEditItemCustomerProfileForStore(
+  actingStore: InventoryStoreSession,
+  itemId: string,
+  hubCode?: string,
+): Promise<boolean> {
+  const item = await getItemById(itemId);
+  if (!item) return false;
+  return canEditItemCustomerProfileAsync(actingStore, item, hubCode);
+}
+
 export async function assertCanEditItemById(
   actingStore: InventoryStoreSession,
   itemId: string,
@@ -797,11 +830,6 @@ export async function listItems(
   search?: string,
   scope?: { store: InventoryStoreSession; hubCode: string },
 ): Promise<InventoryItemListRow[]> {
-  try {
-    await syncMissingCustomerNamesFromCloud('系统同步');
-  } catch {
-    // 离线时仍展示本地列表
-  }
   const rows = await queryItemListRows(search);
   const items = rows.map(rowToListItem);
   if (!scope) return items;
@@ -3245,8 +3273,9 @@ export async function updateItemInboundProfile(
     destination: string;
   },
   actingStore: InventoryStoreSession,
+  hubCode?: string,
 ): Promise<void> {
-  await assertCanEditItemById(actingStore, itemId);
+  await assertCanEditItemCustomerProfile(actingStore, itemId, hubCode);
   const item = await getItemById(itemId);
   if (!item) throw svc('orderNotFoundOrDeleted');
 

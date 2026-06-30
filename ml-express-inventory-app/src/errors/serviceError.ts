@@ -62,6 +62,7 @@ export type ServiceErrorCode =
   | 'orderNotFoundOrDeleted'
   | 'editDeniedUnknownOwner'
   | 'editDeniedOtherStore'
+  | 'editDeniedHubReceived'
   | 'signDeniedPkg'
   | 'signDeniedNotArrived'
   | 'signDeniedAlready'

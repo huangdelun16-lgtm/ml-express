@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,7 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import {
   formatTimeAgo,
@@ -25,8 +26,10 @@ import type { FinanceLedgerCategory, FinanceLedgerEntry, FinanceLedgerResult } f
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type TabKey = 'all' | 'transport' | 'agency' | 'pending' | 'manual';
+type FinanceRoute = RouteProp<RootStackParamList, 'CrossBorderFinance'>;
 
 function formatMmk(n: number): string {
   if (n <= 0) return '0';
@@ -144,6 +147,7 @@ function SummaryBar({
 
 export default function CrossBorderFinanceScreen() {
   const { t, fmt } = useTranslation();
+  const route = useRoute<FinanceRoute>();
   const { store, hubCode, operatorName } = useAuth();
   const [tab, setTab] = useState<TabKey>('all');
   const [loading, setLoading] = useState(true);
@@ -172,6 +176,11 @@ export default function CrossBorderFinanceScreen() {
   );
 
   const currentKey = store ? ownershipKeyFromStoreCode(store.storeCode) : '';
+
+  useEffect(() => {
+    const initial = route.params?.initialTab;
+    if (initial) setTab(initial);
+  }, [route.params?.initialTab]);
 
   const applyFinanceResult = useCallback((result: FinanceLedgerResult) => {
     setEntries(result.entries);

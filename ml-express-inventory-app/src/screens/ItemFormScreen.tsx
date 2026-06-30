@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { normalizePackDestination } from '../constants/destinationOptions';
 import {
   cancelInventoryItem,
+  canEditItemCustomerProfileForStore,
   getItemDetail,
   getItemFirstInboundDate,
   resolveItemOwnerStoreCode,
@@ -36,7 +37,7 @@ import {
   formatInboundDateLabel,
   formatInboundDateYmd,
 } from '../utils/stockInDate';
-import { getEditDeniedMessage, resolveAppError, useTranslation } from '../i18n';
+import { getItemCustomerProfileEditDeniedMessage, resolveAppError, useTranslation } from '../i18n';
 import { canEditOwnedRecord } from '../utils/storeOwnership';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
@@ -49,7 +50,7 @@ export default function ItemFormScreen({
   route: Route;
   navigation: { goBack: () => void };
 }) {
-  const { operatorName, store } = useAuth();
+  const { operatorName, store, hubCode } = useAuth();
   const { t } = useTranslation();
   const itemId = route.params?.itemId;
   const isEdit = !!itemId;
@@ -58,6 +59,15 @@ export default function ItemFormScreen({
   const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
   const [editable, setEditable] = useState(true);
   const [ownerCode, setOwnerCode] = useState('');
+  const [editItemRef, setEditItemRef] = useState<{
+    barcode: string;
+    owner_store_code?: string;
+    destination?: string;
+    final_destination?: string;
+    hub_arrived_at?: string;
+    hub_arrived?: boolean;
+    customer_signed_at?: string;
+  } | null>(null);
 
   const [productName, setProductName] = useState('');
   const [specL, setSpecL] = useState('');
@@ -113,9 +123,22 @@ export default function ItemFormScreen({
 
       const ownerKey = await resolveItemOwnerStoreCode(itemId);
       setOwnerCode(ownerKey);
-      setEditable(!store || canEditOwnedRecord(store, ownerKey));
+      setEditItemRef({
+        barcode: detail.barcode,
+        owner_store_code: ownerKey,
+        destination: detail.destination,
+        final_destination: detail.final_destination,
+        hub_arrived_at: detail.hub_arrived_at,
+        customer_signed_at: detail.customer_signed_at,
+      });
+      if (store) {
+        const ok = await canEditItemCustomerProfileForStore(store, itemId, hubCode ?? undefined);
+        setEditable(ok);
+      } else {
+        setEditable(true);
+      }
     })();
-  }, [itemId, store?.storeCode]);
+  }, [itemId, store?.storeCode, hubCode]);
 
   const saveNew = async () => {
     if (!form.payload.barcode || !form.payload.name) {
@@ -173,6 +196,7 @@ export default function ItemFormScreen({
           destination: destination.trim(),
         },
         store,
+        hubCode ?? undefined,
       );
       showTaskSuccess(t.itemForm.saveSuccess, productName.trim(), () => navigation.goBack());
     } catch (e: unknown) {
@@ -245,7 +269,14 @@ export default function ItemFormScreen({
 
         {isEdit && !editable ? (
           <View style={styles.readonlyBanner}>
-            <Text style={styles.readonlyBannerText}>{getEditDeniedMessage(t, ownerCode)}</Text>
+            <Text style={styles.readonlyBannerText}>
+              {getItemCustomerProfileEditDeniedMessage(
+                t,
+                editItemRef ?? { barcode: inboundBarcode, owner_store_code: ownerCode },
+                store,
+                hubCode ?? undefined,
+              )}
+            </Text>
           </View>
         ) : null}
 

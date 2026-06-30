@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { svc } from '../errors/serviceError';
 import { isInventoryCloudAuthError } from '../utils/cloudAuthErrors';
+import { isCloudReachable, isLikelyNetworkError, withTimeout } from '../utils/networkReachability';
 import {
   getSupabaseAnonKey,
   getSupabaseUrl,
@@ -251,13 +252,40 @@ async function callInventoryStoreLogin(storeCode: string, password: string): Pro
 }
 
 export async function restoreSession(): Promise<InventoryStoreSession | null> {
+  const stored = await loadStoredSession();
   if (!isSupabaseConfigured()) {
-    return await loadStoredSession();
+    return stored;
+  }
+
+  const {
+    data: { session },
+    error: sessionErr,
+  } = await supabase.auth.getSession();
+  if (sessionErr || !session?.user) {
+    if (stored) {
+      await supabase.auth.signOut();
+      await clearSession();
+      await clearDeviceSessionId();
+    }
+    return null;
+  }
+
+  const fromMeta = sessionFromAuthMetadata(session.user);
+  if (!fromMeta?.hubCode) {
+    await supabase.auth.signOut();
+    await clearSession();
+    await clearDeviceSessionId();
+    return null;
+  }
+
+  const reachable = await isCloudReachable();
+  if (!reachable) {
+    return mergeStoredSession(fromMeta);
   }
 
   try {
-    const session = await ensureInventoryCloudAuth();
-    const active = await verifyDeviceSessionStillActive(session.id);
+    const sessionValidated = await withTimeout(ensureInventoryCloudAuth(), 8000);
+    const active = await withTimeout(verifyDeviceSessionStillActive(sessionValidated.id), 5000);
     if (!active) {
       await markSessionKicked();
       await supabase.auth.signOut();
@@ -265,13 +293,23 @@ export async function restoreSession(): Promise<InventoryStoreSession | null> {
       await clearDeviceSessionId();
       return null;
     }
-    return session;
-  } catch {
+    return sessionValidated;
+  } catch (e: unknown) {
+    if (isLikelyNetworkError(e)) {
+      return mergeStoredSession(fromMeta);
+    }
     await supabase.auth.signOut();
     await clearSession();
     await clearDeviceSessionId();
     return null;
   }
+}
+
+async function mergeStoredSession(fromMeta: InventoryStoreSession): Promise<InventoryStoreSession> {
+  const stored = await loadStoredSession();
+  const merged = stored ? { ...stored, ...fromMeta } : fromMeta;
+  await saveSession(merged);
+  return merged;
 }
 
 export async function loginTransitStationStore(

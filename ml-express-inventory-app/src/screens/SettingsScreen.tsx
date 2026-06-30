@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +35,8 @@ import {
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { resolveSyncErrorMessage, syncImpactMessage } from '../utils/cloudSyncSla';
+import type { RootStackParamList } from '../navigation/AppNavigator';
+import { scanOpsHealth } from '../services/opsHealthService';
 
 function SyncStatusRow({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'warn' | 'err' }) {
   const valueColor =
@@ -130,6 +134,7 @@ function QuickAction({
 }
 
 export default function SettingsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { operatorName, storeCode, store, hubCode, logout, hasShiftOperator, updateShiftOperator } = useAuth();
   const { t, fmt, language } = useTranslation();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
@@ -140,6 +145,7 @@ export default function SettingsScreen() {
   const [pickingPrinter, setPickingPrinter] = useState(false);
   const [operatorDraft, setOperatorDraft] = useState('');
   const [savingOperator, setSavingOperator] = useState(false);
+  const [opsOpenCount, setOpsOpenCount] = useState(0);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
 
@@ -156,6 +162,16 @@ export default function SettingsScreen() {
   useEffect(() => {
     setOperatorDraft(hasShiftOperator ? (operatorName ?? '') : '');
   }, [hasShiftOperator, operatorName, storeCode]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!store || !hubCode) {
+        setOpsOpenCount(0);
+        return;
+      }
+      void scanOpsHealth(store, hubCode).then((report) => setOpsOpenCount(report.totalOpen));
+    }, [store, hubCode]),
+  );
 
   const updatePrinter = async (patch: Partial<PrinterSettings>) => {
     if (!settings) return;
@@ -263,6 +279,21 @@ export default function SettingsScreen() {
       </SectionCard>
 
       <SectionCard
+        icon="🩺"
+        title={t.nav.opsHealth}
+        accent="#f59e0b"
+        badge={opsOpenCount > 0 ? String(opsOpenCount) : undefined}
+      >
+        <Text style={styles.hintText}>{t.opsHealth.subtitle}</Text>
+        <Pressable
+          style={[styles.actionBtn, styles.actionBtnPrimary]}
+          onPress={() => navigation.navigate('OpsHealth')}
+        >
+          <Text style={styles.actionBtnPrimaryText}>{t.nav.opsHealth}</Text>
+        </Pressable>
+      </SectionCard>
+
+      <SectionCard
         icon="☁️"
         title={t.settings.cloudSync.title}
         accent="#8b5cf6"
@@ -275,6 +306,15 @@ export default function SettingsScreen() {
               value={connectionLabel(t, cloudSync).text}
               tone={connectionLabel(t, cloudSync).tone}
             />
+            {!cloudSync.connection.authenticated &&
+            cloudSync.pending > 0 &&
+            cloudSync.connection.errorCode === 'syncNetworkFailed' ? (
+              <View style={styles.syncBanner}>
+                <Text style={styles.syncBannerText}>
+                  {fmt(t.settings.cloudSync.offlineModeHint, { count: cloudSync.pending })}
+                </Text>
+              </View>
+            ) : null}
             {!cloudSync.connection.authenticated && cloudSync.connection.errorCode ? (
               <Text style={styles.hintText}>
                 {resolveAppError(t, new Error(cloudSync.connection.errorCode))}

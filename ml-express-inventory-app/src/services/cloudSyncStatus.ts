@@ -5,6 +5,7 @@ import { cancelAutoCloudSyncDebounce } from './cloudAutoSync';
 import { getCloudSyncQueueSnapshot, type CloudSyncOpType } from './inventoryCloudQueue';
 import { syncPlatformInventoryCloud } from './inventoryService';
 import { nowIso } from './database';
+import { isCloudReachable, isLikelyNetworkError, withTimeout } from '../utils/networkReachability';
 import { isSupabaseConfigured } from './supabase';
 
 const SYNC_META_KEY = 'inventory_last_cloud_sync_v1';
@@ -57,15 +58,20 @@ export async function probeCloudConnection(): Promise<CloudConnectionStatus> {
   if (!isSupabaseConfigured()) {
     return { configured: false, authenticated: false, errorCode: 'supabaseNotConfigured' };
   }
+  if (!(await isCloudReachable())) {
+    return { configured: true, authenticated: false, errorCode: 'syncNetworkFailed' };
+  }
   try {
-    await ensureInventoryCloudAuth();
+    await withTimeout(ensureInventoryCloudAuth(), 8000);
     return { configured: true, authenticated: true };
   } catch (e: unknown) {
     const code =
       e && typeof e === 'object' && 'code' in e
         ? String((e as { code: unknown }).code)
         : e instanceof Error
-          ? e.message
+          ? isLikelyNetworkError(e)
+            ? 'syncNetworkFailed'
+            : e.message
           : 'authSessionExpired';
     return { configured: true, authenticated: false, errorCode: code };
   }

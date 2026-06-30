@@ -2,7 +2,18 @@ import type { FinanceLedgerCategory } from '../types/financeLedger';
 import type { OrderTrackingStatus, PkgTrackingStatus } from '../types/tracking';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
-import { ownershipLabelFromKey, toComparableOwnerKey } from '../utils/storeOwnership';
+import type { InventoryStoreSession } from '../services/authService';
+import { resolveItemDestinationCode } from '../utils/itemDestination';
+import {
+  isItemCustomerProfileLocked,
+  type ItemCustomerProfileEditRef,
+} from '../utils/itemCustomerProfileEdit';
+import {
+  canEditOwnedRecord,
+  ownershipLabelFromKey,
+  resolveOwnerKeyForListItem,
+  toComparableOwnerKey,
+} from '../utils/storeOwnership';
 import { fmt } from './format';
 import type { TranslationDict } from './translations';
 
@@ -56,6 +67,28 @@ export function getEditDeniedMessage(
   }
   const label = ownershipLabelFromKey(ownerKey);
   return fmt(t.serviceErrors.editDeniedOtherStore, { owner: label });
+}
+
+export function getItemCustomerProfileEditDeniedMessage(
+  t: TranslationDict,
+  item: ItemCustomerProfileEditRef,
+  store?: InventoryStoreSession | null,
+  hubCode?: string,
+): string {
+  if (isItemCustomerProfileLocked(item)) {
+    return t.items.cannotEditHubReceived;
+  }
+  if (store) {
+    const ownerKey = resolveOwnerKeyForListItem(item);
+    const hub = hubCode?.trim().toUpperCase();
+    const destKey = resolveItemDestinationCode(item);
+    const hasDestAccess = Boolean(hub && destKey && destKey === hub);
+    if (canEditOwnedRecord(store, ownerKey) || hasDestAccess) {
+      return t.items.cannotEditHubReceived;
+    }
+    return getEditDeniedMessage(t, ownerKey);
+  }
+  return t.items.cannotEditBody;
 }
 
 /** 到站扫码查不到包裹时的说明文案 */

@@ -13,22 +13,24 @@ import PkgScreen from '../screens/PkgScreen';
 import TrackExpressScreen from '../screens/TrackExpressScreen';
 import HubReceiveScreen from '../screens/HubReceiveScreen';
 import ShipmentTrackScreen from '../screens/ShipmentTrackScreen';
+import OpsHealthScreen from '../screens/OpsHealthScreen';
 import { useTranslation } from '../i18n';
 
 export type RootStackParamList = {
   Home: undefined;
   StockIn: { presetBarcode?: string } | undefined;
   StockOut: { presetBarcode?: string } | undefined;
-  Items: undefined;
+  Items: { incompleteOnly?: boolean } | undefined;
   ItemForm: { itemId?: string } | undefined;
   Movements: undefined;
-  CrossBorderFinance: undefined;
+  CrossBorderFinance: { initialTab?: 'transport' | 'pending' | 'agency' | 'manual' | 'all' } | undefined;
   CameraScan: undefined;
   Settings: undefined;
   Pkg: undefined;
   TrackExpress: { presetCode?: string } | undefined;
   HubReceive: undefined;
   ShipmentTrack: undefined;
+  OpsHealth: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -64,6 +66,7 @@ export default function AppNavigator() {
         component={CrossBorderFinanceScreen}
         options={{ title: t.nav.crossBorderFinance }}
       />
+      <Stack.Screen name="OpsHealth" component={OpsHealthScreen} options={{ title: t.nav.opsHealth }} />
       <Stack.Screen name="CameraScan" component={CameraScanScreen} options={{ title: t.nav.cameraScan }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t.nav.settings }} />
     </Stack.Navigator>

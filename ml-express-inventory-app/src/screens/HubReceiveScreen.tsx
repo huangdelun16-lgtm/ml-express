@@ -82,7 +82,9 @@ export default function HubReceiveScreen() {
       setError(
         gate.reason === 'notConfigured'
           ? getSupabaseConfigHint() || t.hubReceive.supabaseMissing
-          : t.hubReceive.cloudOfflineBlock,
+          : gate.reason === 'offline' || gate.reason === 'notAuthenticated'
+            ? t.hubReceive.cloudOfflineBlock
+            : t.hubReceive.cloudOfflineBlock,
       );
       setCloudConnected(false);
       return false;

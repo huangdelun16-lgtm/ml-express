@@ -246,6 +246,10 @@ export default function StockInScreen({ route, navigation }: Props) {
         Alert.alert(t.common.tip, t.stockIn.alertName);
         return;
       }
+      if (!recipientPhone.trim()) {
+        Alert.alert(t.common.tip, t.stockIn.alertPhone);
+        return;
+      }
       if (!productName.trim()) {
         Alert.alert(t.common.tip, t.stockIn.alertItemName);
         return;

@@ -18,6 +18,7 @@ import {
 } from './inventoryCloudApi';
 import type { InventoryItem, PackedShipmentDetail, StockMovement } from '../types/inventory';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { isCloudReachable, withTimeout } from '../utils/networkReachability';
 import {
   listOutboundPackagesFromOrigin,
   pushTruckLoadTracking,
@@ -828,7 +829,9 @@ export async function syncPlatformInventoryFromCloud(
   hubCode: string,
 ): Promise<void> {
   if (!isSupabaseConfigured()) return;
-  const activeStore = await ensureInventoryCloudAuth();
+  if (!(await isCloudReachable())) return;
+
+  const activeStore = await withTimeout(ensureInventoryCloudAuth(), 8000);
   if (syncInFlight) {
     syncDirty = true;
     await syncInFlight;

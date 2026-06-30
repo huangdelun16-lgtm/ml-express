@@ -6,6 +6,7 @@ import { getDatabase, newId, nowIso } from './database';
 import { isSupabaseConfigured } from './supabase';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { queueOpPriority } from '../utils/cloudSyncSla';
+import { isCloudReachable, isLikelyNetworkError, withTimeout } from '../utils/networkReachability';
 
 export type CloudSyncOpType = 'truck_load' | 'packed_shipment' | 'item_and_movement';
 
@@ -343,6 +344,7 @@ export async function getCloudSyncQueueSnapshot(
 /** 按业务优先级 + 时间序重试离线队列；失败项保留并停止后续 */
 export async function processCloudSyncQueue(store: InventoryStoreSession): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
+  if (!(await isCloudReachable())) return 0;
 
   const db = await getDatabase();
   const rows = await db.getAllAsync<{
@@ -397,17 +399,24 @@ export async function processCloudSyncQueue(store: InventoryStoreSession): Promi
   return processed;
 }
 
-/** 立即尝试上云；失败则写入离线队列 */
+/** 立即尝试上云；弱网/离线时直接入队，避免长时间阻塞 */
 export function scheduleCloudSync(payload: CloudSyncQueuePayload): void {
   if (!isSupabaseConfigured()) return;
   void (async () => {
+    const reachable = await isCloudReachable();
+    if (!reachable) {
+      await enqueueCloudSync(payload);
+      return;
+    }
     try {
-      const authStore = await ensureInventoryCloudAuth();
-      await executeCloudSyncOp(payload, authStore);
-    } catch {
+      const authStore = await withTimeout(ensureInventoryCloudAuth(), 8000);
+      await withTimeout(executeCloudSyncOp(payload, authStore), 12_000);
+    } catch (e: unknown) {
       await enqueueCloudSync(payload);
       const hub = resolveStoreHubCode(payload.store);
-      if (hub) requestAutoCloudSync(payload.store, hub);
+      if (hub && !isLikelyNetworkError(e)) {
+        requestAutoCloudSync(payload.store, hub);
+      }
     }
   })();
 }
