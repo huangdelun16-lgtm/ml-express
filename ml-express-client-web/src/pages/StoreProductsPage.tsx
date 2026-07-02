@@ -6,6 +6,8 @@ import { useCart, CartItem, getCartItemLineKey } from '../contexts/CartContext';
 import NavigationBar from '../components/home/NavigationBar';
 import ProductVariantPriceList from '../components/ProductVariantPriceList';
 import LoggerService from '../services/LoggerService';
+import { getMerchantStoreTypeLabel } from '../services/_shared/merchantStoreTypes';
+import type { StoreTypeLang } from '../services/_shared/merchantStoreTypes';
 import {
   buildProductForCart,
   cartLineKey,
@@ -576,24 +578,10 @@ const StoreProductsPage: React.FC = () => {
                           fontWeight: 'bold',
                         }}
                       >
-                        {(() => {
-                          const type = store.store_type;
-                          const mapping: any = {
-                            restaurant: { zh: '餐厅', en: 'Dining', my: 'စားသောက်ဆိုင်' },
-                            drinks_snacks: { zh: '饮料小吃', en: 'Snacks', my: 'မုန့်မျိုးစုံ' },
-                            breakfast: { zh: '早点铺', en: 'Breakfast', my: 'မနက်စာဆိုင်' },
-                            cake_shop: { zh: '蛋糕店', en: 'Cake Shop', my: 'ကိတ်မုန့်ဆိုင်' },
-                            tea_shop: { zh: '茶铺', en: 'Tea', my: 'လက်ဖက်ရည်ဆိုင်' },
-                            flower_shop: { zh: '鲜花店', en: 'Flowers', my: 'ပန်းဆိုင်' },
-                            clothing_store: { zh: '服装店', en: 'Clothing', my: 'အဝတ်အထည်ဆိုင်' },
-                            grocery: { zh: '杂货店', en: 'Grocery', my: 'ကုန်စုံဆိုင်' },
-                            hardware_store: { zh: '五金店', en: 'Hardware', my: 'ဟာ့ဒ်ဝဲလ်ဆိုင်' },
-                            supermarket: { zh: '超市', en: 'Supermarket', my: 'စူပါမားကတ်' },
-                            transit_station: { zh: '中转站', en: 'Hub', my: 'အချက်အချာဌာန' },
-                            other: { zh: '其它', en: 'Other', my: 'အခြား' },
-                          };
-                          return mapping[type]?.[language] || mapping[type]?.zh || type;
-                        })()}
+                        {getMerchantStoreTypeLabel(
+                          store.store_type,
+                          (language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh') as StoreTypeLang,
+                        )}
                       </span>
                       {(() => {
                         const status = checkStoreOpenStatus();

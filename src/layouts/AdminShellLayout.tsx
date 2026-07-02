@@ -66,6 +66,7 @@ const AdminShellLayout: React.FC = () => {
   const pendingAssignmentCount = counts.pendingAssignment;
   const pendingProductReviewCount = counts.pendingProductReview;
   const pendingDeliveryAlertsCount = counts.pendingDeliveryAlerts;
+  const pendingMerchantApplicationsCount = counts.pendingMerchantApplications;
 
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
   const prevRechargeCountRef = useRef<number>(0);
@@ -625,6 +626,8 @@ const AdminShellLayout: React.FC = () => {
               (card.id === 'tracking' && pendingAssignmentCount > 0) ||
               (card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0);
             const showProductBadge = card.id === 'merchant_stores' && pendingProductReviewCount > 0;
+            const showMerchantAppBadge =
+              card.id === 'merchant_stores' && pendingMerchantApplicationsCount > 0;
             const showRechargeBadge = card.id === 'recharges' && pendingRechargeCount > 0;
             const showAssignBadge = card.id === 'tracking' && pendingAssignmentCount > 0;
             const showAlertBadge = card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0;
@@ -830,6 +833,24 @@ const AdminShellLayout: React.FC = () => {
                       }}
                     >
                       {pendingProductReviewCount}
+                    </span>
+                  )}
+                  {showMerchantAppBadge && (
+                    <span
+                      title="待审核入驻申请"
+                      style={{
+                        background: 'linear-gradient(135deg, #60a5fa, #2563eb)',
+                        color: 'white',
+                        fontSize: '0.58rem',
+                        fontWeight: 800,
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                        lineHeight: 1.2,
+                        boxShadow: '0 1px 4px rgba(37, 99, 235, 0.4)',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                      }}
+                    >
+                      {pendingMerchantApplicationsCount}
                     </span>
                   )}
                 </div>

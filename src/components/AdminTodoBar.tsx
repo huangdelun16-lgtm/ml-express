@@ -10,6 +10,7 @@ function readTodoAccess(): {
   assign: boolean;
   alerts: boolean;
   products: boolean;
+  merchantApps: boolean;
   audit: boolean;
 } {
   const role =
@@ -33,6 +34,7 @@ function readTodoAccess(): {
     alerts:
       role === 'admin' || role === 'manager' || role === 'finance' || hasPerm('delivery_alerts'),
     products: role === 'admin' || role === 'manager' || hasPerm('merchant_stores'),
+    merchantApps: role === 'admin' || role === 'manager' || hasPerm('merchant_stores'),
     audit: role === 'admin' || role === 'manager' || role === 'finance',
   };
 }
@@ -91,6 +93,12 @@ const AdminTodoBar: React.FC = () => {
         : language === 'en'
           ? 'Products'
           : 'ကုန်ပစ္စည်း',
+    merchantApps:
+      language === 'zh'
+        ? '入驻申请'
+        : language === 'en'
+          ? 'Onboarding'
+          : 'လျှောက်လွှာ',
     audit:
       language === 'zh'
         ? '操作审计'
@@ -103,7 +111,8 @@ const AdminTodoBar: React.FC = () => {
     (access.recharge ? counts.pendingRecharge : 0) +
     (access.assign ? counts.pendingAssignment : 0) +
     (access.alerts ? counts.pendingDeliveryAlerts : 0) +
-    (access.products ? counts.pendingProductReview : 0);
+    (access.products ? counts.pendingProductReview : 0) +
+    (access.merchantApps ? counts.pendingMerchantApplications : 0);
 
   const pill = (
     label: string,
@@ -186,6 +195,13 @@ const AdminTodoBar: React.FC = () => {
             pill(t.alerts, counts.pendingDeliveryAlerts, () => navigate('/admin/delivery-alerts'), '#dc2626')}
           {access.products &&
             pill(t.products, counts.pendingProductReview, () => navigate('/admin/delivery-stores'), '#f59e0b')}
+          {access.merchantApps &&
+            pill(
+              t.merchantApps,
+              counts.pendingMerchantApplications,
+              () => navigate('/admin/merchant-applications'),
+              '#3b82f6',
+            )}
         </div>
         {access.audit && (
         <button

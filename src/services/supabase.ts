@@ -2092,6 +2092,7 @@ export const deliveryStoreService = {
         cod_settlement_day: storeData.cod_settlement_day || '7',
         current_load: 0,
         status: 'active' as const,
+        mall_visible: true,
       };
 
       const { data, error } = await supabase

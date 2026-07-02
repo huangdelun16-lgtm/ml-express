@@ -7,6 +7,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import QRCode from 'qrcode';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
+import { useAdminTodo } from '../contexts/AdminTodoContext';
 import ProductImageEditorModal from '../components/ProductImageEditorModal';
 import ProductVariantsEditor from '../components/ProductVariantsEditor';
 import '../styles/productVariantsEditor.css';
@@ -18,6 +19,10 @@ import {
   formatVariantsForDisplay,
 } from '../utils/productVariants';
 import '../styles/adminStoreCreateForm.css';
+import {
+  MERCHANT_STORE_TYPE_OPTIONS,
+  buildMerchantStoreTypeLabelMap,
+} from '../constants/merchantStoreTypes';
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
@@ -83,19 +88,8 @@ const getOperatingDurationLabel = (open: string, close: string): string => {
   return `共 ${hours} 小时 ${minutes} 分钟`;
 };
 
-const STORE_TYPES = [
-  { value: 'restaurant', label: '餐厅' },
-  { value: 'drinks_snacks', label: '饮料和小吃' },
-  { value: 'breakfast', label: '早点铺' },
-  { value: 'cake_shop', label: '蛋糕店' },
-  { value: 'tea_shop', label: '茶铺' },
-  { value: 'flower_shop', label: '鲜花店' },
-  { value: 'clothing_store', label: '服装店' },
-  { value: 'grocery', label: '杂货店' },
-  { value: 'hardware_store', label: '五金店' },
-  { value: 'supermarket', label: '超市' },
-  { value: 'other', label: '其它' }
-];
+const STORE_TYPES = MERCHANT_STORE_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.zh }));
+const STORE_TYPE_LABELS = buildMerchantStoreTypeLabelMap();
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
@@ -389,6 +383,30 @@ const DeliveryStoreManagement: React.FC = () => {
   const [selectedAdminProductId, setSelectedAdminProductId] = useState<string | null>(null);
   /** 全局待审核商品数（listing_status=pending），用于列表区与仪表板一致提示 */
   const [pendingProductReviewCount, setPendingProductReviewCount] = useState(0);
+  const { counts: adminTodoCounts, refresh: refreshAdminTodos } = useAdminTodo();
+  const pendingMerchantApplications = adminTodoCounts.pendingMerchantApplications;
+  const prevMerchantAppsRef = useRef<number | null>(null);
+  const [merchantAppAlertPulse, setMerchantAppAlertPulse] = useState(false);
+
+  /** 合伙店铺页：更频繁刷新入驻申请待办，并在有新申请时提示 */
+  useEffect(() => {
+    void refreshAdminTodos();
+    const timer = window.setInterval(() => void refreshAdminTodos(), 30000);
+    return () => window.clearInterval(timer);
+  }, [refreshAdminTodos]);
+
+  useEffect(() => {
+    const prev = prevMerchantAppsRef.current;
+    const current = pendingMerchantApplications;
+    if (prev !== null && current > prev) {
+      setMerchantAppAlertPulse(true);
+      const hideTimer = window.setTimeout(() => setMerchantAppAlertPulse(false), 15000);
+      prevMerchantAppsRef.current = current;
+      return () => window.clearTimeout(hideTimer);
+    }
+    prevMerchantAppsRef.current = current;
+  }, [pendingMerchantApplications]);
+
   /** 各合伙店铺待审核商品数量（store_id → 件数），用于列表按店展示与卡片提示 */
   const [pendingReviewByStoreId, setPendingReviewByStoreId] = useState<Record<string, number>>({});
   /** 各合伙店铺商品总数（store_id → 件数） */
@@ -1628,6 +1646,52 @@ const DeliveryStoreManagement: React.FC = () => {
             ← 返回仪表板
           </button>
           <button
+            onClick={() => navigate('/admin/merchant-applications')}
+            style={{
+              position: 'relative',
+              background:
+                pendingMerchantApplications > 0
+                  ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.35) 0%, rgba(37, 99, 235, 0.28) 100%)'
+                  : 'rgba(59, 130, 246, 0.18)',
+              color: 'white',
+              border:
+                pendingMerchantApplications > 0
+                  ? '1px solid rgba(147, 197, 253, 0.75)'
+                  : '1px solid rgba(96, 165, 250, 0.45)',
+              padding: '12px 24px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              flex: isMobile ? 1 : 'none',
+              transition: 'all 0.3s ease',
+              boxShadow:
+                pendingMerchantApplications > 0 ? '0 0 0 2px rgba(59, 130, 246, 0.25)' : 'none',
+            }}
+          >
+            📋 入驻申请
+            {pendingMerchantApplications > 0 && (
+              <span
+                style={{
+                  marginLeft: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '22px',
+                  height: '22px',
+                  padding: '0 6px',
+                  borderRadius: '999px',
+                  background: '#ef4444',
+                  color: '#fff',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.45)',
+                }}
+              >
+                {pendingMerchantApplications}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => {
               if (showForm) {
                 closeStoreForm();
@@ -1664,6 +1728,61 @@ const DeliveryStoreManagement: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {pendingMerchantApplications > 0 && (
+        <div
+          role="alert"
+          onClick={() => navigate('/admin/merchant-applications')}
+          style={{
+            marginBottom: '20px',
+            padding: '14px 18px',
+            borderRadius: '14px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            background: merchantAppAlertPulse
+              ? 'linear-gradient(90deg, rgba(59, 130, 246, 0.28) 0%, rgba(37, 99, 235, 0.18) 100%)'
+              : 'rgba(59, 130, 246, 0.14)',
+            border: merchantAppAlertPulse
+              ? '1px solid rgba(147, 197, 253, 0.85)'
+              : '1px solid rgba(96, 165, 250, 0.45)',
+            color: '#e0f2fe',
+            boxShadow: merchantAppAlertPulse ? '0 0 24px rgba(59, 130, 246, 0.35)' : 'none',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '1.25rem' }} aria-hidden="true">
+              {merchantAppAlertPulse ? '🔔' : '📋'}
+            </span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>
+                {merchantAppAlertPulse
+                  ? `刚刚收到新的商家入驻申请（共 ${pendingMerchantApplications} 条待审核）`
+                  : `有 ${pendingMerchantApplications} 条商家入驻申请待审核`}
+              </div>
+              <div style={{ fontSize: '0.82rem', opacity: 0.88, marginTop: '2px' }}>
+                点击进入审核页面，通过后自动开通店铺账号
+              </div>
+            </div>
+          </div>
+          <span
+            style={{
+              background: 'rgba(255,255,255,0.16)',
+              border: '1px solid rgba(255,255,255,0.28)',
+              borderRadius: '999px',
+              padding: '8px 16px',
+              fontWeight: 700,
+              fontSize: '0.84rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            立即审核 →
+          </span>
+        </div>
+      )}
 
       {/* 消息提示 */}
       {(errorMessage || successMessage) && (
@@ -2367,22 +2486,7 @@ const DeliveryStoreManagement: React.FC = () => {
                     <span>⏰ {store.operating_hours}</span>
                   </div>
                   <div style={{ marginTop: '8px', fontSize: '0.8rem', opacity: 0.6 }}>
-                    <span>类型: {
-                      {
-                        restaurant: '餐厅',
-                        drinks_snacks: '饮料和小吃',
-                        breakfast: '早点铺',
-                        cake_shop: '蛋糕店',
-                        tea_shop: '茶铺',
-                        flower_shop: '鲜花店',
-                        clothing_store: '服装店',
-                        grocery: '杂货店',
-                        hardware_store: '五金店',
-                        supermarket: '超市',
-                        transit_station: '中转站',
-                        other: '其它'
-                      }[store.store_type] || store.store_type
-                    }</span>
+                    <span>类型: {STORE_TYPE_LABELS[store.store_type] || store.store_type}</span>
                     <span style={{ marginLeft: '12px' }}>容量: {store.capacity}</span>
                     <span style={{ marginLeft: '12px' }}>负载: {store.current_load}</span>
                   </div>
@@ -2780,20 +2884,7 @@ const DeliveryStoreManagement: React.FC = () => {
                                 borderRadius: '12px',
                                 fontWeight: '500'
                               }}>
-                                {{
-                                  restaurant: '餐厅',
-                                  drinks_snacks: '饮料和小吃',
-                                  breakfast: '早点铺',
-                                  cake_shop: '蛋糕店',
-                                  tea_shop: '茶铺',
-                                  flower_shop: '鲜花店',
-                                  clothing_store: '服装店',
-                                  grocery: '杂货店',
-                                  hardware_store: '五金店',
-                                  supermarket: '超市',
-                                  transit_station: '中转站',
-                                  other: '其它'
-                                }[selectedStore.store_type] || selectedStore.store_type}
+                                {STORE_TYPE_LABELS[selectedStore.store_type] || selectedStore.store_type}
                               </span>
                             )}
                           </div>

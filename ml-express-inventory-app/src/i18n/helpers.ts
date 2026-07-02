@@ -1,4 +1,5 @@
 import type { FinanceLedgerCategory } from '../types/financeLedger';
+import type { FinanceLedgerEntry } from '../types/financeLedger';
 import type { OrderTrackingStatus, PkgTrackingStatus } from '../types/tracking';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
@@ -125,6 +126,19 @@ export function formatOrderNotFoundHint(
   }
   lines.push('', h.manualTip);
   return lines.join('\n');
+}
+
+export function getLedgerAmountDisplay(t: TranslationDict, entry: FinanceLedgerEntry): string {
+  if (entry.category === 'transport_cost') {
+    if (entry.paid || entry.amountDisplay === '已支付') {
+      return t.crossBorderFinance.ledgerTransportPaid;
+    }
+    const fee = entry.transportFee ?? 0;
+    if (fee <= 0 || entry.amountDisplay === '待登记车费') {
+      return t.crossBorderFinance.ledgerTransportFeePending;
+    }
+  }
+  return entry.amountDisplay;
 }
 
 export function getTransportFeeDisplay(t: TranslationDict, raw: string | undefined | null): string {

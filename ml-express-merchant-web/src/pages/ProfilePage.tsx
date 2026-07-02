@@ -22,7 +22,8 @@ import {
 } from "../services/supabase";
 import QRCode from "qrcode";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api"; // 🚀 新增
-import LoggerService from "../services/LoggerService";
+import { getMerchantStoreTypeLabel } from "../services/_shared/merchantStoreTypes";
+import type { StoreTypeLang } from "../services/_shared/merchantStoreTypes";
 import { autoPrepareProductImageForUpload } from "../utils/productImagePrepare";
 import ProductVariantsEditor from "../components/ProductVariantsEditor";
 import {
@@ -2474,29 +2475,11 @@ const ProfilePage: React.FC = () => {
   }
 
   // 获取店铺类型文本
-  const getStoreTypeLabel = (type: string) => {
-    const typeMap: { [key: string]: { zh: string; en: string; my: string } } = {
-      restaurant: { zh: "餐厅", en: "Restaurant", my: "စားသောက်ဆိုင်" },
-      tea_shop: { zh: "茶馆", en: "Tea Shop", my: "လက်ဖက်ရည်ဆိုင်" },
-      drinks_snacks: {
-        zh: "饮料小吃",
-        en: "Drinks & Snacks",
-        my: "အချိုရည်နှင့်မုန့်",
-      },
-      grocery: { zh: "杂货店", en: "Grocery", my: "ကုန်စုံဆိုင်" },
-      transit_station: {
-        zh: "中转站",
-        en: "Transit Station",
-        my: "သယ်ယူပို့ဆောင်ရေးစခန်း",
-      },
-    };
-    const labels = typeMap[type] || { zh: type, en: type, my: type };
-    return language === "zh"
-      ? labels.zh
-      : language === "en"
-        ? labels.en
-        : labels.my;
-  };
+  const getStoreTypeLabel = (type: string) =>
+    getMerchantStoreTypeLabel(
+      type,
+      (language === "en" ? "en" : language === "my" ? "my" : "zh") as StoreTypeLang,
+    );
 
   // 格式化日期
   const formatDate = (dateString: string) => {

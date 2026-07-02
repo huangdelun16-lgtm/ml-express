@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   formatTimeAgo,
   getCrossBorderCategoryLabel,
+  getLedgerAmountDisplay,
   LEDGER_CATEGORY_STYLE,
   useTranslation,
 } from '../i18n';
@@ -89,7 +90,7 @@ function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
           </Text>
           <View style={[styles.amountPill, { backgroundColor: style.pillBg }]}>
             <Text style={[styles.amountText, { color: style.accent }]} numberOfLines={1}>
-              {item.amountDisplay}
+              {getLedgerAmountDisplay(t, item)}
             </Text>
           </View>
         </View>

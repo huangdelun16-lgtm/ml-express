@@ -383,6 +383,8 @@ const zh = {
     catPendingCollect: '待收',
     catPrepaid: '预付',
     catCollected: '已签收',
+    ledgerTransportPaid: '已支付',
+    ledgerTransportFeePending: '待登记车费',
   },
   manualEntry: {
     title: '其它开销',
@@ -869,7 +871,7 @@ const en: typeof zh = {
   packStatus: {
     pending_load: 'Not loaded',
     loaded: 'Loaded',
-    arrived: 'At hub',
+    arrived: 'Arrived',
     completed: 'Completed',
   },
   settings: {
@@ -1059,6 +1061,8 @@ const en: typeof zh = {
     catPendingCollect: 'COD',
     catPrepaid: 'Prepaid',
     catCollected: 'Collected',
+    ledgerTransportPaid: 'Paid',
+    ledgerTransportFeePending: 'Fee not registered',
   },
   manualEntry: {
     title: 'Other expense',
@@ -1545,8 +1549,8 @@ const my: typeof zh = {
   },
   packStatus: {
     pending_load: 'မတင်ထားပါ',
-    loaded: 'တင်ပြီးပါပြီ',
-    arrived: 'ဟတ်ဘ်ရောက်ပြီ',
+    loaded: 'ကားတင်ပြီး',
+    arrived: 'ရောက်ရှိ',
     completed: 'ပြီးစီးပါပြီ',
   },
   settings: {
@@ -1734,6 +1738,8 @@ const my: typeof zh = {
     catPendingCollect: 'COD',
     catPrepaid: 'Prepaid',
     catCollected: 'Collected',
+    ledgerTransportPaid: 'ပေးချေပြီး',
+    ledgerTransportFeePending: 'ကားခဖြည့်ရန်လို',
   },
   manualEntry: {
     title: 'Other expense',
@@ -1955,7 +1961,7 @@ const my: typeof zh = {
     search: 'ထုပ်ပိုးအမည် / နံပါတ် / ထုပ်ပိုးသူ ရှာရန်',
     empty: 'ထုပ်ပိုးမရှိ\n「ထုပ်ပိုးစာရင်း」 သို့မဟုတ် 「ပစ္စည်းလက်ခံ」 ပြီးနောက် ပေါ်လာမည်',
     packNo: 'ထုပ်ပိုးနံပါတ်',
-    transportFee: 'ယာဉ်ကြေး',
+    transportFee: 'ကားခ',
     packer: 'ထုပ်ပိုးသူ',
     legPrefix: 'ဤကြောင်း {dest} ·',
     a11yPack: 'ထုပ်ပိုး {barcode}၊ {status}',

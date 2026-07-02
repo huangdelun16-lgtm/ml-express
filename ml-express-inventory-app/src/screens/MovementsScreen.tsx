@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import {
   formatTimeAgo,
+  getLedgerAmountDisplay,
   getLedgerCategoryLabel,
   LEDGER_CATEGORY_STYLE,
   useTranslation,
@@ -63,7 +64,7 @@ function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
           </Text>
           <View style={[styles.amountPill, { backgroundColor: style.pillBg }]}>
             <Text style={[styles.amountText, { color: style.accent }]} numberOfLines={1}>
-              {item.amountDisplay}
+              {getLedgerAmountDisplay(t, item)}
             </Text>
           </View>
         </View>

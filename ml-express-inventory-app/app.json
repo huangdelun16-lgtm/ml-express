@@ -2,7 +2,7 @@
   "expo": {
     "name": "ML Inventory",
     "slug": "ml-express-inventory",
-    "version": "1.2.1",
+    "version": "1.3.0",
     "scheme": "ml-express-inventory",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.inventory",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "infoPlist": {
         "NSCameraUsageDescription": "ML Inventory uses the camera to scan barcodes on packages and inventory labels at transit stations.",
         "UISupportedInterfaceOrientations~ipad": [
@@ -33,7 +33,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.mlexpress.inventory",
-      "versionCode": 7,
+      "versionCode": 8,
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",

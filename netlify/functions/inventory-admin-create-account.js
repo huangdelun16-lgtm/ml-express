@@ -11,6 +11,50 @@ const {
   syncInventoryAuthUser,
 } = require('./utils/inventoryTransitAccount');
 
+const CROSS_BORDER_PREFIXES = ['MUSE', 'RUILI', 'MDY', 'POL', 'YGN', 'NPW', 'TGI', 'LSO'];
+
+function extractStoreCodePrefix(storeCode) {
+  const code = String(storeCode ?? '').trim().toUpperCase();
+  const sorted = [...CROSS_BORDER_PREFIXES].sort((a, b) => b.length - a.length);
+  for (const prefix of sorted) {
+    if (code.startsWith(prefix)) return prefix;
+  }
+  const letters = code.replace(/[0-9]/g, '');
+  return letters || code.slice(0, 3);
+}
+
+async function resolveUniqueStoreCode(supabase, requestedCode) {
+  const normalized = String(requestedCode ?? '').trim().toUpperCase();
+  if (!normalized) return normalized;
+
+  const { data: exactDup, error: exactErr } = await supabase
+    .from('delivery_stores')
+    .select('id')
+    .eq('store_code', normalized)
+    .maybeSingle();
+  if (exactErr) throw exactErr;
+  if (!exactDup) return normalized;
+
+  const prefix = extractStoreCodePrefix(normalized);
+  const { data: samePrefixRows, error: prefixErr } = await supabase
+    .from('delivery_stores')
+    .select('store_code')
+    .ilike('store_code', `${prefix}%`);
+  if (prefixErr) throw prefixErr;
+
+  const suffixRe = new RegExp(`^${prefix}(\\d+)$`, 'i');
+  let maxSuffix = 0;
+  for (const row of samePrefixRows || []) {
+    const code = String(row.store_code ?? '').trim().toUpperCase();
+    const match = code.match(suffixRe);
+    if (match) {
+      maxSuffix = Math.max(maxSuffix, Number.parseInt(match[1], 10));
+    }
+  }
+
+  return `${prefix}${String(maxSuffix + 1).padStart(3, '0')}`;
+}
+
 exports.handler = async (event) => {
   const preflightResponse = handleCorsPreflight(event, {
     allowedMethods: ['POST', 'OPTIONS'],
@@ -62,7 +106,7 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}');
     const store_name = String(body.store_name ?? '').trim();
-    const store_code = String(body.store_code ?? '').trim().toUpperCase();
+    let store_code = String(body.store_code ?? '').trim().toUpperCase();
     const region = String(body.region ?? '').trim();
     const address = String(body.address ?? '').trim();
     const phone = String(body.phone ?? '').trim();
@@ -101,17 +145,12 @@ exports.handler = async (event) => {
       };
     }
 
-    const { data: dup, error: dupErr } = await supabase
-      .from('delivery_stores')
-      .select('id')
-      .eq('store_code', store_code)
-      .maybeSingle();
-    if (dupErr) throw dupErr;
-    if (dup) {
+    store_code = await resolveUniqueStoreCode(supabase, store_code);
+    if (!store_code) {
       return {
-        statusCode: 409,
+        statusCode: 400,
         headers,
-        body: JSON.stringify({ error: '店铺代码已存在，请更换区域或修改代码' }),
+        body: JSON.stringify({ error: '店铺代码无效' }),
       };
     }
 
@@ -137,6 +176,7 @@ exports.handler = async (event) => {
       current_load: 0,
       status: 'active',
       created_by: auth.user?.username || 'admin',
+      mall_visible: false,
     };
 
     const { data: store, error: insertErr } = await supabase

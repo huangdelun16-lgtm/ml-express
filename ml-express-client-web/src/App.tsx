@@ -15,6 +15,7 @@ const DeleteAccountPage = lazy(() => import('./pages/DeleteAccountPage'));
 const CityMallPage = lazy(() => import('./pages/CityMallPage'));
 const StoreProductsPage = lazy(() => import('./pages/StoreProductsPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
+const MerchantApplyPage = lazy(() => import('./pages/MerchantApplyPage'));
 
 function RouteFallback() {
   return (
@@ -143,6 +144,7 @@ function App() {
                   <Route path="/mall" element={<CityMallPage />} />
                   <Route path="/mall/:storeId" element={<StoreProductsPage />} />
                   <Route path="/cart" element={<CartPage />} />
+                  <Route path="/merchant-apply" element={<MerchantApplyPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>

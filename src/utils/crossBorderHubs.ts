@@ -37,6 +37,56 @@ export function generateInventoryPassword(length = 8): string {
 
 export type TransitStoreRef = { region?: string; store_code?: string };
 
+function normalizeRegionToken(value?: string): string {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s（）()]/g, '');
+}
+
+/** 判断已有账号是否属于同一跨境区域（兼容 region 存 hubCode / 中文名等历史格式） */
+export function storeBelongsToCrossBorderHub(
+  store: TransitStoreRef,
+  hub: CrossBorderHub,
+): boolean {
+  const code = String(store.store_code ?? '').trim().toUpperCase();
+  if (code.startsWith(hub.prefix)) return true;
+
+  const region = normalizeRegionToken(store.region);
+  if (!region) return false;
+
+  const tokens = [
+    hub.regionId,
+    hub.hubCode,
+    hub.prefix,
+    hub.nameZh,
+    hub.nameEn,
+  ].map(normalizeRegionToken);
+
+  return tokens.some((token) => token && region === token);
+}
+
+/** 按 PREFIX### 取最大序号 +1，避免「计数」与已删号/region 不一致导致重复 409 */
+export function nextCrossBorderStoreCode(
+  hub: CrossBorderHub,
+  existingStores: TransitStoreRef[],
+): string {
+  const prefix = hub.prefix.toUpperCase();
+  const suffixRe = new RegExp(`^${prefix}(\\d+)$`, 'i');
+  let maxSuffix = 0;
+
+  for (const store of existingStores) {
+    if (!storeBelongsToCrossBorderHub(store, hub)) continue;
+    const code = String(store.store_code ?? '').trim().toUpperCase();
+    const match = code.match(suffixRe);
+    if (match) {
+      maxSuffix = Math.max(maxSuffix, Number.parseInt(match[1], 10));
+    }
+  }
+
+  return `${prefix}${String(maxSuffix + 1).padStart(3, '0')}`;
+}
+
 export function buildCrossBorderAccountDraft(
   regionId: string,
   existingStores: TransitStoreRef[],
@@ -46,13 +96,7 @@ export function buildCrossBorderAccountDraft(
     CROSS_BORDER_HUBS.find((h) => h.regionId === regionId) ??
     CROSS_BORDER_HUBS.find((h) => h.regionId === 'mandalay') ??
     CROSS_BORDER_HUBS[0];
-  const regionStores = existingStores.filter(
-    (s) =>
-      s.region === regionId ||
-      (s.store_code && s.store_code.toUpperCase().startsWith(hub.prefix)),
-  );
-  const nextNumber = (regionStores.length + 1).toString().padStart(3, '0');
-  const store_code = `${hub.prefix}${nextNumber}`;
+  const store_code = nextCrossBorderStoreCode(hub, existingStores);
   const hubName = isEn ? hub.nameEn : hub.nameZh;
 
   return {

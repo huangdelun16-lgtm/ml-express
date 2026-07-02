@@ -129,6 +129,7 @@ async function handlePut(supabase, body, auth) {
     facilities,
     cod_settlement_day,
     status,
+    mall_visible: false,
   };
 
   if (password) {

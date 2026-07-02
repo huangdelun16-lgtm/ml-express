@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { fetchPendingMerchantApplicationCount } from '../services/merchantApplicationService';
 import { ADMIN_TODOS_REFRESH_EVENT } from '../utils/adminTodoBridge';
 
 export type AdminTodoCounts = {
@@ -8,6 +9,7 @@ export type AdminTodoCounts = {
   pendingAssignment: number;
   pendingProductReview: number;
   pendingDeliveryAlerts: number;
+  pendingMerchantApplications: number;
 };
 
 const emptyCounts: AdminTodoCounts = {
@@ -15,10 +17,11 @@ const emptyCounts: AdminTodoCounts = {
   pendingAssignment: 0,
   pendingProductReview: 0,
   pendingDeliveryAlerts: 0,
+  pendingMerchantApplications: 0,
 };
 
 export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
-  const [rechargeRes, alertsRes, assignRes, productsRes] = await Promise.all([
+  const [rechargeRes, alertsRes, assignRes, productsRes, pendingMerchantApplications] = await Promise.all([
     supabase.from('recharge_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('delivery_alerts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase
@@ -30,6 +33,7 @@ export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
       .from('products')
       .select('id, listing_status, pending_update', { count: 'exact', head: false })
       .or('listing_status.eq.pending,pending_update.not.is.null'),
+    fetchPendingMerchantApplicationCount(),
   ]);
 
   const pendingProductRows = productsRes.data ?? [];
@@ -46,6 +50,7 @@ export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
     pendingDeliveryAlerts: alertsRes.count ?? 0,
     pendingAssignment: assignRes.count ?? 0,
     pendingProductReview,
+    pendingMerchantApplications,
   };
 }
 

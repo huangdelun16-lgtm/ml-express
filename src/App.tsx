@@ -10,6 +10,7 @@ import SystemSettings from './pages/SystemSettings';
 import AccountManagement from './pages/AccountManagement';
 import BannerManagement from './pages/BannerManagement';
 import DeliveryStoreManagement from './pages/DeliveryStoreManagement';
+import MerchantApplicationsPage from './pages/MerchantApplicationsPage';
 import EmployeeSupervision from './pages/EmployeeSupervision';
 import RealTimeTracking from './pages/RealTimeTracking';
 import RechargeManagement from './pages/RechargeManagement';
@@ -139,6 +140,14 @@ function App() {
                   element={
                     <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="merchant_stores">
                       <DeliveryStoreManagement />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="merchant-applications"
+                  element={
+                    <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="merchant_stores">
+                      <MerchantApplicationsPage />
                     </ProtectedRoute>
                   }
                 />

@@ -7,6 +7,8 @@ import ProductVariantPriceList from '../components/ProductVariantPriceList';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import LoggerService from '../services/LoggerService';
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
+import { CITY_MALL_CATEGORIES, getMerchantStoreTypeLabel } from '../services/_shared/merchantStoreTypes';
+import type { StoreTypeLang } from '../services/_shared/merchantStoreTypes';
 
 const CityMallPage: React.FC = () => {
   const navigate = useNavigate();
@@ -40,21 +42,10 @@ const CityMallPage: React.FC = () => {
     { id: 'MSE', zh: '木姐', en: 'Muse', my: 'မူဆယ်' }
   ];
 
-  const categories = [
-    { id: '全部', zh: '全部', en: 'All', my: 'အားလုံး', icon: 'grid-outline' },
-    { id: 'restaurant', zh: '餐厅', en: 'Dining', my: 'စားသောက်ဆိုင်', icon: 'restaurant-outline' },
-    { id: 'drinks_snacks', zh: '饮料小吃', en: 'Snacks', my: 'မုန့်မျိုးစုံ', icon: 'fast-food-outline' },
-    { id: 'breakfast', zh: '早点铺', en: 'Breakfast', my: 'မနက်စာဆိုင်', icon: 'sunny-outline' },
-    { id: 'cake_shop', zh: '蛋糕店', en: 'Cake Shop', my: 'ကိတ်မုန့်ဆိုင်', icon: 'heart-outline' },
-    { id: 'tea_shop', zh: '茶铺', en: 'Tea', my: 'လက်ဖက်ရည်ဆိုင်', icon: 'cafe-outline' },
-    { id: 'flower_shop', zh: '鲜花店', en: 'Flowers', my: 'ပန်းဆိုင်', icon: 'flower-outline' },
-    { id: 'clothing_store', zh: '服装店', en: 'Clothing', my: 'အဝတ်အထည်ဆိုင်', icon: 'shirt-outline' },
-    { id: 'grocery', zh: '杂货店', en: 'Grocery', my: 'ကုန်စုံဆိုင်', icon: 'cart-outline' },
-    { id: 'hardware_store', zh: '五金店', en: 'Hardware', my: 'ဟာ့ဒ်ဝဲလ်ဆိုင်', icon: 'build-outline' },
-    { id: 'supermarket', zh: '超市', en: 'Supermarket', my: 'စူပါမားကတ်', icon: 'basket-outline' },
-    { id: 'transit_station', zh: '中转站', en: 'Hub', my: 'အချက်အချာဌာန', icon: 'bus-outline' },
-    { id: 'other', zh: '其它', en: 'Other', my: 'အခြား', icon: 'ellipsis-horizontal-outline' },
-  ];
+  const categories = CITY_MALL_CATEGORIES;
+
+  const storeTypeLang: StoreTypeLang =
+    language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
 
   const uiT = {
     zh: {
@@ -261,11 +252,7 @@ const CityMallPage: React.FC = () => {
     }
   };
 
-  const getStoreTypeLabel = (type: string) => {
-    const category = categories.find(c => c.id === type);
-    if (!category) return type;
-    return (category as any)[language] || category.zh;
-  };
+  const getStoreTypeLabel = (type: string) => getMerchantStoreTypeLabel(type, storeTypeLang);
 
   // 🚀 新增：判断店铺是否正在营业
   const checkStoreOpenStatus = (store: DeliveryStore) => {

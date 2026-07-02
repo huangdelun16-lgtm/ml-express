@@ -1,0 +1,566 @@
+.merchant-apply-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(96, 165, 250, 0.35), transparent 55%),
+    linear-gradient(
+      165deg,
+      #558cea 0%,
+      #498ab6 18%,
+      #428cc9 32%,
+      #3a7fb8 50%,
+      #2d6a9f 72%,
+      #1e4d7a 100%
+    );
+  color: #ffffff;
+}
+
+.merchant-apply-page__inner {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 4rem;
+}
+
+.merchant-apply-hero {
+  text-align: center;
+  margin-bottom: 1.75rem;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.merchant-apply-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.merchant-apply-hero h1 {
+  margin: 0 0 0.85rem;
+  font-size: clamp(1.65rem, 4.2vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  text-shadow: 0 2px 16px rgba(15, 23, 42, 0.25);
+  line-height: 1.25;
+}
+
+.merchant-apply-hero p {
+  margin: 0 auto;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.7;
+  max-width: 620px;
+  font-size: clamp(0.92rem, 2.2vw, 1.02rem);
+}
+
+.merchant-apply-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 1rem;
+  margin-top: 1.25rem;
+}
+
+.merchant-apply-steps span {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+}
+
+.merchant-apply-card {
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 24px;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  box-shadow:
+    0 4px 6px rgba(15, 23, 42, 0.06),
+    0 24px 48px rgba(15, 23, 42, 0.14);
+  color: #0f172a;
+}
+
+.merchant-apply-section {
+  margin-bottom: 1.85rem;
+  padding-bottom: 1.85rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.merchant-apply-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.merchant-apply-section__head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1.1rem;
+}
+
+.merchant-apply-section__icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  color: white;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.merchant-apply-section h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.merchant-apply-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.15rem;
+}
+
+.merchant-apply-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.merchant-apply-field--full {
+  grid-column: 1 / -1;
+}
+
+.merchant-apply-field--notes {
+  margin-top: 1.25rem;
+}
+
+.merchant-apply-field label {
+  font-size: 0.84rem;
+  color: #334155;
+  font-weight: 700;
+}
+
+.merchant-apply-field input,
+.merchant-apply-field select,
+.merchant-apply-field textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1.5px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 0.78rem 0.95rem;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.merchant-apply-field input::placeholder,
+.merchant-apply-field textarea::placeholder {
+  color: #94a3b8;
+}
+
+.merchant-apply-field input:hover,
+.merchant-apply-field select:hover,
+.merchant-apply-field textarea:hover {
+  border-color: #94a3b8;
+  background: #ffffff;
+}
+
+.merchant-apply-field input:focus,
+.merchant-apply-field select:focus,
+.merchant-apply-field textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.merchant-apply-field select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23475569' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  padding-right: 2.25rem;
+}
+
+.merchant-apply-field textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.merchant-apply-map-wrap {
+  margin-top: 0.65rem;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1.5px solid #cbd5e1;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.merchant-apply-map {
+  height: 300px;
+}
+
+.merchant-apply-map-placeholder {
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1.25rem;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.merchant-apply-alert {
+  border-radius: 14px;
+  padding: 0.9rem 1.05rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.merchant-apply-alert--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.merchant-apply-alert--success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.merchant-apply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.merchant-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  padding: 0.88rem 1.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.merchant-apply-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.merchant-apply-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.merchant-apply-btn--primary {
+  background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+}
+
+.merchant-apply-btn--primary:hover:not(:disabled) {
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.42);
+}
+
+.merchant-apply-btn--ghost {
+  background: #ffffff;
+  color: #475569;
+  border: 1.5px solid #cbd5e1;
+}
+
+.merchant-apply-footnote {
+  margin-top: 0.65rem;
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.merchant-apply-coords {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* —— 申请登记 —— */
+.merchant-apply-section--registration {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  margin: 0 0 1.5rem;
+  padding: 1rem 1rem 1.1rem;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.merchant-apply-section--registration .merchant-apply-section__head {
+  margin-bottom: 0.85rem;
+}
+
+.merchant-apply-section--registration .merchant-apply-section__icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+.merchant-apply-section--registration .merchant-apply-section__head h2 {
+  font-size: 1rem;
+}
+
+.merchant-apply-grid--registration {
+  gap: 0.85rem 1rem;
+}
+
+.merchant-apply-date--compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.merchant-apply-date__input-visible {
+  width: 100%;
+  border-radius: 12px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  min-height: auto;
+  box-shadow: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.merchant-apply-date__input-visible:hover {
+  border-color: #94a3b8;
+}
+
+.merchant-apply-date__input-visible:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.merchant-apply-date__hint {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.35;
+  padding-left: 0.1rem;
+}
+
+.merchant-apply-section--registration .merchant-apply-upload {
+  margin-top: 0.95rem;
+  padding-top: 0.95rem;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.merchant-apply-section--registration .merchant-apply-upload__add {
+  padding: 0.72rem 0.85rem;
+  font-size: 0.88rem;
+  border-radius: 12px;
+}
+
+.merchant-apply-section--registration .merchant-apply-upload__title {
+  font-size: 0.84rem;
+}
+
+.merchant-apply-section--registration .merchant-apply-upload__formats {
+  font-size: 0.75rem;
+}
+
+/* —— 证件上传 —— */
+.merchant-apply-upload {
+  margin-top: 1.15rem;
+}
+
+.merchant-apply-upload__head {
+  margin-bottom: 0.75rem;
+}
+
+.merchant-apply-upload__title {
+  margin: 0 0 0.25rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.merchant-apply-upload__formats {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.merchant-apply-upload__native {
+  display: none;
+}
+
+.merchant-apply-upload__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border-radius: 14px;
+  border: 2px dashed #93c5fd;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1d4ed8;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.merchant-apply-upload__add:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.merchant-apply-upload__add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.merchant-apply-upload__empty {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.merchant-apply-upload__list {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.merchant-apply-upload__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.merchant-apply-upload__thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+}
+
+.merchant-apply-upload__pdf {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  border: 1px solid #fecaca;
+}
+
+.merchant-apply-upload__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.merchant-apply-upload__name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.merchant-apply-upload__size {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.merchant-apply-upload__remove {
+  flex-shrink: 0;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.merchant-apply-upload__remove:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+@media (max-width: 720px) {
+  .merchant-apply-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .merchant-apply-page__inner {
+    padding-top: 1rem;
+  }
+
+  .merchant-apply-actions {
+    flex-direction: column-reverse;
+  }
+
+  .merchant-apply-btn {
+    width: 100%;
+  }
+}

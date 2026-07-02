@@ -1,0 +1,658 @@
+.merchant-apps-page {
+  padding: 1.25rem 1.5rem 2.5rem;
+  color: #e2e8f0;
+}
+
+.merchant-apps-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.merchant-apps-header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.45rem;
+  color: #f8fafc;
+}
+
+.merchant-apps-header p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.75);
+  font-size: 0.92rem;
+}
+
+.merchant-apps-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.merchant-apps-filter {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.65);
+  color: #f8fafc;
+  padding: 0.45rem 0.85rem;
+}
+
+.merchant-apps-table-wrap {
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.merchant-apps-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 880px;
+}
+
+.merchant-apps-table th,
+.merchant-apps-table td {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.merchant-apps-table th {
+  color: #93c5fd;
+  font-weight: 700;
+  background: rgba(2, 6, 23, 0.35);
+}
+
+.merchant-apps-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.merchant-apps-badge--pending {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+}
+
+.merchant-apps-badge--approved {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.merchant-apps-badge--rejected {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.merchant-apps-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.merchant-apps-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.merchant-apps-btn--primary {
+  background: #2563eb;
+  color: white;
+}
+
+.merchant-apps-btn--primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.merchant-apps-btn--success {
+  background: #16a34a;
+  color: white;
+}
+
+.merchant-apps-btn--success:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.merchant-apps-btn--danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.merchant-apps-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.28);
+}
+
+.merchant-apps-btn--ghost {
+  background: transparent;
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.merchant-apps-btn--ghost:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.merchant-apps-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.merchant-apps-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.merchant-apply-alert {
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.92rem;
+}
+
+.merchant-apply-alert--error {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+}
+
+/* ── Review modal ── */
+
+.merchant-apps-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1200;
+  animation: merchant-apps-fade-in 0.18s ease;
+}
+
+@keyframes merchant-apps-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.merchant-apps-modal {
+  width: min(860px, 100%);
+  max-height: min(92vh, 960px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  animation: merchant-apps-slide-up 0.22s ease;
+}
+
+@keyframes merchant-apps-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.merchant-apps-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.85);
+  flex-shrink: 0;
+}
+
+.merchant-apps-modal__head-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.merchant-apps-modal__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.merchant-apps-modal__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+}
+
+.merchant-apps-modal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  font-size: 0.78rem;
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.merchant-apps-modal__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.merchant-apps-modal__close {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.merchant-apps-modal__close:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.merchant-apps-modal__body {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.merchant-apps-modal__section {
+  margin-bottom: 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.35);
+  overflow: hidden;
+}
+
+.merchant-apps-modal__section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.merchant-apps-modal__section-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.merchant-apps-modal__section-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #93c5fd;
+  letter-spacing: 0.02em;
+}
+
+.merchant-apps-modal__section-body {
+  padding: 0.85rem 0.9rem;
+}
+
+.merchant-apps-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.merchant-apps-detail-item {
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.merchant-apps-detail-item--full {
+  grid-column: 1 / -1;
+}
+
+.merchant-apps-detail-item dt {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.merchant-apps-detail-item dd {
+  margin: 0.2rem 0 0;
+  color: #f8fafc;
+  font-size: 0.88rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.merchant-apps-detail-item__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.merchant-apps-copy-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+.merchant-apps-copy-btn:hover {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.merchant-apps-link {
+  color: #93c5fd;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.merchant-apps-link:hover {
+  text-decoration: underline;
+}
+
+.merchant-apps-docs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.65rem;
+}
+
+.merchant-apps-doc {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.65);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.merchant-apps-doc:hover {
+  border-color: rgba(96, 165, 250, 0.55);
+  transform: translateY(-1px);
+}
+
+.merchant-apps-doc__thumb {
+  aspect-ratio: 4 / 3;
+  background: rgba(2, 6, 23, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.merchant-apps-doc__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.merchant-apps-doc__pdf {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fca5a5;
+}
+
+.merchant-apps-doc__label {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.68rem;
+  color: rgba(226, 232, 240, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.merchant-apps-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #93c5fd;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.merchant-apps-map-link:hover {
+  background: rgba(59, 130, 246, 0.24);
+}
+
+.merchant-apps-coords {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: rgba(226, 232, 240, 0.55);
+  font-family: ui-monospace, monospace;
+}
+
+.merchant-apps-credentials {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.14) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+}
+
+.merchant-apps-credentials__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.merchant-apps-credentials__title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #bbf7d0;
+}
+
+.merchant-apps-credentials__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.merchant-apps-cred-box {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.45);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+.merchant-apps-cred-box__label {
+  font-size: 0.68rem;
+  color: rgba(187, 247, 208, 0.75);
+  margin-bottom: 0.2rem;
+}
+
+.merchant-apps-cred-box__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #ecfdf5;
+  letter-spacing: 0.04em;
+}
+
+.merchant-apps-review-panel {
+  padding: 0.85rem 0.9rem;
+}
+
+.merchant-apps-field {
+  margin-bottom: 0.85rem;
+}
+
+.merchant-apps-field:last-child {
+  margin-bottom: 0;
+}
+
+.merchant-apps-field label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.merchant-apps-field--readonly-code input {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+  font-weight: 800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  cursor: default;
+}
+
+.merchant-apps-field--readonly-code input:focus {
+  box-shadow: none;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.merchant-apps-field textarea,
+.merchant-apps-field input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.75);
+  color: #f8fafc;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+
+.merchant-apps-field textarea:focus,
+.merchant-apps-field input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.55);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.merchant-apps-password-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.merchant-apps-password-row input {
+  flex: 1;
+}
+
+.merchant-apps-field-hint {
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  color: rgba(226, 232, 240, 0.5);
+}
+
+.merchant-apps-reviewed {
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  font-size: 0.82rem;
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.merchant-apps-modal__foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
+  padding: 0.85rem 1.25rem 1.1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.merchant-apps-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  cursor: zoom-out;
+}
+
+.merchant-apps-lightbox img {
+  max-width: min(960px, 100%);
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+}
+
+.merchant-apps-toast {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1400;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(74, 222, 128, 0.45);
+  color: #bbf7d0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: merchant-apps-fade-in 0.15s ease;
+}
+
+@media (max-width: 640px) {
+  .merchant-apps-detail-grid,
+  .merchant-apps-credentials__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .merchant-apps-modal__foot {
+    flex-direction: column-reverse;
+  }
+
+  .merchant-apps-modal__foot .merchant-apps-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

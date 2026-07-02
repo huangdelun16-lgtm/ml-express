@@ -663,18 +663,39 @@ export const addressService = {
   },
 };
 
+function isCityMallVisibleStore(store: Record<string, unknown>): boolean {
+  if (store.mall_visible === false) return false;
+  if (store.store_type === "transit_station") return false;
+  const addr = String(store.address ?? "");
+  const notes = String(store.notes ?? "");
+  if (/跨境物流中转站|cross-border transit hub/i.test(addr)) return false;
+  if (/Inventory App 跨境/i.test(notes)) return false;
+  return true;
+}
+
 // 配送店/合伙商户服务
 export const deliveryStoreService = {
   async getActiveStores() {
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("delivery_stores")
         .select("*")
         .eq("status", "active")
+        .eq("mall_visible", true)
         .order("store_name", { ascending: true });
+      if (error?.message?.includes("mall_visible")) {
+        const fallback = await supabase
+          .from("delivery_stores")
+          .select("*")
+          .eq("status", "active")
+          .neq("store_type", "transit_station")
+          .order("store_name", { ascending: true });
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) throw error;
-      return data || [];
+      return (data || []).filter(isCityMallVisibleStore);
     } catch (error) {
       LoggerService.error("获取配送店列表失败:", error);
       return [];
@@ -2110,7 +2131,12 @@ export const merchantService = {
         .limit(20);
 
       if (error) throw error;
-      return data || [];
+      return (data || []).filter((row) => {
+        const store = row.delivery_stores as { store_type?: string; mall_visible?: boolean } | null;
+        if (!store) return false;
+        if (store.mall_visible === false) return false;
+        return store.store_type !== "transit_station";
+      });
     } catch (error) {
       LoggerService.error("搜索商品失败:", error);
       return [];
