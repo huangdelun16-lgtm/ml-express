@@ -20,6 +20,7 @@ import {
   userService,
   systemSettingsService,
 } from "../services/supabase";
+import LoggerService from "../services/LoggerService";
 import QRCode from "qrcode";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api"; // 🚀 新增
 import { getMerchantStoreTypeLabel } from "../services/_shared/merchantStoreTypes";

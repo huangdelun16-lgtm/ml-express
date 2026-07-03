@@ -9,6 +9,10 @@ import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import LanguageSelector from '../components/LanguageSelector';
 import { feedbackService } from '../services/FeedbackService';
+import {
+  getMerchantLoginBlockReason,
+  type MerchantLoginLang,
+} from '../services/_shared/merchantLoginGuard';
 
 export default function LoginScreen({ navigation }: any) {
   const { language, refreshSession } = useApp();
@@ -79,6 +83,7 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   const currentT = t[language] || t.zh;
+  const loginLang: MerchantLoginLang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -144,6 +149,12 @@ export default function LoginScreen({ navigation }: any) {
         } else {
           feedbackService.error(currentT.storeNotFound);
         }
+        return;
+      }
+
+      const blockReason = getMerchantLoginBlockReason(store, loginLang);
+      if (blockReason) {
+        feedbackService.error(blockReason);
         return;
       }
 

@@ -1391,13 +1391,14 @@ export const merchantService = {
         .limit(40);
 
       if (error) throw error;
-      const rows = (data || []).filter((p: Product) => {
-        const store = p.delivery_stores as { store_type?: string; mall_visible?: boolean } | null | undefined;
+      const rows = (data || []).filter((row) => {
+        const store = row.delivery_stores as { store_type?: string; mall_visible?: boolean } | null | undefined;
         if (!store || store.mall_visible === false || store.store_type === 'transit_station') return false;
-        const ls = (p.listing_status ?? '').toString().trim();
+        const ls = (row.listing_status ?? '').toString().trim();
         if (ls === 'pending' || ls === 'rejected') return false;
         return ls === 'approved' || ls === '';
       }).slice(0, 20);
+      return rows;
     } catch (error: any) {
       LoggerService.error('搜索商品失败:', error?.message || '未知错误');
       return [];

@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from './pages/LoginPage';
 import MerchantLayout from './components/layout/MerchantLayout';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { supabase } from './services/supabase';
+import { isTransitStationStore } from './services/_shared/merchantLoginGuard';
 import './App.css';
 
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -53,12 +55,49 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const user = localStorage.getItem('ml-express-customer');
-    const userType = localStorage.getItem('userType');
-    if (user && userType === 'merchant') {
-      setCurrentUser(JSON.parse(user));
-    }
-    setLoading(false);
+    const restoreSession = async () => {
+      const userRaw = localStorage.getItem('ml-express-customer');
+      const userType = localStorage.getItem('userType');
+      if (!userRaw || userType !== 'merchant') {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const user = JSON.parse(userRaw);
+        const storeCode = String(user.store_code ?? '').trim().toUpperCase();
+        const storeId = user.store_id || user.id;
+
+        let query = supabase.from('delivery_stores').select('id, store_type, status');
+        if (storeCode) {
+          query = query.eq('store_code', storeCode);
+        } else if (storeId) {
+          query = query.eq('id', storeId);
+        } else {
+          localStorage.removeItem('ml-express-customer');
+          localStorage.removeItem('userType');
+          setLoading(false);
+          return;
+        }
+
+        const { data: store, error } = await query.maybeSingle();
+        if (error || !store || isTransitStationStore(store)) {
+          localStorage.removeItem('ml-express-customer');
+          localStorage.removeItem('userType');
+          setLoading(false);
+          return;
+        }
+
+        setCurrentUser(user);
+      } catch {
+        localStorage.removeItem('ml-express-customer');
+        localStorage.removeItem('userType');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void restoreSession();
   }, []);
 
   const handleLogout = () => {

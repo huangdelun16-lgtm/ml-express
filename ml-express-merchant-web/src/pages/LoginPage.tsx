@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import {
+  getMerchantLoginBlockReason,
+  type MerchantLoginLang,
+} from '../services/_shared/merchantLoginGuard';
 import Logo from '../components/Logo';
 import './LoginPage.css';
 
@@ -47,6 +51,8 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
   };
 
   const currentT = (t as any)[language] || t.zh;
+  const loginLang: MerchantLoginLang =
+    language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +68,25 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
 
       if (storeError || !store) {
         throw new Error('Store not found');
+      }
+
+      if (storeError || !store) {
+        throw new Error('Store not found');
+      }
+
+      const blockReason = getMerchantLoginBlockReason(store, loginLang);
+      if (blockReason) {
+        throw new Error(blockReason);
+      }
+
+      if (store.status && store.status !== 'active') {
+        throw new Error(
+          loginLang === 'en'
+            ? `Account status issue (${store.status}). Please contact admin.`
+            : loginLang === 'my'
+              ? `အကောင့်အခြေအနေ (${store.status})။ Admin ကို ဆက်သွယ်ပါ။`
+              : `账号状态异常（${store.status}），请联系管理员。`,
+        );
       }
 
       // 🚀 支持明文和哈希对比 (后续可完善)
@@ -83,7 +108,7 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
       onLogin(merchantsUser);
       navigate('/');
     } catch (err) {
-      setError(currentT.error);
+      setError(err instanceof Error ? err.message : currentT.error);
     } finally {
       setLoading(false);
     }

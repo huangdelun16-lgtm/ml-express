@@ -15,6 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { welcomeScreenService, WelcomeScreen as WelcomeScreenData } from '../services/supabase';
+import { supabase } from '../services/supabase';
+import { isTransitStationStore } from '../services/_shared/merchantLoginGuard';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
@@ -75,6 +77,28 @@ export default function WelcomeScreen({ navigation }: any) {
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (userId) {
+        const storeCode = (await AsyncStorage.getItem('currentStoreCode'))?.trim().toUpperCase() ?? '';
+        let query = supabase.from('delivery_stores').select('id, store_type');
+        if (storeCode) {
+          query = query.eq('store_code', storeCode);
+        } else {
+          query = query.eq('id', userId);
+        }
+        const { data: store } = await query.maybeSingle();
+        if (isTransitStationStore(store)) {
+          await AsyncStorage.multiRemove([
+            'currentUser',
+            'userId',
+            'userEmail',
+            'userName',
+            'userPhone',
+            'userType',
+            'currentStoreCode',
+            'currentSessionId',
+          ]);
+          navigation.replace('Login');
+          return;
+        }
         navigation.replace('Main');
       } else {
         navigation.replace('Login');
