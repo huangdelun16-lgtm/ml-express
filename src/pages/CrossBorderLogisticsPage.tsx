@@ -5,6 +5,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import CrossBorderAccountManagementModal from '../components/CrossBorderAccountManagementModal';
 import CrossBorderPricingModal from '../components/CrossBorderPricingModal';
 import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
+import CrossBorderClearTestDataModal from '../components/CrossBorderClearTestDataModal';
 import CustomerExpressItemsModal from '../components/CustomerExpressItemsModal';
 import StoreFinanceDetailModal from '../components/StoreFinanceDetailModal';
 import StationReconciliationModal from '../components/StationReconciliationModal';
@@ -151,6 +152,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const [showAccountMgmtModal, setShowAccountMgmtModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showManualEntryModal, setShowManualEntryModal] = useState(false);
+  const [showClearTestModal, setShowClearTestModal] = useState(false);
   const [financeModalStore, setFinanceModalStore] = useState<InventoryTransitStore | null>(null);
   const [financeModalMode, setFinanceModalMode] = useState<StoreFinanceDetailMode>('ledger');
   const [reconcileModalStore, setReconcileModalStore] = useState<InventoryTransitStore | null>(
@@ -515,6 +517,13 @@ const CrossBorderLogisticsPage: React.FC = () => {
               onClick={() => setShowPricingModal(true)}
             >
               {isEn ? 'Pricing' : '跨境计费'}
+            </button>
+            <button
+              type="button"
+              className="cbl-btn cbl-btn--danger-outline"
+              onClick={() => setShowClearTestModal(true)}
+            >
+              {isEn ? 'Clear test data' : '清空测试数据'}
             </button>
             <button
               type="button"
@@ -1127,6 +1136,20 @@ const CrossBorderLogisticsPage: React.FC = () => {
         open={showManualEntryModal}
         onClose={() => setShowManualEntryModal(false)}
         onSaved={() => void load()}
+      />
+
+      <CrossBorderClearTestDataModal
+        open={showClearTestModal}
+        onClose={() => setShowClearTestModal(false)}
+        isEn={isEn}
+        onCleared={() => {
+          void load();
+          window.alert(
+            isEn
+              ? 'Inventory test data cleared from cloud. Devices will reconcile on next sync.'
+              : '云端 Inventory 测试数据已清空。各中转站 App 下次同步后将自动清理本机对应订单与包裹。',
+          );
+        }}
       />
 
       <CustomerExpressItemsModal

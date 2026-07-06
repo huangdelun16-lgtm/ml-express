@@ -18,6 +18,7 @@ import AdminReportsPage from './pages/AdminReportsPage';
 import CourierPerformancePage from './pages/CourierPerformancePage';
 import MerchantReconciliationExportPage from './pages/MerchantReconciliationExportPage';
 import ImportMetricDraftsPage from './pages/ImportMetricDraftsPage';
+import ProxyPurchasePage from './pages/ProxyPurchasePage';
 import CrossBorderLogisticsPage from './pages/CrossBorderLogisticsPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -219,6 +220,17 @@ function App() {
                   }
                 />
                 <Route
+                  path="proxy-purchase"
+                  element={
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'finance']}
+                      permissionId={['metric_management', 'product_price', 'personal_expenses']}
+                    >
+                      <ProxyPurchasePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="product-price"
                   element={
                     <ProtectedRoute
@@ -237,6 +249,17 @@ function App() {
                       permissionId={['personal_expenses', 'metric_management']}
                     >
                       <Navigate to="/admin/metric-management?openPersonal=1" replace />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="daigou"
+                  element={
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'finance']}
+                      permissionId={['metric_management', 'product_price', 'personal_expenses']}
+                    >
+                      <Navigate to="/admin/proxy-purchase" replace />
                     </ProtectedRoute>
                   }
                 />

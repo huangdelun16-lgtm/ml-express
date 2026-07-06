@@ -8,6 +8,7 @@ import { useAdminTodo } from '../contexts/AdminTodoContext';
 /** 全屏独立模块：不使用通用后台侧栏/顶栏，由页面自带布局 */
 export const STANDALONE_ADMIN_MODULE_PATHS = [
   '/admin/metric-management',
+  '/admin/proxy-purchase',
   '/admin/cross-border-logistics',
 ] as const;
 

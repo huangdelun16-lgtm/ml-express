@@ -26,7 +26,6 @@ import {
   type PrinterConnectionMode,
   type PrinterSettings,
 } from '../services/printerService';
-import { clearAllTestData } from '../services/inventoryService';
 import {
   getCloudSyncStatus,
   runManualCloudSync,
@@ -138,7 +137,6 @@ export default function SettingsScreen() {
   const { operatorName, storeCode, store, hubCode, logout, hasShiftOperator, updateShiftOperator } = useAuth();
   const { t, fmt, language } = useTranslation();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
-  const [clearing, setClearing] = useState(false);
   const [cloudSync, setCloudSync] = useState<CloudSyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -519,54 +517,6 @@ export default function SettingsScreen() {
             void updatePrinter({ copies: n });
           }}
         />
-      </SectionCard>
-
-      <SectionCard icon="🧪" title={t.settings.testData} accent="#ef4444">
-        <Pressable
-          style={[styles.actionBtn, styles.actionBtnDanger, clearing && styles.btnDisabled]}
-          disabled={clearing}
-          onPress={() => {
-            Alert.alert(
-              t.settings.clearAllTitle,
-              t.settings.clearAllMessage,
-              [
-                { text: t.common.cancel, style: 'cancel' },
-                {
-                  text: t.common.deleteAll,
-                  style: 'destructive',
-                  onPress: () => {
-                    void (async () => {
-                      setClearing(true);
-                      try {
-                        const result = await clearAllTestData(store ?? undefined, hub);
-                        const edgePart = result.cloudEdge
-                          ? `\nCloud: ${result.cloudEdge.items} items, ${result.cloudEdge.packs} packs`
-                          : result.cloudEdgeError
-                            ? `\nCloud: ${resolveAppError(t, new Error(result.cloudEdgeError))}`
-                            : '';
-                        Alert.alert(
-                          t.common.cleared,
-                          `Local: ${result.local.items} items, ${result.local.packs} packs, ${result.local.movements} movements${edgePart}`,
-                        );
-                      } catch (e: unknown) {
-                        Alert.alert(
-                          t.common.fail,
-                          resolveAppError(t, e),
-                        );
-                      } finally {
-                        setClearing(false);
-                      }
-                    })();
-                  },
-                },
-              ],
-            );
-          }}
-        >
-          <Text style={styles.actionBtnText}>
-            {clearing ? t.settings.clearing : t.settings.clearAllBtn}
-          </Text>
-        </Pressable>
       </SectionCard>
 
       <Text style={styles.footer}>{t.settings.footer}</Text>

@@ -1931,6 +1931,51 @@
   letter-spacing: 0.01em;
 }
 
+.cbl-btn--danger-outline {
+  background: rgba(127, 29, 29, 0.22) !important;
+  color: #fecaca !important;
+  border: 1px solid rgba(248, 113, 113, 0.45) !important;
+  font-weight: 700;
+}
+
+.cbl-btn--danger-solid {
+  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+  color: #fff !important;
+  border: 1px solid rgba(248, 113, 113, 0.5) !important;
+  box-shadow: 0 8px 22px rgba(239, 68, 68, 0.28);
+}
+
+.cbl-clear-test-modal__warn {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.cbl-clear-test-modal__hint {
+  display: block;
+  margin: 4px 0 6px;
+  font-size: 0.76rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.cbl-clear-test-modal__ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0 8px;
+  font-size: 0.86rem;
+  color: #334155;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.cbl-clear-test-modal__ack input {
+  margin-top: 3px;
+  accent-color: #ef4444;
+}
+
 .cbl-page--standalone .cbl-btn--primary {
   font-weight: 700;
   letter-spacing: 0.02em;

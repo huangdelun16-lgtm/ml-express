@@ -605,3 +605,38 @@ export async function createCrossBorderManualEntry(
     throw new Error(payload.error || `保存失败 (${response.status})`);
   }
 }
+
+export const INVENTORY_TEST_DATA_CONFIRM_PHRASE = '清空测试数据';
+
+export type InventoryTestDataClearResult = {
+  ok: boolean;
+  deleted: {
+    orderTracking: number;
+    transportFeePayments: number;
+    pkgTracking: number;
+    packedShipmentItems: number;
+    packedShipments: number;
+    stockMovements: number;
+    storeItems: number;
+  };
+  clearedAt: string;
+  message?: string;
+};
+
+export async function clearInventoryTestData(
+  password: string,
+  confirmPhrase: string,
+): Promise<InventoryTestDataClearResult> {
+  const response = await fetch('/.netlify/functions/inventory-admin-clear-test-data', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password, confirmPhrase }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `清空失败 (${response.status})`);
+  }
+  return payload as InventoryTestDataClearResult;
+}
