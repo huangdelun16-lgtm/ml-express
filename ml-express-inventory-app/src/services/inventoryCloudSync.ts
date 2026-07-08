@@ -928,6 +928,8 @@ export async function pushTruckLoadToCloud(params: {
 }): Promise<void> {
   if (!isSupabaseConfigured()) return;
 
+  await ensureInventoryCloudAuth();
+
   const fee = params.transportFee?.trim() ?? '';
   const transportFees: Record<string, string> = {};
   for (const pack of params.packs) {

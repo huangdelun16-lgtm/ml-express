@@ -108,6 +108,7 @@ type LedgerCopy = {
   saveShortcut: string;
   entryCount: string;
   close: string;
+  loginRequired: string;
 };
 
 export type PersonalExpensePageProps = {
@@ -185,6 +186,8 @@ const PersonalExpensePage: React.FC<PersonalExpensePageProps> = ({
           typingAmount: 'Enter an amount',
           saveShortcut: 'Enter — save · Esc — close',
           entryCount: 'records',
+          loginRequired:
+            'Sign in to Admin with the same username on every device. Personal expenses are stored per login name in the cloud.',
         }
       : language === 'my'
         ? {
@@ -226,6 +229,8 @@ const PersonalExpensePage: React.FC<PersonalExpensePageProps> = ({
             typingAmount: 'ပမာဏ ထည့်ပါ',
             saveShortcut: 'Enter — သိမ်း',
             entryCount: 'မှတ်',
+            loginRequired:
+              'Admin တွင် တူညီသော username ဖြင့် login ဝင်ပါ။ ကုန်ကျငွေသည် cloud တွင် login အမည်အလိုက် သိမ်းသည်။',
           }
         : {
             kicker: 'ML EXPRESS · ADMIN',
@@ -266,6 +271,8 @@ const PersonalExpensePage: React.FC<PersonalExpensePageProps> = ({
             typingAmount: '请输入金额',
             saveShortcut: 'Enter 保存 · Esc 关闭 · 点击遮罩关闭',
             entryCount: '笔记录',
+            loginRequired:
+              '请先登录 Admin。个人开销保存在云端，且按登录用户名隔离——换电脑请用同一账号登录才能看到数据。',
           };
 
   const reload = useCallback(async () => {
@@ -596,6 +603,22 @@ const PersonalExpensePage: React.FC<PersonalExpensePageProps> = ({
             }}
           >
             {loadErr}
+          </div>
+        ) : null}
+
+        {!owner.trim() ? (
+          <div
+            style={{
+              padding: '14px 18px',
+              borderRadius: 14,
+              background: 'rgba(30, 58, 138, 0.35)',
+              border: '1px solid rgba(96, 165, 250, 0.45)',
+              marginBottom: 18,
+              fontSize: 13,
+              lineHeight: 1.55,
+            }}
+          >
+            {t.loginRequired}
           </div>
         ) : null}
 

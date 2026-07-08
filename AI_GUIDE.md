@@ -12,17 +12,20 @@
 4. [管理后台（仓库根 `src/`）](#4-管理后台仓库根-src)
 5. [会员端网站 `ml-express-client-web`](#5-会员端网站-ml-express-client-web)
 6. [商家端网站 `ml-express-merchant-web`](#6-商家端网站-ml-express-merchant-web)
-7. [移动端应用（Expo）](#7-移动端应用expo-sdk-54)
-8. [Inventory 中转站 App `ml-express-inventory-app`](#8-inventory-中转站-app-ml-express-inventory-app)
-9. [Admin 跨境物流控制台](#9-admin-跨境物流控制台)
-10. [中转物流业务流（MUSE → MDY → YGN）](#10-中转物流业务流muse--mdy--ygn)
-11. [共享代码层 `/shared`](#11-共享代码层-shared)
-12. [Supabase 与数据模型](#12-supabase-与数据模型)
-13. [Netlify 与 EAS 部署](#13-netlify-与-eas-部署)
-14. [环境变量](#14-环境变量)
-15. [给 AI / 维护者的改代码提示](#15-给-ai--维护者的改代码提示)
-16. [常用文件速查](#16-常用文件速查)
-17. [版本与分支](#17-版本与分支)
+7. [会员 App `ml-express-client`](#7-会员-app-ml-express-client)
+8. [商家 App `ml-express-merchant-app`](#8-商家-app-ml-express-merchant-app)
+9. [骑手/员工 App `ml-express-mobile-app`](#9-骑手员工-app-ml-express-mobile-app)
+10. [Inventory 中转站 App `ml-express-inventory-app`](#10-inventory-中转站-app-ml-express-inventory-app)
+11. [Admin 跨境物流控制台](#11-admin-跨境物流控制台)
+12. [中转物流业务流（MUSE → MDY → YGN）](#12-中转物流业务流muse--mdy--ygn)
+13. [共享代码层 `/shared`](#13-共享代码层-shared)
+14. [Supabase 与数据模型](#14-supabase-与数据模型)
+15. [Netlify 与 EAS 部署](#15-netlify-与-eas-部署)
+16. [环境变量](#16-环境变量)
+17. [常见问题与排障](#17-常见问题与排障)
+18. [给 AI / 维护者的改代码提示](#18-给-ai--维护者的改代码提示)
+19. [常用文件速查](#19-常用文件速查)
+20. [版本与分支](#20-版本与分支)
 
 ---
 
@@ -42,7 +45,7 @@ flowchart TB
   end
   subgraph ops [运营与配送]
     ADM[src/* 管理后台 CRA]
-    RIDER[ml-express-mobile-app\nExpo 骑手端]
+    RIDER[ml-express-mobile-app\nExpo 骑手端 STAFF]
     INV[ml-express-inventory-app\nExpo 中转站库存]
   end
   SH[/shared\n跨端共享纯逻辑/]
@@ -67,22 +70,22 @@ flowchart TB
   INV -. 独立 EAS .-> SB
 ```
 
-**两条业务线（勿混表）：**
+### 两条业务线（勿混表）
 
 | 业务线 | 典型表 | 典型 App / 模块 |
 |--------|--------|-----------------|
 | **City 配送 / 商城 / 跑腿** | `packages`、`orders`、`products`、`couriers`… | 会员/商家/骑手 App + 管理后台 City 模块 |
 | **中转站库存 / 跨境包裹** | `inventory_*`、`cross_border_manual_entries` | `ml-express-inventory-app` + Admin **跨境物流** |
 
-**认证体系概览：**
+### 认证体系概览
 
 | 端 | 登录方式 | 会话存储 |
 |----|----------|----------|
-| 会员 Web/App | Supabase Auth / 本地 customer | `localStorage` `ml-express-customer` |
-| 商家 Web/App | Supabase Auth | 商家会话 |
-| 骑手 App | Supabase Auth + `ensure-courier-auth` | SecureStore |
-| 管理后台 | `verify-admin` Netlify Function + Cookie | Admin session |
-| Inventory App | `inventory-store-login` Edge Function → JWT | SecureStore + Supabase Auth |
+| 会员 Web/App | `users` 表（customer）邮箱/手机 + 密码 | `localStorage` / `AsyncStorage` |
+| 商家 Web/App | `delivery_stores` 店铺码 + 密码 | `localStorage` / `AsyncStorage` |
+| 骑手 App | `admin_accounts` + `ensure-courier-auth` Edge Function | `AsyncStorage` |
+| 管理后台 | `verify-admin` Netlify Function + HMAC JWT Cookie | session/localStorage |
+| Inventory App | `inventory-store-login` Edge Function → Supabase Auth JWT | SecureStore + Supabase Auth |
 
 ---
 
@@ -94,7 +97,7 @@ flowchart TB
 | 管理后台 | `admin-market-link-express.netlify.app` 或自定义 admin 域 | 仓库根 CRA + Functions |
 | 商家 Web | 独立 Netlify 站点 | `ml-express-merchant-web` |
 | Inventory App Support | `https://market-link-express.com/support` | App Store Support URL |
-| Inventory iOS | App Store `com.mlexpress.inventory` | EAS Build，当前 **1.2.0 (6)** |
+| Inventory iOS | App Store `com.mlexpress.inventory` | EAS Build，当前 **1.4.1 (10)** |
 | Supabase | `uopkyuluxnrewvlmutam.supabase.co` | 全端共用同一项目 |
 
 > ⚠️ 勿在 App Store 使用无效域名（如 `linkexpress.com/support`）；Support URL 必须可访问。
@@ -103,19 +106,19 @@ flowchart TB
 
 ## 3. 子项目一览
 
-| 目录 | 类型 | 角色 | 技术栈 | 部署 |
-|------|------|------|--------|------|
-| **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、合伙店铺、报表等 | CRA + TS + React Router **v6** | Netlify（根目录） |
-| **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户 | CRA + TS + React Router **v7** | Netlify |
-| **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | Netlify |
-| **`ml-express-client/`** | Mobile | **会员 App**（`com.mlexpress.client`） | Expo SDK 54 / RN | EAS |
-| **`ml-express-merchant-app/`** | Mobile | **商家 App** | Expo SDK 54 / RN | EAS |
-| **`ml-express-mobile-app/`** | Mobile | **骑手端**（`market-link-express-mobile`） | Expo SDK 54 / RN | EAS |
-| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App**（ML Inventory）：入库、打包、装车、到站收货、快递明细 | Expo SDK 54 / RN + **SQLite 本地缓存** | EAS（独立包名） |
-| **`shared/`** | 共享源 | 跨端纯逻辑单一源（计费/商品审核/充值 QR） | TS | sync 进各 app |
-| **`netlify/`** | 服务端 | 管理后台 Netlify Functions | Node | — |
-| **`supabase/`** | 数据 | SQL migrations + Edge Functions | SQL / Deno | Supabase Cloud |
-| **`design/` `specs/` `scripts/` `docs/`** | 资源 | 设计、规格、CI 脚本、归档文档 | — | — |
+| 目录 | 类型 | 角色 | 技术栈 | 当前版本 | 部署 |
+|------|------|------|--------|----------|------|
+| **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、合伙店铺、报表、跨境物流 | CRA + TS + React Router **v6** | **2.2.4** | Netlify（根目录） |
+| **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户、Support | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
+| **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
+| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.5.0** | EAS |
+| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.0** | EAS |
+| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.7** | EAS |
+| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + SQLite + 蓝牙打印 | **1.4.1 (10)** | EAS |
+| **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
+| **`netlify/`** | 服务端 | 管理后台 Netlify Functions | Node | — | — |
+| **`supabase/`** | 数据 | SQL migrations + Edge Functions | SQL / Deno | — | Supabase Cloud |
+| **`design/` `specs/` `scripts/` `docs/`** | 资源 | 设计、规格、CI 脚本、归档文档 | — | — | — |
 
 > 根 `package.json` 的 `name` 为 `market-link-express`，**代码职责是管理后台**；勿与 `ml-express-client-web` 站点混用 Base directory。
 
@@ -134,6 +137,7 @@ flowchart TB
 | `src/components/` | 通用与跨境组件（`CrossBorder*`、`CblTablePagination`） |
 | `src/layouts/AdminShellLayout.tsx` | 侧栏+顶栏；`STANDALONE_ADMIN_MODULE_PATHS` |
 | `src/contexts/` | 含 `AdminTodoContext` |
+| `src/services/supabase.ts` | Supabase 客户端 + 各业务 service |
 | `src/services/inventoryConsoleService.ts` | 跨境 Admin API 客户端 |
 | `src/utils/crossBorderHubs.ts` | MUSE/MDY/YGN 枢纽与账号草稿 |
 | `src/styles/crossBorderLogistics.css` | 跨境独立页样式 |
@@ -153,18 +157,21 @@ flowchart TB
 | `/admin/finance` | 财务 | `finance` |
 | `/admin/tracking` / `realtime-tracking` | 跟踪 | `tracking` |
 | `/admin/settings` / `system-settings` | 设置 | `settings` |
-| `/admin/accounts` | 后台账号权限 | — |
+| `/admin/accounts` | 后台账号权限 | `settings` |
 | `/admin/banners` | Banner | `banners` |
 | `/admin/delivery-stores` | **合伙店铺**（不含中转站） | `merchant_stores` |
-| `/admin/supervision` | 督导 | `supervision` |
+| `/admin/merchant-applications` | 商家入驻申请 | `merchant_stores` |
+| `/admin/supervision` | 督导 | — |
+| `/admin/audit-logs` | 审计日志 | — |
 | `/admin/delivery-alerts` | 配送警报 | `delivery_alerts` |
 | `/admin/recharges` | 充值 | `recharges` |
 | `/admin/reports` | 报表 | `reports` |
 | `/admin/courier-performance` | 骑手绩效 | `courier_performance` |
 | `/admin/merchant-reconciliation` | 商家对账 | `merchant_reconciliation` |
-| `/admin/metric-management` | 指标管理（**全屏独立**） | `metric_management` |
+| `/admin/metric-management` | 指标管理（**全屏独立**，4 Tab 见 §4.7） | `metric_management` |
+| `/admin/proxy-purchase` | 代购清单（独立页，也可从指标管理 Tab 进入） | `metric_management` |
 | `/admin/product-price` | 商品价格 | — |
-| `/admin/personal-expenses` | 个人开支 | — |
+| `/admin/personal-expenses` | 个人开销 | — |
 | `/admin/cross-border-logistics` | 跨境物流（**全屏独立**） | `cross_border_logistics` |
 
 ### 4.3 独立全屏模块
@@ -188,24 +195,49 @@ flowchart TB
 | `StationReconciliationModal.tsx` | 对账 |
 | `inventoryConsoleService.ts` | Admin API |
 
-### 4.6 Netlify Functions
+### 4.6 Netlify Functions（根 `netlify/functions/`）
 
-**通用**：`verify-admin`、`admin-password`、`send-email-code`、`verify-email-code`、`send-sms`、`ensure-courier-auth`、`upload-banner`、`cleanup-delivery-photos`、`send-order-confirmation`。
+**通用 Admin**
 
-**跨境 / Inventory Admin**：
+| 函数 | 用途 |
+|------|------|
+| `verify-admin` | 校验 Admin JWT |
+| `admin-password` | 改密 |
+| `send-email-code` / `verify-email-code` | 邮箱验证码 |
+| `send-sms` / `verify-sms` | 短信验证码 |
+| `send-order-confirmation` | 下单确认邮件 |
+| `ensure-courier-auth` | 骑手 Auth 代理 |
+| `upload-banner` | Banner 上传 |
+| `cleanup-delivery-photos` | 配送照片清理（cron） |
+| `merchant-admin-applications` | 商家申请审核 |
+
+**跨境 / Inventory Admin**
 
 | 函数 | 用途 |
 |------|------|
 | `inventory-admin-data.js` | 概览/财务/包裹（含 RPC 分页） |
 | `inventory-admin-create-account.js` | 创建中转站+Auth |
 | `inventory-admin-update-account.js` | GET/PUT 编辑账号 |
+| `inventory-admin-delete-account.js` | 删除账号 |
 | `inventory-admin-cross-border-entry.js` | 手工收支 |
 | `inventory-admin-customers.js` | 客户汇总 |
 | `inventory-admin-finance.js` | 财务明细 |
+| `inventory-admin-clear-test-data.js` | 清空测试数据 |
 
-**Utils**：`inventoryTransitAccount.js`、`inventoryFinanceAggregate.js`、`inventoryCustomerAggregate.js`、`cors.js`。
+**Utils**：`inventoryTransitAccount.js`、`inventoryFinanceAggregate.js`、`inventoryCustomerAggregate.js`、`packDisplayStatus.js`、`cors.js`。
 
 生产 Netlify 站点 ID：`ed9c2173-4031-4f10-a466-5b041dfe3511`。
+
+### 4.7 指标管理 Hub（`ImportMetricDraftsPage.tsx`）
+
+全屏独立模块，内含 4 个 Tab（换电脑需 Supabase 云端数据，勿只依赖 localStorage）：
+
+| Tab | 页面/组件 | 数据存储 |
+|-----|-----------|----------|
+| 进口指标草稿 | 本页表格 + 编辑弹窗 | `import_metric_drafts`（Supabase） |
+| 商品价格 | 嵌入商品价格区块 | `products` / 定价设置 |
+| 个人开销 | `PersonalExpensePage` | `personal_ledger_entries`（按 username 隔离） |
+| 代购清单 | `ProxyPurchasePage` | `proxy_purchase_workspaces`（Supabase，migration `20260707120000`） |
 
 ---
 
@@ -218,7 +250,13 @@ flowchart TB
   - `/profile`、`/mall`、`/mall/:storeId`、`/cart`
   - `/privacy-policy`、`/terms-of-service`、`/delete-account`
   - **`/support`** — ML Inventory App Store 支持页（`SupportPage.tsx`）
+- Netlify Functions：`merchant-apply`、`merchant-apply-upload`、`send-sms`、`verify-sms`、`send-email-code` 等。
 - Netlify 站点 ID：`52f5f573-ca0a-4769-a8c7-e5f675764056`。
+- `/download`、`/download-rider` → GitHub Releases APK 重定向。
+
+```bash
+cd ml-express-client-web && npm install && npm start
+```
 
 ---
 
@@ -227,76 +265,146 @@ flowchart TB
 - 目录：`src/{pages,components,contexts,hooks,services,…}` + `_shared/`。
 - **下单弹窗**：`src/components/home/OrderModal.tsx` + `orderModalWizard.ts`（4 步向导）。
 - 多规格：`ProductVariantPicker.tsx` + `utils/productVariants.ts`。
+- Auth：`delivery_stores.store_code` + 密码 → `localStorage`；拒绝 `transit_station`（`merchantLoginGuard`）。
+- 路由：`/login` → `/`（Profile）、`/products`、`/orders`。
 - Netlify 站点 ID：`126af2b9-244f-47fd-9be9-58fb45b6e7a2`。
 
----
-
-## 7. 移动端应用（Expo SDK 54）
-
-会员/商家 App：`src/{screens,components,contexts,services,…}`；骑手端无 `src/` 前缀（`screens/`、`services/` 在子项目根）。
-
-| App | 包标识 | 核心屏幕 |
-|-----|--------|----------|
-| `ml-express-client` | `com.mlexpress.client` | Home、CityMall、PlaceOrder、Cart、MyOrders、TrackOrder… |
-| `ml-express-merchant-app` | 商家包名 | 与会员类似 + 门店商品/订单 |
-| `ml-express-mobile-app` | 骑手 | CourierHome、Map、Scan、PackageManagement、Finance… |
-
-**共性**：`EXPO_PUBLIC_*` 或 `app.config` 注入 Supabase；与 CRA 的 `REACT_APP_*` **不互通**。
+```bash
+cd ml-express-merchant-web && npm install && npm start
+```
 
 ---
 
-## 8. Inventory 中转站 App `ml-express-inventory-app`
+## 7. 会员 App `ml-express-client`
 
-独立 Expo 应用，供 Admin 创建的 **中转站合伙店铺**（`delivery_stores.store_type = transit_station`）使用。详细云端设计见 **`ml-express-inventory-app/docs/CLOUD_DATA_ARCHITECTURE.md`**。
+| 项 | 值 |
+|----|-----|
+| 包名 | `com.mlexpress.client` |
+| 版本 | **2.5.0**（iOS build 64 / Android versionCode 64） |
+| 技术 | Expo 54 + RN 0.81 + React Navigation |
+| Deep link | `ml-express-client://`、`https://mlexpress.com` |
 
-### 8.1 定位与数据策略
+**目录**：`src/{screens,components,contexts,services,utils}` + `src/services/_shared/`。
 
-- **包名**：iOS/Android `com.mlexpress.inventory`；App Store 名 **ML Inventory**。
-- **版本**：见 `app.json` / `package.json`（当前 **1.2.0**，iOS build 见 `ios.buildNumber`）。
-- **登录**：`delivery_stores.store_type = transit_station`；Edge Function `inventory-store-login` 签发 JWT（`inventory_store_code` / `inventory_hub_code`）。
-- **Supabase 配置**：`app.config.js` 将 URL/anon key 写入 `extra`；EAS production 见 `eas.json` env；本地 `.env` 可覆盖。
-- **本地**：SQLite + 离线队列 `cloud_sync_queue`。
-- **云端**：`inventory_*` 表；与 City **`packages`/`orders` 隔离**。
-- **多语言**：`src/i18n/`（中/英/缅）+ `LanguageContext`。
-- **Support URL**：`src/constants/support.ts` → `https://market-link-express.com/support`。
+**核心屏幕**：Welcome → Login/Register → Main(Home tabs) → PlaceOrder、MyOrders、TrackOrder、CityMall、Cart、Profile、OrderDetail…
 
-### 8.2 目录结构
+**Auth**：`users` 表 `user_type='customer'`，非 Supabase Auth JWT；会话 `AsyncStorage`（`currentUser`）；支持游客模式。
+
+**Supabase 表**：`users`、`packages`、`address_book`、`delivery_stores`、`products`、`user_notifications`、`banners` 等。
+
+**构建**：
+
+```bash
+cd ml-express-client
+npm install && npx expo start
+eas build --platform ios --profile production   # 或 android / apk
+```
+
+---
+
+## 8. 商家 App `ml-express-merchant-app`
+
+| 项 | 值 |
+|----|-----|
+| 包名 | `com.mlexpress.merchants` |
+| 版本 | **2.4.0** |
+| Scheme | `ml-express-merchants://` |
+
+与会员 App 架构相同，额外 `expo-image-manipulator`（商品图）。
+
+**Auth**：`delivery_stores` 店铺码 + 密码；`merchantLoginGuard` 拦截 `transit_station`。
+
+**核心屏幕**：Welcome → Login → Main → MyOrders、MerchantProducts、PlaceOrder、Cart、Profile…
+
+---
+
+## 9. 骑手/员工 App `ml-express-mobile-app`
+
+| 项 | 值 |
+|----|-----|
+| 包名 | `com.mlexpress.courier` |
+| 显示名 | MARKET LINK STAFF |
+| 版本 | **2.3.7** |
+| Scheme | `ml-express-staff://` |
+
+**目录结构（无 `src/` 前缀）**：`screens/`、`services/`、`navigation/`（lazyScreens）、`components/`、`contexts/`、`database/`（本地 SQLite）、`services/_shared/`。
+
+**Auth**：`admin_accounts` 登录；骑手 provisioning 走 `ensure-courier-auth` Edge Function；Supabase client `persistSession: false`。
+
+**核心屏幕**：Login → LocationDisclosure → Main tabs（Dashboard/MyTasks/Map/Scan/Profile）→ PackageDetail、DeliveryHistory、PackageManagement、CourierManagement、FinanceManagement…
+
+**特性**：`@sentry/react-native`、后台定位（`expo-location` + `expo-task-manager`）、角色守卫（管理员可见财务/骑手管理）。
+
+```bash
+cd ml-express-mobile-app && npm install && npx expo start
+npm run build:aab   # Android AAB 生产包
+```
+
+---
+
+## 10. Inventory 中转站 App `ml-express-inventory-app`
+
+独立 Expo 应用，供 Admin 创建的 **中转站合伙店铺**（`delivery_stores.store_type = transit_station`）使用。详细云端设计见 **`ml-express-inventory-app/docs/CLOUD_DATA_ARCHITECTURE.md`**（若存在）。
+
+### 10.1 定位与数据策略
+
+| 项 | 值 |
+|----|-----|
+| 包名 | iOS/Android `com.mlexpress.inventory` |
+| App Store 名 | **ML Inventory** |
+| 版本 | **1.4.1**（iOS build **10** / Android versionCode **10**） |
+| 登录 | Edge Function `inventory-store-login` → Supabase Auth JWT |
+| JWT claims | `inventory_store_code`、`inventory_hub_code` 等 |
+| 本地 | SQLite + 离线队列 `cloud_sync_queue` |
+| 云端 | `inventory_*` 表；与 City **`packages`/`orders` 隔离** |
+| 多语言 | `src/i18n/`（中/英/缅）+ `LanguageContext` |
+| Support URL | `src/constants/support.ts` → `https://market-link-express.com/support` |
+
+**Supabase 配置**：`app.config.js` 将 URL/anon key 写入 `extra`；EAS production 见 `eas.json` env；本地 `.env` 可覆盖。
+
+**不参与 `/shared` sync**（独立业务线）。
+
+### 10.2 目录结构
 
 ```
 ml-express-inventory-app/src/
-├── screens/           # 业务页（见 7.3）
-├── components/      # HubReceiveOrdersModal、PackExpressModal、Pkg*Modal…
-├── contexts/        # AuthContext、LanguageContext
-├── i18n/            # translations.ts、format.ts
-├── navigation/      # AppNavigator（Stack）
+├── screens/           # 业务页（见 10.3）
+├── components/        # HubReceiveOrdersModal、PackExpressModal、OrderBarcodeModal、LabelPrintPreviewCard…
+├── contexts/          # AuthContext、LanguageContext
+├── i18n/              # translations.ts、format.ts、types.ts
+├── navigation/        # AppNavigator（Stack）
+├── constants/         # branding.ts、xprinterP203a.ts
 ├── services/
 │   ├── database.ts              # SQLite schema / migrations
 │   ├── inventoryService.ts      # 核心业务（入库/打包/装车/到站/列表）
 │   ├── trackingService.ts       # inventory_pkg/order_tracking 云端
 │   ├── inventoryCloudSync.ts    # 拉取/推送/合并/装车双写
 │   ├── inventoryCloudApi.ts     # Supabase inventory_* CRUD
-│   ├── inventoryCloudQueue.ts  # 离线重试队列
+│   ├── inventoryCloudQueue.ts   # 离线重试队列
 │   ├── inventoryCloudRealtime.ts
-│   ├── authService.ts           # 中转站登录会话
-│   ├── hubTransportFeeService.ts # 到站车费支付状态
-│   ├── financeLedgerService.ts  # 与财务流水联动
-│   └── printerService.ts        # 标签打印（expo-print）
+│   ├── authService.ts           # 中转站登录会话 + ensureInventoryCloudAuth
+│   ├── hubTransportFeeService.ts
+│   ├── financeLedgerService.ts
+│   ├── printerService.ts        # 标签打印编排
+│   ├── bluetoothThermalPrinter.ts  # 蓝牙直连 Xprinter P203A
+│   └── tsplLabelBuilder.ts      # TSPL 指令生成
 ├── utils/
-│   ├── expressDetailsVisibility.ts  # 区域可见性（快递明细/打包/云端合并）
-│   ├── packDisplayStatus.ts         # 打包列表状态：未装车/已装车/已到站/已完成
+│   ├── expressDetailsVisibility.ts  # 区域可见性
+│   ├── packDisplayStatus.ts         # 打包列表状态
 │   ├── storeOwnership.ts            # MUSE/YGN/MDY 归属与编辑权限
-│   ├── storeZone.ts                 # resolveStoreHubCode（YGN/MDY/MSE…）
-│   ├── itemDestination.ts / packageNumber.ts / inboundBarcode.ts
+│   ├── storeZone.ts                 # resolveStoreHubCode
+│   ├── cloudAuthErrors.ts           # RLS 错误识别
+│   ├── labelPrintLayout.ts
 │   └── …
 └── types/             # inventory.ts, tracking.ts
 ```
 
-### 8.3 屏幕与导航（`AppNavigator.tsx`）
+### 10.3 屏幕与导航（`AppNavigator.tsx`）
 
 | Screen | 标题 | 职责 |
 |--------|------|------|
 | `HomeScreen` | ML Inventory | 入口、统计、快捷入口 |
-| `StockInScreen` | 入库 | 登记订单、生成入库条码 |
+| `StockInScreen` | 入库 | 登记订单、生成入库条码；成功后自动弹 Barcode 打印（可取消） |
 | `ItemsScreen` | **快递明细** | 订单列表、打包快递、多选打印 |
 | `PkgScreen` | **打包** | 已打包 PKG 列表、编辑/拆包/打印 |
 | `StockOutScreen` | **装车出库** | 选 PKG、选本段目的地、发车 |
@@ -304,12 +412,13 @@ ml-express-inventory-app/src/
 | `ShipmentTrackScreen` | 在途追踪 | 发站视角看在途包 |
 | `TrackExpressScreen` | 追踪快递 | 单笔查询 |
 | `MovementsScreen` | 流水 | 出入库流水 |
-| `CrossBorderFinanceScreen` | **跨境财务** | 站点账本/待入账/车费（与 Admin 规则对齐） |
-| `CameraScanScreen` | 通用扫码 | 自动请求系统相机权限 |
-| `SettingsScreen` | 设置 | 店铺信息、同步、改密、退出 |
+| `CrossBorderFinanceScreen` | **跨境财务** | 站点账本/待入账/车费 |
+| `OpsHealthScreen` | 运维健康 | 同步/连接诊断 |
+| `CameraScanScreen` | 通用扫码 | 系统相机权限 |
+| `SettingsScreen` | 设置 | 店铺信息、同步、打印机、改密、退出 |
 | `ItemFormScreen` | 商品 | 编辑订单字段 |
 
-### 8.4 核心业务流程（代码路径）
+### 10.4 核心业务流程
 
 ```mermaid
 flowchart LR
@@ -335,7 +444,28 @@ flowchart LR
 | 列表同步 | `syncPlatformInventoryCloud` → `pullPlatformInventoryFromCloud` |
 | 到站写本地 | `importInboundPackToLocal` |
 
-### 8.5 区域可见性（重要）
+**装车云端双写**（`pushTruckLoadToCloud`）：
+1. `ensureInventoryCloudAuth()` 刷新 JWT
+2. `pushTruckLoadTracking` → `inventory_pkg_tracking` + `inventory_order_tracking`
+3. 更新 `inventory_packed_shipments` + 写出库流水
+
+### 10.5 云端同步架构
+
+```
+本地 SQLite
+  ├── store_items / packed_shipments / stock_movements
+  └── cloud_sync_queue（离线待上传）
+         ↓ flush
+inventoryCloudQueue.ts → inventoryCloudApi.ts → Supabase inventory_*
+         ↓ 合并
+inventoryCloudSync.ts（pull + merge + 区域过滤）
+         ↓ 实时（可选）
+inventoryCloudRealtime.ts
+```
+
+**单设备会话**：migration `20260621120000_inventory_single_device_session`；`InventorySessionMonitor` 检测被踢下线。
+
+### 10.6 区域可见性（重要）
 
 逻辑集中在 **`src/utils/expressDetailsVisibility.ts`** + **`packDisplayStatus.ts`**：
 
@@ -346,28 +476,37 @@ flowchart LR
 | **目的站（YGN）** | **仅**最终目的地 YGN 的订单 | **仅**YGN 目的地且本站持有的 PKG |
 
 相关 API：
-
 - `isVisibleInExpressDetailsList` → `listItems` 过滤
 - `isVisibleInPackedList` → `listPackedShipments` 过滤
-- `canSelectPackedShipmentForTruckLoad` → `listOutboundPackages`（**已到站/在途不可再装车**）
-- `canEditPackedShipment` → 打包页不可编辑
+- `canSelectPackedShipmentForTruckLoad` → `listOutboundPackages`
 - `shouldMergeCloudItemToLocal` / `shouldMergeCloudPackToLocal` → 云端拉取过滤
-- `pruneItemsOutsideExpressDetailsScope` / `prunePacksOutsideExpressDetailsScope` → 清理脏缓存
 
 **目的站集合**（仅最终目的地、非中转）：`YGN`、`TGI`（见 `DESTINATION_ONLY_HUBS`）。
 
-### 8.6 打包列表状态（`packDisplayStatus.ts`）
+### 10.7 打包列表状态（`packDisplayStatus.ts`）
 
 | display_status | 中文 | 条件概要 |
 |----------------|------|----------|
 | `pending_load` | 未装车 | 未出库 |
 | `loaded` | 已装车 | 本地已出库，云端仍 `in_transit` |
 | `arrived` | 已到站 | 云端 `hub_received` 且本地未同步出库等边缘情况 |
-| `completed` | 已完成 | 云端 `hub_received`/`split_at_hub`/`completed` 且已装车；或本段运输结束 |
+| `completed` | 已完成 | 云端 `hub_received`/`split_at_hub`/`completed` 且已装车 |
 
 云端追踪状态：`inventory_pkg_tracking.status` → `in_transit` | `hub_received` | `completed` | `split_at_hub` | `cancelled`。
 
-### 8.7 运行、EAS 与 App Store
+### 10.8 蓝牙标签打印（Xprinter P203A）
+
+| 文件 | 职责 |
+|------|------|
+| `constants/xprinterP203a.ts` | 纸张尺寸、DPI |
+| `tsplLabelBuilder.ts` | TSPL 指令（条码、文字布局） |
+| `bluetoothThermalPrinter.ts` | 蓝牙直连发送 |
+| `printerService.ts` | 统一打印入口（预览 / 蓝牙） |
+| `LabelPrintPreviewCard.tsx` | 打印预览 UI |
+
+Settings 可选「蓝牙直连」模式；入库成功后可弹 `OrderBarcodeModal` 打印标签。
+
+### 10.9 运行、EAS 与 App Store
 
 ```bash
 cd ml-express-inventory-app
@@ -379,25 +518,30 @@ npx expo start
 supabase functions deploy inventory-store-login
 supabase functions deploy inventory-change-password
 
+# DB migrations
+supabase db push
+
 # iOS 生产包
 eas build --platform ios --profile production
 eas submit --platform ios --profile production
+
+# Android APK（内测）
+eas build --platform android --profile apk
 ```
 
-- **`app.config.js`**：合并 `app.json`，注入 `extra.supabaseUrl/AnonKey`（生产默认值 + env 覆盖）。
-- **`eas.json`**：`appVersionSource: local`；production profile 含 `EXPO_PUBLIC_*`。
-- **相机权限**：进入扫码时直接触发系统对话框；拒绝后显示「继续」/「打开设置」（`BarcodeScannerView.tsx`）。
+- **`app.config.js`**：合并 `app.json`，注入 `extra.supabaseUrl/AnonKey`。
+- **`eas.json`** profiles：`development`、`preview`（APK）、`apk`、`production`（AAB/iOS）。
 - **B2B 说明**：登录页注明账号由 Admin 分配；无公开注册（App Store Guideline 3.2）。
 
 账号须在 Admin **跨境物流 → 跨境账号管理** 创建（`transit_station`）。
 
 ---
 
-## 9. Admin 跨境物流控制台
+## 11. Admin 跨境物流控制台
 
 页面：`CrossBorderLogisticsPage.tsx`（独立全屏深色 UI）。
 
-### 9.1 功能区块
+### 11.1 功能区块
 
 | 区块 | 数据来源 | 说明 |
 |------|----------|------|
@@ -408,14 +552,14 @@ eas submit --platform ios --profile production
 | 客户信息 | `inventory-admin-customers` | IntersectionObserver 懒加载 |
 | 最近包裹 | `scope=packs` | 可筛选状态 |
 
-### 9.2 性能策略（已实现）
+### 11.2 性能策略
 
 - P0：overview / finance / packs 并行加载；finance 聚合缓存。
 - P1：8 项 count 并行；finance 服务端分页；`transport_fee_total` migration。
 - P2：客户列表懒加载。
 - P3：overview 单次 RPC `inventory_admin_overview_stats()`。
 
-### 9.3 账号与定价
+### 11.3 账号与定价
 
 - **跨境账号管理**弹窗：列表 + 创建/编辑（`inventory-admin-create/update-account`）。
 - **跨境定价**：`CrossBorderPricingModal` → `system_settings` 键 `pricing.{region}.cross_border.*`。
@@ -423,7 +567,7 @@ eas submit --platform ios --profile production
 
 ---
 
-## 10. 中转物流业务流（MUSE → MDY → YGN）
+## 12. 中转物流业务流（MUSE → MDY → YGN）
 
 典型场景：木姐 **MUSE** 发站入库 → 打包 → 装车；经 **MDY** 中转 → 最终 **YGN** 目的。
 
@@ -440,33 +584,58 @@ eas submit --platform ios --profile production
 
 ---
 
-## 11. 共享代码层 `/shared`
+## 13. 共享代码层 `/shared`
 
 为减少 6 份 `supabase.ts` 重复，**纯逻辑**放在 `/shared/src`，经 `sync.mjs` 复制到各 app 的 `_shared/`（带 `AUTO-GENERATED` 头，**已提交 git**）。
 
 | 文件 | 作用 | 消费方 |
 |------|------|--------|
-| `pricing.ts` | 计费规则合并 `buildPricingSettings` | admin、client、merchant、mobile |
+| `pricing.ts` | 计费规则合并 `buildPricingSettings`、领区解析 | admin、client、client-web、merchant、mobile |
 | `productReview.ts` | 商品审核辅助 | merchant-web、merchant-app |
 | `rechargeQr.ts` | 充值 QR 档位 | client、client-web |
+| `merchantLoginGuard.ts` | 拦截 transit_station 登录商家端 | merchant-web、merchant-app |
+| `merchantStoreTypes.ts` | 门店类型常量 | 多端 |
+| `domainTypes.ts` | 共享类型 | 多端 |
+| `services.ts` | banner/tutorial 工厂 | 多端 |
+
+各 app `_shared` 目标目录：
+
+| App | 目标目录 |
+|-----|----------|
+| 根 admin | `src/services/_shared/` |
+| ml-express-client-web | `src/services/_shared/` |
+| ml-express-merchant-web | `src/services/_shared/` |
+| ml-express-client | `src/services/_shared/` |
+| ml-express-merchant-app | `src/services/_shared/` |
+| ml-express-mobile-app | `services/_shared/` |
 
 - ❌ 不要改各 app 内 `_shared/` 副本。
 - ✅ 只改 `/shared/src`，再 `npm run sync:shared`（根目录 `prestart`/`prebuild` 会自动跑）。
-- **Inventory App 不使用 `/shared`**（独立业务线）。
+- **Inventory App 不使用 `/shared`**。
 
 ---
 
-## 12. Supabase 与数据模型
+## 14. Supabase 与数据模型
 
-所有前后端共享 **同一 Supabase 项目**（各 app env 指向同一 URL）。
+所有前后端共享 **同一 Supabase 项目**（`uopkyuluxnrewvlmutam`）。
 
-### 12.1 City 配送（会员/商家/骑手/后台）
+### 14.1 City 配送（会员/商家/骑手/后台）
 
-举例：`packages`、`users`、`delivery_stores`、`couriers`、`products`、`delivery_alerts`、`recharge_requests`、`system_settings`、`banners`…
+| 域 | 表 |
+|----|-----|
+| 快递核心 | `packages`、`tracking_events`、`courier_locations`、`couriers` |
+| 用户/门店 | `users`、`delivery_stores`、`address_book` |
+| 商城 | `products`、`product_images`、`product_variants`、`store_reviews`、`pending_orders` |
+| 运营 | `admin_accounts`、`finances`、`system_settings`、`notifications`、`banners`、`audit_logs` |
+| 充值/告警 | `recharge_requests`、`delivery_alerts` |
+| 骑手薪资 | `courier_salaries`、`courier_salary_details`、`courier_payment_records` |
+| 商家入驻 | `merchant_applications` |
 
 计费：`system_settings` 中 `pricing.{field}` 与 `pricing.{region}.{field}`。
 
-### 12.2 Inventory 中转站（Inventory App + Admin 跨境）
+**Realtime 订阅**：`packages`、`products`、`recharge_requests`、`delivery_alerts` 等。
+
+### 14.2 Inventory 中转站（Inventory App + Admin 跨境）
 
 | 表 | 用途 |
 |----|------|
@@ -476,111 +645,203 @@ eas submit --platform ios --profile production
 | `inventory_packed_shipment_items` | 包内订单行 |
 | `inventory_pkg_tracking` | 装车后在途 PKG 追踪 |
 | `inventory_order_tracking` | 包内订单追踪（到站/释放） |
-
 | `inventory_hub_transport_fee_payments` | 到站车费支付状态 |
 | `cross_border_manual_entries` | Admin 手工跨境收支 |
 
 **登录账号**：`delivery_stores`（`store_type = transit_station`），与 City 合伙店铺同表不同业务。
 
-### 12.3 相关 migrations（`supabase/migrations/`）
+### 14.3 指标 / 财务 / 代购
+
+| 表 | 用途 |
+|----|------|
+| `import_metric_drafts` | 进口指标草稿 |
+| `personal_ledger_entries` | 个人开销 |
+| `proxy_purchase_workspaces` | 代购清单（按 workspace 隔离） |
+
+### 14.4 RLS 要点（Inventory）
+
+| 机制 | 说明 |
+|------|------|
+| JWT metadata | `inventory_store_code`、`inventory_hub_code` 来自 `inventory-store-login` |
+| `inventory_session_active()` | 单设备会话校验 |
+| `inventory_owner_code_matches()` | 店码归一化（MUSE ↔ MUSE001） |
+| 按 hub 读写 | 发站写 origin；目的站读 leg_destination / destination |
+
+**关键 migrations**：
 
 | 文件 | 说明 |
 |------|------|
-| `20260610120000_inventory_shipment_tracking.sql` | PKG/订单追踪 |
-| `20260612120000_inventory_order_tracking_invoice_fields.sql` | 发票/费用字段 |
+| `20260617120000_inventory_rls_by_delivery_store.sql` | 初始 RLS + JWT |
+| `20260621120000_inventory_single_device_session.sql` | 单设备会话 |
+| `20260622120000_inventory_store_items_hub_custody_rls.sql` | 目的站托管 RLS |
+| `20260623120000_inventory_owner_code_normalize_rls.sql` | store_items / packed_shipments 店码归一化 |
+| `20260708120000_inventory_pkg_tracking_owner_rls.sql` | **pkg/order tracking 店码归一化**（装车同步修复） |
+| `20260610120000_inventory_shipment_tracking.sql` | PKG/订单追踪表 |
 | `20260615120000_inventory_platform_store_data.sql` | 库存主表 |
-| `20260617120000_inventory_rls_by_delivery_store.sql` | RLS + JWT metadata |
-| `20260618120000_inventory_store_items_pack_state.sql` | 打包状态 |
-| `20260620120000_cross_border_manual_entries.sql` | 其它开销表 |
-| `20260621120000_inventory_admin_transport_fee_total.sql` | 车费合计函数 |
 | `20260621130000_inventory_admin_overview_stats.sql` | Admin overview RPC |
-| `20260531120000_hub_transit_sorting.sql` | 中转分拨 |
-| `20260531140000_pkg_tracking_transport_fee.sql` | 车费字段 |
+| `20260707120000_proxy_purchase_workspace.sql` | 代购清单表 |
 
 ```bash
+# 推送全部 migration
 supabase db push
+
+# 或 Supabase Dashboard SQL Editor 手工执行单个文件
+
+# Edge Functions
 supabase functions deploy inventory-store-login
 supabase functions deploy inventory-change-password
+supabase functions deploy inventory-clear-test-data
+supabase functions deploy ensure-courier-auth
 ```
 
-### 12.4 Edge Functions（`supabase/functions/`）
+### 14.5 Edge Functions（`supabase/functions/`）
 
 | 函数 | 用途 |
 |------|------|
-| `inventory-store-login` | 中转站登录 + Auth JWT |
+| `inventory-store-login` | 中转站登录 + Auth JWT + 虚拟邮箱 `inventory+{code}@inventory.mlexpress.internal` |
 | `inventory-change-password` | 改密 |
 | `inventory-clear-test-data` | 测试清空 |
-| `ensure-courier-auth` | 骑手 Auth（City） |
+| `ensure-courier-auth` | 骑手 Auth provisioning（City） |
 
 ---
 
-## 13. Netlify 与 EAS 部署
+## 15. Netlify 与 EAS 部署
 
-| 应用 | 配置文件 | Base directory | 站点 ID |
-|------|----------|----------------|---------|
-| 管理后台 | `/netlify.toml` | 仓库根 | `ed9c2173-…` |
-| 会员 Web | `ml-express-client-web/netlify.toml` | `ml-express-client-web` | `52f5f573-…` |
-| 商家 Web | `ml-express-merchant-web/netlify.toml` | `ml-express-merchant-web` | `126af2b9-…` |
+### 15.1 Netlify 站点
+
+| 应用 | 配置文件 | Base directory | Publish | 站点 ID |
+|------|----------|----------------|---------|---------|
+| 管理后台 | `/netlify.toml` | 仓库根 | `build/` | `ed9c2173-…` |
+| 会员 Web | `ml-express-client-web/netlify.toml` | 子目录 | `build/` | `52f5f573-…` |
+| 商家 Web | `ml-express-merchant-web/netlify.toml` | 子目录 | `build/` | `126af2b9-…` |
 
 构建：`npm install --legacy-peer-deps && CI=false npm run build`（触发 `prebuild` → `sync:shared`）。
 
-**Inventory App** 使用 **EAS Build**（`ml-express-inventory-app/eas.json`），不走 Netlify。
+Admin 部署：`npm run deploy:netlify`（根 package.json）。
+
+### 15.2 EAS 移动端
+
+| App | Bundle ID | 主要 Profile |
+|-----|-----------|--------------|
+| client | `com.mlexpress.client` | production AAB / testflight |
+| merchant-app | `com.mlexpress.merchants` | 同上 |
+| mobile-app (staff) | `com.mlexpress.courier` | production AAB |
+| inventory | `com.mlexpress.inventory` | production + **apk**（内测） |
+
+Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.json`；`appVersionSource: local`（版本以 `app.json` 为准）。
 
 ---
 
-## 14. 环境变量
+## 16. 环境变量
 
 | 环境 | 前缀 | 示例 |
 |------|------|------|
 | CRA（admin/client-web/merchant-web） | `REACT_APP_*` | `REACT_APP_SUPABASE_URL`、`REACT_APP_SUPABASE_ANON_KEY` |
 | Expo（含 Inventory） | `EXPO_PUBLIC_*` + `app.config.js` `extra` | Inventory 生产默认值在 `app.config.js` |
-| Netlify Functions | Dashboard | `SUPABASE_SERVICE_ROLE_KEY` 等 |
+| Netlify Functions | Dashboard | `SUPABASE_SERVICE_ROLE_KEY`、`JWT_SECRET` 等 |
+
+**注意**：CRA 的 `REACT_APP_*` 与 Expo 的 `EXPO_PUBLIC_*` **不互通**，各 app 独立配置。
 
 ---
 
-## 15. 给 AI / 维护者的改代码提示
+## 17. 常见问题与排障
+
+### 17.1 Inventory「云端权限校验失败」/「同步快递包追踪失败」
+
+**现象**：装车本地成功但云端未同步；设置页显示待上传；目的站无法扫码。
+
+**常见根因**（非数据库损坏）：
+1. **RLS 策略拒绝** — JWT 店码与数据行 `origin_store_code` 格式不一致（如 `MUSE` vs `MUSE001`）；需执行 `20260708120000` migration。
+2. **JWT 过期** — 显示「已连接云端」但写入失败；需退出重新登录。
+3. **Migration 未在生产执行** — 本地代码新但 Supabase 仍是旧 RLS。
+
+**处理步骤**：
+1. Supabase SQL Editor 执行缺失 migrations（尤其 `20260623120000`、`20260708120000`）。
+2. App：**设置 → 退出 → 重新登录**。
+3. **设置 → 立即同步** 清待上传队列。
+4. 装车页 **立即重试同步** 或打包页补传 PKG。
+
+**代码路径**：`authService.ensureInventoryCloudAuth` → `pushTruckLoadToCloud` → `trackingService.pushTruckLoadTracking`；RLS 错误映射见 `cloudAuthErrors.ts`。
+
+### 17.2 指标管理换电脑看不到数据
+
+- **进口指标草稿**：存 Supabase `import_metric_drafts`，非 localStorage。
+- **代购清单**：需 migration `20260707120000`；原电脑打开一次完成云端上传。
+- **个人开销**：按 `admin_accounts.username` 隔离，需同一账号登录。
+
+### 17.3 Admin Console CSS 警告
+
+`-moz-osx-font-smoothing` 等 vendor 前缀警告可忽略，不影响功能。
+
+### 17.4 商家无法登录 Inventory / 商家端
+
+`transit_station` 类型门店只能登录 **Inventory App**，不能登录商家 Web/App（`merchantLoginGuard`）。
+
+---
+
+## 18. 给 AI / 维护者的改代码提示
 
 1. **先确认业务线**：`inventory_*`/装车/到站 → Inventory App 或 Admin 跨境；跑腿单 → City + `packages`。
 2. **改路由**：后台 Router **v6**（`/admin/*`）；会员/商家 Web Router **v7**。
 3. **改 Inventory 区域可见性**：`expressDetailsVisibility.ts` → `listItems` / `listPackedShipments` / `inventoryCloudSync`。
 4. **改 Inventory 状态**：`packDisplayStatus.ts` + `trackingService`。
-5. **改 Admin 跨境 UI/API**：`CrossBorderLogisticsPage.tsx` + `inventoryConsoleService.ts` + `netlify/functions/inventory-admin-*`。
-6. **改中转站账号**：Admin 跨境账号管理（**不要**在合伙店铺页创建 `transit_station`）。
-7. **改计费/商品审核/充值 QR**：只改 `/shared/src`，再 `npm run sync:shared`。
-8. **改 Supabase schema**：新增 migration，同步 §12.3；Inventory 需考虑 RLS 与离线队列。
-9. **Inventory EAS 发布**：改 `app.json` version/buildNumber + `eas build`；Support URL 保持可访问。
-10. **勿提交** `.env`、keystore、`.temp/`；仅用户要求时 commit。
+5. **改 Inventory 云端同步/装车**：`inventoryCloudSync.ts` + `trackingService.ts` + 检查 RLS migration。
+6. **改 Admin 跨境 UI/API**：`CrossBorderLogisticsPage.tsx` + `inventoryConsoleService.ts` + `netlify/functions/inventory-admin-*`。
+7. **改中转站账号**：Admin 跨境账号管理（**不要**在合伙店铺页创建 `transit_station`）。
+8. **改计费/商品审核/充值 QR**：只改 `/shared/src`，再 `npm run sync:shared`。
+9. **改 Supabase schema**：新增 migration，同步 §14.4；Inventory 需考虑 RLS 与离线队列。
+10. **Inventory EAS 发布**：改 `app.json` version/buildNumber + `eas build`；Support URL 保持可访问。
+11. **改打印**：`tsplLabelBuilder.ts` + `bluetoothThermalPrinter.ts` + `printerService.ts`。
+12. **勿提交** `.env`、keystore、`.temp/`、`upload-release.keystore`；仅用户要求时 commit。
 
 ---
 
-## 16. 常用文件速查
+## 19. 常用文件速查
 
 | 我想… | 先看 |
 |--------|------|
 | Inventory 订单列表过滤 | `expressDetailsVisibility.ts` → `inventoryService.listItems` |
 | Inventory PKG 列表 / 装车候选 | `packDisplayStatus.ts` → `listOutboundPackages` |
+| 装车云端双写 | `inventoryCloudSync.pushTruckLoadToCloud` |
+| 云端 RLS 错误识别 | `cloudAuthErrors.ts` → `trackingService.throwTrackingCloudWriteError` |
 | 到站收货 UI | `HubReceiveScreen.tsx`、`HubReceiveOrdersModal.tsx` |
 | 装车出库 UI | `StockOutScreen.tsx`、`applyTruckLoadOutbound` |
 | 云端同步/合并 | `inventoryCloudSync.ts` |
+| 离线重试队列 | `inventoryCloudQueue.ts` |
 | 在途追踪读写 | `trackingService.ts` |
+| 蓝牙标签打印 | `printerService.ts`、`tsplLabelBuilder.ts` |
 | Admin 跨境控制台 | `CrossBorderLogisticsPage.tsx`、`inventoryConsoleService.ts` |
 | 跨境账号 CRUD | `CrossBorderAccountManagementModal.tsx`、`inventory-admin-update-account.js` |
+| 代购清单 | `ProxyPurchasePage.tsx`、`proxy_purchase_workspaces` |
+| 进口指标草稿 | `ImportMetricDraftsPage.tsx`、`import_metric_drafts` |
 | Admin 跨境性能 | `inventory-admin-data.js`、`inventory_admin_overview_stats` RPC |
-| Inventory App Store | `app.config.js`、`eas.json`、`LoginScreen.tsx`、`SupportPage.tsx` |
+| Inventory App Store | `app.config.js`、`eas.json`、`LoginScreen.tsx` |
+| Support 页 | `ml-express-client-web/.../SupportPage.tsx` |
 | 合伙店铺（不含中转站） | `DeliveryStoreManagement.tsx` |
 | 商家下单弹窗 | `merchant-web/.../OrderModal.tsx` |
 | 会员/商家计费 | `/shared/src/pricing.ts` |
 | 管理后台权限菜单 | `App.tsx`、`AccountManagement.tsx`、`AdminShellLayout.tsx` |
+| Supabase migrations | `supabase/migrations/` |
+| Edge Functions | `supabase/functions/` |
 
 ---
 
-## 17. 版本与分支
+## 20. 版本与分支
 
-- 根 `package.json`：`market-link-express` v2.2.4（管理后台 CRA）。
-- Inventory App：`ml-express-inventory-app` **1.2.0**（iOS build 见 `app.json` `ios.buildNumber`）。
-- 各子项目独立 `version`；Expo App 各自 `eas.json`。
-- 功能分支示例：`cursor/client-merchant-order-and-web`。
+| 项目 | 版本 | 备注 |
+|------|------|------|
+| 管理后台（根） | **2.2.4** | `package.json` |
+| ml-express-client | **2.5.0** | iOS build 64 |
+| ml-express-merchant-app | **2.4.0** | |
+| ml-express-mobile-app | **2.3.7** | STAFF 骑手端 |
+| ml-express-inventory-app | **1.4.1 (10)** | 含 P203A 打印、装车 RLS 修复 |
+| ml-express-client-web | **0.1.0** | |
+| ml-express-merchant-web | **0.1.0** | |
+
+各 Expo App 各自 `eas.json`；Inventory 使用 `appVersionSource: local`。
+
+功能分支示例：`cursor/client-merchant-order-and-web`。
 
 ---
 
-*最后更新：补全 monorepo 架构、生产域名、Admin 跨境控制台、Inventory EAS/App Store、Support 页、账号解耦与 migrations 索引。*
+*最后更新：2026-07-08 — 补全 7 个子项目架构、版本号、P203A 打印、代购清单云端、装车 RLS migration、云端同步排障、Netlify Functions 索引、指标管理 4 Tab。*

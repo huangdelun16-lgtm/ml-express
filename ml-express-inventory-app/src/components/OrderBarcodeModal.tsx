@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import BarcodeImage from './BarcodeImage';
+import LabelPrintPreviewCard from './LabelPrintPreviewCard';
 import { resolvePrintError, useTranslation } from '../i18n';
 import type { LabelPrintPayload } from '../services/printerService';
 import { printBarcodeLabel, printInboundBarcodeOnly } from '../services/printerService';
@@ -28,6 +28,10 @@ type Props = {
   onClose: () => void;
   /** 打包等流程：点「完成」后回调（不要求先打印） */
   onDone?: () => void;
+  /** 弹窗标题（默认「订单 Barcode」） */
+  title?: string;
+  /** 次要按钮文案（如入库后「取消」） */
+  cancelLabel?: string;
 };
 
 function InfoRow({ label, value }: { label: string; value?: string }) {
@@ -47,6 +51,8 @@ export default function OrderBarcodeModal({
   data,
   onClose,
   onDone,
+  title,
+  cancelLabel,
 }: Props) {
   const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
@@ -58,10 +64,11 @@ export default function OrderBarcodeModal({
       const ok =
         data.kind === 'pack' && data.packLabel
           ? await printBarcodeLabel(data.packLabel)
-          : await printInboundBarcodeOnly(
-              data.barcode,
-              data.inputBarcode?.trim() || undefined,
-            );
+          : await printInboundBarcodeOnly(data.barcode, data.inputBarcode?.trim() || undefined, {
+              name: data.productName,
+              destination: data.destination,
+              customerName: data.customerName,
+            });
       if (!ok) {
         Alert.alert(t.common.tip, t.settings.printDisabled);
         return;
@@ -85,26 +92,20 @@ export default function OrderBarcodeModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.title}>订单 Barcode</Text>
-          <Text style={styles.productName} numberOfLines={2}>
-            {data.productName}
-          </Text>
+          <Text style={styles.title}>{title ?? '订单 Barcode'}</Text>
 
-          <View style={styles.infoBox}>
-            <InfoRow label="客户" value={data.customerName} />
-            <InfoRow label="目的地" value={data.destination} />
-          </View>
+          {data.destination?.trim() ? (
+            <View style={styles.infoBox}>
+              <InfoRow label={t.stockIn.finalDest} value={data.destination} />
+            </View>
+          ) : null}
 
           <View style={styles.barcodeSection}>
-            {data.inputBarcode ? (
-              <Text style={styles.inputCodeText} selectable>
-                快递单 {data.inputBarcode}
-              </Text>
-            ) : null}
-            <BarcodeImage code={data.barcode} height={80} showCodeText={false} />
-            <Text style={styles.codeText} selectable>
-              {data.barcode}
-            </Text>
+            <LabelPrintPreviewCard
+              barcode={data.barcode}
+              inputBarcode={data.inputBarcode}
+              destination={data.destination}
+            />
           </View>
 
           <Pressable
@@ -117,7 +118,9 @@ export default function OrderBarcodeModal({
             </Text>
           </Pressable>
           <Pressable style={styles.btnClose} onPress={finish}>
-            <Text style={styles.btnCloseText}>{onDone ? '完成' : '关闭'}</Text>
+            <Text style={styles.btnCloseText}>
+              {cancelLabel ?? (onDone ? t.common.done : t.common.close)}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -140,13 +143,6 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
   },
   title: { color: '#7dd3fc', fontSize: 22, fontWeight: '900', textAlign: 'center', marginBottom: 8 },
-  productName: {
-    color: '#f8fafc',
-    fontSize: 16,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 14,
-  },
   infoBox: {
     backgroundColor: '#0f172a',
     borderRadius: 12,

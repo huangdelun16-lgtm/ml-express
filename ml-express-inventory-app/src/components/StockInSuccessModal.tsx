@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import BarcodeImage from './BarcodeImage';
+import LabelPrintPreviewCard from './LabelPrintPreviewCard';
 import { resolvePrintError, useTranslation } from '../i18n';
 import { printInboundBarcodeOnly } from '../services/printerService';
 
@@ -37,7 +37,11 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
     if (!data?.barcode) return;
     setPrinting(true);
     try {
-      const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode);
+      const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode, {
+        name: data.productName,
+        destination: data.destination,
+        customerName: data.recipientName,
+      });
       if (!ok) {
         Alert.alert(t.common.tip, t.settings.printDisabled);
         return;
@@ -62,13 +66,10 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
             <Text style={styles.icon}>✓</Text>
           </View>
           <Text style={styles.title}>{t.stockIn.inboundSuccess}</Text>
-          <Text style={styles.summary}>
-            {data.productName} · +{data.qty}
-          </Text>
+          <Text style={styles.summary}>+{data.qty}</Text>
 
           <View style={styles.infoBox}>
             <InfoRow label={t.forms.inboundDate} value={data.inboundDateLabel} />
-            <InfoRow label={t.stockIn.nameRequired.replace(' *', '')} value={data.recipientName} />
             <InfoRow label={t.stockIn.finalDest} value={data.destination} />
             {meta ? (
               <InfoRow
@@ -79,15 +80,11 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
           </View>
 
           <View style={styles.barcodeSection}>
-            {data.inputBarcode ? (
-              <Text style={styles.inputCodeText} selectable>
-                {t.trackExpress.expressNo} {data.inputBarcode}
-              </Text>
-            ) : null}
-            <BarcodeImage code={data.barcode} height={80} showCodeText={false} />
-            <Text style={styles.codeText} selectable>
-              {data.barcode}
-            </Text>
+            <LabelPrintPreviewCard
+              barcode={data.barcode}
+              inputBarcode={data.inputBarcode}
+              destination={data.destination}
+            />
           </View>
 
           <Pressable

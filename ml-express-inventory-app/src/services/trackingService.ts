@@ -7,6 +7,7 @@ import type {
 } from '../types/tracking';
 import type { InventoryStoreSession } from './authService';
 import { svc } from '../errors/serviceError';
+import { isInventoryRlsPolicyError } from '../utils/cloudAuthErrors';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
@@ -275,6 +276,15 @@ function assertSupabaseReady(): void {
   }
 }
 
+function throwTrackingCloudWriteError(error: { message?: string } | null, fallbackCode: 'pkgSyncFailed' = 'pkgSyncFailed'): never {
+  const msg = error?.message?.trim() ?? '';
+  if (msg && isInventoryRlsPolicyError(msg)) {
+    throw svc('syncRlsBlocked');
+  }
+  if (msg) throw new Error(msg);
+  throw svc(fallbackCode);
+}
+
 export type OrderInboundSnapshot = {
   recipient_name: string;
   recipient_phone: string;
@@ -346,7 +356,7 @@ export async function pushTruckLoadTracking(params: {
         .select('id')
         .single();
       if (pkgError || !data) {
-        throw svc('pkgSyncFailed');
+        throwTrackingCloudWriteError(pkgError);
       }
       pkgRow = data as { id: string };
     } else {
@@ -371,7 +381,7 @@ export async function pushTruckLoadTracking(params: {
         .select('id')
         .single();
       if (pkgError || !data) {
-        throw svc('pkgSyncFailed');
+        throwTrackingCloudWriteError(pkgError);
       }
       pkgRow = data as { id: string };
     }
@@ -431,10 +441,10 @@ export async function pushTruckLoadTracking(params: {
           .eq('order_barcode', line.item_barcode)
           .eq('pack_barcode', pack.bundle_barcode)
           .eq('status', 'in_transit');
-        if (error) throw new Error(error.message);
+        if (error) throwTrackingCloudWriteError(error);
       } else {
         const { error } = await supabase.from('inventory_order_tracking').insert(orderPayload);
-        if (error) throw new Error(error.message);
+        if (error) throwTrackingCloudWriteError(error);
       }
     }
   }

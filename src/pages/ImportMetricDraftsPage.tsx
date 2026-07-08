@@ -2635,15 +2635,29 @@ const ImportMetricDraftsPage: React.FC = () => {
   const [editingDraft, setEditingDraft] = useState<ImportMetricDraftSaved | null>(null);
   const [lineItemsPreviewDraft, setLineItemsPreviewDraft] = useState<ImportMetricDraftSaved | null>(null);
   const [savedDrafts, setSavedDrafts] = useState<ImportMetricDraftSaved[]>([]);
+  const [draftsLoadErr, setDraftsLoadErr] = useState('');
   const [tableSort, setTableSort] = useState<{
     key: DraftTableSortKey | null;
     direction: DraftTableSortDirection;
   }>({ key: null, direction: 'asc' });
 
   const reloadDrafts = useCallback(async () => {
-    const rows = await importMetricDraftService.listAll();
-    setSavedDrafts(rows.map(importMetricDbRowToSaved));
-  }, []);
+    setDraftsLoadErr('');
+    try {
+      const rows = await importMetricDraftService.listAll();
+      setSavedDrafts(rows.map(importMetricDbRowToSaved));
+    } catch (e) {
+      console.error(e);
+      setSavedDrafts([]);
+      setDraftsLoadErr(
+        language === 'en'
+          ? 'Could not load import drafts from cloud. Run Supabase migration import_metric_drafts, then refresh.'
+          : language === 'my'
+            ? 'Cloud မှ import drafts မဖတ်နိုင်ပါ။'
+            : '无法从云端加载进口指标草稿。请确认 Supabase 已执行 migration「import_metric_drafts」，并重新登录 Admin。',
+      );
+    }
+  }, [language]);
 
   useEffect(() => {
     void reloadDrafts();
@@ -3094,6 +3108,23 @@ const ImportMetricDraftsPage: React.FC = () => {
             >
               {t.subtitle}
             </p>
+            {draftsLoadErr ? (
+              <p
+                style={{
+                  margin: '12px 0 0',
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  lineHeight: 1.55,
+                  color: '#fecaca',
+                  background: 'rgba(127, 29, 29, 0.35)',
+                  border: '1px solid rgba(248, 113, 113, 0.35)',
+                  maxWidth: 920,
+                }}
+              >
+                {draftsLoadErr}
+              </p>
+            ) : null}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <button
@@ -3291,7 +3322,7 @@ const ImportMetricDraftsPage: React.FC = () => {
                         fontSize: 14,
                       }}
                     >
-                      {t.empty}
+                      {draftsLoadErr || t.empty}
                     </td>
                   </tr>
                 ) : (

@@ -465,8 +465,6 @@ export const packageService = {
   // 获取所有包裹
   async getAllPackages(): Promise<Package[]> {
     try {
-      console.log('尝试获取包裹列表...');
-      
       const { data, error } = await supabase
         .from('packages')
         .select('*')
@@ -483,7 +481,6 @@ export const packageService = {
         return [];
       }
       
-      console.log('获取包裹列表成功:', data);
       return data || [];
     } catch (err) {
       console.error('获取包裹列表异常:', err);
@@ -3502,7 +3499,7 @@ export const importMetricDraftService = {
         .order('updated_at', { ascending: false });
       if (error) {
         console.error('import_metric_drafts 列表失败:', error);
-        return [];
+        throw error;
       }
       return (data || []) as ImportMetricDraftDbRow[];
     } catch (err) {
@@ -3792,6 +3789,67 @@ export const personalLedgerService = {
     } catch (err) {
       console.error('personal_ledger_entries 删除异常:', err);
       return false;
+    }
+  },
+};
+
+const PROXY_PURCHASE_WORKSPACE_KEY = 'default';
+
+export type ProxyPurchaseWorkspaceRow = {
+  id: string;
+  customerName: string;
+  orderDate: string;
+  address: string;
+  phone: string;
+  platform: string;
+  productName: string;
+  quantity: string;
+  unitPrice: string;
+};
+
+export type ProxyPurchaseWorkspacePayload = {
+  proxy_fee_percent: string;
+  exchange_rate: string;
+  rows: ProxyPurchaseWorkspaceRow[];
+  updated_by?: string;
+};
+
+export const proxyPurchaseService = {
+  async getWorkspace(): Promise<ProxyPurchaseWorkspacePayload | null> {
+    const { data, error } = await supabase
+      .from('proxy_purchase_workspaces')
+      .select('proxy_fee_percent, exchange_rate, rows')
+      .eq('workspace_key', PROXY_PURCHASE_WORKSPACE_KEY)
+      .maybeSingle();
+    if (error) {
+      console.error('proxy_purchase_workspaces 读取失败:', error);
+      throw error;
+    }
+    if (!data) return null;
+    const rows = Array.isArray(data.rows) ? (data.rows as ProxyPurchaseWorkspaceRow[]) : [];
+    return {
+      proxy_fee_percent: String(data.proxy_fee_percent ?? '5'),
+      exchange_rate: String(data.exchange_rate ?? '595'),
+      rows,
+    };
+  },
+
+  async upsertWorkspace(payload: ProxyPurchaseWorkspacePayload): Promise<void> {
+    const updated_at = new Date().toISOString();
+    const { error } = await supabase.from('proxy_purchase_workspaces').upsert(
+      {
+        workspace_key: PROXY_PURCHASE_WORKSPACE_KEY,
+        proxy_fee_percent: payload.proxy_fee_percent,
+        exchange_rate: payload.exchange_rate,
+        rows: payload.rows,
+        updated_by: payload.updated_by ?? '',
+        updated_at,
+      },
+      { onConflict: 'workspace_key' },
+    );
+    if (error) {
+      console.error('proxy_purchase_workspaces 保存失败:', error);
+      throw error;
     }
   },
 };

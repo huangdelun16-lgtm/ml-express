@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import BarcodeImage from './BarcodeImage';
+import LabelPrintPreviewCard from './LabelPrintPreviewCard';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 import { callPhoneNumber } from '../utils/phoneCall';
 
@@ -70,11 +70,11 @@ export function InboundInvoiceContent({ data }: { data: InboundInvoiceData }) {
 
       <View style={styles.barcodeBlock}>
         <Text style={styles.barcodeBlockTitle}>入库条码</Text>
-        {data.inputBarcode ? (
-          <Text style={styles.expressCode} selectable>快递单 {data.inputBarcode}</Text>
-        ) : null}
-        <BarcodeImage code={data.barcode} height={72} showCodeText={false} />
-        <Text style={styles.inboundCode} selectable>{data.barcode}</Text>
+        <LabelPrintPreviewCard
+          barcode={data.barcode}
+          inputBarcode={data.inputBarcode}
+          destination={data.destination}
+        />
       </View>
     </>
   );

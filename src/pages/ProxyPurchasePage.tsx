@@ -9,6 +9,11 @@ import {
   rowHasExportContent,
   type ProxyPurchaseRow,
 } from '../utils/proxyPurchaseExcel';
+import { proxyPurchaseService } from '../services/supabase';
+import {
+  describeProxyPurchaseCloudError,
+  isProxyPurchaseTableMissingError,
+} from '../utils/proxyPurchaseCloudError';
 
 const STORAGE_KEY = 'ml_admin_proxy_purchase_draft_v1';
 const FEE_PRESETS = [3, 5, 8, 10];
@@ -120,6 +125,11 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const [rows, setRows] = useState<ProxyPurchaseRow[]>([newRow()]);
   const [exportBusy, setExportBusy] = useState(false);
   const [savedPulse, setSavedPulse] = useState(false);
+  const [cloudLoading, setCloudLoading] = useState(true);
+  const [cloudErr, setCloudErr] = useState('');
+  const [cloudReady, setCloudReady] = useState(false);
+  const [cloudSyncDisabled, setCloudSyncDisabled] = useState(false);
+  const [cloudRetrying, setCloudRetrying] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportFilterCustomer, setExportFilterCustomer] = useState('');
   const [exportFilterDate, setExportFilterDate] = useState('');
@@ -127,12 +137,123 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const [listPage, setListPage] = useState(1);
   const [exportSelected, setExportSelected] = useState<Record<string, boolean>>({});
 
+  const currentOwner = useCallback(
+    () =>
+      (typeof window !== 'undefined' &&
+        (sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser'))) ||
+      '',
+    [],
+  );
+
+  const syncToCloud = useCallback(
+    async (payload: { proxyFeePercent: string; exchangeRate: string; rows: ProxyPurchaseRow[] }) => {
+      await proxyPurchaseService.upsertWorkspace({
+        proxy_fee_percent: payload.proxyFeePercent,
+        exchange_rate: payload.exchangeRate,
+        rows: payload.rows,
+        updated_by: currentOwner(),
+      });
+    },
+    [currentOwner],
+  );
+
+  const loadFromCloud = useCallback(async () => {
+    const localDraft = loadDraft();
+    const cloud = await proxyPurchaseService.getWorkspace();
+    const localHasRows = localDraft.rows.some(rowHasContent);
+    const cloudHasRows = (cloud?.rows ?? []).some(rowHasContent);
+
+    if (cloudHasRows) {
+      setProxyFeePercent(cloud!.proxy_fee_percent || '5');
+      setExchangeRate(cloud!.exchange_rate || '595');
+      setRows(cloud!.rows.length > 0 ? cloud!.rows : [newRow()]);
+    } else if (localHasRows) {
+      setProxyFeePercent(localDraft.proxyFeePercent);
+      setExchangeRate(localDraft.exchangeRate);
+      setRows(localDraft.rows);
+      await syncToCloud(localDraft);
+    } else {
+      setProxyFeePercent(localDraft.proxyFeePercent);
+      setExchangeRate(localDraft.exchangeRate);
+      setRows(localDraft.rows);
+    }
+    setCloudErr('');
+    setCloudSyncDisabled(false);
+  }, [syncToCloud]);
+
+  const retryCloudSync = useCallback(async () => {
+    setCloudRetrying(true);
+    setCloudErr('');
+    try {
+      await loadFromCloud();
+      await syncToCloud({ proxyFeePercent, exchangeRate, rows });
+      setSavedPulse(true);
+      window.setTimeout(() => setSavedPulse(false), 1400);
+    } catch (e) {
+      console.error(e);
+      setCloudSyncDisabled(isProxyPurchaseTableMissingError(e));
+      setCloudErr(describeProxyPurchaseCloudError(e, language));
+    } finally {
+      setCloudRetrying(false);
+    }
+  }, [exchangeRate, language, loadFromCloud, proxyFeePercent, rows, syncToCloud]);
+
   useEffect(() => {
-    const draft = loadDraft();
-    setProxyFeePercent(draft.proxyFeePercent);
-    setExchangeRate(draft.exchangeRate);
-    setRows(draft.rows);
-  }, []);
+    let cancelled = false;
+
+    void (async () => {
+      setCloudLoading(true);
+      setCloudErr('');
+      try {
+        await loadFromCloud();
+        if (!cancelled) setCloudReady(true);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          const draft = loadDraft();
+          setProxyFeePercent(draft.proxyFeePercent);
+          setExchangeRate(draft.exchangeRate);
+          setRows(draft.rows);
+          setCloudSyncDisabled(isProxyPurchaseTableMissingError(e));
+          setCloudErr(describeProxyPurchaseCloudError(e, language));
+          setCloudReady(true);
+        }
+      } finally {
+        if (!cancelled) setCloudLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [language, loadFromCloud]);
+
+  useEffect(() => {
+    if (!cloudReady || cloudSyncDisabled) return undefined;
+    let hideTimer: number | undefined;
+    const saveTimer = window.setTimeout(() => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ proxyFeePercent, exchangeRate, rows }),
+      );
+      void syncToCloud({ proxyFeePercent, exchangeRate, rows })
+        .then(() => {
+          setCloudErr('');
+          setCloudSyncDisabled(false);
+          setSavedPulse(true);
+          hideTimer = window.setTimeout(() => setSavedPulse(false), 1400);
+        })
+        .catch((e) => {
+          console.error(e);
+          setCloudSyncDisabled(isProxyPurchaseTableMissingError(e));
+          setCloudErr(describeProxyPurchaseCloudError(e, language));
+        });
+    }, 400);
+    return () => {
+      window.clearTimeout(saveTimer);
+      if (hideTimer) window.clearTimeout(hideTimer);
+    };
+  }, [proxyFeePercent, exchangeRate, rows, cloudReady, cloudSyncDisabled, language, syncToCloud]);
 
   useEffect(() => {
     const styleId = 'proxy-purchase-page-styles';
@@ -181,22 +302,6 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     document.head.appendChild(el);
     return () => el.remove();
   }, []);
-
-  useEffect(() => {
-    let hideTimer: number | undefined;
-    const saveTimer = window.setTimeout(() => {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ proxyFeePercent, exchangeRate, rows }),
-      );
-      setSavedPulse(true);
-      hideTimer = window.setTimeout(() => setSavedPulse(false), 1400);
-    }, 400);
-    return () => {
-      window.clearTimeout(saveTimer);
-      if (hideTimer) window.clearTimeout(hideTimer);
-    };
-  }, [proxyFeePercent, exchangeRate, rows]);
 
   const feePctNum = parseNum(proxyFeePercent);
   const rateNum = parseNum(exchangeRate);
@@ -422,7 +527,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           exportFail: 'Excel export failed. Please try again.',
           confirmClear: 'Confirm delete all rows? This cannot be undone.',
           confirmDeleteRow: 'Confirm delete this order?',
-          autoSaved: 'Saved locally',
+          autoSaved: 'Cloud synced',
           rowCount: 'rows with data',
           scrollHint: 'Swipe horizontally to see all columns',
           groupCustomer: 'Customer',
@@ -490,7 +595,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             exportFail: 'Export failed',
             confirmClear: 'Confirm delete all rows?',
             confirmDeleteRow: 'Confirm delete this order?',
-            autoSaved: 'Saved',
+            autoSaved: 'Cloud synced',
             rowCount: 'rows',
             scrollHint: 'Swipe →',
             groupCustomer: 'Customer',
@@ -557,7 +662,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             exportFail: 'Excel 导出失败，请重试。',
             confirmClear: '确认删除全部订单？此操作不可恢复。',
             confirmDeleteRow: '确认删除这条订单？',
-            autoSaved: '已自动保存',
+            autoSaved: '已同步云端',
             rowCount: '条有效记录',
             scrollHint: '← 左右滑动查看全部列 →',
             groupCustomer: '客户信息',
@@ -1038,6 +1143,57 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             <p style={{ margin: '10px 0 0', opacity: 0.88, fontSize: 13, lineHeight: 1.6, maxWidth: 640, color: 'rgba(226, 232, 240, 0.92)' }}>
               {t.subtitle}
             </p>
+            {cloudLoading ? (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#94a3b8' }}>
+                {language === 'en' ? 'Loading cloud data…' : language === 'my' ? 'Cloud ဒေတာ ဖွင့်နေသည်…' : '正在从云端加载…'}
+              </p>
+            ) : null}
+            {cloudErr ? (
+              <div style={{ margin: '10px 0 0', maxWidth: 640 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    fontSize: 12,
+                    lineHeight: 1.55,
+                    color: '#fecaca',
+                    background: 'rgba(127, 29, 29, 0.35)',
+                    border: '1px solid rgba(248, 113, 113, 0.35)',
+                  }}
+                >
+                  {cloudErr}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void retryCloudSync()}
+                  disabled={cloudRetrying}
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 14px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(248, 113, 113, 0.45)',
+                    background: 'rgba(127, 29, 29, 0.25)',
+                    color: '#fecaca',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    cursor: cloudRetrying ? 'wait' : 'pointer',
+                  }}
+                >
+                  {cloudRetrying
+                    ? language === 'en'
+                      ? 'Retrying…'
+                      : language === 'my'
+                        ? 'Retry…'
+                        : '重试中…'
+                    : language === 'en'
+                      ? 'Retry sync'
+                      : language === 'my'
+                        ? 'Retry sync'
+                        : '重试同步'}
+                </button>
+              </div>
+            ) : null}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
               <span
                 style={{

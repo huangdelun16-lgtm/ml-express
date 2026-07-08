@@ -17,7 +17,7 @@ import InboundDateField from '../components/InboundDateField';
 import { InboundFormField, InboundFormSection } from '../components/InboundFormPrimitives';
 import PackagingPickerField from '../components/PackagingPickerField';
 import ScanInputBar from '../components/ScanInputBar';
-import StockInInvoiceModal, { type StockInInvoiceData } from '../components/StockInInvoiceModal';
+import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import { DimensionSpecField, LockedSuffixField } from '../components/StructuredItemFields';
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -33,18 +33,17 @@ import {
   stockUnitLabel,
 } from '../utils/itemFieldFormat';
 import {
-  formatInboundDateLabel,
   inboundDateToIso,
   todayInMyanmar,
 } from '../utils/stockInDate';
 import { normalizePackDestination } from '../constants/destinationOptions';
+import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   calculateCrossBorderTotalFee,
-  fetchCrossBorderBaseFee,
+  fetchCrossBorderRoutePerKg,
   formatCrossBorderFeeHint,
 } from '../utils/crossBorderPricing';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
-import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { fmt, resolveAppError, useTranslation } from '../i18n';
 
 type Route = { params?: { presetBarcode?: string } };
@@ -74,7 +73,7 @@ function ScanRefBanner({ code, hint }: { code: string; hint?: string }) {
 }
 
 export default function StockInScreen({ route, navigation }: Props) {
-  const { operatorName, store } = useAuth();
+  const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
   const stepLabels: Record<Step, string> = {
     1: t.stockIn.step1,
@@ -103,7 +102,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
-  const [invoiceData, setInvoiceData] = useState<StockInInvoiceData | null>(null);
+  const [barcodeModalData, setBarcodeModalData] = useState<OrderBarcodeData | null>(null);
   const [lookupHint, setLookupHint] = useState('');
   const [scanLoading, setScanLoading] = useState(false);
 
@@ -142,16 +141,21 @@ export default function StockInScreen({ route, navigation }: Props) {
       return;
     }
     const weightKg = Number(weightN.trim()) || 0;
+    const originHub = hubCode ?? (store ? resolveStoreHubCode(store) : '');
     let cancelled = false;
-    void fetchCrossBorderBaseFee(destination).then(({ baseFee, destinationCode }) => {
-      if (cancelled) return;
-      setFeeFormulaHint(formatCrossBorderFeeHint(destinationCode, baseFee, weightKg));
-      setTotalFee(String(calculateCrossBorderTotalFee(baseFee, weightStr)));
-    });
+    void fetchCrossBorderRoutePerKg(originHub, destination).then(
+      ({ perKg, originCode, destinationCode, usedLegacyFallback }) => {
+        if (cancelled) return;
+        setFeeFormulaHint(
+          formatCrossBorderFeeHint(originCode, destinationCode, perKg, weightKg, usedLegacyFallback),
+        );
+        setTotalFee(String(calculateCrossBorderTotalFee(perKg, weightStr)));
+      },
+    );
     return () => {
       cancelled = true;
     };
-  }, [step, destination, weightStr, weightN, totalFeeManual, canAutoTotalFee]);
+  }, [step, destination, weightStr, weightN, totalFeeManual, canAutoTotalFee, hubCode, store]);
 
   useEffect(() => {
     void loadStockInContactDraft().then((d) => {
@@ -346,27 +350,16 @@ export default function StockInScreen({ route, navigation }: Props) {
       });
 
       const trimmedProduct = productName.trim();
-      setInvoiceData({
+      setBarcodeModalData({
+        productName: trimmedProduct,
         barcode,
         inputBarcode: inputBarcode || undefined,
-        productName: trimmedProduct,
-        inboundDateLabel: formatInboundDateLabel(inboundDate),
-        recipientName: recipientName.trim(),
-        recipientPhone: recipientPhone.trim() || undefined,
         destination: dest,
-        detailAddress: detailAddress.trim() || undefined,
-        qty: n,
-        packaging,
-        spec: specStr || undefined,
-        weight: weightStr || undefined,
-        totalFee: totalFee.trim() || undefined,
-        paymentLabel: paymentLabel || undefined,
-        note: note.trim() || undefined,
-        storeName: store?.storeName,
+        customerName: recipientName.trim(),
+        kind: 'inbound',
       });
 
       resetWizard();
-      showTaskSuccess(t.stockIn.inboundSuccess, `${trimmedProduct}\n${barcode}`);
     } catch (e: unknown) {
       Alert.alert(t.common.fail, resolveAppError(t, e));
     } finally {
@@ -621,10 +614,12 @@ export default function StockInScreen({ route, navigation }: Props) {
         </Pressable>
       </View>
 
-      <StockInInvoiceModal
-        visible={!!invoiceData}
-        data={invoiceData}
-        onClose={() => setInvoiceData(null)}
+      <OrderBarcodeModal
+        visible={!!barcodeModalData}
+        data={barcodeModalData}
+        title={t.stockIn.barcodeModalTitle}
+        cancelLabel={t.stockIn.cancel}
+        onClose={() => setBarcodeModalData(null)}
       />
     </KeyboardAvoidingView>
   );

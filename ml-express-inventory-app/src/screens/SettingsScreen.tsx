@@ -18,11 +18,15 @@ import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
 import { formatTimeAgo, resolveAppError, useTranslation } from '../i18n';
 import type { TranslationDict } from '../i18n/translations';
+import type { LabelPrintProtocol } from '../constants/xprinterP203a';
 import {
   getBluetoothCapabilityHint,
   getPrinterSettings,
+  getXprinterP203aPreset,
   pickIosLabelPrinter,
   savePrinterSettings,
+  type LabelHeightMm,
+  type LabelWidthMm,
   type PrinterConnectionMode,
   type PrinterSettings,
 } from '../services/printerService';
@@ -68,7 +72,12 @@ function opTypeLabel(t: TranslationDict, op: string | null): string {
   return op ?? '—';
 }
 
-const WIDTH_OPTIONS: PrinterSettings['labelWidthMm'][] = [40, 50, 60, 80];
+const WIDTH_OPTIONS: LabelWidthMm[] = [40, 50, 58, 60, 80];
+const HEIGHT_OPTIONS: LabelHeightMm[] = [30, 40, 50];
+const PROTOCOL_OPTIONS: { value: LabelPrintProtocol; labelKey: 'protocolTspl' | 'protocolEscpos' }[] = [
+  { value: 'tspl', labelKey: 'protocolTspl' },
+  { value: 'escpos', labelKey: 'protocolEscpos' },
+];
 const CONNECTION_OPTIONS: { mode: PrinterConnectionMode; labelKey: 'connectionSystem' | 'connectionBluetooth' }[] = [
   { mode: 'system', labelKey: 'connectionSystem' },
   { mode: 'bluetooth', labelKey: 'connectionBluetooth' },
@@ -460,8 +469,20 @@ export default function SettingsScreen() {
         </View>
         {settings.connectionMode === 'bluetooth' ? (
           <>
-            <Text style={styles.hintText}>{getBluetoothCapabilityHint(language)}</Text>
+            <Text style={styles.hintText}>{getBluetoothCapabilityHint(language, settings)}</Text>
             <Text style={styles.hintText}>{t.settings.bluetoothPairHint}</Text>
+            {Platform.OS === 'android' ? (
+              <>
+                <Text style={styles.fieldLabel}>{t.settings.androidPrinterMac}</Text>
+                <TextInput
+                  style={styles.macInput}
+                  autoCapitalize="characters"
+                  placeholder={t.settings.androidPrinterMacPlaceholder}
+                  value={settings.androidBluetoothMac ?? ''}
+                  onChangeText={(v) => void updatePrinter({ androidBluetoothMac: v.trim() })}
+                />
+              </>
+            ) : null}
             {Platform.OS === 'ios' ? (
               <>
                 <Text style={styles.fieldLabel}>{t.settings.iosSelectPrinter}</Text>
@@ -493,6 +514,26 @@ export default function SettingsScreen() {
             ) : null}
           </>
         ) : null}
+        <Pressable
+          style={[styles.actionBtn, styles.actionBtnPrimary, { marginBottom: 10 }]}
+          onPress={() => void updatePrinter(getXprinterP203aPreset())}
+        >
+          <Text style={styles.actionBtnPrimaryText}>{t.settings.applyP203aPreset}</Text>
+        </Pressable>
+        <Text style={styles.fieldLabel}>{t.settings.printProtocol}</Text>
+        <View style={styles.chips}>
+          {PROTOCOL_OPTIONS.map(({ value, labelKey }) => (
+            <Pressable
+              key={value}
+              style={[styles.chip, settings.printProtocol === value && styles.chipOn]}
+              onPress={() => void updatePrinter({ printProtocol: value })}
+            >
+              <Text style={[styles.chipText, settings.printProtocol === value && styles.chipTextOn]}>
+                {t.settings[labelKey]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
         <Text style={styles.fieldLabel}>{t.settings.labelWidth}</Text>
         <View style={styles.chips}>
           {WIDTH_OPTIONS.map((w) => (
@@ -503,6 +544,20 @@ export default function SettingsScreen() {
             >
               <Text style={[styles.chipText, settings.labelWidthMm === w && styles.chipTextOn]}>
                 {w}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.fieldLabel}>{t.settings.labelHeight}</Text>
+        <View style={styles.chips}>
+          {HEIGHT_OPTIONS.map((h) => (
+            <Pressable
+              key={h}
+              style={[styles.chip, settings.labelHeightMm === h && styles.chipOn]}
+              onPress={() => void updatePrinter({ labelHeightMm: h })}
+            >
+              <Text style={[styles.chipText, settings.labelHeightMm === h && styles.chipTextOn]}>
+                {h}
               </Text>
             </Pressable>
           ))}
@@ -707,6 +762,18 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: '#2563eb', borderColor: '#3b82f6' },
   chipText: { color: '#94a3b8', fontWeight: '800' },
   chipTextOn: { color: '#fff' },
+  macInput: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
   copiesInput: {
     backgroundColor: '#f8fafc',
     borderRadius: 12,

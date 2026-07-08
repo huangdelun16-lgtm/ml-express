@@ -109,7 +109,11 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
     if (!invoiceData?.barcode) return;
     setPrinting(true);
     try {
-      const ok = await printInboundBarcodeOnly(invoiceData.barcode, invoiceData.inputBarcode);
+      const ok = await printInboundBarcodeOnly(invoiceData.barcode, invoiceData.inputBarcode, {
+        name: invoiceData.productName,
+        destination: invoiceData.destination,
+        customerName: invoiceData.recipientName,
+      });
       if (!ok) {
         Alert.alert(t.common.tip, t.settings.printDisabled);
         return;

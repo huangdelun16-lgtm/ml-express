@@ -32,7 +32,11 @@ export default function StockInInvoiceModal({ visible, data, onClose }: Props) {
     if (!data?.barcode) return;
     setPrinting(true);
     try {
-      const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode);
+      const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode, {
+        name: data.productName,
+        destination: data.destination,
+        customerName: data.recipientName,
+      });
       if (!ok) {
         Alert.alert(t.common.tip, t.settings.printDisabled);
         return;

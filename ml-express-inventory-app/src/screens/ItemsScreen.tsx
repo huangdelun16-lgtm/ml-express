@@ -209,6 +209,13 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       kind: 'inbound',
       barcode: item.barcode,
       inputBarcode: item.input_barcode || undefined,
+      label: {
+        name: item.name,
+        barcode: item.barcode,
+        inputBarcode: item.input_barcode || undefined,
+        destination: item.destination || undefined,
+        customerName: item.customer_name,
+      },
     };
   };
 
@@ -484,7 +491,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                         <Text style={styles.destination}> · {item.destination}</Text>
                       ) : null}
                     </Text>
-                    <Text style={styles.productName} numberOfLines={1}>
+                    <Text style={styles.productName} numberOfLines={2}>
                       {item.name}
                     </Text>
                     <View style={styles.statusRow}>
@@ -801,7 +808,14 @@ const styles = StyleSheet.create({
   topLine: { fontSize: 12, lineHeight: 16 },
   customer: { color: '#7dd3fc', fontWeight: '800' },
   destination: { color: '#a5b4fc', fontWeight: '700' },
-  productName: { color: '#f8fafc', fontSize: 15, fontWeight: '800', marginTop: 1, lineHeight: 19 },
+  productName: {
+    color: '#f8fafc',
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 2,
+    lineHeight: 24,
+    paddingVertical: 2,
+  },
   statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 },
   statusBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   statusInDone: { backgroundColor: 'rgba(34,197,94,0.15)' },
