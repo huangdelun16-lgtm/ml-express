@@ -1,4 +1,4 @@
-import { probeCloudConnection } from './cloudSyncStatus';
+import { probeCloudConnection } from './cloudConnection';
 import { isCloudReachable } from '../utils/networkReachability';
 import { isSupabaseConfigured } from './supabase';
 

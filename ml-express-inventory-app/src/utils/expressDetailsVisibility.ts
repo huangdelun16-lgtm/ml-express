@@ -3,7 +3,7 @@ import type { InventoryItemListRow } from '../types/inventory';
 import { extractDestinationCode } from './inboundBarcode';
 import { isCustomerSignedItem } from './itemFieldFormat';
 import { resolveItemDestinationCode } from './itemDestination';
-import { packDestinationFromBarcode } from './packageNumber';
+import { isPackageBarcode, packDestinationFromBarcode } from './packageNumber';
 import {
   isAdminStore,
   ownershipKeyFromStoreCode,
@@ -33,7 +33,7 @@ type CloudPackRef = PackVisibilityRef;
 const DESTINATION_ONLY_HUBS = new Set(['YGN', 'TGI']);
 
 function isInboundPackBarcode(barcode: string): boolean {
-  return barcode.trim().toUpperCase().startsWith('PKG');
+  return isPackageBarcode(barcode);
 }
 
 /** 是否为本站账号自己入库登记（发站视角：可见自己装车出库的全部目的地订单） */

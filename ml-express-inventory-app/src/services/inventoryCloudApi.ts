@@ -127,30 +127,34 @@ export async function fetchCloudStoreItems(
 ): Promise<CloudStoreItemRow[]> {
   if (!isSupabaseConfigured()) return [];
   const storeCode = store.storeCode.trim().toUpperCase();
+  const ownerKey = ownershipKeyFromStoreCode(storeCode);
   const hub = hubCode.trim().toUpperCase();
   const itemMap = new Map<string, CloudStoreItemRow>();
 
-  const { data: ownerData, error: ownerErr } = await supabase
-    .from('inventory_store_items')
-    .select('*')
-    .eq('owner_store_code', storeCode)
-    .order('updated_at', { ascending: false })
-    .limit(800);
-  if (ownerErr) throw new Error(ownerErr.message);
-  for (const row of ownerData ?? []) {
-    const item = rowToCloudItem(row as Record<string, unknown>);
-    itemMap.set(item.id, item);
-  }
-
-  if (hub) {
-    const { data: destData, error: destErr } = await supabase
+  const ownerCodes = ownerKey === storeCode ? [storeCode] : [storeCode, ownerKey];
+  const queries = ownerCodes.map((ownerCode) =>
+    supabase
       .from('inventory_store_items')
       .select('*')
-      .eq('final_destination', hub)
+      .eq('owner_store_code', ownerCode)
       .order('updated_at', { ascending: false })
-      .limit(800);
-    if (destErr) throw new Error(destErr.message);
-    for (const row of destData ?? []) {
+      .limit(800),
+  );
+  if (hub) {
+    queries.push(
+      supabase
+        .from('inventory_store_items')
+        .select('*')
+        .eq('final_destination', hub)
+        .order('updated_at', { ascending: false })
+        .limit(800),
+    );
+  }
+
+  const results = await Promise.all(queries);
+  for (const { data, error } of results) {
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
       const item = rowToCloudItem(row as Record<string, unknown>);
       itemMap.set(item.id, item);
     }
@@ -159,39 +163,73 @@ export async function fetchCloudStoreItems(
   return Array.from(itemMap.values());
 }
 
+const MOVEMENT_BATCH_SIZE = 80;
+
 export async function fetchCloudMovementsForItems(itemIds: string[]): Promise<CloudMovementRow[]> {
   if (!isSupabaseConfigured() || itemIds.length === 0) return [];
+  const uniqueIds = [...new Set(itemIds.filter(Boolean))];
+  const rows: CloudMovementRow[] = [];
+
+  for (let i = 0; i < uniqueIds.length; i += MOVEMENT_BATCH_SIZE) {
+    const batch = uniqueIds.slice(i, i + MOVEMENT_BATCH_SIZE);
+    const { data, error } = await supabase
+      .from('inventory_stock_movements')
+      .select('*')
+      .in('item_id', batch)
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    if (error) throw new Error(error.message);
+    rows.push(
+      ...(data ?? []).map((row) => ({
+        id: String((row as CloudMovementRow).id),
+        item_id: String((row as CloudMovementRow).item_id),
+        barcode: String((row as CloudMovementRow).barcode),
+        item_name: String((row as CloudMovementRow).item_name ?? ''),
+        type: String((row as CloudMovementRow).type),
+        qty: Number((row as CloudMovementRow).qty) || 0,
+        qty_before: Number((row as CloudMovementRow).qty_before) || 0,
+        qty_after: Number((row as CloudMovementRow).qty_after) || 0,
+        operator: String((row as CloudMovementRow).operator ?? ''),
+        note: String((row as CloudMovementRow).note ?? ''),
+        recipient_name: String((row as CloudMovementRow).recipient_name ?? ''),
+        recipient_phone: String((row as CloudMovementRow).recipient_phone ?? ''),
+        destination: String((row as CloudMovementRow).destination ?? ''),
+        detail_address: String((row as CloudMovementRow).detail_address ?? ''),
+        packaging: String((row as CloudMovementRow).packaging ?? ''),
+        input_barcode: String((row as CloudMovementRow).input_barcode ?? ''),
+        origin_store_id: (row as CloudMovementRow).origin_store_id
+          ? String((row as CloudMovementRow).origin_store_id)
+          : null,
+        origin_store_code: String((row as CloudMovementRow).origin_store_code ?? ''),
+        origin_store_name: String((row as CloudMovementRow).origin_store_name ?? ''),
+        created_at: String((row as CloudMovementRow).created_at),
+      })),
+    );
+  }
+
+  return rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** 今日出入库汇总（首页统计专用，比拉全量流水轻） */
+export async function fetchCloudTodayMovementTotals(): Promise<{ todayIn: number; todayOut: number }> {
+  if (!isSupabaseConfigured()) return { todayIn: 0, todayOut: 0 };
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
   const { data, error } = await supabase
     .from('inventory_stock_movements')
-    .select('*')
-    .in('item_id', itemIds)
-    .order('created_at', { ascending: false })
-    .limit(2000);
+    .select('type, qty')
+    .gte('created_at', start.toISOString())
+    .limit(3000);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => ({
-    id: String((row as CloudMovementRow).id),
-    item_id: String((row as CloudMovementRow).item_id),
-    barcode: String((row as CloudMovementRow).barcode),
-    item_name: String((row as CloudMovementRow).item_name ?? ''),
-    type: String((row as CloudMovementRow).type),
-    qty: Number((row as CloudMovementRow).qty) || 0,
-    qty_before: Number((row as CloudMovementRow).qty_before) || 0,
-    qty_after: Number((row as CloudMovementRow).qty_after) || 0,
-    operator: String((row as CloudMovementRow).operator ?? ''),
-    note: String((row as CloudMovementRow).note ?? ''),
-    recipient_name: String((row as CloudMovementRow).recipient_name ?? ''),
-    recipient_phone: String((row as CloudMovementRow).recipient_phone ?? ''),
-    destination: String((row as CloudMovementRow).destination ?? ''),
-    detail_address: String((row as CloudMovementRow).detail_address ?? ''),
-    packaging: String((row as CloudMovementRow).packaging ?? ''),
-    input_barcode: String((row as CloudMovementRow).input_barcode ?? ''),
-    origin_store_id: (row as CloudMovementRow).origin_store_id
-      ? String((row as CloudMovementRow).origin_store_id)
-      : null,
-    origin_store_code: String((row as CloudMovementRow).origin_store_code ?? ''),
-    origin_store_name: String((row as CloudMovementRow).origin_store_name ?? ''),
-    created_at: String((row as CloudMovementRow).created_at),
-  }));
+  let todayIn = 0;
+  let todayOut = 0;
+  for (const row of data ?? []) {
+    const type = String((row as { type: string }).type);
+    const qty = Number((row as { qty: number }).qty) || 0;
+    if (type === 'in') todayIn += qty;
+    else if (type === 'out') todayOut += qty;
+  }
+  return { todayIn, todayOut };
 }
 
 export async function fetchCloudPackedShipments(
@@ -200,19 +238,27 @@ export async function fetchCloudPackedShipments(
 ): Promise<CloudPackRow[]> {
   if (!isSupabaseConfigured()) return [];
   const storeCode = store.storeCode.trim().toUpperCase();
+  const ownerKey = ownershipKeyFromStoreCode(storeCode);
   const hub = hubCode?.trim().toUpperCase() ?? '';
   const packMap = new Map<string, CloudPackRow>();
 
-  const { data: ownerData, error: ownerErr } = await supabase
-    .from('inventory_packed_shipments')
-    .select('*, inventory_packed_shipment_items(*)')
-    .eq('owner_store_code', storeCode)
-    .order('created_at', { ascending: false })
-    .limit(200);
-  if (ownerErr) throw new Error(ownerErr.message);
-  for (const row of ownerData ?? []) {
-    const pack = row as CloudPackRow;
-    packMap.set(pack.bundle_barcode.trim().toUpperCase(), pack);
+  const ownerCodes = ownerKey === storeCode ? [storeCode] : [storeCode, ownerKey];
+  const ownerResults = await Promise.all(
+    ownerCodes.map((ownerCode) =>
+      supabase
+        .from('inventory_packed_shipments')
+        .select('*, inventory_packed_shipment_items(*)')
+        .eq('owner_store_code', ownerCode)
+        .order('created_at', { ascending: false })
+        .limit(200),
+    ),
+  );
+  for (const { data, error } of ownerResults) {
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      const pack = row as CloudPackRow;
+      packMap.set(pack.bundle_barcode.trim().toUpperCase(), pack);
+    }
   }
 
   if (hub) {

@@ -1,5 +1,7 @@
 import type { InventoryItem } from '../types/inventory';
 
+import { isPackageBarcode } from './packageNumber';
+
 export function isExpressPackItem(item: Pick<InventoryItem, 'barcode'>): boolean {
-  return item.barcode.trim().toUpperCase().startsWith('PKG');
+  return isPackageBarcode(item.barcode);
 }

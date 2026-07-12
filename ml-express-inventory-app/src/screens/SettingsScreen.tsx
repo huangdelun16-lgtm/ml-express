@@ -16,8 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
-import { formatTimeAgo, resolveAppError, useTranslation } from '../i18n';
-import type { TranslationDict } from '../i18n/translations';
+import { resolveAppError, useTranslation } from '../i18n';
 import type { LabelPrintProtocol } from '../constants/xprinterP203a';
 import {
   getBluetoothCapabilityHint,
@@ -30,47 +29,9 @@ import {
   type PrinterConnectionMode,
   type PrinterSettings,
 } from '../services/printerService';
-import {
-  getCloudSyncStatus,
-  runManualCloudSync,
-  type CloudSyncStatus,
-} from '../services/cloudSyncStatus';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
-import { resolveSyncErrorMessage, syncImpactMessage } from '../utils/cloudSyncSla';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { scanOpsHealth } from '../services/opsHealthService';
-
-function SyncStatusRow({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'warn' | 'err' }) {
-  const valueColor =
-    tone === 'ok' ? '#6ee7b7' : tone === 'warn' ? '#fcd34d' : tone === 'err' ? '#fca5a5' : '#e2e8f0';
-  return (
-    <View style={styles.syncRow}>
-      <Text style={styles.syncLabel}>{label}</Text>
-      <Text style={[styles.syncValue, { color: valueColor }]} numberOfLines={3}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function connectionLabel(t: TranslationDict, status: CloudSyncStatus): { text: string; tone: 'ok' | 'warn' | 'err' } {
-  const { connection } = status;
-  if (!connection.configured) {
-    return { text: t.settings.cloudSync.notConfigured, tone: 'err' };
-  }
-  if (!connection.authenticated) {
-    return { text: t.settings.cloudSync.authRequired, tone: 'warn' };
-  }
-  return { text: t.settings.cloudSync.connected, tone: 'ok' };
-}
-
-function opTypeLabel(t: TranslationDict, op: string | null): string {
-  if (op === 'item_and_movement') return t.settings.cloudSync.opItem;
-  if (op === 'packed_shipment') return t.settings.cloudSync.opPack;
-  if (op === 'truck_load') return t.settings.cloudSync.opTruckLoad;
-  return op ?? '—';
-}
 
 const WIDTH_OPTIONS: LabelWidthMm[] = [40, 50, 58, 60, 80];
 const HEIGHT_OPTIONS: LabelHeightMm[] = [30, 40, 50];
@@ -143,42 +104,17 @@ function QuickAction({
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { operatorName, storeCode, store, hubCode, logout, hasShiftOperator, updateShiftOperator } = useAuth();
+  const { operatorName, storeCode, store, hubCode, logout } = useAuth();
   const { t, fmt, language } = useTranslation();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
-  const [cloudSync, setCloudSync] = useState<CloudSyncStatus | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [pickingPrinter, setPickingPrinter] = useState(false);
-  const [operatorDraft, setOperatorDraft] = useState('');
-  const [savingOperator, setSavingOperator] = useState(false);
-  const [opsOpenCount, setOpsOpenCount] = useState(0);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
 
-  const refreshCloudSync = async () => {
-    const status = await getCloudSyncStatus(store);
-    setCloudSync(status);
-  };
-
   useEffect(() => {
     void getPrinterSettings().then(setSettings);
-    void refreshCloudSync();
   }, [storeCode, store?.id]);
-
-  useEffect(() => {
-    setOperatorDraft(hasShiftOperator ? (operatorName ?? '') : '');
-  }, [hasShiftOperator, operatorName, storeCode]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!store || !hubCode) {
-        setOpsOpenCount(0);
-        return;
-      }
-      void scanOpsHealth(store, hubCode).then((report) => setOpsOpenCount(report.totalOpen));
-    }, [store, hubCode]),
-  );
 
   const updatePrinter = async (patch: Partial<PrinterSettings>) => {
     if (!settings) return;
@@ -240,207 +176,6 @@ export default function SettingsScreen() {
 
       <SectionCard icon="🌐" title={t.language.title} accent="#0ea5e9">
         <LanguageSwitcherRow />
-      </SectionCard>
-
-      <SectionCard icon="👤" title={t.settings.operator.title} accent="#10b981">
-        <Text style={styles.fieldLabel}>{t.settings.operator.nameLabel}</Text>
-        <TextInput
-          style={styles.operatorInput}
-          value={operatorDraft}
-          onChangeText={setOperatorDraft}
-          placeholder={t.settings.operator.namePlaceholder}
-          placeholderTextColor="#64748b"
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-        <Text style={styles.hintText}>{t.settings.operator.nameHint}</Text>
-        {!hasShiftOperator && store ? (
-          <Text style={styles.operatorWarn}>{t.settings.operator.storeFallback}</Text>
-        ) : null}
-        <Pressable
-          style={[
-            styles.actionBtn,
-            styles.actionBtnPrimary,
-            (savingOperator || !operatorDraft.trim() || !store) && styles.btnDisabled,
-          ]}
-          disabled={savingOperator || !operatorDraft.trim() || !store}
-          onPress={() => {
-            if (!store || !operatorDraft.trim()) return;
-            void (async () => {
-              setSavingOperator(true);
-              try {
-                await updateShiftOperator(operatorDraft);
-                Alert.alert(t.common.success, t.settings.operator.saved);
-              } catch (e: unknown) {
-                Alert.alert(t.common.fail, resolveAppError(t, e));
-              } finally {
-                setSavingOperator(false);
-              }
-            })();
-          }}
-        >
-          <Text style={styles.actionBtnPrimaryText}>
-            {savingOperator ? t.common.processing : t.settings.operator.save}
-          </Text>
-        </Pressable>
-      </SectionCard>
-
-      <SectionCard
-        icon="🩺"
-        title={t.nav.opsHealth}
-        accent="#f59e0b"
-        badge={opsOpenCount > 0 ? String(opsOpenCount) : undefined}
-      >
-        <Text style={styles.hintText}>{t.opsHealth.subtitle}</Text>
-        <Pressable
-          style={[styles.actionBtn, styles.actionBtnPrimary]}
-          onPress={() => navigation.navigate('OpsHealth')}
-        >
-          <Text style={styles.actionBtnPrimaryText}>{t.nav.opsHealth}</Text>
-        </Pressable>
-      </SectionCard>
-
-      <SectionCard
-        icon="☁️"
-        title={t.settings.cloudSync.title}
-        accent="#8b5cf6"
-        badge={cloudSync && cloudSync.pending > 0 ? String(cloudSync.pending) : undefined}
-      >
-        {cloudSync ? (
-          <>
-            <SyncStatusRow
-              label={t.settings.cloudSync.connectionStatus}
-              value={connectionLabel(t, cloudSync).text}
-              tone={connectionLabel(t, cloudSync).tone}
-            />
-            {!cloudSync.connection.authenticated &&
-            cloudSync.pending > 0 &&
-            cloudSync.connection.errorCode === 'syncNetworkFailed' ? (
-              <View style={styles.syncBanner}>
-                <Text style={styles.syncBannerText}>
-                  {fmt(t.settings.cloudSync.offlineModeHint, { count: cloudSync.pending })}
-                </Text>
-              </View>
-            ) : null}
-            {!cloudSync.connection.authenticated && cloudSync.connection.errorCode ? (
-              <Text style={styles.hintText}>
-                {resolveAppError(t, new Error(cloudSync.connection.errorCode))}
-              </Text>
-            ) : null}
-            <SyncStatusRow
-              label={t.settings.cloudSync.pending}
-              value={
-                cloudSync.pending > 0
-                  ? fmt(t.settings.cloudSync.pendingCount, { count: cloudSync.pending })
-                  : t.settings.cloudSync.pendingNone
-              }
-              tone={cloudSync.pending > 0 ? 'warn' : 'ok'}
-            />
-            {cloudSync.pending > 0 ? (
-              <>
-                {cloudSync.pendingTruckLoad > 0 ? (
-                  <Text style={styles.hintText}>
-                    {fmt(t.settings.cloudSync.priorityTruck, { count: cloudSync.pendingTruckLoad })}
-                  </Text>
-                ) : null}
-                {cloudSync.pendingPack > 0 ? (
-                  <Text style={styles.hintText}>
-                    {fmt(t.settings.cloudSync.priorityPack, { count: cloudSync.pendingPack })}
-                  </Text>
-                ) : null}
-                {cloudSync.pendingItem > 0 ? (
-                  <Text style={styles.hintText}>
-                    {fmt(t.settings.cloudSync.priorityItem, { count: cloudSync.pendingItem })}
-                  </Text>
-                ) : null}
-                {syncImpactMessage(t, cloudSync.highestPriorityType, cloudSync.pending) ? (
-                  <View style={styles.syncBanner}>
-                    <Text style={styles.syncBannerLabel}>{t.settings.cloudSync.slaImpactTitle}</Text>
-                    <Text style={styles.syncBannerText}>
-                      {syncImpactMessage(t, cloudSync.highestPriorityType, cloudSync.pending)}
-                    </Text>
-                  </View>
-                ) : null}
-              </>
-            ) : null}
-            {cloudSync.pending > 0 && cloudSync.oldestOpType ? (
-              <Text style={styles.hintText}>{opTypeLabel(t, cloudSync.oldestOpType)}</Text>
-            ) : null}
-            <SyncStatusRow
-              label={t.settings.cloudSync.lastSync}
-              value={
-                cloudSync.lastSync
-                  ? `${formatTimeAgo(cloudSync.lastSync.at, t).primary} · ${
-                      cloudSync.lastSync.ok
-                        ? t.settings.cloudSync.lastSyncOk
-                        : t.settings.cloudSync.lastSyncFailed
-                    }`
-                  : t.settings.cloudSync.lastSyncNever
-              }
-              tone={
-                !cloudSync.lastSync
-                  ? undefined
-                  : cloudSync.lastSync.ok
-                    ? 'ok'
-                    : 'err'
-              }
-            />
-            {cloudSync.lastSync?.at ? (
-              <Text style={styles.hintText}>{formatTimeAgo(cloudSync.lastSync.at, t).secondary}</Text>
-            ) : null}
-            {cloudSync.queueError ? (
-              <>
-                <SyncStatusRow
-                  label={t.settings.cloudSync.queueError}
-                  value={resolveSyncErrorMessage(t, cloudSync.queueError)}
-                  tone="err"
-                />
-              </>
-            ) : null}
-            {cloudSync.lastSync?.error && !cloudSync.queueError ? (
-              <SyncStatusRow
-                label={t.settings.cloudSync.lastSyncFailed}
-                value={resolveSyncErrorMessage(t, cloudSync.lastSync.error)}
-                tone="err"
-              />
-            ) : null}
-          </>
-        ) : (
-          <ActivityIndicator color="#a78bfa" />
-        )}
-        <Pressable
-          style={[
-            styles.actionBtn,
-            styles.actionBtnPrimary,
-            (syncing || !store || !hub) && styles.btnDisabled,
-          ]}
-          disabled={syncing || !store || !hub}
-          onPress={() => {
-            if (!store || !hub) return;
-            void (async () => {
-              setSyncing(true);
-              try {
-                const result = await runManualCloudSync(store, hub);
-                await refreshCloudSync();
-                Alert.alert(
-                  t.settings.cloudSync.syncSuccess,
-                  result.pending > 0
-                    ? fmt(t.settings.cloudSync.syncSuccessWithPending, { count: result.pending })
-                    : t.settings.cloudSync.syncSuccess,
-                );
-              } catch (e: unknown) {
-                await refreshCloudSync();
-                Alert.alert(t.common.fail, resolveAppError(t, e));
-              } finally {
-                setSyncing(false);
-              }
-            })();
-          }}
-        >
-          <Text style={styles.actionBtnPrimaryText}>
-            {syncing ? t.settings.cloudSync.syncing : t.settings.cloudSync.syncNow}
-          </Text>
-        </Pressable>
       </SectionCard>
 
       <SectionCard icon="🖨️" title={t.settings.labelPrint} accent="#3b82f6">

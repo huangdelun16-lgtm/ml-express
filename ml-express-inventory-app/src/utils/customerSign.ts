@@ -9,6 +9,7 @@ import {
   ownershipLabelFromKey,
   resolveOwnerKeyForListItem,
 } from './storeOwnership';
+import { isPackageBarcode } from './packageNumber';
 
 type SignableItem = InventoryItem | InventoryItemListRow;
 
@@ -27,7 +28,7 @@ export function canMarkCustomerSigned(
   store: InventoryStoreSession,
   item: SignableItem,
 ): boolean {
-  if (item.barcode.trim().toUpperCase().startsWith('PKG')) return false;
+  if (isPackageBarcode(item.barcode)) return false;
   if (!item.hub_arrived_at?.trim()) return false;
   if (item.customer_signed_at?.trim()) return false;
 
@@ -50,7 +51,7 @@ export function customerSignDeniedError(
   store: InventoryStoreSession,
   item: SignableItem,
 ): ServiceError {
-  if (item.barcode.trim().toUpperCase().startsWith('PKG')) {
+  if (isPackageBarcode(item.barcode)) {
     return svc('signDeniedPkg');
   }
   if (!item.hub_arrived_at?.trim()) {

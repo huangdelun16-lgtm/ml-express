@@ -18,8 +18,6 @@ import StockOutSuccessModal, { type StockOutSuccessData } from '../components/St
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useTranslation, resolveAppError } from '../i18n';
-import { awaitForceCloudSync, requestAutoCloudSync } from '../services/cloudAutoSync';
-import { getCloudSyncQueueSnapshot } from '../services/inventoryCloudQueue';
 import { applyTruckLoadOutbound, listOutboundPackages } from '../services/inventoryService';
 import type { PackedShipmentDetail } from '../types/inventory';
 import OutboundDateField from '../components/OutboundDateField';
@@ -32,7 +30,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'StockOut'>;
 
 export default function StockOutScreen({ navigation }: Props) {
   const { t, fmt } = useTranslation();
-  const { operatorName, store, hubCode, hasShiftOperator } = useAuth();
+  const { operatorName, store, hubCode } = useAuth();
   const [packs, setPacks] = useState<PackedShipmentDetail[]>([]);
   const [loadingPacks, setLoadingPacks] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -43,7 +41,6 @@ export default function StockOutScreen({ navigation }: Props) {
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState<StockOutSuccessData | null>(null);
-  const [retryingSync, setRetryingSync] = useState(false);
 
   const originLabel = store ? resolveStoreOriginLabel(store) : '';
   const routeLabel = formatTruckRouteLabel(originLabel, destination);
@@ -62,9 +59,6 @@ export default function StockOutScreen({ navigation }: Props) {
   const loadPacks = useCallback(async () => {
     setLoadingPacks(true);
     try {
-      if (store && hubCode) {
-        requestAutoCloudSync(store, hubCode);
-      }
       const scope = store && hubCode ? { store, hubCode } : undefined;
       setPacks(await listOutboundPackages(scope));
     } finally {
@@ -143,37 +137,7 @@ export default function StockOutScreen({ navigation }: Props) {
     navigation.navigate('Settings');
   }, [navigation]);
 
-  const handleRetrySync = useCallback(async () => {
-    if (!store || !hubCode || !successData) return;
-    setRetryingSync(true);
-    try {
-      await awaitForceCloudSync(store, hubCode);
-      const snap = await getCloudSyncQueueSnapshot(store.storeCode);
-      if (snap.pendingTruckLoad === 0 && snap.highestPriorityType !== 'truck_load') {
-        setSuccessData({ ...successData, cloudStatus: 'synced', cloudError: undefined });
-      } else {
-        Alert.alert(
-          t.common.fail,
-          fmt(t.settings.cloudSync.impactTruckLoad, {
-            count: snap.pendingTruckLoad || snap.pending,
-          }),
-        );
-      }
-    } catch (e: unknown) {
-      Alert.alert(t.common.fail, resolveAppError(t, e));
-    } finally {
-      setRetryingSync(false);
-    }
-  }, [store, hubCode, successData, t]);
-
   const submit = async () => {
-    if (!hasShiftOperator) {
-      Alert.alert(t.settings.operator.requiredTitle, t.settings.operator.requiredHint, [
-        { text: t.common.close },
-        { text: t.nav.settings, onPress: () => navigation.navigate('Settings') },
-      ]);
-      return;
-    }
     if (!destination.trim()) {
       Alert.alert(t.common.tip, t.stockOut.alertSelectDest);
       return;
@@ -372,9 +336,7 @@ export default function StockOutScreen({ navigation }: Props) {
         data={successData}
         onDone={handleSuccessDone}
         onGoResync={handleGoResync}
-        onRetrySync={() => void handleRetrySync()}
         onGoSyncSettings={handleGoSyncSettings}
-        retrying={retryingSync}
       />
     </KeyboardAvoidingView>
   );

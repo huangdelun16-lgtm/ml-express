@@ -1,5 +1,6 @@
 /**
- * Admin 跨境物流 — 一键清空 Inventory 云端全部测试包裹/订单数据
+ * Admin 跨境物流 — 一键清空 Inventory 云端全部跨境业务数据
+ * （快递明细、包装、到站签收、在途追踪、流水、跨境会计手工账）
  * 需 admin 角色 + 登录密码 + 确认短语
  */
 
@@ -132,6 +133,7 @@ exports.handler = async (event) => {
       packedShipments: 0,
       stockMovements: 0,
       storeItems: 0,
+      crossBorderManualEntries: 0,
     };
 
     deleted.orderTracking = await wipeTable(supabase, 'inventory_order_tracking');
@@ -145,6 +147,25 @@ exports.handler = async (event) => {
     deleted.packedShipments = await wipeTable(supabase, 'inventory_packed_shipments');
     deleted.stockMovements = await wipeTable(supabase, 'inventory_stock_movements');
     deleted.storeItems = await wipeTable(supabase, 'inventory_store_items');
+    deleted.crossBorderManualEntries = await wipeTable(
+      supabase,
+      'cross_border_manual_entries',
+    );
+
+    const clearedAt = new Date().toISOString();
+    const { error: settingsErr } = await supabase.from('system_settings').upsert(
+      {
+        category: 'inventory',
+        settings_key: 'inventory.platform_test_data_cleared_at',
+        settings_value: clearedAt,
+        description:
+          'Admin 清空跨境物流测试数据；Inventory App 同步时会清除本机缓存并避免把旧数据推回云端',
+        updated_by: auth.user.username,
+        updated_at: clearedAt,
+      },
+      { onConflict: 'settings_key' },
+    );
+    if (settingsErr) throw settingsErr;
 
     console.info('inventory-admin-clear-test-data by', auth.user.username, deleted);
 
@@ -154,9 +175,9 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         ok: true,
         deleted,
-        clearedAt: new Date().toISOString(),
+        clearedAt,
         message:
-          '云端 Inventory 测试数据已清空。各中转站 App 在下次同步后将自动移除本机对应缓存（未在队列中的订单/包裹）。',
+          '云端跨境物流数据已清空（快递明细、包装、到站签收、在途追踪、流水、跨境会计）。请在各 Inventory App（APK/Expo）打开「设置 → 立即同步」，本机对应数据将一并移除。',
       }),
     };
   } catch (error) {

@@ -1,7 +1,7 @@
 import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
 import type { InventoryStoreSession } from '../services/authService';
 import { extractDestinationCode } from './inboundBarcode';
-import { packDestinationFromBarcode } from './packageNumber';
+import { isPackageBarcode, packDestinationFromBarcode, packOriginFromBarcode } from './packageNumber';
 
 /** 木姐区域：店铺 MUSE* 与入库条码前缀 MSE/MUS 视为同一归属 */
 /** 瑞丽区域：店铺 RUILI* 与入库条码前缀 RUI 视为同一归属 */
@@ -45,7 +45,9 @@ export function inferOwnerKeyFromItem(item: {
   destination?: string;
 }): string {
   const barcode = item.barcode.trim().toUpperCase();
-  if (barcode.startsWith('PKG')) {
+  if (isPackageBarcode(barcode)) {
+    const origin = packOriginFromBarcode(barcode);
+    if (origin && origin !== 'PKG') return normalizeOwnerKey(origin);
     const dest = packDestinationFromBarcode(barcode);
     if (dest) return normalizeOwnerKey(dest);
   }

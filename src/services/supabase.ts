@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildPricingSettings } from './_shared/pricing';
 import type { Banner, Tutorial, WelcomeScreen } from './_shared/domainTypes';
+import type { ProxyPurchaseRow } from '../utils/proxyPurchaseExcel';
 export type { Banner, Tutorial, WelcomeScreen };
+export type { ProxyPurchaseRow as ProxyPurchaseWorkspaceRow };
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -3795,22 +3797,10 @@ export const personalLedgerService = {
 
 const PROXY_PURCHASE_WORKSPACE_KEY = 'default';
 
-export type ProxyPurchaseWorkspaceRow = {
-  id: string;
-  customerName: string;
-  orderDate: string;
-  address: string;
-  phone: string;
-  platform: string;
-  productName: string;
-  quantity: string;
-  unitPrice: string;
-};
-
 export type ProxyPurchaseWorkspacePayload = {
   proxy_fee_percent: string;
   exchange_rate: string;
-  rows: ProxyPurchaseWorkspaceRow[];
+  rows: ProxyPurchaseRow[];
   updated_by?: string;
 };
 
@@ -3826,7 +3816,7 @@ export const proxyPurchaseService = {
       throw error;
     }
     if (!data) return null;
-    const rows = Array.isArray(data.rows) ? (data.rows as ProxyPurchaseWorkspaceRow[]) : [];
+    const rows = Array.isArray(data.rows) ? (data.rows as ProxyPurchaseRow[]) : [];
     return {
       proxy_fee_percent: String(data.proxy_fee_percent ?? '5'),
       exchange_rate: String(data.exchange_rate ?? '595'),

@@ -2,12 +2,12 @@
   "expo": {
     "name": "ML Inventory",
     "slug": "ml-express-inventory",
-    "version": "1.4.1",
+    "version": "1.5.0",
     "scheme": "ml-express-inventory",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "description": "Business logistics app for transit stations: inbound stock, packing, truck loading, barcode scanning, and cloud inventory sync. Download from the App Store and sign in with your station store code.",
+    "description": "Business logistics app for transit stations: inbound stock, packing, truck loading, hub receive, barcode scanning, and Supabase-backed inventory. Download from the App Store and sign in with your station store code.",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.inventory",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "infoPlist": {
         "NSCameraUsageDescription": "ML Inventory uses the camera to scan barcodes on packages and inventory labels at transit stations.",
         "UISupportedInterfaceOrientations~ipad": [
@@ -33,7 +33,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.mlexpress.inventory",
-      "versionCode": 10,
+      "versionCode": 11,
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",

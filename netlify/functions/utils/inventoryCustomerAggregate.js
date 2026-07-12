@@ -10,6 +10,17 @@ function parseAmount(raw) {
   return Number.isFinite(n) ? n : 0;
 }
 
+const FEE_LABEL_PATTERN = /^(?:总费用|Total fee|ပို့ဆောင်ခ)\s+([\d.]+)\s*MMK$/i;
+
+function normalizePaymentLabel(raw) {
+  const p = String(raw || '').trim();
+  if (!p) return undefined;
+  const lower = p.toLowerCase();
+  if (p === '到付' || lower === 'cod') return '到付';
+  if (p === '预付' || lower === 'prepaid' || p === 'ကြိုပေးချေ') return '预付';
+  return p;
+}
+
 function parseInboundMovementNote(note) {
   const trimmed = String(note || '').trim();
   if (!trimmed) return {};
@@ -18,18 +29,24 @@ function parseInboundMovementNote(note) {
   let paymentLabel;
   const userParts = [];
   for (const part of parts) {
-    const feeMatch = part.match(/^总费用\s+([\d.]+)\s*MMK/i);
+    const feeMatch = part.match(FEE_LABEL_PATTERN);
     if (feeMatch) {
       totalFee = feeMatch[1];
       continue;
     }
-    if (part === '到付' || part === '预付') {
-      paymentLabel = part;
+    const normalized = normalizePaymentLabel(part);
+    if (normalized === '到付' || normalized === '预付') {
+      paymentLabel = normalized;
       continue;
     }
     userParts.push(part);
   }
   return { totalFee, paymentLabel, userNote: userParts.join(' · ') };
+}
+
+function inboundNoteHasFeeOrPayment(note) {
+  const parsed = parseInboundMovementNote(note);
+  return Boolean(String(parsed.totalFee || '').trim() || String(parsed.paymentLabel || '').trim());
 }
 
 function parseWeightKg(raw) {
@@ -39,7 +56,7 @@ function parseWeightKg(raw) {
 
 function movementRichness(m) {
   const note = String(m.note || '');
-  if (note.includes('总费用')) return 0;
+  if (inboundNoteHasFeeOrPayment(note)) return 0;
   if (String(m.recipient_name || '').trim() || String(m.recipient_phone || '').trim()) return 1;
   if (String(m.packaging || '').trim()) return 2;
   return 3;
@@ -140,14 +157,24 @@ function derivePackageStatus(item) {
 }
 
 function derivePaymentStatus(paymentLabel, customerSigned) {
-  const payment = String(paymentLabel || '').trim();
+  const payment = normalizePaymentLabel(paymentLabel) || '';
   if (payment === '预付') return '已付款';
   if (payment === '到付') return customerSigned ? '已收款' : '到付待收';
+  if (customerSigned) return '已收款';
   return payment || '—';
 }
 
-function buildExpressItemRow(item, inbound) {
-  const parsed = parseInboundMovementNote(inbound?.note);
+function mergeInvoiceParsed(movementNote, trackingNote) {
+  const fromMovement = parseInboundMovementNote(String(movementNote || ''));
+  const fromTracking = parseInboundMovementNote(String(trackingNote || ''));
+  return {
+    totalFee: fromMovement.totalFee || fromTracking.totalFee,
+    paymentLabel: fromMovement.paymentLabel || fromTracking.paymentLabel,
+  };
+}
+
+function buildExpressItemRow(item, inbound, trackingNote) {
+  const merged = mergeInvoiceParsed(inbound?.note, trackingNote);
   const customerName =
     normalizeCustomerName(
       String(item.recipient_name || '').trim() ||
@@ -162,7 +189,7 @@ function buildExpressItemRow(item, inbound) {
     String(item.owner_store_code || '').trim() ||
     '—';
   const qty = inbound ? Number(inbound.qty) || 1 : Number(item.qty_on_hand) || 1;
-  const fee = parseAmount(parsed.totalFee);
+  const fee = parseAmount(merged.totalFee);
   const customerSigned = isCustomerSignedItem(item);
 
   return {
@@ -180,10 +207,10 @@ function buildExpressItemRow(item, inbound) {
     weightKg: parseWeightKg(item.weight),
     qty,
     fee,
-    paymentStatus: derivePaymentStatus(parsed.paymentLabel, customerSigned),
+    paymentStatus: derivePaymentStatus(merged.paymentLabel, customerSigned),
     packageStatus: derivePackageStatus(item),
     transportStatus: deriveTransportStatus(item, inbound, destination),
-    paymentLabel: parsed.paymentLabel || '',
+    paymentLabel: merged.paymentLabel || '',
     ownerStoreCode: String(item.owner_store_code || '').trim(),
     inboundAt: inbound?.created_at || '',
     updatedAt: item.updated_at || inbound?.created_at || '',
@@ -231,11 +258,34 @@ async function loadExpressItemsDataset(supabase) {
     }
   }
 
+  const barcodes = itemList.map((i) => String(i.barcode || '').trim()).filter(Boolean);
+  const trackingNoteByBarcode = {};
+  if (barcodes.length > 0) {
+    const { data: trackingRows, error: trackingErr } = await supabase
+      .from('inventory_order_tracking')
+      .select('order_barcode, inbound_note')
+      .in('order_barcode', barcodes);
+
+    if (trackingErr) {
+      warnings.push(`订单追踪读取失败：${trackingErr.message}`);
+    } else {
+      for (const row of trackingRows || []) {
+        const code = String(row.order_barcode || '').trim();
+        const note = String(row.inbound_note || '').trim();
+        if (!code || !note) continue;
+        if (!trackingNoteByBarcode[code] || inboundNoteHasFeeOrPayment(note)) {
+          trackingNoteByBarcode[code] = note;
+        }
+      }
+    }
+  }
+
   const rows = [];
   for (const item of itemList) {
     const inbound = pickInboundMovement(inboundByItem[item.id]);
     if (!inbound && !String(item.recipient_name || '').trim()) continue;
-    rows.push(buildExpressItemRow(item, inbound));
+    const barcode = String(item.barcode || '').trim();
+    rows.push(buildExpressItemRow(item, inbound, trackingNoteByBarcode[barcode]));
   }
 
   return { rows, warnings };

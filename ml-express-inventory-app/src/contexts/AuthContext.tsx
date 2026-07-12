@@ -17,9 +17,9 @@ import {
   inventorySessionFromAuthMetadata,
   type InventoryStoreSession,
 } from '../services/authService';
-import { loadShiftOperatorName, saveShiftOperatorName } from '../services/operatorService';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { isSupabaseConfigured, supabase } from '../services/supabase';
+import { clearInventoryCloudCache, prefetchInventoryCache } from '../services/inventoryCloudStore';
 
 type AuthContextValue = {
   ready: boolean;
@@ -27,15 +27,11 @@ type AuthContextValue = {
   store: InventoryStoreSession | null;
   /** 本站服务区域码（到站收货匹配用，如 YGN、MDY） */
   hubCode: string | null;
-  /** 当班操作员姓名（写入流水）；未设置时回退店铺名 */
+  /** 写入流水的操作员标识（使用店铺名称） */
   operatorName: string | null;
-  /** 是否已设置当班操作员姓名 */
-  hasShiftOperator: boolean;
   storeCode: string | null;
   login: (storeCode: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  /** 换班登记操作员，无需退出登录 */
-  updateShiftOperator: (name: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -43,25 +39,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [store, setStore] = useState<InventoryStoreSession | null>(null);
-  const [shiftOperator, setShiftOperator] = useState('');
-
-  useEffect(() => {
-    if (!store?.storeCode) {
-      setShiftOperator('');
-      return;
-    }
-    void loadShiftOperatorName(store.storeCode).then(setShiftOperator);
-  }, [store?.storeCode]);
 
   useEffect(() => {
     void restoreSession()
       .then((session) => {
         setStore(session);
         if (session) {
-          const hub = resolveStoreHubCode(session);
-          void import('../services/cloudAutoSync').then(({ requestAutoCloudSync }) =>
-            requestAutoCloudSync(session, hub, { force: true }),
-          );
+          void prefetchInventoryCache(session, resolveStoreHubCode(session));
         }
       })
       .finally(() => setReady(true));
@@ -74,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((event, authSession) => {
       if (event === 'SIGNED_OUT') {
         setStore(null);
+        clearInventoryCloudCache();
         void clearSession();
         void clearDeviceSessionId();
         return;
@@ -92,59 +77,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!store) {
-      void import('../services/inventoryCloudRealtime').then(({ stopInventoryCloudRealtime }) =>
-        stopInventoryCloudRealtime(),
-      );
-      return;
-    }
-    const hub = resolveStoreHubCode(store);
-    let stopped = false;
-
-    void import('../services/inventoryCloudRealtime').then(({ startInventoryCloudRealtime }) => {
-      if (stopped) return;
-      startInventoryCloudRealtime(store, hub, () => {
-        void import('../services/inventoryService').then(({ pullPlatformInventoryCloud }) =>
-          pullPlatformInventoryCloud(store, hub),
-        );
-      });
-    });
-
-    return () => {
-      stopped = true;
-      void import('../services/inventoryCloudRealtime').then(({ stopInventoryCloudRealtime }) =>
-        stopInventoryCloudRealtime(),
-      );
-    };
-  }, [store]);
-
   const login = useCallback(async (storeCode: string, password: string) => {
     const session = await loginTransitStationStore(storeCode, password);
     setStore(session);
-    const hub = resolveStoreHubCode(session);
-    void import('../services/cloudAutoSync').then(({ requestAutoCloudSync }) =>
-      requestAutoCloudSync(session, hub, { force: true }),
-    );
+    void prefetchInventoryCache(session, resolveStoreHubCode(session));
   }, []);
 
   const logout = useCallback(async () => {
     await logoutTransitStationStore();
+    clearInventoryCloudCache();
     setStore(null);
-    setShiftOperator('');
   }, []);
 
-  const updateShiftOperator = useCallback(
-    async (name: string) => {
-      if (!store) return;
-      const trimmed = name.trim();
-      await saveShiftOperatorName(store.storeCode, trimmed);
-      setShiftOperator(trimmed);
-    },
-    [store],
-  );
-
-  const operatorName = shiftOperator.trim() || store?.storeName || null;
+  const operatorName = store?.storeName?.trim() || store?.storeCode?.trim() || null;
 
   const value = useMemo(
     () => ({
@@ -153,13 +98,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       store,
       hubCode: store ? resolveStoreHubCode(store) : null,
       operatorName,
-      hasShiftOperator: Boolean(shiftOperator.trim()),
       storeCode: store?.storeCode ?? null,
       login,
       logout,
-      updateShiftOperator,
     }),
-    [ready, store, shiftOperator, operatorName, login, logout, updateShiftOperator],
+    [ready, store, operatorName, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

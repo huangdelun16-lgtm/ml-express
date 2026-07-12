@@ -6,8 +6,11 @@ import {
   calcLineTotalRmb,
   calcProxyFee,
   exportProxyPurchaseExcel,
+  normalizeProxyPurchaseStatus,
+  proxyPurchaseStatusLabel,
   rowHasExportContent,
   type ProxyPurchaseRow,
+  type ProxyPurchaseStatus,
 } from '../utils/proxyPurchaseExcel';
 import { proxyPurchaseService } from '../services/supabase';
 import {
@@ -39,6 +42,15 @@ function formatFilterDateLabel(isoDate: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function normalizeLoadedRow(row: Partial<ProxyPurchaseRow> & { id?: string }): ProxyPurchaseRow {
+  return {
+    ...newRow(),
+    ...row,
+    id: row.id || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    status: normalizeProxyPurchaseStatus(row.status),
+  };
+}
+
 function newRow(seed?: Partial<ProxyPurchaseRow>): ProxyPurchaseRow {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -50,6 +62,7 @@ function newRow(seed?: Partial<ProxyPurchaseRow>): ProxyPurchaseRow {
     productName: '',
     quantity: '',
     unitPrice: '',
+    status: normalizeProxyPurchaseStatus(seed?.status),
   };
 }
 
@@ -90,7 +103,7 @@ function loadDraft(): SavedDraft {
     return {
       proxyFeePercent: parsed.proxyFeePercent || '5',
       exchangeRate: parsed.exchangeRate || '595',
-      rows: parsed.rows,
+      rows: parsed.rows.map((r) => normalizeLoadedRow(r)),
     };
   } catch {
     return { proxyFeePercent: '5', exchangeRate: '595', rows: [newRow()] };
@@ -166,16 +179,20 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     if (cloudHasRows) {
       setProxyFeePercent(cloud!.proxy_fee_percent || '5');
       setExchangeRate(cloud!.exchange_rate || '595');
-      setRows(cloud!.rows.length > 0 ? cloud!.rows : [newRow()]);
+      setRows(cloud!.rows.length > 0 ? cloud!.rows.map((r) => normalizeLoadedRow(r)) : [newRow()]);
     } else if (localHasRows) {
       setProxyFeePercent(localDraft.proxyFeePercent);
       setExchangeRate(localDraft.exchangeRate);
-      setRows(localDraft.rows);
-      await syncToCloud(localDraft);
+      setRows(localDraft.rows.map((r) => normalizeLoadedRow(r)));
+      await syncToCloud({
+        proxyFeePercent: localDraft.proxyFeePercent,
+        exchangeRate: localDraft.exchangeRate,
+        rows: localDraft.rows.map((r) => normalizeLoadedRow(r)),
+      });
     } else {
       setProxyFeePercent(localDraft.proxyFeePercent);
       setExchangeRate(localDraft.exchangeRate);
-      setRows(localDraft.rows);
+      setRows(localDraft.rows.map((r) => normalizeLoadedRow(r)));
     }
     setCloudErr('');
     setCloudSyncDisabled(false);
@@ -213,7 +230,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           const draft = loadDraft();
           setProxyFeePercent(draft.proxyFeePercent);
           setExchangeRate(draft.exchangeRate);
-          setRows(draft.rows);
+          setRows(draft.rows.map((r) => normalizeLoadedRow(r)));
           setCloudSyncDisabled(isProxyPurchaseTableMissingError(e));
           setCloudErr(describeProxyPurchaseCloudError(e, language));
           setCloudReady(true);
@@ -298,6 +315,31 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
         box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.12);
       }
       .proxy-purchase-cell-input::placeholder { color: rgba(148, 163, 184, 0.55); }
+      .proxy-purchase-cell-input[type="number"]::-webkit-outer-spin-button,
+      .proxy-purchase-cell-input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .proxy-purchase-cell-input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+      .proxy-purchase-status-select {
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 12px;
+        padding-right: 24px;
+      }
+      .proxy-purchase-status-select--pending {
+        color: #fde68a;
+        border-color: rgba(250, 204, 21, 0.35) !important;
+        background: rgba(234, 179, 8, 0.12) !important;
+      }
+      .proxy-purchase-status-select--receive {
+        color: #6ee7b7;
+        border-color: rgba(52, 211, 153, 0.35) !important;
+        background: rgba(16, 185, 129, 0.12) !important;
+      }
     `;
     document.head.appendChild(el);
     return () => el.remove();
@@ -515,6 +557,9 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           colPhone: 'Phone',
           colPlatform: 'Platform',
           colProduct: 'Product',
+          colStatus: 'Status',
+          statusPending: 'pending',
+          statusReceived: 'receive',
           colQty: 'Qty',
           colUnitPrice: 'Unit ¥',
           colFee: 'Fee',
@@ -583,6 +628,9 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             colPhone: 'Phone',
             colPlatform: 'Platform',
             colProduct: 'Product',
+            colStatus: 'Status',
+            statusPending: 'pending',
+            statusReceived: 'receive',
             colQty: 'Qty',
             colUnitPrice: 'Unit ¥',
             colFee: 'Fee',
@@ -650,6 +698,9 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             colPhone: '电话',
             colPlatform: '平台',
             colProduct: '商品',
+            colStatus: '状态',
+            statusPending: 'pending',
+            statusReceived: 'receive',
             colQty: '数量',
             colUnitPrice: '单价 ¥',
             colFee: '代购费',
@@ -692,6 +743,27 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             pagePrev: '上一页',
             pageNext: '下一页',
           };
+
+  const renderStatusSelect = (row: ProxyPurchaseRow) => {
+    const status = normalizeProxyPurchaseStatus(row.status);
+    return (
+      <select
+        className={`proxy-purchase-cell-input proxy-purchase-status-select ${
+          status === 'receive'
+            ? 'proxy-purchase-status-select--receive'
+            : 'proxy-purchase-status-select--pending'
+        }`}
+        value={status}
+        onChange={(e) =>
+          updateRow(row.id, { status: e.target.value as ProxyPurchaseStatus })
+        }
+        title={t.colStatus}
+      >
+        <option value="pending">{t.statusPending}</option>
+        <option value="receive">{t.statusReceived}</option>
+      </select>
+    );
+  };
 
   const renderExportCheckbox = (row: ProxyPurchaseRow, size: 'sm' | 'md' = 'md') => {
     const canExport = rowHasExportContent(row);
@@ -950,6 +1022,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           <label style={{ gridColumn: '1 / -1' }}>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colProduct}</span>
             <input className="proxy-purchase-cell-input" value={row.productName} onChange={(e) => updateRow(row.id, { productName: e.target.value })} />
+          </label>
+          <label>
+            <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colStatus}</span>
+            {renderStatusSelect(row)}
           </label>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colPlatform}</span>
@@ -1377,12 +1453,12 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
               className="proxy-purchase-table-scroll"
               style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
             >
-              <table style={{ width: '100%', minWidth: 1180, borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
+              <table style={{ width: '100%', minWidth: 1276, borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
                 <thead>
                   <tr>
                     <th colSpan={1} style={groupHeaderStyle('#94a3b8')}>{t.colExport}</th>
                     <th colSpan={5} style={groupHeaderStyle('#38bdf8')}>{t.groupCustomer}</th>
-                    <th colSpan={2} style={groupHeaderStyle('#a78bfa')}>{t.groupProduct}</th>
+                    <th colSpan={3} style={groupHeaderStyle('#a78bfa')}>{t.groupProduct}</th>
                     <th colSpan={4} style={{ ...groupHeaderStyle('#34d399'), borderRight: 'none' }}>{t.groupPrice}</th>
                   </tr>
                   <tr style={{ background: 'linear-gradient(180deg, rgba(51, 65, 85, 0.95), rgba(30, 41, 59, 0.92))' }}>
@@ -1414,6 +1490,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                       t.colPhone,
                       t.colPlatform,
                       t.colProduct,
+                      t.colStatus,
                       t.colQty,
                       t.colUnitPrice,
                       feeColLabel,
@@ -1427,7 +1504,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                           top: 0,
                           zIndex: 2,
                           padding: '11px 8px',
-                          textAlign: i >= 8 && i <= 10 ? 'right' : 'left',
+                          textAlign: i >= 9 && i <= 11 ? 'right' : 'left',
                           fontWeight: 700,
                           fontSize: 12,
                           whiteSpace: 'nowrap',
@@ -1497,6 +1574,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                         <td style={cellPad}><input className="proxy-purchase-cell-input" value={row.phone} onChange={(e) => updateRow(row.id, { phone: e.target.value })} /></td>
                         <td style={{ ...cellPad, width: COL_PLATFORM_WIDTH, maxWidth: COL_PLATFORM_WIDTH }}><input className="proxy-purchase-cell-input" list="proxy-platform-list" value={row.platform} onChange={(e) => updateRow(row.id, { platform: e.target.value })} placeholder="拼多多" /></td>
                         <td style={{ ...cellPad, minWidth: COL_PRODUCT_MIN_WIDTH, width: COL_PRODUCT_MIN_WIDTH }}><input className="proxy-purchase-cell-input" value={row.productName} onChange={(e) => updateRow(row.id, { productName: e.target.value })} /></td>
+                        <td style={{ ...cellPad, width: 96 }}>{renderStatusSelect(row)}</td>
                         <td style={{ ...cellPad, width: 72 }}><input className="proxy-purchase-cell-input" type="number" min={0} value={row.quantity} onChange={(e) => updateRow(row.id, { quantity: e.target.value })} style={{ textAlign: 'center' }} /></td>
                         <td style={{ ...cellPad, width: 96 }}><input className="proxy-purchase-cell-input" type="number" min={0} step={0.01} value={row.unitPrice} onChange={(e) => updateRow(row.id, { unitPrice: e.target.value })} style={{ textAlign: 'right' }} /></td>
                         <td style={{ ...cellPad, textAlign: 'right' }}>{renderCalcPill(unit > 0 ? fee.toFixed(2) : '—', 'fee')}</td>

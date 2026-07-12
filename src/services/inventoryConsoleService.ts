@@ -618,6 +618,7 @@ export type InventoryTestDataClearResult = {
     packedShipments: number;
     stockMovements: number;
     storeItems: number;
+    crossBorderManualEntries: number;
   };
   clearedAt: string;
   message?: string;

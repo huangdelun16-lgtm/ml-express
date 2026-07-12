@@ -19,13 +19,11 @@ import RegionFilterBar from '../components/RegionFilterBar';
 import { useAuth } from '../contexts/AuthContext';
 import type { BatchPrintEntry, LabelPrintPayload } from '../services/printerService';
 import { printBatchLabels } from '../services/printerService';
-import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import {
   createPackedShipment,
   canEditItemCustomerProfileForStore,
   listItems,
   listPackableItems,
-  syncInboundHubPacksToLocal,
 } from '../services/inventoryService';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { confirmAndMarkCustomerSigned } from '../utils/customerSignConfirm';
@@ -61,7 +59,7 @@ type ListMode = 'normal' | 'pack' | 'print';
 
 export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const route = useRoute<ItemsRoute>();
-  const incompleteOnly = route.params?.incompleteOnly ?? false;
+  const incompleteOnly = false;
   const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
   const [search, setSearch] = useState('');
@@ -89,23 +87,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         ? await listPackableItems(search, scope)
         : await listItems(search, scope),
     );
-
-    if (store && hubCode) {
-      requestAutoCloudSync(store, hubCode);
-      void (async () => {
-        try {
-          await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);
-          setItems(
-            listMode === 'pack'
-              ? await listPackableItems(search, scope)
-              : await listItems(search, scope),
-          );
-        } catch {
-          // 弱网/离线：保留已展示的本地列表
-        }
-      })();
-    }
-  }, [search, listMode, store, hubCode, operatorName, t.common.operator]);
+  }, [search, listMode, store, hubCode]);
 
   useFocusEffect(
     useCallback(() => {

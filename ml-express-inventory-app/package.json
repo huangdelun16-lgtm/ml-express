@@ -1,6 +1,6 @@
 {
   "name": "ml-express-inventory-app",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "main": "index.js",
   "private": true,
   "scripts": {
@@ -37,7 +37,6 @@
     "expo-print": "^15.0.8",
     "expo-secure-store": "^15.0.7",
     "expo-splash-screen": "~0.29.20",
-    "expo-sqlite": "~16.0.8",
     "expo-status-bar": "~3.0.8",
     "expo-updates": "~29.0.18",
     "react": "19.1.0",

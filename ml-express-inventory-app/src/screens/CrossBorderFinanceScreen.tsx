@@ -19,10 +19,7 @@ import {
   LEDGER_CATEGORY_STYLE,
   useTranslation,
 } from '../i18n';
-import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import { listCrossBorderFinance } from '../services/financeLedgerService';
-import { syncPlatformInventoryFromCloud } from '../services/inventoryCloudSync';
-import { isSupabaseConfigured } from '../services/supabase';
 import type { FinanceLedgerCategory, FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { regionDisplayLabel } from '../constants/destinationOptions';
@@ -204,37 +201,12 @@ export default function CrossBorderFinanceScreen() {
         return;
       }
 
-      requestAutoCloudSync(store, hubCode, options?.awaitSync ? { force: true } : undefined);
-
       try {
         const result = await listCrossBorderFinance(store, hubCode);
         applyFinanceResult(result);
       } finally {
         setLoading(false);
-        if (!options?.awaitSync) setRefreshing(false);
-      }
-
-      if (!isSupabaseConfigured()) {
-        if (options?.awaitSync) setRefreshing(false);
-        return;
-      }
-
-      const syncAndRefresh = async () => {
-        try {
-          await syncPlatformInventoryFromCloud(store, hubCode);
-          const result = await listCrossBorderFinance(store, hubCode);
-          applyFinanceResult(result);
-        } catch {
-          // offline: keep local data
-        } finally {
-          if (options?.awaitSync) setRefreshing(false);
-        }
-      };
-
-      if (options?.awaitSync) {
-        await syncAndRefresh();
-      } else {
-        void syncAndRefresh();
+        setRefreshing(false);
       }
     },
     [store, hubCode, applyFinanceResult],

@@ -1,5 +1,4 @@
 import { normalizePackDestination } from '../constants/destinationOptions';
-import { getDatabase } from '../services/database';
 import { isSupabaseConfigured, supabase } from '../services/supabase';
 
 function buildSettingsKey(origin: string, destination: string): string {
@@ -46,21 +45,7 @@ export function formatTruckRouteLabel(originLabel: string, destination: string):
   return `${from} → ${to}`;
 }
 
-async function readLocalFee(origins: string[], dest: string): Promise<number | null> {
-  const db = await getDatabase();
-  for (const origin of origins) {
-    const row = await db.getFirstAsync<{ fee: string }>(
-      `SELECT fee FROM truck_route_fees WHERE origin_code = ? AND destination_code = ?`,
-      [origin, dest],
-    );
-    if (!row?.fee?.trim()) continue;
-    const fee = parseFeeValue(row.fee);
-    if (fee != null) return fee;
-  }
-  return null;
-}
-
-/** 查询发站至目的地的装车车费（本地缓存 → 云端 system_settings） */
+/** 查询发站至目的地的装车车费（Supabase system_settings）。 */
 export async function fetchTruckRouteFee(
   originLabel: string,
   destination: string,
@@ -69,9 +54,6 @@ export async function fetchTruckRouteFee(
   if (!dest || !originLabel.trim()) return null;
 
   const origins = originCandidates(originLabel);
-  const local = await readLocalFee(origins, dest);
-  if (local != null) return local;
-
   if (isSupabaseConfigured()) {
     for (const origin of origins) {
       const key = buildSettingsKey(origin, dest);

@@ -11,7 +11,7 @@ import { isInventoryRlsPolicyError } from '../utils/cloudAuthErrors';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
-import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { isPackageBarcode, packDestinationFromBarcode } from '../utils/packageNumber';
 import { toNullableUuid } from '../utils/uuid';
 
 type OriginStore = {
@@ -806,7 +806,7 @@ export async function findTrackingByAnyCode(code: string): Promise<{
   const q = code.trim();
   if (!q) return { pkg: null, order: null };
 
-  if (q.toUpperCase().startsWith('PKG')) {
+  if (isPackageBarcode(q)) {
     const pkg = await getPkgTrackingDetail(q);
     return { pkg, order: null };
   }

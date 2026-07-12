@@ -24,7 +24,7 @@ import {
 } from '../services/hubTransportFeeService';
 import { isSupabaseConfigured, getSupabaseConfigHint } from '../services/supabase';
 import { ensureHubReceiveCloudReady } from '../services/hubReceiveGate';
-import { probeCloudConnection } from '../services/cloudSyncStatus';
+import { probeCloudConnection } from '../services/cloudConnection';
 import {
   confirmOrderHubReceived,
   confirmOrderInPackById,
@@ -35,12 +35,13 @@ import {
 import type { PkgTrackingDetail } from '../types/tracking';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
+import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 export default function HubReceiveScreen() {
   const { t, fmt } = useTranslation();
-  const { store, operatorName, hasShiftOperator } = useAuth();
-  const hubCode = store ? resolveStoreHubCode(store) : '';
+  const { store, hubCode: authHubCode, operatorName } = useAuth();
+  const hubCode = authHubCode ?? (store ? resolveStoreHubCode(store) : '');
   const operator = operatorName ?? t.common.operator;
   const [cloudConnected, setCloudConnected] = useState<boolean | null>(null);
   const [scan, setScan] = useState('');
@@ -73,10 +74,6 @@ export default function HubReceiveScreen() {
   );
 
   const preflightHubReceive = useCallback(async (): Promise<boolean> => {
-    if (!hasShiftOperator) {
-      Alert.alert(t.settings.operator.requiredTitle, t.settings.operator.requiredHint);
-      return false;
-    }
     const gate = await ensureHubReceiveCloudReady();
     if (!gate.ok) {
       setError(
@@ -91,7 +88,7 @@ export default function HubReceiveScreen() {
     }
     setCloudConnected(true);
     return true;
-  }, [hasShiftOperator, t]);
+  }, [t]);
 
   const applyOrderSuccess = useCallback(
     async (pkg: PkgTrackingDetail) => {
@@ -400,7 +397,7 @@ export default function HubReceiveScreen() {
   const onSubmit = (code: string) => {
     setScan(code);
     const trimmed = code.trim().toUpperCase();
-    if (trimmed.startsWith('PKG')) {
+    if (isPackageBarcode(trimmed)) {
       void handlePackScan(code);
       return;
     }
@@ -425,12 +422,6 @@ export default function HubReceiveScreen() {
         <View style={styles.cloudWarnBox}>
           <Text style={styles.cloudWarnTitle}>{t.hubReceive.cloudRequiredTitle}</Text>
           <Text style={styles.cloudWarnText}>{t.hubReceive.cloudRequiredHint}</Text>
-        </View>
-      ) : null}
-      {!hasShiftOperator ? (
-        <View style={styles.operatorWarnBox}>
-          <Text style={styles.operatorWarnTitle}>{t.settings.operator.requiredTitle}</Text>
-          <Text style={styles.operatorWarnText}>{t.settings.operator.requiredHint}</Text>
         </View>
       ) : null}
 

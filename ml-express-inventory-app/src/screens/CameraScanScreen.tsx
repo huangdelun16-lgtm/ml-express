@@ -8,6 +8,7 @@ import { getItemByBarcode, markCustomerSigned } from '../services/inventoryServi
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItem } from '../types/inventory';
 import { canMarkCustomerSigned } from '../utils/customerSign';
+import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Nav = {
@@ -148,7 +149,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
               <Pressable style={styles.action} onPress={goStockIn}>
                 <Text style={styles.actionText}>{t.cameraScan.goStockIn}</Text>
               </Pressable>
-              {result.code.toUpperCase().startsWith('PKG') ? (
+              {isPackageBarcode(result.code) ? (
                 <Pressable style={styles.action} onPress={goHubReceive}>
                   <Text style={styles.actionText}>{t.cameraScan.goHubReceive}</Text>
                 </Pressable>

@@ -14,7 +14,6 @@ import PkgActionModal from '../components/PkgActionModal';
 import PkgEditModal from '../components/PkgEditModal';
 import PkgOrdersModal from '../components/PkgOrdersModal';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
-import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import {
   cancelPackedShipment,
   listPackedShipmentRows,
@@ -57,7 +56,6 @@ export default function PkgScreen() {
     setPacks(await listPackedShipmentRows(search, scope));
 
     if (store && hubCode) {
-      requestAutoCloudSync(store, hubCode);
       void (async () => {
         try {
           await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);

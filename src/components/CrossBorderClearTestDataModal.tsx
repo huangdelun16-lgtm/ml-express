@@ -35,7 +35,7 @@ const CrossBorderClearTestDataModal: React.FC<Props> = ({ open, onClose, onClear
   const t = isEn
     ? {
         title: 'Clear inventory test data',
-        sub: 'Permanently removes all cloud orders, packs, and tracking for Inventory App. Transit accounts are kept. Devices drop local copies on next sync.',
+        sub: 'Permanently removes all cross-border cloud data: express orders, packs, hub sign-off, in-transit tracking, ledger movements, and finance entries. Transit accounts are kept. Inventory App (APK/Expo) clears matching local data on next sync.',
         password: 'Your admin password',
         confirmLabel: 'Confirmation phrase',
         confirmHint: `Type exactly: ${INVENTORY_TEST_DATA_CONFIRM_PHRASE}`,
@@ -47,7 +47,7 @@ const CrossBorderClearTestDataModal: React.FC<Props> = ({ open, onClose, onClear
       }
     : {
         title: '清空 Inventory 测试数据',
-        sub: '将永久删除云端全部订单、快递包、在途追踪与库存流水，不会删除中转站账号。各 Inventory App 下次同步后会自动清理本机缓存。',
+        sub: '将永久删除云端全部跨境数据：快递明细、包装、到站签收、在途追踪、流水、跨境会计（含手工账目）。不会删除中转站账号。各 Inventory App（APK/Expo）在「设置 → 立即同步」后会自动清理本机对应数据。',
         password: '当前 Admin 登录密码',
         confirmLabel: '确认短语',
         confirmHint: `请准确输入：${INVENTORY_TEST_DATA_CONFIRM_PHRASE}`,

@@ -1,5 +1,7 @@
 import type { Workbook, Worksheet } from 'exceljs';
 
+export type ProxyPurchaseStatus = 'pending' | 'receive';
+
 export type ProxyPurchaseRow = {
   id: string;
   customerName: string;
@@ -10,7 +12,21 @@ export type ProxyPurchaseRow = {
   productName: string;
   quantity: string;
   unitPrice: string;
+  /** pending · receive（旧数据 received 视为 receive） */
+  status?: ProxyPurchaseStatus;
 };
+
+export function normalizeProxyPurchaseStatus(raw: unknown): ProxyPurchaseStatus {
+  if (raw === 'receive' || raw === 'received') return 'receive';
+  return 'pending';
+}
+
+export function proxyPurchaseStatusLabel(
+  status: ProxyPurchaseStatus,
+  _language: 'zh' | 'en' | 'my' = 'zh',
+): string {
+  return status === 'receive' ? 'receive' : 'pending';
+}
 
 export function rowHasExportContent(row: ProxyPurchaseRow): boolean {
   return Boolean(
@@ -154,8 +170,9 @@ function applyDataCellStyle(
   cell: import('exceljs').Cell,
   colNumber: number,
   stripe: 'even' | 'odd',
-  kind: 'text' | 'product' | 'money' | 'fee' | 'total' | 'index' | 'qty' | 'platform',
+  kind: 'text' | 'product' | 'money' | 'fee' | 'total' | 'index' | 'qty' | 'platform' | 'status',
   productText?: string,
+  status?: ProxyPurchaseStatus,
 ) {
   cell.border = XL_BORDER;
   const stripeBg = stripe === 'odd' ? 'FFF8FAFC' : 'FFFFFFFF';
@@ -173,18 +190,33 @@ function applyDataCellStyle(
     bg = stripe === 'odd' ? 'FFF0F9FF' : 'FFF8FAFC';
   }
   if (kind === 'platform') align = 'center';
+  if (kind === 'status') align = 'center';
   if (kind === 'fee') bg = stripe === 'odd' ? 'FFFFFBEB' : 'FFFEFCE8';
   if (kind === 'total') bg = stripe === 'odd' ? 'FFECFDF5' : 'FFF0FDF4';
+  if (kind === 'status') {
+    const isReceive = status === 'receive';
+    bg = isReceive
+      ? stripe === 'odd'
+        ? 'FFD1FAE5'
+        : 'FFECFDF5'
+      : stripe === 'odd'
+        ? 'FFFEF9C3'
+        : 'FFFFFBEB';
+  }
 
   cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
   cell.alignment = { vertical, horizontal: align, wrapText: wrap };
   const productBurmese = kind === 'product' && productText ? hasMyanmarScript(productText) : false;
   if (!(kind === 'product' && productBurmese)) {
+    const statusColor =
+      kind === 'status' ? (status === 'receive' ? 'FF047857' : 'FFB45309') : undefined;
     cell.font = {
       name: 'Calibri',
       size: kind === 'product' ? 10.5 : 11,
-      color: { argb: kind === 'total' ? 'FF047857' : kind === 'product' ? 'FF0F172A' : 'FF0F172A' },
-      bold: kind === 'total',
+      color: {
+        argb: statusColor ?? (kind === 'total' ? 'FF047857' : 'FF0F172A'),
+      },
+      bold: kind === 'total' || kind === 'status',
     };
   }
 
@@ -207,7 +239,7 @@ export async function exportProxyPurchaseExcel(opts: {
   wb.creator = 'ML Express Admin';
   wb.created = new Date();
 
-  const COL_COUNT = 11;
+  const COL_COUNT = 12;
   const feePct = Number.isFinite(opts.proxyFeePercent) ? opts.proxyFeePercent : 5;
   const rate = Number.isFinite(opts.exchangeRate) ? opts.exchangeRate : 595;
 
@@ -235,6 +267,7 @@ export async function exportProxyPurchaseExcel(opts: {
     { width: 12 },
     { width: 14 },
     { width: 13 },
+    { width: 12 },
   ];
 
   styleMergedBanner(ws, 1, COL_COUNT, 'MARKET LINK · 代购清单', {
@@ -279,6 +312,7 @@ export async function exportProxyPurchaseExcel(opts: {
     '单价 (¥) Unit Price',
     `代购费 (${feePct}%) Proxy Fee`,
     '合计 Total (¥)',
+    '状态 Status',
   ];
 
   const headerRow = ws.getRow(4);
@@ -315,6 +349,7 @@ export async function exportProxyPurchaseExcel(opts: {
     const stripe: 'even' | 'odd' = idx % 2 === 0 ? 'even' : 'odd';
 
     const productName = row.productName.trim();
+    const rowStatus = normalizeProxyPurchaseStatus(row.status);
     const r = ws.addRow([
       idx + 1,
       row.customerName.trim(),
@@ -327,6 +362,7 @@ export async function exportProxyPurchaseExcel(opts: {
       unitPrice || '',
       fee || '',
       total || '',
+      proxyPurchaseStatusLabel(rowStatus, 'zh'),
     ]);
     r.height = DATA_ROW_HEIGHT;
 
@@ -341,6 +377,7 @@ export async function exportProxyPurchaseExcel(opts: {
       else if (colNumber === 9) applyDataCellStyle(cell, colNumber, stripe, 'money');
       else if (colNumber === 10) applyDataCellStyle(cell, colNumber, stripe, 'fee');
       else if (colNumber === 11) applyDataCellStyle(cell, colNumber, stripe, 'total');
+      else if (colNumber === 12) applyDataCellStyle(cell, colNumber, stripe, 'status', undefined, rowStatus);
       else applyDataCellStyle(cell, colNumber, stripe, 'text');
     });
   });

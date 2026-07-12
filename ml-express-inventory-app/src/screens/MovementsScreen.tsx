@@ -18,10 +18,7 @@ import {
   LEDGER_CATEGORY_STYLE,
   useTranslation,
 } from '../i18n';
-import { requestAutoCloudSync } from '../services/cloudAutoSync';
 import { listFinanceLedger } from '../services/financeLedgerService';
-import { syncPlatformInventoryFromCloud } from '../services/inventoryCloudSync';
-import { isSupabaseConfigured } from '../services/supabase';
 import type { FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 
 type TabKey = 'all' | 'income' | 'transport' | 'ops';
@@ -139,37 +136,12 @@ export default function MovementsScreen() {
         return;
       }
 
-      requestAutoCloudSync(store, hubCode, options?.awaitSync ? { force: true } : undefined);
-
       try {
         const result = await listFinanceLedger(store, hubCode);
         applyLedgerResult(result);
       } finally {
         setLoading(false);
-        if (!options?.awaitSync) setRefreshing(false);
-      }
-
-      if (!isSupabaseConfigured()) {
-        if (options?.awaitSync) setRefreshing(false);
-        return;
-      }
-
-      const syncAndRefresh = async () => {
-        try {
-          await syncPlatformInventoryFromCloud(store, hubCode);
-          const result = await listFinanceLedger(store, hubCode);
-          applyLedgerResult(result);
-        } catch {
-          // 离线时保留本地流水
-        } finally {
-          if (options?.awaitSync) setRefreshing(false);
-        }
-      };
-
-      if (options?.awaitSync) {
-        await syncAndRefresh();
-      } else {
-        void syncAndRefresh();
+        setRefreshing(false);
       }
     },
     [store, hubCode, applyLedgerResult],

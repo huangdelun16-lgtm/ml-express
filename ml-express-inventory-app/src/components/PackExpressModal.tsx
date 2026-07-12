@@ -19,6 +19,7 @@ import type { InventoryStoreSession } from '../services/authService';
 import type { InventoryItem } from '../types/inventory';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { aggregatePackSpecFromItems, sumPackageWeightsKg } from '../utils/itemFieldFormat';
+import { resolveStoreHubCode } from '../utils/storeZone';
 import { fmt, resolveAppError, useTranslation } from '../i18n';
 import {
   isPackContentLockedForStore,
@@ -106,7 +107,8 @@ export default function PackExpressModal({
 
     void (async () => {
       try {
-        const packageNo = await generatePackageNumber(destination, selectedItems.length);
+        const originPrefix = store ? resolveStoreHubCode(store) : 'PKG';
+        const packageNo = await generatePackageNumber(destination, selectedItems.length, originPrefix);
         if (cancelled) return;
         const names = selectedItems.map((i) => i.name).slice(0, 3).join('、');
         const suffix =
