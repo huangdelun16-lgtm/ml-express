@@ -1,56 +1,115 @@
-/** Code128 条码图（bwip-js 在线 API，打印前会内嵌为 base64） */
+/** Code128-B 模块宽度表。条码在本机生成，不依赖外网图片服务。 */
+const CODE128_PATTERNS = [
+  '212222', '222122', '222221', '121223', '121322', '131222', '122213', '122312',
+  '132212', '221213', '221312', '231212', '112232', '122132', '122231', '113222',
+  '123122', '123221', '223211', '221132', '221231', '213212', '223112', '312131',
+  '311222', '321122', '321221', '312212', '322112', '322211', '212123', '212321',
+  '232121', '111323', '131123', '131321', '112313', '132113', '132311', '211313',
+  '231113', '231311', '112133', '112331', '132131', '113123', '113321', '133121',
+  '313121', '211331', '231131', '213113', '213311', '213131', '311123', '311321',
+  '331121', '312113', '312311', '332111', '314111', '221411', '431111', '111224',
+  '111422', '121124', '121421', '141122', '141221', '112214', '112412', '122114',
+  '122411', '142112', '142211', '241211', '221114', '413111', '241112', '134111',
+  '111242', '121142', '121241', '114212', '124112', '124211', '411212', '421112',
+  '421211', '212141', '214121', '412121', '111143', '111341', '131141', '114113',
+  '114311', '411113', '411311', '113141', '114131', '311141', '411131', '211412',
+  '211214', '211232', '2331112',
+] as const;
+
+const START_B = 104;
+const STOP = 106;
+const DATA_URI_CACHE_LIMIT = 64;
+const dataUriCache = new Map<string, string>();
+
+function encodeCode128B(code: string): number[] {
+  const values = [...code].map((char) => {
+    const charCode = char.charCodeAt(0);
+    if (charCode < 32 || charCode > 126) {
+      throw new Error('CODE128_UNSUPPORTED_CHARACTER');
+    }
+    return charCode - 32;
+  });
+  const checksum = (START_B + values.reduce((sum, value, index) => sum + value * (index + 1), 0)) % 103;
+  return [START_B, ...values, checksum, STOP];
+}
+
+export function buildCode128Svg(
+  code: string,
+  opts?: { scale?: number; height?: number; includeText?: boolean },
+): string {
+  const trimmed = code.trim();
+  if (!trimmed) return '';
+  const moduleWidth = Math.max(1, opts?.scale ?? 2);
+  const barHeight = Math.max(24, (opts?.height ?? 12) * 4);
+  const quietZone = 10;
+  const patterns = encodeCode128B(trimmed).map((value) => CODE128_PATTERNS[value]);
+  const modules = patterns.reduce(
+    (sum, pattern) => sum + [...pattern].reduce((width, digit) => width + Number(digit), 0),
+    quietZone * 2,
+  );
+  const textHeight = opts?.includeText === false ? 0 : 18;
+  let x = quietZone;
+  const bars: string[] = [];
+
+  for (const pattern of patterns) {
+    [...pattern].forEach((digit, index) => {
+      const width = Number(digit);
+      if (index % 2 === 0) {
+        bars.push(`<rect x="${x * moduleWidth}" y="0" width="${width * moduleWidth}" height="${barHeight}"/>`);
+      }
+      x += width;
+    });
+  }
+
+  const width = modules * moduleWidth;
+  const text = textHeight
+    ? `<text x="${width / 2}" y="${barHeight + 14}" text-anchor="middle" font-family="monospace" font-size="12">${escapeSvgText(trimmed)}</text>`
+    : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${barHeight + textHeight}" viewBox="0 0 ${width} ${barHeight + textHeight}"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${bars.join('')}</g>${text}</svg>`;
+}
+
+function escapeSvgText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function cacheDataUri(key: string, value: string): void {
+  if (dataUriCache.size >= DATA_URI_CACHE_LIMIT) {
+    const oldestKey = dataUriCache.keys().next().value;
+    if (oldestKey) dataUriCache.delete(oldestKey);
+  }
+  dataUriCache.set(key, value);
+}
+
 export function getBarcodeImageUrl(
   code: string,
   opts?: { scale?: number; height?: number; includeText?: boolean },
 ): string {
-  const scale = opts?.scale ?? 3;
-  const height = opts?.height ?? 12;
-  const text = opts?.includeText !== false ? '&includetext' : '';
-  return `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(code)}&scale=${scale}&height=${height}${text}`;
+  const trimmed = code.trim();
+  if (!trimmed) return '';
+  const cacheKey = `${trimmed}|${opts?.scale ?? 2}|${opts?.height ?? 12}|${opts?.includeText !== false}`;
+  const cached = dataUriCache.get(cacheKey);
+  if (cached) return cached;
+  const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildCode128Svg(trimmed, opts))}`;
+  cacheDataUri(cacheKey, dataUri);
+  return dataUri;
 }
 
-const dataUriCache = new Map<string, string>();
-
-function bytesToBase64(bytes: Uint8Array): string {
-  const table = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  let output = '';
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i];
-    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
-    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
-    const triplet = (a << 16) | (b << 8) | c;
-    output += table[(triplet >> 18) & 0x3f];
-    output += table[(triplet >> 12) & 0x3f];
-    output += i + 1 < bytes.length ? table[(triplet >> 6) & 0x3f] : '=';
-    output += i + 2 < bytes.length ? table[triplet & 0x3f] : '=';
-  }
-  return output;
-}
-
-/** 拉取条码 PNG 并转为 data URI，供打印 HTML 内嵌（避免蓝牙/离线时远程图加载失败） */
+/** 保留异步签名供打印服务复用；实现完全本地化。 */
 export async function fetchBarcodeDataUri(
   code: string,
   opts?: { scale?: number; height?: number },
 ): Promise<string> {
-  const trimmed = code.trim();
-  if (!trimmed) return '';
-
-  const cacheKey = `${trimmed}|${opts?.scale ?? 2}|${opts?.height ?? 12}`;
-  const cached = dataUriCache.get(cacheKey);
-  if (cached) return cached;
-
-  const url = getBarcodeImageUrl(trimmed, { ...opts, includeText: false });
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Barcode image fetch failed (${response.status})`);
-  }
-  const buffer = await response.arrayBuffer();
-  const base64 = bytesToBase64(new Uint8Array(buffer));
-  const dataUri = `data:image/png;base64,${base64}`;
-  dataUriCache.set(cacheKey, dataUri);
-  return dataUri;
+  return getBarcodeImageUrl(code, { ...opts, includeText: false });
 }
 
 export function clearBarcodeDataUriCache(): void {
   dataUriCache.clear();
+}
+
+export function getBarcodeDataUriCacheSize(): number {
+  return dataUriCache.size;
 }

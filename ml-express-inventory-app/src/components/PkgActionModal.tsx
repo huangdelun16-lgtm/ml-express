@@ -13,7 +13,6 @@ type Props = {
   onEdit: () => void;
   onPrint: () => void;
   onViewOrders?: () => void;
-  onResyncCloud?: () => void;
   onUnpack?: () => void;
   canEdit?: boolean;
   canUnpack?: boolean;
@@ -27,7 +26,6 @@ export default function PkgActionModal({
   onEdit,
   onPrint,
   onViewOrders,
-  onResyncCloud,
   onUnpack,
   canEdit = true,
   canUnpack = false,
@@ -102,11 +100,6 @@ export default function PkgActionModal({
           <Pressable style={styles.btnPrint} onPress={onPrint}>
             <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
           </Pressable>
-          {onResyncCloud ? (
-            <Pressable style={styles.btnResync} onPress={onResyncCloud}>
-              <Text style={styles.btnResyncText}>{t.pkg.resyncSuccess}</Text>
-            </Pressable>
-          ) : null}
           <Pressable style={styles.btnCancel} onPress={onClose}>
             <Text style={styles.btnCancelText}>{t.common.close}</Text>
           </Pressable>
@@ -215,14 +208,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  btnResync: {
-    backgroundColor: '#0f766e',
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  btnResyncText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   btnUnpack: {
     backgroundColor: 'transparent',
     borderRadius: 14,

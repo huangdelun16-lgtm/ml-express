@@ -106,6 +106,14 @@ exports.handler = async (event) => {
       };
     }
 
+    const { error: attemptsDeleteErr } = await supabase
+      .from('inventory_login_attempts')
+      .delete()
+      .eq('store_code', String(store.store_code).trim().toUpperCase());
+    if (attemptsDeleteErr) {
+      console.error('inventory-admin-delete-account cooldown cleanup failed:', attemptsDeleteErr);
+    }
+
     return {
       statusCode: 200,
       headers,

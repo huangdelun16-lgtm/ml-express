@@ -1,7 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildPricingSettings } from './_shared/pricing';
 import type { Banner, Tutorial, WelcomeScreen } from './_shared/domainTypes';
-import type { ProxyPurchaseRow } from '../utils/proxyPurchaseExcel';
+import type {
+  CustomerDepositStore,
+  CustomerExchangeRateStore,
+  CustomerProxyFeeStore,
+  ProxyPurchaseRow,
+} from '../utils/proxyPurchaseExcel';
+import {
+  normalizeCustomerDepositStore,
+  normalizeCustomerExchangeRateStore,
+  normalizeCustomerProxyFeeStore,
+} from '../utils/proxyPurchaseExcel';
 export type { Banner, Tutorial, WelcomeScreen };
 export type { ProxyPurchaseRow as ProxyPurchaseWorkspaceRow };
 
@@ -3801,6 +3811,9 @@ export type ProxyPurchaseWorkspacePayload = {
   proxy_fee_percent: string;
   exchange_rate: string;
   rows: ProxyPurchaseRow[];
+  customer_deposits?: CustomerDepositStore;
+  customer_proxy_fees?: CustomerProxyFeeStore;
+  customer_exchange_rates?: CustomerExchangeRateStore;
   updated_by?: string;
 };
 
@@ -3808,7 +3821,7 @@ export const proxyPurchaseService = {
   async getWorkspace(): Promise<ProxyPurchaseWorkspacePayload | null> {
     const { data, error } = await supabase
       .from('proxy_purchase_workspaces')
-      .select('proxy_fee_percent, exchange_rate, rows')
+      .select('proxy_fee_percent, exchange_rate, rows, customer_deposits, customer_proxy_fees, customer_exchange_rates')
       .eq('workspace_key', PROXY_PURCHASE_WORKSPACE_KEY)
       .maybeSingle();
     if (error) {
@@ -3817,10 +3830,16 @@ export const proxyPurchaseService = {
     }
     if (!data) return null;
     const rows = Array.isArray(data.rows) ? (data.rows as ProxyPurchaseRow[]) : [];
+    const customer_deposits = normalizeCustomerDepositStore(data.customer_deposits);
+    const customer_proxy_fees = normalizeCustomerProxyFeeStore(data.customer_proxy_fees);
+    const customer_exchange_rates = normalizeCustomerExchangeRateStore(data.customer_exchange_rates);
     return {
       proxy_fee_percent: String(data.proxy_fee_percent ?? '5'),
       exchange_rate: String(data.exchange_rate ?? '595'),
       rows,
+      customer_deposits,
+      customer_proxy_fees,
+      customer_exchange_rates,
     };
   },
 
@@ -3832,6 +3851,9 @@ export const proxyPurchaseService = {
         proxy_fee_percent: payload.proxy_fee_percent,
         exchange_rate: payload.exchange_rate,
         rows: payload.rows,
+        customer_deposits: payload.customer_deposits ?? {},
+        customer_proxy_fees: payload.customer_proxy_fees ?? {},
+        customer_exchange_rates: payload.customer_exchange_rates ?? {},
         updated_by: payload.updated_by ?? '',
         updated_at,
       },

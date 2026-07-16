@@ -170,7 +170,6 @@ exports.handler = async (event) => {
       capacity,
       facilities,
       notes,
-      password,
       region,
       cod_settlement_day,
       current_load: 0,
@@ -190,6 +189,20 @@ exports.handler = async (event) => {
         statusCode: 500,
         headers,
         body: JSON.stringify({ error: insertErr.message || '创建失败' }),
+      };
+    }
+
+    const { data: passwordStored, error: passwordErr } = await supabase.rpc(
+      'inventory_set_store_password',
+      { p_store_id: store.id, p_new_password: password },
+    );
+    if (passwordErr || !passwordStored) {
+      console.error('inventory-admin-create-account password hash failed:', passwordErr);
+      await supabase.from('delivery_stores').delete().eq('id', store.id);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: '创建账号失败' }),
       };
     }
 

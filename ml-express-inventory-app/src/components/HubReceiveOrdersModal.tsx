@@ -14,6 +14,7 @@ import type { PkgTrackingDetail } from '../types/tracking';
 import { getOrderStatusLabel, getPkgStatusLabel, getTransportFeeDisplay, useTranslation } from '../i18n';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { parseTransportFeeAmount } from '../services/hubTransportFeeService';
+import { canReleaseTransitManually } from '../utils/inventoryReliability';
 
 function hubOrderStatusLabel(
   line: PkgTrackingDetail['orders'][number],
@@ -35,10 +36,12 @@ type Props = {
   confirmingOrderId: string | null;
   payingTransportFee: boolean;
   transportFeePaid: boolean;
+  releasingTransit: boolean;
   onClose: () => void;
   onConfirmPack: () => void;
   onConfirmOrder: (orderId: string) => void;
   onPayTransportFee: () => void;
+  onReleaseTransit: () => void;
 };
 
 export default function HubReceiveOrdersModal({
@@ -50,10 +53,12 @@ export default function HubReceiveOrdersModal({
   confirmingOrderId,
   payingTransportFee,
   transportFeePaid,
+  releasingTransit,
   onClose,
   onConfirmPack,
   onConfirmOrder,
   onPayTransportFee,
+  onReleaseTransit,
 }: Props) {
   const { t, fmt } = useTranslation();
   const { height: windowHeight } = useWindowDimensions();
@@ -88,6 +93,12 @@ export default function HubReceiveOrdersModal({
   const needsFeePayment =
     ordersAllProcessed && feeAmount > 0 && !transportFeePaid && !needsPackConfirm;
   const canDismiss = !needsFeePayment;
+  const transitOrders = pack.orders.filter((line) => resolveOrderDestinationCode(line) !== hubCode);
+  const canReleaseTransit = canReleaseTransitManually({
+    packageStatus: pack.status,
+    hasTransitOrders: transitOrders.length > 0,
+    hasUnreleasedTransitOrders: transitOrders.some((line) => line.status === 'hub_received'),
+  });
 
   const handleDismiss = () => {
     if (canDismiss) onClose();
@@ -227,6 +238,17 @@ export default function HubReceiveOrdersModal({
           </ScrollView>
 
           <View style={styles.footerBlock}>
+            {canReleaseTransit ? (
+              <Pressable
+                style={[styles.transitBtn, (releasingTransit || loading) && styles.btnBusy]}
+                onPress={onReleaseTransit}
+                disabled={releasingTransit || loading}
+              >
+                <Text style={styles.transitBtnText}>
+                  {releasingTransit ? t.common.processing : t.hubReceive.modalReleaseTransit}
+                </Text>
+              </Pressable>
+            ) : null}
             {canPayTransportFee ? (
               <Pressable
                 style={[styles.payFeeBtn, (payingTransportFee || loading) && styles.btnBusy]}

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -17,9 +18,11 @@ import {
   getCrossBorderCategoryLabel,
   getLedgerAmountDisplay,
   LEDGER_CATEGORY_STYLE,
+  resolveAppError,
   useTranslation,
 } from '../i18n';
 import { listCrossBorderFinance } from '../services/financeLedgerService';
+import { deleteCrossBorderManualEntry } from '../services/crossBorderManualEntryService';
 import type { FinanceLedgerCategory, FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { regionDisplayLabel } from '../constants/destinationOptions';
@@ -70,7 +73,15 @@ function filterByTab(
   );
 }
 
-function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
+function LedgerRow({
+  item,
+  deleting,
+  onDelete,
+}: {
+  item: FinanceLedgerEntry;
+  deleting: boolean;
+  onDelete?: () => void;
+}) {
   const { t } = useTranslation();
   const style = LEDGER_CATEGORY_STYLE[item.category];
   const when = formatTimeAgo(item.occurredAt, t);
@@ -107,6 +118,19 @@ function LedgerRow({ item }: { item: FinanceLedgerEntry }) {
               <Text style={styles.metaDot}>·</Text>
               <Text style={styles.metaBarcode} numberOfLines={1}>{item.barcode}</Text>
             </>
+          ) : null}
+          {item.deletable && onDelete ? (
+            <Pressable
+              style={styles.deleteBtn}
+              disabled={deleting}
+              onPress={onDelete}
+            >
+              {deleting ? (
+                <ActivityIndicator color="#f87171" size="small" />
+              ) : (
+                <Text style={styles.deleteText}>{t.manualEntry.delete}</Text>
+              )}
+            </Pressable>
           ) : null}
         </View>
       </View>
@@ -161,6 +185,8 @@ export default function CrossBorderFinanceScreen() {
     manualExpenseTotal: 0,
   });
   const [manualModalVisible, setManualModalVisible] = useState(false);
+  const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   const tabs = useMemo(
     (): { key: TabKey; label: string }[] => [
@@ -202,14 +228,43 @@ export default function CrossBorderFinanceScreen() {
       }
 
       try {
+        setError('');
         const result = await listCrossBorderFinance(store, hubCode);
         applyFinanceResult(result);
+      } catch (e: unknown) {
+        setError(resolveAppError(t, e));
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [store, hubCode, applyFinanceResult],
+    [store, hubCode, applyFinanceResult, t],
+  );
+
+  const confirmDelete = useCallback(
+    (entry: FinanceLedgerEntry) => {
+      if (!entry.manualEntryId || deletingId || !store || !hubCode) return;
+      const currentStore = store;
+      const currentHubCode = hubCode;
+      Alert.alert(t.manualEntry.deleteTitle, t.manualEntry.deleteConfirm, [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.manualEntry.delete,
+          style: 'destructive',
+          onPress: () => {
+            const id = entry.manualEntryId;
+            if (!id) return;
+            setDeletingId(id);
+            setError('');
+            void deleteCrossBorderManualEntry(currentStore, currentHubCode, id)
+              .then(() => load())
+              .catch((e: unknown) => setError(resolveAppError(t, e)))
+              .finally(() => setDeletingId(''));
+          },
+        },
+      ]);
+    },
+    [deletingId, hubCode, load, store, t],
   );
 
   useFocusEffect(
@@ -390,6 +445,13 @@ export default function CrossBorderFinanceScreen() {
         })}
       </ScrollView>
 
+      {error ? (
+        <Pressable style={styles.errorBanner} onPress={() => void load()}>
+          <Text style={styles.errorBannerText}>{error}</Text>
+          <Text style={styles.errorRetry}>{t.common.retry}</Text>
+        </Pressable>
+      ) : null}
+
       {!loading && displayed.length > 0 ? (
         <Text style={styles.sectionTitle}>
           {tabs.find((tabItem) => tabItem.key === tab)?.label} · {displayed.length}
@@ -428,13 +490,20 @@ export default function CrossBorderFinanceScreen() {
               colors={['#7c3aed']}
             />
           }
-          renderItem={({ item }) => <LedgerRow item={item} />}
+          renderItem={({ item }) => (
+            <LedgerRow
+              item={item}
+              deleting={deletingId === item.manualEntryId}
+              onDelete={item.deletable ? () => confirmDelete(item) : undefined}
+            />
+          )}
         />
       )}
 
       <CrossBorderManualEntryModal
         visible={manualModalVisible}
-        storeCode={store.storeCode}
+        store={store}
+        hubCode={hubCode}
         operatorName={operatorName ?? t.common.operator}
         onClose={() => setManualModalVisible(false)}
         onSaved={() => void load()}
@@ -579,6 +648,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 2,
   },
+  errorBanner: {
+    backgroundColor: 'rgba(248,113,113,0.12)',
+    borderColor: 'rgba(248,113,113,0.5)',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  errorBannerText: { color: '#fecaca', fontSize: 12, fontWeight: '700', lineHeight: 17 },
+  errorRetry: { color: '#f87171', fontSize: 12, fontWeight: '900', marginTop: 5 },
   list: { paddingHorizontal: 16, paddingBottom: 32 },
   ledgerRow: {
     flexDirection: 'row',
@@ -624,6 +703,17 @@ const styles = StyleSheet.create({
   metaTime: { color: '#64748b', fontSize: 11, fontWeight: '600' },
   metaDot: { color: '#475569', fontSize: 11 },
   metaBarcode: { color: '#64748b', fontSize: 11, fontWeight: '600', flex: 1 },
+  deleteBtn: {
+    marginLeft: 'auto',
+    minWidth: 42,
+    minHeight: 26,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 7,
+    backgroundColor: 'rgba(248,113,113,0.1)',
+  },
+  deleteText: { color: '#f87171', fontSize: 11, fontWeight: '800' },
   emptyBox: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 24 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { color: '#e2e8f0', fontSize: 16, fontWeight: '800' },

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Pressable,
@@ -12,6 +13,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import ItemActionModal from '../components/ItemActionModal';
 import ItemViewModal from '../components/ItemViewModal';
+import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import PaidStampWatermark from '../components/PaidStampWatermark';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import PackExpressModal from '../components/PackExpressModal';
@@ -63,7 +65,11 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [items, setItems] = useState<InventoryItemListRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [listMode, setListMode] = useState<ListMode>('normal');
   const [filterRegion, setFilterRegion] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -79,25 +85,43 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     count: number;
   } | null>(null);
   const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
+  const requestIdRef = useRef(0);
+  const activeRequestKeyRef = useRef('');
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const load = useCallback(async (force = false) => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
-    setItems(
-      listMode === 'pack'
-        ? await listPackableItems(search, scope)
-        : await listItems(search, scope),
-    );
-  }, [search, listMode, store, hubCode]);
+    const requestKey = `${listMode}|${debouncedSearch}|${store?.id ?? ''}|${hubCode ?? ''}`;
+    if (!force && activeRequestKeyRef.current === requestKey) return;
+    const requestId = ++requestIdRef.current;
+    activeRequestKeyRef.current = requestKey;
+    setLoading(true);
+    setLoadError('');
+    try {
+      const nextItems =
+        listMode === 'pack'
+          ? await listPackableItems(debouncedSearch, scope)
+          : await listItems(debouncedSearch, scope);
+      if (requestId === requestIdRef.current) setItems(nextItems);
+    } catch (error: unknown) {
+      if (requestId === requestIdRef.current) {
+        setLoadError(resolveAppError(t, error));
+      }
+    } finally {
+      if (activeRequestKeyRef.current === requestKey) activeRequestKeyRef.current = '';
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, [debouncedSearch, listMode, store, hubCode, t]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
     }, [load]),
   );
-
-  useEffect(() => {
-    void load();
-  }, [listMode]);
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -342,14 +366,28 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           placeholderTextColor="#94a3b8"
           value={search}
           onChangeText={setSearch}
-          onSubmitEditing={() => load()}
+          onSubmitEditing={() => {
+            const nextSearch = search.trim();
+            if (nextSearch === debouncedSearch) void load(true);
+            else setDebouncedSearch(nextSearch);
+          }}
           returnKeyType="search"
+          accessibilityLabel={t.common.search}
         />
         {listMode === 'normal' ? (
-          <Pressable style={styles.addBtn} onPress={() => navigation.navigate('ItemForm')}>
+          <Pressable
+            style={styles.addBtn}
+            onPress={() => navigation.navigate('ItemForm')}
+            accessibilityRole="button"
+            accessibilityLabel={t.items.newBtn}
+          >
             <Text style={styles.addText}>{t.items.newBtn}</Text>
           </Pressable>
         ) : null}
+      </View>
+
+      <View style={styles.onlineBannerWrap}>
+        <OnlineRequiredBanner />
       </View>
 
       {incompleteOnly ? (
@@ -369,29 +407,49 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                 setFilterRegion('');
                 setListMode('pack');
               }}
+              accessibilityRole="button"
+              accessibilityLabel={t.items.packBtn}
             >
               <Text style={styles.packBtnText}>{t.items.packBtn}</Text>
             </Pressable>
-            <Pressable style={styles.printSelectBtn} onPress={() => setListMode('print')}>
+            <Pressable
+              style={styles.printSelectBtn}
+              onPress={() => setListMode('print')}
+              accessibilityRole="button"
+              accessibilityLabel={t.items.multiSelect}
+            >
               <Text style={styles.printSelectBtnText}>{t.items.multiSelect}</Text>
             </Pressable>
           </>
         ) : listMode === 'pack' ? (
           <>
-            <Pressable style={styles.ghostBtn} onPress={exitSelectMode}>
+            <Pressable
+              style={styles.ghostBtn}
+              onPress={exitSelectMode}
+              accessibilityRole="button"
+              accessibilityLabel={t.items.cancelSelect}
+            >
               <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
             </Pressable>
             <Text style={styles.packHint}>{t.items.packHint}</Text>
             <Pressable
               style={[styles.packBtn, selectedIds.size === 0 && styles.packBtnDisabled]}
               onPress={openPackModal}
+              disabled={selectedIds.size === 0}
+              accessibilityRole="button"
+              accessibilityLabel={fmt(t.items.nextStep, { count: selectedIds.size })}
             >
               <Text style={styles.packBtnText}>{fmt(t.items.nextStep, { count: selectedIds.size })}</Text>
             </Pressable>
           </>
         ) : (
           <>
-            <Pressable style={styles.ghostBtn} onPress={exitSelectMode}>
+            <Pressable
+              style={styles.ghostBtn}
+              onPress={exitSelectMode}
+              accessibilityRole="button"
+              accessibilityLabel={t.items.cancelSelect}
+            >
               <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
             </Pressable>
             <Text style={styles.packHint}>{t.items.printHint}</Text>
@@ -401,7 +459,9 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                 (selectedIds.size === 0 || batchPrinting) && styles.packBtnDisabled,
               ]}
               onPress={() => void handleBatchPrint()}
-              disabled={batchPrinting}
+              disabled={batchPrinting || selectedIds.size === 0}
+              accessibilityRole="button"
+              accessibilityLabel={fmt(t.items.printLabels, { count: selectedIds.size })}
             >
               <Text style={styles.printBtnText}>
                 {batchPrinting
@@ -413,18 +473,53 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         )}
       </View>
 
+      {loadError ? (
+        <View style={styles.inlineError}>
+          <Text style={styles.errorText}>{loadError}</Text>
+          <Pressable
+            style={styles.retryBtn}
+            onPress={() => void load(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t.common.retry}
+          >
+            <Text style={styles.retryBtnText}>{t.common.retry}</Text>
+          </Pressable>
+        </View>
+      ) : loading && items.length > 0 && !refreshing ? (
+        <View style={styles.inlineLoading}>
+          <ActivityIndicator size="small" color="#38bdf8" />
+          <Text style={styles.stateText}>{t.common.loading}</Text>
+        </View>
+      ) : null}
+
       <FlatList
         data={displayedItems}
         keyExtractor={(it) => it.id}
         contentContainerStyle={styles.list}
+        onRefresh={async () => {
+          setRefreshing(true);
+          try {
+            await load(true);
+          } finally {
+            setRefreshing(false);
+          }
+        }}
+        refreshing={refreshing}
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            {listMode === 'pack'
-              ? t.items.noPackable
-              : filterRegion
-                ? fmt(t.items.noRegion, { region: regionDisplayLabel(filterRegion) })
-                : t.items.empty}
-          </Text>
+          loading ? (
+            <View style={styles.stateBox}>
+              <ActivityIndicator color="#38bdf8" />
+              <Text style={styles.stateText}>{t.common.loading}</Text>
+            </View>
+          ) : (
+            <Text style={styles.empty}>
+              {listMode === 'pack'
+                ? t.items.noPackable
+                : filterRegion
+                  ? fmt(t.items.noRegion, { region: regionDisplayLabel(filterRegion) })
+                  : t.items.empty}
+            </Text>
+          )
         }
         renderItem={({ item }) => {
           const selected = selectedIds.has(item.id);
@@ -455,6 +550,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                 if (selectActive) toggleSelect(item.id);
                 else setActionItem(item);
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.customer_name?.trim() || item.recipient_name?.trim() || t.items.noCustomer}，${item.name}，${item.barcode}`}
             >
               {selectActive ? (
                 <SelectCheck selected={selected} accent={selectAccent} />
@@ -693,6 +790,7 @@ function SelectCheck({ selected, accent }: { selected: boolean; accent: string }
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
   toolbar: { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 8 },
+  onlineBannerWrap: { marginHorizontal: 16 },
   incompleteBanner: {
     marginHorizontal: 16,
     marginBottom: 8,
@@ -759,6 +857,34 @@ const styles = StyleSheet.create({
   },
   ghostBtnText: { color: '#94a3b8', fontWeight: '700' },
   packHint: { flex: 1, color: '#64748b', fontSize: 12, minWidth: 120 },
+  inlineLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(248,113,113,0.12)',
+  },
+  stateBox: { alignItems: 'center', gap: 10, marginTop: 40 },
+  stateText: { color: '#94a3b8', fontSize: 13 },
+  errorText: { color: '#fca5a5', flex: 1, fontSize: 12, lineHeight: 18 },
+  retryBtn: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#f87171',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  retryBtnText: { color: '#fecaca', fontWeight: '800', fontSize: 12 },
   list: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 24 },
   empty: { color: '#94a3b8', textAlign: 'center', marginTop: 40, lineHeight: 22 },
   row: {

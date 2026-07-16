@@ -3,6 +3,8 @@
 面向 **生产 Supabase 项目**（与 Admin Web / 商户端共用：`uopkyuluxnrewvlmutam`）。  
 每次发布 Inventory App 新功能前，按本清单逐项勾选。
 
+当前客户端版本：**v1.5.0 (11)**。Inventory App 为在线专用，Supabase 是唯一业务数据源。
+
 ---
 
 ## 一、部署前检查
@@ -10,6 +12,7 @@
 - [ ] 本地 `ml-express-inventory-app/.env` 中 `EXPO_PUBLIC_SUPABASE_URL` / `ANON_KEY` 与生产一致
 - [ ] Admin Web 已部署且可登录
 - [ ] 合伙店铺在 Admin 中类型为 **中转站**（`transit_station`）
+- [ ] 测试设备可稳定访问生产 Supabase；不以离线缓存或待同步队列作为验收路径
 - [ ] 已安装 Supabase CLI 并已登录：`supabase login`
 - [ ] 项目已 link（仓库内 `supabase/.temp/project-ref` 应为 `uopkyuluxnrewvlmutam`）
 
@@ -48,6 +51,9 @@ supabase db push
 | `20260623120000_inventory_owner_code_normalize_rls.sql` | **归属码归一化 RLS**（MUSE↔MUSE001，修复 upsert USING） |
 | `20260620120000_cross_border_manual_entries.sql` | 跨境手工账目 |
 | `20260621120000_inventory_single_device_session.sql` | **单设备登录** `current_session_id` |
+| `20260716180000_inventory_auth_security_hardening.sql` | **必须先执行**：密码哈希、登录冷却、JWT session 绑定、站点财务 RLS |
+| `20260716185000_inventory_atomic_operations.sql` | **随后执行**：入库/打包/装车/到站幂等事务 RPC |
+| `20260716190000_inventory_authenticate_store_ambiguity_fix.sql` | 修复登录 RPC 的 `store_code` 列名歧义 |
 
 **单设备登录（最小 SQL）：**
 
@@ -70,11 +76,18 @@ WHERE table_name = 'delivery_stores'
   AND column_name = 'current_session_id';
 ```
 
-应返回一行。再确认 RLS 函数存在：
+应返回一行。再确认 RLS 与事务函数存在：
 
 ```sql
 SELECT proname FROM pg_proc
-WHERE proname IN ('inventory_jwt_hub_code', 'inventory_session_active');
+WHERE proname IN (
+  'inventory_jwt_hub_code',
+  'inventory_session_active',
+  'inventory_apply_stock_movement',
+  'inventory_create_packed_shipment',
+  'inventory_load_shipments',
+  'inventory_confirm_pkg_hub_received'
+);
 ```
 
 ---
@@ -157,12 +170,14 @@ eas submit --platform ios --profile production
 | # | 步骤 | 预期 |
 |---|------|------|
 | 1 | 中转站账号登录 | 成功进入首页 |
-| 2 | 入库 → 打包 → 装车出库 | 成功提示含「已同步云端」 |
+| 2 | 入库 → 打包 → 装车出库 | 每一步均在线写入 Supabase 并成功 |
 | 3 | 目的/中转站 **到站签收** 扫 PKG | 能打开包内订单 |
 | 4 | 同一账号在 **手机 B** 再登录 | **手机 A** 提示已在其它设备登录并退出 |
 | 5 | 设置 → 修改密码 | 成功，下次用新密码登录 |
-| 6 | 设置 → 云同步 / 待上传 | 无长期积压（或显示明确错误） |
+| 6 | 断网后读取或提交 | 明确提示联网失败，不显示“已保存本机/稍后同步” |
 | 7 | 在途追踪 | 装车后的 PKG 出现在对应 Tab |
+| 8 | MDY 释放中转 → 再打包 → 再装车 | 订单不重复，装车后不再显示“待转出” |
+| 9 | 跨境财务新增/删除手工收支 | 仅当前站点可见，汇总即时更新 |
 
 ---
 
@@ -170,7 +185,7 @@ eas submit --platform ios --profile production
 
 ### 到站扫 PKG 提示「云端未找到该快递包追踪记录」
 
-1. 发站装车是否显示 **已同步云端**？若否 → 发站 **打包** 页 **补传云端**
+1. 发站装车是否成功完成在线写入？若失败，请恢复网络后重新确认当前云端状态再操作
 2. 发站与本站 **Supabase 项目** 是否一致（`.env` URL 相同）
 3. 装车所选 **本段目的地** 是否为当前扫描站（中转需先到 MDY 再到 YGN 等）
 4. 表 `inventory_pkg_tracking` 是否存在该 `pack_barcode`（Dashboard Table Editor）
@@ -181,7 +196,7 @@ eas submit --platform ios --profile production
 
 ### Expo 与上架 App 快递明细不一致
 
-正常：每部手机有 **独立 SQLite**。同账号只保证 **云端** 一致；列表以本机缓存为主。换机或新装需登录后 **设置 → 立即同步**。
+先确认两端均为 **v1.5.0 (11)**、连接同一 Supabase 项目且使用同一站点账号，然后在列表下拉刷新。列表应以 Supabase 查询结果为准；若仍不一致，检查 RLS、hub/store claims 与查询范围。
 
 ---
 

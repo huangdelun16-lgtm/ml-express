@@ -1,5 +1,8 @@
+import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
 import { svc } from '../errors/serviceError';
-import { isSupabaseConfigured, supabase } from './supabase';
+import type { FinanceManualRow } from '../utils/financeLedgerAggregate';
+import { normalizeDestinationCode } from '../utils/destinationCode';
+import { supabase } from './supabase';
 
 export type CrossBorderManualEntryKind = 'income' | 'expense';
 
@@ -12,12 +15,62 @@ export type CrossBorderManualEntryDraft = {
   createdBy: string;
 };
 
+function code(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+async function currentScope(
+  requestedStore: InventoryStoreSession,
+  requestedHubCode: string,
+): Promise<{ store: InventoryStoreSession; hubCode: string }> {
+  const authenticated = await ensureInventoryCloudAuth();
+  const hubCode = normalizeDestinationCode(requestedHubCode);
+  const authHub = normalizeDestinationCode(authenticated.hubCode || authenticated.region);
+  if (
+    requestedStore.id !== authenticated.id ||
+    code(requestedStore.storeCode) !== code(authenticated.storeCode) ||
+    !hubCode ||
+    hubCode !== authHub
+  ) {
+    throw new Error('当前登录站点与手工收支范围不一致，请重新登录。');
+  }
+  return { store: authenticated, hubCode };
+}
+
+export async function listCrossBorderManualEntries(
+  requestedStore: InventoryStoreSession,
+  requestedHubCode: string,
+): Promise<FinanceManualRow[]> {
+  const { store, hubCode } = await currentScope(requestedStore, requestedHubCode);
+  const pageSize = 250;
+  const rows: FinanceManualRow[] = [];
+  for (let page = 0; page < 100; page += 1) {
+    const from = page * pageSize;
+    const { data, error } = await supabase
+      .from('cross_border_manual_entries')
+      .select(
+        'id, entry_date, kind, amount, category, note, created_by, created_at',
+      )
+      .eq('store_id', store.id)
+      .eq('store_code', code(store.storeCode))
+      .eq('hub_code', hubCode)
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const pageRows = (data || []) as FinanceManualRow[];
+    rows.push(...pageRows);
+    if (pageRows.length < pageSize) return rows;
+  }
+  throw new Error('手工收支记录数量超过安全读取上限，请联系管理员。');
+}
+
 export async function createCrossBorderManualEntry(
+  requestedStore: InventoryStoreSession,
+  requestedHubCode: string,
   draft: CrossBorderManualEntryDraft,
 ): Promise<void> {
-  if (!isSupabaseConfigured()) {
-    throw svc('cloudNotConfiguredManual');
-  }
+  const { store, hubCode } = await currentScope(requestedStore, requestedHubCode);
 
   const amount = Math.round(Number(draft.amount));
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -38,8 +91,29 @@ export async function createCrossBorderManualEntry(
     category: draft.category.trim().slice(0, 120),
     note: draft.note.trim().slice(0, 500),
     created_by: draft.createdBy.trim().slice(0, 120),
+    store_id: store.id,
+    store_code: code(store.storeCode),
+    hub_code: hubCode,
     updated_at: now,
   });
 
   if (error) throw error.message ? new Error(error.message) : svc('saveFailed');
+}
+
+export async function deleteCrossBorderManualEntry(
+  requestedStore: InventoryStoreSession,
+  requestedHubCode: string,
+  entryId: string,
+): Promise<void> {
+  const { store, hubCode } = await currentScope(requestedStore, requestedHubCode);
+  const id = entryId.trim();
+  if (!id) throw svc('saveFailed');
+  const { error } = await supabase
+    .from('cross_border_manual_entries')
+    .delete()
+    .eq('id', id)
+    .eq('store_id', store.id)
+    .eq('store_code', code(store.storeCode))
+    .eq('hub_code', hubCode);
+  if (error) throw new Error(error.message);
 }

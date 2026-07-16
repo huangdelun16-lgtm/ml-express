@@ -3,12 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import {
+  buildDepositRecord,
   calcLineTotalRmb,
   calcProxyFee,
   exportProxyPurchaseExcel,
+  getCustomerDepositTotal,
+  isProxyPurchaseRowSettled,
+  newDepositEntry,
+  normalizeCustomerDepositStore,
+  normalizeCustomerExchangeRateStore,
+  normalizeCustomerProxyFeeStore,
   normalizeProxyPurchaseStatus,
   proxyPurchaseStatusLabel,
+  resolveCustomerExchangeRate,
+  resolveCustomerProxyFeePercent,
   rowHasExportContent,
+  type CustomerDepositEntry,
+  type CustomerDepositStore,
+  type CustomerExchangeRateStore,
+  type CustomerProxyFeeStore,
   type ProxyPurchaseRow,
   type ProxyPurchaseStatus,
 } from '../utils/proxyPurchaseExcel';
@@ -19,13 +32,17 @@ import {
 } from '../utils/proxyPurchaseCloudError';
 
 const STORAGE_KEY = 'ml_admin_proxy_purchase_draft_v1';
-const FEE_PRESETS = [3, 5, 8, 10];
+const SUMMARY_ALL_CUSTOMERS = '__all__';
 const ROWS_PER_PAGE = 20;
 const EXPORT_QUICK_PICK_LIMIT = 6;
 const COL_ADDRESS_WIDTH = 76;
 const COL_PLATFORM_WIDTH = 80;
 const COL_PRODUCT_MIN_WIDTH = 280;
 const PLATFORM_PRESETS = ['拼多多', '淘宝', '天猫', '京东', '1688', '抖音'];
+
+function isSpecificSummaryCustomer(key: string | null): key is string {
+  return key !== null && key !== SUMMARY_ALL_CUSTOMERS;
+}
 
 function todayIso(): string {
   const d = new Date();
@@ -48,6 +65,8 @@ function normalizeLoadedRow(row: Partial<ProxyPurchaseRow> & { id?: string }): P
     ...row,
     id: row.id || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     status: normalizeProxyPurchaseStatus(row.status),
+    settled: Boolean(row.settled),
+    settledAt: row.settledAt?.trim() ?? '',
   };
 }
 
@@ -63,6 +82,8 @@ function newRow(seed?: Partial<ProxyPurchaseRow>): ProxyPurchaseRow {
     quantity: '',
     unitPrice: '',
     status: normalizeProxyPurchaseStatus(seed?.status),
+    settled: false,
+    settledAt: '',
   };
 }
 
@@ -79,10 +100,24 @@ function rowHasContent(row: ProxyPurchaseRow): boolean {
   return rowHasExportContent(row);
 }
 
+function formatSettledAt(iso: string | undefined, language: 'zh' | 'en' | 'my'): string {
+  if (!iso?.trim()) return '';
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso.trim();
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (language === 'en') return `Settled ${date} ${time}`;
+  if (language === 'my') return `${date} ${time}`;
+  return `结清于 ${date} ${time}`;
+}
+
 type SavedDraft = {
   proxyFeePercent: string;
   exchangeRate: string;
   rows: ProxyPurchaseRow[];
+  customerDeposits?: CustomerDepositStore;
+  customerProxyFees?: CustomerProxyFeeStore;
+  customerExchangeRates?: CustomerExchangeRateStore;
 };
 
 function loadDraft(): SavedDraft {
@@ -104,6 +139,9 @@ function loadDraft(): SavedDraft {
       proxyFeePercent: parsed.proxyFeePercent || '5',
       exchangeRate: parsed.exchangeRate || '595',
       rows: parsed.rows.map((r) => normalizeLoadedRow(r)),
+      customerDeposits: normalizeCustomerDepositStore(parsed.customerDeposits),
+      customerProxyFees: normalizeCustomerProxyFeeStore(parsed.customerProxyFees),
+      customerExchangeRates: normalizeCustomerExchangeRateStore(parsed.customerExchangeRates),
     };
   } catch {
     return { proxyFeePercent: '5', exchangeRate: '595', rows: [newRow()] };
@@ -134,8 +172,19 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const { isMobile } = useResponsive();
 
   const [proxyFeePercent, setProxyFeePercent] = useState('5');
+  const [workspaceDefaultFee, setWorkspaceDefaultFee] = useState('5');
+  const [workspaceDefaultRate, setWorkspaceDefaultRate] = useState('595');
   const [exchangeRate, setExchangeRate] = useState('595');
   const [rows, setRows] = useState<ProxyPurchaseRow[]>([newRow()]);
+  const [customerDeposits, setCustomerDeposits] = useState<CustomerDepositStore>({});
+  const [customerProxyFees, setCustomerProxyFees] = useState<CustomerProxyFeeStore>({});
+  const [customerExchangeRates, setCustomerExchangeRates] = useState<CustomerExchangeRateStore>({});
+  const [remittanceModalOpen, setRemittanceModalOpen] = useState(false);
+  const [depositDraftDate, setDepositDraftDate] = useState(todayIso());
+  const [depositDraftAmount, setDepositDraftAmount] = useState('');
+  const [depositDraftNote, setDepositDraftNote] = useState('');
+  const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
+  const [editDepositDraft, setEditDepositDraft] = useState<CustomerDepositEntry | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
   const [savedPulse, setSavedPulse] = useState(false);
   const [cloudLoading, setCloudLoading] = useState(true);
@@ -149,6 +198,8 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const [exportCustomerDropdownOpen, setExportCustomerDropdownOpen] = useState(false);
   const [listPage, setListPage] = useState(1);
   const [exportSelected, setExportSelected] = useState<Record<string, boolean>>({});
+  const [settleFilter, setSettleFilter] = useState<'all' | 'open' | 'settled'>('all');
+  const [summaryCustomerKey, setSummaryCustomerKey] = useState<string | null>(SUMMARY_ALL_CUSTOMERS);
 
   const currentOwner = useCallback(
     () =>
@@ -159,11 +210,21 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   );
 
   const syncToCloud = useCallback(
-    async (payload: { proxyFeePercent: string; exchangeRate: string; rows: ProxyPurchaseRow[] }) => {
+    async (payload: {
+      proxyFeePercent: string;
+      exchangeRate: string;
+      rows: ProxyPurchaseRow[];
+      customerDeposits: CustomerDepositStore;
+      customerProxyFees: CustomerProxyFeeStore;
+      customerExchangeRates: CustomerExchangeRateStore;
+    }) => {
       await proxyPurchaseService.upsertWorkspace({
         proxy_fee_percent: payload.proxyFeePercent,
         exchange_rate: payload.exchangeRate,
         rows: payload.rows,
+        customer_deposits: payload.customerDeposits,
+        customer_proxy_fees: payload.customerProxyFees,
+        customer_exchange_rates: payload.customerExchangeRates,
         updated_by: currentOwner(),
       });
     },
@@ -177,22 +238,42 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     const cloudHasRows = (cloud?.rows ?? []).some(rowHasContent);
 
     if (cloudHasRows) {
-      setProxyFeePercent(cloud!.proxy_fee_percent || '5');
-      setExchangeRate(cloud!.exchange_rate || '595');
+      const defaultFee = cloud!.proxy_fee_percent || '5';
+      const defaultRate = cloud!.exchange_rate || '595';
+      setWorkspaceDefaultFee(defaultFee);
+      setWorkspaceDefaultRate(defaultRate);
+      setProxyFeePercent(defaultFee);
+      setExchangeRate(defaultRate);
       setRows(cloud!.rows.length > 0 ? cloud!.rows.map((r) => normalizeLoadedRow(r)) : [newRow()]);
+      setCustomerDeposits(normalizeCustomerDepositStore(cloud!.customer_deposits));
+      setCustomerProxyFees(normalizeCustomerProxyFeeStore(cloud!.customer_proxy_fees));
+      setCustomerExchangeRates(normalizeCustomerExchangeRateStore(cloud!.customer_exchange_rates));
     } else if (localHasRows) {
+      setWorkspaceDefaultFee(localDraft.proxyFeePercent);
+      setWorkspaceDefaultRate(localDraft.exchangeRate);
       setProxyFeePercent(localDraft.proxyFeePercent);
       setExchangeRate(localDraft.exchangeRate);
       setRows(localDraft.rows.map((r) => normalizeLoadedRow(r)));
+      setCustomerDeposits(normalizeCustomerDepositStore(localDraft.customerDeposits));
+      setCustomerProxyFees(normalizeCustomerProxyFeeStore(localDraft.customerProxyFees));
+      setCustomerExchangeRates(normalizeCustomerExchangeRateStore(localDraft.customerExchangeRates));
       await syncToCloud({
         proxyFeePercent: localDraft.proxyFeePercent,
         exchangeRate: localDraft.exchangeRate,
         rows: localDraft.rows.map((r) => normalizeLoadedRow(r)),
+        customerDeposits: normalizeCustomerDepositStore(localDraft.customerDeposits),
+        customerProxyFees: normalizeCustomerProxyFeeStore(localDraft.customerProxyFees),
+        customerExchangeRates: normalizeCustomerExchangeRateStore(localDraft.customerExchangeRates),
       });
     } else {
+      setWorkspaceDefaultFee(localDraft.proxyFeePercent);
+      setWorkspaceDefaultRate(localDraft.exchangeRate);
       setProxyFeePercent(localDraft.proxyFeePercent);
       setExchangeRate(localDraft.exchangeRate);
       setRows(localDraft.rows.map((r) => normalizeLoadedRow(r)));
+      setCustomerDeposits(normalizeCustomerDepositStore(localDraft.customerDeposits));
+      setCustomerProxyFees(normalizeCustomerProxyFeeStore(localDraft.customerProxyFees));
+      setCustomerExchangeRates(normalizeCustomerExchangeRateStore(localDraft.customerExchangeRates));
     }
     setCloudErr('');
     setCloudSyncDisabled(false);
@@ -203,7 +284,14 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     setCloudErr('');
     try {
       await loadFromCloud();
-      await syncToCloud({ proxyFeePercent, exchangeRate, rows });
+      await syncToCloud({
+        proxyFeePercent: workspaceDefaultFee,
+        exchangeRate: workspaceDefaultRate,
+        rows,
+        customerDeposits,
+        customerProxyFees,
+        customerExchangeRates,
+      });
       setSavedPulse(true);
       window.setTimeout(() => setSavedPulse(false), 1400);
     } catch (e) {
@@ -213,7 +301,17 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     } finally {
       setCloudRetrying(false);
     }
-  }, [exchangeRate, language, loadFromCloud, proxyFeePercent, rows, syncToCloud]);
+  }, [
+    customerDeposits,
+    customerExchangeRates,
+    customerProxyFees,
+    language,
+    loadFromCloud,
+    workspaceDefaultFee,
+    workspaceDefaultRate,
+    rows,
+    syncToCloud,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -229,8 +327,13 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
         if (!cancelled) {
           const draft = loadDraft();
           setProxyFeePercent(draft.proxyFeePercent);
+          setWorkspaceDefaultFee(draft.proxyFeePercent);
+          setWorkspaceDefaultRate(draft.exchangeRate);
           setExchangeRate(draft.exchangeRate);
           setRows(draft.rows.map((r) => normalizeLoadedRow(r)));
+          setCustomerDeposits(normalizeCustomerDepositStore(draft.customerDeposits));
+          setCustomerProxyFees(normalizeCustomerProxyFeeStore(draft.customerProxyFees));
+          setCustomerExchangeRates(normalizeCustomerExchangeRateStore(draft.customerExchangeRates));
           setCloudSyncDisabled(isProxyPurchaseTableMissingError(e));
           setCloudErr(describeProxyPurchaseCloudError(e, language));
           setCloudReady(true);
@@ -251,9 +354,23 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     const saveTimer = window.setTimeout(() => {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ proxyFeePercent, exchangeRate, rows }),
+        JSON.stringify({
+          proxyFeePercent: workspaceDefaultFee,
+          exchangeRate: workspaceDefaultRate,
+          rows,
+          customerDeposits,
+          customerProxyFees,
+          customerExchangeRates,
+        }),
       );
-      void syncToCloud({ proxyFeePercent, exchangeRate, rows })
+      void syncToCloud({
+        proxyFeePercent: workspaceDefaultFee,
+        exchangeRate: workspaceDefaultRate,
+        rows,
+        customerDeposits,
+        customerProxyFees,
+        customerExchangeRates,
+      })
         .then(() => {
           setCloudErr('');
           setCloudSyncDisabled(false);
@@ -270,7 +387,18 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       window.clearTimeout(saveTimer);
       if (hideTimer) window.clearTimeout(hideTimer);
     };
-  }, [proxyFeePercent, exchangeRate, rows, cloudReady, cloudSyncDisabled, language, syncToCloud]);
+  }, [
+    workspaceDefaultFee,
+    workspaceDefaultRate,
+    rows,
+    customerDeposits,
+    customerProxyFees,
+    customerExchangeRates,
+    cloudReady,
+    cloudSyncDisabled,
+    language,
+    syncToCloud,
+  ]);
 
   useEffect(() => {
     const styleId = 'proxy-purchase-page-styles';
@@ -340,6 +468,34 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
         border-color: rgba(52, 211, 153, 0.35) !important;
         background: rgba(16, 185, 129, 0.12) !important;
       }
+      .proxy-purchase-row--settled {
+        background: rgba(30, 58, 95, 0.28) !important;
+      }
+      .proxy-purchase-readonly-cell {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 9px;
+        border-radius: 9px;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        background: rgba(51, 65, 85, 0.32);
+        color: rgba(226, 232, 240, 0.92);
+        font-size: 13px;
+        cursor: default;
+        user-select: text;
+      }
+      .proxy-purchase-settled-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 800;
+        color: #93c5fd;
+        background: rgba(59, 130, 246, 0.16);
+        border: 1px solid rgba(96, 165, 250, 0.28);
+        white-space: nowrap;
+      }
     `;
     document.head.appendChild(el);
     return () => el.remove();
@@ -347,6 +503,52 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
 
   const feePctNum = parseNum(proxyFeePercent);
   const rateNum = parseNum(exchangeRate);
+
+  const feeForCustomer = useCallback(
+    (customerKey: string) =>
+      resolveCustomerProxyFeePercent(customerKey, customerProxyFees, workspaceDefaultFee),
+    [customerProxyFees, workspaceDefaultFee],
+  );
+
+  const rateForCustomer = useCallback(
+    (customerKey: string) =>
+      resolveCustomerExchangeRate(customerKey, customerExchangeRates, workspaceDefaultRate),
+    [customerExchangeRates, workspaceDefaultRate],
+  );
+
+  const handleSummaryCustomerChange = useCallback(
+    (customerKey: string) => {
+      setSummaryCustomerKey(customerKey);
+      if (customerKey === SUMMARY_ALL_CUSTOMERS) {
+        setProxyFeePercent(workspaceDefaultFee);
+        setExchangeRate(workspaceDefaultRate);
+        return;
+      }
+      setProxyFeePercent(customerProxyFees[customerKey] ?? workspaceDefaultFee);
+      setExchangeRate(customerExchangeRates[customerKey] ?? workspaceDefaultRate);
+    },
+    [customerExchangeRates, customerProxyFees, workspaceDefaultFee, workspaceDefaultRate],
+  );
+
+  const handleProxyFeePercentChange = useCallback(
+    (value: string) => {
+      setProxyFeePercent(value);
+      if (isSpecificSummaryCustomer(summaryCustomerKey)) {
+        setCustomerProxyFees((prev) => ({ ...prev, [summaryCustomerKey]: value }));
+      }
+    },
+    [summaryCustomerKey],
+  );
+
+  const handleExchangeRateChange = useCallback(
+    (value: string) => {
+      setExchangeRate(value);
+      if (isSpecificSummaryCustomer(summaryCustomerKey)) {
+        setCustomerExchangeRates((prev) => ({ ...prev, [summaryCustomerKey]: value }));
+      }
+    },
+    [summaryCustomerKey],
+  );
 
   useEffect(() => {
     setExportSelected((prev) => {
@@ -364,6 +566,12 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   }, [rows]);
 
   const exportableRows = useMemo(() => rows.filter(rowHasExportContent), [rows]);
+
+  const batchSettleEligibleCount = useMemo(
+    () =>
+      exportableRows.filter((r) => exportSelected[r.id] && !isProxyPurchaseRowSettled(r)).length,
+    [exportableRows, exportSelected],
+  );
 
   const exportCustomerOptions = useMemo(() => {
     const counts = new Map<string, number>();
@@ -424,15 +632,19 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const selectedExportTotalRmb = useMemo(() => {
     let total = 0;
     selectedExportRows.forEach((row) => {
-      total += calcLineTotalRmb(parseNum(row.unitPrice), feePctNum);
+      total += calcLineTotalRmb(parseNum(row.unitPrice), feeForCustomer(row.customerName.trim()));
     });
     return round2(total);
-  }, [selectedExportRows, feePctNum]);
+  }, [selectedExportRows, feeForCustomer]);
 
-  const selectedExportTotalMmk = useMemo(
-    () => Math.round(selectedExportTotalRmb * rateNum),
-    [selectedExportTotalRmb, rateNum],
-  );
+  const selectedExportTotalMmk = useMemo(() => {
+    let total = 0;
+    selectedExportRows.forEach((row) => {
+      const rmb = calcLineTotalRmb(parseNum(row.unitPrice), feeForCustomer(row.customerName.trim()));
+      total += Math.round(rmb * rateForCustomer(row.customerName.trim()));
+    });
+    return total;
+  }, [selectedExportRows, feeForCustomer, rateForCustomer]);
 
   const allExportableSelected =
     filteredExportRows.length > 0 && filteredExportRows.every((r) => exportSelected[r.id]);
@@ -504,31 +716,187 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
 
   const filledRowCount = exportableRows.length;
 
+  const openBillingRows = useMemo(
+    () => rows.filter((row) => !isProxyPurchaseRowSettled(row)),
+    [rows],
+  );
+
+  const settleCounts = useMemo(
+    () => ({
+      all: rows.length,
+      open: rows.filter((r) => !isProxyPurchaseRowSettled(r)).length,
+      settled: rows.filter((r) => isProxyPurchaseRowSettled(r)).length,
+    }),
+    [rows],
+  );
+
+  const displayRows = useMemo(() => {
+    let filtered = rows;
+    if (settleFilter === 'open') filtered = filtered.filter((r) => !isProxyPurchaseRowSettled(r));
+    else if (settleFilter === 'settled') filtered = filtered.filter((r) => isProxyPurchaseRowSettled(r));
+    if (isSpecificSummaryCustomer(summaryCustomerKey)) {
+      filtered = filtered.filter((r) => r.customerName.trim() === summaryCustomerKey);
+    }
+    return filtered;
+  }, [rows, settleFilter, summaryCustomerKey]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [summaryCustomerKey]);
+
   const listTotalPages = useMemo(
-    () => Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE)),
-    [rows.length],
+    () => Math.max(1, Math.ceil(displayRows.length / ROWS_PER_PAGE)),
+    [displayRows.length],
   );
 
   const paginatedRows = useMemo(() => {
     const start = (listPage - 1) * ROWS_PER_PAGE;
-    return rows.slice(start, start + ROWS_PER_PAGE);
-  }, [rows, listPage]);
+    return displayRows.slice(start, start + ROWS_PER_PAGE);
+  }, [displayRows, listPage]);
 
   useEffect(() => {
     setListPage((page) => Math.min(page, listTotalPages));
   }, [listTotalPages]);
 
-  const { grandTotalRmb, grandTotalMmk } = useMemo(() => {
-    let total = 0;
-    rows.forEach((row) => {
-      const unit = parseNum(row.unitPrice);
-      total += calcLineTotalRmb(unit, feePctNum);
+  const customerRmbBreakdown = useMemo(() => {
+    const byCustomer = new Map<string, number>();
+    openBillingRows.forEach((row) => {
+      const line = calcLineTotalRmb(parseNum(row.unitPrice), feeForCustomer(row.customerName.trim()));
+      if (line <= 0) return;
+      const key = row.customerName.trim();
+      byCustomer.set(key, (byCustomer.get(key) ?? 0) + line);
     });
-    return {
-      grandTotalRmb: round2(total),
-      grandTotalMmk: Math.round(total * rateNum),
-    };
-  }, [rows, feePctNum, rateNum]);
+    return Array.from(byCustomer.entries())
+      .map(([customerName, rmb]) => ({
+        customerName,
+        totalRmb: round2(rmb),
+        totalMmk: Math.round(rmb * rateForCustomer(customerName)),
+      }))
+      .sort((a, b) => {
+        if (!a.customerName) return 1;
+        if (!b.customerName) return -1;
+        return a.customerName.localeCompare(b.customerName, 'zh-CN');
+      });
+  }, [openBillingRows, feeForCustomer, rateForCustomer]);
+
+  const customerDirectory = useMemo(() => {
+    const amountByName = new Map(
+      customerRmbBreakdown.map((item) => [item.customerName, item] as const),
+    );
+    const names = new Set<string>();
+    openBillingRows.forEach((row) => names.add(row.customerName.trim()));
+    Object.keys(customerDeposits).forEach((name) => names.add(name));
+    Object.keys(customerProxyFees).forEach((name) => names.add(name));
+    Object.keys(customerExchangeRates).forEach((name) => names.add(name));
+    return Array.from(names)
+      .sort((a, b) => {
+        if (!a) return 1;
+        if (!b) return -1;
+        return a.localeCompare(b, 'zh-CN');
+      })
+      .map((customerName) => {
+        const amounts = amountByName.get(customerName);
+        return {
+          customerName,
+          shoppingRmb: amounts?.totalRmb ?? 0,
+          shoppingMmk: amounts?.totalMmk ?? 0,
+        };
+      });
+  }, [openBillingRows, customerRmbBreakdown, customerDeposits, customerProxyFees, customerExchangeRates]);
+
+  const customerPhoneByName = useMemo(() => {
+    const map = new Map<string, string>();
+    rows.forEach((row) => {
+      const key = row.customerName.trim();
+      const phone = row.phone.trim();
+      if (phone) map.set(key, phone);
+    });
+    return map;
+  }, [rows]);
+
+  const selectedCustomerDeposit = useMemo(() => {
+    if (summaryCustomerKey === null) return 0;
+    if (summaryCustomerKey === SUMMARY_ALL_CUSTOMERS) {
+      return round2(
+        Object.keys(customerDeposits).reduce(
+          (sum, key) => sum + getCustomerDepositTotal(customerDeposits, key),
+          0,
+        ),
+      );
+    }
+    return getCustomerDepositTotal(customerDeposits, summaryCustomerKey);
+  }, [customerDeposits, summaryCustomerKey]);
+
+  const summaryCustomerShoppingRows = useMemo(() => {
+    if (summaryCustomerKey === null) return [];
+    if (summaryCustomerKey === SUMMARY_ALL_CUSTOMERS) {
+      return openBillingRows.filter((row) => rowHasExportContent(row));
+    }
+    return openBillingRows.filter(
+      (row) => row.customerName.trim() === summaryCustomerKey && rowHasExportContent(row),
+    );
+  }, [openBillingRows, summaryCustomerKey]);
+
+  const selectedCustomerShopping = useMemo(() => {
+    let total = 0;
+    summaryCustomerShoppingRows.forEach((row) => {
+      total += calcLineTotalRmb(parseNum(row.unitPrice), feeForCustomer(row.customerName.trim()));
+    });
+    return round2(total);
+  }, [summaryCustomerShoppingRows, feeForCustomer]);
+
+  const selectedCustomerBalance = useMemo(
+    () => round2(selectedCustomerDeposit - selectedCustomerShopping),
+    [selectedCustomerDeposit, selectedCustomerShopping],
+  );
+
+  const selectedCustomerBalanceMmk = useMemo(() => {
+    if (summaryCustomerKey === null) return 0;
+    if (summaryCustomerKey === SUMMARY_ALL_CUSTOMERS) {
+      const names = new Set<string>();
+      Object.keys(customerDeposits).forEach((name) => names.add(name));
+      openBillingRows.forEach((row) => names.add(row.customerName.trim()));
+      let total = 0;
+      names.forEach((name) => {
+        const deposit = getCustomerDepositTotal(customerDeposits, name);
+        let shopping = 0;
+        openBillingRows.forEach((row) => {
+          if (row.customerName.trim() !== name) return;
+          shopping += calcLineTotalRmb(parseNum(row.unitPrice), feeForCustomer(name));
+        });
+        total += Math.round(round2(deposit - shopping) * rateForCustomer(name));
+      });
+      return total;
+    }
+    return Math.round(selectedCustomerBalance * rateForCustomer(summaryCustomerKey));
+  }, [
+    customerDeposits,
+    feeForCustomer,
+    openBillingRows,
+    rateForCustomer,
+    selectedCustomerBalance,
+    summaryCustomerKey,
+  ]);
+
+  useEffect(() => {
+    if (customerDirectory.length === 0) {
+      setSummaryCustomerKey(null);
+      return;
+    }
+    setSummaryCustomerKey((current) => {
+      if (current === SUMMARY_ALL_CUSTOMERS) return SUMMARY_ALL_CUSTOMERS;
+      if (current !== null && customerDirectory.some((item) => item.customerName === current)) {
+        return current;
+      }
+      return SUMMARY_ALL_CUSTOMERS;
+    });
+  }, [customerDirectory]);
+
+  useEffect(() => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey)) return;
+    setProxyFeePercent(customerProxyFees[summaryCustomerKey] ?? workspaceDefaultFee);
+    setExchangeRate(customerExchangeRates[summaryCustomerKey] ?? workspaceDefaultRate);
+  }, [summaryCustomerKey, customerProxyFees, customerExchangeRates, workspaceDefaultFee, workspaceDefaultRate]);
 
   const t =
     language === 'en'
@@ -546,6 +914,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           backMetric: '← Metric hub',
           proxyFee: 'Proxy fee',
           exchangeRate: 'Exchange rate',
+          feeRateCardTitle: 'Fee & rate',
+          combinedCardTitle: 'Customer settlement',
+          feeLinkedHint: 'Linked to customer',
+          rateLinkedHint: 'Linked to customer',
           addRow: 'Add row',
           duplicateRow: 'Duplicate last',
           clearAll: 'Clear all',
@@ -554,7 +926,6 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           colCustomer: 'Customer',
           colDate: 'Date',
           colAddress: 'Address',
-          colPhone: 'Phone',
           colPlatform: 'Platform',
           colProduct: 'Product',
           colStatus: 'Status',
@@ -564,13 +935,38 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           colUnitPrice: 'Unit ¥',
           colFee: 'Fee',
           colTotal: 'Total ¥',
-          colActions: '',
+          colActions: 'Actions',
           delete: 'Remove',
-          totalRmb: 'Grand total',
+          totalRmb: 'Customer balance',
+          totalRmbByCustomer: 'Per customer',
+          customerDeposit: 'Deposit',
+          customerShopping: 'Purchases',
+          depositDate: 'Date',
+          depositAmount: 'Amount',
+          depositAdd: 'Add',
+          depositNote: 'Details',
+          depositEdit: 'Edit',
+          depositSave: 'Save',
+          depositDelete: 'Delete',
+          depositCancel: 'Cancel',
+          remittanceDetails: 'Remittance details',
+          depositClickHint: 'View remittance details',
+          depositEmpty: 'No remittance records yet.',
+          depositAddEntry: 'Add remittance',
+          depositAmountInvalid: 'Enter a valid deposit amount.',
+          exportNoneCustomer: 'No open orders for this customer to export.',
+          summaryPhone: 'Phone',
+          summaryPhonePlaceholder: 'Customer phone',
+          selectCustomer: 'Select customer',
+          allCustomers: 'All',
+          ordersForCustomer: 'Showing orders for {name}',
+          grandTotalLabel: 'Balance',
+          unnamedCustomer: '(No customer)',
           totalMmk: 'In MMK',
           rateHint: 'Shown in Excel footer',
           exportFail: 'Excel export failed. Please try again.',
-          confirmClear: 'Confirm delete all rows? This cannot be undone.',
+          confirmClear: 'Delete all open orders? This cannot be undone.',
+          confirmClearKeepSettled: 'Clear open orders only. {n} settled record(s) will be kept.',
           confirmDeleteRow: 'Confirm delete this order?',
           autoSaved: 'Cloud synced',
           rowCount: 'rows with data',
@@ -601,6 +997,17 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           exportSelectFiltered: 'Select filtered',
           pagePrev: 'Previous',
           pageNext: 'Next',
+          settle: 'Settle',
+          batchSettle: 'Batch settle',
+          settledBadge: 'Settled',
+          settledViewOnly: 'Settled — read only',
+          confirmSettle: 'Mark this order as settled? It will be removed from the RMB total but kept for export.',
+          confirmBatchSettle: 'Settle selected open orders? They will be removed from the RMB total but kept for export.',
+          noRowsToSettle: 'Select at least one unsettled order with data.',
+          confirmDeleteSettledRow: 'Delete this settled order? This cannot be undone.',
+          filterAll: 'All',
+          filterOpen: 'Open',
+          filterSettled: 'Settled',
         }
       : language === 'my'
         ? {
@@ -617,6 +1024,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             backMetric: '← Metric hub',
             proxyFee: 'ကြားခံကြေး',
             exchangeRate: 'ငွေလဲနှုန်း',
+            feeRateCardTitle: 'Fee & rate',
+            combinedCardTitle: 'Settlement',
+            feeLinkedHint: 'Per customer',
+            rateLinkedHint: 'Per customer',
             addRow: 'Add row',
             duplicateRow: 'Duplicate',
             clearAll: 'Clear',
@@ -625,7 +1036,6 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             colCustomer: 'Customer',
             colDate: 'Date',
             colAddress: 'Address',
-            colPhone: 'Phone',
             colPlatform: 'Platform',
             colProduct: 'Product',
             colStatus: 'Status',
@@ -635,14 +1045,40 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             colUnitPrice: 'Unit ¥',
             colFee: 'Fee',
             colTotal: 'Total ¥',
-            colActions: '',
+            colActions: 'Actions',
             delete: 'Remove',
-            totalRmb: 'Total',
+            totalRmb: 'Balance',
+            totalRmbByCustomer: 'Per customer',
+            customerDeposit: 'Deposit',
+            customerShopping: 'Purchases',
+            depositDate: 'Date',
+            depositAmount: 'Amount',
+            depositAdd: 'Add',
+            depositNote: 'Details',
+            depositEdit: 'Edit',
+            depositSave: 'Save',
+            depositDelete: 'Delete',
+            depositDeleteConfirm: 'Delete this record?',
+            depositCancel: 'Cancel',
+            remittanceDetails: 'Remittance',
+            depositClickHint: 'View details',
+            depositEmpty: 'No records.',
+            depositAddEntry: 'Add',
+            depositAmountInvalid: 'Enter amount.',
+            exportNoneCustomer: 'No orders to export.',
+            summaryPhone: 'Phone',
+            summaryPhonePlaceholder: 'Phone number',
+            selectCustomer: 'Customer',
+            allCustomers: 'All',
+            ordersForCustomer: 'Orders: {name}',
+            grandTotalLabel: 'Balance',
+            unnamedCustomer: '(No customer)',
             totalMmk: 'MMK',
             rateHint: 'Excel footer',
-            exportFail: 'Export failed',
-            confirmClear: 'Confirm delete all rows?',
-            confirmDeleteRow: 'Confirm delete this order?',
+          exportFail: 'Export failed',
+          confirmClear: 'Delete all open orders? This cannot be undone.',
+          confirmClearKeepSettled: 'Clear open orders only. {n} settled record(s) will be kept.',
+          confirmDeleteRow: 'Confirm delete this order?',
             autoSaved: 'Cloud synced',
             rowCount: 'rows',
             scrollHint: 'Swipe →',
@@ -672,6 +1108,17 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             exportSelectFiltered: 'Select filtered',
             pagePrev: 'Prev',
             pageNext: 'Next',
+            settle: 'Settle',
+            batchSettle: 'Batch',
+            settledBadge: 'Settled',
+            settledViewOnly: 'Settled — read only',
+            confirmSettle: 'Settle this order?',
+            confirmBatchSettle: 'Batch settle selected?',
+            noRowsToSettle: 'Select unsettled rows',
+            confirmDeleteSettledRow: 'Delete settled order?',
+            filterAll: 'All',
+            filterOpen: 'Open',
+            filterSettled: 'Settled',
           }
         : {
             kicker: 'ML Express · Admin',
@@ -687,6 +1134,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             backMetric: '← 返回指标管理',
             proxyFee: '代购费',
             exchangeRate: '汇率',
+            feeRateCardTitle: '代购费 · 汇率',
+            combinedCardTitle: '代购结算',
+            feeLinkedHint: '随所选客户自动切换',
+            rateLinkedHint: '随所选客户自动切换',
             addRow: '添加一行',
             duplicateRow: '复制上一行',
             clearAll: '清空',
@@ -695,7 +1146,6 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             colCustomer: '客户',
             colDate: '日期',
             colAddress: '地址',
-            colPhone: '电话',
             colPlatform: '平台',
             colProduct: '商品',
             colStatus: '状态',
@@ -705,13 +1155,39 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             colUnitPrice: '单价 ¥',
             colFee: '代购费',
             colTotal: '合计 ¥',
-            colActions: '',
+            colActions: '操作',
             delete: '删',
             totalRmb: '人民币合计',
+            totalRmbByCustomer: '单客户结算',
+            customerDeposit: '客户订金',
+            customerShopping: '客户购物',
+            depositDate: '日期',
+            depositAmount: '金额',
+            depositAdd: '添加',
+            depositNote: '来龙去脉',
+            depositEdit: '编辑',
+            depositSave: '保存',
+            depositDelete: '删除',
+            depositDeleteConfirm: '确认删除这条汇款记录？',
+            depositCancel: '取消',
+            remittanceDetails: '汇款详情',
+            depositClickHint: '点击查看汇款详情',
+            depositEmpty: '暂无汇款记录。',
+            depositAddEntry: '添加汇款',
+            depositAmountInvalid: '请填写有效的订金金额。',
+            exportNoneCustomer: '当前客户没有可导出的未结清订单。',
+            summaryPhone: '电话',
+            summaryPhonePlaceholder: '填写客户电话',
+            selectCustomer: '选择客户',
+            allCustomers: '全部',
+            ordersForCustomer: '仅显示 {name} 的订单',
+            grandTotalLabel: '总合计',
+            unnamedCustomer: '（未填客户）',
             totalMmk: '缅币约合',
             rateHint: '导出 Excel 时显示在底部',
             exportFail: 'Excel 导出失败，请重试。',
-            confirmClear: '确认删除全部订单？此操作不可恢复。',
+            confirmClear: '确认删除全部未结清订单？此操作不可恢复。',
+            confirmClearKeepSettled: '将清空未结清订单，{n} 条已结清记录将保留。',
             confirmDeleteRow: '确认删除这条订单？',
             autoSaved: '已同步云端',
             rowCount: '条有效记录',
@@ -742,10 +1218,161 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             exportSelectFiltered: '选中筛选结果',
             pagePrev: '上一页',
             pageNext: '下一页',
+            settle: '结清',
+            batchSettle: '批量结清',
+            settledBadge: '已结清',
+            settledViewOnly: '已结清，不可编辑',
+            confirmSettle: '确认结清此订单？结清后不计入人民币合计，但仍保留可再次导出。',
+            confirmBatchSettle: '确认批量结清已勾选的未结清订单？结清后不计入人民币合计，但仍保留可再次导出。',
+            noRowsToSettle: '请先勾选至少一条未结清的有效订单。',
+            confirmDeleteSettledRow: '确认删除这条已结清订单？删除后无法恢复。',
+            filterAll: '全部',
+            filterOpen: '未结清',
+            filterSettled: '已结清',
           };
+
+  const currentDepositEntries = useMemo(() => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey)) return [];
+    return customerDeposits[summaryCustomerKey]?.entries ?? [];
+  }, [customerDeposits, summaryCustomerKey]);
+
+  const persistDepositEntries = useCallback(
+    (customerKey: string, entries: CustomerDepositEntry[]) => {
+      setCustomerDeposits((prev) => ({
+        ...prev,
+        [customerKey]: buildDepositRecord(entries),
+      }));
+    },
+    [],
+  );
+
+  const openRemittanceModal = useCallback(() => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey)) return;
+    setDepositDraftDate(todayIso());
+    setDepositDraftAmount('');
+    setDepositDraftNote('');
+    setEditingDepositId(null);
+    setEditDepositDraft(null);
+    setRemittanceModalOpen(true);
+  }, [summaryCustomerKey]);
+
+  const addCustomerDepositEntry = useCallback(() => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey)) return;
+    const amount = parseNum(depositDraftAmount);
+    if (amount <= 0) {
+      window.alert(t.depositAmountInvalid);
+      return;
+    }
+    const entry = newDepositEntry({
+      date: depositDraftDate.trim() || todayIso(),
+      amount: amount.toFixed(2),
+      note: depositDraftNote.trim(),
+    });
+    const entries = [...(customerDeposits[summaryCustomerKey]?.entries ?? []), entry];
+    persistDepositEntries(summaryCustomerKey, entries);
+    setDepositDraftAmount('');
+    setDepositDraftNote('');
+  }, [
+    customerDeposits,
+    depositDraftAmount,
+    depositDraftDate,
+    depositDraftNote,
+    persistDepositEntries,
+    summaryCustomerKey,
+    t.depositAmountInvalid,
+  ]);
+
+  const startEditDepositEntry = useCallback((entry: CustomerDepositEntry) => {
+    setEditingDepositId(entry.id);
+    setEditDepositDraft({ ...entry });
+  }, []);
+
+  const saveEditDepositEntry = useCallback(() => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey) || !editDepositDraft) return;
+    const amount = parseNum(editDepositDraft.amount);
+    if (amount <= 0) {
+      window.alert(t.depositAmountInvalid);
+      return;
+    }
+    const entries = (customerDeposits[summaryCustomerKey]?.entries ?? []).map((entry) =>
+      entry.id === editDepositDraft.id
+        ? {
+            ...editDepositDraft,
+            amount: amount.toFixed(2),
+            note: editDepositDraft.note.trim(),
+          }
+        : entry,
+    );
+    persistDepositEntries(summaryCustomerKey, entries);
+    setEditingDepositId(null);
+    setEditDepositDraft(null);
+  }, [
+    customerDeposits,
+    editDepositDraft,
+    persistDepositEntries,
+    summaryCustomerKey,
+    t.depositAmountInvalid,
+  ]);
+
+  const deleteDepositEntry = useCallback(
+    (entryId: string) => {
+      if (!isSpecificSummaryCustomer(summaryCustomerKey)) return;
+      if (!window.confirm(t.depositDeleteConfirm)) return;
+      const entries = (customerDeposits[summaryCustomerKey]?.entries ?? []).filter(
+        (entry) => entry.id !== entryId,
+      );
+      persistDepositEntries(summaryCustomerKey, entries);
+      if (editingDepositId === entryId) {
+        setEditingDepositId(null);
+        setEditDepositDraft(null);
+      }
+    },
+    [customerDeposits, editingDepositId, persistDepositEntries, summaryCustomerKey, t.depositDeleteConfirm],
+  );
+
+  const handleSummaryCustomerExport = useCallback(async () => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey)) {
+      window.alert(t.exportNoneCustomer);
+      return;
+    }
+    if (summaryCustomerShoppingRows.length === 0) {
+      window.alert(t.exportNoneCustomer);
+      return;
+    }
+    setExportBusy(true);
+    try {
+      await exportProxyPurchaseExcel({
+        rows: summaryCustomerShoppingRows,
+        proxyFeePercent: feeForCustomer(summaryCustomerKey),
+        exchangeRate: rateForCustomer(summaryCustomerKey),
+        filenameHint: summaryCustomerKey || 'supplier',
+      });
+    } catch (err) {
+      console.error(err);
+      window.alert(t.exportFail);
+    } finally {
+      setExportBusy(false);
+    }
+  }, [
+    summaryCustomerKey,
+    summaryCustomerShoppingRows,
+    feeForCustomer,
+    rateForCustomer,
+    feePctNum,
+    rateNum,
+    t.exportFail,
+    t.exportNoneCustomer,
+  ]);
 
   const renderStatusSelect = (row: ProxyPurchaseRow) => {
     const status = normalizeProxyPurchaseStatus(row.status);
+    if (isProxyPurchaseRowSettled(row)) {
+      return (
+        <span className="proxy-purchase-readonly-cell" title={t.settledViewOnly}>
+          {proxyPurchaseStatusLabel(status, language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh')}
+        </span>
+      );
+    }
     return (
       <select
         className={`proxy-purchase-cell-input proxy-purchase-status-select ${
@@ -788,16 +1415,200 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   };
 
   const updateRow = useCallback((id: string, patch: Partial<ProxyPurchaseRow>) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        if (isProxyPurchaseRowSettled(r)) return r;
+        const next = { ...r, ...patch };
+        if (patch.customerName !== undefined) {
+          const key = patch.customerName.trim();
+          const existingPhone = prev.find(
+            (row) => row.id !== id && row.customerName.trim() === key && row.phone.trim(),
+          )?.phone.trim();
+          if (existingPhone) next.phone = existingPhone;
+        }
+        return next;
+      }),
+    );
   }, []);
+
+  const updateSummaryCustomerPhone = useCallback((customerKey: string, phone: string) => {
+    setRows((prev) =>
+      prev.map((row) => (row.customerName.trim() === customerKey ? { ...row, phone } : row)),
+    );
+  }, []);
+
+  const settleRow = useCallback(
+    (id: string) => {
+      const row = rows.find((r) => r.id === id);
+      if (!row || !rowHasContent(row) || isProxyPurchaseRowSettled(row)) return;
+      if (!window.confirm(t.confirmSettle)) return;
+      const ts = new Date().toISOString();
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, settled: true, settledAt: ts } : r)),
+      );
+    },
+    [rows, t.confirmSettle],
+  );
+
+  const batchSettleSelected = useCallback(() => {
+    const targets = exportableRows.filter(
+      (r) => exportSelected[r.id] && !isProxyPurchaseRowSettled(r),
+    );
+    if (targets.length === 0) {
+      window.alert(t.noRowsToSettle);
+      return;
+    }
+    if (!window.confirm(t.confirmBatchSettle)) return;
+    const ts = new Date().toISOString();
+    const ids = new Set(targets.map((r) => r.id));
+    setRows((prev) =>
+      prev.map((r) => (ids.has(r.id) ? { ...r, settled: true, settledAt: ts } : r)),
+    );
+  }, [exportableRows, exportSelected, t.confirmBatchSettle, t.noRowsToSettle]);
+
+  const clearAllRows = useCallback(() => {
+    const settledRows = rows.filter((r) => isProxyPurchaseRowSettled(r));
+    if (settledRows.length > 0) {
+      if (!window.confirm(t.confirmClearKeepSettled.replace('{n}', String(settledRows.length)))) return;
+      setRows([newRow(), ...settledRows]);
+      setExportSelected((prev) => {
+        const next: Record<string, boolean> = {};
+        settledRows.forEach((r) => {
+          if (prev[r.id]) next[r.id] = true;
+        });
+        return next;
+      });
+      return;
+    }
+    if (!window.confirm(t.confirmClear)) return;
+    setRows([newRow()]);
+    setExportSelected({});
+  }, [rows, t.confirmClear, t.confirmClearKeepSettled]);
+
+  const renderSettledBadge = (row: ProxyPurchaseRow) => {
+    const lang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
+    const at = formatSettledAt(row.settledAt, lang);
+    return (
+      <span className="proxy-purchase-settled-badge" title={at ? `${t.settledViewOnly} · ${at}` : t.settledViewOnly}>
+        {t.settledBadge}
+      </span>
+    );
+  };
+
+  const renderEditableInput = (
+    row: ProxyPurchaseRow,
+    value: string,
+    onChange: (next: string) => void,
+    opts?: {
+      type?: string;
+      placeholder?: string;
+      style?: React.CSSProperties;
+      list?: string;
+      min?: number;
+      step?: number;
+    },
+  ) => {
+    if (isProxyPurchaseRowSettled(row)) {
+      const lang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
+      const at = formatSettledAt(row.settledAt, lang);
+      return (
+        <span className="proxy-purchase-readonly-cell" title={at ? `${t.settledViewOnly} · ${at}` : t.settledViewOnly}>
+          {value || '—'}
+        </span>
+      );
+    }
+    return (
+      <input
+        className="proxy-purchase-cell-input"
+        type={opts?.type}
+        min={opts?.min}
+        step={opts?.step}
+        list={opts?.list}
+        value={value}
+        placeholder={opts?.placeholder}
+        style={opts?.style}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  };
 
   const requestRemoveRow = useCallback(
     (id: string) => {
-      if (!window.confirm(t.confirmDeleteRow)) return;
+      const row = rows.find((r) => r.id === id);
+      const confirmMsg =
+        row && isProxyPurchaseRowSettled(row) ? t.confirmDeleteSettledRow : t.confirmDeleteRow;
+      if (!window.confirm(confirmMsg)) return;
       setRows((prev) => (prev.length <= 1 ? [newRow()] : prev.filter((r) => r.id !== id)));
+      setExportSelected((prev) => {
+        if (prev[id] === undefined) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     },
-    [t.confirmDeleteRow],
+    [rows, t.confirmDeleteRow, t.confirmDeleteSettledRow],
   );
+
+  const renderDeleteRowButton = (row: ProxyPurchaseRow, size: 'sm' | 'md' = 'md') => {
+    const dim = size === 'sm' ? 34 : 32;
+    return (
+      <button
+        type="button"
+        aria-label={t.delete}
+        onClick={() => requestRemoveRow(row.id)}
+        style={{
+          width: dim,
+          height: dim,
+          borderRadius: size === 'sm' ? 10 : 9,
+          border: '1px solid rgba(248, 113, 113, 0.32)',
+          background: 'rgba(127, 29, 29, 0.2)',
+          color: '#fca5a5',
+          cursor: 'pointer',
+          fontSize: size === 'sm' ? 16 : 17,
+          lineHeight: 1,
+        }}
+      >
+        ×
+      </button>
+    );
+  };
+
+  const renderRowActions = (row: ProxyPurchaseRow) => {
+    if (isProxyPurchaseRowSettled(row)) {
+      return (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {renderSettledBadge(row)}
+          {renderDeleteRowButton(row)}
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <button
+          type="button"
+          title={t.settle}
+          onClick={() => settleRow(row.id)}
+          disabled={!rowHasContent(row)}
+          style={{
+            height: 32,
+            padding: '0 10px',
+            borderRadius: 9,
+            border: '1px solid rgba(96, 165, 250, 0.35)',
+            background: 'rgba(37, 99, 235, 0.22)',
+            color: '#93c5fd',
+            cursor: rowHasContent(row) ? 'pointer' : 'not-allowed',
+            fontSize: 12,
+            fontWeight: 800,
+            opacity: rowHasContent(row) ? 1 : 0.45,
+          }}
+        >
+          {t.settle}
+        </button>
+        {renderDeleteRowButton(row)}
+      </div>
+    );
+  };
 
   const addRow = useCallback((seed?: Partial<ProxyPurchaseRow>) => {
     setListPage(1);
@@ -814,8 +1625,8 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           customerName: source.customerName,
           orderDate: source.orderDate,
           address: source.address,
-          phone: source.phone,
           platform: source.platform,
+          phone: source.phone,
         }),
         ...prev,
       ];
@@ -838,10 +1649,18 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     setExportBusy(true);
     try {
       const firstCustomer = selectedExportRows.find((r) => r.customerName.trim())?.customerName.trim();
+      const exportFee =
+        selectedExportRows.length > 0
+          ? feeForCustomer(selectedExportRows[0].customerName.trim())
+          : feePctNum;
+      const exportRate =
+        selectedExportRows.length > 0
+          ? rateForCustomer(selectedExportRows[0].customerName.trim())
+          : rateNum;
       await exportProxyPurchaseExcel({
         rows: selectedExportRows,
-        proxyFeePercent: feePctNum,
-        exchangeRate: rateNum,
+        proxyFeePercent: exportFee,
+        exchangeRate: exportRate,
         filenameHint: firstCustomer || 'supplier',
       });
       setExportModalOpen(false);
@@ -851,7 +1670,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     } finally {
       setExportBusy(false);
     }
-  }, [selectedExportRows, feePctNum, rateNum, t.exportFail, t.exportNone]);
+  }, [selectedExportRows, feeForCustomer, rateForCustomer, feePctNum, rateNum, t.exportFail, t.exportNone]);
 
   const hubTabStyle = (active: boolean): React.CSSProperties => ({
     padding: '10px 18px',
@@ -867,7 +1686,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     boxShadow: active ? '0 6px 18px rgba(13, 148, 136, 0.35)' : 'none',
   });
 
-  const feeColLabel = `${t.colFee} ${feePctNum || 0}%`;
+  const feeColLabel = t.colFee;
 
   const presetChip = (active: boolean): React.CSSProperties => ({
     padding: '4px 10px',
@@ -958,15 +1777,19 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
 
   const renderMobileCard = (row: ProxyPurchaseRow, idx: number) => {
     const unit = parseNum(row.unitPrice);
-    const fee = calcProxyFee(unit, feePctNum);
-    const total = calcLineTotalRmb(unit, feePctNum);
+    const rowFeePct = feeForCustomer(row.customerName.trim());
+    const fee = calcProxyFee(unit, rowFeePct);
+    const total = calcLineTotalRmb(unit, rowFeePct);
+    const settled = isProxyPurchaseRowSettled(row);
     return (
       <article
         key={row.id}
+        className={settled ? 'proxy-purchase-row--settled' : undefined}
         style={{
           ...glassCard,
           padding: '14px 14px 12px',
           marginBottom: 12,
+          border: settled ? '1px solid rgba(96, 165, 250, 0.28)' : glassCard.border,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -975,6 +1798,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             {t.colExport}
           </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {settled ? renderSettledBadge(row) : null}
             <span
               style={{
                 width: 28,
@@ -991,37 +1815,38 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             >
               {idx + 1}
             </span>
-            <button
-            type="button"
-            onClick={() => requestRemoveRow(row.id)}
-            aria-label={t.delete}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              border: '1px solid rgba(248, 113, 113, 0.35)',
-              background: 'rgba(127, 29, 29, 0.25)',
-              color: '#fca5a5',
-              cursor: 'pointer',
-              fontSize: 16,
-            }}
-          >
-            ×
-          </button>
+            {renderDeleteRowButton(row, 'sm')}
           </div>
         </div>
+        {!settled && rowHasContent(row) ? (
+          <div style={{ marginBottom: 10 }}>
+            <button type="button" onClick={() => settleRow(row.id)} style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: '1px solid rgba(96, 165, 250, 0.35)',
+              background: 'rgba(37, 99, 235, 0.22)',
+              color: '#93c5fd',
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}>
+              {t.settle}
+            </button>
+          </div>
+        ) : null}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colCustomer}</span>
-            <input className="proxy-purchase-cell-input" value={row.customerName} onChange={(e) => updateRow(row.id, { customerName: e.target.value })} />
+            {renderEditableInput(row, row.customerName, (v) => updateRow(row.id, { customerName: v }))}
           </label>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colDate}</span>
-            <input className="proxy-purchase-cell-input" type="date" value={row.orderDate} onChange={(e) => updateRow(row.id, { orderDate: e.target.value })} />
+            {renderEditableInput(row, row.orderDate, (v) => updateRow(row.id, { orderDate: v }), { type: 'date' })}
           </label>
           <label style={{ gridColumn: '1 / -1' }}>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colProduct}</span>
-            <input className="proxy-purchase-cell-input" value={row.productName} onChange={(e) => updateRow(row.id, { productName: e.target.value })} />
+            {renderEditableInput(row, row.productName, (v) => updateRow(row.id, { productName: v }))}
           </label>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colStatus}</span>
@@ -1029,15 +1854,15 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           </label>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colPlatform}</span>
-            <input className="proxy-purchase-cell-input" list="proxy-platform-list" value={row.platform} onChange={(e) => updateRow(row.id, { platform: e.target.value })} placeholder="拼多多" />
+            {renderEditableInput(row, row.platform, (v) => updateRow(row.id, { platform: v }), { list: 'proxy-platform-list', placeholder: '拼多多' })}
           </label>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colQty}</span>
-            <input className="proxy-purchase-cell-input" type="number" min={0} value={row.quantity} onChange={(e) => updateRow(row.id, { quantity: e.target.value })} />
+            {renderEditableInput(row, row.quantity, (v) => updateRow(row.id, { quantity: v }), { type: 'number', min: 0 })}
           </label>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colUnitPrice}</span>
-            <input className="proxy-purchase-cell-input" type="number" min={0} step={0.01} value={row.unitPrice} onChange={(e) => updateRow(row.id, { unitPrice: e.target.value })} />
+            {renderEditableInput(row, row.unitPrice, (v) => updateRow(row.id, { unitPrice: v }), { type: 'number', min: 0, step: 0.01 })}
           </label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             {renderCalcPill(unit > 0 ? fee.toFixed(2) : '—', 'fee')}
@@ -1049,15 +1874,15 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   };
 
   const renderListPagination = () => {
-    if (rows.length <= ROWS_PER_PAGE) return null;
+    if (displayRows.length <= ROWS_PER_PAGE) return null;
     const start = (listPage - 1) * ROWS_PER_PAGE + 1;
-    const end = Math.min(listPage * ROWS_PER_PAGE, rows.length);
+    const end = Math.min(listPage * ROWS_PER_PAGE, displayRows.length);
     const pageInfo =
       language === 'en'
-        ? `Showing ${start}–${end} of ${rows.length}`
+        ? `Showing ${start}–${end} of ${displayRows.length}`
         : language === 'my'
-          ? `${start}–${end} / ${rows.length}`
-          : `第 ${start}–${end} 条，共 ${rows.length} 条`;
+          ? `${start}–${end} / ${displayRows.length}`
+          : `第 ${start}–${end} 条，共 ${displayRows.length} 条`;
 
     return (
       <div
@@ -1304,12 +2129,6 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             {actionBtn(
-              exportBusy ? '…' : `📥 ${t.exportExcel}`,
-              () => void handleExport(),
-              'success',
-              exportBusy,
-            )}
-            {actionBtn(
               isEmbedded ? `✕ ${t.close}` : t.backMetric,
               () => (isEmbedded ? onCloseEmbedded?.() : navigate('/admin/metric-management')),
               'ghost',
@@ -1317,90 +2136,215 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           </div>
         </header>
 
-        <section
-          style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1.15fr',
-            gap: 14,
-            marginBottom: 16,
-          }}
-        >
-          <div style={{ ...glassCard, padding: '16px 16px 14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#fde68a', marginBottom: 10, letterSpacing: '0.04em' }}>
-              {t.proxyFee}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                className="proxy-purchase-cell-input"
-                type="number"
-                min={0}
-                step={0.1}
-                value={proxyFeePercent}
-                onChange={(e) => setProxyFeePercent(e.target.value)}
-                style={{ fontSize: 22, fontWeight: 800, textAlign: 'center', flex: 1 }}
-              />
-              <span style={{ fontSize: 18, fontWeight: 700, opacity: 0.75 }}>%</span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              {FEE_PRESETS.map((p) => (
-                <button key={p} type="button" style={presetChip(Math.abs(feePctNum - p) < 0.01)} onClick={() => setProxyFeePercent(String(p))}>
-                  {p}%
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ ...glassCard, padding: '16px 16px 14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd', marginBottom: 10, letterSpacing: '0.04em' }}>
-              {t.exchangeRate}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, opacity: 0.75 }}>1 RMB =</span>
-              <input
-                className="proxy-purchase-cell-input"
-                type="number"
-                min={0}
-                step={1}
-                value={exchangeRate}
-                onChange={(e) => setExchangeRate(e.target.value)}
-                style={{ fontSize: 22, fontWeight: 800, textAlign: 'center', width: 100, flex: '1 1 80px' }}
-              />
-              <span style={{ fontSize: 13, opacity: 0.75 }}>MMK</span>
-            </div>
-            <div style={{ fontSize: 11, opacity: 0.55, marginTop: 8 }}>{t.rateHint}</div>
-          </div>
-
+        <section style={{ marginBottom: 12 }}>
           <div
             style={{
               ...glassCard,
-              padding: '16px 18px',
-              background:
-                'linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(16, 185, 129, 0.1) 100%)',
-              border: '1px solid rgba(250, 204, 21, 0.22)',
+              padding: '10px 12px',
+              background: 'linear-gradient(135deg, rgba(30, 58, 95, 0.35) 0%, rgba(234, 179, 8, 0.08) 55%, rgba(16, 185, 129, 0.08) 100%)',
+              border: '1px solid rgba(148, 163, 184, 0.2)',
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(253, 224, 71, 0.95)', marginBottom: 8 }}>
-              {t.totalRmb}
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#93c5fd', marginBottom: 8 }}>
+              {t.combinedCardTitle}
             </div>
-            <div style={{ fontSize: isMobile ? 28 : 32, fontWeight: 900, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
-              ¥{grandTotalRmb.toFixed(2)}
-            </div>
+
             <div
               style={{
-                marginTop: 10,
-                paddingTop: 10,
-                borderTop: '1px solid rgba(148, 163, 184, 0.15)',
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'minmax(88px, 0.22fr) minmax(100px, 0.28fr) minmax(120px, 0.26fr) minmax(100px, 0.24fr)',
+                gap: 8,
+                alignItems: 'end',
+                marginBottom: 8,
+              }}
+            >
+              <label style={{ minWidth: 0 }}>
+                <span style={{ fontSize: 10, opacity: 0.65, display: 'block', marginBottom: 3 }}>{t.selectCustomer}</span>
+                <select
+                  className="proxy-purchase-cell-input"
+                  value={summaryCustomerKey ?? ''}
+                  onChange={(e) => handleSummaryCustomerChange(e.target.value)}
+                  disabled={customerDirectory.length === 0}
+                  style={{ width: '100%', fontWeight: 700, fontSize: 12, padding: '6px 8px' }}
+                >
+                  {customerDirectory.length === 0 ? (
+                    <option value="">—</option>
+                  ) : (
+                    <>
+                      <option value={SUMMARY_ALL_CUSTOMERS}>{t.allCustomers}</option>
+                      {customerDirectory.map((item) => (
+                        <option key={item.customerName || '__unnamed__'} value={item.customerName}>
+                          {item.customerName || t.unnamedCustomer}
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+              </label>
+              <label style={{ minWidth: 0 }}>
+                <span style={{ fontSize: 10, opacity: 0.65, display: 'block', marginBottom: 3 }}>{t.summaryPhone}</span>
+                <input
+                  className="proxy-purchase-cell-input"
+                  value={isSpecificSummaryCustomer(summaryCustomerKey) ? (customerPhoneByName.get(summaryCustomerKey) ?? '') : ''}
+                  onChange={(e) => {
+                    if (!isSpecificSummaryCustomer(summaryCustomerKey)) return;
+                    updateSummaryCustomerPhone(summaryCustomerKey, e.target.value);
+                  }}
+                  disabled={!isSpecificSummaryCustomer(summaryCustomerKey)}
+                  placeholder={t.summaryPhonePlaceholder}
+                  style={{ width: '100%', fontSize: 12, padding: '6px 8px' }}
+                />
+              </label>
+              <label style={{ minWidth: 0 }}>
+                <span style={{ fontSize: 10, opacity: 0.65, display: 'block', marginBottom: 3 }}>
+                  {t.proxyFee}
+                  <span style={{ marginLeft: 4, opacity: 0.55 }}>({t.feeLinkedHint})</span>
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    className="proxy-purchase-cell-input"
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={proxyFeePercent}
+                    onChange={(e) => handleProxyFeePercentChange(e.target.value)}
+                    disabled={!isSpecificSummaryCustomer(summaryCustomerKey)}
+                    style={{ fontSize: 14, fontWeight: 800, textAlign: 'center', flex: 1, padding: '6px 8px' }}
+                  />
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>%</span>
+                </div>
+              </label>
+              <label style={{ minWidth: 0 }}>
+                <span style={{ fontSize: 10, opacity: 0.65, display: 'block', marginBottom: 3 }}>
+                  {t.exchangeRate}
+                  <span style={{ marginLeft: 4, opacity: 0.55 }}>({t.rateLinkedHint})</span>
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 10, opacity: 0.65 }}>1¥=</span>
+                  <input
+                    className="proxy-purchase-cell-input"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={exchangeRate}
+                    onChange={(e) => handleExchangeRateChange(e.target.value)}
+                    disabled={!isSpecificSummaryCustomer(summaryCustomerKey)}
+                    style={{ fontSize: 14, fontWeight: 800, textAlign: 'center', flex: 1, padding: '6px 8px' }}
+                  />
+                  <span style={{ fontSize: 10, opacity: 0.65 }}>MMK</span>
+                </div>
+              </label>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                gap: 6,
+                marginBottom: 8,
+                fontSize: 12,
+              }}
+            >
+              <button
+                type="button"
+                onClick={openRemittanceModal}
+                disabled={!isSpecificSummaryCustomer(summaryCustomerKey)}
+                title={t.depositClickHint}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '7px 10px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(96, 165, 250, 0.32)',
+                  background: 'rgba(37, 99, 235, 0.16)',
+                  color: '#dbeafe',
+                  cursor: isSpecificSummaryCustomer(summaryCustomerKey) ? 'pointer' : 'not-allowed',
+                  opacity: isSpecificSummaryCustomer(summaryCustomerKey) ? 1 : 0.5,
+                }}
+              >
+                <span style={{ opacity: 0.85 }}>{t.customerDeposit}</span>
+                <span style={{ fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: '#93c5fd' }}>
+                  ¥{selectedCustomerDeposit.toFixed(2)}{isSpecificSummaryCustomer(summaryCustomerKey) ? ' ›' : ''}
+                </span>
+              </button>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '7px 10px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(250, 204, 21, 0.22)',
+                  background: 'rgba(234, 179, 8, 0.08)',
+                }}
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => void handleSummaryCustomerExport()}
+                    disabled={exportBusy || !isSpecificSummaryCustomer(summaryCustomerKey) || summaryCustomerShoppingRows.length === 0}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: 8,
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: '#fff',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      cursor:
+                        exportBusy || !isSpecificSummaryCustomer(summaryCustomerKey) || summaryCustomerShoppingRows.length === 0
+                          ? 'not-allowed'
+                          : 'pointer',
+                      opacity:
+                        exportBusy || !isSpecificSummaryCustomer(summaryCustomerKey) || summaryCustomerShoppingRows.length === 0
+                          ? 0.55
+                          : 1,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {exportBusy ? '…' : t.exportExcel}
+                  </button>
+                  <span style={{ opacity: 0.82, whiteSpace: 'nowrap' }}>{t.customerShopping}</span>
+                </div>
+                <span style={{ fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: '#fde68a' }}>
+                  ¥{selectedCustomerShopping.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                paddingTop: 8,
+                borderTop: '1px solid rgba(148, 163, 184, 0.18)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'baseline',
                 gap: 8,
               }}
             >
-              <span style={{ fontSize: 12, opacity: 0.75 }}>{t.totalMmk}</span>
-              <span style={{ fontSize: 18, fontWeight: 800, color: '#6ee7b7', fontVariantNumeric: 'tabular-nums' }}>
-                {grandTotalMmk.toLocaleString()}
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#f8fafc' }}>{t.grandTotalLabel}</span>
+              <span
+                style={{
+                  fontSize: isMobile ? 20 : 22,
+                  fontWeight: 900,
+                  fontVariantNumeric: 'tabular-nums',
+                  color: selectedCustomerBalance >= 0 ? '#6ee7b7' : '#fca5a5',
+                }}
+              >
+                ¥{selectedCustomerBalance.toFixed(2)}
               </span>
             </div>
+            {(isSpecificSummaryCustomer(summaryCustomerKey) ? rateNum > 0 : selectedCustomerBalanceMmk !== 0) ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4, fontSize: 11, opacity: 0.72 }}>
+                <span>{t.totalMmk}</span>
+                <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: selectedCustomerBalance >= 0 ? '#6ee7b7' : '#fca5a5' }}>
+                  {selectedCustomerBalanceMmk.toLocaleString()}
+                </span>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -1419,11 +2363,8 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             {actionBtn(`⎘ ${t.duplicateRow}`, duplicateLastRow, 'ghost')}
             {actionBtn(t.selectAll, selectAllExportable, 'ghost')}
             {actionBtn(t.selectNone, selectNoneExportable, 'ghost')}
-            {actionBtn(t.clearAll, () => {
-              if (!window.confirm(t.confirmClear)) return;
-              setRows([newRow()]);
-              setExportSelected({});
-            }, 'danger')}
+            {actionBtn(t.batchSettle, batchSettleSelected, 'success', batchSettleEligibleCount === 0)}
+            {actionBtn(t.clearAll, clearAllRows, 'danger')}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <span
@@ -1445,6 +2386,30 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           </div>
         </div>
 
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+          {(['all', 'open', 'settled'] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              style={presetChip(settleFilter === key)}
+              onClick={() => {
+                setSettleFilter(key);
+                setListPage(1);
+              }}
+            >
+              {key === 'all' ? t.filterAll : key === 'open' ? t.filterOpen : t.filterSettled}
+              {' '}({settleCounts[key]})
+            </button>
+          ))}
+          {isSpecificSummaryCustomer(summaryCustomerKey) ? (
+            <span style={{ fontSize: 12, opacity: 0.68, marginLeft: 4 }}>
+              {t.ordersForCustomer.replace('{name}', summaryCustomerKey || t.unnamedCustomer)}
+              {' · '}
+              {displayRows.length}
+            </span>
+          ) : null}
+        </div>
+
         {isMobile ? (
           <div>{paginatedRows.map((row, idx) => renderMobileCard(row, (listPage - 1) * ROWS_PER_PAGE + idx))}</div>
         ) : (
@@ -1453,11 +2418,11 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
               className="proxy-purchase-table-scroll"
               style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
             >
-              <table style={{ width: '100%', minWidth: 1276, borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
+              <table style={{ width: '100%', minWidth: 1168, borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
                 <thead>
                   <tr>
                     <th colSpan={1} style={groupHeaderStyle('#94a3b8')}>{t.colExport}</th>
-                    <th colSpan={5} style={groupHeaderStyle('#38bdf8')}>{t.groupCustomer}</th>
+                    <th colSpan={4} style={groupHeaderStyle('#38bdf8')}>{t.groupCustomer}</th>
                     <th colSpan={3} style={groupHeaderStyle('#a78bfa')}>{t.groupProduct}</th>
                     <th colSpan={4} style={{ ...groupHeaderStyle('#34d399'), borderRight: 'none' }}>{t.groupPrice}</th>
                   </tr>
@@ -1487,7 +2452,6 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                       t.colCustomer,
                       t.colDate,
                       t.colAddress,
-                      t.colPhone,
                       t.colPlatform,
                       t.colProduct,
                       t.colStatus,
@@ -1504,7 +2468,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                           top: 0,
                           zIndex: 2,
                           padding: '11px 8px',
-                          textAlign: i >= 9 && i <= 11 ? 'right' : 'left',
+                          textAlign: i >= 7 && i <= 10 ? 'right' : 'left',
                           fontWeight: 700,
                           fontSize: 12,
                           whiteSpace: 'nowrap',
@@ -1513,9 +2477,9 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                           background: 'rgba(30, 41, 59, 0.98)',
                           ...(i === 3
                             ? { width: COL_ADDRESS_WIDTH, maxWidth: COL_ADDRESS_WIDTH }
-                            : i === 5
+                            : i === 4
                               ? { width: COL_PLATFORM_WIDTH, maxWidth: COL_PLATFORM_WIDTH }
-                              : i === 6
+                              : i === 5
                                 ? { minWidth: COL_PRODUCT_MIN_WIDTH, width: COL_PRODUCT_MIN_WIDTH }
                                 : {}),
                         }}
@@ -1529,20 +2493,24 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                   {paginatedRows.map((row, idx) => {
                     const globalIdx = (listPage - 1) * ROWS_PER_PAGE + idx;
                     const unit = parseNum(row.unitPrice);
-                    const fee = calcProxyFee(unit, feePctNum);
-                    const total = calcLineTotalRmb(unit, feePctNum);
+                    const rowFeePct = feeForCustomer(row.customerName.trim());
+                    const fee = calcProxyFee(unit, rowFeePct);
+                    const total = calcLineTotalRmb(unit, rowFeePct);
                     const active = rowHasContent(row);
+                    const settled = isProxyPurchaseRowSettled(row);
                     return (
                       <tr
                         key={row.id}
-                        className="proxy-purchase-row"
+                        className={`proxy-purchase-row${settled ? ' proxy-purchase-row--settled' : ''}`}
                         style={{
                           borderBottom: '1px solid rgba(148, 163, 184, 0.08)',
-                          background: active
-                            ? globalIdx % 2 === 0
-                              ? 'rgba(15, 23, 42, 0.35)'
-                              : 'rgba(15, 23, 42, 0.18)'
-                            : 'transparent',
+                          background: settled
+                            ? 'rgba(30, 58, 95, 0.28)'
+                            : active
+                              ? globalIdx % 2 === 0
+                                ? 'rgba(15, 23, 42, 0.35)'
+                                : 'rgba(15, 23, 42, 0.18)'
+                              : 'transparent',
                           transition: 'background 0.15s',
                           opacity: exportSelected[row.id] || !rowHasExportContent(row) ? 1 : 0.68,
                         }}
@@ -1568,36 +2536,18 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                             {globalIdx + 1}
                           </span>
                         </td>
-                        <td style={cellPad}><input className="proxy-purchase-cell-input" value={row.customerName} onChange={(e) => updateRow(row.id, { customerName: e.target.value })} placeholder="TSL" /></td>
-                        <td style={cellPad}><input className="proxy-purchase-cell-input" type="date" value={row.orderDate} onChange={(e) => updateRow(row.id, { orderDate: e.target.value })} /></td>
-                        <td style={{ ...cellPad, width: COL_ADDRESS_WIDTH, maxWidth: COL_ADDRESS_WIDTH }}><input className="proxy-purchase-cell-input" value={row.address} onChange={(e) => updateRow(row.id, { address: e.target.value })} placeholder="RUILI" /></td>
-                        <td style={cellPad}><input className="proxy-purchase-cell-input" value={row.phone} onChange={(e) => updateRow(row.id, { phone: e.target.value })} /></td>
-                        <td style={{ ...cellPad, width: COL_PLATFORM_WIDTH, maxWidth: COL_PLATFORM_WIDTH }}><input className="proxy-purchase-cell-input" list="proxy-platform-list" value={row.platform} onChange={(e) => updateRow(row.id, { platform: e.target.value })} placeholder="拼多多" /></td>
-                        <td style={{ ...cellPad, minWidth: COL_PRODUCT_MIN_WIDTH, width: COL_PRODUCT_MIN_WIDTH }}><input className="proxy-purchase-cell-input" value={row.productName} onChange={(e) => updateRow(row.id, { productName: e.target.value })} /></td>
+                        <td style={cellPad}>{renderEditableInput(row, row.customerName, (v) => updateRow(row.id, { customerName: v }), { placeholder: 'TSL' })}</td>
+                        <td style={cellPad}>{renderEditableInput(row, row.orderDate, (v) => updateRow(row.id, { orderDate: v }), { type: 'date' })}</td>
+                        <td style={{ ...cellPad, width: COL_ADDRESS_WIDTH, maxWidth: COL_ADDRESS_WIDTH }}>{renderEditableInput(row, row.address, (v) => updateRow(row.id, { address: v }), { placeholder: 'RUILI' })}</td>
+                        <td style={{ ...cellPad, width: COL_PLATFORM_WIDTH, maxWidth: COL_PLATFORM_WIDTH }}>{renderEditableInput(row, row.platform, (v) => updateRow(row.id, { platform: v }), { list: 'proxy-platform-list', placeholder: '拼多多' })}</td>
+                        <td style={{ ...cellPad, minWidth: COL_PRODUCT_MIN_WIDTH, width: COL_PRODUCT_MIN_WIDTH }}>{renderEditableInput(row, row.productName, (v) => updateRow(row.id, { productName: v }))}</td>
                         <td style={{ ...cellPad, width: 96 }}>{renderStatusSelect(row)}</td>
-                        <td style={{ ...cellPad, width: 72 }}><input className="proxy-purchase-cell-input" type="number" min={0} value={row.quantity} onChange={(e) => updateRow(row.id, { quantity: e.target.value })} style={{ textAlign: 'center' }} /></td>
-                        <td style={{ ...cellPad, width: 96 }}><input className="proxy-purchase-cell-input" type="number" min={0} step={0.01} value={row.unitPrice} onChange={(e) => updateRow(row.id, { unitPrice: e.target.value })} style={{ textAlign: 'right' }} /></td>
+                        <td style={{ ...cellPad, width: 72 }}>{renderEditableInput(row, row.quantity, (v) => updateRow(row.id, { quantity: v }), { type: 'number', min: 0, style: { textAlign: 'center' } })}</td>
+                        <td style={{ ...cellPad, width: 96 }}>{renderEditableInput(row, row.unitPrice, (v) => updateRow(row.id, { unitPrice: v }), { type: 'number', min: 0, step: 0.01, style: { textAlign: 'right' } })}</td>
                         <td style={{ ...cellPad, textAlign: 'right' }}>{renderCalcPill(unit > 0 ? fee.toFixed(2) : '—', 'fee')}</td>
                         <td style={{ ...cellPad, textAlign: 'right' }}>{renderCalcPill(unit > 0 ? total.toFixed(2) : '—', 'total')}</td>
-                        <td style={{ ...cellPad, width: 44, textAlign: 'center' }}>
-                          <button
-                            type="button"
-                            aria-label={t.delete}
-                            onClick={() => requestRemoveRow(row.id)}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: 9,
-                              border: '1px solid rgba(248, 113, 113, 0.32)',
-                              background: 'rgba(127, 29, 29, 0.2)',
-                              color: '#fca5a5',
-                              cursor: 'pointer',
-                              fontSize: 17,
-                              lineHeight: 1,
-                            }}
-                          >
-                            ×
-                          </button>
+                        <td style={{ ...cellPad, minWidth: 108, textAlign: 'center' }}>
+                          {renderRowActions(row)}
                         </td>
                       </tr>
                     );
@@ -1616,6 +2566,232 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           </div>
         ) : null}
       </div>
+
+      {remittanceModalOpen ? (
+        <div
+          role="presentation"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10040,
+            background: 'rgba(2, 6, 23, 0.72)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: isMobile ? 12 : 24,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setRemittanceModalOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.remittanceDetails}
+            style={{
+              width: '100%',
+              maxWidth: 560,
+              maxHeight: isMobile ? '92vh' : '86vh',
+              display: 'flex',
+              flexDirection: 'column',
+              ...glassCard,
+              padding: isMobile ? '14px 12px' : '16px 16px 14px',
+              boxShadow: '0 28px 80px rgba(0,0,0,0.45)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{t.remittanceDetails}</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.72 }}>
+                  {summaryCustomerKey || t.unnamedCustomer}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRemittanceModalOpen(false)}
+                style={{
+                  border: 'none',
+                  background: 'rgba(148,163,184,0.12)',
+                  color: '#e2e8f0',
+                  borderRadius: 8,
+                  width: 30,
+                  height: 30,
+                  cursor: 'pointer',
+                  fontSize: 16,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '8px 10px',
+                marginBottom: 10,
+                borderRadius: 10,
+                background: 'rgba(37, 99, 235, 0.14)',
+                border: '1px solid rgba(96, 165, 250, 0.24)',
+              }}
+            >
+              <span style={{ fontSize: 12, opacity: 0.85 }}>{t.customerDeposit}</span>
+              <span style={{ fontSize: 18, fontWeight: 900, color: '#93c5fd', fontVariantNumeric: 'tabular-nums' }}>
+                ¥{selectedCustomerDeposit.toFixed(2)}
+              </span>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', marginBottom: 10, paddingRight: 2 }}>
+              {currentDepositEntries.length === 0 ? (
+                <div style={{ fontSize: 12, opacity: 0.55, padding: '12px 4px' }}>{t.depositEmpty}</div>
+              ) : (
+                currentDepositEntries.map((entry) => {
+                  const isEditing = editingDepositId === entry.id && editDepositDraft;
+                  return (
+                    <div
+                      key={entry.id}
+                      style={{
+                        padding: '10px 10px',
+                        marginBottom: 8,
+                        borderRadius: 10,
+                        border: '1px solid rgba(148, 163, 184, 0.16)',
+                        background: 'rgba(15, 23, 42, 0.42)',
+                      }}
+                    >
+                      {isEditing ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            <label style={{ fontSize: 11, opacity: 0.7 }}>
+                              {t.depositDate}
+                              <input
+                                className="proxy-purchase-cell-input"
+                                type="date"
+                                value={editDepositDraft.date}
+                                onChange={(e) => setEditDepositDraft({ ...editDepositDraft, date: e.target.value })}
+                                style={{ width: '100%', marginTop: 4, fontSize: 12 }}
+                              />
+                            </label>
+                            <label style={{ fontSize: 11, opacity: 0.7 }}>
+                              {t.depositAmount}
+                              <input
+                                className="proxy-purchase-cell-input"
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={editDepositDraft.amount}
+                                onChange={(e) => setEditDepositDraft({ ...editDepositDraft, amount: e.target.value })}
+                                style={{ width: '100%', marginTop: 4, fontSize: 12, textAlign: 'right' }}
+                              />
+                            </label>
+                          </div>
+                          <label style={{ fontSize: 11, opacity: 0.7 }}>
+                            {t.depositNote}
+                            <textarea
+                              className="proxy-purchase-cell-input"
+                              value={editDepositDraft.note}
+                              onChange={(e) => setEditDepositDraft({ ...editDepositDraft, note: e.target.value })}
+                              rows={2}
+                              style={{ width: '100%', marginTop: 4, fontSize: 12, resize: 'vertical' }}
+                            />
+                          </label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {actionBtn(t.depositSave, saveEditDepositEntry, 'primary')}
+                            {actionBtn(t.depositCancel, () => {
+                              setEditingDepositId(null);
+                              setEditDepositDraft(null);
+                            }, 'ghost')}
+                            {actionBtn(t.depositDelete, () => deleteDepositEntry(entry.id), 'danger')}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                              <span style={{ fontSize: 12, opacity: 0.75 }}>{entry.date || '—'}</span>
+                              <span style={{ fontSize: 14, fontWeight: 800, color: '#93c5fd', fontVariantNumeric: 'tabular-nums' }}>
+                                ¥{parseNum(entry.amount).toFixed(2)}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 12, opacity: 0.88, lineHeight: 1.45, wordBreak: 'break-word' }}>
+                              {entry.note?.trim() || '—'}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => startEditDepositEntry(entry)}
+                            style={{
+                              flexShrink: 0,
+                              padding: '4px 10px',
+                              borderRadius: 8,
+                              border: '1px solid rgba(148, 163, 184, 0.28)',
+                              background: 'rgba(255,255,255,0.06)',
+                              color: '#e2e8f0',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {t.depositEdit}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div
+              style={{
+                paddingTop: 10,
+                borderTop: '1px solid rgba(148, 163, 184, 0.16)',
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, opacity: 0.88 }}>{t.depositAddEntry}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <label style={{ fontSize: 11, opacity: 0.7 }}>
+                  {t.depositDate}
+                  <input
+                    className="proxy-purchase-cell-input"
+                    type="date"
+                    value={depositDraftDate}
+                    onChange={(e) => setDepositDraftDate(e.target.value)}
+                    style={{ width: '100%', marginTop: 4, fontSize: 12 }}
+                  />
+                </label>
+                <label style={{ fontSize: 11, opacity: 0.7 }}>
+                  {t.depositAmount}
+                  <input
+                    className="proxy-purchase-cell-input"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={depositDraftAmount}
+                    onChange={(e) => setDepositDraftAmount(e.target.value)}
+                    placeholder="0.00"
+                    style={{ width: '100%', marginTop: 4, fontSize: 12, textAlign: 'right' }}
+                  />
+                </label>
+              </div>
+              <label style={{ display: 'block', fontSize: 11, opacity: 0.7, marginBottom: 8 }}>
+                {t.depositNote}
+                <textarea
+                  className="proxy-purchase-cell-input"
+                  value={depositDraftNote}
+                  onChange={(e) => setDepositDraftNote(e.target.value)}
+                  rows={2}
+                  placeholder={t.depositNote}
+                  style={{ width: '100%', marginTop: 4, fontSize: 12, resize: 'vertical' }}
+                />
+              </label>
+              {actionBtn(t.depositAdd, addCustomerDepositEntry, 'success')}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {exportModalOpen ? (
         <div
@@ -1896,7 +3072,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
               ) : (
                 filteredExportRows.map((row, idx) => {
                   const unit = parseNum(row.unitPrice);
-                  const total = calcLineTotalRmb(unit, feePctNum);
+                  const total = calcLineTotalRmb(unit, feeForCustomer(row.customerName.trim()));
                   const label =
                     [formatFilterDateLabel(row.orderDate), row.customerName, row.productName, row.platform]
                       .map((s) => s.trim())

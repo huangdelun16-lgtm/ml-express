@@ -13,6 +13,7 @@ import { extractDestinationCode } from '../utils/inboundBarcode';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { isPackageBarcode, packDestinationFromBarcode } from '../utils/packageNumber';
 import { toNullableUuid } from '../utils/uuid';
+import { inventoryOperationId } from '../utils/inventoryReliability';
 
 type OriginStore = {
   id: string;
@@ -552,21 +553,18 @@ export async function confirmPkgHubReceived(
   if (detail.status === 'cancelled') throw svc('pkgCancelled');
   if (detail.status === 'hub_received') return detail;
 
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from('inventory_pkg_tracking')
-    .update({
-      status: 'hub_received',
-      hub_received_at: now,
-      hub_received_by_store_id: store.id,
-      hub_received_by_store_code: store.storeCode,
-      hub_received_by_store_name: store.storeName,
-      updated_at: now,
-    })
-    .eq('pack_barcode', detail.pack_barcode);
-
+  const { error } = await supabase.rpc('inventory_confirm_pkg_hub_received', {
+    p_operation_id: inventoryOperationId('hub-receive', detail.pack_barcode),
+    p_pack_barcode: detail.pack_barcode,
+    p_store_id: toNullableUuid(store.id),
+    p_store_code: store.storeCode,
+    p_store_name: store.storeName,
+    p_hub_code: dest,
+  });
   if (error) throw new Error(error.message);
-  return (await getPkgTrackingDetail(detail.pack_barcode))!;
+  const updated = await getPkgTrackingDetail(detail.pack_barcode);
+  if (!updated) throw svc('pkgNotFoundNeedLoad');
+  return updated;
 }
 
 async function applyOrderHubReceived(

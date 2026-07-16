@@ -90,7 +90,6 @@ export const serviceErrorsZh: ServiceErrorTexts = {
   syncRlsBlocked:
     '云端权限校验失败。请退出后重新登录；若仍失败请联系管理员。装车/到站数据可能未上传，目的站无法扫码。',
   syncNetworkFailed: '网络不可用或信号弱，请检查网络后在「设置 → 云端同步」重试。',
-  operatorNameRequired: '请先在「设置」登记当班操作员姓名',
   invalidPackBarcode: '包装号无效',
   packNoTransportFee: '该快递包未登记车费，无法支付',
   syncItemFailed: '同步商品失败',
@@ -191,7 +190,6 @@ export const serviceErrorsEn: ServiceErrorTexts = {
   syncRlsBlocked:
     'Cloud permission denied. Log out and sign in again; contact admin if it persists. Load/hub data may not be uploaded.',
   syncNetworkFailed: 'Network unavailable or weak. Check connection and retry in Settings → Cloud sync.',
-  operatorNameRequired: 'Register shift operator name in Settings first.',
   invalidPackBarcode: 'Invalid package barcode.',
   packNoTransportFee: 'No transport fee on this package; cannot pay.',
   syncItemFailed: 'Item sync failed.',
@@ -289,7 +287,6 @@ export const serviceErrorsMy: ServiceErrorTexts = {
   syncRlsBlocked:
     'ကလောက် ခွင့်ပြုချက် မအောင်မြင်။ ထွက်ပြီး ပြန် login လုပ်ပါ။ တင်ပို့ข้อมูล မရောက်နိုင်ပါ။',
   syncNetworkFailed: 'ကွန်ရက် မရှိ/ အားနည်း။ Settings → Cloud sync တွင် ပြန်ကြိုးစားပါ။',
-  operatorNameRequired: 'Settings တွင် လက်ရှိ operator အမည် မှတ်ပါ။',
   invalidPackBarcode: 'PKG ဘားကုဒ် မမှန်',
   packNoTransportFee: 'ကားခ မရှိ — ပေးချေ၍မရ',
   syncItemFailed: 'ပစ္စည်း စင့်ခ် မအောင်မြင်',
@@ -311,7 +308,7 @@ export const pkgNotFoundHintZh = {
   destMismatch:
     '包装号标注目的地 {packDest}，本站 {hub}。若为本段运达站，请确认发站装车时目的地选 {hub}',
   destOnly: '包装号目的地：{packDest}',
-  resyncTip: '若发站已装车但未同步，可在发站「打包快递」页对该包裹「补传云端」。',
+  resyncTip: '请恢复网络，并由发站核对该 PKG 是否已完整写入 Supabase；未确认前不要重复装车。',
 };
 
 export const pkgNotFoundHintEn = {
@@ -324,7 +321,7 @@ export const pkgNotFoundHintEn = {
   destMismatch:
     'Package shows destination {packDest}; this hub is {hub}. For this leg, origin must select {hub} when loading.',
   destOnly: 'Package destination: {packDest}',
-  resyncTip: 'If loaded but not synced, re-sync from Packing on the origin device.',
+  resyncTip: 'Restore the connection and verify that the origin fully wrote this PKG to Supabase before repeating any truck load.',
 };
 
 export const pkgNotFoundHintMy = {
@@ -336,7 +333,7 @@ export const pkgNotFoundHintMy = {
   step4: '4. inventory_pkg_tracking migration',
   destMismatch: 'PKG {packDest} — ဤစခန်း {hub} — leg အတွက် {hub} ရွေးပါ',
   destOnly: 'PKG ရ DESTINATION — {packDest}',
-  resyncTip: 'တင်ပြီး sync မရသေးပါက 「ထုပ်ပိုးစာရင်း」 တွင် 「ကလောက်ပြန်တင်」',
+  resyncTip: 'ကွန်ရက်ပြန်ချိတ်ပြီး မူလစခန်းက ဤ PKG ကို Supabase တွင် အပြည့်အစုံရေးထားကြောင်း စစ်ဆေးပါ။',
 };
 
 export const orderNotFoundHintZh = {

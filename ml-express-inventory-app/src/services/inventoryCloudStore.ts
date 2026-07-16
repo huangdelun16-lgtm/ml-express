@@ -7,12 +7,15 @@ import type {
 } from '../types/inventory';
 import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
 import {
+  applyCloudStockMovementAtomic,
+  createCloudPackedShipmentAtomic,
   deleteCloudPackedShipment,
   fetchCloudMovementsForItems,
   fetchCloudPackedShipments,
   fetchCloudStoreItems,
   getCloudItemIdByBarcode,
   insertCloudStockMovement,
+  loadCloudShipmentsAtomic,
   upsertCloudPackedShipment,
   upsertCloudStoreItem,
   type CloudPackRow,
@@ -262,17 +265,50 @@ export async function upsertItem(item: InventoryItem, store?: InventoryStoreSess
   return saved;
 }
 
-export async function applyMovement(item: InventoryItem, movement: StockMovement, store?: InventoryStoreSession): Promise<void> {
+export async function applyMovement(
+  item: InventoryItem,
+  movement: StockMovement,
+  store?: InventoryStoreSession,
+): Promise<InventoryItem> {
   const session = store ?? await ensureInventoryCloudReady();
-  const saved = await upsertItem(item, session);
-  await insertCloudStockMovement(saved.id || await getCloudItemIdByBarcode(saved.barcode) || saved.id, {
-    ...movement, item_id: saved.id,
+  const saved = rowToItem(await applyCloudStockMovementAtomic(session, item, movement, movement.id));
+  clearInventoryCloudCache();
+  return saved;
+}
+
+export async function createPackAtomic(params: {
+  bundle: InventoryItem;
+  pack: PackedShipment;
+  lines: PackedShipmentItem[];
+  originStore: { id: string; storeCode: string; storeName: string };
+  operationId: string;
+  store?: InventoryStoreSession;
+}): Promise<InventoryItem> {
+  const session = params.store ?? await ensureInventoryCloudReady();
+  const result = await createCloudPackedShipmentAtomic({
+    store: session,
+    bundle: params.bundle,
+    pack: params.pack,
+    lines: params.lines.map((line) => ({
+      item_id: line.item_id,
+      item_barcode: line.item_barcode,
+      qty: line.qty,
+    })),
+    originStore: params.originStore,
+    operationId: params.operationId,
   });
-  if (cache) {
-    cache.movements = [movement, ...cache.movements.filter((m) => m.id !== movement.id)];
-    cacheHasMovements = true;
-    cacheFetchedAt = Date.now();
-  }
+  clearInventoryCloudCache();
+  return rowToItem(result.bundleItem);
+}
+
+export async function loadShipmentsAtomic(params: {
+  operationId: string;
+  payload: Record<string, unknown>;
+}): Promise<number> {
+  await ensureInventoryCloudReady();
+  const count = await loadCloudShipmentsAtomic(params);
+  clearInventoryCloudCache();
+  return count;
 }
 
 export async function createPack(

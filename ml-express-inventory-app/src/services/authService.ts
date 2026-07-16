@@ -45,6 +45,8 @@ export type InventoryStoreSession = {
   loggedInAt: string;
   /** P4 JWT app_metadata.inventory_hub_code，优先于 region 推断 */
   hubCode?: string;
+  /** JWT app_metadata.inventory_session_id；用于数据库级单设备会话校验 */
+  sessionId?: string;
 };
 
 type DeliveryStoreRow = {
@@ -129,14 +131,20 @@ export async function verifyDeviceSessionStillActive(storeId: string): Promise<b
   if (!isSupabaseConfigured()) return true;
 
   const localSessionId = await loadDeviceSessionId();
-  if (!localSessionId) return true;
+  const {
+    data: { session: authSession },
+  } = await supabase.auth.getSession();
+  const jwtSessionId = String(
+    authSession?.user?.app_metadata?.inventory_session_id ?? '',
+  ).trim();
+  if (!localSessionId || !jwtSessionId || localSessionId !== jwtSessionId) return false;
 
   const { data, error } = await supabase
     .from('delivery_stores')
     .select('current_session_id')
     .eq('id', storeId)
     .maybeSingle();
-  if (error || !data?.current_session_id) return true;
+  if (error || !data?.current_session_id) return false;
 
   return data.current_session_id === localSessionId;
 }
@@ -160,7 +168,8 @@ function sessionFromAuthMetadata(user: {
   const meta = user.app_metadata ?? {};
   const id = String(meta.inventory_store_id ?? '').trim();
   const storeCode = String(meta.inventory_store_code ?? '').trim().toUpperCase();
-  if (!id || !storeCode) return null;
+  const sessionId = String(meta.inventory_session_id ?? '').trim();
+  if (!id || !storeCode || !sessionId) return null;
   const hubCode = String(meta.inventory_hub_code ?? '').trim().toUpperCase();
   return {
     id,
@@ -171,6 +180,7 @@ function sessionFromAuthMetadata(user: {
     storeType: String(meta.inventory_store_type ?? TRANSIT_STATION_STORE_TYPE),
     loggedInAt: new Date().toISOString(),
     hubCode: hubCode || undefined,
+    sessionId,
   };
 }
 
@@ -208,7 +218,7 @@ export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession>
   const user = userErr ? session.user : userData?.user ?? session.user;
 
   const fromMeta = sessionFromAuthMetadata(user);
-  if (!fromMeta?.hubCode) {
+  if (!fromMeta?.hubCode || !fromMeta.sessionId) {
     throw new InventoryAuthRequiredError('authJwtMissingHubCode');
   }
 
@@ -271,7 +281,7 @@ export async function restoreSession(): Promise<InventoryStoreSession | null> {
   }
 
   const fromMeta = sessionFromAuthMetadata(session.user);
-  if (!fromMeta?.hubCode) {
+  if (!fromMeta?.hubCode || !fromMeta.sessionId) {
     await supabase.auth.signOut();
     await clearSession();
     await clearDeviceSessionId();
@@ -327,15 +337,13 @@ export async function loginTransitStationStore(
   }
 
   const loginPayload = await callInventoryStoreLogin(code, pass);
-  if (!loginPayload.email || !loginPayload.store) {
+  if (!loginPayload.email || !loginPayload.store || !loginPayload.sessionId) {
     throw svc('loginFailed');
   }
 
   await signInInventoryAuth(loginPayload.email, pass);
 
-  if (loginPayload.sessionId) {
-    await saveDeviceSessionId(loginPayload.sessionId);
-  }
+  await saveDeviceSessionId(loginPayload.sessionId);
 
   return await ensureInventoryCloudAuth();
 }

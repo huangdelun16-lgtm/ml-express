@@ -97,7 +97,7 @@ flowchart TB
 | 管理后台 | `admin-market-link-express.netlify.app` 或自定义 admin 域 | 仓库根 CRA + Functions |
 | 商家 Web | 独立 Netlify 站点 | `ml-express-merchant-web` |
 | Inventory App Support | `https://market-link-express.com/support` | App Store Support URL |
-| Inventory iOS | App Store `com.mlexpress.inventory` | EAS Build，当前 **1.4.1 (10)** |
+| Inventory iOS | App Store `com.mlexpress.inventory` | EAS Build，当前 **1.5.0 (11)** |
 | Supabase | `uopkyuluxnrewvlmutam.supabase.co` | 全端共用同一项目 |
 
 > ⚠️ 勿在 App Store 使用无效域名（如 `linkexpress.com/support`）；Support URL 必须可访问。
@@ -114,7 +114,7 @@ flowchart TB
 | **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.5.0** | EAS |
 | **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.0** | EAS |
 | **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.7** | EAS |
-| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + SQLite + 蓝牙打印 | **1.4.1 (10)** | EAS |
+| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + Supabase + 蓝牙打印 | **1.5.0 (11)** | EAS |
 | **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
 | **`netlify/`** | 服务端 | 管理后台 Netlify Functions | Node | — | — |
 | **`supabase/`** | 数据 | SQL migrations + Edge Functions | SQL / Deno | — | Supabase Cloud |
@@ -352,10 +352,11 @@ npm run build:aab   # Android AAB 生产包
 |----|-----|
 | 包名 | iOS/Android `com.mlexpress.inventory` |
 | App Store 名 | **ML Inventory** |
-| 版本 | **1.4.1**（iOS build **10** / Android versionCode **10**） |
+| 版本 | **1.5.0**（iOS build **11** / Android versionCode **11**） |
 | 登录 | Edge Function `inventory-store-login` → Supabase Auth JWT |
 | JWT claims | `inventory_store_code`、`inventory_hub_code` 等 |
-| 本地 | SQLite + 离线队列 `cloud_sync_queue` |
+| 数据策略 | **Supabase `inventory_*` 是唯一业务数据源；必须联网，不提供离线队列** |
+| 本地 | 仅设备会话、语言、打印设置等非业务配置 |
 | 云端 | `inventory_*` 表；与 City **`packages`/`orders` 隔离** |
 | 多语言 | `src/i18n/`（中/英/缅）+ `LanguageContext` |
 | Support URL | `src/constants/support.ts` → `https://market-link-express.com/support` |
@@ -375,13 +376,10 @@ ml-express-inventory-app/src/
 ├── navigation/        # AppNavigator（Stack）
 ├── constants/         # branding.ts、xprinterP203a.ts
 ├── services/
-│   ├── database.ts              # SQLite schema / migrations
-│   ├── inventoryService.ts      # 核心业务（入库/打包/装车/到站/列表）
+│   ├── database.ts              # 历史本地兼容层（非权威数据源）
+│   ├── inventoryService.ts      # 核心业务入口（入库/打包/装车/到站/列表）
 │   ├── trackingService.ts       # inventory_pkg/order_tracking 云端
-│   ├── inventoryCloudSync.ts    # 拉取/推送/合并/装车双写
 │   ├── inventoryCloudApi.ts     # Supabase inventory_* CRUD
-│   ├── inventoryCloudQueue.ts   # 离线重试队列
-│   ├── inventoryCloudRealtime.ts
 │   ├── authService.ts           # 中转站登录会话 + ensureInventoryCloudAuth
 │   ├── hubTransportFeeService.ts
 │   ├── financeLedgerService.ts
@@ -413,9 +411,8 @@ ml-express-inventory-app/src/
 | `TrackExpressScreen` | 追踪快递 | 单笔查询 |
 | `MovementsScreen` | 流水 | 出入库流水 |
 | `CrossBorderFinanceScreen` | **跨境财务** | 站点账本/待入账/车费 |
-| `OpsHealthScreen` | 运维健康 | 同步/连接诊断 |
 | `CameraScanScreen` | 通用扫码 | 系统相机权限 |
-| `SettingsScreen` | 设置 | 店铺信息、同步、打印机、改密、退出 |
+| `SettingsScreen` | 设置 | 站点连接、语言、P203A 打印测试、版本支持、改密/退出 |
 | `ItemFormScreen` | 商品 | 编辑订单字段 |
 
 ### 10.4 核心业务流程
@@ -436,34 +433,30 @@ flowchart LR
 | 步骤 | 关键函数 / 文件 |
 |------|-----------------|
 | 入库 | `inventoryService.applyStockMovement`（type=in） |
-| 打包 | `createPackedShipment` → 本地 `packed_shipments` + 推 `inventory_packed_shipments` |
-| 装车 | `applyTruckLoadOutbound` → `pushTruckLoadToCloud` + `trackingService.pushTruckLoadTracking` |
+| 打包 | `createPackedShipment` → `inventory_create_packed_shipment` 事务 RPC |
+| 装车 | `applyTruckLoadOutbound` → `inventory_load_shipments` 事务 RPC |
 | 到站收包 | `trackingService.confirmPkgHubReceived` |
 | 到站收单 | `confirmOrderHubReceived` / `confirmOrderInPackById` |
 | 释放中转 | `releaseTransitOrdersAtHub` + `inventoryService.releaseHubTransitOrders` |
-| 列表同步 | `syncPlatformInventoryCloud` → `pullPlatformInventoryFromCloud` |
-| 到站写本地 | `importInboundPackToLocal` |
+| 列表读取 | `inventoryCloudStore` 45 秒内存缓存 → `inventoryCloudApi` |
+| 到站入库 | `importInboundPackToLocal`（历史命名，实际直接写 Supabase） |
 
-**装车云端双写**（`pushTruckLoadToCloud`）：
-1. `ensureInventoryCloudAuth()` 刷新 JWT
-2. `pushTruckLoadTracking` → `inventory_pkg_tracking` + `inventory_order_tracking`
-3. 更新 `inventory_packed_shipments` + 写出库流水
+**核心写入事务**：
+1. `ensureInventoryCloudAuth()` 校验 JWT 与当前单设备 session
+2. App 生成稳定 `operation_id`，调用 PostgreSQL RPC
+3. RPC 在单事务内更新库存、流水、PKG/订单追踪；重复请求返回同一结果
+4. 成功后清理 45 秒内存缓存，失败不保留半完成状态
 
-### 10.5 云端同步架构
+### 10.5 在线数据架构
 
 ```
-本地 SQLite
-  ├── store_items / packed_shipments / stock_movements
-  └── cloud_sync_queue（离线待上传）
-         ↓ flush
-inventoryCloudQueue.ts → inventoryCloudApi.ts → Supabase inventory_*
-         ↓ 合并
-inventoryCloudSync.ts（pull + merge + 区域过滤）
-         ↓ 实时（可选）
-inventoryCloudRealtime.ts
+Inventory 页面 / 业务操作
+  ↓ 必须联网并校验 Supabase Auth JWT
+inventoryService.ts → inventoryCloudApi.ts → Supabase inventory_*
+  ↓ 成功后刷新 UI；失败则明确报错并保留当前画面
 ```
 
-**单设备会话**：migration `20260621120000_inventory_single_device_session`；`InventorySessionMonitor` 检测被踢下线。
+**单设备会话**：基础字段来自 `20260621120000_inventory_single_device_session`，强制 JWT session 绑定与密码哈希见 `20260716180000_inventory_auth_security_hardening`；`InventorySessionMonitor` 检测被踢下线。
 
 ### 10.6 区域可见性（重要）
 
@@ -676,6 +669,9 @@ eas build --platform android --profile apk
 | `20260622120000_inventory_store_items_hub_custody_rls.sql` | 目的站托管 RLS |
 | `20260623120000_inventory_owner_code_normalize_rls.sql` | store_items / packed_shipments 店码归一化 |
 | `20260708120000_inventory_pkg_tracking_owner_rls.sql` | **pkg/order tracking 店码归一化**（装车同步修复） |
+| `20260716180000_inventory_auth_security_hardening.sql` | 中转站密码哈希、登录冷却、JWT session 绑定、站点财务 RLS |
+| `20260716185000_inventory_atomic_operations.sql` | 入库、打包、装车、到站幂等事务 RPC |
+| `20260716190000_inventory_authenticate_store_ambiguity_fix.sql` | 修复登录 RPC `store_code` 歧义 |
 | `20260610120000_inventory_shipment_tracking.sql` | PKG/订单追踪表 |
 | `20260615120000_inventory_platform_store_data.sql` | 库存主表 |
 | `20260621130000_inventory_admin_overview_stats.sql` | Admin overview RPC |
@@ -748,20 +744,19 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 ### 17.1 Inventory「云端权限校验失败」/「同步快递包追踪失败」
 
-**现象**：装车本地成功但云端未同步；设置页显示待上传；目的站无法扫码。
+**现象**：在线装车提交失败，或目的站无法扫码。
 
 **常见根因**（非数据库损坏）：
 1. **RLS 策略拒绝** — JWT 店码与数据行 `origin_store_code` 格式不一致（如 `MUSE` vs `MUSE001`）；需执行 `20260708120000` migration。
-2. **JWT 过期** — 显示「已连接云端」但写入失败；需退出重新登录。
+2. **JWT 过期** — 云端写入失败；需退出重新登录。
 3. **Migration 未在生产执行** — 本地代码新但 Supabase 仍是旧 RLS。
 
 **处理步骤**：
 1. Supabase SQL Editor 执行缺失 migrations（尤其 `20260623120000`、`20260708120000`）。
 2. App：**设置 → 退出 → 重新登录**。
-3. **设置 → 立即同步** 清待上传队列。
-4. 装车页 **立即重试同步** 或打包页补传 PKG。
+3. 恢复网络后先核对云端 PKG 状态，再重新执行未完成的业务操作。
 
-**代码路径**：`authService.ensureInventoryCloudAuth` → `pushTruckLoadToCloud` → `trackingService.pushTruckLoadTracking`；RLS 错误映射见 `cloudAuthErrors.ts`。
+**代码路径**：`authService.ensureInventoryCloudAuth` → `inventoryService.applyTruckLoadOutbound` → `inventoryCloudApi.loadCloudShipmentsAtomic` → `inventory_load_shipments` RPC；RLS 错误映射见 `cloudAuthErrors.ts`。
 
 ### 17.2 指标管理换电脑看不到数据
 
@@ -783,13 +778,13 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 1. **先确认业务线**：`inventory_*`/装车/到站 → Inventory App 或 Admin 跨境；跑腿单 → City + `packages`。
 2. **改路由**：后台 Router **v6**（`/admin/*`）；会员/商家 Web Router **v7**。
-3. **改 Inventory 区域可见性**：`expressDetailsVisibility.ts` → `listItems` / `listPackedShipments` / `inventoryCloudSync`。
+3. **改 Inventory 区域可见性**：`expressDetailsVisibility.ts` → `listItems` / `listPackedShipments`。
 4. **改 Inventory 状态**：`packDisplayStatus.ts` + `trackingService`。
-5. **改 Inventory 云端同步/装车**：`inventoryCloudSync.ts` + `trackingService.ts` + 检查 RLS migration。
+5. **改 Inventory 在线读写/装车**：`inventoryService.ts` + `inventoryCloudApi.ts` + `trackingService.ts`，并检查 RLS migration。
 6. **改 Admin 跨境 UI/API**：`CrossBorderLogisticsPage.tsx` + `inventoryConsoleService.ts` + `netlify/functions/inventory-admin-*`。
 7. **改中转站账号**：Admin 跨境账号管理（**不要**在合伙店铺页创建 `transit_station`）。
 8. **改计费/商品审核/充值 QR**：只改 `/shared/src`，再 `npm run sync:shared`。
-9. **改 Supabase schema**：新增 migration，同步 §14.4；Inventory 需考虑 RLS 与离线队列。
+9. **改 Supabase schema**：新增 migration，同步 §14.4；Inventory 需考虑 RLS 与断网失败处理。
 10. **Inventory EAS 发布**：改 `app.json` version/buildNumber + `eas build`；Support URL 保持可访问。
 11. **改打印**：`tsplLabelBuilder.ts` + `bluetoothThermalPrinter.ts` + `printerService.ts`。
 12. **勿提交** `.env`、keystore、`.temp/`、`upload-release.keystore`；仅用户要求时 commit。
@@ -802,12 +797,11 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 |--------|------|
 | Inventory 订单列表过滤 | `expressDetailsVisibility.ts` → `inventoryService.listItems` |
 | Inventory PKG 列表 / 装车候选 | `packDisplayStatus.ts` → `listOutboundPackages` |
-| 装车云端双写 | `inventoryCloudSync.pushTruckLoadToCloud` |
+| 装车在线写入 | `inventoryService.applyTruckLoadOutbound` |
 | 云端 RLS 错误识别 | `cloudAuthErrors.ts` → `trackingService.throwTrackingCloudWriteError` |
 | 到站收货 UI | `HubReceiveScreen.tsx`、`HubReceiveOrdersModal.tsx` |
 | 装车出库 UI | `StockOutScreen.tsx`、`applyTruckLoadOutbound` |
-| 云端同步/合并 | `inventoryCloudSync.ts` |
-| 离线重试队列 | `inventoryCloudQueue.ts` |
+| Inventory 云端 CRUD | `inventoryCloudApi.ts` |
 | 在途追踪读写 | `trackingService.ts` |
 | 蓝牙标签打印 | `printerService.ts`、`tsplLabelBuilder.ts` |
 | Admin 跨境控制台 | `CrossBorderLogisticsPage.tsx`、`inventoryConsoleService.ts` |
@@ -834,7 +828,7 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | ml-express-client | **2.5.0** | iOS build 64 |
 | ml-express-merchant-app | **2.4.0** | |
 | ml-express-mobile-app | **2.3.7** | STAFF 骑手端 |
-| ml-express-inventory-app | **1.4.1 (10)** | 含 P203A 打印、装车 RLS 修复 |
+| ml-express-inventory-app | **1.5.0 (11)** | 在线专用、P203A TSPL 与本地 Code128 系统打印 |
 | ml-express-client-web | **0.1.0** | |
 | ml-express-merchant-web | **0.1.0** | |
 
@@ -844,4 +838,4 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 ---
 
-*最后更新：2026-07-08 — 补全 7 个子项目架构、版本号、P203A 打印、代购清单云端、装车 RLS migration、云端同步排障、Netlify Functions 索引、指标管理 4 Tab。*
+*最后更新：2026-07-16 — Inventory v1.5.0 (11) 调整为 Supabase 唯一数据源与在线专用 UX，并移除离线队列/立即同步文档。*

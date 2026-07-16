@@ -16,6 +16,7 @@ import DestinationPickerField from '../components/DestinationPickerField';
 import InboundDateField from '../components/InboundDateField';
 import { InboundFormField, InboundFormSection } from '../components/InboundFormPrimitives';
 import PackagingPickerField from '../components/PackagingPickerField';
+import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import ScanInputBar from '../components/ScanInputBar';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import { DimensionSpecField, LockedSuffixField } from '../components/StructuredItemFields';
@@ -188,6 +189,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   };
 
   const resolveBarcode = async (code: string) => {
+    if (scanLoading || loading) return;
     const trimmed = code.trim();
     if (!trimmed) return;
     setScan(trimmed);
@@ -196,11 +198,11 @@ export default function StockInScreen({ route, navigation }: Props) {
       const prefill = await getStockInPrefillByCode(trimmed);
       if (prefill) {
         applyPrefill(prefill);
-        return;
+      } else {
+        setItem(null);
+        setLookupHint('');
       }
-      setItem(null);
-      setProductName('');
-      setLookupHint('');
+      setProductName(trimmed);
     } finally {
       setScanLoading(false);
     }
@@ -242,6 +244,8 @@ export default function StockInScreen({ route, navigation }: Props) {
 
   const goNext = () => {
     if (step === 1) {
+      const trimmedScan = scan.trim();
+      if (trimmedScan) setProductName(trimmedScan);
       setStep(2);
       return;
     }
@@ -290,6 +294,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const paymentLabel = payCod ? t.stockIn.cod : payPrepaid ? t.stockIn.prepaid : '';
 
   const submit = async () => {
+    if (loading) return;
     if (!destination.trim()) {
       Alert.alert(t.common.tip, t.stockIn.alertDestination);
       return;
@@ -401,11 +406,15 @@ export default function StockInScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        <OnlineRequiredBanner />
         {step === 1 ? (
           <InboundFormSection title={t.stockIn.step1Title} accent="#3b82f6">
             <ScanInputBar
               value={scan}
-              onChangeText={setScan}
+              onChangeText={(text) => {
+                setScan(text);
+                setProductName(text.trim());
+              }}
               onSubmit={(code) => void resolveBarcode(code)}
               busy={scanLoading}
               cameraScan={{
@@ -526,6 +535,8 @@ export default function StockInScreen({ route, navigation }: Props) {
                   <Pressable
                     style={styles.qtyBtn}
                     onPress={() => setQty(String(Math.max(1, (Number(qty) || 1) - 1)))}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.stockIn.qtyRequired}
                   >
                     <Text style={styles.qtyBtnText}>−</Text>
                   </Pressable>
@@ -543,6 +554,8 @@ export default function StockInScreen({ route, navigation }: Props) {
                   <Pressable
                     style={styles.qtyBtn}
                     onPress={() => setQty(String((Number(qty) || 0) + 1))}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.stockIn.qtyRequired}
                   >
                     <Text style={styles.qtyBtnText}>+</Text>
                   </Pressable>
@@ -602,13 +615,21 @@ export default function StockInScreen({ route, navigation }: Props) {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable style={styles.cancelBtn} onPress={handleCancel}>
+        <Pressable
+          style={[styles.cancelBtn, loading && styles.nextBtnDisabled]}
+          onPress={handleCancel}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={t.stockIn.cancel}
+        >
           <Text style={styles.cancelBtnText}>{t.stockIn.cancel}</Text>
         </Pressable>
         <Pressable
           style={[styles.nextBtn, loading && styles.nextBtnDisabled]}
           onPress={primaryAction}
           disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={primaryLabel}
         >
           <Text style={styles.nextBtnText}>{primaryLabel}</Text>
         </Pressable>

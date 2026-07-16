@@ -14,7 +14,146 @@ export type ProxyPurchaseRow = {
   unitPrice: string;
   /** pending · receive（旧数据 received 视为 receive） */
   status?: ProxyPurchaseStatus;
+  /** 已结清：只读，不可改，可删 */
+  settled?: boolean;
+  settledAt?: string;
 };
+
+export function isProxyPurchaseRowSettled(row: ProxyPurchaseRow): boolean {
+  return Boolean(row.settled);
+}
+
+export type CustomerDepositEntry = {
+  id: string;
+  date: string;
+  amount: string;
+  note: string;
+};
+
+export type CustomerDepositRecord = {
+  total: string;
+  entries: CustomerDepositEntry[];
+};
+
+export type CustomerDepositStore = Record<string, CustomerDepositRecord>;
+
+function depositRound2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export function newDepositEntry(seed?: Partial<CustomerDepositEntry>): CustomerDepositEntry {
+  return {
+    id: seed?.id || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    date: seed?.date ?? '',
+    amount: seed?.amount ?? '',
+    note: seed?.note ?? '',
+  };
+}
+
+export function sumDepositEntryAmounts(entries: CustomerDepositEntry[]): number {
+  return depositRound2(
+    entries.reduce((sum, entry) => sum + depositParseNum(entry.amount), 0),
+  );
+}
+
+export function buildDepositRecord(entries: CustomerDepositEntry[]): CustomerDepositRecord {
+  const total = sumDepositEntryAmounts(entries);
+  return { total: total.toFixed(2), entries };
+}
+
+export function emptyDepositRecord(): CustomerDepositRecord {
+  return { total: '0', entries: [] };
+}
+
+function depositParseNum(s: string): number {
+  const n = parseFloat(String(s).replace(/,/g, '').trim());
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function normalizeCustomerDepositStore(raw: unknown): CustomerDepositStore {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: CustomerDepositStore = {};
+  Object.entries(raw as Record<string, unknown>).forEach(([key, value]) => {
+    if (value === null || value === undefined) return;
+    if (typeof value === 'string' || typeof value === 'number') {
+      out[key] = { total: String(value), entries: [] };
+      return;
+    }
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>;
+      const entries = Array.isArray(obj.entries)
+        ? obj.entries
+            .filter((entry) => entry && typeof entry === 'object')
+            .map((entry, idx) => {
+              const row = entry as Partial<CustomerDepositEntry> & { date?: string; amount?: string };
+              return newDepositEntry({
+                id: row.id || `legacy-${key}-${idx}`,
+                date: String(row.date ?? ''),
+                amount: String(row.amount ?? ''),
+                note: String(row.note ?? ''),
+              });
+            })
+        : [];
+      out[key] = buildDepositRecord(entries);
+    }
+  });
+  return out;
+}
+
+export function getCustomerDepositTotal(store: CustomerDepositStore, customerKey: string): number {
+  const record = store[customerKey];
+  if (!record) return 0;
+  if (record.entries.length > 0) return sumDepositEntryAmounts(record.entries);
+  return depositParseNum(record.total);
+}
+
+export type CustomerProxyFeeStore = Record<string, string>;
+
+export function normalizeCustomerProxyFeeStore(raw: unknown): CustomerProxyFeeStore {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: CustomerProxyFeeStore = {};
+  Object.entries(raw as Record<string, unknown>).forEach(([key, value]) => {
+    if (value === null || value === undefined) return;
+    out[key] = String(value);
+  });
+  return out;
+}
+
+export function resolveCustomerProxyFeePercent(
+  customerKey: string,
+  store: CustomerProxyFeeStore,
+  fallback: string | number,
+): number {
+  const key = customerKey.trim();
+  const raw = store[key] ?? fallback;
+  const n = depositParseNum(String(raw));
+  const fb = depositParseNum(String(fallback));
+  return n > 0 ? n : fb > 0 ? fb : 5;
+}
+
+export type CustomerExchangeRateStore = Record<string, string>;
+
+export function normalizeCustomerExchangeRateStore(raw: unknown): CustomerExchangeRateStore {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: CustomerExchangeRateStore = {};
+  Object.entries(raw as Record<string, unknown>).forEach(([key, value]) => {
+    if (value === null || value === undefined) return;
+    out[key] = String(value);
+  });
+  return out;
+}
+
+export function resolveCustomerExchangeRate(
+  customerKey: string,
+  store: CustomerExchangeRateStore,
+  fallback: string | number,
+): number {
+  const key = customerKey.trim();
+  const raw = store[key] ?? fallback;
+  const n = depositParseNum(String(raw));
+  const fb = depositParseNum(String(fallback));
+  return n > 0 ? n : fb > 0 ? fb : 595;
+}
 
 export function normalizeProxyPurchaseStatus(raw: unknown): ProxyPurchaseStatus {
   if (raw === 'receive' || raw === 'received') return 'receive';

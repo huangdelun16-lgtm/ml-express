@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
+import bcrypt from "npm:bcryptjs@2.4.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,8 +15,20 @@ function inventoryAuthEmail(storeCode: string): string {
 }
 
 function createInventorySessionId(): string {
-  return `SESS_INV_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  return `SESS_INV_${crypto.randomUUID()}`;
 }
+
+type AuthenticatedStore = {
+  authenticated: boolean;
+  retry_after_seconds: number;
+  store_id: string | null;
+  store_code: string | null;
+  store_name: string | null;
+  store_type: string | null;
+  store_status: string | null;
+  region: string | null;
+  address: string | null;
+};
 
 function resolveHubCode(region: string | null | undefined, storeCode: string): string {
   const reg = (region ?? "").trim().toUpperCase();
@@ -49,6 +62,47 @@ async function findUserByEmail(
   return null;
 }
 
+async function authenticateStoreFallback(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  code: string,
+  password: string,
+  sessionId: string,
+): Promise<AuthenticatedStore | null> {
+  const { data: store, error } = await supabaseAdmin
+    .from("delivery_stores")
+    .select("id, store_code, store_name, store_type, status, password_hash, region, address")
+    .eq("store_code", code)
+    .maybeSingle();
+  if (error) throw new Error("Inventory account lookup failed");
+  if (
+    !store ||
+    store.store_type !== TRANSIT_STATION_STORE_TYPE ||
+    (store.status && store.status !== "active") ||
+    !store.password_hash ||
+    !bcrypt.compareSync(password, String(store.password_hash))
+  ) {
+    return null;
+  }
+
+  const { error: sessionError } = await supabaseAdmin
+    .from("delivery_stores")
+    .update({ current_session_id: sessionId, updated_at: new Date().toISOString() })
+    .eq("id", store.id);
+  if (sessionError) throw new Error("Inventory session update failed");
+
+  return {
+    authenticated: true,
+    retry_after_seconds: 0,
+    store_id: String(store.id),
+    store_code: String(store.store_code),
+    store_name: String(store.store_name ?? ""),
+    store_type: String(store.store_type),
+    store_status: store.status ? String(store.status) : null,
+    region: store.region ? String(store.region) : null,
+    address: store.address ? String(store.address) : null,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -59,7 +113,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey =
       Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     if (!supabaseUrl || !serviceRoleKey) {
-      return new Response(JSON.stringify({ error: "Supabase Service Role 未配置" }), {
+      return new Response(JSON.stringify({ error: "服务暂不可用，请稍后重试" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -67,8 +121,8 @@ Deno.serve(async (req) => {
 
     const { storeCode, password } = await req.json();
     const code = String(storeCode ?? "").trim().toUpperCase();
-    const pass = String(password ?? "").trim();
-    if (!code || !pass) {
+    const pass = String(password ?? "");
+    if (!code || !pass || code.length > 64 || pass.length > 256) {
       return new Response(JSON.stringify({ error: "请填写店铺代码和密码" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -76,61 +130,37 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    const { data: store, error: storeError } = await supabaseAdmin
-      .from("delivery_stores")
-      .select("id, store_code, store_name, store_type, status, password, region, address")
-      .eq("store_code", code)
-      .maybeSingle();
-
-    if (storeError) {
-      return new Response(JSON.stringify({ error: storeError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const sessionId = createInventorySessionId();
+    const { data: authRows, error: authError } = await supabaseAdmin.rpc(
+      "inventory_authenticate_store",
+      { p_store_code: code, p_password: pass, p_session_id: sessionId },
+    );
+    let store = (Array.isArray(authRows) ? authRows[0] : authRows) as AuthenticatedStore | null;
+    if (authError) {
+      console.error("inventory-store-login RPC failed; using hash fallback", authError);
+      store = await authenticateStoreFallback(supabaseAdmin, code, pass, sessionId);
     }
-    if (!store) {
-      return new Response(JSON.stringify({ error: "店铺代码不存在" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (String(store.password ?? "").trim() !== pass) {
-      return new Response(JSON.stringify({ error: "密码错误" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (store.store_type !== TRANSIT_STATION_STORE_TYPE) {
-      return new Response(JSON.stringify({ error: "仅中转站合伙店铺可登录 Inventory App" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (store.status && store.status !== "active") {
-      return new Response(JSON.stringify({ error: `账号状态异常（${store.status}）` }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!store?.authenticated || !store.store_id || !store.store_code) {
+      const coolingDown = Number(store?.retry_after_seconds ?? 0) > 0;
+      return new Response(JSON.stringify({ error: "店铺代码或密码错误，请稍后重试" }), {
+        status: coolingDown ? 429 : 401,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          ...(coolingDown
+            ? { "Retry-After": String(Math.max(1, store?.retry_after_seconds ?? 1)) }
+            : {}),
+        },
       });
     }
 
     const hubCode = resolveHubCode(store.region, store.store_code);
-    const sessionId = createInventorySessionId();
-    const { error: sessionError } = await supabaseAdmin
-      .from("delivery_stores")
-      .update({ current_session_id: sessionId })
-      .eq("id", store.id);
-    if (sessionError) {
-      return new Response(JSON.stringify({ error: sessionError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const email = inventoryAuthEmail(store.store_code);
     const appMetadata = {
-      inventory_store_id: store.id,
+      inventory_store_id: store.store_id,
       inventory_store_code: String(store.store_code).trim().toUpperCase(),
       inventory_hub_code: hubCode,
+      inventory_session_id: sessionId,
       inventory_store_type: TRANSIT_STATION_STORE_TYPE,
       inventory_store_name: store.store_name,
       inventory_region: (store.region ?? "").trim(),
@@ -145,7 +175,8 @@ Deno.serve(async (req) => {
         app_metadata: appMetadata,
       });
       if (updateError) {
-        return new Response(JSON.stringify({ error: updateError.message }), {
+        console.error("inventory-store-login Auth update failed", updateError);
+        return new Response(JSON.stringify({ error: "登录失败，请稍后重试" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -158,7 +189,8 @@ Deno.serve(async (req) => {
         app_metadata: appMetadata,
       });
       if (createError) {
-        return new Response(JSON.stringify({ error: createError.message }), {
+        console.error("inventory-store-login Auth create failed", createError);
+        return new Response(JSON.stringify({ error: "登录失败，请稍后重试" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -170,20 +202,21 @@ Deno.serve(async (req) => {
         email,
         sessionId,
         store: {
-          id: store.id,
+          id: store.store_id,
           storeCode: String(store.store_code).trim().toUpperCase(),
           storeName: store.store_name,
           region: (store.region ?? "").trim(),
           address: (store.address ?? "").trim(),
-          storeType: store.store_type,
+          storeType: store.store_type ?? TRANSIT_STATION_STORE_TYPE,
         },
         hubCode,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
+    console.error("inventory-store-login unexpected error", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "登录失败" }),
+      JSON.stringify({ error: "登录失败，请稍后重试" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }

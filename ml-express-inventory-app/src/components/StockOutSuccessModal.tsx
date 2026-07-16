@@ -17,10 +17,6 @@ type Props = {
   visible: boolean;
   data: StockOutSuccessData | null;
   onDone: () => void;
-  onGoResync?: () => void;
-  onRetrySync?: () => void;
-  onGoSyncSettings?: () => void;
-  retrying?: boolean;
   autoReturnSeconds?: number;
 };
 
@@ -28,10 +24,6 @@ export default function StockOutSuccessModal({
   visible,
   data,
   onDone,
-  onGoResync,
-  onRetrySync,
-  onGoSyncSettings,
-  retrying = false,
   autoReturnSeconds = 2,
 }: Props) {
   const { t, fmt } = useTranslation();
@@ -137,23 +129,8 @@ export default function StockOutSuccessModal({
                   ))}
                 </View>
               ) : null}
-              <Pressable
-                style={[styles.btnPrimary, retrying && styles.btnDisabled]}
-                onPress={() => onRetrySync?.()}
-                disabled={retrying}
-              >
-                <Text style={styles.btnPrimaryText}>
-                  {retrying ? t.common.processing : t.stockOut.retryCloudSync}
-                </Text>
-              </Pressable>
-              <Pressable style={styles.btnSecondary} onPress={() => onGoSyncSettings?.()}>
-                <Text style={styles.btnSecondaryText}>{t.stockOut.goSyncSettings}</Text>
-              </Pressable>
-              <Pressable style={styles.btnSecondary} onPress={() => onGoResync?.()}>
-                <Text style={styles.btnSecondaryText}>{t.stockOut.goResyncPkg}</Text>
-              </Pressable>
               <Pressable style={styles.btnSecondary} onPress={finish}>
-                <Text style={styles.btnSecondaryText}>{t.stockOut.cloudSyncAck}</Text>
+                <Text style={styles.btnSecondaryText}>{t.common.close}</Text>
               </Pressable>
             </>
           ) : (
@@ -291,7 +268,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  btnDisabled: { opacity: 0.6 },
   btnSecondary: {
     borderRadius: 14,
     paddingVertical: 14,

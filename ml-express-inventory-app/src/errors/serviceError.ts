@@ -88,7 +88,6 @@ export type ServiceErrorCode =
   | 'syncPackFailed'
   | 'syncRlsBlocked'
   | 'syncNetworkFailed'
-  | 'operatorNameRequired'
   | 'cloudPackAlreadyLoaded'
   | 'cloudPackInTrackingCannotUnpack'
   | 'loginRequiredBeforeClear'

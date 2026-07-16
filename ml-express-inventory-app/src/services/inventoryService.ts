@@ -7,24 +7,36 @@ import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import { svc, isServiceError } from '../errors/serviceError';
 import { newId, nowIso } from './database';
 import {
-  applyMovement, clearInventoryCloudCache, createPack, deletePack, getItemByBarcode as cloudGetItemByBarcode,
+  applyMovement, clearInventoryCloudCache, createPack, createPackAtomic, deletePack,
+  getItemByBarcode as cloudGetItemByBarcode,
   getItemById as cloudGetItemById, getInventorySnapshot, listMovementsForItem as cloudListMovementsForItem,
-  listPacks, upsertItem as cloudUpsertItem,
+  listPacks, loadShipmentsAtomic, upsertItem as cloudUpsertItem,
 } from './inventoryCloudStore';
 import { deleteCloudPackedShipment, fetchCloudTodayMovementTotals } from './inventoryCloudApi';
 import {
-  buildPackageNumberBody, formatPackageSequence, isPackageBarcode, parsePackageBarcode,
+  buildPackageNumberBody, formatPackageSequence, isPackageBarcode, packDestinationFromBarcode,
+  parsePackageBarcode,
 } from '../utils/packageNumber';
-import { resolvePackDisplayStatus, canEditPackedShipment } from '../utils/packDisplayStatus';
+import {
+  resolvePackDisplayStatus,
+  canEditPackedShipment,
+  canSelectPackedShipmentForTruckLoad,
+} from '../utils/packDisplayStatus';
 import { isVisibleInExpressDetailsList, isVisibleInPackedList } from '../utils/expressDetailsVisibility';
 import { canEditItemCustomerProfileAsync } from '../utils/itemCustomerProfileEdit';
 import { todayIsoDate } from '../utils/dateFormat';
+import { inventoryOperationId } from '../utils/inventoryReliability';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
-import { listPkgTrackingStatusMap, pushTruckLoadTracking } from './trackingService';
+import {
+  listPkgTrackingStatusMap,
+  markHubTransitOrdersRepacked,
+  pushTruckLoadTracking,
+} from './trackingService';
 import {
   deliverHubOrderInboundAtStation as hubDeliverOrder,
   importInboundPackToLocal as hubImportPack,
   maybeAutoReleaseTransitAfterAllInbound as hubMaybeAutoRelease,
+  releaseHubTransitOrders as hubReleaseTransit,
   syncInboundHubPacksToLocal as hubSyncInbound,
   type OriginStoreRef,
 } from './inventoryHubOps';
@@ -133,36 +145,52 @@ export async function applyStockMovement(params: {
   if (!qty) throw new Error('数量必须大于 0');
   let item = await getItemByBarcode(params.barcode);
   if (!item && params.type === 'in' && params.createIfMissing) {
-    item = await upsertItem(
-      { barcode: params.barcode, input_barcode: params.inputBarcode ?? '', ...params.createIfMissing, min_qty: 0, qty_on_hand: 0 },
-      { actingStore: params.actingStore, ownerStoreCode: params.originStore?.storeCode },
-    );
+    const createdAt = params.inboundAt || nowIso();
+    item = {
+      id: newId(),
+      barcode: params.barcode.trim(),
+      input_barcode: params.inputBarcode ?? '',
+      name: params.createIfMissing.name ?? params.barcode,
+      spec: params.createIfMissing.spec ?? '',
+      unit: params.createIfMissing.unit ?? '件',
+      weight: params.createIfMissing.weight ?? '',
+      qty_on_hand: 0,
+      min_qty: 0,
+      note: params.createIfMissing.note ?? '',
+      owner_store_code: params.originStore?.storeCode ?? params.actingStore?.storeCode ?? '',
+      recipient_name: params.recipientName ?? params.createIfMissing.recipient_name ?? '',
+      final_destination: params.destination ?? params.createIfMissing.final_destination ?? '',
+      created_at: createdAt,
+      updated_at: createdAt,
+    };
   }
   if (!item) throw new Error('未找到该商品');
   const before = item.qty_on_hand;
   const after = params.type === 'in' ? before + qty : params.type === 'out' ? before - qty : qty;
   if (after < 0) throw new Error('库存不足');
   const ts = params.inboundAt || nowIso();
-  const saved = await cloudUpsertItem({
+  const pendingItem: InventoryItem = {
     ...item,
     qty_on_hand: after,
     input_barcode: params.inputBarcode ?? item.input_barcode,
     recipient_name: params.recipientName ?? item.recipient_name,
     final_destination: params.destination ?? item.final_destination,
     updated_at: ts,
-  }, params.actingStore);
+  };
   const movement: StockMovement = {
-    id: newId(), item_id: saved.id, barcode: saved.barcode, item_name: saved.name,
+    id: newId(), item_id: pendingItem.id, barcode: pendingItem.barcode, item_name: pendingItem.name,
     type: params.type, qty, qty_before: before, qty_after: after, operator: params.operator,
     note: params.note ?? '', recipient_name: params.recipientName ?? '', recipient_phone: params.recipientPhone ?? '',
     destination: params.destination ?? '', detail_address: params.detailAddress ?? '', packaging: params.packaging ?? '',
-    input_barcode: params.inputBarcode ?? saved.input_barcode,
+    input_barcode: params.inputBarcode ?? pendingItem.input_barcode,
     origin_store_id: params.originStore?.id ?? params.actingStore?.id ?? '',
     origin_store_code: params.originStore?.storeCode ?? params.actingStore?.storeCode ?? '',
     origin_store_name: params.originStore?.storeName ?? params.actingStore?.storeName ?? '',
     created_at: ts,
   };
-  await applyMovement(saved, movement, params.actingStore);
+  const saved = await applyMovement(pendingItem, movement, params.actingStore);
+  movement.item_id = saved.id;
+  movement.qty_after = saved.qty_on_hand;
   return { item: saved, movement };
 }
 
@@ -180,10 +208,17 @@ export async function createPackedShipment(params: {
   const items = await Promise.all(params.itemIds.map((id) => getItemById(id)));
   if (items.some((item) => !item || item.qty_on_hand < 1)) throw new Error('选中的订单不可打包');
   const ts = nowIso();
-  const bundleItem = await upsertItem(
-    { ...params.bundle, barcode: params.bundle.barcode, qty_on_hand: 1, min_qty: 0, input_barcode: '' },
-    { actingStore: params.actingStore, ownerStoreCode: params.originStore.storeCode },
-  );
+  const bundleItem: InventoryItem = {
+    ...params.bundle,
+    id: newId(),
+    barcode: params.bundle.barcode.trim(),
+    qty_on_hand: 1,
+    min_qty: 0,
+    input_barcode: '',
+    owner_store_code: params.originStore.storeCode,
+    created_at: ts,
+    updated_at: ts,
+  };
   const pack: PackedShipment = {
     id: newId(), bundle_item_id: bundleItem.id, bundle_barcode: bundleItem.barcode,
     bundle_name: bundleItem.name, operator: params.operator, note: params.bundle.note ?? '',
@@ -191,27 +226,29 @@ export async function createPackedShipment(params: {
   };
   const lines: PackedShipmentItem[] = [];
   for (const item of items as InventoryItem[]) {
-    const saved = await cloudUpsertItem({
-      ...item, qty_on_hand: 0, packed_at: ts, packed_bundle_barcode: bundleItem.barcode, updated_at: ts,
-    }, params.actingStore);
-    const movement: StockMovement = {
-      id: newId(), item_id: saved.id, barcode: saved.barcode, item_name: saved.name, type: 'out',
-      qty: 1, qty_before: item.qty_on_hand, qty_after: 0, operator: params.operator,
-      note: `打包入 ${bundleItem.barcode}`, recipient_name: '', recipient_phone: '',
-      destination: saved.final_destination ?? '', detail_address: '', packaging: '',
-      input_barcode: saved.input_barcode, origin_store_id: params.originStore.id,
-      origin_store_code: params.originStore.storeCode, origin_store_name: params.originStore.storeName,
-      created_at: ts,
-    };
-    await applyMovement(saved, movement, params.actingStore);
     lines.push({
-      id: newId(), pack_id: pack.id, item_id: saved.id, item_barcode: saved.barcode,
-      input_barcode: saved.input_barcode, item_name: saved.name, destination: saved.final_destination ?? '',
-      customer_name: saved.recipient_name ?? '', owner_store_code: saved.owner_store_code, qty: 1,
+      id: newId(), pack_id: pack.id, item_id: item.id, item_barcode: item.barcode,
+      input_barcode: item.input_barcode, item_name: item.name, destination: item.final_destination ?? '',
+      customer_name: item.recipient_name ?? '', owner_store_code: item.owner_store_code, qty: 1,
     });
   }
-  await createPack(pack, lines, null, params.actingStore);
-  return { bundleItem, pack };
+  const savedBundle = await createPackAtomic({
+    bundle: bundleItem,
+    pack,
+    lines,
+    originStore: params.originStore,
+    operationId: inventoryOperationId('pack', pack.bundle_barcode),
+    store: params.actingStore,
+  });
+  const hubCode = params.actingStore?.hubCode || params.actingStore?.region || '';
+  if (hubCode) {
+    await markHubTransitOrdersRepacked(
+      lines.map((line) => ({ order_barcode: line.item_barcode })),
+      savedBundle.barcode,
+      hubCode,
+    );
+  }
+  return { bundleItem: savedBundle, pack: { ...pack, bundle_item_id: savedBundle.id } };
 }
 
 export async function listPackedShipments(
@@ -273,32 +310,47 @@ export async function applyTruckLoadOutbound(params: {
   actingStore?: InventoryStoreSession;
 }): Promise<{ count: number; cloudSynced: boolean; cloudError?: string }> {
   const ts = nowIso();
-  for (const pack of params.packs) {
-    await applyStockMovement({
-      barcode: pack.bundle_barcode, type: 'out', qty: 1, operator: params.operator,
-      destination: params.destination,
-      note: `装车出库\n日期 ${params.outboundDate}\n目的地 ${params.destination}${params.transportFee ? `\n车费 ${params.transportFee} MMK` : ''}`,
-      actingStore: params.actingStore,
-    });
-    await createPack({
-      ...pack, transport_fee: params.transportFee ?? '', truck_leg_destination: params.destination,
-    }, pack.items, ts, params.actingStore);
-  }
-  if (params.originStore) {
-    await pushTruckLoadTracking({
-      originStore: params.originStore,
-      destinationCode: params.destination,
-      outboundDate: params.outboundDate,
-      packs: params.packs,
-      totalWeightKg: params.totalWeightKg ?? '',
-      transportFees: Object.fromEntries(params.packs.map((p) => [p.bundle_barcode, params.transportFee ?? ''])),
-    });
-  }
-  return { count: params.packs.length, cloudSynced: true };
+  if (!params.originStore) throw svc('pkgSyncFailed');
+  const note = `装车出库\n日期 ${params.outboundDate}\n目的地 ${params.destination}${params.transportFee ? `\n车费 ${params.transportFee} MMK` : ''}`;
+  const count = await loadShipmentsAtomic({
+    operationId: inventoryOperationId(
+      'load',
+      `${params.outboundDate}:${params.destination}:${params.packs
+        .map((pack) => pack.bundle_barcode)
+        .sort()
+        .join(',')}`,
+    ),
+    payload: {
+      loaded_at: ts,
+      operator: params.operator,
+      note,
+      destination_code: params.destination.trim().toUpperCase(),
+      outbound_date: params.outboundDate,
+      origin_store_id: params.originStore.id,
+      origin_store_code: params.originStore.storeCode,
+      origin_store_name: params.originStore.storeName,
+      packs: params.packs.map((pack) => ({
+        bundle_barcode: pack.bundle_barcode,
+        bundle_name: pack.bundle_name,
+        destination_code: packDestinationFromBarcode(pack.bundle_barcode) || params.destination,
+        weight: pack.weight ?? params.totalWeightKg ?? '',
+        transport_fee: params.transportFee ?? '',
+        lines: pack.items,
+      })),
+    },
+  });
+  return { count, cloudSynced: true };
 }
 
 export async function listOutboundPackages(scope?: { store: InventoryStoreSession; hubCode: string }): Promise<PackedShipmentDetail[]> {
-  return (await listPacks(scope?.store, scope?.hubCode)).filter((p) => !p.loaded);
+  const packs = await listPacks(scope?.store, scope?.hubCode);
+  const statuses = await listPkgTrackingStatusMap(packs.map((p) => p.bundle_barcode));
+  return packs.filter((pack) =>
+    canSelectPackedShipmentForTruckLoad({
+      loaded: pack.loaded,
+      cloud_status: statuses[pack.bundle_barcode.trim().toUpperCase()] ?? null,
+    }),
+  );
 }
 
 export async function cancelPackedShipment(
@@ -613,4 +665,14 @@ export async function maybeAutoReleaseTransitAfterAllInbound(params: {
   operator: string;
 }): Promise<{ releasedCount: number }> {
   return hubMaybeAutoRelease(hubOps, params);
+}
+
+export async function releaseHubTransitOrders(params: {
+  packBarcode: string;
+  store: InventoryStoreSession;
+  hubCode: string;
+  operator: string;
+  allowCompleted?: boolean;
+}): Promise<{ releasedCount: number }> {
+  return hubReleaseTransit(hubOps, params);
 }

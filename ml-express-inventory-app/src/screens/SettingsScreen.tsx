@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -11,34 +12,27 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Constants from 'expo-constants';
+import { useFocusEffect } from '@react-navigation/native';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
 import { resolveAppError, useTranslation } from '../i18n';
-import type { LabelPrintProtocol } from '../constants/xprinterP203a';
 import {
   getBluetoothCapabilityHint,
   getPrinterSettings,
   getXprinterP203aPreset,
   pickIosLabelPrinter,
+  printBarcodeLabel,
   savePrinterSettings,
-  type LabelHeightMm,
-  type LabelWidthMm,
   type PrinterConnectionMode,
   type PrinterSettings,
 } from '../services/printerService';
+import { probeCloudConnection } from '../services/cloudConnection';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
-import type { RootStackParamList } from '../navigation/AppNavigator';
+import { INVENTORY_SUPPORT_URL } from '../constants/support';
 
-const WIDTH_OPTIONS: LabelWidthMm[] = [40, 50, 58, 60, 80];
-const HEIGHT_OPTIONS: LabelHeightMm[] = [30, 40, 50];
-const PROTOCOL_OPTIONS: { value: LabelPrintProtocol; labelKey: 'protocolTspl' | 'protocolEscpos' }[] = [
-  { value: 'tspl', labelKey: 'protocolTspl' },
-  { value: 'escpos', labelKey: 'protocolEscpos' },
-];
 const CONNECTION_OPTIONS: { mode: PrinterConnectionMode; labelKey: 'connectionSystem' | 'connectionBluetooth' }[] = [
   { mode: 'system', labelKey: 'connectionSystem' },
   { mode: 'bluetooth', labelKey: 'connectionBluetooth' },
@@ -93,6 +87,8 @@ function QuickAction({
       style={[styles.quickAction, { borderColor: `${accent}55` }, disabled && styles.quickActionDisabled]}
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <View style={[styles.quickActionIcon, { backgroundColor: `${accent}22` }]}>
         <Text style={styles.quickActionEmoji}>{icon}</Text>
@@ -103,24 +99,79 @@ function QuickAction({
 }
 
 export default function SettingsScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { operatorName, storeCode, store, hubCode, logout } = useAuth();
+  const {
+    operatorName,
+    storeCode,
+    store,
+    hubCode,
+    logout,
+  } = useAuth();
   const { t, fmt, language } = useTranslation();
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [pickingPrinter, setPickingPrinter] = useState(false);
+  const [testingPrinter, setTestingPrinter] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<
+    'checking' | 'online' | 'offline'
+  >('checking');
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
+  const appVersion = Constants.expoConfig?.version ?? '1.5.0';
+  const buildVersion = Constants.nativeBuildVersion ?? '11';
 
   useEffect(() => {
     void getPrinterSettings().then(setSettings);
   }, [storeCode, store?.id]);
+
+  const checkConnection = useCallback(async () => {
+    setConnectionStatus('checking');
+    const result = await probeCloudConnection();
+    setConnectionStatus(result.authenticated ? 'online' : 'offline');
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void checkConnection();
+    }, [checkConnection]),
+  );
 
   const updatePrinter = async (patch: Partial<PrinterSettings>) => {
     if (!settings) return;
     const next = { ...settings, ...patch };
     setSettings(next);
     await savePrinterSettings(next);
+  };
+
+  const handleTestPrint = async () => {
+    if (!settings?.enabled) {
+      Alert.alert(t.common.tip, t.settings.printDisabled);
+      return;
+    }
+    setTestingPrinter(true);
+    try {
+      const sent = await printBarcodeLabel({
+        name: 'ML Inventory',
+        barcode: `TEST${Date.now().toString().slice(-8)}`,
+        destination: hub || undefined,
+        customerName: operatorName ?? storeCode ?? undefined,
+      });
+      if (!sent) {
+        Alert.alert(t.common.tip, t.settings.printDisabled);
+        return;
+      }
+      Alert.alert(t.settings.testPrintSuccess, t.settings.printSentBody);
+    } catch (e: unknown) {
+      Alert.alert(t.settings.printFailed, resolveAppError(t, e));
+    } finally {
+      setTestingPrinter(false);
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(t.settings.logoutTitle, t.settings.logoutConfirm, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.common.logout, style: 'destructive', onPress: () => void logout() },
+    ]);
   };
 
   if (!settings) {
@@ -159,7 +210,12 @@ export default function SettingsScreen() {
               <Text style={styles.heroAddr} numberOfLines={2}>{store.address}</Text>
             ) : null}
           </View>
-          <Pressable style={styles.logoutChip} onPress={() => void logout()}>
+          <Pressable
+            style={styles.logoutChip}
+            onPress={handleLogout}
+            accessibilityRole="button"
+            accessibilityLabel={t.common.logout}
+          >
             <Text style={styles.logoutChipText}>{t.common.logout}</Text>
           </Pressable>
         </View>
@@ -173,6 +229,29 @@ export default function SettingsScreen() {
           />
         </View>
       </View>
+
+      <SectionCard
+        icon="●"
+        title={t.settings.connectionTitle}
+        accent={connectionStatus === 'online' ? '#10b981' : '#f59e0b'}
+        badge={
+          connectionStatus === 'checking'
+            ? t.settings.connectionChecking
+            : connectionStatus === 'online'
+              ? t.settings.connectionOnline
+              : t.settings.connectionOffline
+        }
+      >
+        <Text style={styles.hintText}>{t.settings.onlineOnlyHint}</Text>
+        <Pressable
+          style={[styles.actionBtn, styles.actionBtnSecondary]}
+          onPress={() => void checkConnection()}
+          disabled={connectionStatus === 'checking'}
+          accessibilityRole="button"
+        >
+          <Text style={styles.actionBtnSecondaryText}>{t.settings.testConnection}</Text>
+        </Pressable>
+      </SectionCard>
 
       <SectionCard icon="🌐" title={t.language.title} accent="#0ea5e9">
         <LanguageSwitcherRow />
@@ -255,48 +334,6 @@ export default function SettingsScreen() {
         >
           <Text style={styles.actionBtnPrimaryText}>{t.settings.applyP203aPreset}</Text>
         </Pressable>
-        <Text style={styles.fieldLabel}>{t.settings.printProtocol}</Text>
-        <View style={styles.chips}>
-          {PROTOCOL_OPTIONS.map(({ value, labelKey }) => (
-            <Pressable
-              key={value}
-              style={[styles.chip, settings.printProtocol === value && styles.chipOn]}
-              onPress={() => void updatePrinter({ printProtocol: value })}
-            >
-              <Text style={[styles.chipText, settings.printProtocol === value && styles.chipTextOn]}>
-                {t.settings[labelKey]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={styles.fieldLabel}>{t.settings.labelWidth}</Text>
-        <View style={styles.chips}>
-          {WIDTH_OPTIONS.map((w) => (
-            <Pressable
-              key={w}
-              style={[styles.chip, settings.labelWidthMm === w && styles.chipOn]}
-              onPress={() => updatePrinter({ labelWidthMm: w })}
-            >
-              <Text style={[styles.chipText, settings.labelWidthMm === w && styles.chipTextOn]}>
-                {w}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={styles.fieldLabel}>{t.settings.labelHeight}</Text>
-        <View style={styles.chips}>
-          {HEIGHT_OPTIONS.map((h) => (
-            <Pressable
-              key={h}
-              style={[styles.chip, settings.labelHeightMm === h && styles.chipOn]}
-              onPress={() => void updatePrinter({ labelHeightMm: h })}
-            >
-              <Text style={[styles.chipText, settings.labelHeightMm === h && styles.chipTextOn]}>
-                {h}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
         <Text style={styles.fieldLabel}>{t.settings.copies}</Text>
         <TextInput
           style={styles.copiesInput}
@@ -307,6 +344,30 @@ export default function SettingsScreen() {
             void updatePrinter({ copies: n });
           }}
         />
+        <Pressable
+          style={[styles.actionBtn, styles.actionBtnSecondary, testingPrinter && styles.btnDisabled]}
+          onPress={() => void handleTestPrint()}
+          disabled={testingPrinter}
+          accessibilityRole="button"
+        >
+          <Text style={styles.actionBtnSecondaryText}>
+            {testingPrinter ? t.settings.sendingPrint : t.settings.testPrint}
+          </Text>
+        </Pressable>
+      </SectionCard>
+
+      <SectionCard icon="ℹ️" title={t.settings.appInfo} accent="#8b5cf6">
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>{t.settings.versionLabel}</Text>
+          <Text style={styles.infoValue}>{appVersion} ({buildVersion})</Text>
+        </View>
+        <Pressable
+          style={[styles.actionBtn, styles.actionBtnSecondary]}
+          onPress={() => void Linking.openURL(INVENTORY_SUPPORT_URL)}
+          accessibilityRole="link"
+        >
+          <Text style={styles.actionBtnSecondaryText}>{t.settings.openSupport}</Text>
+        </Pressable>
       </SectionCard>
 
       <Text style={styles.footer}>{t.settings.footer}</Text>
@@ -404,49 +465,6 @@ const styles = StyleSheet.create({
   },
   quickActionEmoji: { fontSize: 20 },
   quickActionLabel: { color: '#f1f5f9', fontWeight: '800', fontSize: 14 },
-  syncRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 10,
-  },
-  syncLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '700', flex: 1 },
-  syncValue: {
-    color: '#e2e8f0',
-    fontSize: 13,
-    fontWeight: '800',
-    flex: 1.2,
-    textAlign: 'right',
-  },
-  syncBanner: {
-    backgroundColor: '#4c1d95',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#6d28d9',
-  },
-  syncBannerLabel: { color: '#c4b5fd', fontSize: 11, fontWeight: '800', marginBottom: 4 },
-  syncBannerText: { color: '#e9d5ff', fontSize: 13, fontWeight: '700', lineHeight: 19 },
-  operatorInput: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 8,
-    fontWeight: '700',
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  operatorWarn: {
-    color: '#fcd34d',
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 10,
-    fontWeight: '700',
-  },
   sectionCard: { marginBottom: 14 },
   sectionHead: {
     flexDirection: 'row',
@@ -526,11 +544,25 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
   },
-  actionBtnDanger: { backgroundColor: '#b91c1c' },
   actionBtnPrimary: { backgroundColor: '#2563eb', marginBottom: 8 },
   actionBtnPrimaryText: { color: '#fff', fontWeight: '900', fontSize: 15 },
-  actionBtnText: { color: '#fff', fontWeight: '900', fontSize: 15 },
+  actionBtnSecondary: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#475569',
+    marginBottom: 8,
+  },
+  actionBtnSecondaryText: { color: '#e2e8f0', fontWeight: '900', fontSize: 14 },
   btnDisabled: { opacity: 0.55 },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  infoLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '700' },
+  infoValue: { color: '#f8fafc', fontSize: 14, fontWeight: '900' },
   footer: {
     textAlign: 'center',
     color: '#475569',

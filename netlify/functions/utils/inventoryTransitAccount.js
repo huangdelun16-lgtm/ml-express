@@ -67,6 +67,8 @@ async function syncInventoryAuthUser(supabaseAdmin, store, options = {}) {
     inventory_region: (store.region ?? '').trim(),
     inventory_address: (store.address ?? '').trim(),
   };
+  const sessionId = String(store.current_session_id ?? '').trim();
+  if (sessionId) appMetadata.inventory_session_id = sessionId;
 
   const existing = await findUserByEmail(supabaseAdmin, email);
   if (existing) {

@@ -14,10 +14,12 @@ import {
 import { resolveAppError, useTranslation } from '../i18n';
 import { createCrossBorderManualEntry } from '../services/crossBorderManualEntryService';
 import type { CrossBorderManualEntryKind } from '../services/crossBorderManualEntryService';
+import type { InventoryStoreSession } from '../services/authService';
 
 type Props = {
   visible: boolean;
-  storeCode: string;
+  store: InventoryStoreSession;
+  hubCode: string;
   operatorName: string;
   onClose: () => void;
   onSaved: () => void;
@@ -31,7 +33,8 @@ function todayIsoDate(): string {
 
 export default function CrossBorderManualEntryModal({
   visible,
-  storeCode,
+  store,
+  hubCode,
   operatorName,
   onClose,
   onSaved,
@@ -79,15 +82,19 @@ export default function CrossBorderManualEntryModal({
     setSubmitting(true);
     setError('');
     try {
-      const createdBy = `${storeCode} · ${operatorName || t.common.operator}`.trim();
-      await createCrossBorderManualEntry({
-        entry_date: entryDate.trim(),
-        kind,
-        amount: Math.round(numeric),
-        category: category.trim(),
-        note: note.trim(),
-        createdBy,
-      });
+      const createdBy = `${store.storeCode} · ${operatorName || t.common.operator}`.trim();
+      await createCrossBorderManualEntry(
+        store,
+        hubCode,
+        {
+          entry_date: entryDate.trim(),
+          kind,
+          amount: Math.round(numeric),
+          category: category.trim(),
+          note: note.trim(),
+          createdBy,
+        },
+      );
       onSaved();
       handleClose();
     } catch (e: unknown) {

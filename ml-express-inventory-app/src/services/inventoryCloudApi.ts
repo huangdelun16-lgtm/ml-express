@@ -81,6 +81,14 @@ export type CloudPackRow = {
   inventory_packed_shipment_items?: CloudPackLineRow[];
 };
 
+type AtomicRpcResult = {
+  idempotent?: boolean;
+  item?: Record<string, unknown>;
+  bundle_item?: Record<string, unknown>;
+  pack_id?: string;
+  count?: number;
+};
+
 function cloudUuid(): string {
   return generateUuid();
 }
@@ -119,6 +127,84 @@ function rowToCloudItem(row: Record<string, unknown>): CloudStoreItemRow {
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
+}
+
+function itemToRpcPayload(item: InventoryItem, ownerStoreId?: string | null): Record<string, unknown> {
+  return {
+    ...item,
+    owner_store_id: ownerStoreId ?? null,
+    owner_store_code: item.owner_store_code?.trim() ?? '',
+    hub_arrived_at: toNullableTs(item.hub_arrived_at),
+    customer_signed_at: toNullableTs(item.customer_signed_at),
+    packed_at: toNullableTs(item.packed_at),
+    hub_transit_released_at: toNullableTs(item.hub_transit_released_at),
+    hub_transit_shipped_at: toNullableTs(item.hub_transit_shipped_at),
+  };
+}
+
+/** 库存与流水在同一 PostgreSQL 事务中提交；operationId 可安全重试。 */
+export async function applyCloudStockMovementAtomic(
+  store: InventoryStoreSession,
+  item: InventoryItem,
+  movement: StockMovement,
+  operationId: string,
+): Promise<CloudStoreItemRow> {
+  if (!isSupabaseConfigured()) throw svc('supabaseTrackingNotConfigured');
+  const authStore = await ensureInventoryCloudAuth();
+  const ownedByAuthStore =
+    ownershipKeyFromStoreCode(item.owner_store_code || store.storeCode) ===
+    ownershipKeyFromStoreCode(authStore.storeCode);
+  const { data, error } = await supabase.rpc('inventory_apply_stock_movement', {
+    p_operation_id: operationId,
+    p_item: itemToRpcPayload(item, ownedByAuthStore ? toNullableUuid(authStore.id) : null),
+    p_movement: { ...movement, origin_store_id: toNullableUuid(movement.origin_store_id) },
+  });
+  if (error || !data) throw error?.message ? new Error(error.message) : svc('syncItemFailed');
+  const result = data as AtomicRpcResult;
+  if (!result.item) throw svc('syncItemFailed');
+  return rowToCloudItem(result.item);
+}
+
+/** 商品扣减、流水、包和明细在同一事务中提交。 */
+export async function createCloudPackedShipmentAtomic(params: {
+  store: InventoryStoreSession;
+  bundle: InventoryItem;
+  pack: PackedShipment;
+  lines: { item_id: string; item_barcode: string; qty: number }[];
+  originStore: { id: string; storeCode: string; storeName: string };
+  operationId: string;
+}): Promise<{ bundleItem: CloudStoreItemRow; packId: string }> {
+  if (!isSupabaseConfigured()) throw svc('supabaseTrackingNotConfigured');
+  const authStore = await ensureInventoryCloudAuth();
+  const { data, error } = await supabase.rpc('inventory_create_packed_shipment', {
+    p_operation_id: params.operationId,
+    p_bundle: itemToRpcPayload(params.bundle, toNullableUuid(authStore.id)),
+    p_pack: {
+      ...params.pack,
+      owner_store_id: toNullableUuid(authStore.id),
+      origin_store_id: toNullableUuid(params.originStore.id),
+      origin_store_name: params.originStore.storeName,
+    },
+    p_lines: params.lines,
+  });
+  if (error || !data) throw error?.message ? new Error(error.message) : svc('syncPackFailed');
+  const result = data as AtomicRpcResult;
+  if (!result.bundle_item || !result.pack_id) throw svc('syncPackFailed');
+  return { bundleItem: rowToCloudItem(result.bundle_item), packId: String(result.pack_id) };
+}
+
+/** 包库存、装车标记和云端追踪在同一事务中提交。 */
+export async function loadCloudShipmentsAtomic(params: {
+  operationId: string;
+  payload: Record<string, unknown>;
+}): Promise<number> {
+  if (!isSupabaseConfigured()) throw svc('supabaseTrackingNotConfigured');
+  const { data, error } = await supabase.rpc('inventory_load_shipments', {
+    p_operation_id: params.operationId,
+    p_payload: params.payload,
+  });
+  if (error || !data) throw error?.message ? new Error(error.message) : svc('pkgSyncFailed');
+  return Number((data as AtomicRpcResult).count) || 0;
 }
 
 export async function fetchCloudStoreItems(

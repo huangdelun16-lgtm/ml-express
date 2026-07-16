@@ -23,6 +23,9 @@ export interface FinanceLedgerEntry {
   transportFee?: number;
   paid?: boolean;
   transportDirection?: 'inbound' | 'outbound';
+  /** cross_border_manual_entries 主键；仅手工收支行存在 */
+  manualEntryId?: string;
+  deletable?: boolean;
 }
 
 export interface FinanceLedgerSummary {

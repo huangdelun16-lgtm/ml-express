@@ -15,7 +15,7 @@ const {
 } = require('./utils/inventoryTransitAccount');
 
 const DETAIL_SELECT =
-  'id, store_name, store_code, region, address, latitude, longitude, phone, email, manager_name, manager_phone, operating_hours, notes, status, service_area_radius, capacity, facilities, cod_settlement_day, store_type, created_at';
+  'id, store_name, store_code, region, address, latitude, longitude, phone, email, manager_name, manager_phone, operating_hours, notes, status, service_area_radius, capacity, facilities, cod_settlement_day, store_type, current_session_id, created_at';
 
 async function loadTransitStore(supabase, storeCode) {
   const code = String(storeCode || '').trim().toUpperCase();
@@ -132,10 +132,6 @@ async function handlePut(supabase, body, auth) {
     mall_visible: false,
   };
 
-  if (password) {
-    updateRow.password = password;
-  }
-
   const { data: store, error: updateErr } = await supabase
     .from('delivery_stores')
     .update(updateRow)
@@ -148,6 +144,20 @@ async function handlePut(supabase, body, auth) {
       statusCode: 500,
       body: { error: updateErr.message || '保存失败' },
     };
+  }
+
+  if (password) {
+    const { data: passwordStored, error: passwordErr } = await supabase.rpc(
+      'inventory_set_store_password',
+      { p_store_id: store.id, p_new_password: password },
+    );
+    if (passwordErr || !passwordStored) {
+      console.error('inventory-admin-update-account password hash failed:', passwordErr);
+      return {
+        statusCode: 500,
+        body: { error: '密码更新失败' },
+      };
+    }
   }
 
   const authInfo = await syncInventoryAuthUser(

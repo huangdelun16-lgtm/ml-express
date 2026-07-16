@@ -13,6 +13,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DestinationPickerField from '../components/DestinationPickerField';
+import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import PkgPickerField from '../components/PkgPickerField';
 import StockOutSuccessModal, { type StockOutSuccessData } from '../components/StockOutSuccessModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -127,17 +128,8 @@ export default function StockOutScreen({ navigation }: Props) {
     navigation.navigate('Home');
   }, [navigation]);
 
-  const handleGoResync = useCallback(() => {
-    setSuccessData(null);
-    navigation.navigate('Pkg');
-  }, [navigation]);
-
-  const handleGoSyncSettings = useCallback(() => {
-    setSuccessData(null);
-    navigation.navigate('Settings');
-  }, [navigation]);
-
   const submit = async () => {
+    if (loading) return;
     if (!destination.trim()) {
       Alert.alert(t.common.tip, t.stockOut.alertSelectDest);
       return;
@@ -216,6 +208,7 @@ export default function StockOutScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>{t.stockOut.title}</Text>
         <Text style={styles.subtitle}>{t.stockOut.subtitle}</Text>
+        <OnlineRequiredBanner />
 
         <View style={styles.formCard}>
           <PkgPickerField
@@ -324,6 +317,8 @@ export default function StockOutScreen({ navigation }: Props) {
           style={[styles.btn, (selectedPacks.length === 0 || loading) && styles.btnDisabled]}
           onPress={submit}
           disabled={loading || selectedPacks.length === 0}
+          accessibilityRole="button"
+          accessibilityLabel={loading ? t.common.processing : t.stockOut.submit}
         >
           <Text style={styles.btnText}>
             {loading ? t.common.processing : t.stockOut.submit}
@@ -335,8 +330,6 @@ export default function StockOutScreen({ navigation }: Props) {
         visible={!!successData}
         data={successData}
         onDone={handleSuccessDone}
-        onGoResync={handleGoResync}
-        onGoSyncSettings={handleGoSyncSettings}
       />
     </KeyboardAvoidingView>
   );

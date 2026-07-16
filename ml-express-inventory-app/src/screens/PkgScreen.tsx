@@ -14,13 +14,11 @@ import PkgActionModal from '../components/PkgActionModal';
 import PkgEditModal from '../components/PkgEditModal';
 import PkgOrdersModal from '../components/PkgOrdersModal';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
+import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import {
   cancelPackedShipment,
   listPackedShipmentRows,
-  resyncLoadedPackToCloud,
-  syncInboundHubPacksToLocal,
 } from '../services/inventoryService';
-import { isSupabaseConfigured } from '../services/supabase';
 import { packOrderBarcodeData } from '../utils/orderBarcodeData';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { fmt, getPackStatusLabel, resolveAppError, useTranslation } from '../i18n';
@@ -48,24 +46,12 @@ export default function PkgScreen() {
   const [editPack, setEditPack] = useState<PackedShipmentListRow | null>(null);
   const [ordersPack, setOrdersPack] = useState<PackedShipmentListRow | null>(null);
   const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
-  const [resyncing, setResyncing] = useState(false);
   const [unpacking, setUnpacking] = useState(false);
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
     setPacks(await listPackedShipmentRows(search, scope));
-
-    if (store && hubCode) {
-      void (async () => {
-        try {
-          await syncInboundHubPacksToLocal(store, hubCode, operatorName ?? t.common.operator);
-          setPacks(await listPackedShipmentRows(search, scope));
-        } catch {
-          // 弱网/离线：保留已展示的本地列表
-        }
-      })();
-    }
-  }, [search, store, hubCode, operatorName, t.common.operator]);
+  }, [search, store, hubCode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,6 +80,9 @@ export default function PkgScreen() {
 
   return (
     <View style={styles.root}>
+      <View style={styles.onlineBannerWrap}>
+        <OnlineRequiredBanner />
+      </View>
       <TextInput
         style={styles.search}
         placeholder={t.pkg.search}
@@ -102,6 +91,7 @@ export default function PkgScreen() {
         onChangeText={setSearch}
         onSubmitEditing={() => void load()}
         returnKeyType="search"
+        accessibilityLabel={t.common.search}
       />
 
       <FlatList
@@ -110,8 +100,11 @@ export default function PkgScreen() {
         contentContainerStyle={packs.length === 0 ? styles.emptyList : styles.list}
         onRefresh={async () => {
           setRefreshing(true);
-          await load();
-          setRefreshing(false);
+          try {
+            await load();
+          } finally {
+            setRefreshing(false);
+          }
         }}
         refreshing={refreshing}
         ListEmptyComponent={
@@ -135,6 +128,7 @@ export default function PkgScreen() {
                 barcode: item.bundle_name,
                 status: statusLabel,
               })}
+              accessibilityRole="button"
             >
               <View style={styles.cardTop}>
                 <View style={styles.titleBlock}>
@@ -283,32 +277,6 @@ export default function PkgScreen() {
           setOrdersPack(actionPack);
           setActionPack(null);
         }}
-        onResyncCloud={
-          actionPack?.loaded && !actionPack.cloud_status && store && isSupabaseConfigured()
-            ? () => {
-                if (!actionPack || !store || resyncing) return;
-                void (async () => {
-                  setResyncing(true);
-                  try {
-                    await resyncLoadedPackToCloud(actionPack.bundle_barcode, store);
-                    showTaskSuccess(
-                      t.pkg.resyncSuccess,
-                      `${actionPack.bundle_barcode} · ${t.stockOut.cloudSynced}`,
-                    );
-                    setActionPack(null);
-                    await load();
-                  } catch (e: unknown) {
-                    Alert.alert(
-                      t.pkg.resyncFailed,
-                      resolveAppError(t, e),
-                    );
-                  } finally {
-                    setResyncing(false);
-                  }
-                })();
-              }
-            : undefined
-        }
       />
 
       <PkgEditModal
@@ -335,6 +303,7 @@ export default function PkgScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
+  onlineBannerWrap: { marginHorizontal: 16, marginTop: 16, marginBottom: -6 },
   search: {
     margin: 16,
     marginBottom: 8,

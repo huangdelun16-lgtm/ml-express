@@ -11,12 +11,14 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import ScanInputBar from '../components/ScanInputBar';
 import HubReceiveOrdersModal from '../components/HubReceiveOrdersModal';
+import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import { useAuth } from '../contexts/AuthContext';
 import { getOrderStatusLabel, getPkgStatusLabel, getTransportFeeDisplay, formatOrderNotFoundHint, formatPkgNotFoundHint, resolveAppError, useTranslation } from '../i18n';
 import {
   deliverHubOrderInboundAtStation,
   importInboundPackToLocal,
   maybeAutoReleaseTransitAfterAllInbound,
+  releaseHubTransitOrders,
 } from '../services/inventoryService';
 import {
   isHubTransportFeePaid,
@@ -51,6 +53,7 @@ export default function HubReceiveScreen() {
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
   const [payingTransportFee, setPayingTransportFee] = useState(false);
   const [transportFeePaid, setTransportFeePaid] = useState(false);
+  const [releasingTransit, setReleasingTransit] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -160,7 +163,7 @@ export default function HubReceiveScreen() {
   );
 
   const handlePackScan = async (code: string) => {
-    if (!store) return;
+    if (!store || loading) return;
     setError('');
     setMessage('');
     if (!(await preflightHubReceive())) return;
@@ -199,7 +202,7 @@ export default function HubReceiveScreen() {
   };
 
   const handleConfirmPack = async () => {
-    if (!store || !activePack) return;
+    if (!store || !activePack || loading) return;
     if (!(await preflightHubReceive())) return;
     setLoading(true);
     setError('');
@@ -222,7 +225,7 @@ export default function HubReceiveScreen() {
   };
 
   const handleOrderLookupScan = async (code: string) => {
-    if (!store) return;
+    if (!store || loading) return;
     setError('');
     setMessage('');
     if (!(await preflightHubReceive())) return;
@@ -293,7 +296,7 @@ export default function HubReceiveScreen() {
   };
 
   const handleOrderScan = async (code: string) => {
-    if (!store) return;
+    if (!store || loading) return;
     setError('');
     if (!(await preflightHubReceive())) return;
     setLoading(true);
@@ -320,7 +323,7 @@ export default function HubReceiveScreen() {
   };
 
   const handleConfirmOrder = async (orderId: string) => {
-    if (!store) return;
+    if (!store || confirmingOrderId || loading) return;
     setError('');
     if (!(await preflightHubReceive())) return;
     setConfirmingOrderId(orderId);
@@ -346,7 +349,7 @@ export default function HubReceiveScreen() {
   };
 
   const handlePayTransportFee = () => {
-    if (!store || !activePack) return;
+    if (!store || !activePack || payingTransportFee || loading) return;
     const feeDisplay = getTransportFeeDisplay(t, activePack.transport_fee);
     const legDest = activePack.leg_destination_code || activePack.destination_code || hubCode;
 
@@ -394,6 +397,29 @@ export default function HubReceiveScreen() {
     );
   };
 
+  const handleReleaseTransit = async () => {
+    if (!store || !activePack) return;
+    if (!(await preflightHubReceive())) return;
+    setReleasingTransit(true);
+    setError('');
+    try {
+      const { releasedCount } = await releaseHubTransitOrders({
+        packBarcode: activePack.pack_barcode,
+        store,
+        hubCode,
+        operator,
+        allowCompleted: true,
+      });
+      const updated = await getPkgTrackingDetail(activePack.pack_barcode);
+      if (updated) setActivePack(updated);
+      setMessage(fmt(t.hubReceive.manualReleaseDone, { count: releasedCount }));
+    } catch (e: unknown) {
+      setError(resolveAppError(t, e));
+    } finally {
+      setReleasingTransit(false);
+    }
+  };
+
   const onSubmit = (code: string) => {
     setScan(code);
     const trimmed = code.trim().toUpperCase();
@@ -418,6 +444,7 @@ export default function HubReceiveScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <OnlineRequiredBanner />
       {cloudConnected === false ? (
         <View style={styles.cloudWarnBox}>
           <Text style={styles.cloudWarnTitle}>{t.hubReceive.cloudRequiredTitle}</Text>
@@ -466,7 +493,12 @@ export default function HubReceiveScreen() {
       ) : null}
 
       {activePack && !ordersModalVisible ? (
-        <Pressable style={styles.reopenBtn} onPress={() => setOrdersModalVisible(true)}>
+        <Pressable
+          style={styles.reopenBtn}
+          onPress={() => setOrdersModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${activePack.pack_barcode}，${t.common.continueDispatch}`}
+        >
           <Text style={styles.reopenBtnTitle}>{activePack.pack_barcode}</Text>
           <Text style={styles.reopenBtnSub}>
             {getPkgStatusLabel(t, activePack.status)} · {t.common.progress}{' '}
@@ -484,10 +516,12 @@ export default function HubReceiveScreen() {
         confirmingOrderId={confirmingOrderId}
         payingTransportFee={payingTransportFee}
         transportFeePaid={transportFeePaid}
+        releasingTransit={releasingTransit}
         onClose={() => setOrdersModalVisible(false)}
         onConfirmPack={() => void handleConfirmPack()}
         onConfirmOrder={(orderId) => void handleConfirmOrder(orderId)}
         onPayTransportFee={handlePayTransportFee}
+        onReleaseTransit={() => void handleReleaseTransit()}
       />
     </ScrollView>
   );

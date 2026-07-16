@@ -2,7 +2,9 @@
 
 独立运行的手机/平板库存管理应用，供 **Admin 后台创建的中转站合伙店铺** 使用。登录校验连接 Supabase `delivery_stores`。
 
-**数据策略**：业务数据以 Supabase `inventory_*` 表为权威来源，本机 SQLite 作缓存与离线队列（与客户端/商家端/骑手端隔离）。详见 `docs/CLOUD_DATA_ARCHITECTURE.md`。登录后自动云同步；**每部手机本地列表可能短暂不一致**，换机后请在设置中「立即同步」。
+**数据策略**：Supabase `inventory_*` 表是唯一业务数据源（与客户端/商家端/骑手端隔离）。App 为在线专用，登录、列表读取与所有业务提交均要求联网；本机存储只保存会话、打印设置等设备配置，不承诺离线业务能力。详见 `docs/CLOUD_DATA_ARCHITECTURE.md`。
+
+当前发布版本：**v1.5.0 (11)**。
 
 ## 功能
 
@@ -13,7 +15,7 @@
 - **扫码枪**：USB / Wi-Fi / 蓝牙 HID 键盘模式
 - **相机扫码**：查询商品并快捷跳转
 - **标签打印**：HTML 系统打印（标签机型号待定，设置页可配置宽度与份数）
-- **云端同步**：离线队列、Realtime 拉取、设置页强制同步
+- **在线数据**：直接读取和写入 Supabase；下拉刷新用于重新获取最新数据
 
 ## 环境要求
 
@@ -51,7 +53,7 @@ npx expo start
 
 ## 打印说明
 
-当前使用 `expo-print` 输出 HTML 条码标签，通过系统打印对话框选择打印机（含 AirPrint）。确定具体标签机型号后，可替换为 ESC/POS 或厂商 SDK。
+Android 蓝牙直连优先使用 Xprinter P203A 的本地 TSPL Code128 指令；系统打印使用本机生成的 Code128 SVG 嵌入 `expo-print` HTML，不依赖 bwipjs 等外网条码图片 API。
 
 ## 项目结构
 
@@ -59,20 +61,18 @@ npx expo start
 src/
   components/     ScanInputBar（扫码枪输入）
   contexts/       AuthContext（中转站店铺会话）
-  services/       SQLite、库存、Supabase 登录
+  services/       Supabase 库存、登录、TSPL / 系统打印
   navigation/     AppNavigator
   screens/        各业务页面
   types/
 ```
 
-## 后续对接
+## 云端表
 
 云端表结构：
 
 - 在途追踪：`inventory_pkg_tracking` / `inventory_order_tracking`（已用）
 - 订单/流水/快递包：`inventory_store_items` 等（见 `supabase/migrations/20260615120000_inventory_platform_store_data.sql`）
-
-旧占位文件：`supabase/migrations/20260531120000_inventory_cloud_sync_placeholder.sql`
 
 ## 生产部署
 
