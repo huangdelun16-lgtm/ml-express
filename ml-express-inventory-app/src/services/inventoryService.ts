@@ -25,6 +25,7 @@ import {
 import { isVisibleInExpressDetailsList, isVisibleInPackedList } from '../utils/expressDetailsVisibility';
 import { canEditItemCustomerProfileAsync } from '../utils/itemCustomerProfileEdit';
 import { todayIsoDate } from '../utils/dateFormat';
+import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
 import {
@@ -92,9 +93,17 @@ export async function listItems(
 export async function getItemById(id: string): Promise<InventoryItem | null> { return cloudGetItemById(id); }
 
 export async function getItemByBarcode(barcode: string): Promise<InventoryItem | null> {
-  const exact = await cloudGetItemByBarcode(barcode);
+  const code = barcode.trim().toUpperCase();
+  if (!code) return null;
+  const exact = await cloudGetItemByBarcode(code);
   if (exact) return exact;
-  return (await listItems()).find((item) => item.input_barcode === barcode.trim()) ?? null;
+  return (
+    (await listItems()).find((item) => {
+      const inbound = item.barcode.trim().toUpperCase();
+      const express = (item.input_barcode ?? '').trim().toUpperCase();
+      return inbound === code || express === code;
+    }) ?? null
+  );
 }
 
 export async function upsertItem(
@@ -308,11 +317,12 @@ export async function applyTruckLoadOutbound(params: {
   note?: string;
   originStore?: OriginStoreRef;
   actingStore?: InventoryStoreSession;
-}): Promise<{ count: number; cloudSynced: boolean; cloudError?: string }> {
+}): Promise<{ count: number; cloudSynced: boolean; cloudError?: string; tripNumber?: string }> {
   const ts = nowIso();
   if (!params.originStore) throw svc('pkgSyncFailed');
+  const tripPrefix = params.actingStore ? resolveTripNumberPrefix(params.actingStore) : 'PKG';
   const note = `装车出库\n日期 ${params.outboundDate}\n目的地 ${params.destination}${params.transportFee ? `\n车费 ${params.transportFee} MMK` : ''}`;
-  const count = await loadShipmentsAtomic({
+  const loadResult = await loadShipmentsAtomic({
     operationId: inventoryOperationId(
       'load',
       `${params.outboundDate}:${params.destination}:${params.packs
@@ -326,6 +336,7 @@ export async function applyTruckLoadOutbound(params: {
       note,
       destination_code: params.destination.trim().toUpperCase(),
       outbound_date: params.outboundDate,
+      trip_prefix: tripPrefix,
       origin_store_id: params.originStore.id,
       origin_store_code: params.originStore.storeCode,
       origin_store_name: params.originStore.storeName,
@@ -339,7 +350,7 @@ export async function applyTruckLoadOutbound(params: {
       })),
     },
   });
-  return { count, cloudSynced: true };
+  return { count: loadResult.count, cloudSynced: true, tripNumber: loadResult.tripNumber };
 }
 
 export async function listOutboundPackages(scope?: { store: InventoryStoreSession; hubCode: string }): Promise<PackedShipmentDetail[]> {

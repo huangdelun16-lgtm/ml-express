@@ -28,6 +28,8 @@ export interface PkgTrackingRecord {
   completed_at: string | null;
   /** 本段装车车费 MMK（由运达站承担） */
   transport_fee: string;
+  /** 装车车次，如 RUI0001 / MSE0001 */
+  trip_number: string;
   created_at: string;
   updated_at: string;
 }

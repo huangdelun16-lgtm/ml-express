@@ -14,13 +14,32 @@ export function formatTransportFeeDisplay(raw: string | undefined | null): strin
   return n > 0 ? `${n % 1 === 0 ? n : n.toFixed(2)} MMK` : '未登记';
 }
 function code(value: string): string { return value.trim().toUpperCase(); }
+
+const feePaidCache = new Map<string, boolean>();
+
+export function primeHubTransportFeePaidCache(packBarcode: string, paid: boolean): void {
+  feePaidCache.set(code(packBarcode), paid);
+}
+
 async function ready(): Promise<void> {
   if (!(await isCloudReachable())) throw new Error('网络不可用，无法连接 Supabase。请恢复网络后重试。');
   await ensureInventoryCloudAuth();
 }
 export async function isHubTransportFeePaid(packBarcode: string): Promise<boolean> {
-  const rows = await getAllHubTransportFeePayments();
-  return rows.some((row) => code(row.pack_barcode) === code(packBarcode));
+  const packCode = code(packBarcode);
+  if (!packCode) return false;
+  const cached = feePaidCache.get(packCode);
+  if (cached !== undefined) return cached;
+  await ready();
+  const { data, error } = await supabase
+    .from('inventory_hub_transport_fee_payments')
+    .select('pack_barcode')
+    .eq('pack_barcode', packCode)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const paid = Boolean(data);
+  feePaidCache.set(packCode, paid);
+  return paid;
 }
 export async function getHubTransportFeePaidBarcodeSet(): Promise<Set<string>> {
   return new Set((await getAllHubTransportFeePayments()).map((row) => code(row.pack_barcode)));
@@ -54,6 +73,7 @@ export async function markHubTransportFeePaid(params: {
     originStoreCode: params.originStoreCode, operator: params.operator,
     storeCode: params.store.storeCode, paidAt: new Date().toISOString(),
   });
+  feePaidCache.set(code(params.packBarcode), true);
 }
 /** Kept for API compatibility; there is no local queue to push. */
 export async function pushLocalTransportFeePaymentsToCloud(): Promise<void> {}

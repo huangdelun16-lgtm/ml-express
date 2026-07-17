@@ -4,6 +4,7 @@ import { merchantService, deliveryStoreService, Product, DeliveryStore } from '.
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart, CartItem, getCartItemLineKey } from '../contexts/CartContext';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import ProductVariantPriceList from '../components/ProductVariantPriceList';
 import LoggerService from '../services/LoggerService';
 import { getMerchantStoreTypeLabel } from '../services/_shared/merchantStoreTypes';
@@ -484,17 +485,9 @@ const StoreProductsPage: React.FC = () => {
     }
   };
 
-  const homeBackground =
-    'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)';
-
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: homeBackground,
-        backgroundAttachment: 'fixed',
-      }}
-    >
+    <ClientInteriorShell ambient="mall">
+    <div>
       <div
         style={{
           padding: '1rem 2rem 0',
@@ -1435,6 +1428,7 @@ const StoreProductsPage: React.FC = () => {
         }
       `}</style>
     </div>
+    </ClientInteriorShell>
   );
 };
 

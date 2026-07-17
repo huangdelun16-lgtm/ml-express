@@ -237,6 +237,37 @@ export async function listMovementsForItem(itemId: string): Promise<StockMovemen
   return snapshot.movements.filter((movement) => movement.item_id === itemId);
 }
 
+/** 只查单个商品的流水类型，避免为判断「是否已入库」拉全站流水 */
+export async function itemHasMovementType(
+  itemId: string,
+  type: StockMovement['type'],
+  notePattern?: RegExp,
+): Promise<boolean> {
+  if (!itemId) return false;
+  const cached = cache?.movements.some(
+    (movement) =>
+      movement.item_id === itemId &&
+      movement.type === type &&
+      (!notePattern || notePattern.test(movement.note)),
+  );
+  if (cached) return true;
+
+  const rows = await fetchCloudMovementsForItems([itemId]);
+  const matched = rows.some(
+    (row) =>
+      row.type === type &&
+      (!notePattern || notePattern.test(String(row.note ?? ''))),
+  );
+  if (matched && cache) {
+    const extra = rows.map(rowToMovement).filter((movement) => !cache!.movements.some((m) => m.id === movement.id));
+    if (extra.length > 0) {
+      cache = { ...cache, movements: [...cache.movements, ...extra] };
+      cacheHasMovements = true;
+    }
+  }
+  return matched;
+}
+
 export async function listPacks(
   store?: InventoryStoreSession,
   hubCode?: string,
@@ -272,7 +303,28 @@ export async function applyMovement(
 ): Promise<InventoryItem> {
   const session = store ?? await ensureInventoryCloudReady();
   const saved = rowToItem(await applyCloudStockMovementAtomic(session, item, movement, movement.id));
-  clearInventoryCloudCache();
+  const savedMovement: StockMovement = {
+    ...movement,
+    item_id: saved.id,
+    qty_after: saved.qty_on_hand,
+  };
+  if (cache) {
+    const hasItem = cache.items.some((existing) => existing.id === saved.id || existing.barcode === saved.barcode);
+    cache = {
+      ...cache,
+      items: hasItem
+        ? cache.items.map((existing) =>
+            existing.id === saved.id || existing.barcode === saved.barcode ? saved : existing,
+          )
+        : [...cache.items, saved],
+      movements: [
+        ...cache.movements.filter((existing) => existing.id !== savedMovement.id),
+        savedMovement,
+      ],
+    };
+    cacheFetchedAt = Date.now();
+    cacheHasMovements = true;
+  }
   return saved;
 }
 
@@ -304,11 +356,14 @@ export async function createPackAtomic(params: {
 export async function loadShipmentsAtomic(params: {
   operationId: string;
   payload: Record<string, unknown>;
-}): Promise<number> {
+}): Promise<{ count: number; tripNumber?: string }> {
   await ensureInventoryCloudReady();
-  const count = await loadCloudShipmentsAtomic(params);
+  const result = await loadCloudShipmentsAtomic(params);
   clearInventoryCloudCache();
-  return count;
+  return {
+    count: result.count ?? 0,
+    tripNumber: result.trip_number,
+  };
 }
 
 export async function createPack(

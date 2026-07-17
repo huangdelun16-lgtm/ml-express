@@ -21,7 +21,9 @@ export function isInventoryRlsPolicyError(error: unknown): boolean {
       : typeof error === 'object' && error !== null && 'message' in error
         ? String((error as { message: unknown }).message)
         : String(error ?? '');
-  return /row-level security|violates row-level security policy/i.test(msg);
+  return /row-level security|violates row-level security policy|permission denied for (table|relation) inventory_trip_sequences/i.test(
+    msg,
+  );
 }
 
 export const INVENTORY_RELOGIN_HINT =

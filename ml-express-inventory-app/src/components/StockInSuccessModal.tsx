@@ -184,6 +184,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
+    overflow: 'hidden',
+    width: '100%',
   },
   btnPrint: {
     marginTop: 18,

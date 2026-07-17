@@ -9,6 +9,7 @@ import type { InventoryStoreSession } from './authService';
 import { svc } from '../errors/serviceError';
 import { isInventoryRlsPolicyError } from '../utils/cloudAuthErrors';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { isPackageBarcode, packDestinationFromBarcode } from '../utils/packageNumber';
@@ -55,6 +56,7 @@ function rowToPkg(row: Record<string, unknown>): PkgTrackingRecord {
       : null,
     completed_at: row.completed_at ? String(row.completed_at) : null,
     transport_fee: String(row.transport_fee ?? ''),
+    trip_number: String(row.trip_number ?? ''),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -120,18 +122,18 @@ async function fetchOrderTrackingChunk(
   return (data ?? []).map((r) => rowToOrder(r as Record<string, unknown>));
 }
 
-/** 按扫码值查询订单追踪行（先 order_barcode，再 express_barcode） */
+/** 按扫码值查询订单追踪行（先 order_barcode，再 express_barcode；统一大写匹配入库码） */
 async function fetchOrderTrackingRowsByScanCode(
   code: string,
   limit = 5,
 ): Promise<Record<string, unknown>[]> {
-  const trimmed = code.trim();
+  const trimmed = code.trim().toUpperCase();
   if (!trimmed) return [];
 
   const { data: byOrder, error: orderErr } = await supabase
     .from('inventory_order_tracking')
     .select('*')
-    .eq('order_barcode', trimmed)
+    .ilike('order_barcode', trimmed)
     .order('updated_at', { ascending: false })
     .limit(limit);
   if (orderErr) throw new Error(orderErr.message);
@@ -140,7 +142,7 @@ async function fetchOrderTrackingRowsByScanCode(
   const { data: byExpress, error: expressErr } = await supabase
     .from('inventory_order_tracking')
     .select('*')
-    .eq('express_barcode', trimmed)
+    .ilike('express_barcode', trimmed)
     .order('updated_at', { ascending: false })
     .limit(limit);
   if (expressErr) throw new Error(expressErr.message);
@@ -233,11 +235,27 @@ async function fetchOrdersForPack(packBarcode: string): Promise<OrderTrackingRec
   return (data ?? []).map((r) => rowToOrder(r as Record<string, unknown>));
 }
 
-async function maybeFinalizePkg(pkgId: string, packBarcode: string): Promise<void> {
-  const orders = await fetchOrdersForPack(packBarcode);
-  if (orders.length === 0) return;
+async function fetchPkgTrackingRecord(packBarcode: string): Promise<PkgTrackingRecord | null> {
+  const code = packBarcode.trim().toUpperCase();
+  const { data, error } = await supabase
+    .from('inventory_pkg_tracking')
+    .select('*')
+    .eq('pack_barcode', code)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return rowToPkg(data as Record<string, unknown>);
+}
+
+async function maybeFinalizePkg(
+  pkgId: string,
+  packBarcode: string,
+  ordersHint?: OrderTrackingRecord[],
+): Promise<boolean> {
+  const orders = ordersHint ?? (await fetchOrdersForPack(packBarcode));
+  if (orders.length === 0) return false;
   const allDone = orders.every((o) => isOrderProcessed(o.status));
-  if (!allDone) return;
+  if (!allDone) return false;
 
   const { data: pkgRow, error: pkgFetchErr } = await supabase
     .from('inventory_pkg_tracking')
@@ -252,7 +270,7 @@ async function maybeFinalizePkg(pkgId: string, packBarcode: string): Promise<voi
     currentStatus === 'split_at_hub' ||
     currentStatus === 'cancelled'
   ) {
-    return;
+    return false;
   }
 
   const hasReleased = orders.some((o) => o.status === 'released_at_hub');
@@ -269,6 +287,7 @@ async function maybeFinalizePkg(pkgId: string, packBarcode: string): Promise<voi
     .in('status', ['hub_received', 'completed']);
 
   if (error) throw new Error(error.message);
+  return true;
 }
 
 function assertSupabaseReady(): void {
@@ -514,10 +533,16 @@ export async function listOutboundPackagesFromOrigin(
 ): Promise<PkgTrackingDetail[]> {
   if (!isSupabaseConfigured()) return [];
   const code = storeCode.trim().toUpperCase();
+  const ownerKey = ownershipKeyFromStoreCode(code);
+  const originFilter =
+    ownerKey && ownerKey !== code
+      ? `origin_store_code.eq.${code},origin_store_code.ilike.${ownerKey}%`
+      : `origin_store_code.eq.${code}`;
+
   const { data, error } = await supabase
     .from('inventory_pkg_tracking')
     .select('*')
-    .eq('origin_store_code', code)
+    .or(originFilter)
     .in('status', statuses)
     .order('truck_loaded_at', { ascending: false });
   if (error) throw new Error(error.message);
@@ -571,8 +596,9 @@ async function applyOrderHubReceived(
   order: OrderTrackingRecord,
   store: InventoryStoreSession,
   hubCode: string,
+  knownPkg?: PkgTrackingDetail,
 ): Promise<{ order: OrderTrackingRecord; pkg: PkgTrackingDetail }> {
-  const pkg = await getPkgTrackingDetail(order.pack_barcode);
+  const pkg = knownPkg ?? (await getPkgTrackingDetail(order.pack_barcode));
   if (!pkg) throw svc('linkedPkgNotFound');
 
   const dest = hubCode.trim().toUpperCase();
@@ -612,18 +638,31 @@ async function applyOrderHubReceived(
     .eq('id', order.id);
 
   if (error) throw new Error(error.message);
-  await maybeFinalizePkg(pkg.id, pkg.pack_barcode);
 
-  const updatedPkg = (await getPkgTrackingDetail(pkg.pack_barcode))!;
-  const updatedOrder =
-    updatedPkg.orders.find((o) => o.id === order.id) ?? { ...order, status: 'hub_received' as const };
-  return { order: updatedOrder, pkg: updatedPkg };
+  const updatedOrder: OrderTrackingRecord = {
+    ...order,
+    status: 'hub_received',
+    hub_received_at: now,
+    hub_received_by_store_code: store.storeCode,
+    hub_received_by_store_name: store.storeName,
+    updated_at: now,
+  };
+  const updatedOrders = pkg.orders.map((line) => (line.id === order.id ? updatedOrder : line));
+  const finalized = await maybeFinalizePkg(pkg.id, pkg.pack_barcode, updatedOrders);
+  if (finalized) {
+    const refreshedPkg = await fetchPkgTrackingRecord(pkg.pack_barcode);
+    if (refreshedPkg) {
+      return { order: updatedOrder, pkg: toDetail(refreshedPkg, updatedOrders) };
+    }
+  }
+  return { order: updatedOrder, pkg: toDetail(pkg, updatedOrders) };
 }
 
 export async function confirmOrderHubReceived(
   scanCode: string,
   store: InventoryStoreSession,
   hubCode: string,
+  knownPkg?: PkgTrackingDetail,
 ): Promise<{ order: OrderTrackingRecord; pkg: PkgTrackingDetail }> {
   const code = scanCode.trim();
   if (!code) throw svc('scanOrderBarcode');
@@ -633,7 +672,7 @@ export async function confirmOrderHubReceived(
 
   const order = await pickOrderTrackingForHubScan(rows, hubCode);
   if (!order) throw svc('orderNotFound');
-  return applyOrderHubReceived(order, store, hubCode);
+  return applyOrderHubReceived(order, store, hubCode, knownPkg);
 }
 
 /** 在收单列表中直接确认订单已在快递包内 */
@@ -641,17 +680,21 @@ export async function confirmOrderInPackById(
   orderId: string,
   store: InventoryStoreSession,
   hubCode: string,
+  context?: { pkg?: PkgTrackingDetail; order?: OrderTrackingRecord },
 ): Promise<{ order: OrderTrackingRecord; pkg: PkgTrackingDetail }> {
-  const { data, error } = await supabase
-    .from('inventory_order_tracking')
-    .select('*')
-    .eq('id', orderId)
-    .maybeSingle();
+  let order = context?.order;
+  if (!order) {
+    const { data, error } = await supabase
+      .from('inventory_order_tracking')
+      .select('*')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw svc('orderNotFound');
+    order = rowToOrder(data as Record<string, unknown>);
+  }
 
-  if (error) throw new Error(error.message);
-  if (!data) throw svc('orderNotFound');
-
-  return applyOrderHubReceived(rowToOrder(data as Record<string, unknown>), store, hubCode);
+  return applyOrderHubReceived(order, store, hubCode, context?.pkg);
 }
 
 /** 中转站重新打包后：云端订单从 released_at_hub 挂到新快递包，避免同步时重复释放恢复 */
@@ -801,7 +844,7 @@ export async function findTrackingByAnyCode(code: string): Promise<{
   order: OrderTrackingRecord | null;
 }> {
   if (!isSupabaseConfigured()) return { pkg: null, order: null };
-  const q = code.trim();
+  const q = code.trim().toUpperCase();
   if (!q) return { pkg: null, order: null };
 
   if (isPackageBarcode(q)) {

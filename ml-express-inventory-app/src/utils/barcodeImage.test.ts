@@ -5,6 +5,8 @@ import {
   fetchBarcodeDataUri,
   getBarcodeDataUriCacheSize,
   getBarcodeImageUrl,
+  getCode128ModuleRuns,
+  getCode128TotalModules,
 } from './barcodeImage';
 
 describe('local Code128 barcode', () => {
@@ -19,6 +21,18 @@ describe('local Code128 barcode', () => {
     expect(uri).toMatch(/^data:image\/svg\+xml/);
     expect(uri).not.toContain('bwipjs');
     expect(uri).not.toContain('metafloor');
+  });
+
+  it('builds real module runs for inbound barcodes like MDY…', () => {
+    const code = 'MDY505211140726';
+    const runs = getCode128ModuleRuns(code);
+    const total = getCode128TotalModules(code);
+
+    expect(runs.length).toBeGreaterThan(10);
+    expect(runs[0]).toEqual({ black: false, modules: 10 });
+    expect(runs[runs.length - 1]).toEqual({ black: false, modules: 10 });
+    expect(total).toBeGreaterThan(100);
+    expect(runs.some((run) => run.black)).toBe(true);
   });
 
   it('rejects characters unsupported by Code128-B', () => {

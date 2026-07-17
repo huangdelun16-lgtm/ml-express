@@ -54,6 +54,8 @@ supabase db push
 | `20260716180000_inventory_auth_security_hardening.sql` | **必须先执行**：密码哈希、登录冷却、JWT session 绑定、站点财务 RLS |
 | `20260716185000_inventory_atomic_operations.sql` | **随后执行**：入库/打包/装车/到站幂等事务 RPC |
 | `20260716190000_inventory_authenticate_store_ambiguity_fix.sql` | 修复登录 RPC 的 `store_code` 列名歧义 |
+| `20260717103000_inventory_truck_trip_number.sql` | 装车车次 `trip_number` + `inventory_load_shipments` 扩展 |
+| `20260717113000_inventory_trip_sequences_rls_fix.sql` | **装车必跑**：车次序号表 SECURITY DEFINER，修复 RLS 装车失败 |
 
 **单设备登录（最小 SQL）：**
 

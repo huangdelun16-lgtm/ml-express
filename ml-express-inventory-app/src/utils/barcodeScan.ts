@@ -1,12 +1,10 @@
 import { Vibration } from 'react-native';
-import { isPackageBarcode } from './packageNumber';
 
-/** 规范化扫码结果：去空白、控制字符，包装号转大写 */
+/** 规范化扫码结果：去控制字符/空白，并统一大写（入库码 MDY…、包装号、快递单均一致） */
 export function normalizeScanCode(raw: string): string {
   const cleaned = raw.replace(/[\x00-\x1F\x7F]/g, '').trim();
   if (!cleaned) return '';
-  if (isPackageBarcode(cleaned)) return cleaned.toUpperCase();
-  return cleaned;
+  return cleaned.toUpperCase();
 }
 
 export function vibrateScanSuccess(): void {

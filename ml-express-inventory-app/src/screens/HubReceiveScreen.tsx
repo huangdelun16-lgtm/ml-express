@@ -27,6 +27,7 @@ import {
 import { isSupabaseConfigured, getSupabaseConfigHint } from '../services/supabase';
 import { ensureHubReceiveCloudReady } from '../services/hubReceiveGate';
 import { probeCloudConnection } from '../services/cloudConnection';
+import { prefetchInventoryCache } from '../services/inventoryCloudStore';
 import {
   confirmOrderHubReceived,
   confirmOrderInPackById,
@@ -73,7 +74,10 @@ export default function HubReceiveScreen() {
   useFocusEffect(
     useCallback(() => {
       void refreshCloudStatus();
-    }, [refreshCloudStatus]),
+      if (store && hubCode) {
+        void prefetchInventoryCache(store, hubCode);
+      }
+    }, [refreshCloudStatus, store, hubCode]),
   );
 
   const preflightHubReceive = useCallback(async (): Promise<boolean> => {
@@ -94,10 +98,10 @@ export default function HubReceiveScreen() {
   }, [t]);
 
   const applyOrderSuccess = useCallback(
-    async (pkg: PkgTrackingDetail) => {
+    async (pkg: PkgTrackingDetail, options?: { skipPackImport?: boolean }) => {
       setActivePack(pkg);
-      await refreshTransportFeePaid(pkg.pack_barcode);
-      if (store && pkg.status !== 'in_transit') {
+      void refreshTransportFeePaid(pkg.pack_barcode);
+      if (!options?.skipPackImport && store && pkg.status !== 'in_transit') {
         try {
           await importInboundPackToLocal(pkg, store, operator);
         } catch (e: unknown) {
@@ -132,7 +136,7 @@ export default function HubReceiveScreen() {
 
   const finishInboundFlow = useCallback(
     async (pkg: PkgTrackingDetail) => {
-      await applyOrderSuccess(pkg);
+      await applyOrderSuccess(pkg, { skipPackImport: true });
       if (!store) return;
 
       const { releasedCount } = await maybeAutoReleaseTransitAfterAllInbound({
@@ -265,7 +269,11 @@ export default function HubReceiveScreen() {
       }
 
       if (order.status === 'in_transit') {
-        const { order: confirmed, pkg } = await confirmOrderInPackById(order.id, store, hubCode);
+        const { order: confirmed, pkg } = await confirmOrderInPackById(order.id, store, hubCode, {
+          pkg: detail,
+          order,
+        });
+        setActivePack(pkg);
         await deliverHubOrderInboundAtStation({
           order: confirmed,
           pkg,
@@ -301,7 +309,8 @@ export default function HubReceiveScreen() {
     if (!(await preflightHubReceive())) return;
     setLoading(true);
     try {
-      const { order, pkg } = await confirmOrderHubReceived(code, store, hubCode);
+      const { order, pkg } = await confirmOrderHubReceived(code, store, hubCode, activePack ?? undefined);
+      setActivePack(pkg);
       await deliverHubOrderInboundAtStation({
         order,
         pkg,
@@ -328,7 +337,18 @@ export default function HubReceiveScreen() {
     if (!(await preflightHubReceive())) return;
     setConfirmingOrderId(orderId);
     try {
-      const { order, pkg } = await confirmOrderInPackById(orderId, store, hubCode);
+      const knownOrder = activePack?.orders.find((line) => line.id === orderId);
+      const { order, pkg } = await confirmOrderInPackById(orderId, store, hubCode, {
+        pkg: activePack ?? undefined,
+        order: knownOrder,
+      });
+      setActivePack(pkg);
+      setMessage(
+        fmt(t.hubReceive.processedProgress, {
+          done: pkg.received_order_count,
+          total: pkg.item_count,
+        }),
+      );
       await deliverHubOrderInboundAtStation({
         order,
         pkg,

@@ -26,6 +26,7 @@ import { formatDisplayDate, isValidIsoDate, todayIsoDate } from '../utils/dateFo
 import { sanitizeNumberInput, sumPackageWeightsKg } from '../utils/itemFieldFormat';
 import { resolveStoreOriginLabel, listOutboundDestinationOptions, isOwnStationOutboundDestination } from '../utils/storeZone';
 import { fetchTruckRouteFee, formatTruckRouteLabel } from '../utils/truckRouteFee';
+import { peekNextTripNumber } from '../services/tripNumberService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StockOut'>;
 
@@ -38,6 +39,8 @@ export default function StockOutScreen({ navigation }: Props) {
   const [destination, setDestination] = useState('');
   const [outboundDate, setOutboundDate] = useState(todayIsoDate());
   const [transportFee, setTransportFee] = useState('');
+  const [tripNumberPreview, setTripNumberPreview] = useState('');
+  const [tripLoading, setTripLoading] = useState(false);
   const [feeLoading, setFeeLoading] = useState(false);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
@@ -72,6 +75,25 @@ export default function StockOutScreen({ navigation }: Props) {
       void loadPacks();
     }, [loadPacks]),
   );
+
+  useEffect(() => {
+    if (!store) {
+      setTripNumberPreview('');
+      return;
+    }
+    let cancelled = false;
+    setTripLoading(true);
+    void peekNextTripNumber(store)
+      .then((trip) => {
+        if (!cancelled) setTripNumberPreview(trip ?? '');
+      })
+      .finally(() => {
+        if (!cancelled) setTripLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [store]);
 
   useEffect(() => {
     if (!store || !destination.trim()) {
@@ -120,8 +142,22 @@ export default function StockOutScreen({ navigation }: Props) {
     setDestination('');
     setOutboundDate(todayIsoDate());
     setTransportFee('');
+    setTripNumberPreview('');
     setNote('');
   };
+
+  const refreshTripPreview = useCallback(async () => {
+    if (!store) {
+      setTripNumberPreview('');
+      return;
+    }
+    setTripLoading(true);
+    try {
+      setTripNumberPreview((await peekNextTripNumber(store)) ?? '');
+    } finally {
+      setTripLoading(false);
+    }
+  }, [store]);
 
   const handleSuccessDone = useCallback(() => {
     setSuccessData(null);
@@ -178,6 +214,7 @@ export default function StockOutScreen({ navigation }: Props) {
         destination: destLabel,
         count: result.count,
         totalWeight,
+        tripNumber: result.tripNumber,
         cloudStatus,
         cloudError: result.cloudError
           ? resolveAppError(t, new Error(result.cloudError))
@@ -186,6 +223,7 @@ export default function StockOutScreen({ navigation }: Props) {
       });
       resetForm();
       await loadPacks();
+      await refreshTripPreview();
     } catch (e: unknown) {
       Alert.alert(t.common.fail, resolveAppError(t, e));
     } finally {
@@ -279,6 +317,14 @@ export default function StockOutScreen({ navigation }: Props) {
               })}
             </Text>
           ) : null}
+
+          <Text style={styles.label}>{t.stockOut.tripNumber}</Text>
+          <View style={styles.tripBox}>
+            <Text style={styles.tripValue}>
+              {tripLoading ? t.stockOut.tripLoading : tripNumberPreview || '—'}
+            </Text>
+          </View>
+          <Text style={styles.fieldHint}>{t.stockOut.tripHint}</Text>
 
           <Text style={styles.label}>{t.stockOut.noteOptional}</Text>
           <TextInput
@@ -387,6 +433,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   feeUnit: { color: '#94a3b8', fontWeight: '800', fontSize: 14, paddingBottom: 2 },
+  tripBox: {
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+  },
+  tripValue: {
+    color: '#7dd3fc',
+    fontSize: 22,
+    fontWeight: '900',
+    fontFamily: 'monospace',
+    letterSpacing: 1,
+  },
   input: {
     backgroundColor: '#fff',
     borderRadius: 10,

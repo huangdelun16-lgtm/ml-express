@@ -64,9 +64,10 @@ export function buildTsplInboundLabel(params: {
     y += 34;
   }
 
-  const barcodeHeight = content.inputBarcode ? 72 : 88;
+  const barcodeHeight = content.inputBarcode ? 80 : 96;
+  // narrow=3 / wide=6：比 2/4 更易被手机相机识别自动生成的入库码（如 MDY…）
   lines.push(
-    `BARCODE 12,${y},"128",${barcodeHeight},1,0,2,4,"${escapeTsplText(content.barcode)}"`,
+    `BARCODE 12,${y},"128",${barcodeHeight},1,0,3,6,"${escapeTsplText(content.barcode)}"`,
   );
   y += barcodeHeight + 10;
   lines.push(`TEXT 12,${y},"2",0,1,1,"${escapeTsplText(truncateLabelText(content.barcode, 24))}"`);

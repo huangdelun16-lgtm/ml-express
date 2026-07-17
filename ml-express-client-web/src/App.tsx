@@ -25,9 +25,9 @@ function RouteFallback() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: '#64748b',
+        color: 'rgba(226, 232, 240, 0.9)',
         fontSize: '1rem',
-        fontWeight: 600
+        fontWeight: 600,
       }}
     >
       Loading…
@@ -59,7 +59,7 @@ class ErrorBoundary extends React.Component<
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
+          background: 'linear-gradient(168deg, #0b1220 0%, #132337 40%, #1e3a5f 75%, #0f172a 100%)',
           color: 'white',
           padding: '2rem',
           textAlign: 'center'

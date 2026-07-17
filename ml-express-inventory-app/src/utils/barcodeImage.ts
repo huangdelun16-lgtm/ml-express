@@ -18,8 +18,16 @@ const CODE128_PATTERNS = [
 
 const START_B = 104;
 const STOP = 106;
+const QUIET_ZONE_MODULES = 10;
 const DATA_URI_CACHE_LIMIT = 64;
 const dataUriCache = new Map<string, string>();
+
+export type Code128ModuleRun = {
+  /** true = 黑条，false = 空白 */
+  black: boolean;
+  /** 模块宽度（相对单位） */
+  modules: number;
+};
 
 function encodeCode128B(code: string): number[] {
   const values = [...code].map((char) => {
@@ -29,8 +37,31 @@ function encodeCode128B(code: string): number[] {
     }
     return charCode - 32;
   });
-  const checksum = (START_B + values.reduce((sum, value, index) => sum + value * (index + 1), 0)) % 103;
+  const checksum =
+    (START_B + values.reduce((sum, value, index) => sum + value * (index + 1), 0)) % 103;
   return [START_B, ...values, checksum, STOP];
+}
+
+/** 生成 Code128-B 的黑白模块序列（含 quiet zone），供原生 View 渲染可扫条码 */
+export function getCode128ModuleRuns(code: string): Code128ModuleRun[] {
+  const trimmed = code.trim();
+  if (!trimmed) return [];
+
+  const patterns = encodeCode128B(trimmed).map((value) => CODE128_PATTERNS[value]);
+  const runs: Code128ModuleRun[] = [{ black: false, modules: QUIET_ZONE_MODULES }];
+
+  for (const pattern of patterns) {
+    [...pattern].forEach((digit, index) => {
+      runs.push({ black: index % 2 === 0, modules: Number(digit) });
+    });
+  }
+
+  runs.push({ black: false, modules: QUIET_ZONE_MODULES });
+  return runs;
+}
+
+export function getCode128TotalModules(code: string): number {
+  return getCode128ModuleRuns(code).reduce((sum, run) => sum + run.modules, 0);
 }
 
 export function buildCode128Svg(
@@ -40,28 +71,23 @@ export function buildCode128Svg(
   const trimmed = code.trim();
   if (!trimmed) return '';
   const moduleWidth = Math.max(1, opts?.scale ?? 2);
-  const barHeight = Math.max(24, (opts?.height ?? 12) * 4);
-  const quietZone = 10;
-  const patterns = encodeCode128B(trimmed).map((value) => CODE128_PATTERNS[value]);
-  const modules = patterns.reduce(
-    (sum, pattern) => sum + [...pattern].reduce((width, digit) => width + Number(digit), 0),
-    quietZone * 2,
-  );
+  const barHeight = Math.max(40, (opts?.height ?? 12) * 4);
+  const runs = getCode128ModuleRuns(trimmed);
+  const totalModules = runs.reduce((sum, run) => sum + run.modules, 0);
   const textHeight = opts?.includeText === false ? 0 : 18;
-  let x = quietZone;
+  let x = 0;
   const bars: string[] = [];
 
-  for (const pattern of patterns) {
-    [...pattern].forEach((digit, index) => {
-      const width = Number(digit);
-      if (index % 2 === 0) {
-        bars.push(`<rect x="${x * moduleWidth}" y="0" width="${width * moduleWidth}" height="${barHeight}"/>`);
-      }
-      x += width;
-    });
+  for (const run of runs) {
+    if (run.black) {
+      bars.push(
+        `<rect x="${x * moduleWidth}" y="0" width="${run.modules * moduleWidth}" height="${barHeight}"/>`,
+      );
+    }
+    x += run.modules;
   }
 
-  const width = modules * moduleWidth;
+  const width = totalModules * moduleWidth;
   const text = textHeight
     ? `<text x="${width / 2}" y="${barHeight + 14}" text-anchor="middle" font-family="monospace" font-size="12">${escapeSvgText(trimmed)}</text>`
     : '';

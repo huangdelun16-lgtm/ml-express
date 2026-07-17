@@ -8,6 +8,7 @@ export type StockOutSuccessData = {
   destination: string;
   count: number;
   totalWeight: string;
+  tripNumber?: string;
   cloudStatus: CloudSyncStatus;
   cloudError?: string;
   packBarcodes: string[];
@@ -111,6 +112,11 @@ export default function StockOutSuccessModal({
           </Text>
 
           <Text style={styles.summary}>{summaryText}</Text>
+          {data.tripNumber ? (
+            <Text style={styles.tripNumber}>
+              {fmt(t.stockOut.successTrip, { trip: data.tripNumber })}
+            </Text>
+          ) : null}
 
           {needsCloudAction ? (
             <>
@@ -201,6 +207,14 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
     fontSize: 14,
     lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  tripNumber: {
+    color: '#7dd3fc',
+    fontSize: 16,
+    fontWeight: '900',
+    fontFamily: 'monospace',
     textAlign: 'center',
     marginBottom: 14,
   },

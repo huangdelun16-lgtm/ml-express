@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const copy = {
@@ -113,11 +114,9 @@ export default function InventoryPrivacyPage() {
   }, []);
 
   return (
+    <ClientInteriorShell>
     <div
       style={{
-        minHeight: '100vh',
-        background:
-          'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
         padding: window.innerWidth < 768 ? '12px' : '20px',
       }}
     >
@@ -183,5 +182,6 @@ export default function InventoryPrivacyPage() {
         </div>
       </section>
     </div>
+    </ClientInteriorShell>
   );
 }

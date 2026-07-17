@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import TripPackagesModal from '../components/TripPackagesModal';
 import { useAuth } from '../contexts/AuthContext';
 import { getPkgStatusLabel, useTranslation } from '../i18n';
 import {
@@ -15,12 +16,18 @@ import {
   listOutboundPackagesFromOrigin,
 } from '../services/trackingService';
 import type { PkgTrackingDetail } from '../types/tracking';
-import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
+import { formatDisplayDate } from '../utils/dateFormat';
+import { resolveStoreHubCode } from '../utils/storeZone';
+import { splitOutboundByTrip, type TruckTripSummary } from '../utils/truckTripGroups';
 
 type Tab = 'inbound' | 'outbound';
 
 type Nav = { navigate: (name: string, params?: { presetCode?: string }) => void };
+
+type OutboundListItem =
+  | { kind: 'trip'; key: string; trip: TruckTripSummary }
+  | { kind: 'pack'; key: string; pack: PkgTrackingDetail };
 
 function PackTrackCard({ item, onPress }: { item: PkgTrackingDetail; onPress?: () => void }) {
   const { t, fmt } = useTranslation();
@@ -59,6 +66,35 @@ function PackTrackCard({ item, onPress }: { item: PkgTrackingDetail; onPress?: (
   return content;
 }
 
+function TripTrackCard({ trip, onPress }: { trip: TruckTripSummary; onPress: () => void }) {
+  const { t, fmt } = useTranslation();
+  return (
+    <Pressable onPress={onPress}>
+      <View style={[styles.card, styles.tripCard]}>
+        <View style={styles.cardTop}>
+          <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
+          <Text style={styles.status}>{getPkgStatusLabel(t, trip.packages[0]?.status ?? 'in_transit')}</Text>
+        </View>
+        <Text style={styles.route}>
+          {fmt(t.shipmentTrack.tripCardRoute, {
+            dest: regionDisplayLabel(trip.legDestination),
+            count: trip.packCount,
+          })}
+        </Text>
+        <Text style={styles.meta}>
+          {trip.outboundDate
+            ? fmt(t.shipmentTrack.tripCardDate, { date: formatDisplayDate(trip.outboundDate) })
+            : ''}
+          {trip.transportFee
+            ? ` · ${fmt(t.shipmentTrack.tripCardFee, { fee: trip.transportFee })}`
+            : ''}
+        </Text>
+        <Text style={styles.tripHint}>{t.shipmentTrack.tripCardHint}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function ShipmentTrackScreen({ navigation }: { navigation: Nav }) {
   const { t, fmt } = useTranslation();
   const { store } = useAuth();
@@ -67,6 +103,7 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
   const [inbound, setInbound] = useState<PkgTrackingDetail[]>([]);
   const [outbound, setOutbound] = useState<PkgTrackingDetail[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState<TruckTripSummary | null>(null);
 
   const load = useCallback(async () => {
     if (!store) return;
@@ -84,7 +121,21 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
     }, [load]),
   );
 
-  const data = tab === 'inbound' ? inbound : outbound;
+  const outboundItems = useMemo<OutboundListItem[]>(() => {
+    const { trips, legacyPackages } = splitOutboundByTrip(outbound);
+    const items: OutboundListItem[] = trips.map((trip) => ({
+      kind: 'trip',
+      key: `trip:${trip.tripNumber}`,
+      trip,
+    }));
+    for (const pack of legacyPackages) {
+      items.push({ kind: 'pack', key: `pack:${pack.id}`, pack });
+    }
+    return items;
+  }, [outbound]);
+
+  const inboundCount = inbound.length;
+  const outboundCount = outbound.length;
 
   return (
     <View style={styles.root}>
@@ -104,7 +155,7 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
           onPress={() => setTab('inbound')}
         >
           <Text style={[styles.tabText, tab === 'inbound' && styles.tabTextOn]}>
-            {fmt(t.shipmentTrack.tabInbound, { count: inbound.length })}
+            {fmt(t.shipmentTrack.tabInbound, { count: inboundCount })}
           </Text>
         </Pressable>
         <Pressable
@@ -112,15 +163,23 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
           onPress={() => setTab('outbound')}
         >
           <Text style={[styles.tabText, tab === 'outbound' && styles.tabTextOn]}>
-            {fmt(t.shipmentTrack.tabOutbound, { count: outbound.length })}
+            {fmt(t.shipmentTrack.tabOutbound, { count: outboundCount })}
           </Text>
         </Pressable>
       </View>
 
-      <FlatList
-        data={data}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={data.length === 0 ? styles.emptyList : styles.list}
+      <FlatList<OutboundListItem | PkgTrackingDetail>
+        data={(tab === 'inbound' ? inbound : outboundItems) as Array<OutboundListItem | PkgTrackingDetail>}
+        keyExtractor={(item) =>
+          tab === 'inbound'
+            ? (item as PkgTrackingDetail).id
+            : (item as OutboundListItem).key
+        }
+        contentContainerStyle={
+          (tab === 'inbound' ? inbound.length : outboundItems.length) === 0
+            ? styles.emptyList
+            : styles.list
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -138,12 +197,44 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
               : t.shipmentTrack.emptyOutbound}
           </Text>
         }
-        renderItem={({ item }) => (
-          <PackTrackCard
-            item={item}
-            onPress={() => navigation.navigate('TrackExpress', { presetCode: item.pack_barcode })}
-          />
-        )}
+        renderItem={({ item }) => {
+          if (tab === 'inbound') {
+            const pack = item as PkgTrackingDetail;
+            return (
+              <PackTrackCard
+                item={pack}
+                onPress={() => navigation.navigate('TrackExpress', { presetCode: pack.pack_barcode })}
+              />
+            );
+          }
+          const outboundItem = item as OutboundListItem;
+          if (outboundItem.kind === 'trip') {
+            return (
+              <TripTrackCard
+                trip={outboundItem.trip}
+                onPress={() => setSelectedTrip(outboundItem.trip)}
+              />
+            );
+          }
+          return (
+            <PackTrackCard
+              item={outboundItem.pack}
+              onPress={() =>
+                navigation.navigate('TrackExpress', { presetCode: outboundItem.pack.pack_barcode })
+              }
+            />
+          );
+        }}
+      />
+
+      <TripPackagesModal
+        visible={!!selectedTrip}
+        trip={selectedTrip}
+        onClose={() => setSelectedTrip(null)}
+        onOpenPackage={(code) => {
+          setSelectedTrip(null);
+          navigation.navigate('TrackExpress', { presetCode: code });
+        }}
       />
     </View>
   );
@@ -178,9 +269,14 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#0ea5e9',
   },
+  tripCard: {
+    borderLeftColor: '#f59e0b',
+  },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   barcode: { color: '#d8b4fe', fontSize: 14, fontWeight: '900', fontFamily: 'monospace', flex: 1 },
+  tripNumber: { color: '#fcd34d', fontSize: 18, fontWeight: '900', fontFamily: 'monospace', flex: 1 },
   status: { color: '#7dd3fc', fontSize: 11, fontWeight: '900' },
   route: { color: '#94a3b8', fontSize: 12, marginTop: 6 },
   meta: { color: '#64748b', fontSize: 11, marginTop: 4 },
+  tripHint: { color: '#64748b', fontSize: 11, marginTop: 8, fontStyle: 'italic' },
 });

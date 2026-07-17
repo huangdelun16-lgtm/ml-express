@@ -161,6 +161,8 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginBottom: 16,
+    overflow: 'hidden',
+    width: '100%',
   },
   inputCodeText: {
     color: '#0284c7',

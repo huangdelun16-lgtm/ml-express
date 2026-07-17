@@ -59,7 +59,7 @@ function buildEscPosPayload(content: ReturnType<typeof normalizeLabelContent>): 
     lines.push(`[C]<font size='normal'>${escapeEscPosText(line)}</font>`);
   }
   if (meta.length) lines.push('[L]');
-  lines.push(`[C]<barcode type='128' height='64'>${code}</barcode>`);
+  lines.push(`[C]<barcode type='128' height='80'>${code}</barcode>`);
   lines.push(`[C]<font size='tall'>${code}</font>`);
   lines.push('[L]');
   lines.push('[C]MARKET LINK');

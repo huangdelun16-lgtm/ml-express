@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const PrivacyPolicyPage: React.FC = () => {
@@ -39,37 +40,12 @@ const PrivacyPolicyPage: React.FC = () => {
   }, [showLanguageDropdown]);
 
   return (
+    <ClientInteriorShell>
     <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
       position: 'relative',
       overflow: 'hidden',
       padding: window.innerWidth < 768 ? '12px' : '20px'
     }}>
-      {/* 背景装饰 */}
-      <div style={{
-        position: 'absolute',
-        top: '5%',
-        right: '5%',
-        width: '200px',
-        height: '200px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(40px)',
-        zIndex: 1
-      }}></div>
-      <div style={{
-        position: 'absolute',
-        bottom: '5%',
-        left: '5%',
-        width: '150px',
-        height: '150px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(30px)',
-        zIndex: 1
-      }}></div>
-      
       {/* 导航栏 */}
       <NavigationBar
         language={language}
@@ -263,6 +239,7 @@ const PrivacyPolicyPage: React.FC = () => {
         </div>
       </div>
     </div>
+    </ClientInteriorShell>
   );
 };
 

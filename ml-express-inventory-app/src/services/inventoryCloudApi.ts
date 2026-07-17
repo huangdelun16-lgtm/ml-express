@@ -87,6 +87,7 @@ type AtomicRpcResult = {
   bundle_item?: Record<string, unknown>;
   pack_id?: string;
   count?: number;
+  trip_number?: string;
 };
 
 function cloudUuid(): string {
@@ -197,14 +198,19 @@ export async function createCloudPackedShipmentAtomic(params: {
 export async function loadCloudShipmentsAtomic(params: {
   operationId: string;
   payload: Record<string, unknown>;
-}): Promise<number> {
+}): Promise<AtomicRpcResult> {
   if (!isSupabaseConfigured()) throw svc('supabaseTrackingNotConfigured');
   const { data, error } = await supabase.rpc('inventory_load_shipments', {
     p_operation_id: params.operationId,
     p_payload: params.payload,
   });
   if (error || !data) throw error?.message ? new Error(error.message) : svc('pkgSyncFailed');
-  return Number((data as AtomicRpcResult).count) || 0;
+  const result = data as AtomicRpcResult;
+  return {
+    count: Number(result.count) || 0,
+    trip_number: result.trip_number ? String(result.trip_number) : undefined,
+    idempotent: Boolean(result.idempotent),
+  };
 }
 
 export async function fetchCloudStoreItems(

@@ -6,7 +6,7 @@ import { newId, nowIso } from './database';
 import {
   clearInventoryCloudCache,
   createPack,
-  listMovementsForItem,
+  itemHasMovementType,
   upsertItem as cloudUpsertItem,
 } from './inventoryCloudStore';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
@@ -52,8 +52,9 @@ async function patchItem(
   return cloudUpsertItem({ ...item, ...patch, updated_at: nowIso() }, store);
 }
 
-async function hasInboundMovement(itemId: string): Promise<boolean> {
-  return (await listMovementsForItem(itemId)).some((m) => m.type === 'in');
+async function hasInboundMovement(item: InventoryItem): Promise<boolean> {
+  if (item.qty_on_hand >= 1) return true;
+  return itemHasMovementType(item.id, 'in');
 }
 
 async function upsertInboundSnapshotFromHubOrder(
@@ -85,7 +86,7 @@ async function upsertInboundSnapshotFromHubOrder(
   if (snapshot.recipientName) {
     item = await patchItem(item, { recipient_name: snapshot.recipientName }, params.actingStore);
   }
-  if (!(await hasInboundMovement(item.id))) {
+  if (!(await hasInboundMovement(item))) {
     await ops.applyStockMovement({
       barcode: item.barcode,
       type: 'in',
@@ -106,10 +107,8 @@ async function upsertInboundSnapshotFromHubOrder(
   }
 }
 
-export async function hasHubTransitInboundAtStation(itemId: string): Promise<boolean> {
-  return (await listMovementsForItem(itemId)).some(
-    (m) => m.type === 'in' && /中转站到站|中转站释放/.test(m.note),
-  );
+export async function hasHubTransitInboundAtStation(item: InventoryItem): Promise<boolean> {
+  return itemHasMovementType(item.id, 'in', /中转站到站|中转站释放/);
 }
 
 export async function deliverLocalHubOrderToInventory(
@@ -208,7 +207,7 @@ export async function deliverTransitOrderAtHubStation(
   if (params.order.status === 'released_at_hub') return;
 
   let item = await ops.getItemByBarcode(params.order.order_barcode);
-  if (item && (await hasHubTransitInboundAtStation(item.id)) && item.qty_on_hand >= 1) return;
+  if (item && (await hasHubTransitInboundAtStation(item)) && item.qty_on_hand >= 1) return;
 
   const hubStationAt =
     params.pkg.hub_received_at?.trim() ||
@@ -428,12 +427,6 @@ export async function deliverHubOrderInboundAtStation(
   }
   if (orderDest && orderDest !== hub) {
     await deliverTransitOrderAtHubStation(ops, params);
-    await maybeAutoReleaseTransitAfterAllInbound(ops, {
-      packBarcode: params.pkg.pack_barcode,
-      store: params.store,
-      hubCode: params.hubCode,
-      operator: params.operator,
-    });
     return;
   }
   throw new Error(`无法解析订单 ${params.order.order_barcode} 的目的地`);

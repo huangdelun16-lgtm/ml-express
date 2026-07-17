@@ -8,6 +8,7 @@ import QRCode from 'qrcode';
 import HomeBanner from '../components/home/HomeBanner';
 import NavigationBar from '../components/home/NavigationBar';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
+import DeliveryAmbientBackground from '../components/layout/DeliveryAmbientBackground';
 import OrderModal from '../components/home/OrderModal';
 import LoginRegisterModal from '../components/home/LoginRegisterModal';
 import { MYANMAR_CITIES, CityKey, DEFAULT_CITY_KEY, DEFAULT_CITY_CENTER } from '../constants/cities';
@@ -2218,11 +2219,7 @@ const HomePage: React.FC = () => {
       }}
     >
       <div className="home-landing__ambient" aria-hidden>
-        <div className="home-landing__ambient-grid" />
-        <div className="home-landing__ambient-noise" />
-        <div className="home-landing__orb home-landing__orb--sky" />
-        <div className="home-landing__orb home-landing__orb--violet" />
-        <div className="home-landing__orb home-landing__orb--amber" />
+        <DeliveryAmbientBackground variant="landing" />
       </div>
       <div className="home-landing__content">
       <NavigationBar
@@ -2391,7 +2388,7 @@ const HomePage: React.FC = () => {
         id="landing-services"
         className="home-landing-snap-section home-landing-embed-wrap"
       >
-        <ClientInteriorShell>
+        <ClientInteriorShell embedded>
           {mountLandingEmbeds ? (
             <Suspense fallback={<LandingEmbedFallback />}>
               <LandingServicesChunk embedInLanding />
@@ -2403,7 +2400,7 @@ const HomePage: React.FC = () => {
       </section>
 
       <section id="landing-tracking" className="home-landing-snap-section home-landing-embed-wrap">
-        <ClientInteriorShell>
+        <ClientInteriorShell embedded>
           {mountLandingEmbeds ? (
             <Suspense fallback={<LandingEmbedFallback />}>
               <LandingTrackingChunk embedInLanding />
@@ -2415,7 +2412,7 @@ const HomePage: React.FC = () => {
       </section>
 
       <section id="landing-contact" className="home-landing-snap-section home-landing-embed-wrap">
-        <ClientInteriorShell>
+        <ClientInteriorShell embedded>
           {mountLandingEmbeds ? (
             <Suspense fallback={<LandingEmbedFallback />}>
               <LandingContactChunk embedInLanding />

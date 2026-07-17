@@ -192,6 +192,8 @@ export const inboundInvoiceStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     alignItems: 'center',
+    overflow: 'hidden',
+    width: '100%',
   },
   barcodeBlockTitle: { color: '#64748b', fontSize: 12, fontWeight: '800', marginBottom: 8 },
   expressCode: {
