@@ -1,6 +1,6 @@
 {
   "name": "ml-express-inventory-app",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "main": "index.js",
   "private": true,
   "scripts": {
@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "build:ios": "eas build --platform ios --profile production",
     "build:ios:local": "eas build --platform ios --profile production --local",
+    "build:ios:preview": "eas build --platform ios --profile preview",
     "download:ios": "eas build:download --platform ios --latest",
     "build:apk": "eas build --platform android --profile apk",
     "build:apk:local": "eas build --platform android --profile apk --local",

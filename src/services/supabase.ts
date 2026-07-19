@@ -12,6 +12,7 @@ import {
   normalizeCustomerExchangeRateStore,
   normalizeCustomerProxyFeeStore,
 } from '../utils/proxyPurchaseExcel';
+import { isAbortLikeError } from '../utils/fetchError';
 export type { Banner, Tutorial, WelcomeScreen };
 export type { ProxyPurchaseRow as ProxyPurchaseWorkspaceRow };
 
@@ -1597,12 +1598,14 @@ export const bannerService = {
       const { data, error } = await query;
 
       if (error) {
+        if (isAbortLikeError(error)) throw error;
         console.error('获取广告列表失败:', error);
         return [];
       }
 
       return data || [];
     } catch (err) {
+      if (isAbortLikeError(err)) throw err;
       console.error('获取广告列表异常:', err);
       return [];
     }
@@ -3510,11 +3513,13 @@ export const importMetricDraftService = {
         .select('*')
         .order('updated_at', { ascending: false });
       if (error) {
+        if (isAbortLikeError(error)) throw error;
         console.error('import_metric_drafts 列表失败:', error);
         throw error;
       }
       return (data || []) as ImportMetricDraftDbRow[];
     } catch (err) {
+      if (isAbortLikeError(err)) throw err;
       console.error('import_metric_drafts 列表异常:', err);
       return [];
     }
@@ -3825,6 +3830,7 @@ export const proxyPurchaseService = {
       .eq('workspace_key', PROXY_PURCHASE_WORKSPACE_KEY)
       .maybeSingle();
     if (error) {
+      if (isAbortLikeError(error)) throw error;
       console.error('proxy_purchase_workspaces 读取失败:', error);
       throw error;
     }
@@ -3860,6 +3866,7 @@ export const proxyPurchaseService = {
       { onConflict: 'workspace_key' },
     );
     if (error) {
+      if (isAbortLikeError(error)) throw error;
       console.error('proxy_purchase_workspaces 保存失败:', error);
       throw error;
     }

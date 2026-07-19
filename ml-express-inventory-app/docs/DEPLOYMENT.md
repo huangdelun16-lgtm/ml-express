@@ -3,7 +3,7 @@
 面向 **生产 Supabase 项目**（与 Admin Web / 商户端共用：`uopkyuluxnrewvlmutam`）。  
 每次发布 Inventory App 新功能前，按本清单逐项勾选。
 
-当前客户端版本：**v1.5.0 (11)**。Inventory App 为在线专用，Supabase 是唯一业务数据源。
+当前客户端版本：**v1.6.0 (12)**。Inventory App 为在线专用，Supabase 是唯一业务数据源。
 
 ---
 
@@ -148,11 +148,29 @@ Dashboard → Edge Functions → 确认 `inventory-store-login` / `inventory-cha
 
 ### 构建命令
 
+**App Store / TestFlight（production IPA）：**
+
 ```bash
 cd ml-express-inventory-app
-eas build --platform ios --profile production
-# 或
-eas build --platform android --profile production
+npm install
+eas login          # 首次或 token 过期时
+npm run build:ios  # 等价于 eas build --platform ios --profile production
+npm run download:ios
+```
+
+**内测直装（preview IPA，需 EAS 设备 UDID 注册）：**
+
+```bash
+cd ml-express-inventory-app
+npm run build:ios:preview
+npm run download:ios
+```
+
+**本机 Mac 本地打 IPA（需 Xcode + Fastlane）：**
+
+```bash
+cd ml-express-inventory-app
+npm run build:ios:local
 ```
 
 提交 App Store：
@@ -162,6 +180,14 @@ eas submit --platform ios --profile production
 ```
 
 当前 Bundle ID：`com.mlexpress.inventory`（见 `app.json`）。
+
+### Android APK 应用内更新（设置 → 更新最新版本）
+
+1. 将 APK 上传到可公网访问的地址（Supabase Storage 公开桶、CDN 等）
+2. 在 Supabase SQL Editor 执行 `docs/sql/inventory_android_latest_release.sql`，填入真实 `apkUrl`，并确保 `versionCode` **大于** 用户已安装版本
+3. 用户点击设置中的 **「更新最新版本」** → 若有新版本则打开下载链接；下载完成后在系统「下载」中安装 APK
+
+每次发布新 APK 后只需更新 `system_settings` 中 `inventory.android.latest_release` 一条记录，**无需**重新发版 App 即可让旧版用户看到更新提示（旧版 App 需已包含此功能，自 v1.6.0 起）。
 
 ---
 
@@ -198,7 +224,7 @@ eas submit --platform ios --profile production
 
 ### Expo 与上架 App 快递明细不一致
 
-先确认两端均为 **v1.5.0 (11)**、连接同一 Supabase 项目且使用同一站点账号，然后在列表下拉刷新。列表应以 Supabase 查询结果为准；若仍不一致，检查 RLS、hub/store claims 与查询范围。
+先确认两端均为 **v1.6.0 (12)**、连接同一 Supabase 项目且使用同一站点账号，然后在列表下拉刷新。列表应以 Supabase 查询结果为准；若仍不一致，检查 RLS、hub/store claims 与查询范围。
 
 ---
 

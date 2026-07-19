@@ -32,6 +32,10 @@ import { probeCloudConnection } from '../services/cloudConnection';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { INVENTORY_SUPPORT_URL } from '../constants/support';
+import {
+  checkAndroidAppUpdate,
+  openAndroidApkDownload,
+} from '../services/appUpdateService';
 
 const CONNECTION_OPTIONS: { mode: PrinterConnectionMode; labelKey: 'connectionSystem' | 'connectionBluetooth' }[] = [
   { mode: 'system', labelKey: 'connectionSystem' },
@@ -114,10 +118,11 @@ export default function SettingsScreen() {
   const [connectionStatus, setConnectionStatus] = useState<
     'checking' | 'online' | 'offline'
   >('checking');
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
-  const appVersion = Constants.expoConfig?.version ?? '1.5.0';
-  const buildVersion = Constants.nativeBuildVersion ?? '11';
+  const appVersion = Constants.expoConfig?.version ?? '1.6.0';
+  const buildVersion = Constants.nativeBuildVersion ?? '12';
 
   useEffect(() => {
     void getPrinterSettings().then(setSettings);
@@ -172,6 +177,56 @@ export default function SettingsScreen() {
       { text: t.common.cancel, style: 'cancel' },
       { text: t.common.logout, style: 'destructive', onPress: () => void logout() },
     ]);
+  };
+
+  const handleCheckForUpdate = () => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    void (async () => {
+      try {
+        const result = await checkAndroidAppUpdate();
+        if (!result.latest) {
+          Alert.alert(t.common.tip, t.settings.updateNoReleaseConfig);
+          return;
+        }
+        if (!result.hasUpdate) {
+          Alert.alert(
+            t.settings.updateUpToDateTitle,
+            fmt(t.settings.updateUpToDateBody, {
+              current: result.currentVersion,
+              code: String(result.currentVersionCode),
+            }),
+          );
+          return;
+        }
+        const latest = result.latest;
+        Alert.alert(
+          t.settings.updateAvailableTitle,
+          fmt(t.settings.updateAvailableBody, {
+            current: result.currentVersion,
+            code: String(result.currentVersionCode),
+            latest: latest.version,
+            latestCode: String(latest.versionCode),
+            notes: latest.releaseNotes || '—',
+          }),
+          [
+            { text: t.common.cancel, style: 'cancel' },
+            {
+              text: t.settings.updateDownload,
+              onPress: () => {
+                void openAndroidApkDownload(latest.apkUrl).catch((e: unknown) => {
+                  Alert.alert(t.settings.updateCheckFailed, resolveAppError(t, e));
+                });
+              },
+            },
+          ],
+        );
+      } catch (e: unknown) {
+        Alert.alert(t.settings.updateCheckFailed, resolveAppError(t, e));
+      } finally {
+        setCheckingUpdate(false);
+      }
+    })();
   };
 
   if (!settings) {
@@ -361,6 +416,18 @@ export default function SettingsScreen() {
           <Text style={styles.infoLabel}>{t.settings.versionLabel}</Text>
           <Text style={styles.infoValue}>{appVersion} ({buildVersion})</Text>
         </View>
+        {Platform.OS === 'android' ? (
+          <Pressable
+            style={[styles.actionBtn, styles.actionBtnPrimary, checkingUpdate && styles.btnDisabled]}
+            onPress={handleCheckForUpdate}
+            disabled={checkingUpdate}
+            accessibilityRole="button"
+          >
+            <Text style={styles.actionBtnPrimaryText}>
+              {checkingUpdate ? t.settings.checkingUpdate : t.settings.checkForUpdate}
+            </Text>
+          </Pressable>
+        ) : null}
         <Pressable
           style={[styles.actionBtn, styles.actionBtnSecondary]}
           onPress={() => void Linking.openURL(INVENTORY_SUPPORT_URL)}

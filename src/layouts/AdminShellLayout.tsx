@@ -9,6 +9,7 @@ import { useAdminTodo } from '../contexts/AdminTodoContext';
 export const STANDALONE_ADMIN_MODULE_PATHS = [
   '/admin/metric-management',
   '/admin/proxy-purchase',
+  '/admin/proxy-quote',
   '/admin/cross-border-logistics',
 ] as const;
 

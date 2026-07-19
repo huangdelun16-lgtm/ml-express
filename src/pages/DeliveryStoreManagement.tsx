@@ -23,6 +23,10 @@ import {
   MERCHANT_STORE_TYPE_OPTIONS,
   buildMerchantStoreTypeLabelMap,
 } from '../constants/merchantStoreTypes';
+import {
+  isStoreCodeTaken,
+  resolveNextStoreCodeForPrefix,
+} from '../utils/merchantStoreCode';
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
@@ -1296,6 +1300,21 @@ const DeliveryStoreManagement: React.FC = () => {
     [storeProducts, selectedAdminProductId],
   );
 
+  const suggestStoreCode = useCallback(
+    (regionId: string) => {
+      const regionObj = REGIONS.find((r) => r.id === regionId);
+      const prefix = regionObj ? regionObj.prefix : 'MDY';
+      return resolveNextStoreCodeForPrefix(prefix, allStores);
+    },
+    [allStores],
+  );
+
+  useEffect(() => {
+    if (!showForm || isEditing || !formData.region || !formData.store_name) return;
+    const nextCode = suggestStoreCode(formData.region);
+    setFormData((prev) => (prev.store_code === nextCode ? prev : { ...prev, store_code: nextCode }));
+  }, [showForm, isEditing, formData.region, formData.store_name, suggestStoreCode]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
@@ -1310,22 +1329,15 @@ const DeliveryStoreManagement: React.FC = () => {
 
     // 自动生成店铺代码逻辑
     if (!isEditing && (name === 'store_name' || name === 'region')) {
-      setFormData(prev => {
+      setFormData((prev) => {
         const newData = { ...prev, [name]: value };
-        // 如果区域和店铺名称都有了（或者正在输入名称），自动生成代码
         if (newData.region && newData.store_name) {
-          const regionObj = REGIONS.find(r => r.id === newData.region);
-          const prefix = regionObj ? regionObj.prefix : 'MDY';
-          
-          // 获取该区域现有的店铺数量
-          const regionStores = allStores.filter(s => s.region === newData.region || (s.store_code && s.store_code.startsWith(prefix)));
-          const nextNumber = (regionStores.length + 1).toString().padStart(3, '0');
-          newData.store_code = `${prefix}${nextNumber}`;
+          newData.store_code = suggestStoreCode(newData.region);
         }
         return newData;
       });
     } else {
-    setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -1461,9 +1473,13 @@ const DeliveryStoreManagement: React.FC = () => {
         }
       } else {
         const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
+        const store_code = isStoreCodeTaken(formData.store_code, allStores)
+          ? suggestStoreCode(formData.region)
+          : formData.store_code.trim().toUpperCase();
 
         const result = await deliveryStoreService.createStore({
           ...restFormData,
+          store_code,
           latitude: lat,
           longitude: lng,
           service_area_radius: Number(service_area_radius),

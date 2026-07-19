@@ -26,6 +26,7 @@ import {
   type ProxyPurchaseStatus,
 } from '../utils/proxyPurchaseExcel';
 import { proxyPurchaseService } from '../services/supabase';
+import { isAbortLikeError } from '../utils/fetchError';
 import {
   describeProxyPurchaseCloudError,
   isProxyPurchaseTableMissingError,
@@ -295,6 +296,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       setSavedPulse(true);
       window.setTimeout(() => setSavedPulse(false), 1400);
     } catch (e) {
+      if (isAbortLikeError(e)) return;
       console.error(e);
       setCloudSyncDisabled(isProxyPurchaseTableMissingError(e));
       setCloudErr(describeProxyPurchaseCloudError(e, language));
@@ -323,8 +325,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
         await loadFromCloud();
         if (!cancelled) setCloudReady(true);
       } catch (e) {
-        console.error(e);
-        if (!cancelled) {
+        if (!cancelled && !isAbortLikeError(e)) {
+          console.error(e);
+        }
+        if (!cancelled && !isAbortLikeError(e)) {
           const draft = loadDraft();
           setProxyFeePercent(draft.proxyFeePercent);
           setWorkspaceDefaultFee(draft.proxyFeePercent);
@@ -378,6 +382,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           hideTimer = window.setTimeout(() => setSavedPulse(false), 1400);
         })
         .catch((e) => {
+          if (isAbortLikeError(e)) return;
           console.error(e);
           setCloudSyncDisabled(isProxyPurchaseTableMissingError(e));
           setCloudErr(describeProxyPurchaseCloudError(e, language));
@@ -907,11 +912,12 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           pricesTabBtn: '💲 Product prices',
           personalTabBtn: '🧾 Personal expenses',
           proxyTabBtn: '🛒 Proxy purchase',
+          quoteTabBtn: '📋 Proxy quote sheet',
           title: 'Proxy purchase',
           subtitle: 'Record orders, tweak fee & rate live, export a polished Excel for your customer.',
           close: 'Close',
           back: 'Metric management',
-          backMetric: '← Metric hub',
+          backMetric: 'Back to dashboard',
           proxyFee: 'Proxy fee',
           exchangeRate: 'Exchange rate',
           feeRateCardTitle: 'Fee & rate',
@@ -1017,11 +1023,12 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             pricesTabBtn: '💲 Prices',
             personalTabBtn: '🧾 Expenses',
             proxyTabBtn: '🛒 Proxy',
+            quoteTabBtn: '📋 Quote sheet',
             title: 'ကြားခံဝယ်ယူမှု',
             subtitle: 'မှတ်တမ်းတင်ပြီး Excel တင်ပါ။',
             close: 'ပိတ်မည်',
             back: 'Metric hub',
-            backMetric: '← Metric hub',
+            backMetric: 'Back to dashboard',
             proxyFee: 'ကြားခံကြေး',
             exchangeRate: 'ငွေလဲနှုန်း',
             feeRateCardTitle: 'Fee & rate',
@@ -1127,11 +1134,12 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             pricesTabBtn: '💲 商品价格',
             personalTabBtn: '🧾 个人开销',
             proxyTabBtn: '🛒 代购',
+            quoteTabBtn: '📋 代购报价表',
             title: '代购清单',
             subtitle: '登记客户订单，代购费与汇率可随时调整，一键导出 Excel 发给客户。',
             close: '关闭',
             back: '指标管理',
-            backMetric: '← 返回指标管理',
+            backMetric: '返回控制台',
             proxyFee: '代购费',
             exchangeRate: '汇率',
             feeRateCardTitle: '代购费 · 汇率',
@@ -2028,6 +2036,9 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                 <button type="button" style={hubTabStyle(true)} aria-selected>
                   {t.proxyTabBtn}
                 </button>
+                <button type="button" style={hubTabStyle(false)} onClick={() => navigate('/admin/proxy-quote')}>
+                  {t.quoteTabBtn}
+                </button>
               </div>
             ) : null}
             <div
@@ -2130,7 +2141,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             {actionBtn(
               isEmbedded ? `✕ ${t.close}` : t.backMetric,
-              () => (isEmbedded ? onCloseEmbedded?.() : navigate('/admin/metric-management')),
+              () => (isEmbedded ? onCloseEmbedded?.() : navigate('/admin/dashboard')),
               'ghost',
             )}
           </div>

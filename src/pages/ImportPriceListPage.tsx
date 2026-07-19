@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { importMetricDraftService } from '../services/supabase';
+import { isAbortLikeError } from '../utils/fetchError';
 import {
   importMetricDbRowToSaved,
   type ImportMetricDraftSaved,
@@ -114,9 +115,14 @@ const ImportPriceListPage: React.FC<ImportPriceListPageProps> = ({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const rows = await importMetricDraftService.listAll();
-      if (cancelled) return;
-      setDbDrafts(rows.map(importMetricDbRowToSaved));
+      try {
+        const rows = await importMetricDraftService.listAll();
+        if (cancelled) return;
+        setDbDrafts(rows.map(importMetricDbRowToSaved));
+      } catch (e) {
+        if (cancelled || isAbortLikeError(e)) return;
+        setDbDrafts([]);
+      }
     })();
     return () => {
       cancelled = true;

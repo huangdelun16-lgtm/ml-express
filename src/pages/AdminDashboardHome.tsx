@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
 import { bannerService, type Banner } from '../services/supabase';
+import { isAbortLikeError } from '../utils/fetchError';
 
 const CAROUSEL_INTERVAL_MS = 6500;
 
@@ -30,21 +31,27 @@ const AdminDashboardHome: React.FC = () => {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [carouselPaused, setCarouselPaused] = useState(false);
 
-  const loadBanners = useCallback(async () => {
+  const loadBanners = useCallback(async (signal?: { cancelled: boolean }) => {
     setBannersLoading(true);
     try {
       const data = await bannerService.getAllBanners(true);
+      if (signal?.cancelled) return;
       setBanners(data);
       setCarouselIndex(0);
-    } catch {
+    } catch (e) {
+      if (signal?.cancelled || isAbortLikeError(e)) return;
       setBanners([]);
     } finally {
-      setBannersLoading(false);
+      if (!signal?.cancelled) setBannersLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadBanners();
+    const signal = { cancelled: false };
+    void loadBanners(signal);
+    return () => {
+      signal.cancelled = true;
+    };
   }, [loadBanners]);
 
   useEffect(() => {

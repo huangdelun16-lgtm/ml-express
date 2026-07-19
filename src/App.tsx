@@ -19,6 +19,7 @@ import CourierPerformancePage from './pages/CourierPerformancePage';
 import MerchantReconciliationExportPage from './pages/MerchantReconciliationExportPage';
 import ImportMetricDraftsPage from './pages/ImportMetricDraftsPage';
 import ProxyPurchasePage from './pages/ProxyPurchasePage';
+import ProxyQuotePage from './pages/ProxyQuotePage';
 import CrossBorderLogisticsPage from './pages/CrossBorderLogisticsPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -227,6 +228,17 @@ function App() {
                       permissionId={['metric_management', 'product_price', 'personal_expenses']}
                     >
                       <ProxyPurchasePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="proxy-quote"
+                  element={
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'finance']}
+                      permissionId={['metric_management', 'product_price', 'personal_expenses']}
+                    >
+                      <ProxyQuotePage />
                     </ProtectedRoute>
                   }
                 />

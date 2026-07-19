@@ -11,6 +11,7 @@ import {
 } from '../services/supabase';
 import ImportPriceListPage from './ImportPriceListPage';
 import PersonalExpensePage from './PersonalExpensePage';
+import { isAbortLikeError } from '../utils/fetchError';
 
 const CURRENCIES = [
   { value: 'USD', label: '美金 USD' },
@@ -2641,12 +2642,14 @@ const ImportMetricDraftsPage: React.FC = () => {
     direction: DraftTableSortDirection;
   }>({ key: null, direction: 'asc' });
 
-  const reloadDrafts = useCallback(async () => {
+  const reloadDrafts = useCallback(async (signal?: { cancelled: boolean }) => {
     setDraftsLoadErr('');
     try {
       const rows = await importMetricDraftService.listAll();
+      if (signal?.cancelled) return;
       setSavedDrafts(rows.map(importMetricDbRowToSaved));
     } catch (e) {
+      if (signal?.cancelled || isAbortLikeError(e)) return;
       console.error(e);
       setSavedDrafts([]);
       setDraftsLoadErr(
@@ -2660,7 +2663,11 @@ const ImportMetricDraftsPage: React.FC = () => {
   }, [language]);
 
   useEffect(() => {
-    void reloadDrafts();
+    const signal = { cancelled: false };
+    void reloadDrafts(signal);
+    return () => {
+      signal.cancelled = true;
+    };
   }, [reloadDrafts]);
 
   useEffect(() => {
@@ -2774,6 +2781,7 @@ const ImportMetricDraftsPage: React.FC = () => {
           pricesTabBtn: '💲 Product prices',
           personalTabBtn: '🧾 Personal expenses',
           proxyTabBtn: '🛒 Proxy purchase',
+          quoteTabBtn: '📋 Proxy quote sheet',
           title: 'Import metric drafts',
           subtitle:
             'Draft permit ledger: includes customer name; each entry can list multiple line items, each with HS, description and valuation on one card. Saved lines roll up to the «Import price list». The «Myanmar Description» / count column is clickable (shows «1 item» or «N items» plus a short excerpt) to open Cargo details.',
@@ -2806,6 +2814,7 @@ const ImportMetricDraftsPage: React.FC = () => {
             pricesTabBtn: '💲 ကုန်စျေးနှုန်း',
             personalTabBtn: '🧾 ကိုယ်ပိုင်ကုန်ကျစရိတ်',
             proxyTabBtn: '🛒 ကြားခံဝယ်ယူမှု',
+            quoteTabBtn: '📋 Quote sheet',
             title: 'သွင်းကုန် မီတြိခြင်းမူကြမ်း',
             subtitle:
               'ခွင့်ပြုချက်မူကြမ်း — ဖောက်သည်အမည်ပါသည်။ တစ်မှုတွင် ကုန်ပစ္စည်း များစွာ မှတ်တမ်းတင်နိုင်ပြီး HS၊ ဖော်ပြချက် နှင့် တန်ဖိုး။ သိမ်းပြီးပါက 「သွင်းကုန်စျေးနှုန်းဇယား」 သို့ စုသည်။',
@@ -2836,6 +2845,7 @@ const ImportMetricDraftsPage: React.FC = () => {
             pricesTabBtn: '💲 商品价格',
             personalTabBtn: '🧾 个人开销',
             proxyTabBtn: '🛒 代购',
+            quoteTabBtn: '📋 代购报价表',
             title: '进口指标草稿',
             subtitle:
               '批文草稿台账：含客户名称；单笔可登记多条商品，每条在一张卡片内完成 HS、描述与计价。保存后的明细会汇总到「进口价格表」。列表「Myanmar Description」列可点击，显示「共 N 项」标签（含 N=1）及摘要后查看 Cargo 明细。',
@@ -3095,6 +3105,24 @@ const ImportMetricDraftsPage: React.FC = () => {
                 }}
               >
                 {t.proxyTabBtn}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={false}
+                onClick={() => navigate('/admin/proxy-quote')}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,0.22)',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                {t.quoteTabBtn}
               </button>
             </div>
             <p
