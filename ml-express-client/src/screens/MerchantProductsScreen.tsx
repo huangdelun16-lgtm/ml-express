@@ -28,6 +28,7 @@ import { theme } from '../config/theme';
 import Toast from '../components/Toast';
 import ProductVariantChipList from '../components/ProductVariantChipList';
 import MyanmarAwareText from '../components/MyanmarAwareText';
+import { adjustStyleForMyanmarText } from '../utils/myanmarText';
 import {
   buildProductForCart,
   cartLineKey,
@@ -1333,7 +1334,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
               <View style={styles.detailSheet}>
                 <View style={styles.detailHeader}>
-                  <Text style={styles.detailName}>{selectedProductDetail?.name}</Text>
+                  <MyanmarAwareText
+                    style={adjustStyleForMyanmarText(selectedProductDetail?.name, styles.detailName)}
+                    myanmarWeight="bold"
+                    text={selectedProductDetail?.name}
+                  />
                   <View style={styles.detailPriceRow}>
                     {selectedProductDetail && productHasVariants(selectedProductDetail) && !selectedVariantId ? (
                       <Text style={styles.detailPriceHint}>
@@ -1415,7 +1420,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>{currentT.description}</Text>
                   <View style={styles.descriptionBox}>
-                    <MyanmarAwareText style={styles.detailDescription}>
+                    <MyanmarAwareText
+                      style={adjustStyleForMyanmarText(
+                        selectedProductDetail?.description || currentT.noDescription,
+                        styles.detailDescription,
+                      )}
+                    >
                       {selectedProductDetail?.description || currentT.noDescription}
                     </MyanmarAwareText>
                   </View>
@@ -2276,13 +2286,15 @@ const styles = StyleSheet.create({
   },
   detailHeader: {
     marginBottom: 18,
+    paddingTop: 2,
   },
   detailName: {
     fontSize: 22,
     fontWeight: '900',
     color: '#0f172a',
     marginBottom: 10,
-    lineHeight: 28,
+    lineHeight: 30,
+    flexShrink: 0,
   },
   detailPriceRow: {
     flexDirection: 'row',

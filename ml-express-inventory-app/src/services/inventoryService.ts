@@ -28,6 +28,13 @@ import { todayIsoDate } from '../utils/dateFormat';
 import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
+import { parseInboundMovementNote } from '../utils/inboundMovementNote';
+import type { CustomerSignPickupType, CustomerSignReceiptInput } from '../types/customerSignReceipt';
+import {
+  parseSignatureStrokes,
+  serializeSignatureStrokes,
+  validateCustomerSignReceipt,
+} from '../types/customerSignReceipt';
 import {
   listPkgTrackingStatusMap,
   markHubTransitOrdersRepacked,
@@ -478,6 +485,17 @@ export async function getItemDetail(id: string): Promise<InventoryItemDetail | n
   if (!item) return null;
   const moves = await cloudListMovementsForItem(id);
   const inbound = moves.find((m) => m.type === 'in');
+  const parsedNote = parseInboundMovementNote(inbound?.note ?? '');
+  const signReceipt = item.customer_signed_at?.trim()
+    ? {
+        signPhone: item.customer_sign_phone?.trim() ?? '',
+        pickupType: (item.customer_sign_pickup_type === 'proxy' ? 'proxy' : 'self') as CustomerSignPickupType,
+        proxyName: item.customer_sign_proxy_name?.trim() || undefined,
+        signatureStrokes: parseSignatureStrokes(item.customer_signature_data),
+        signedByOperator: item.customer_signed_by_operator?.trim() || undefined,
+        signedAt: item.customer_signed_at,
+      }
+    : undefined;
   return {
     ...item,
     recipient_phone: inbound?.recipient_phone ?? '',
@@ -486,7 +504,10 @@ export async function getItemDetail(id: string): Promise<InventoryItemDetail | n
     inbound_qty: inbound?.qty ?? 0,
     inbound_date_label: inbound?.created_at ?? '',
     inbound_store_name: inbound?.origin_store_name ?? '',
-    inbound_note: inbound?.note ?? '',
+    inbound_note: parsedNote.userNote ?? inbound?.note ?? '',
+    total_fee: parsedNote.totalFee,
+    payment_label: parsedNote.paymentLabel,
+    sign_receipt: signReceipt,
     pack: await getPackedShipmentByBundleItemId(id),
   };
 }
@@ -524,12 +545,30 @@ export async function getItemFirstInboundDate(id: string): Promise<Date | null> 
   return m ? new Date(m.created_at) : null;
 }
 
-export async function markCustomerSigned(id: string, operator: string, actingStore?: InventoryStoreSession): Promise<void> {
+export async function markCustomerSigned(
+  id: string,
+  operator: string,
+  actingStore?: InventoryStoreSession,
+  receipt?: CustomerSignReceiptInput,
+): Promise<void> {
   const item = await getItemById(id);
   if (!item) throw new Error('未找到订单');
+  if (!receipt) throw new Error('请填写签收人信息');
+  const validationError = validateCustomerSignReceipt(receipt);
+  if (validationError) throw new Error(validationError);
+
   await cloudUpsertItem({
-    ...item, customer_signed_at: nowIso(), qty_on_hand: 0,
-    packed_at: '', packed_bundle_barcode: '', updated_at: nowIso(),
+    ...item,
+    customer_signed_at: nowIso(),
+    qty_on_hand: 0,
+    packed_at: '',
+    packed_bundle_barcode: '',
+    customer_sign_phone: receipt.signPhone.trim(),
+    customer_sign_pickup_type: receipt.pickupType,
+    customer_sign_proxy_name: receipt.pickupType === 'proxy' ? receipt.proxyName?.trim() ?? '' : '',
+    customer_signature_data: serializeSignatureStrokes(receipt.signatureStrokes),
+    customer_signed_by_operator: operator.trim(),
+    updated_at: nowIso(),
   }, actingStore);
 }
 

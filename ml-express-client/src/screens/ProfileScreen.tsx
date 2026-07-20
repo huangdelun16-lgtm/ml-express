@@ -20,13 +20,27 @@ import BackToHomeButton from '../components/BackToHomeButton';
 import { theme } from '../config/theme';
 import Skeleton, { StatsCardSkeleton } from '../components/Skeleton';
 import { printerService, PrinterSettings } from '../services/PrinterService';
+import {
+  checkAndroidAppUpdate,
+  checkExpoOtaUpdateAvailable,
+  downloadAndApplyExpoOtaUpdate,
+  getInstalledBuildVersion,
+  getIosAppStoreUrl,
+  openAndroidApkDownload,
+  openIosAppStore,
+} from '../services/appUpdateService';
 
 const { width } = Dimensions.get('window');
+
+function formatUpdateMessage(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? '');
+}
 
 export default function ProfileScreen({ navigation }: any) {
   const { language, setLanguage, isDarkMode, setIsDarkMode, isGuest, setIsGuest } = useApp();
   const { showLoading, hideLoading } = useLoading(); // 🚀 新增：加载状态控制
   const appVersion = Constants.expoConfig?.version ?? '1.1.0';
+  const buildVersion = getInstalledBuildVersion();
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string>('');
   const [userName, setUserName] = useState<string>('访客用户');
@@ -92,6 +106,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 关于我们模态框
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [checkingAppUpdate, setCheckingAppUpdate] = useState(false);
 
   // 🚀 新增：充值模态框状态
   const [showRechargeModal, setShowRechargeModal] = useState(false);
@@ -256,6 +271,23 @@ export default function ProfileScreen({ navigation }: any) {
       aboutApp: '关于应用',
       appDescription: 'MARKET LINK EXPRESS 是一款专业的快递配送服务平台，为用户提供快速、安全、可靠的包裹配送服务。',
       version: '版本',
+      checkForUpdate: '更新版本',
+      checkingUpdate: '检查更新中…',
+      updateTip: '提示',
+      updateDevTip: '开发模式下无法检查正式版更新，请使用已发布的安装包测试。',
+      updateAvailableTitle: '发现新版本',
+      updateAvailableBody:
+        '当前 v{current} ({code})\n最新 v{latest} ({latestCode})\n\n{notes}\n\n下载完成后，请在通知栏或「下载」中打开 APK 安装；若系统提示，请允许「安装未知应用」。',
+      updateDownload: '下载更新',
+      updateUpToDateTitle: '已是最新版本',
+      updateUpToDateBody: '当前已安装 v{current} ({code})，无需更新。',
+      updateUpToDateBodyIos: '当前已安装 v{current} ({code})。如需从 App Store 获取最新安装包，可点击下方按钮。',
+      updateOtaAvailableTitle: '发现热更新',
+      updateOtaAvailableBody: '检测到新的应用资源包，安装后立即生效。是否现在更新并重启？',
+      updateOtaApply: '立即更新',
+      updateOpenStore: '前往 App Store',
+      updateCheckFailed: '检查更新失败',
+      updateNoReleaseConfig: '管理员尚未配置 Android 最新版本下载地址，请联系 Market Link 客服。',
       privacyPolicy: '隐私政策',
       termsOfService: '用户协议',
       contactUs: '联系我们',
@@ -392,6 +424,23 @@ export default function ProfileScreen({ navigation }: any) {
       aboutApp: 'About App',
       appDescription: 'MARKET LINK EXPRESS is a professional express delivery service platform that provides fast, secure, and reliable package delivery services.',
       version: 'Version',
+      checkForUpdate: 'Check for update',
+      checkingUpdate: 'Checking…',
+      updateTip: 'Notice',
+      updateDevTip: 'Update check is unavailable in development builds. Please test with a release build.',
+      updateAvailableTitle: 'Update available',
+      updateAvailableBody:
+        'Installed v{current} ({code})\nLatest v{latest} ({latestCode})\n\n{notes}\n\nAfter download, open the APK from Notifications or Downloads. Allow install from unknown sources if prompted.',
+      updateDownload: 'Download update',
+      updateUpToDateTitle: 'Up to date',
+      updateUpToDateBody: 'You already have v{current} ({code}).',
+      updateUpToDateBodyIos: 'You have v{current} ({code}). You can open the App Store for the latest build.',
+      updateOtaAvailableTitle: 'Update available',
+      updateOtaAvailableBody: 'A new app bundle is ready. Update and restart now?',
+      updateOtaApply: 'Update now',
+      updateOpenStore: 'Open App Store',
+      updateCheckFailed: 'Update check failed',
+      updateNoReleaseConfig: 'No Android release URL is configured yet. Please contact Market Link support.',
       privacyPolicy: 'Privacy Policy',
       termsOfService: 'Terms of Service',
       contactUs: 'Contact Us',
@@ -527,6 +576,23 @@ export default function ProfileScreen({ navigation }: any) {
       aboutApp: 'အက်ပ်အကြောင်း',
       appDescription: 'MARKET LINK EXPRESS သည် အမြန်နှင့်လုံခြုံသော ပါဆယ်ပို့ဆောင်ရေးဝန်ဆောင်မှုများကို ပေးအပ်သော ပရော်ဖက်ရှင်နယ် ပို့ဆောင်ရေးဝန်ဆောင်မှုပလက်ဖောင်းဖြစ်သည်။',
       version: 'ဗားရှင်း',
+      checkForUpdate: 'ဗားရှင်းအပ်ဒိတ်စစ်မည်',
+      checkingUpdate: 'အပ်ဒိတ်စစ်နေသည်…',
+      updateTip: 'သတိပေးချက်',
+      updateDevTip: 'Dev build တွင် update မစစ်နိုင်ပါ — release APK/IPA ဖြင့် စမ်းသပ်ပါ။',
+      updateAvailableTitle: 'ဗားရှင်းအသစ် ရှိပါသည်',
+      updateAvailableBody:
+        'လက်ရှိ v{current} ({code})\nနောက်ဆုံး v{latest} ({latestCode})\n\n{notes}\n\nဒေါင်းလုဒ်ပြီးနောက် APK ကို Notifications/Downloads မှ ဖွင့်ပြီး တပ်ဆင်ပါ။',
+      updateDownload: 'ဒေါင်းလုဒ်ရယူမည်',
+      updateUpToDateTitle: 'နောက်ဆုံးဗားရှင်းဖြစ်ပါသည်',
+      updateUpToDateBody: 'လက်ရှိ v{current} ({code}) — အပ်ဒိတ်မလိုပါ။',
+      updateUpToDateBodyIos: 'လက်ရှိ v{current} ({code})။ App Store မှ နောက်ဆုံးဗားရှင်းရယူနိုင်ပါသည်။',
+      updateOtaAvailableTitle: 'အပ်ဒိတ်အသစ် ရှိပါသည်',
+      updateOtaAvailableBody: 'App bundle အသစ် ရှိပါသည်။ ယခု update လုပ်ပြီး restart လုပ်မလား？',
+      updateOtaApply: 'ယခု update',
+      updateOpenStore: 'App Store သို့',
+      updateCheckFailed: 'အပ်ဒိတ်စစ်ဆေးမှု မအောင်မြင်ပါ',
+      updateNoReleaseConfig: 'Android APK လင့်ခ် မသတ်မှတ်ရသေးပါ — Market Link support ကို ဆက်သွယ်ပါ။',
       privacyPolicy: 'ကိုယ်ရေးလုံခြုံမှုမူဝါဒ',
       termsOfService: 'အသုံးပြုသူစည်းမျဉ်းများ',
       contactUs: 'ဆက်သွယ်ရန်',
@@ -625,6 +691,114 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const t = translations[language as keyof typeof translations];
+  const cancelLabel = language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်မည်';
+
+  const handleCheckAppUpdate = () => {
+    if (checkingAppUpdate) return;
+    if (__DEV__) {
+      Alert.alert(t.updateTip, t.updateDevTip);
+      return;
+    }
+    setCheckingAppUpdate(true);
+    void (async () => {
+      try {
+        if (Platform.OS === 'android') {
+          const result = await checkAndroidAppUpdate();
+          if (!result.latest) {
+            Alert.alert(t.updateTip, t.updateNoReleaseConfig);
+            return;
+          }
+          if (!result.hasUpdate) {
+            Alert.alert(
+              t.updateUpToDateTitle,
+              formatUpdateMessage(t.updateUpToDateBody, {
+                current: result.currentVersion,
+                code: String(result.currentVersionCode),
+              }),
+            );
+            return;
+          }
+          const latest = result.latest;
+          Alert.alert(
+            t.updateAvailableTitle,
+            formatUpdateMessage(t.updateAvailableBody, {
+              current: result.currentVersion,
+              code: String(result.currentVersionCode),
+              latest: latest.version,
+              latestCode: String(latest.versionCode),
+              notes: latest.releaseNotes || '—',
+            }),
+            [
+              { text: cancelLabel, style: 'cancel' },
+              {
+                text: t.updateDownload,
+                onPress: () => {
+                  void openAndroidApkDownload(latest.apkUrl).catch((e: unknown) => {
+                    Alert.alert(
+                      t.updateCheckFailed,
+                      e instanceof Error ? e.message : String(e),
+                    );
+                  });
+                },
+              },
+            ],
+          );
+          return;
+        }
+
+        const otaAvailable = await checkExpoOtaUpdateAvailable();
+        if (otaAvailable) {
+          Alert.alert(t.updateOtaAvailableTitle, t.updateOtaAvailableBody, [
+            { text: cancelLabel, style: 'cancel' },
+            {
+              text: t.updateOtaApply,
+              onPress: () => {
+                void downloadAndApplyExpoOtaUpdate().catch((e: unknown) => {
+                  Alert.alert(
+                    t.updateCheckFailed,
+                    e instanceof Error ? e.message : String(e),
+                  );
+                });
+              },
+            },
+          ]);
+          return;
+        }
+
+        const storeButtons = getIosAppStoreUrl()
+          ? [
+              {
+                text: t.updateOpenStore,
+                onPress: () => {
+                  void openIosAppStore().catch((e: unknown) => {
+                    Alert.alert(
+                      t.updateCheckFailed,
+                      e instanceof Error ? e.message : String(e),
+                    );
+                  });
+                },
+              },
+            ]
+          : [];
+
+        Alert.alert(
+          t.updateUpToDateTitle,
+          formatUpdateMessage(t.updateUpToDateBodyIos, {
+            current: appVersion,
+            code: buildVersion,
+          }),
+          [{ text: cancelLabel, style: 'cancel' }, ...storeButtons],
+        );
+      } catch (e: unknown) {
+        Alert.alert(
+          t.updateCheckFailed,
+          e instanceof Error ? e.message : String(e),
+        );
+      } finally {
+        setCheckingAppUpdate(false);
+      }
+    })();
+  };
 
   useEffect(() => {
     loadUserData();
@@ -2692,7 +2866,26 @@ export default function ProfileScreen({ navigation }: any) {
               
               <View style={styles.aboutSection}>
                 <Text style={styles.aboutSectionTitle}>{t.version}</Text>
-                <Text style={styles.aboutSectionValue}>v{appVersion}</Text>
+                <View style={styles.aboutVersionRow}>
+                  <Text style={styles.aboutSectionValue}>
+                    v{appVersion} ({buildVersion})
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.aboutUpdateBtn,
+                      checkingAppUpdate && styles.aboutUpdateBtnDisabled,
+                    ]}
+                    onPress={handleCheckAppUpdate}
+                    disabled={checkingAppUpdate}
+                    activeOpacity={0.85}
+                  >
+                    {checkingAppUpdate ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.aboutUpdateBtnText}>{t.checkForUpdate}</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.aboutSection}>
@@ -3966,6 +4159,37 @@ const styles = StyleSheet.create({
   aboutSectionValue: {
     fontSize: theme.typography.sizes.m,
     color: theme.colors.text.secondary,
+    flex: 1,
+  },
+  aboutVersionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.borderRadius.s,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  aboutUpdateBtn: {
+    minWidth: 96,
+    minHeight: 36,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: theme.borderRadius.m,
+    backgroundColor: theme.colors.primary.DEFAULT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aboutUpdateBtnDisabled: {
+    opacity: 0.75,
+  },
+  aboutUpdateBtnText: {
+    color: '#fff',
+    fontSize: theme.typography.sizes.s,
+    fontWeight: '700',
   },
   aboutLink: {
     flexDirection: 'row',

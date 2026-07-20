@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import BarcodeScannerView from '../components/BarcodeScannerView';
+import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import { useAuth } from '../contexts/AuthContext';
 import { getPkgStatusLabel, resolveAppError, useTranslation } from '../i18n';
-import { getItemByBarcode, markCustomerSigned } from '../services/inventoryService';
+import { getItemByBarcode } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItem } from '../types/inventory';
 import { canMarkCustomerSigned } from '../utils/customerSign';
@@ -30,7 +31,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
   const { store, operatorName } = useAuth();
   const isFocused = useIsFocused();
   const [loading, setLoading] = useState(false);
-  const [signing, setSigning] = useState(false);
+  const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
 
   const handleScan = async (code: string) => {
@@ -70,32 +71,20 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
   const canSign =
     result?.item && store && canMarkCustomerSigned(store, result.item);
 
-  const handleSign = async () => {
+  const handleSign = () => {
     if (!result?.item || !store) return;
-    setSigning(true);
-    try {
-      await markCustomerSigned(result.item.id, operatorName ?? t.common.operator, store);
-      const item = await getItemByBarcode(result.code);
-      setResult({ ...result, item });
-      showTaskSuccess(
-        t.common.signSuccess,
-        fmt(t.common.signMarked, { name: result.item.name }),
-      );
-    } catch (e: unknown) {
-      Alert.alert(
-        t.common.signFailed,
-        resolveAppError(t, e),
-      );
-    } finally {
-      setSigning(false);
-    }
+    setSignRequest({
+      itemIds: [result.item.id],
+      operator: operatorName ?? t.common.operator,
+      store,
+    });
   };
 
   return (
     <View style={styles.root}>
       <View style={styles.scannerArea}>
         <BarcodeScannerView
-          active={isFocused}
+          active={isFocused && signRequest == null}
           compact
           onScan={(code) => void handleScan(code)}
           title={t.cameraScan.title}
@@ -137,12 +126,12 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
               </Pressable>
               {canSign ? (
                 <Pressable
-                  style={[styles.actionSign, signing && styles.actionDisabled]}
-                  onPress={() => void handleSign()}
-                  disabled={signing}
+                  style={[styles.actionSign, signRequest && styles.actionDisabled]}
+                  onPress={handleSign}
+                  disabled={signRequest != null}
                 >
                   <Text style={styles.actionSignText}>
-                    {signing ? t.common.signInProgress : t.common.signed}
+                    {signRequest ? t.common.signInProgress : t.common.signed}
                   </Text>
                 </Pressable>
               ) : null}
@@ -158,6 +147,23 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
           </>
         )}
       </View>
+
+      <CustomerSignFlowModal
+        request={signRequest}
+        onClose={() => setSignRequest(null)}
+        resolveError={(e) => resolveAppError(t, e)}
+        onSuccess={async (detail, signedCount) => {
+          const item = await getItemByBarcode(result?.code ?? detail.barcode);
+          if (result) setResult({ ...result, item });
+          showTaskSuccess(
+            t.common.signSuccess,
+            signedCount > 1
+              ? `已签收 ${signedCount} 单`
+              : fmt(t.common.signMarked, { name: detail.name }),
+          );
+        }}
+        onError={(message) => Alert.alert(t.common.signFailed, message)}
+      />
     </View>
   );
 }

@@ -23,6 +23,11 @@ export type CloudStoreItemRow = {
   final_destination: string;
   hub_arrived_at: string | null;
   customer_signed_at: string | null;
+  customer_sign_phone: string;
+  customer_sign_pickup_type: string;
+  customer_sign_proxy_name: string;
+  customer_signature_data: string;
+  customer_signed_by_operator: string;
   packed_at: string | null;
   packed_bundle_barcode: string;
   hub_transit_released_at: string | null;
@@ -117,6 +122,11 @@ function rowToCloudItem(row: Record<string, unknown>): CloudStoreItemRow {
     final_destination: String(row.final_destination ?? ''),
     hub_arrived_at: row.hub_arrived_at ? String(row.hub_arrived_at) : null,
     customer_signed_at: row.customer_signed_at ? String(row.customer_signed_at) : null,
+    customer_sign_phone: String(row.customer_sign_phone ?? ''),
+    customer_sign_pickup_type: String(row.customer_sign_pickup_type ?? ''),
+    customer_sign_proxy_name: String(row.customer_sign_proxy_name ?? ''),
+    customer_signature_data: String(row.customer_signature_data ?? ''),
+    customer_signed_by_operator: String(row.customer_signed_by_operator ?? ''),
     packed_at: row.packed_at ? String(row.packed_at) : null,
     packed_bundle_barcode: String(row.packed_bundle_barcode ?? ''),
     hub_transit_released_at: row.hub_transit_released_at
@@ -137,6 +147,11 @@ function itemToRpcPayload(item: InventoryItem, ownerStoreId?: string | null): Re
     owner_store_code: item.owner_store_code?.trim() ?? '',
     hub_arrived_at: toNullableTs(item.hub_arrived_at),
     customer_signed_at: toNullableTs(item.customer_signed_at),
+    customer_sign_phone: item.customer_sign_phone?.trim() ?? '',
+    customer_sign_pickup_type: item.customer_sign_pickup_type?.trim() ?? '',
+    customer_sign_proxy_name: item.customer_sign_proxy_name?.trim() ?? '',
+    customer_signature_data: item.customer_signature_data?.trim() ?? '',
+    customer_signed_by_operator: item.customer_signed_by_operator?.trim() ?? '',
     packed_at: toNullableTs(item.packed_at),
     hub_transit_released_at: toNullableTs(item.hub_transit_released_at),
     hub_transit_shipped_at: toNullableTs(item.hub_transit_shipped_at),
@@ -422,6 +437,11 @@ export async function upsertCloudStoreItem(
     final_destination: finalDestination,
     hub_arrived_at: toNullableTs(item.hub_arrived_at),
     customer_signed_at: toNullableTs(item.customer_signed_at),
+    customer_sign_phone: item.customer_sign_phone?.trim() ?? '',
+    customer_sign_pickup_type: item.customer_sign_pickup_type?.trim() ?? '',
+    customer_sign_proxy_name: item.customer_sign_proxy_name?.trim() ?? '',
+    customer_signature_data: item.customer_signature_data?.trim() ?? '',
+    customer_signed_by_operator: item.customer_signed_by_operator?.trim() ?? '',
     packed_at: toNullableTs(item.packed_at),
     packed_bundle_barcode: item.packed_bundle_barcode?.trim() ?? '',
     hub_transit_released_at: toNullableTs(item.hub_transit_released_at),

@@ -1,8 +1,11 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import LabelPrintPreviewCard from './LabelPrintPreviewCard';
+import { SignaturePreview } from './SignaturePad';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 import { callPhoneNumber } from '../utils/phoneCall';
+import type { CustomerSignReceipt } from '../types/customerSignReceipt';
+import { pickupTypeLabel } from '../types/customerSignReceipt';
 
 export type InboundInvoiceData = {
   barcode: string;
@@ -21,7 +24,15 @@ export type InboundInvoiceData = {
   paymentLabel?: string;
   note?: string;
   storeName?: string;
+  signReceipt?: CustomerSignReceipt;
 };
+
+function formatSignTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export function InvoiceRow({
   label,
@@ -67,6 +78,38 @@ export function InboundInvoiceContent({ data }: { data: InboundInvoiceData }) {
       {data.totalFee ? <InvoiceRow label="总费用" value={`${data.totalFee} MMK`} highlight /> : null}
       {data.paymentLabel ? <InvoiceRow label="付款方式" value={data.paymentLabel} /> : null}
       {data.note ? <InvoiceRow label="备注" value={data.note} /> : null}
+
+      {data.signReceipt ? (
+        <View style={styles.signReceiptSection}>
+          <Text style={styles.signReceiptTitle}>签收留痕</Text>
+          {data.signReceipt.pickupType === 'proxy' ? (
+            <>
+              <InvoiceRow label="代收电话" value={data.signReceipt.signPhone} highlight />
+              <InvoiceRow
+                label="代收人"
+                value={data.signReceipt.proxyName?.trim() || '—'}
+              />
+            </>
+          ) : (
+            <InvoiceRow label="签收方式" value={pickupTypeLabel(data.signReceipt.pickupType)} />
+          )}
+          {data.signReceipt.signedByOperator ? (
+            <InvoiceRow label="操作员" value={data.signReceipt.signedByOperator} />
+          ) : null}
+          {data.signReceipt.signedAt ? (
+            <InvoiceRow
+              label="签收时间"
+              value={formatSignTime(data.signReceipt.signedAt)}
+            />
+          ) : null}
+          {data.signReceipt.signatureStrokes.length > 0 ? (
+            <View style={styles.signatureBlock}>
+              <Text style={styles.signatureLabel}>收件人签名</Text>
+              <SignaturePreview strokes={data.signReceipt.signatureStrokes} />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.barcodeBlock}>
         <Text style={styles.barcodeBlockTitle}>入库条码</Text>
@@ -184,6 +227,19 @@ export const inboundInvoiceStyles = StyleSheet.create({
     textAlign: 'right',
   },
   rowValueHighlight: { color: '#059669', fontSize: 16 },
+  signReceiptSection: {
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    gap: 2,
+  },
+  signReceiptTitle: { color: '#047857', fontSize: 14, fontWeight: '900', marginBottom: 6 },
+  signatureBlock: { marginTop: 10, gap: 8 },
+  signatureLabel: { color: '#64748b', fontSize: 12, fontWeight: '800' },
   barcodeBlock: {
     marginTop: 16,
     backgroundColor: '#fff',

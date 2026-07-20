@@ -9,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import ScanInputBar from '../components/ScanInputBar';
+import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
+import { SignaturePreview } from '../components/SignaturePad';
 import { useAuth } from '../contexts/AuthContext';
 import {
   fmt,
@@ -18,13 +20,14 @@ import {
   useTranslation,
 } from '../i18n';
 import type { TranslationDict } from '../i18n/translations';
-import { markCustomerSigned, trackOrderByCode } from '../services/inventoryService';
+import { trackOrderByCode } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { PackedShipmentDetail, TrackOrderResult } from '../types/inventory';
 import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 import { regionDisplayLabel } from '../constants/destinationOptions';
+import { pickupTypeLabel } from '../types/customerSignReceipt';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Route = { params?: { presetCode?: string } };
@@ -222,6 +225,30 @@ function TrackResultPanel({
         <DetailRow label={t.trackExpress.packaging} value={detail.packaging} />
       </Section>
 
+      {detail.sign_receipt ? (
+        <Section title="签收留痕">
+          {detail.sign_receipt.pickupType === 'proxy' ? (
+            <>
+              <DetailRow label="代收电话" value={detail.sign_receipt.signPhone} />
+              <DetailRow label="代收人" value={detail.sign_receipt.proxyName} />
+            </>
+          ) : (
+            <DetailRow label="签收方式" value={pickupTypeLabel(detail.sign_receipt.pickupType)} />
+          )}
+          <DetailRow label="操作员" value={detail.sign_receipt.signedByOperator} />
+          <DetailRow
+            label="签收时间"
+            value={detail.sign_receipt.signedAt ? formatTime(detail.sign_receipt.signedAt) : ''}
+          />
+          {detail.sign_receipt.signatureStrokes.length > 0 ? (
+            <View style={styles.signatureBox}>
+              <Text style={styles.signatureLabel}>收件人签名</Text>
+              <SignaturePreview strokes={detail.sign_receipt.signatureStrokes} />
+            </View>
+          ) : null}
+        </Section>
+      ) : null}
+
       <Section title={t.trackExpress.sectionItemInfo}>
         <DetailRow label={t.trackExpress.itemName} value={detail.name} />
         <DetailRow label={t.trackExpress.spec} value={detail.spec} />
@@ -308,7 +335,7 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
   const { store, operatorName } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [signing, setSigning] = useState(false);
+  const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
   const [result, setResult] = useState<TrackOrderResult | null>(null);
   const [cloudPkg, setCloudPkg] = useState<PkgTrackingDetail | null>(null);
   const [cloudOrder, setCloudOrder] = useState<OrderTrackingRecord | null>(null);
@@ -353,25 +380,13 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
     result && store && canMarkCustomerSigned(store, result.detail),
   );
 
-  const handleSign = async () => {
+  const handleSign = () => {
     if (!result || !store) return;
-    setSigning(true);
-    try {
-      await markCustomerSigned(result.detail.id, operatorName ?? t.common.operator, store);
-      const refreshed = await trackOrderByCode(result.query);
-      if (refreshed) setResult(refreshed);
-      showTaskSuccess(
-        t.common.signSuccess,
-        fmt(t.common.signMarked, { name: result.detail.name }),
-      );
-    } catch (e: unknown) {
-      Alert.alert(
-        t.common.signFailed,
-        resolveAppError(t, e),
-      );
-    } finally {
-      setSigning(false);
-    }
+    setSignRequest({
+      itemIds: [result.detail.id],
+      operator: operatorName ?? t.common.operator,
+      store,
+    });
   };
 
   return (
@@ -418,11 +433,28 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
           cloudPkg={cloudPkg}
           cloudOrder={cloudOrder}
           canSignDelivered={canSign}
-          signing={signing}
-          onSignDelivered={() => void handleSign()}
+          signing={signRequest != null}
+          onSignDelivered={handleSign}
         />
       ) : null}
       {!result && cloudPkg ? <CloudOnlyPanel pkg={cloudPkg} order={cloudOrder} /> : null}
+
+      <CustomerSignFlowModal
+        request={signRequest}
+        onClose={() => setSignRequest(null)}
+        resolveError={(e) => resolveAppError(t, e)}
+        onSuccess={async (detail, signedCount) => {
+          const refreshed = await trackOrderByCode(result?.query ?? detail.barcode);
+          if (refreshed) setResult(refreshed);
+          showTaskSuccess(
+            t.common.signSuccess,
+            signedCount > 1
+              ? `已签收 ${signedCount} 单`
+              : fmt(t.common.signMarked, { name: detail.name }),
+          );
+        }}
+        onError={(message) => Alert.alert(t.common.signFailed, message)}
+      />
     </ScrollView>
   );
 }
@@ -529,4 +561,6 @@ const styles = StyleSheet.create({
   },
   signBtnDisabled: { opacity: 0.65 },
   signBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  signatureBox: { marginTop: 8, gap: 8 },
+  signatureLabel: { color: '#94a3b8', fontSize: 12, fontWeight: '800' },
 });

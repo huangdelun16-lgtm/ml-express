@@ -45,6 +45,32 @@ function isSpecificSummaryCustomer(key: string | null): key is string {
   return key !== null && key !== SUMMARY_ALL_CUSTOMERS;
 }
 
+function buildRowSeedForCustomerContext(
+  summaryCustomerKey: string | null,
+  customerPhoneByName: ReadonlyMap<string, string>,
+  seed?: Partial<ProxyPurchaseRow>,
+): Partial<ProxyPurchaseRow> {
+  if (!isSpecificSummaryCustomer(summaryCustomerKey)) return seed ?? {};
+  return {
+    ...seed,
+    customerName: summaryCustomerKey,
+    phone: seed?.phone ?? customerPhoneByName.get(summaryCustomerKey) ?? '',
+  };
+}
+
+function insertRowForCustomerContext(
+  prev: ProxyPurchaseRow[],
+  row: ProxyPurchaseRow,
+  summaryCustomerKey: string | null,
+): ProxyPurchaseRow[] {
+  if (!isSpecificSummaryCustomer(summaryCustomerKey)) {
+    return [row, ...prev];
+  }
+  const insertAt = prev.findIndex((item) => item.customerName.trim() === summaryCustomerKey);
+  if (insertAt < 0) return [row, ...prev];
+  return [...prev.slice(0, insertAt), row, ...prev.slice(insertAt)];
+}
+
 function todayIso(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -1618,28 +1644,37 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     );
   };
 
-  const addRow = useCallback((seed?: Partial<ProxyPurchaseRow>) => {
-    setListPage(1);
-    setRows((prev) => [newRow(seed), ...prev]);
-  }, []);
+  const addRow = useCallback(
+    (seed?: Partial<ProxyPurchaseRow>) => {
+      setListPage(1);
+      setRows((prev) => {
+        const created = newRow(
+          buildRowSeedForCustomerContext(summaryCustomerKey, customerPhoneByName, seed),
+        );
+        return insertRowForCustomerContext(prev, created, summaryCustomerKey);
+      });
+    },
+    [summaryCustomerKey, customerPhoneByName],
+  );
 
   const duplicateLastRow = useCallback(() => {
     setListPage(1);
     setRows((prev) => {
-      const source = prev[0];
-      if (!source) return prev;
-      return [
-        newRow({
-          customerName: source.customerName,
-          orderDate: source.orderDate,
-          address: source.address,
-          platform: source.platform,
-          phone: source.phone,
-        }),
-        ...prev,
-      ];
+      const source = isSpecificSummaryCustomer(summaryCustomerKey)
+        ? prev.find((row) => row.customerName.trim() === summaryCustomerKey)
+        : prev[0];
+      const created = source
+        ? newRow({
+            customerName: source.customerName,
+            orderDate: source.orderDate,
+            address: source.address,
+            platform: source.platform,
+            phone: source.phone,
+          })
+        : newRow(buildRowSeedForCustomerContext(summaryCustomerKey, customerPhoneByName));
+      return insertRowForCustomerContext(prev, created, summaryCustomerKey);
     });
-  }, []);
+  }, [summaryCustomerKey, customerPhoneByName]);
 
   const handleExport = useCallback(async () => {
     if (exportableRows.length === 0) {

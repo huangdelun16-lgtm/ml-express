@@ -28,7 +28,11 @@ import {
   listPackableItems,
 } from '../services/inventoryService';
 import { canMarkCustomerSigned } from '../utils/customerSign';
-import { confirmAndMarkCustomerSigned } from '../utils/customerSignConfirm';
+import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
+import {
+  collectSameCustomerPeers,
+  validateBatchSignSelection,
+} from '../utils/customerBatchSign';
 import {
   canEditItemCustomerProfile,
 } from '../utils/itemCustomerProfileEdit';
@@ -57,7 +61,7 @@ type Nav = {
 
 type ItemsRoute = RouteProp<RootStackParamList, 'Items'>;
 
-type ListMode = 'normal' | 'pack' | 'print';
+type ListMode = 'normal' | 'pack' | 'print' | 'sign';
 
 export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const route = useRoute<ItemsRoute>();
@@ -79,6 +83,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [actionCanEdit, setActionCanEdit] = useState(false);
   const [viewItemId, setViewItemId] = useState<string | null>(null);
   const [orderBarcodeRequireDone, setOrderBarcodeRequireDone] = useState(false);
+  const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
   const [packSuccessInfo, setPackSuccessInfo] = useState<{
     name: string;
     barcode: string;
@@ -177,9 +182,25 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   );
 
   const selectActive = listMode !== 'normal';
-  const selectAccent = listMode === 'pack' ? '#7c3aed' : '#0ea5e9';
+  const selectAccent =
+    listMode === 'pack' ? '#7c3aed' : listMode === 'sign' ? '#059669' : '#0ea5e9';
 
   const toggleSelect = (id: string) => {
+    if (listMode === 'sign' && store) {
+      const anchor = displayedItems.find((item) => item.id === id);
+      if (!anchor) return;
+      const peers = collectSameCustomerPeers(displayedItems, anchor, store);
+      const peerIds = peers.map((item) => item.id);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        const allSelected = peerIds.every((peerId) => next.has(peerId));
+        if (allSelected) peerIds.forEach((peerId) => next.delete(peerId));
+        else peerIds.forEach((peerId) => next.add(peerId));
+        return next;
+      });
+      return;
+    }
+
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -246,6 +267,20 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     } finally {
       setBatchPrinting(false);
     }
+  };
+
+  const handleBatchSign = () => {
+    if (!store) return;
+    const validationError = validateBatchSignSelection(selectedItems);
+    if (validationError) {
+      Alert.alert(t.common.tip, validationError);
+      return;
+    }
+    setSignRequest({
+      itemIds: selectedItems.map((item) => item.id),
+      operator: operatorName ?? t.common.operator,
+      store,
+    });
   };
 
   const openPackModal = () => {
@@ -420,6 +455,17 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
             >
               <Text style={styles.printSelectBtnText}>{t.items.multiSelect}</Text>
             </Pressable>
+            <Pressable
+              style={styles.signSelectBtn}
+              onPress={() => {
+                setFilterRegion('');
+                setListMode('sign');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t.items.batchSignBtn}
+            >
+              <Text style={styles.signSelectBtnText}>{t.items.batchSignBtn}</Text>
+            </Pressable>
           </>
         ) : listMode === 'pack' ? (
           <>
@@ -440,6 +486,29 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
               accessibilityLabel={fmt(t.items.nextStep, { count: selectedIds.size })}
             >
               <Text style={styles.packBtnText}>{fmt(t.items.nextStep, { count: selectedIds.size })}</Text>
+            </Pressable>
+          </>
+        ) : listMode === 'sign' ? (
+          <>
+            <Pressable
+              style={styles.ghostBtn}
+              onPress={exitSelectMode}
+              accessibilityRole="button"
+              accessibilityLabel={t.items.cancelSelect}
+            >
+              <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
+            </Pressable>
+            <Text style={styles.packHint}>{t.items.signSelectHint}</Text>
+            <Pressable
+              style={[styles.signActionBtn, selectedIds.size === 0 && styles.packBtnDisabled]}
+              onPress={handleBatchSign}
+              disabled={selectedIds.size === 0}
+              accessibilityRole="button"
+              accessibilityLabel={fmt(t.items.batchSignConfirm, { count: selectedIds.size })}
+            >
+              <Text style={styles.signActionBtnText}>
+                {fmt(t.items.batchSignConfirm, { count: selectedIds.size })}
+              </Text>
             </Pressable>
           </>
         ) : (
@@ -728,20 +797,11 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           actionItem && store
             ? () => {
                 const item = actionItem;
-                confirmAndMarkCustomerSigned({
-                  itemId: item.id,
+                setActionItem(null);
+                setSignRequest({
+                  itemIds: [item.id],
                   operator: operatorName ?? t.common.operator,
                   store,
-                  resolveError: (e) => resolveAppError(t, e),
-                  onSuccess: () => {
-                    setActionItem(null);
-                    showTaskSuccess(
-                      t.common.signSuccess,
-                      fmt(t.common.signMarked, { name: item.name }),
-                    );
-                    void load();
-                  },
-                  onError: (message) => Alert.alert(t.common.signFailed, message),
                 });
               }
             : undefined
@@ -769,6 +829,24 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         data={orderBarcodeData}
         onClose={closeOrderBarcode}
         onDone={orderBarcodeRequireDone ? handlePackPrintDone : undefined}
+      />
+
+      <CustomerSignFlowModal
+        request={signRequest}
+        onClose={() => setSignRequest(null)}
+        resolveError={(e) => resolveAppError(t, e)}
+        onSuccess={(detail, signedCount) => {
+          setSelectedIds(new Set());
+          exitSelectMode();
+          showTaskSuccess(
+            t.common.signSuccess,
+            signedCount > 1
+              ? `已签收 ${signedCount} 单（${detail.customer_name?.trim() || detail.recipient_name?.trim() || detail.name}）`
+              : fmt(t.common.signMarked, { name: detail.name }),
+          );
+          void load();
+        }}
+        onError={(message) => Alert.alert(t.common.signFailed, message)}
       />
     </View>
   );
@@ -841,6 +919,22 @@ const styles = StyleSheet.create({
     borderColor: '#0ea5e9',
   },
   printSelectBtnText: { color: '#38bdf8', fontWeight: '800', fontSize: 14 },
+  signSelectBtn: {
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#059669',
+  },
+  signSelectBtnText: { color: '#6ee7b7', fontWeight: '800', fontSize: 14 },
+  signActionBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  signActionBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   printBtn: {
     backgroundColor: '#0ea5e9',
     borderRadius: 10,

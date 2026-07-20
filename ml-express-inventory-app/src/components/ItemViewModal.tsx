@@ -19,9 +19,6 @@ import { resolvePrintError, useTranslation } from '../i18n';
 import { getItemDetail } from '../services/inventoryService';
 import { printInboundBarcodeOnly } from '../services/printerService';
 import type { InventoryItemDetail } from '../types/inventory';
-import { canMarkCustomerSigned } from '../utils/customerSign';
-import { confirmAndMarkCustomerSigned } from '../utils/customerSignConfirm';
-import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
 type Props = {
   visible: boolean;
@@ -48,16 +45,15 @@ function mapDetailToInvoice(detail: InventoryItemDetail): InboundInvoiceData {
     paymentLabel: detail.payment_label,
     note: detail.inbound_note,
     storeName: detail.inbound_store_name?.trim() || undefined,
+    signReceipt: detail.sign_receipt,
   };
 }
 
 export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Props) {
-  const { store, operatorName } = useAuth();
   const { t } = useTranslation();
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
-  const [signing, setSigning] = useState(false);
 
   const invoiceData = useMemo(
     () => (detail ? mapDetailToInvoice(detail) : null),
@@ -81,29 +77,6 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
       cancelled = true;
     };
   }, [visible, itemId]);
-
-  const canSign = Boolean(
-    detail && store && canMarkCustomerSigned(store, detail),
-  );
-
-  const signDelivered = () => {
-    if (!detail || !store) return;
-    setSigning(true);
-    confirmAndMarkCustomerSigned({
-      itemId: detail.id,
-      operator: operatorName ?? '工作人员',
-      store,
-      onSuccess: () => {
-        void getItemDetail(detail.id).then((refreshed) => {
-          setDetail(refreshed);
-          onSigned?.();
-          showTaskSuccess('签收成功', `${detail.name} 已标记为客户已签收`);
-        });
-      },
-      onError: (message) => Alert.alert('签收失败', message),
-      onDismiss: () => setSigning(false),
-    });
-  };
 
   const printLabel = async () => {
     if (!invoiceData?.barcode) return;
@@ -153,9 +126,6 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
             <InboundInvoiceFooter
               recipientPhone={invoiceData.recipientPhone}
               printing={printing}
-              signing={signing}
-              canSignDelivered={canSign}
-              onSignDelivered={() => void signDelivered()}
               onPrint={() => void printLabel()}
               onClose={onClose}
             />

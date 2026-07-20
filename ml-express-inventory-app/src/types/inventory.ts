@@ -1,3 +1,5 @@
+import type { CustomerSignReceipt } from './customerSignReceipt';
+
 export type MovementType = 'in' | 'out' | 'adjust';
 
 export interface InventoryItem {
@@ -27,6 +29,16 @@ export interface InventoryItem {
   hub_arrived_at?: string;
   /** 客户签收时间（目的站交付） */
   customer_signed_at?: string;
+  /** 签收登记电话 */
+  customer_sign_phone?: string;
+  /** 签收方式 self | proxy */
+  customer_sign_pickup_type?: string;
+  /** 代收人姓名 */
+  customer_sign_proxy_name?: string;
+  /** 手写签名 JSON */
+  customer_signature_data?: string;
+  /** 执行签收操作员 */
+  customer_signed_by_operator?: string;
   /** 打包入快递包时间（持久化，避免同步清掉关联表后状态丢失） */
   packed_at?: string;
   /** 所属快递包包装号 */
@@ -158,6 +170,8 @@ export interface InventoryItemDetail extends InventoryItem {
   total_fee?: string;
   payment_label?: string;
   inbound_note?: string;
+  /** 签收留痕（已签收后展示） */
+  sign_receipt?: CustomerSignReceipt;
   /** 若为打包生成的包裹，附带打包明细 */
   pack: PackedShipmentDetail | null;
 }

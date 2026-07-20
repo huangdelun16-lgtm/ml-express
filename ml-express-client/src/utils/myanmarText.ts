@@ -23,7 +23,20 @@ export function myanmarFontStyle(
       : weight === 'semibold'
         ? MYANMAR_FONT_SEMIBOLD
         : MYANMAR_FONT_REGULAR;
-  return { fontFamily, lineHeight: 24 };
+  return { fontFamily, lineHeight: 28 };
+}
+
+/** 商品标题等大字：缅文略缩小并拉高行高，避免弹窗内竖向裁切 */
+export function adjustStyleForMyanmarText(text: string | null | undefined, base: TextStyle): TextStyle {
+  if (!containsMyanmarText(text)) return base;
+  const baseSize = typeof base.fontSize === 'number' ? base.fontSize : 16;
+  const fontSize = Math.max(baseSize - 4, 14);
+  return {
+    ...base,
+    fontSize,
+    lineHeight: Math.max(Math.round(fontSize * 1.75), 28),
+    paddingTop: 2,
+  };
 }
 
 export type TextRun = { text: string; myanmar: boolean };
