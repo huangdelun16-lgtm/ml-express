@@ -9,6 +9,7 @@
 1. [仓库总览](#1-仓库总览)
 2. [生产域名与部署矩阵](#2-生产域名与部署矩阵)
 3. [子项目一览](#3-子项目一览)
+3.1. [各子项目架构详解（总览）](#31-各子项目架构详解总览)
 4. [管理后台（仓库根 `src/`）](#4-管理后台仓库根-src)
 5. [会员端网站 `ml-express-client-web`](#5-会员端网站-ml-express-client-web)
 6. [商家端网站 `ml-express-merchant-web`](#6-商家端网站-ml-express-merchant-web)
@@ -26,6 +27,7 @@
 18. [给 AI / 维护者的改代码提示](#18-给-ai--维护者的改代码提示)
 19. [常用文件速查](#19-常用文件速查)
 20. [版本与分支](#20-版本与分支)
+21. [CI 与质量门禁](#21-ci-与质量门禁)
 
 ---
 
@@ -97,7 +99,7 @@ flowchart TB
 | 管理后台 | `admin-market-link-express.netlify.app` 或自定义 admin 域 | 仓库根 CRA + Functions |
 | 商家 Web | 独立 Netlify 站点 | `ml-express-merchant-web` |
 | Inventory App Support | `https://market-link-express.com/support` | App Store Support URL |
-| Inventory iOS | App Store `com.mlexpress.inventory` | EAS Build，当前 **1.5.0 (11)** |
+| Inventory iOS | App Store `com.mlexpress.inventory` | EAS Build，当前 **1.6.0 (12)** |
 | Supabase | `uopkyuluxnrewvlmutam.supabase.co` | 全端共用同一项目 |
 
 > ⚠️ 勿在 App Store 使用无效域名（如 `linkexpress.com/support`）；Support URL 必须可访问。
@@ -111,10 +113,10 @@ flowchart TB
 | **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、合伙店铺、报表、跨境物流 | CRA + TS + React Router **v6** | **2.2.4** | Netlify（根目录） |
 | **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户、Support | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
-| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.5.0** | EAS |
-| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.0** | EAS |
-| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.7** | EAS |
-| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + Supabase + 蓝牙打印 | **1.5.0 (11)** | EAS |
+| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.5.2 (66)** | EAS |
+| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.0 (11)** | EAS |
+| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.7 (76)** | EAS |
+| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + Supabase Auth + 蓝牙打印 | **1.6.0 (12)** | EAS |
 | **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
 | **`netlify/`** | 服务端 | 管理后台 Netlify Functions | Node | — | — |
 | **`supabase/`** | 数据 | SQL migrations + Edge Functions | SQL / Deno | — | Supabase Cloud |
@@ -126,14 +128,167 @@ flowchart TB
 
 ---
 
+## 3.1 各子项目架构详解（总览）
+
+以下为 **8 个可部署子项目** 的统一架构说明。改代码前先确认业务线（§1）与认证方式（§1 认证表）。
+
+### 架构分层（通用模式）
+
+```
+┌─────────────────────────────────────────┐
+│  UI 层：pages/screens/components        │
+├─────────────────────────────────────────┤
+│  状态层：contexts/hooks                 │
+├─────────────────────────────────────────┤
+│  业务层：services/*.ts（巨型 supabase.ts│
+│          或 inventoryService 等）        │
+├─────────────────────────────────────────┤
+│  共享逻辑：/shared → 各 app _shared/    │
+├─────────────────────────────────────────┤
+│  数据层：Supabase JS / Netlify Fn / RPC │
+│          （Inventory 另有 45s 内存缓存）  │
+└─────────────────────────────────────────┘
+```
+
+### 3.1.1 管理后台（仓库根 `/`）
+
+| 维度 | 说明 |
+|------|------|
+| **定位** | 内部运营：City 包裹/财务/跟踪/告警 + 跨境物流控制台 + 指标/代购 |
+| **入口** | `src/index.tsx` → `src/App.tsx`（React Router **v6**） |
+| **UI** | `src/pages/`（32+ 页）、`AdminShellLayout`；全屏独立模块见 §4.3 |
+| **业务层** | `src/services/supabase.ts`（City 主业务）、`inventoryConsoleService.ts`（跨境）、`authService.ts` |
+| **服务端** | `netlify/functions/`（Admin JWT 校验、跨境 CRUD、短信/邮件） |
+| **认证** | `verify-admin` + HMAC JWT Cookie；角色 `admin\|manager\|operator\|finance` + `permissionId` |
+| **数据** | Supabase 直连（anon key）；跨境写操作经 Netlify Function + service role |
+| **共享** | `prebuild` → `sync:shared` → `src/services/_shared/` |
+| **部署** | Netlify site `ed9c2173-…`；`npm run deploy:netlify` |
+
+### 3.1.2 会员 Web（`ml-express-client-web/`）
+
+| 维度 | 说明 |
+|------|------|
+| **定位** | C 端官网：着陆、商城、购物车、账户、合规/Support |
+| **入口** | `src/index.tsx` → `src/App.tsx`（React Router **v7**） |
+| **UI** | `src/pages/`（14 页）；`LanguageProvider`、`CartProvider` |
+| **业务层** | `src/services/supabase.ts` + `_shared/` |
+| **服务端** | `netlify/functions/`：`merchant-apply`、`send-sms`、`send-statement` 等 |
+| **认证** | `users`（customer）→ `localStorage`（`ml-express-customer`）；**非 Supabase Auth** |
+| **路由** | `/`、`/mall`、`/cart`、`/profile`、`/support`、`/ml-inventory/privacy`、合规页 |
+| **部署** | Netlify site `52f5f573-…`；Base directory = 本子目录 |
+
+### 3.1.3 商家 Web（`ml-express-merchant-web/`）
+
+| 维度 | 说明 |
+|------|------|
+| **定位** | B 端轻量后台：门店资料、商品、订单跟踪 |
+| **入口** | `src/index.tsx` → `src/App.tsx`（Router **v7**） |
+| **UI** | `LoginPage`、`ProfilePage`、`StoreProductsPage`、`TrackingPage`；`OrderModal` 4 步下单向导 |
+| **业务层** | `src/services/supabase.ts` + `_shared/`（含 `merchantLoginGuard`） |
+| **认证** | `delivery_stores` 店铺码 + 密码 → `localStorage`；**拒绝** `transit_station` |
+| **路由** | `/login` → `/`（Profile）、`/products`、订单经 Profile/Tracking |
+| **部署** | Netlify site `126af2b9-…` |
+
+### 3.1.4 会员 App（`ml-express-client/`）
+
+| 维度 | 说明 |
+|------|------|
+| **定位** | C 端原生：下单、追踪、商城、充值、通知 |
+| **入口** | `index.js` → `App.tsx`（React Navigation 6 Native Stack） |
+| **UI** | `src/screens/`（16 Screen）、`src/components/` |
+| **状态** | `AppContext`、`CartContext`、`LoadingContext` |
+| **业务层** | `supabase.ts`、`DatabaseService.ts`（SQLite 缓存）、`notificationService.ts`、`appUpdateService.ts` |
+| **工具** | `mediaAccess.ts`（Android Photo Picker，无 READ_MEDIA 权限）、`appUpdate.ts` |
+| **认证** | `users` customer → `AsyncStorage`；支持游客；商家分支走 `delivery_stores` |
+| **Deep link** | `ml-express-client://`；关联域 `mlexpress.com` |
+| **Google Play** | `blockedPermissions` 屏蔽 READ_MEDIA_*；选图走系统 Photo Picker |
+| **部署** | EAS projectId `80b0873d-…`；profiles：`apk` / `production`（AAB） |
+
+**屏幕导航**：Welcome → Login/Register → Main(Home) → PlaceOrder、MyOrders、TrackOrder、CityMall、Cart、MerchantProducts、Profile、OrderDetail、AddressBook、NotificationCenter…
+
+### 3.1.5 商家 App（`ml-express-merchant-app/`）
+
+| 维度 | 说明 |
+|------|------|
+| **定位** | B 端原生：与会员 App 架构镜像，侧重门店订单/商品管理 |
+| **入口** | `index.js` → `App.tsx` |
+| **包名** | `com.mlexpress.merchants`；scheme `ml-express-merchants://` |
+| **差异** | 额外 `expo-image-manipulator`；Screen 命名与 client 基本一致 |
+| **认证** | `delivery_stores` + `merchantLoginGuard`（拦截中转站账号） |
+| **共享** | `src/services/_shared/`（含 `productReview.ts`） |
+| **部署** | EAS projectId `0c1336bd-…` |
+
+### 3.1.6 骑手/员工 App（`ml-express-mobile-app/`）
+
+| 维度 | 说明 |
+|------|------|
+| **定位** | STAFF：骑手配送 + 管理员督导（双角色 Tab） |
+| **入口** | `index.ts` → `App.tsx`；显示名 **MARKET LINK STAFF** |
+| **目录** | 无 `src/` 前缀：`screens/`、`services/`、`navigation/`（lazyScreens）、`contexts/` |
+| **业务层** | `supabase.ts`、`locationService`、`notificationService` |
+| **特性** | `@sentry/react-native`；后台定位（`expo-task-manager`）；`RoleGuardScreen` |
+| **认证** | `admin_accounts` + Edge/Netlify `ensure-courier-auth`；`persistSession: false` |
+| **导航** | Stack + 双 Tab 组：Admin（Dashboard/Map/Scan/Profile）vs Courier（MyTasks/Map/Scan/Profile） |
+| **部署** | EAS projectId `9831d961-…`；`build:aab` |
+
+### 3.1.7 Inventory 中转站 App（`ml-express-inventory-app/`）
+
+| 维度 | 说明 |
+|------|------|
+| **定位** | 跨境包裹全链路：入库→打包→装车→到站→签收 |
+| **入口** | `App.tsx`：AuthProvider → Login / `AppNavigator` |
+| **认证** | **唯一使用 Supabase Auth JWT 的移动端**；`inventory-store-login` Edge Function |
+| **数据** | **在线专用**：`inventory_*` 表 + RPC 幂等事务；45s 内存缓存（`inventoryCloudStore`） |
+| **不写 shared** | `sync:shared` 为空操作 |
+| **测试** | `vitest`（单元测试，`npm test`） |
+| **详细** | 见 §10（屏幕、区域可见性、打印、签收流程） |
+
+### 3.1.8 共享层（`/shared/`）
+
+| 维度 | 说明 |
+|------|------|
+| **机制** | 单一源 `shared/src/*.ts` → `sync.mjs` → 各 app `_shared/`（AUTO-GENERATED，已提交 git） |
+| **源文件（7）** | `pricing.ts`、`productReview.ts`、`rechargeQr.ts`、`merchantLoginGuard.ts`、`merchantStoreTypes.ts`、`domainTypes.ts`、`services.ts` |
+| **消费方** | Admin、client-web、merchant-web、client、merchant-app、mobile-app（**不含 Inventory**） |
+| **规则** | ❌ 勿改 `_shared/` 副本；✅ 只改 `/shared/src` 后 `npm run sync:shared` |
+
+### 3.1.9 Supabase 后端（`supabase/`）
+
+| 维度 | 说明 |
+|------|------|
+| **项目** | `uopkyuluxnrewvlmutam.supabase.co`（全端共用） |
+| **Migrations** | **47** 个 SQL 文件（`supabase/migrations/`） |
+| **Edge Functions** | 4 个：`inventory-store-login`、`inventory-change-password`、`inventory-clear-test-data`、`ensure-courier-auth` |
+| **业务域** | City（`packages`/`users`…）与 Inventory（`inventory_*`）**表隔离**，见 §14 |
+
+### 3.1.10 CI 与脚本（`scripts/`、`.github/`）
+
+| 项 | 说明 |
+|----|------|
+| **CI** | `.github/workflows/typecheck.yml`：7 子项目 `tsc --noEmit`（基线门禁） |
+| **脚本** | `scripts/ci-typecheck.mjs` + `typecheck-baselines.json` |
+| **其它** | `scripts/` 含密码迁移、图标同步等运维脚本 |
+
+---
+
 ## 4. 管理后台（仓库根 `src/`）
 
-### 4.1 目录结构
+### 4.1 技术栈
+
+- **React 18** + **TypeScript 4.9** + **react-scripts 5**（CRA）
+- **react-router-dom v6**
+- **@supabase/supabase-js ^2.76**
+- 地图：**@react-google-maps/api**；图表：**recharts**；Excel：**exceljs**；OCR：**tesseract.js**
+- 服务端：**twilio**、**nodemailer**（Netlify Functions）
+
+> 架构总览见 [§3.1.1](#311-管理后台仓库根-)。
+
+### 4.2 目录结构
 
 | 路径 | 职责 |
 |------|------|
 | `src/index.tsx` → `src/App.tsx` | 入口与路由表 |
-| `src/pages/` | 页面（见 §4.2） |
+| `src/pages/` | 页面（见 §4.3） |
 | `src/components/` | 通用与跨境组件（`CrossBorder*`、`CblTablePagination`） |
 | `src/layouts/AdminShellLayout.tsx` | 侧栏+顶栏；`STANDALONE_ADMIN_MODULE_PATHS` |
 | `src/contexts/` | 含 `AdminTodoContext` |
@@ -142,9 +297,9 @@ flowchart TB
 | `src/utils/crossBorderHubs.ts` | MUSE/MDY/YGN 枢纽与账号草稿 |
 | `src/styles/crossBorderLogistics.css` | 跨境独立页样式 |
 | `src/services/_shared/` | `/shared` 同步副本（**勿手改**） |
-| `netlify/functions/` | 服务端（§4.6） |
+| `netlify/functions/` | 服务端（§4.7） |
 
-### 4.2 路由与页面（`src/App.tsx`）
+### 4.3 路由与页面（`src/App.tsx`）
 
 根 `/` → `/admin/login`；`**/admin/**` + `ProtectedRoute`（角色 + `permissionId`）。
 
@@ -168,22 +323,22 @@ flowchart TB
 | `/admin/reports` | 报表 | `reports` |
 | `/admin/courier-performance` | 骑手绩效 | `courier_performance` |
 | `/admin/merchant-reconciliation` | 商家对账 | `merchant_reconciliation` |
-| `/admin/metric-management` | 指标管理（**全屏独立**，4 Tab 见 §4.7） | `metric_management` |
+| `/admin/metric-management` | 指标管理（**全屏独立**，4 Tab 见 §4.8） | `metric_management` |
 | `/admin/proxy-purchase` | 代购清单（独立页，也可从指标管理 Tab 进入） | `metric_management` |
 | `/admin/product-price` | 商品价格 | — |
 | `/admin/personal-expenses` | 个人开销 | — |
 | `/admin/cross-border-logistics` | 跨境物流（**全屏独立**） | `cross_border_logistics` |
 
-### 4.3 独立全屏模块
+### 4.4 独立全屏模块
 
 `STANDALONE_ADMIN_MODULE_PATHS`：`/admin/metric-management`、`/admin/cross-border-logistics`。无通用侧栏/全局搜索/待办条。
 
-### 4.4 合伙店铺 vs 中转站
+### 4.5 合伙店铺 vs 中转站
 
 - **合伙店铺**：City 配送门店；列表过滤 `transit_station`。
 - **跨境物流**：中转站账号、财务、包裹；**跨境账号管理** 创建/编辑 `transit_station`。
 
-### 4.5 跨境物流前端关键文件
+### 4.6 跨境物流前端关键文件
 
 | 文件 | 职责 |
 |------|------|
@@ -195,7 +350,7 @@ flowchart TB
 | `StationReconciliationModal.tsx` | 对账 |
 | `inventoryConsoleService.ts` | Admin API |
 
-### 4.6 Netlify Functions（根 `netlify/functions/`）
+### 4.7 Netlify Functions（根 `netlify/functions/`）
 
 **通用 Admin**
 
@@ -228,7 +383,7 @@ flowchart TB
 
 生产 Netlify 站点 ID：`ed9c2173-4031-4f10-a466-5b041dfe3511`。
 
-### 4.7 指标管理 Hub（`ImportMetricDraftsPage.tsx`）
+### 4.8 指标管理 Hub（`ImportMetricDraftsPage.tsx`）
 
 全屏独立模块，内含 4 个 Tab（换电脑需 Supabase 云端数据，勿只依赖 localStorage）：
 
@@ -243,16 +398,51 @@ flowchart TB
 
 ## 5. 会员端网站 `ml-express-client-web/`
 
-- 仅服务会员（`localStorage`：`ml-express-customer`）。
-- 目录：`src/{pages,components,contexts,services,constants,styles,utils}` + `src/services/_shared/`。
-- 路由（`src/App.tsx`）：
-  - `/` 着陆页（内嵌服务/追踪/联系区块）
-  - `/profile`、`/mall`、`/mall/:storeId`、`/cart`
-  - `/privacy-policy`、`/terms-of-service`、`/delete-account`
-  - **`/support`** — ML Inventory App Store 支持页（`SupportPage.tsx`）
-- Netlify Functions：`merchant-apply`、`merchant-apply-upload`、`send-sms`、`verify-sms`、`send-email-code` 等。
+> 架构总览见 [§3.1.2](#312-会员-webml-express-client-web)。
+
+### 5.1 技术栈
+
+CRA + TypeScript + React Router **v7** + `@supabase/supabase-js` + `@sentry/react` + Google Maps。
+
+### 5.2 目录结构
+
+```
+ml-express-client-web/
+├── src/
+│   ├── index.tsx → App.tsx
+│   ├── pages/              # 14 个页面（Home、Mall、Cart、Profile、Support…）
+│   ├── components/
+│   ├── contexts/           # LanguageProvider, CartProvider
+│   ├── services/           # supabase.ts + _shared/
+│   ├── constants/ styles/ utils/
+├── netlify/functions/      # merchant-apply, send-sms, send-statement…
+└── netlify.toml            # Base directory = 本子目录
+```
+
+### 5.3 认证与会话
+
+- 仅服务会员：`users` 表 customer 凭证。
+- 会话：`localStorage` 键 `ml-express-customer`。
+- **非 Supabase Auth JWT**；`ClientWebMerchantSessionGuard` 防止商家 session 误用。
+
+### 5.4 路由（`src/App.tsx`）
+
+| 路径 | 页面 |
+|------|------|
+| `/` | HomePage（着陆，内嵌 services/tracking/contact） |
+| `/profile` | 账户 |
+| `/mall`、`/mall/:storeId` | 商城 |
+| `/cart` | 购物车 |
+| `/merchant-apply` | 商家入驻申请 |
+| `/support` | **ML Inventory App Store Support 页** |
+| `/ml-inventory/privacy` | Inventory 隐私政策 |
+| `/privacy-policy`、`/terms-of-service`、`/delete-account` | 合规 |
+| `/download`、`/download-rider` | 重定向 GitHub APK |
+
+### 5.5 部署
+
 - Netlify 站点 ID：`52f5f573-ca0a-4769-a8c7-e5f675764056`。
-- `/download`、`/download-rider` → GitHub Releases APK 重定向。
+- 构建：`npm install --legacy-peer-deps && CI=false npm run build`（`prebuild` → `sync:shared`）。
 
 ```bash
 cd ml-express-client-web && npm install && npm start
@@ -262,11 +452,46 @@ cd ml-express-client-web && npm install && npm start
 
 ## 6. 商家端网站 `ml-express-merchant-web/`
 
-- 目录：`src/{pages,components,contexts,hooks,services,…}` + `_shared/`。
-- **下单弹窗**：`src/components/home/OrderModal.tsx` + `orderModalWizard.ts`（4 步向导）。
-- 多规格：`ProductVariantPicker.tsx` + `utils/productVariants.ts`。
-- Auth：`delivery_stores.store_code` + 密码 → `localStorage`；拒绝 `transit_station`（`merchantLoginGuard`）。
-- 路由：`/login` → `/`（Profile）、`/products`、`/orders`。
+> 架构总览见 [§3.1.3](#313-商家-webml-express-merchant-web)。
+
+### 6.1 技术栈
+
+与 client-web 类似：CRA + TS + React Router v7 + Supabase。
+
+### 6.2 目录结构
+
+```
+ml-express-merchant-web/
+├── src/
+│   ├── pages/              # Login, Profile, StoreProducts, Tracking
+│   ├── components/home/    # OrderModal.tsx（4 步下单向导）
+│   ├── contexts/ hooks/
+│   ├── services/           # supabase.ts + _shared/
+├── netlify/functions/      # send-sms, send-statement, verify-email…
+└── netlify.toml
+```
+
+### 6.3 认证
+
+- `delivery_stores.store_code` + 密码 → `localStorage`。
+- **`merchantLoginGuard`**（来自 `/shared`）：拒绝 `store_type = transit_station` 登录商家端。
+
+### 6.4 路由
+
+| 路径 | 页面 |
+|------|------|
+| `/login` | 登录 |
+| `/` | Profile（主页） |
+| `/products` | 商品管理 |
+| `/orders` | 订单（经 Profile/Tracking 导航） |
+
+### 6.5 关键 UI
+
+- **下单弹窗**：`OrderModal.tsx` + `orderModalWizard.ts`（4 步）。
+- **多规格**：`ProductVariantPicker.tsx` + `utils/productVariants.ts`。
+
+### 6.6 部署
+
 - Netlify 站点 ID：`126af2b9-244f-47fd-9be9-58fb45b6e7a2`。
 
 ```bash
@@ -277,63 +502,164 @@ cd ml-express-merchant-web && npm install && npm start
 
 ## 7. 会员 App `ml-express-client`
 
+> 架构总览见 [§3.1.4](#314-会员-appml-express-client)。
+
+### 7.1 标识与版本
+
 | 项 | 值 |
 |----|-----|
 | 包名 | `com.mlexpress.client` |
-| 版本 | **2.5.0**（iOS build 64 / Android versionCode 64） |
-| 技术 | Expo 54 + RN 0.81 + React Navigation |
+| 版本 | **2.5.2**（iOS build **66** / Android versionCode **66**） |
+| 技术 | Expo SDK 54 + RN 0.81.4 + React Navigation 6 |
 | Deep link | `ml-express-client://`、`https://mlexpress.com` |
+| EAS | projectId `80b0873d-1d76-429e-8c79-738a817d8a15` |
 
-**目录**：`src/{screens,components,contexts,services,utils}` + `src/services/_shared/`。
+### 7.2 目录结构
 
-**核心屏幕**：Welcome → Login/Register → Main(Home tabs) → PlaceOrder、MyOrders、TrackOrder、CityMall、Cart、Profile、OrderDetail…
+```
+ml-express-client/
+├── index.js → App.tsx
+├── app.json / eas.json
+├── src/
+│   ├── screens/            # 16 Screen（见 7.4）
+│   ├── components/
+│   ├── contexts/           # AppContext, CartContext, LoadingContext
+│   ├── services/
+│   │   ├── supabase.ts     # 主业务 API
+│   │   ├── DatabaseService.ts   # expo-sqlite 本地缓存
+│   │   ├── notificationService.ts
+│   │   ├── appUpdateService.ts  # 应用内 APK 更新检查
+│   │   └── _shared/
+│   └── utils/
+│       ├── mediaAccess.ts       # Android Photo Picker（Google Play 合规）
+│       └── appUpdate.ts
+├── android/ ios/           # 原生工程
+└── docs/sql/               # client_android_latest_release.sql
+```
 
-**Auth**：`users` 表 `user_type='customer'`，非 Supabase Auth JWT；会话 `AsyncStorage`（`currentUser`）；支持游客模式。
+### 7.3 数据层
 
-**Supabase 表**：`users`、`packages`、`address_book`、`delivery_stores`、`products`、`user_notifications`、`banners` 等。
+| 层 | 说明 |
+|----|------|
+| **Supabase** | `users`、`packages`、`products`、`delivery_stores`、`address_book`、`banners`、`user_notifications`… |
+| **SQLite** | `DatabaseService.ts` 离线/缓存辅助 |
+| **AsyncStorage** | 用户 session（`currentUser`） |
+| **SecureStore** | 敏感数据 |
 
-**构建**：
+### 7.4 屏幕与导航
+
+**Native Stack**（`initialRouteName="Welcome"`）：
+
+Welcome → Login/Register → **Main(HomeScreen)** → PlaceOrder、MyOrders、TrackOrder、Profile、OrderDetail、AddressBook、CityMall、Cart、MerchantProducts、NotificationCenter、NotificationSettings…
+
+### 7.5 认证
+
+- `users` 表 `user_type='customer'`，自定义密码校验（**非 Supabase Auth JWT**）。
+- 支持游客模式；商家登录走 `delivery_stores` 分支（同一 `supabase.ts`）。
+
+### 7.6 Google Play 媒体权限策略
+
+- `app.json` → `android.blockedPermissions` 屏蔽 `READ_MEDIA_IMAGES/VIDEO/AUDIO`、`READ_MEDIA_VISUAL_USER_SELECTED`、`READ_EXTERNAL_STORAGE`。
+- `expo-media-library` 配置 `granularPermissions: []`；保存二维码用 `writeOnly` 或 Android 13+ MediaStore。
+- 选图统一经 `utils/mediaAccess.ts` → 系统 Photo Picker，**不** `requestMediaLibraryPermissionsAsync`（Android）。
+
+### 7.7 应用内更新
+
+- `appUpdateService.ts` 读取 Supabase `system_settings` 键 `client.android.latest_release`。
+- SQL 模板：`docs/sql/client_android_latest_release.sql`。
+
+### 7.8 构建
 
 ```bash
 cd ml-express-client
 npm install && npx expo start
-eas build --platform ios --profile production   # 或 android / apk
+eas build --platform android --profile production   # Play AAB
+eas build --platform android --profile apk          # 侧载 APK
+npm run build:apk:gradle                            # 本地 Gradle APK
 ```
 
 ---
 
 ## 8. 商家 App `ml-express-merchant-app`
 
+> 架构总览见 [§3.1.5](#315-商家-appml-express-merchant-app)。
+
+### 8.1 标识
+
 | 项 | 值 |
 |----|-----|
 | 包名 | `com.mlexpress.merchants` |
-| 版本 | **2.4.0** |
+| 版本 | **2.4.0**（build **11**） |
 | Scheme | `ml-express-merchants://` |
+| EAS | projectId `0c1336bd-…` |
 
-与会员 App 架构相同，额外 `expo-image-manipulator`（商品图）。
+### 8.2 架构
 
-**Auth**：`delivery_stores` 店铺码 + 密码；`merchantLoginGuard` 拦截 `transit_station`。
+与会员 App（§7）**同构**：Expo 54 + Navigation 6 + `supabase.ts` + SQLite 缓存 + `_shared/`。
 
-**核心屏幕**：Welcome → Login → Main → MyOrders、MerchantProducts、PlaceOrder、Cart、Profile…
+**额外依赖**：`expo-image-manipulator`（商品图处理）。
+
+### 8.3 认证
+
+- `delivery_stores` 店铺码 + 密码 → `AsyncStorage`。
+- **`merchantLoginGuard`**：拦截 `transit_station`（中转站账号只能登 Inventory App）。
+
+### 8.4 屏幕
+
+Welcome → Login → Main → MyOrders、MerchantProducts、PlaceOrder、Cart、Profile、OrderDetail…（与 client 命名基本一致，面向 B 端操作）。
+
+### 8.5 构建
+
+```bash
+cd ml-express-merchant-app && npm install && npx expo start
+eas build --platform android --profile production
+```
 
 ---
 
 ## 9. 骑手/员工 App `ml-express-mobile-app`
 
+> 架构总览见 [§3.1.6](#316-骑手员工-appml-express-mobile-app)。
+
+### 9.1 标识
+
 | 项 | 值 |
 |----|-----|
 | 包名 | `com.mlexpress.courier` |
 | 显示名 | MARKET LINK STAFF |
-| 版本 | **2.3.7** |
+| 版本 | **2.3.7**（Android versionCode **76**） |
 | Scheme | `ml-express-staff://` |
+| EAS | projectId `9831d961-…` |
 
-**目录结构（无 `src/` 前缀）**：`screens/`、`services/`、`navigation/`（lazyScreens）、`components/`、`contexts/`、`database/`（本地 SQLite）、`services/_shared/`。
+### 9.2 目录结构（无 `src/` 前缀）
 
-**Auth**：`admin_accounts` 登录；骑手 provisioning 走 `ensure-courier-auth` Edge Function；Supabase client `persistSession: false`。
+```
+ml-express-mobile-app/
+├── index.ts → App.tsx
+├── screens/           # 20 Screen（lazy load）
+├── navigation/        # lazyScreens.tsx, navigationRef.ts
+├── services/          # supabase.ts, locationService, notificationService, _shared/
+├── components/ contexts/
+├── constants/         # courierOnline.ts
+└── app.config.js      # blockedPermissions 屏蔽 READ_MEDIA_*
+```
 
-**核心屏幕**：Login → LocationDisclosure → Main tabs（Dashboard/MyTasks/Map/Scan/Profile）→ PackageDetail、DeliveryHistory、PackageManagement、CourierManagement、FinanceManagement…
+### 9.3 认证与角色
 
-**特性**：`@sentry/react-native`、后台定位（`expo-location` + `expo-task-manager`）、角色守卫（管理员可见财务/骑手管理）。
+- 登录：`admin_accounts` 用户名 + 密码。
+- Provisioning：`ensure-courier-auth` Edge Function / Netlify Function。
+- Supabase client **`persistSession: false`**。
+- **双角色 UI**：管理员 Tab（Dashboard/财务/骑手管理）vs 骑手 Tab（MyTasks/配送）。
+
+### 9.4 导航
+
+Stack：Login → LocationDisclosure → Main(Tabs) → PackageDetail、DeliveryHistory、PackageManagement、CourierManagement、FinanceManagement、Settings…
+
+### 9.5 特性
+
+- `@sentry/react-native` 错误监控。
+- 后台定位：`expo-location` + `expo-task-manager` → `courier_locations` 实时上报。
+- `RoleGuardScreen` 权限守卫。
 
 ```bash
 cd ml-express-mobile-app && npm install && npx expo start
@@ -352,7 +678,7 @@ npm run build:aab   # Android AAB 生产包
 |----|-----|
 | 包名 | iOS/Android `com.mlexpress.inventory` |
 | App Store 名 | **ML Inventory** |
-| 版本 | **1.5.0**（iOS build **11** / Android versionCode **11**） |
+| 版本 | **1.6.0**（iOS build **12** / Android versionCode **12**） |
 | 登录 | Edge Function `inventory-store-login` → Supabase Auth JWT |
 | JWT claims | `inventory_store_code`、`inventory_hub_code` 等 |
 | 数据策略 | **Supabase `inventory_*` 是唯一业务数据源；必须联网，不提供离线队列** |
@@ -370,7 +696,7 @@ npm run build:aab   # Android AAB 生产包
 ```
 ml-express-inventory-app/src/
 ├── screens/           # 业务页（见 10.3）
-├── components/        # HubReceiveOrdersModal、PackExpressModal、OrderBarcodeModal、LabelPrintPreviewCard…
+├── components/        # HubReceiveOrdersModal、CustomerSignFlowModal、SignaturePad、PackExpressModal…
 ├── contexts/          # AuthContext、LanguageContext
 ├── i18n/              # translations.ts、format.ts、types.ts
 ├── navigation/        # AppNavigator（Stack）
@@ -426,7 +752,7 @@ flowchart LR
   E --> F[云端 inventory_pkg_tracking]
   F --> G[到站收货 HubReceive]
   G --> H{订单目的地}
-  H -->|本站| I[确认入库 / 客户签收]
+  H -->|本站| I[确认入库 / 客户签收 CustomerSignFlow]
   H -->|其它站| J[释放中转 → 再打包 → 再装车]
 ```
 
@@ -499,7 +825,33 @@ inventoryService.ts → inventoryCloudApi.ts → Supabase inventory_*
 
 Settings 可选「蓝牙直连」模式；入库成功后可弹 `OrderBarcodeModal` 打印标签。
 
-### 10.9 运行、EAS 与 App Store
+### 10.10 目的站客户签收（v1.6+）
+
+目的站将订单标记「已签收」前，弹出 **`CustomerSignFlowModal`** 采集签收留痕：
+
+| 模式 | 采集字段 |
+|------|----------|
+| **本人签收** | SVG 签名；电话沿用订单收件人电话 |
+| **代收** | 代收人电话 + 姓名 + 签名 |
+
+**批量签收**：`ItemsScreen`「✓ 批量签收」模式 → 选一单自动选中同客户可签收订单 → 一次签名写多单（`customerBatchSign.ts`）。
+
+**关键文件**：
+
+| 文件 | 职责 |
+|------|------|
+| `CustomerSignFlowModal.tsx` | 签收弹窗流程 |
+| `SignaturePad.tsx` | SVG 平滑签名（`react-native-svg`） |
+| `customerSignReceipt.ts` | 类型与校验 |
+| `customerBatchSign.ts` | 同客户批量逻辑 |
+| `inventoryService.markCustomerSigned()` | 写入 Supabase |
+| `InboundInvoiceView.tsx` | 订单详情展示签收留痕 |
+
+**Migration**：`20260720140000_inventory_customer_sign_receipt.sql` — 字段含 `customer_signed_at`、`sign_receipt_json` 等。
+
+**入口**：列表操作菜单、批量签收、TrackExpress、CameraScan（**不含** Invoice 详情页单独按钮）。
+
+### 10.11 运行、EAS 与 App Store
 
 ```bash
 cd ml-express-inventory-app
@@ -632,7 +984,7 @@ eas build --platform android --profile apk
 
 | 表 | 用途 |
 |----|------|
-| `inventory_store_items` | 订单/商品主数据（条码、目的地、打包状态、qty） |
+| `inventory_store_items` | 订单/商品主数据（条码、目的地、打包状态、qty、**签收留痕**） |
 | `inventory_stock_movements` | 入库/出库流水 |
 | `inventory_packed_shipments` | 快递包头 |
 | `inventory_packed_shipment_items` | 包内订单行 |
@@ -676,6 +1028,9 @@ eas build --platform android --profile apk
 | `20260615120000_inventory_platform_store_data.sql` | 库存主表 |
 | `20260621130000_inventory_admin_overview_stats.sql` | Admin overview RPC |
 | `20260707120000_proxy_purchase_workspace.sql` | 代购清单表 |
+| `20260720140000_inventory_customer_sign_receipt.sql` | 目的站客户签收留痕字段 |
+
+**Migrations 总数**：**47** 个文件（`supabase/migrations/`）。
 
 ```bash
 # 推送全部 migration
@@ -788,6 +1143,8 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 10. **Inventory EAS 发布**：改 `app.json` version/buildNumber + `eas build`；Support URL 保持可访问。
 11. **改打印**：`tsplLabelBuilder.ts` + `bluetoothThermalPrinter.ts` + `printerService.ts`。
 12. **勿提交** `.env`、keystore、`.temp/`、`upload-release.keystore`；仅用户要求时 commit。
+13. **改 Google Play 媒体权限**：client `app.json blockedPermissions` + `mediaAccess.ts` + `AndroidManifest.xml tools:node="remove"`。
+14. **改 Inventory 签收**：`CustomerSignFlowModal` + migration `20260720140000` + `markCustomerSigned`。
 
 ---
 
@@ -811,7 +1168,11 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | Admin 跨境性能 | `inventory-admin-data.js`、`inventory_admin_overview_stats` RPC |
 | Inventory App Store | `app.config.js`、`eas.json`、`LoginScreen.tsx` |
 | Support 页 | `ml-express-client-web/.../SupportPage.tsx` |
+| 目的站客户签收 | `CustomerSignFlowModal.tsx`、`customerBatchSign.ts`、`markCustomerSigned` |
 | 合伙店铺（不含中转站） | `DeliveryStoreManagement.tsx` |
+| 会员 App 应用内更新 | `appUpdateService.ts`、`docs/sql/client_android_latest_release.sql` |
+| 会员 App 媒体权限 / 选图 | `ml-express-client/src/utils/mediaAccess.ts`、`app.json blockedPermissions` |
+| 代购报价表 | `ProxyQuotePage.tsx`、`utils/proxyQuoteExcel.ts` |
 | 商家下单弹窗 | `merchant-web/.../OrderModal.tsx` |
 | 会员/商家计费 | `/shared/src/pricing.ts` |
 | 管理后台权限菜单 | `App.tsx`、`AccountManagement.tsx`、`AdminShellLayout.tsx` |
@@ -822,15 +1183,15 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 ## 20. 版本与分支
 
-| 项目 | 版本 | 备注 |
-|------|------|------|
-| 管理后台（根） | **2.2.4** | `package.json` |
-| ml-express-client | **2.5.0** | iOS build 64 |
-| ml-express-merchant-app | **2.4.0** | |
-| ml-express-mobile-app | **2.3.7** | STAFF 骑手端 |
-| ml-express-inventory-app | **1.5.0 (11)** | 在线专用、P203A TSPL 与本地 Code128 系统打印 |
-| ml-express-client-web | **0.1.0** | |
-| ml-express-merchant-web | **0.1.0** | |
+| 项目 | 版本 | Build / Code | 备注 |
+|------|------|--------------|------|
+| 管理后台（根） | **2.2.4** | — | `package.json` |
+| ml-express-client | **2.5.2** | **66** | Google Play Photo Picker 合规；应用内更新 |
+| ml-express-merchant-app | **2.4.0** | **11** | |
+| ml-express-mobile-app | **2.3.7** | **76** | STAFF 骑手端 |
+| ml-express-inventory-app | **1.6.0** | **12** | 客户签收留痕、SVG 签名、批量签收 |
+| ml-express-client-web | **0.1.0** | — | |
+| ml-express-merchant-web | **0.1.0** | — | |
 
 各 Expo App 各自 `eas.json`；Inventory 使用 `appVersionSource: local`。
 
@@ -838,4 +1199,37 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 ---
 
-*最后更新：2026-07-16 — Inventory v1.5.0 (11) 调整为 Supabase 唯一数据源与在线专用 UX，并移除离线队列/立即同步文档。*
+## 21. CI 与质量门禁
+
+### 21.1 GitHub Actions
+
+- 工作流：`.github/workflows/typecheck.yml`
+- 触发：`pull_request`、推送到 `main`
+- 矩阵：**7 个子项目** 并行跑 `tsc --noEmit`
+
+| 项目路径 | 说明 |
+|----------|------|
+| `.` | 管理后台 CRA |
+| `ml-express-client-web` | 会员 Web |
+| `ml-express-merchant-web` | 商家 Web |
+| `ml-express-client` | 会员 App |
+| `ml-express-merchant-app` | 商家 App |
+| `ml-express-mobile-app` | STAFF App |
+| `ml-express-inventory-app` | Inventory App |
+
+### 21.2 基线门禁
+
+- 脚本：`scripts/ci-typecheck.mjs` + `scripts/typecheck-baselines.json`
+- **Clean 项目**：必须 0 类型错误。
+- **RN 项目**：以现有错误数为基线（不允许变多）；修复后下调基线。
+
+### 21.3 Inventory 单元测试
+
+```bash
+cd ml-express-inventory-app && npm test    # vitest
+cd ml-express-inventory-app && npm run typecheck
+```
+
+---
+
+*最后更新：2026-07-21 — 补充 §3.1 各子项目架构详解；同步 client 2.5.2 (66) Google Play 媒体权限、Inventory 1.6.0 (12) 客户签收、47 migrations、CI 门禁。*

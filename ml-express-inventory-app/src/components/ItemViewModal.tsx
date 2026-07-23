@@ -120,7 +120,15 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
               contentContainerStyle={inboundInvoiceStyles.scroll}
               showsVerticalScrollIndicator={false}
             >
-              <InboundInvoiceContent data={invoiceData} />
+              <InboundInvoiceContent
+                data={invoiceData}
+                copyLabels={{
+                  copied: t.common.copied,
+                  tapToCopy: t.common.tapToCopy,
+                  expressNo: t.items.expressNo,
+                  inbound: t.items.inbound,
+                }}
+              />
             </ScrollView>
 
             <InboundInvoiceFooter

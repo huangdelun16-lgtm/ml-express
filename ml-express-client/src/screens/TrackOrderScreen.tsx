@@ -5,6 +5,12 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'reac
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { packageService, supabase, deliveryPhotoService } from '../services/supabase';
+import {
+  crossBorderTrackingService,
+  pickCrossBorderLabel,
+  crossBorderStatusColor,
+  type CrossBorderTrackingResult,
+} from '../services/crossBorderTrackingService';
 import { chatService } from '../services/chatService';
 import { useApp } from '../contexts/AppContext';
 import Toast from '../components/Toast';
@@ -54,6 +60,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [trackingCode, setTrackingCode] = useState(route?.params?.orderId || '');
   const [loading, setLoading] = useState(false);
   const [packageData, setPackageData] = useState<Package | null>(null);
+  const [crossBorderData, setCrossBorderData] = useState<CrossBorderTrackingResult | null>(null);
   const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([]);
   const [searched, setSearched] = useState(false);
   const [courierId, setCourierId] = useState<string | null>(null);
@@ -309,13 +316,15 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 
     setLoading(true);
     setSearched(true);
+    setCrossBorderData(null);
     
     try {
-      // 查询订单
+      // 查询同城配送订单
       const order = await packageService.trackOrder(code.trim());
       
       if (order) {
         setPackageData(order);
+        setCrossBorderData(null);
         
         // 🚀 新增：获取骑手ID以进行实时追踪 (优先匹配姓名，失败则匹配订单中的courier字段作为ID尝试)
         if (order.courier && order.courier !== '待分配') {
@@ -354,15 +363,28 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           setDeliveryPhotos([]);
         }
         
-        showToast('查询成功！', 'success');
+        showToast(language === 'zh' ? '查询成功！' : 'Found!', 'success');
       } else {
-        setPackageData(null);
-        setTrackingHistory([]);
-        showToast(t.notFound, 'error');
+        // 同城未命中时，尝试 Inventory 跨境物流（快递单号 / 入库单号）
+        const crossBorder = await crossBorderTrackingService.trackByCode(code.trim());
+        if (crossBorder) {
+          setPackageData(null);
+          setTrackingHistory([]);
+          setCourierId(null);
+          setRiderLocation(null);
+          setCrossBorderData(crossBorder);
+          showToast(language === 'zh' ? '已找到跨境包裹' : 'Cross-border shipment found', 'success');
+        } else {
+          setPackageData(null);
+          setCrossBorderData(null);
+          setTrackingHistory([]);
+          showToast(t.notFound, 'error');
+        }
       }
     } catch (error: any) {
       LoggerService.error('查询失败:', error);
       setPackageData(null);
+      setCrossBorderData(null);
       setTrackingHistory([]);
       showToast(t.searchError, 'error');
     } finally {
@@ -504,8 +526,13 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const translations: any = {
     zh: {
       title: '追踪订单',
-      subtitle: '输入订单号查询包裹状态',
-      inputPlaceholder: '请输入订单号或扫描二维码',
+      subtitle: '输入订单号、快递单号或入库单号查询',
+      inputPlaceholder: '订单号 / 快递单号 / 入库单号',
+      crossBorderBadge: '跨境物流',
+      inboundBarcode: '入库单号',
+      expressBarcode: '快递单号',
+      destination: '目的地',
+      productName: '商品',
       trackButton: '查询',
       scanButton: '扫码查询',
       notFound: '未找到订单',
@@ -549,8 +576,13 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     },
     en: {
       title: 'Track Order',
-      subtitle: 'Enter order number to check status',
-      inputPlaceholder: 'Enter order number or scan QR code',
+      subtitle: 'Order ID, express waybill, or inbound barcode',
+      inputPlaceholder: 'Order / express / inbound barcode',
+      crossBorderBadge: 'Cross-border',
+      inboundBarcode: 'Inbound barcode',
+      expressBarcode: 'Express waybill',
+      destination: 'Destination',
+      productName: 'Product',
       trackButton: 'Track',
       scanButton: 'Scan',
       notFound: 'Order Not Found',
@@ -594,8 +626,13 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     },
     my: {
       title: 'အော်ဒါခြေရာခံ',
-      subtitle: 'အော်ဒါနံပါတ်ထည့်သွင်းပါ',
-      inputPlaceholder: 'အော်ဒါနံပါတ် သို့မဟုတ် QR ကုဒ်စကန်ဖတ်ပါ',
+      subtitle: 'အော်ဒါ / express / inbound barcode',
+      inputPlaceholder: 'အော်ဒါ / express / inbound',
+      crossBorderBadge: 'Cross-border',
+      inboundBarcode: 'Inbound barcode',
+      expressBarcode: 'Express waybill',
+      destination: 'Destination',
+      productName: 'Product',
       trackButton: 'ရှာဖွေ',
       scanButton: 'စကန်ဖတ်',
       notFound: 'အော်ဒါမတွေ့ပါ',
@@ -664,9 +701,18 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       '配送中': '#8b5cf6',
       '已送达': '#10b981',
       '已取消': '#ef4444',
+      '已到达瑞丽仓库': '#3b82f6',
+      '已装车': '#8b5cf6',
+      '已抵达目的地': '#22c55e',
+      '已签收': '#10b981',
     };
     return colors[status] || '#6b7280';
   };
+
+  const crossBorderEvents = useMemo(() => {
+    if (!crossBorderData?.events?.length) return [];
+    return [...crossBorderData.events].reverse();
+  }, [crossBorderData]);
 
   // 格式化日期
   const formatDate = (dateString?: string) => {
@@ -833,12 +879,127 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         )}
 
         {/* 未找到 */}
-        {searched && !loading && !packageData && (
+        {searched && !loading && !packageData && !crossBorderData && (
           <View style={styles.notFoundContainer}>
             <Text style={styles.notFoundIcon}>📦</Text>
             <Text style={styles.notFoundText}>{t.notFound}</Text>
             <Text style={styles.notFoundDesc}>{t.notFoundDesc}</Text>
           </View>
+        )}
+
+        {crossBorderData && !loading && (
+          <>
+            <View style={styles.statusCard}>
+              <LinearGradient
+                colors={[
+                  crossBorderStatusColor(crossBorderData.current_status_key),
+                  crossBorderStatusColor(crossBorderData.current_status_key) + 'dd',
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.statusGradient}
+              >
+                <View style={styles.statusHeader}>
+                  <Text style={styles.statusBadge}>{t.crossBorderBadge}</Text>
+                  <Text style={styles.statusText}>
+                    {pickCrossBorderLabel(crossBorderData.current_status, language)}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </View>
+
+            <View style={[styles.card, isDarkMode && styles.darkCard]}>
+              <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📦 {t.orderInfo}</Text>
+              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
+                <Text style={styles.infoLabel}>{t.inboundBarcode}:</Text>
+                <Text style={[styles.infoValue, isDarkMode && styles.darkText]} selectable>
+                  {crossBorderData.order_barcode}
+                </Text>
+              </View>
+              {crossBorderData.express_barcode ? (
+                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
+                  <Text style={styles.infoLabel}>{t.expressBarcode}:</Text>
+                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]} selectable>
+                    {crossBorderData.express_barcode}
+                  </Text>
+                </View>
+              ) : null}
+              {crossBorderData.recipient_name ? (
+                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
+                  <Text style={styles.infoLabel}>{t.receiver}:</Text>
+                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>
+                    {crossBorderData.recipient_name}
+                  </Text>
+                </View>
+              ) : null}
+              {crossBorderData.final_destination ? (
+                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
+                  <Text style={styles.infoLabel}>{t.destination}:</Text>
+                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>
+                    {crossBorderData.final_destination_label
+                      ? pickCrossBorderLabel(
+                          {
+                            zh: crossBorderData.final_destination_label.zh,
+                            en: crossBorderData.final_destination_label.en,
+                            my: crossBorderData.final_destination_label.en,
+                          },
+                          language,
+                        )
+                      : crossBorderData.final_destination}
+                  </Text>
+                </View>
+              ) : null}
+              {crossBorderData.product_name ? (
+                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
+                  <Text style={styles.infoLabel}>{t.productName}:</Text>
+                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>
+                    {crossBorderData.product_name}
+                  </Text>
+                </View>
+              ) : null}
+              {crossBorderData.weight ? (
+                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
+                  <Text style={styles.infoLabel}>{t.weight}:</Text>
+                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>
+                    {crossBorderData.weight}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {crossBorderEvents.length > 0 && (
+              <View style={[styles.card, isDarkMode && styles.darkCard]}>
+                <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📍 {t.trackingHistory}</Text>
+                {crossBorderEvents.map((event, index) => (
+                  <View key={`${event.status_key}-${event.event_time}-${index}`} style={styles.trackingItem}>
+                    <View style={styles.trackingDot}>
+                      <View
+                        style={[
+                          styles.trackingDotInner,
+                          index === 0 && styles.trackingDotActive,
+                          isDarkMode && { borderColor: '#1e293b' },
+                        ]}
+                      />
+                      {index !== crossBorderEvents.length - 1 && (
+                        <View style={[styles.trackingLine, isDarkMode && { backgroundColor: '#1e293b' }]} />
+                      )}
+                    </View>
+                    <View style={styles.trackingContent}>
+                      <Text style={[styles.trackingStatus, isDarkMode && styles.darkText]}>
+                        {pickCrossBorderLabel(event.labels, language)}
+                      </Text>
+                      {event.note ? (
+                        <Text style={[styles.trackingNote, isDarkMode && { color: '#94a3b8' }]}>
+                          {event.note}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.trackingTime}>{formatDate(event.event_time)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         {/* 订单信息 */}
@@ -1290,6 +1451,20 @@ const styles = StyleSheet.create({
   statusGradient: {
     padding: 30,
     alignItems: 'center',
+  },
+  statusHeader: {
+    alignItems: 'center',
+  },
+  statusBadge: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
   etaContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',

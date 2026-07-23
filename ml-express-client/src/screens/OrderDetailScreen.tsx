@@ -9,6 +9,7 @@ import QRCode from 'react-native-qrcode-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
+import { ensureSaveToLibraryPermission } from '../utils/mediaAccess';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { packageService, reviewService, supabase } from '../services/supabase';
 import { addDismissedReviewOrderId, getDismissedReviewOrderIds } from '../utils/reviewPromptStorage';
@@ -114,8 +115,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const handleSaveQRCode = async () => {
     try {
       showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const granted = await ensureSaveToLibraryPermission();
+      if (!granted) {
         hideLoading();
         Alert.alert(
           language === 'zh' ? '权限提示' : 'Permission Required',

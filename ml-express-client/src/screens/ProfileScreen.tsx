@@ -9,8 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import { Vibration } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
+import { ensureSaveToLibraryPermission, pickImageFromLibrary } from '../utils/mediaAccess';
 import * as FileSystem from 'expo-file-system';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -1504,8 +1504,8 @@ export default function ProfileScreen({ navigation }: any) {
       console.log('🚀 开始保存二维码...', amount);
       showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
       
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const granted = await ensureSaveToLibraryPermission();
+      if (!granted) {
         hideLoading();
         Alert.alert('提示', '需要相册权限才能保存图片');
         return;
@@ -1545,17 +1545,16 @@ export default function ProfileScreen({ navigation }: any) {
   // 🚀 新增：上传支付凭证
   const handleUploadPaymentProof = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('提示', '需要相册权限才能选择图片');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result = await pickImageFromLibrary({
         mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.7,
       });
+
+      if (result.canceled && result.assets === null) {
+        Alert.alert('提示', '需要相册权限才能选择图片');
+        return;
+      }
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setRechargeProofUri(result.assets[0].uri);

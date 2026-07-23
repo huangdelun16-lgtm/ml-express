@@ -19,7 +19,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
+import type { ImagePickerOptions } from 'expo-image-picker';
+import { pickImageFromLibrary } from '../utils/mediaAccess';
 import { useApp } from '../contexts/AppContext';
 import { useCart, CartItem, getCartItemLineKey } from '../contexts/CartContext';
 import { merchantService, Product, ProductCategory } from '../services/supabase';
@@ -296,44 +297,24 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
   const pickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('提示', '需要相册权限才能选择图片');
-        return;
-      }
-
-      // 使用兼容性写法，优先尝试新版 API，失败则回退
-      const options: any = {
+      const options: ImagePickerOptions = {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
+        mediaTypes: ['images'],
       };
 
-      // 尝试使用字符串数组，这是新版 Expo 推荐的写法
-      options.mediaTypes = ['images'];
-
-      const result = await ImagePicker.launchImageLibraryAsync(options);
+      const result = await pickImageFromLibrary(options);
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const uri = result.assets[0].uri;
         setProductForm(prev => ({ ...prev, image_url: uri }));
+      } else if (result.canceled && result.assets === null) {
+        Alert.alert('提示', '需要相册权限才能选择图片');
       }
     } catch (error) {
       console.error('Pick image error:', error);
-      // 如果 ['images'] 报错，尝试回退到旧版 MediaTypeOptions
-      try {
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.7,
-        });
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          setProductForm(prev => ({ ...prev, image_url: result.assets[0].uri }));
-        }
-      } catch (retryError) {
-        Alert.alert('错误', '无法打开相册，请检查权限');
-      }
+      Alert.alert('错误', '无法打开相册，请稍后重试');
     }
   };
 

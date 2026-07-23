@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import CopyableCodeRow from './CopyableCodeRow';
 import { useTranslation } from '../i18n';
 import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
@@ -54,15 +55,38 @@ export default function ItemActionModal({
           <Text style={styles.title} numberOfLines={2}>
             {item.name}
           </Text>
-          {isPack ? (
-            <Text style={styles.barcode} numberOfLines={1}>
-              {item.barcode}
-            </Text>
-          ) : (
+          {!isPack ? (
             <Text style={styles.subtitle} numberOfLines={1}>
               {item.customer_name || t.items.noCustomer}
               {item.destination ? ` · ${item.destination}` : ''}
             </Text>
+          ) : null}
+
+          {!isPack ? (
+            <View style={styles.codeBlock}>
+              <CopyableCodeRow
+                label={t.items.expressNo}
+                value={item.input_barcode ?? ''}
+                copiedLabel={t.common.copied}
+                tapHint={t.common.tapToCopy}
+                variant="dark"
+              />
+              <CopyableCodeRow
+                label={t.items.inbound}
+                value={item.barcode}
+                copiedLabel={t.common.copied}
+                tapHint={t.common.tapToCopy}
+                variant="dark"
+              />
+            </View>
+          ) : (
+            <CopyableCodeRow
+              label={t.nav.pkg}
+              value={item.barcode}
+              copiedLabel={t.common.copied}
+              tapHint={t.common.tapToCopy}
+              variant="dark"
+            />
           )}
 
           <View style={styles.btnRow}>
@@ -165,7 +189,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 16,
   },
-  subtitle: { color: '#94a3b8', fontSize: 13, marginTop: 4, marginBottom: 16 },
+  subtitle: { color: '#94a3b8', fontSize: 13, marginTop: 4, marginBottom: 10 },
+  codeBlock: { marginBottom: 8 },
   btnRow: {
     flexDirection: 'row',
     gap: 10,

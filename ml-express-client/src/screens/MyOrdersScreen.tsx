@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, D
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as ImagePicker from 'expo-image-picker';
+import { pickImageFromLibrary } from '../utils/mediaAccess';
 import { packageService, supabase, reviewService } from '../services/supabase';
 import { chatService } from '../services/chatService';
 import LoggerService from '../services/LoggerService';
@@ -628,20 +628,19 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       return;
     }
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    const result = await pickImageFromLibrary({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 6 - reviewImages.length,
+      quality: 0.7,
+    });
+
+    if (result.canceled && result.assets === null) {
       Alert.alert(language === 'zh' ? '权限错误' : 'Permission Error', language === 'zh' ? '需要相册访问权限来上传评价图片' : 'Need photo library access');
       return;
     }
 
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        selectionLimit: 6 - reviewImages.length,
-        quality: 0.7,
-      });
-
       if (!result.canceled) {
         setIsUploadingReviewImage(true);
         const newImages = [...reviewImages];

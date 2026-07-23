@@ -502,6 +502,9 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       .proxy-purchase-row--settled {
         background: rgba(30, 58, 95, 0.28) !important;
       }
+      .proxy-purchase-row--settled td {
+        vertical-align: middle;
+      }
       .proxy-purchase-readonly-cell {
         display: block;
         width: 100%;
@@ -514,6 +517,27 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
         font-size: 13px;
         cursor: default;
         user-select: text;
+      }
+      .proxy-purchase-readonly-cell--table {
+        display: inline;
+        width: auto;
+        max-width: 100%;
+        padding: 0;
+        border: none;
+        background: transparent;
+        border-radius: 0;
+        line-height: 1.35;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
+      .proxy-purchase-readonly-cell--customer {
+        font-weight: 600;
+        color: #f1f5f9;
+        white-space: nowrap;
+      }
+      .proxy-purchase-row--settled .proxy-purchase-settled-badge {
+        padding: 2px 6px;
+        font-size: 10px;
       }
       .proxy-purchase-settled-badge {
         display: inline-flex;
@@ -598,10 +622,22 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
 
   const exportableRows = useMemo(() => rows.filter(rowHasExportContent), [rows]);
 
+  /** 批量结清/撤销、全选等操作的当前范围（客户页仅该客户，总览页为全部） */
+  const batchScopeRows = useMemo(() => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey)) return exportableRows;
+    return exportableRows.filter((r) => r.customerName.trim() === summaryCustomerKey);
+  }, [exportableRows, summaryCustomerKey]);
+
   const batchSettleEligibleCount = useMemo(
     () =>
-      exportableRows.filter((r) => exportSelected[r.id] && !isProxyPurchaseRowSettled(r)).length,
-    [exportableRows, exportSelected],
+      batchScopeRows.filter((r) => exportSelected[r.id] && !isProxyPurchaseRowSettled(r)).length,
+    [batchScopeRows, exportSelected],
+  );
+
+  const batchUnsettleEligibleCount = useMemo(
+    () =>
+      batchScopeRows.filter((r) => exportSelected[r.id] && isProxyPurchaseRowSettled(r)).length,
+    [batchScopeRows, exportSelected],
   );
 
   const exportCustomerOptions = useMemo(() => {
@@ -680,6 +716,9 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const allExportableSelected =
     filteredExportRows.length > 0 && filteredExportRows.every((r) => exportSelected[r.id]);
 
+  const allBatchScopeSelected =
+    batchScopeRows.length > 0 && batchScopeRows.every((r) => exportSelected[r.id]);
+
   const toggleExportRow = useCallback((id: string, checked?: boolean) => {
     setExportSelected((prev) => ({
       ...prev,
@@ -706,6 +745,26 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       return next;
     });
   }, [filteredExportRows]);
+
+  const selectAllInBatchScope = useCallback(() => {
+    setExportSelected((prev) => {
+      const next = { ...prev };
+      batchScopeRows.forEach((r) => {
+        next[r.id] = true;
+      });
+      return next;
+    });
+  }, [batchScopeRows]);
+
+  const selectNoneInBatchScope = useCallback(() => {
+    setExportSelected((prev) => {
+      const next = { ...prev };
+      batchScopeRows.forEach((r) => {
+        next[r.id] = false;
+      });
+      return next;
+    });
+  }, [batchScopeRows]);
 
   const selectFilteredCustomer = useCallback((customerName: string) => {
     setExportFilterCustomer(customerName);
@@ -1036,6 +1095,12 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           confirmSettle: 'Mark this order as settled? It will be removed from the RMB total but kept for export.',
           confirmBatchSettle: 'Settle selected open orders? They will be removed from the RMB total but kept for export.',
           noRowsToSettle: 'Select at least one unsettled order with data.',
+          unsettle: 'Undo settle',
+          unsettleShort: 'Undo',
+          batchUnsettle: 'Undo batch settle',
+          confirmUnsettle: 'Mark this order as unsettled again? It will count toward the RMB total.',
+          confirmBatchUnsettle: 'Undo settlement for selected settled orders? They will count toward the RMB total again.',
+          noRowsToUnsettle: 'Select at least one settled order.',
           confirmDeleteSettledRow: 'Delete this settled order? This cannot be undone.',
           filterAll: 'All',
           filterOpen: 'Open',
@@ -1148,6 +1213,12 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             confirmSettle: 'Settle this order?',
             confirmBatchSettle: 'Batch settle selected?',
             noRowsToSettle: 'Select unsettled rows',
+            unsettle: 'Undo',
+            unsettleShort: 'Undo',
+            batchUnsettle: 'Undo batch',
+            confirmUnsettle: 'Undo settle?',
+            confirmBatchUnsettle: 'Undo batch settle?',
+            noRowsToUnsettle: 'Select settled rows',
             confirmDeleteSettledRow: 'Delete settled order?',
             filterAll: 'All',
             filterOpen: 'Open',
@@ -1257,8 +1328,14 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             settledBadge: '已结清',
             settledViewOnly: '已结清，不可编辑',
             confirmSettle: '确认结清此订单？结清后不计入人民币合计，但仍保留可再次导出。',
-            confirmBatchSettle: '确认批量结清已勾选的未结清订单？结清后不计入人民币合计，但仍保留可再次导出。',
+            confirmBatchSettle: '确认批量结清当前范围内已勾选的未结清订单？结清后不计入人民币合计，但仍保留可再次导出。',
             noRowsToSettle: '请先勾选至少一条未结清的有效订单。',
+            unsettle: '撤销结清',
+            unsettleShort: '撤销',
+            batchUnsettle: '批量撤销结清',
+            confirmUnsettle: '确认撤销此订单的结清状态？撤销后将重新计入人民币合计。',
+            confirmBatchUnsettle: '确认批量撤销已勾选订单的结清状态？撤销后将重新计入人民币合计。',
+            noRowsToUnsettle: '请先勾选至少一条已结清订单。',
             confirmDeleteSettledRow: '确认删除这条已结清订单？删除后无法恢复。',
             filterAll: '全部',
             filterOpen: '未结清',
@@ -1401,9 +1478,14 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const renderStatusSelect = (row: ProxyPurchaseRow) => {
     const status = normalizeProxyPurchaseStatus(row.status);
     if (isProxyPurchaseRowSettled(row)) {
+      const lang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
+      const at = formatSettledAt(row.settledAt, lang);
       return (
-        <span className="proxy-purchase-readonly-cell" title={t.settledViewOnly}>
-          {proxyPurchaseStatusLabel(status, language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh')}
+        <span
+          className="proxy-purchase-readonly-cell proxy-purchase-readonly-cell--table"
+          title={at ? `${t.settledViewOnly} · ${at}` : t.settledViewOnly}
+        >
+          {proxyPurchaseStatusLabel(status, lang)}
         </span>
       );
     }
@@ -1486,20 +1568,59 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   );
 
   const batchSettleSelected = useCallback(() => {
-    const targets = exportableRows.filter(
+    const scopeHint = isSpecificSummaryCustomer(summaryCustomerKey)
+      ? `\n\n范围：仅客户「${summaryCustomerKey}」`
+      : '';
+    const targets = batchScopeRows.filter(
       (r) => exportSelected[r.id] && !isProxyPurchaseRowSettled(r),
     );
     if (targets.length === 0) {
       window.alert(t.noRowsToSettle);
       return;
     }
-    if (!window.confirm(t.confirmBatchSettle)) return;
+    if (!window.confirm(`${t.confirmBatchSettle}${scopeHint}`)) return;
     const ts = new Date().toISOString();
     const ids = new Set(targets.map((r) => r.id));
     setRows((prev) =>
       prev.map((r) => (ids.has(r.id) ? { ...r, settled: true, settledAt: ts } : r)),
     );
-  }, [exportableRows, exportSelected, t.confirmBatchSettle, t.noRowsToSettle]);
+  }, [batchScopeRows, exportSelected, summaryCustomerKey, t.confirmBatchSettle, t.noRowsToSettle]);
+
+  const unsettleRow = useCallback(
+    (id: string) => {
+      const row = rows.find((r) => r.id === id);
+      if (!row || !isProxyPurchaseRowSettled(row)) return;
+      if (!window.confirm(t.confirmUnsettle)) return;
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, settled: false, settledAt: '' } : r)),
+      );
+    },
+    [rows, t.confirmUnsettle],
+  );
+
+  const batchUnsettleSelected = useCallback(() => {
+    const scopeHint = isSpecificSummaryCustomer(summaryCustomerKey)
+      ? `\n\n范围：仅客户「${summaryCustomerKey}」`
+      : '';
+    const targets = batchScopeRows.filter(
+      (r) => exportSelected[r.id] && isProxyPurchaseRowSettled(r),
+    );
+    if (targets.length === 0) {
+      window.alert(t.noRowsToUnsettle);
+      return;
+    }
+    if (!window.confirm(`${t.confirmBatchUnsettle}${scopeHint}`)) return;
+    const ids = new Set(targets.map((r) => r.id));
+    setRows((prev) =>
+      prev.map((r) => (ids.has(r.id) ? { ...r, settled: false, settledAt: '' } : r)),
+    );
+  }, [
+    batchScopeRows,
+    exportSelected,
+    summaryCustomerKey,
+    t.confirmBatchUnsettle,
+    t.noRowsToUnsettle,
+  ]);
 
   const clearAllRows = useCallback(() => {
     const settledRows = rows.filter((r) => isProxyPurchaseRowSettled(r));
@@ -1530,6 +1651,26 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     );
   };
 
+  const renderSettledReadonlyCell = (
+    value: string,
+    title: string,
+    variant: 'table' | 'card' = 'table',
+    emphasis?: 'customer',
+  ) => (
+    <span
+      className={[
+        'proxy-purchase-readonly-cell',
+        variant === 'table' ? 'proxy-purchase-readonly-cell--table' : '',
+        emphasis === 'customer' ? 'proxy-purchase-readonly-cell--customer' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      title={title}
+    >
+      {value || '—'}
+    </span>
+  );
+
   const renderEditableInput = (
     row: ProxyPurchaseRow,
     value: string,
@@ -1541,15 +1682,18 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       list?: string;
       min?: number;
       step?: number;
+      readonlyVariant?: 'table' | 'card';
+      readonlyEmphasis?: 'customer';
     },
   ) => {
     if (isProxyPurchaseRowSettled(row)) {
       const lang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
       const at = formatSettledAt(row.settledAt, lang);
-      return (
-        <span className="proxy-purchase-readonly-cell" title={at ? `${t.settledViewOnly} · ${at}` : t.settledViewOnly}>
-          {value || '—'}
-        </span>
+      return renderSettledReadonlyCell(
+        value,
+        at ? `${t.settledViewOnly} · ${at}` : t.settledViewOnly,
+        opts?.readonlyVariant ?? 'table',
+        opts?.readonlyEmphasis,
       );
     }
     return (
@@ -1611,9 +1755,37 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const renderRowActions = (row: ProxyPurchaseRow) => {
     if (isProxyPurchaseRowSettled(row)) {
       return (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            flexWrap: 'nowrap',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {renderSettledBadge(row)}
-          {renderDeleteRowButton(row)}
+          <button
+            type="button"
+            title={t.unsettle}
+            onClick={() => unsettleRow(row.id)}
+            style={{
+              height: 26,
+              padding: '0 8px',
+              borderRadius: 8,
+              border: '1px solid rgba(251, 191, 36, 0.35)',
+              background: 'rgba(245, 158, 11, 0.18)',
+              color: '#fcd34d',
+              cursor: 'pointer',
+              fontSize: 11,
+              fontWeight: 800,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {t.unsettleShort}
+          </button>
+          {renderDeleteRowButton(row, 'sm')}
         </div>
       );
     }
@@ -1881,7 +2053,11 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colCustomer}</span>
-            {renderEditableInput(row, row.customerName, (v) => updateRow(row.id, { customerName: v }))}
+            {renderEditableInput(row, row.customerName, (v) => updateRow(row.id, { customerName: v }), {
+              placeholder: 'TSL',
+              readonlyVariant: 'card',
+              readonlyEmphasis: 'customer',
+            })}
           </label>
           <label>
             <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginBottom: 4 }}>{t.colDate}</span>
@@ -2407,9 +2583,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {actionBtn(`+ ${t.addRow}`, () => addRow(), 'primary')}
             {actionBtn(`⎘ ${t.duplicateRow}`, duplicateLastRow, 'ghost')}
-            {actionBtn(t.selectAll, selectAllExportable, 'ghost')}
-            {actionBtn(t.selectNone, selectNoneExportable, 'ghost')}
+            {actionBtn(t.selectAll, selectAllInBatchScope, 'ghost')}
+            {actionBtn(t.selectNone, selectNoneInBatchScope, 'ghost')}
             {actionBtn(t.batchSettle, batchSettleSelected, 'success', batchSettleEligibleCount === 0)}
+            {actionBtn(t.batchUnsettle, batchUnsettleSelected, 'ghost', batchUnsettleEligibleCount === 0)}
             {actionBtn(t.clearAll, clearAllRows, 'danger')}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
@@ -2487,8 +2664,8 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                     >
                       <input
                         type="checkbox"
-                        checked={allExportableSelected}
-                        onChange={(e) => (e.target.checked ? selectAllExportable() : selectNoneExportable())}
+                        checked={allBatchScopeSelected}
+                        onChange={(e) => (e.target.checked ? selectAllInBatchScope() : selectNoneInBatchScope())}
                         title={t.selectAll}
                         style={{ width: 16, height: 16, accentColor: '#2dd4bf', cursor: 'pointer' }}
                       />
@@ -2582,7 +2759,12 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                             {globalIdx + 1}
                           </span>
                         </td>
-                        <td style={cellPad}>{renderEditableInput(row, row.customerName, (v) => updateRow(row.id, { customerName: v }), { placeholder: 'TSL' })}</td>
+                        <td style={{ ...cellPad, minWidth: 140, maxWidth: 180 }}>
+                          {renderEditableInput(row, row.customerName, (v) => updateRow(row.id, { customerName: v }), {
+                            placeholder: 'TSL',
+                            readonlyEmphasis: 'customer',
+                          })}
+                        </td>
                         <td style={cellPad}>{renderEditableInput(row, row.orderDate, (v) => updateRow(row.id, { orderDate: v }), { type: 'date' })}</td>
                         <td style={{ ...cellPad, width: COL_ADDRESS_WIDTH, maxWidth: COL_ADDRESS_WIDTH }}>{renderEditableInput(row, row.address, (v) => updateRow(row.id, { address: v }), { placeholder: 'RUILI' })}</td>
                         <td style={{ ...cellPad, width: COL_PLATFORM_WIDTH, maxWidth: COL_PLATFORM_WIDTH }}>{renderEditableInput(row, row.platform, (v) => updateRow(row.id, { platform: v }), { list: 'proxy-platform-list', placeholder: '拼多多' })}</td>
@@ -2592,7 +2774,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                         <td style={{ ...cellPad, width: 96 }}>{renderEditableInput(row, row.unitPrice, (v) => updateRow(row.id, { unitPrice: v }), { type: 'number', min: 0, step: 0.01, style: { textAlign: 'right' } })}</td>
                         <td style={{ ...cellPad, textAlign: 'right' }}>{renderCalcPill(unit > 0 ? fee.toFixed(2) : '—', 'fee')}</td>
                         <td style={{ ...cellPad, textAlign: 'right' }}>{renderCalcPill(unit > 0 ? total.toFixed(2) : '—', 'total')}</td>
-                        <td style={{ ...cellPad, minWidth: 108, textAlign: 'center' }}>
+                        <td style={{ ...cellPad, minWidth: 118, textAlign: 'center' }}>
                           {renderRowActions(row)}
                         </td>
                       </tr>

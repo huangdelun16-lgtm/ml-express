@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import LabelPrintPreviewCard from './LabelPrintPreviewCard';
+import CopyableCodeRow from './CopyableCodeRow';
 import { SignaturePreview } from './SignaturePad';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 import { callPhoneNumber } from '../utils/phoneCall';
@@ -54,7 +55,13 @@ export function InvoiceRow({
   );
 }
 
-export function InboundInvoiceContent({ data }: { data: InboundInvoiceData }) {
+export function InboundInvoiceContent({
+  data,
+  copyLabels,
+}: {
+  data: InboundInvoiceData;
+  copyLabels?: { copied: string; tapToCopy: string; expressNo: string; inbound: string };
+}) {
   return (
     <>
       <View style={styles.invoiceHeader}>
@@ -112,6 +119,25 @@ export function InboundInvoiceContent({ data }: { data: InboundInvoiceData }) {
       ) : null}
 
       <View style={styles.barcodeBlock}>
+        <Text style={styles.barcodeBlockTitle}>条码信息</Text>
+        {copyLabels ? (
+          <View style={styles.copyBlock}>
+            <CopyableCodeRow
+              label={copyLabels.expressNo}
+              value={data.inputBarcode ?? ''}
+              copiedLabel={copyLabels.copied}
+              tapHint={copyLabels.tapToCopy}
+              variant="light"
+            />
+            <CopyableCodeRow
+              label={copyLabels.inbound}
+              value={data.barcode}
+              copiedLabel={copyLabels.copied}
+              tapHint={copyLabels.tapToCopy}
+              variant="light"
+            />
+          </View>
+        ) : null}
         <Text style={styles.barcodeBlockTitle}>入库条码</Text>
         <LabelPrintPreviewCard
           barcode={data.barcode}
@@ -252,6 +278,7 @@ export const inboundInvoiceStyles = StyleSheet.create({
     width: '100%',
   },
   barcodeBlockTitle: { color: '#64748b', fontSize: 12, fontWeight: '800', marginBottom: 8 },
+  copyBlock: { width: '100%', marginBottom: 8 },
   expressCode: {
     color: '#0284c7',
     fontSize: 13,

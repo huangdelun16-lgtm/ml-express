@@ -50,6 +50,7 @@ import { promptGuestLogin } from '../utils/guestSession';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 import * as MediaLibrary from 'expo-media-library';
+import { ensureSaveToLibraryPermission } from '../utils/mediaAccess';
 import * as Sharing from 'expo-sharing'; // 即使没在package.json，有时expo自带
 import * as FileSystem from 'expo-file-system/legacy';
 import ViewShot, { captureRef } from 'react-native-view-shot';
@@ -142,8 +143,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
       
       // 检查相册权限
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const granted = await ensureSaveToLibraryPermission();
+      if (!granted) {
         hideLoading();
         Alert.alert(
           language === 'zh' ? '权限提示' : 'Permission Required',
