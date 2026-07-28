@@ -1,6 +1,6 @@
 {
   "name": "ml-express-inventory-app",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "main": "index.js",
   "private": true,
   "scripts": {
@@ -11,11 +11,11 @@
     "web": "expo start --web",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build:ios": "eas build --platform ios --profile production",
+    "build:ios": "eas build --platform ios --profile production --non-interactive",
     "build:ios:local": "eas build --platform ios --profile production --local",
-    "build:ios:preview": "eas build --platform ios --profile preview",
+    "build:ios:preview": "eas build --platform ios --profile preview --non-interactive",
     "download:ios": "eas build:download --platform ios --latest",
-    "build:apk": "eas build --platform android --profile apk",
+    "build:apk": "eas build --platform android --profile apk --non-interactive",
     "build:apk:local": "eas build --platform android --profile apk --local",
     "download:apk": "eas build:download --platform android --latest",
     "build:aab": "eas build --platform android --profile production",

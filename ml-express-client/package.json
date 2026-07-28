@@ -1,6 +1,6 @@
 {
   "name": "ml-express-client",
-  "version": "2.5.2",
+  "version": "2.6.0",
   "main": "index.js",
   "scripts": {
     "sync:shared": "node ../shared/sync.mjs --out src/services/_shared",
@@ -15,6 +15,11 @@
     "build:web": "npm run sync:shared && npx expo export --platform web",
     "build:apk": "eas build --platform android --profile apk",
     "build:apk:local": "eas build --platform android --profile apk --local",
+    "build:aab": "eas build --platform android --profile production --non-interactive",
+    "build:ios": "eas build --platform ios --profile production --non-interactive",
+    "build:ios:local": "eas build --platform ios --profile production --local",
+    "download:ios": "eas build:download --platform ios --latest",
+    "download:aab": "eas build:download --platform android --latest",
     "build:apk:gradle": "cd android && ./gradlew assembleRelease",
     "download:apk": "eas build:download --platform android --latest"
   },

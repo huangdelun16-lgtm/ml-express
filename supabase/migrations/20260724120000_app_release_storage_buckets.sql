@@ -1,0 +1,12 @@
+-- ⚠️ 本文件不能直接在 Supabase SQL Editor 执行
+-- 报错：ERROR 42501: must be owner of table buckets
+-- 原因：storage.buckets / storage.objects 由 Supabase 平台托管，Dashboard 的 postgres 角色无权 INSERT/改策略。
+--
+-- ✅ 正确做法（见 ml-express-client/docs/CLIENT_APK_RELEASE.md）：
+-- 1. Dashboard → Storage → New bucket → 名称 client-releases → 勾选 Public bucket
+-- 2. 可选：再建 inventory-releases（Inventory App APK）
+-- 3. 上传 APK，例如 ml-client-2.6.0-67.apk
+-- 4. 执行 docs/sql/client_android_latest_release.sql 更新 system_settings
+--
+-- 公开桶 (Public bucket) 开启后，匿名用户可通过以下 URL 格式下载，无需额外 RLS：
+-- https://<project-ref>.supabase.co/storage/v1/object/public/client-releases/<文件名>.apk

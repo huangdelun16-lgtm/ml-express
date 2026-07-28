@@ -121,7 +121,7 @@ export default function SettingsScreen() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
-  const appVersion = Constants.expoConfig?.version ?? '1.6.0';
+  const appVersion = Constants.expoConfig?.version ?? '1.7.0';
   const buildVersion = Constants.nativeBuildVersion ?? '12';
 
   useEffect(() => {

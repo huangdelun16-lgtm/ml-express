@@ -14,6 +14,7 @@ import {
   packageHasCod,
   resolvePackageCodAmount,
 } from '../utils/packageCodAmount';
+import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
@@ -1759,6 +1760,7 @@ const RealTimeTracking: React.FC = () => {
                         <span className="rt-tracking__pkg-id">{pkg.id}</span>
                         <div className="rt-tracking__badges">{renderPackageIdentityBadges(pkg)}</div>
                       </div>
+                      <DeliveryCountdownBadge pkg={pkg} />
                       <div className="rt-tracking__pkg-body">
                         <p>
                           从 {formatTrackingAddress(pkg.sender_address)}
@@ -1846,6 +1848,7 @@ const RealTimeTracking: React.FC = () => {
                       </span>
                     </div>
                   </div>
+                  <DeliveryCountdownBadge pkg={pkg} />
                   <div className="rt-tracking__pkg-body">
                     <p>
                       {pkg.sender_name} → {pkg.receiver_name}

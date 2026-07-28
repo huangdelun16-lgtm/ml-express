@@ -43,6 +43,7 @@ import {
   getDeliverySpeedShortLabel,
   isScheduledDeliverySpeed,
 } from '../utils/courierScheduledDelivery';
+import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 
 const { width } = Dimensions.get('window');
 
@@ -676,6 +677,13 @@ export default function PackageDetailScreen({ route, navigation }: any) {
               </Text>
             </View>
           ) : null}
+
+          <DeliveryCountdownBadge
+            pkg={pkg}
+            language={language === 'zh' ? 'zh' : language === 'en' ? 'en' : 'my'}
+            variant="full"
+            theme="dark"
+          />
 
           <View style={styles.glassDivider} />
           <Text style={styles.sectionTitle}>💰 {language === 'zh' ? '费用信息' : 'Price Information'}</Text>

@@ -5,14 +5,14 @@ describe('parseAndroidRelease', () => {
   it('parses release manifest object', () => {
     expect(
       parseAndroidRelease({
-        version: '1.6.0',
-        versionCode: 12,
+        version: '1.7.0',
+        versionCode: 13,
         apkUrl: 'https://example.com/ml-inventory.apk',
         releaseNotes: 'Fix hub receive',
       }),
     ).toEqual({
-      version: '1.6.0',
-      versionCode: 12,
+      version: '1.7.0',
+      versionCode: 13,
       apkUrl: 'https://example.com/ml-inventory.apk',
       releaseNotes: 'Fix hub receive',
     });
@@ -40,8 +40,8 @@ describe('parseAndroidRelease', () => {
   });
 
   it('compares versionCode for update availability', () => {
-    expect(isAndroidUpdateAvailable(11, 12)).toBe(true);
-    expect(isAndroidUpdateAvailable(12, 12)).toBe(false);
-    expect(isAndroidUpdateAvailable(13, 12)).toBe(false);
+    expect(isAndroidUpdateAvailable(12, 13)).toBe(true);
+    expect(isAndroidUpdateAvailable(13, 13)).toBe(false);
+    expect(isAndroidUpdateAvailable(14, 13)).toBe(false);
   });
 });

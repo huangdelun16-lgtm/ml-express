@@ -42,6 +42,7 @@ import {
   isNavigateMerchantFirstPhase,
 } from '../utils/packageStatusNormalize';
 import { openMapsToAddress } from '../utils/openMapsNavigation';
+import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 
 const { width, height } = Dimensions.get('window');
 
@@ -905,6 +906,12 @@ const MyTasksScreen: React.FC = () => {
                       <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
                     </View>
                   </View>
+                  <DeliveryCountdownBadge
+                    pkg={item}
+                    language={language === 'zh' ? 'zh' : language === 'en' ? 'en' : 'my'}
+                    variant="compact"
+                    theme="dark"
+                  />
                   <View style={styles.cardBody}>
                     <View style={styles.cardRow}><Ionicons name="person" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue}>{item.receiver_name}</Text></View>
                     <View style={styles.cardRow}><Ionicons name="location" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue} numberOfLines={1}>{item.receiver_address}</Text></View>

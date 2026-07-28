@@ -7,10 +7,10 @@ VALUES (
   'client',
   'client.android.latest_release',
   jsonb_build_object(
-    'version', '2.5.2',
-    'versionCode', 66,
-    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/client-releases/ml-client-2.5.2-66.apk',
-    'releaseNotes', '设置 → 关于应用新增「更新版本」；优化版本显示与更新检查'
+    'version', '2.6.0',
+    'versionCode', 67,
+    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/client-releases/ml-client-2.6.0-67.apk',
+    'releaseNotes', '跨境物流追踪（快递单/入库单号）；Inventory 联动状态查询；多项体验优化'
   ),
   'Client app Android latest APK for in-app update check',
   'admin'

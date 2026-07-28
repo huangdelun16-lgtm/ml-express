@@ -233,7 +233,7 @@ const zh = {
     clearing: '清空中…',
     passwordUpdated: '密码已更新',
     passwordUpdatedMsg: '当前会话已刷新，下次登录请使用新密码。',
-    footer: 'ML Inventory v1.6.0 (12) · Market Link Express',
+    footer: 'ML Inventory v1.7.0 (13) · Market Link Express',
     regionTag: '区域 {hub}',
   },
   tracking: {
@@ -873,7 +873,7 @@ const en: typeof zh = {
     clearing: 'Clearing…',
     passwordUpdated: 'Password updated',
     passwordUpdatedMsg: 'Session refreshed. Use the new password next login.',
-    footer: 'ML Inventory v1.6.0 (12) · Market Link Express',
+    footer: 'ML Inventory v1.7.0 (13) · Market Link Express',
     regionTag: 'Region {hub}',
   },
   tracking: {
@@ -1521,7 +1521,7 @@ const my: typeof zh = {
     clearing: 'ရှင်းနေသည်…',
     passwordUpdated: 'စကားဝှက်အပ်ဒိတ်ပြီးပါပြီ',
     passwordUpdatedMsg: 'ဆက်ရှင်အပ်ဒိတ်ပြီးပါပြီ။ နောက်ဝင်ရောက်ချိန်တွင် စကားဝှက်အသစ်သုံးပါ။',
-    footer: 'ML Inventory v1.6.0 (12) · Market Link Express',
+    footer: 'ML Inventory v1.7.0 (13) · Market Link Express',
     regionTag: 'ဒေသ {hub}',
   },
   tracking: {

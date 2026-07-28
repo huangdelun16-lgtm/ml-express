@@ -47,6 +47,7 @@ import {
   getDeliverySpeedShortLabel,
   isScheduledDeliverySpeed,
 } from '../utils/courierScheduledDelivery';
+import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 import InAppNavigationModal, { type NavStop } from '../components/InAppNavigationModal';
 
 const { width, height } = Dimensions.get('window');
@@ -1480,6 +1481,13 @@ export default function MapScreen({ navigation }: any) {
               </Text>
             </View>
           </View>
+
+          <DeliveryCountdownBadge
+            pkg={item}
+            language={language === 'zh' ? 'zh' : language === 'en' ? 'en' : 'my'}
+            variant="full"
+            theme="light"
+          />
 
           {showMerchantCodBanner && (
             <View style={styles.merchantCodBanner}>

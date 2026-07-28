@@ -99,7 +99,7 @@ flowchart TB
 | 管理后台 | `admin-market-link-express.netlify.app` 或自定义 admin 域 | 仓库根 CRA + Functions |
 | 商家 Web | 独立 Netlify 站点 | `ml-express-merchant-web` |
 | Inventory App Support | `https://market-link-express.com/support` | App Store Support URL |
-| Inventory iOS | App Store `com.mlexpress.inventory` | EAS Build，当前 **1.6.0 (12)** |
+| Inventory iOS | App Store `com.mlexpress.inventory` | EAS Build，当前 **1.7.0 (13)** |
 | Supabase | `uopkyuluxnrewvlmutam.supabase.co` | 全端共用同一项目 |
 
 > ⚠️ 勿在 App Store 使用无效域名（如 `linkexpress.com/support`）；Support URL 必须可访问。
@@ -113,10 +113,10 @@ flowchart TB
 | **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、合伙店铺、报表、跨境物流 | CRA + TS + React Router **v6** | **2.2.4** | Netlify（根目录） |
 | **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户、Support | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
-| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.5.2 (66)** | EAS |
+| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.6.0 (67)** | EAS |
 | **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.0 (11)** | EAS |
 | **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.7 (76)** | EAS |
-| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + Supabase Auth + 蓝牙打印 | **1.6.0 (12)** | EAS |
+| **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + Supabase Auth + 蓝牙打印 | **1.7.0 (13)** | EAS |
 | **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
 | **`netlify/`** | 服务端 | 管理后台 Netlify Functions | Node | — | — |
 | **`supabase/`** | 数据 | SQL migrations + Edge Functions | SQL / Deno | — | Supabase Cloud |
@@ -509,7 +509,7 @@ cd ml-express-merchant-web && npm install && npm start
 | 项 | 值 |
 |----|-----|
 | 包名 | `com.mlexpress.client` |
-| 版本 | **2.5.2**（iOS build **66** / Android versionCode **66**） |
+| 版本 | **2.6.0**（iOS build **67** / Android versionCode **67**） |
 | 技术 | Expo SDK 54 + RN 0.81.4 + React Navigation 6 |
 | Deep link | `ml-express-client://`、`https://mlexpress.com` |
 | EAS | projectId `80b0873d-1d76-429e-8c79-738a817d8a15` |
@@ -678,7 +678,7 @@ npm run build:aab   # Android AAB 生产包
 |----|-----|
 | 包名 | iOS/Android `com.mlexpress.inventory` |
 | App Store 名 | **ML Inventory** |
-| 版本 | **1.6.0**（iOS build **12** / Android versionCode **12**） |
+| 版本 | **1.7.0**（iOS build **13** / Android versionCode **13**） |
 | 登录 | Edge Function `inventory-store-login` → Supabase Auth JWT |
 | JWT claims | `inventory_store_code`、`inventory_hub_code` 等 |
 | 数据策略 | **Supabase `inventory_*` 是唯一业务数据源；必须联网，不提供离线队列** |
@@ -1186,10 +1186,10 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | 项目 | 版本 | Build / Code | 备注 |
 |------|------|--------------|------|
 | 管理后台（根） | **2.2.4** | — | `package.json` |
-| ml-express-client | **2.5.2** | **66** | Google Play Photo Picker 合规；应用内更新 |
+| ml-express-client | **2.6.0** | **67** | 跨境物流追踪；Google Play Photo Picker 合规；应用内更新 |
 | ml-express-merchant-app | **2.4.0** | **11** | |
 | ml-express-mobile-app | **2.3.7** | **76** | STAFF 骑手端 |
-| ml-express-inventory-app | **1.6.0** | **12** | 客户签收留痕、SVG 签名、批量签收 |
+| ml-express-inventory-app | **1.7.0** | **13** | 快递单/入库单复制；客户签收留痕 |
 | ml-express-client-web | **0.1.0** | — | |
 | ml-express-merchant-web | **0.1.0** | — | |
 
