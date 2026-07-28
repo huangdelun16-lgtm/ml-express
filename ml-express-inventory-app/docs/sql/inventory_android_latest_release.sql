@@ -6,10 +6,10 @@ VALUES (
   'inventory',
   'inventory.android.latest_release',
   jsonb_build_object(
-    'version', '1.7.0',
-    'versionCode', 13,
-    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.7.0-13.apk',
-    'releaseNotes', '快递单/入库单一键复制；多项体验优化'
+    'version', '1.8.1',
+    'versionCode', 15,
+    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.8.1-15.apk',
+    'releaseNotes', 'iPhone 蓝牙 TSPL 直连 Xprinter P201A；标签打印优化'
   ),
   'Inventory App Android 最新 APK 发布信息（versionCode 须大于旧版才会提示更新）',
   'admin'

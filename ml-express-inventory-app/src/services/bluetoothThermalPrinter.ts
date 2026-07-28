@@ -18,8 +18,12 @@ function loadThermalModule(): ThermalPrinterModule | null {
     return cachedModule;
   }
   try {
-    const mod = require('react-native-thermal-printer').default as ThermalPrinterModule;
-    cachedModule = typeof mod?.printBluetooth === 'function' ? mod : null;
+    const pkg = require('react-native-thermal-printer') as
+      | ThermalPrinterModule
+      | { default?: ThermalPrinterModule | null };
+    const mod = ('default' in pkg ? pkg.default : pkg) as ThermalPrinterModule | null | undefined;
+    cachedModule =
+      mod != null && typeof mod.printBluetooth === 'function' ? mod : null;
   } catch {
     cachedModule = null;
   }
@@ -42,10 +46,25 @@ function escapeEscPosText(value: string): string {
   return value.replace(/[[\]]/g, ' ').trim();
 }
 
-function buildEscPosPayload(content: ReturnType<typeof normalizeLabelContent>): string {
+function buildEscPosPayload(
+  content: ReturnType<typeof normalizeLabelContent>,
+  sheetKind: import('./printLabelSheets').PrintLabelSheetKind = 'barcode',
+): string {
   const code = escapeEscPosText(content.barcode);
   const input = content.inputBarcode ? escapeEscPosText(content.inputBarcode) : '';
   const lines: string[] = [];
+
+  if (sheetKind === 'barcode') {
+    if (input) {
+      lines.push(`[C]<font size='wide'>${input}</font>`);
+      lines.push('[L]');
+    }
+    lines.push(`[C]<barcode type='128' height='80'>${code}</barcode>`);
+    lines.push(`[C]<font size='tall'>${code}</font>`);
+    lines.push('[L]');
+    return lines.join('\n');
+  }
+
   if (input) {
     lines.push(`[C]<font size='wide'>${input}</font>`);
     lines.push('[L]');
@@ -104,6 +123,7 @@ export async function printBluetoothLabel(params: {
   inputBarcode?: string;
   extras?: Partial<LabelPrintPayload>;
   settings: PrinterSettings;
+  sheetKind?: import('./printLabelSheets').PrintLabelSheetKind;
 }): Promise<void> {
   const content = normalizeLabelContent(params.barcode, {
     ...params.extras,
@@ -120,12 +140,13 @@ export async function printBluetoothLabel(params: {
       heightMm: params.settings.labelHeightMm,
       gapMm: params.settings.labelGapMm,
       copies: 1,
+      sheetKind: params.sheetKind ?? 'barcode',
     });
     await sendBluetoothPayload({ payload: tspl, settings: params.settings, isTspl: true });
     return;
   }
 
-  const payload = buildEscPosPayload(content);
+  const payload = buildEscPosPayload(content, params.sheetKind ?? 'barcode');
   await sendBluetoothPayload({ payload, settings: params.settings, isTspl: false });
 }
 

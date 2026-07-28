@@ -7,6 +7,8 @@ type Props = {
   barcode: string;
   inputBarcode?: string;
   destination?: string;
+  /** full：快递单号/目的地等；barcodeOnly：仅条码 */
+  variant?: 'full' | 'barcodeOnly' | 'express';
 };
 
 /** 标签预览最大宽度：不超过屏幕可用宽度，也不超过约 58mm 标签比例 */
@@ -21,32 +23,37 @@ export default function LabelPrintPreviewCard({
   barcode,
   inputBarcode,
   destination,
+  variant = 'full',
 }: Props) {
   const previewWidth = useLabelPreviewMaxWidth();
   const barcodeMaxWidth = previewWidth - 16;
+  const expressCode = inputBarcode?.trim() || '';
+  const codeToRender = variant === 'express' && expressCode ? expressCode : barcode;
 
   return (
     <View style={[styles.wrap, { maxWidth: previewWidth }]}>
       <View style={styles.label}>
-        {inputBarcode?.trim() ? (
+        {variant === 'full' && expressCode ? (
           <Text style={styles.inputCode} numberOfLines={2}>
-            {inputBarcode.trim()}
+            {expressCode}
           </Text>
         ) : null}
-        {destination?.trim() ? (
+        {variant === 'full' && destination?.trim() ? (
           <Text style={styles.metaDest} numberOfLines={1}>
             {truncateLabelText(`→ ${destination.trim()}`, 20)}
           </Text>
         ) : null}
         <BarcodeImage
-          code={barcode}
+          code={codeToRender}
           height={64}
           maxWidth={barcodeMaxWidth}
-          showCodeText={false}
+          showCodeText
         />
-        <Text style={styles.code} selectable numberOfLines={2}>
-          {barcode}
-        </Text>
+        {variant === 'full' ? (
+          <Text style={styles.code} selectable numberOfLines={2}>
+            {barcode}
+          </Text>
+        ) : null}
       </View>
     </View>
   );

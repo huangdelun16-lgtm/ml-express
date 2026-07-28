@@ -1,6 +1,5 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import LabelPrintPreviewCard from './LabelPrintPreviewCard';
 import CopyableCodeRow from './CopyableCodeRow';
 import { SignaturePreview } from './SignaturePad';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
@@ -138,12 +137,6 @@ export function InboundInvoiceContent({
             />
           </View>
         ) : null}
-        <Text style={styles.barcodeBlockTitle}>入库条码</Text>
-        <LabelPrintPreviewCard
-          barcode={data.barcode}
-          inputBarcode={data.inputBarcode}
-          destination={data.destination}
-        />
       </View>
     </>
   );

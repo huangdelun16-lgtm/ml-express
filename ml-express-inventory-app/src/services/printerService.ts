@@ -3,6 +3,7 @@ import * as Print from 'expo-print';
 import { Platform } from 'react-native';
 import {
   XPRINTER_P203A,
+  labelPagePixels,
   type LabelPrintProtocol,
   type PrinterModelId,
 } from '../constants/xprinterP203a';
@@ -13,6 +14,22 @@ import {
   isAndroidBluetoothThermalAvailable,
   printBluetoothLabel,
 } from './bluetoothThermalPrinter';
+import {
+  isIosBleThermalAvailable,
+  printIosBleLabel,
+} from './iosBleThermalPrinter';
+import type { InboundInvoiceData } from '../components/InboundInvoiceView';
+import {
+  buildBarcodeOnlySheetHtml,
+  buildExpressSheetHtml,
+  buildInboundSheetHtml,
+  buildPackSheetHtml,
+  invoiceFromPrintPayload,
+  normalizePrintContent,
+  type PrintLabelSheetKind,
+} from './printLabelSheets';
+
+export type { PrintLabelSheetKind };
 
 const SETTINGS_KEY = 'inventory_printer_settings';
 
@@ -32,6 +49,9 @@ export interface PrinterSettings {
   connectionMode: PrinterConnectionMode;
   iosPrinterUrl?: string;
   iosPrinterName?: string;
+  /** iOS BLE：Xprinter SDK 设备 UUID（与 Xlabel 相同蓝牙通道） */
+  iosBlePrinterId?: string;
+  iosBlePrinterName?: string;
   /** Android 可选：指定已配对蓝牙 MAC（如 P203A） */
   androidBluetoothMac?: string;
 }
@@ -58,7 +78,8 @@ const DEFAULT_SETTINGS: PrinterSettings = {
   printerModel: XPRINTER_P203A.modelId,
   printProtocol: XPRINTER_P203A.defaultProtocol,
   printerDpi: XPRINTER_P203A.dpi,
-  connectionMode: XPRINTER_P203A.defaultConnectionMode,
+  connectionMode:
+    Platform.OS === 'ios' ? 'bluetooth' : XPRINTER_P203A.defaultConnectionMode,
 };
 
 const VALID_WIDTHS = new Set<LabelWidthMm>([40, 50, 58, 60, 80]);
@@ -106,11 +127,57 @@ export async function savePrinterSettings(s: PrinterSettings): Promise<void> {
 }
 
 export function getXprinterP203aPreset(): PrinterSettings {
-  return { ...DEFAULT_SETTINGS };
+  return {
+    ...DEFAULT_SETTINGS,
+    connectionMode: 'bluetooth',
+    printerModel: XPRINTER_P203A.modelId,
+    labelWidthMm: XPRINTER_P203A.defaultWidthMm as LabelWidthMm,
+    labelHeightMm: XPRINTER_P203A.defaultHeightMm as LabelHeightMm,
+    labelGapMm: XPRINTER_P203A.defaultGapMm,
+    printProtocol: XPRINTER_P203A.defaultProtocol,
+    printerDpi: XPRINTER_P203A.dpi,
+  };
 }
 
-export function isBluetoothPrintMode(settings: PrinterSettings): boolean {
-  return settings.connectionMode === 'bluetooth';
+/** iOS + Xprinter 蓝牙模式：P201A 不支持 AirPrint，无法走 expo-print 系统打印 */
+export function isIosXprinterBluetoothMode(settings: PrinterSettings): boolean {
+  return (
+    Platform.OS === 'ios' &&
+    settings.connectionMode === 'bluetooth' &&
+    settings.printerModel === XPRINTER_P203A.modelId
+  );
+}
+
+function isPrintUserCancelled(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error ?? '');
+  return /printing did not complete|print cancelled|cancelled|canceled/i.test(msg);
+}
+
+/** iOS：仅当设置里已手动绑定打印机时使用（不在打印前强制弹出 AirPrint 选择器） */
+async function submitHtmlPrint(html: string, settings: PrinterSettings, copies: number): Promise<void> {
+  const count = Math.max(1, copies);
+  const { width, height } = labelPagePixels(settings.labelWidthMm, settings.labelHeightMm);
+  const options: Print.PrintOptions = {
+    html,
+    width,
+    height,
+    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+  };
+
+  if (Platform.OS === 'ios' && settings.iosPrinterUrl?.trim()) {
+    options.printerUrl = settings.iosPrinterUrl.trim();
+  }
+
+  for (let i = 0; i < count; i += 1) {
+    try {
+      await Print.printAsync(options);
+    } catch (error) {
+      if (isPrintUserCancelled(error)) {
+        throw new Error('PRINT_CANCELLED');
+      }
+      throw error;
+    }
+  }
 }
 
 export async function pickIosLabelPrinter(): Promise<PrinterSettings> {
@@ -137,20 +204,26 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-function labelPageStyles(widthMm: number, heightMm: number): string {
-  return `@page { size: ${widthMm}mm ${heightMm}mm; margin: 1.5mm; }
-    .label-page { page-break-after: always; break-after: page; width: ${widthMm}mm; min-height: ${heightMm}mm; box-sizing: border-box; }
+function labelPageStyles(widthMm: number, heightMm: number, multiPage = true): string {
+  const pageRule = `@page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }`;
+  if (!multiPage) {
+    return `${pageRule}
+    html, body { margin: 0; padding: 0; width: ${widthMm}mm; height: ${heightMm}mm; max-height: ${heightMm}mm; overflow: hidden; }`;
+  }
+  return `${pageRule}
+    .label-page { page-break-after: always; break-after: page; width: ${widthMm}mm; height: ${heightMm}mm; box-sizing: border-box; overflow: hidden; }
     .label-page:last-child { page-break-after: auto; break-after: auto; }`;
 }
 
-function labelBodyStyles(widthMm: number): string {
-  return `body { font-family: -apple-system, "Helvetica Neue", sans-serif; margin: 0; padding: 2mm 2.5mm; width: ${widthMm}mm; box-sizing: border-box; text-align: center; }
-    .meta { font-size: 8pt; font-weight: 700; color: #334155; line-height: 1.25; margin: 1mm 0; word-break: break-word; }
+function labelBodyStyles(widthMm: number, heightMm: number = DEFAULT_SETTINGS.labelHeightMm): string {
+  const barcodeMaxMm = Math.max(10, Math.min(16, heightMm - 18));
+  return `body { font-family: -apple-system, "Helvetica Neue", sans-serif; margin: 0; padding: 1.5mm 2mm; width: ${widthMm}mm; box-sizing: border-box; text-align: center; }
+    .meta { font-size: 8pt; font-weight: 700; color: #334155; line-height: 1.2; margin: 0.5mm 0; word-break: break-word; }
     .meta-dest { color: #0369a1; font-size: 9pt; }
-    .barcode-wrap { padding: 1mm 0; }
-    .barcode-img { width: 100%; max-height: 18mm; object-fit: contain; display: block; margin: 0 auto; }
-    .barcode-text, .code { font-family: ui-monospace, Menlo, monospace; font-size: 10pt; font-weight: 800; letter-spacing: 0.5px; text-align: center; margin-top: 1.5mm; word-break: break-all; }
-    .input-code { font-family: ui-monospace, Menlo, monospace; font-size: 9pt; font-weight: 800; color: #0284c7; margin-bottom: 2mm; word-break: break-all; }
+    .barcode-wrap { padding: 0.5mm 0; line-height: 0; }
+    .barcode-img { width: 100%; max-height: ${barcodeMaxMm}mm; object-fit: contain; display: block; margin: 0 auto; }
+    .barcode-text, .code { font-family: ui-monospace, Menlo, monospace; font-size: 10pt; font-weight: 800; letter-spacing: 0.3px; text-align: center; margin-top: 1mm; word-break: break-all; }
+    .input-code { font-family: ui-monospace, Menlo, monospace; font-size: 9pt; font-weight: 800; color: #0284c7; margin-bottom: 1mm; word-break: break-all; }
     .hint { font-size: 6.5pt; color: #64748b; text-align: center; margin-top: 2mm; letter-spacing: 0.3px; }`;
 }
 
@@ -178,20 +251,36 @@ async function buildLabelBodyHtml(
   content: ReturnType<typeof normalizeLabelContent>,
   barcodeScale: number,
   barcodeHeight: number,
+  sheetKind: PrintLabelSheetKind = 'pack',
 ): Promise<string> {
-  const imgUri = await fetchBarcodeDataUri(content.barcode, {
-    scale: barcodeScale,
-    height: barcodeHeight,
-  });
+  if (sheetKind === 'barcode') {
+    return barcodeBlockHtml(content.barcode, barcodeScale, barcodeHeight + 2);
+  }
+  if (sheetKind === 'express') {
+    const expressCode = (content.inputBarcode || content.barcode).trim();
+    const parts = [
+      `<div class="title">快递单</div>`,
+      content.destination
+        ? `<div class="meta meta-dest">${escapeHtml(truncateLabelText(`→ ${content.destination}`, 20))}</div>`
+        : '',
+      await barcodeBlockHtml(expressCode, barcodeScale, barcodeHeight),
+    ];
+    return parts.filter(Boolean).join('');
+  }
   const inputBlock = content.inputBarcode
     ? `<div class="input-code">${escapeHtml(content.inputBarcode)}</div>`
     : '';
   return `${inputBlock}${buildMetaHtml(content)}
-    <div class="barcode-wrap">
+    ${await barcodeBlockHtml(content.barcode, barcodeScale, barcodeHeight)}
+    <div class="code">${escapeHtml(content.barcode)}</div>`;
+}
+
+async function barcodeBlockHtml(code: string, scale: number, height: number): Promise<string> {
+  const imgUri = await fetchBarcodeDataUri(code, { scale, height });
+  return `<div class="barcode-wrap">
       <img class="barcode-img" src="${imgUri}" alt="barcode"/>
     </div>
-    <div class="code">${escapeHtml(content.barcode)}</div>
-    <div class="hint">MARKET LINK · Inventory</div>`;
+    <div class="code">${escapeHtml(code)}</div>`;
 }
 
 export async function buildBarcodeLabelHtml(
@@ -200,11 +289,11 @@ export async function buildBarcodeLabelHtml(
   const w = item.widthMm ?? DEFAULT_SETTINGS.labelWidthMm;
   const h = item.heightMm ?? DEFAULT_SETTINGS.labelHeightMm;
   const content = normalizeLabelContent(item.barcode, item);
-  const body = await buildLabelBodyHtml(content, 2, 11);
+  const body = await buildLabelBodyHtml(content, 2, 11, 'pack');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
-    ${labelPageStyles(w, h)}
-    ${labelBodyStyles(w)}
-  </style></head><body class="label-page">${body}</body></html>`;
+    ${labelPageStyles(w, h, false)}
+    ${labelBodyStyles(w, h)}
+  </style></head><body>${body}</body></html>`;
 }
 
 export async function buildInboundBarcodeOnlyHtml(
@@ -214,13 +303,8 @@ export async function buildInboundBarcodeOnlyHtml(
   heightMm = DEFAULT_SETTINGS.labelHeightMm,
   extras?: Partial<LabelPrintPayload>,
 ): Promise<string> {
-  const content = normalizeLabelContent(barcode, { ...extras, inputBarcode });
-  const body = await buildLabelBodyHtml(content, 2, 13);
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
-    ${labelPageStyles(widthMm, heightMm)}
-    ${labelBodyStyles(widthMm)}
-    .code { font-size: 11pt; }
-  </style></head><body class="label-page">${body}</body></html>`;
+  void extras;
+  return buildBarcodeOnlySheetHtml(barcode, widthMm, heightMm, inputBarcode);
 }
 
 async function buildCombinedLabelHtml(parts: string[], widthMm: number, heightMm: number): Promise<string> {
@@ -236,26 +320,16 @@ async function buildCombinedLabelHtml(parts: string[], widthMm: number, heightMm
   </style></head><body>${bodies.map((chunk) => `<div class="label-page">${chunk}</div>`).join('')}</body></html>`;
 }
 
-async function submitHtmlPrint(html: string, settings: PrinterSettings, copies: number): Promise<void> {
-  const count = Math.max(1, copies);
-  const options: Print.PrintOptions = { html };
-
-  if (Platform.OS === 'ios' && settings.connectionMode === 'bluetooth' && settings.iosPrinterUrl) {
-    options.printerUrl = settings.iosPrinterUrl;
-  }
-
-  for (let i = 0; i < count; i += 1) {
-    await Print.printAsync(options);
-  }
-}
-
 async function printLabelJob(params: {
   barcode: string;
   inputBarcode?: string;
   packLabel?: LabelPrintPayload;
   settings: PrinterSettings;
+  sheetKind?: PrintLabelSheetKind;
+  invoice?: InboundInvoiceData;
 }): Promise<void> {
   const { settings } = params;
+  const sheetKind = params.sheetKind ?? 'barcode';
   const labelExtras: Partial<LabelPrintPayload> | undefined = params.packLabel ?? {
     name: '',
     barcode: params.barcode,
@@ -267,37 +341,122 @@ async function printLabelJob(params: {
     Platform.OS === 'android' &&
     isAndroidBluetoothThermalAvailable()
   ) {
-    await printBluetoothLabel({
+    try {
+      await printBluetoothLabel({
+        barcode: params.barcode,
+        inputBarcode: params.inputBarcode ?? params.packLabel?.inputBarcode,
+        extras: labelExtras,
+        settings,
+        sheetKind,
+      });
+      return;
+    } catch {
+      /* Expo Go 或无蓝牙模块时回退系统 HTML 打印 */
+    }
+  }
+
+  if (
+    settings.connectionMode === 'bluetooth' &&
+    Platform.OS === 'ios' &&
+    isIosBleThermalAvailable() &&
+    isIosXprinterBluetoothMode(settings)
+  ) {
+    await printIosBleLabel({
       barcode: params.barcode,
       inputBarcode: params.inputBarcode ?? params.packLabel?.inputBarcode,
       extras: labelExtras,
       settings,
+      sheetKind,
     });
     return;
   }
 
-  const html =
-    params.packLabel != null
-      ? await buildBarcodeLabelHtml({
-          ...params.packLabel,
-          widthMm: settings.labelWidthMm,
-          heightMm: settings.labelHeightMm,
-        })
-      : await buildInboundBarcodeOnlyHtml(
-          params.barcode,
-          params.inputBarcode,
-          settings.labelWidthMm,
-          settings.labelHeightMm,
-          labelExtras,
-        );
+  if (isIosXprinterBluetoothMode(settings)) {
+    throw new Error('IOS_BLE_MODULE_UNAVAILABLE');
+  }
+
+  const html = await buildSheetHtml({
+    kind: sheetKind,
+    barcode: params.barcode,
+    inputBarcode: params.inputBarcode,
+    packLabel: params.packLabel,
+    invoice: params.invoice,
+    settings,
+  });
 
   await submitHtmlPrint(html, settings, settings.copies);
+}
+
+async function buildSheetHtml(params: {
+  kind: PrintLabelSheetKind;
+  barcode: string;
+  inputBarcode?: string;
+  packLabel?: LabelPrintPayload;
+  invoice?: InboundInvoiceData;
+  settings: PrinterSettings;
+}): Promise<string> {
+  const { settings } = params;
+  const w = settings.labelWidthMm;
+  const h = settings.labelHeightMm;
+  const content = normalizePrintContent(params.barcode, {
+    ...(params.packLabel ?? {}),
+    inputBarcode: params.inputBarcode ?? params.packLabel?.inputBarcode,
+  });
+
+  if (params.kind === 'barcode') {
+    return buildBarcodeOnlySheetHtml(
+      params.barcode,
+      w,
+      h,
+      params.inputBarcode ?? params.packLabel?.inputBarcode,
+    );
+  }
+  if (params.kind === 'express') {
+    return buildExpressSheetHtml(content, w, h);
+  }
+  if (params.kind === 'inbound') {
+    const invoice =
+      params.invoice ??
+      invoiceFromPrintPayload({
+        name: params.packLabel?.name ?? '',
+        barcode: params.barcode,
+        inputBarcode: params.inputBarcode,
+        productName: params.packLabel?.productName,
+        customerName: params.packLabel?.customerName,
+        destination: params.packLabel?.destination,
+        spec: params.packLabel?.spec,
+        weight: params.packLabel?.weight,
+        packaging: params.packLabel?.packaging,
+      });
+    return buildInboundSheetHtml(invoice, w, h);
+  }
+  return buildPackSheetHtml(content, w, h);
+}
+
+export async function printLabelSheet(params: {
+  kind: PrintLabelSheetKind;
+  barcode: string;
+  inputBarcode?: string;
+  packLabel?: LabelPrintPayload;
+  invoice?: InboundInvoiceData;
+}): Promise<boolean> {
+  const settings = await getPrinterSettings();
+  if (!settings.enabled) return false;
+  await printLabelJob({
+    barcode: params.barcode,
+    inputBarcode: params.inputBarcode,
+    packLabel: params.packLabel,
+    invoice: params.invoice,
+    settings,
+    sheetKind: params.kind,
+  });
+  return true;
 }
 
 export async function printBarcodeLabel(item: LabelPrintPayload): Promise<boolean> {
   const settings = await getPrinterSettings();
   if (!settings.enabled) return false;
-  await printLabelJob({ barcode: item.barcode, packLabel: item, settings });
+  await printLabelJob({ barcode: item.barcode, packLabel: item, settings, sheetKind: 'pack' });
   return true;
 }
 
@@ -315,6 +474,7 @@ export async function printInboundBarcodeOnly(
       ? { name: extras.name ?? extras.productName ?? '', barcode, inputBarcode, ...extras }
       : undefined,
     settings,
+    sheetKind: 'barcode',
   });
   return true;
 }
@@ -336,12 +496,35 @@ export async function printBatchLabels(entries: BatchPrintEntry[]): Promise<bool
     Platform.OS === 'android' &&
     isAndroidBluetoothThermalAvailable()
   ) {
+    try {
+      for (const entry of entries) {
+        await printBluetoothLabel({
+          barcode: entry.barcode,
+          inputBarcode: entry.inputBarcode,
+          extras: entry.label ?? { inputBarcode: entry.inputBarcode },
+          settings,
+          sheetKind: entry.kind === 'pack' ? 'pack' : 'barcode',
+        });
+      }
+      return true;
+    } catch {
+      /* 回退下方 HTML 批量打印 */
+    }
+  }
+
+  if (
+    settings.connectionMode === 'bluetooth' &&
+    Platform.OS === 'ios' &&
+    isIosBleThermalAvailable() &&
+    isIosXprinterBluetoothMode(settings)
+  ) {
     for (const entry of entries) {
-      await printBluetoothLabel({
+      await printIosBleLabel({
         barcode: entry.barcode,
         inputBarcode: entry.inputBarcode,
         extras: entry.label ?? { inputBarcode: entry.inputBarcode },
-        settings,
+        settings: { ...settings, copies: 1 },
+        sheetKind: entry.kind === 'pack' ? 'pack' : 'barcode',
       });
     }
     return true;
@@ -350,19 +533,13 @@ export async function printBatchLabels(entries: BatchPrintEntry[]): Promise<bool
   const parts: string[] = [];
   for (const entry of entries) {
     parts.push(
-      entry.kind === 'pack' && entry.label
-        ? await buildBarcodeLabelHtml({
-            ...entry.label,
-            widthMm: settings.labelWidthMm,
-            heightMm: settings.labelHeightMm,
-          })
-        : await buildInboundBarcodeOnlyHtml(
-            entry.barcode,
-            entry.inputBarcode,
-            settings.labelWidthMm,
-            settings.labelHeightMm,
-            entry.label,
-          ),
+      await buildSheetHtml({
+        kind: entry.kind === 'pack' ? 'pack' : 'barcode',
+        barcode: entry.barcode,
+        inputBarcode: entry.inputBarcode,
+        packLabel: entry.label,
+        settings,
+      }),
     );
   }
 
@@ -396,12 +573,25 @@ export function getBluetoothCapabilityHint(language: Language, settings?: Printe
     return modelHint ? `${modelHint} · ${base}` : base;
   }
   if (Platform.OS === 'ios') {
+    const bleReady = isIosBleThermalAvailable();
     const base =
-      language === 'zh'
-        ? '请选择已配对的 AirPrint / 蓝牙标签机'
-        : language === 'my'
-          ? 'AirPrint/BT printer ရွေးပါ'
-          : 'Select paired AirPrint / Bluetooth printer';
+      settings?.printerModel === XPRINTER_P203A.modelId
+        ? bleReady
+          ? language === 'zh'
+            ? 'iPhone 蓝牙 TSPL 直连（与 Xlabel 相同方式）'
+            : language === 'my'
+              ? 'iPhone BT TSPL တိုက်ရိုက်'
+              : 'iPhone Bluetooth TSPL direct print'
+          : language === 'zh'
+            ? '需重新安装含原生打印模块的 IPA'
+            : language === 'my'
+              ? 'Native print module IPA လိုအပ်'
+              : 'Rebuild IPA with native print module'
+        : language === 'zh'
+          ? '请选择 AirPrint 标签机'
+          : language === 'my'
+            ? 'AirPrint printer ရွေးပါ'
+            : 'Select AirPrint label printer';
     return modelHint ? `${modelHint} · ${base}` : base;
   }
   return modelHint;

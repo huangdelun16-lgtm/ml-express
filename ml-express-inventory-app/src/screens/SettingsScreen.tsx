@@ -15,9 +15,10 @@ import {
 import Constants from 'expo-constants';
 import { useFocusEffect } from '@react-navigation/native';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import IosBlePrinterPickerModal from '../components/IosBlePrinterPickerModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
-import { resolveAppError, useTranslation } from '../i18n';
+import { resolveAppError, resolvePrintError, useTranslation } from '../i18n';
 import {
   getBluetoothCapabilityHint,
   getPrinterSettings,
@@ -28,6 +29,7 @@ import {
   type PrinterConnectionMode,
   type PrinterSettings,
 } from '../services/printerService';
+import { isIosBleThermalAvailable } from '../services/iosBleThermalPrinter';
 import { probeCloudConnection } from '../services/cloudConnection';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
@@ -114,6 +116,7 @@ export default function SettingsScreen() {
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [pickingPrinter, setPickingPrinter] = useState(false);
+  const [blePickerVisible, setBlePickerVisible] = useState(false);
   const [testingPrinter, setTestingPrinter] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<
     'checking' | 'online' | 'offline'
@@ -121,8 +124,8 @@ export default function SettingsScreen() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
-  const appVersion = Constants.expoConfig?.version ?? '1.7.0';
-  const buildVersion = Constants.nativeBuildVersion ?? '12';
+  const appVersion = Constants.expoConfig?.version ?? '1.8.1';
+  const buildVersion = Constants.nativeBuildVersion ?? '15';
 
   useEffect(() => {
     void getPrinterSettings().then(setSettings);
@@ -166,7 +169,9 @@ export default function SettingsScreen() {
       }
       Alert.alert(t.settings.testPrintSuccess, t.settings.printSentBody);
     } catch (e: unknown) {
-      Alert.alert(t.settings.printFailed, resolveAppError(t, e));
+      const msg = e instanceof Error ? e.message : String(e ?? '');
+      if (msg === 'PRINT_CANCELLED') return;
+      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
     } finally {
       setTestingPrinter(false);
     }
@@ -356,29 +361,41 @@ export default function SettingsScreen() {
               <>
                 <Text style={styles.fieldLabel}>{t.settings.iosSelectPrinter}</Text>
                 <Text style={styles.hintText}>
-                  {settings.iosPrinterName
-                    ? fmt(t.settings.iosPrinterSelected, { name: settings.iosPrinterName })
-                    : t.settings.iosPrinterNotSelected}
+                  {settings.iosBlePrinterName
+                    ? fmt(t.settings.iosPrinterSelected, { name: settings.iosBlePrinterName })
+                    : settings.iosPrinterName
+                      ? fmt(t.settings.iosPrinterSelected, { name: settings.iosPrinterName })
+                      : t.settings.iosPrinterNotSelected}
                 </Text>
-                <Pressable
-                  style={[styles.actionBtn, styles.actionBtnPrimary, pickingPrinter && styles.btnDisabled]}
-                  disabled={pickingPrinter}
-                  onPress={() => {
-                    void (async () => {
-                      setPickingPrinter(true);
-                      try {
-                        const next = await pickIosLabelPrinter();
-                        setSettings(next);
-                      } catch (e: unknown) {
-                        Alert.alert(t.settings.printFailed, resolveAppError(t, e));
-                      } finally {
-                        setPickingPrinter(false);
-                      }
-                    })();
-                  }}
-                >
-                  <Text style={styles.actionBtnPrimaryText}>{t.settings.iosSelectPrinter}</Text>
-                </Pressable>
+                {isIosBleThermalAvailable() ? (
+                  <Pressable
+                    style={[styles.actionBtn, styles.actionBtnPrimary, pickingPrinter && styles.btnDisabled]}
+                    disabled={pickingPrinter}
+                    onPress={() => setBlePickerVisible(true)}
+                  >
+                    <Text style={styles.actionBtnPrimaryText}>{t.settings.iosScanBlePrinter}</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={[styles.actionBtn, styles.actionBtnPrimary, pickingPrinter && styles.btnDisabled]}
+                    disabled={pickingPrinter}
+                    onPress={() => {
+                      void (async () => {
+                        setPickingPrinter(true);
+                        try {
+                          const next = await pickIosLabelPrinter();
+                          setSettings(next);
+                        } catch (e: unknown) {
+                          Alert.alert(t.settings.printFailed, resolveAppError(t, e));
+                        } finally {
+                          setPickingPrinter(false);
+                        }
+                      })();
+                    }}
+                  >
+                    <Text style={styles.actionBtnPrimaryText}>{t.settings.iosSelectPrinter}</Text>
+                  </Pressable>
+                )}
               </>
             ) : null}
           </>
@@ -446,6 +463,27 @@ export default function SettingsScreen() {
         onSuccess={() =>
           Alert.alert(t.settings.passwordUpdated, t.settings.passwordUpdatedMsg)
         }
+      />
+
+      <IosBlePrinterPickerModal
+        visible={blePickerVisible}
+        onClose={() => setBlePickerVisible(false)}
+        title={t.settings.iosScanBlePrinter}
+        scanningLabel={t.settings.iosScanningBle}
+        emptyLabel={t.settings.iosBleScanEmpty}
+        connectLabel={t.settings.sendingPrint}
+        closeLabel={t.common.close}
+        onSelect={(device) => {
+          void (async () => {
+            await updatePrinter({
+              iosBlePrinterId: device.id,
+              iosBlePrinterName: device.name,
+              iosPrinterName: device.name,
+            });
+            setBlePickerVisible(false);
+            Alert.alert(t.common.tip, fmt(t.settings.iosPrinterSelected, { name: device.name }));
+          })();
+        }}
       />
     </ScrollView>
   );
@@ -570,6 +608,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: { color: '#f1f5f9', fontWeight: '800', fontSize: 14, marginBottom: 8 },
   hintText: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 10 },
+  warningText: { color: '#fbbf24', fontSize: 12, lineHeight: 18, marginBottom: 10, fontWeight: '700' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   chip: {
     paddingHorizontal: 16,

@@ -2,7 +2,7 @@
   "expo": {
     "name": "ML Inventory",
     "slug": "ml-express-inventory",
-    "version": "1.7.0",
+    "version": "1.8.1",
     "scheme": "ml-express-inventory",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -16,9 +16,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.inventory",
-      "buildNumber": "13",
+      "buildNumber": "15",
       "infoPlist": {
         "NSCameraUsageDescription": "ML Inventory uses the camera to scan barcodes on packages and inventory labels at transit stations.",
+        "NSBluetoothAlwaysUsageDescription": "ML Inventory uses Bluetooth to connect to your Xprinter label printer and print TSPL labels.",
+        "NSBluetoothPeripheralUsageDescription": "ML Inventory uses Bluetooth to connect to your Xprinter label printer and print TSPL labels.",
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationLandscapeLeft",
@@ -33,7 +35,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.mlexpress.inventory",
-      "versionCode": 13,
+      "versionCode": 15,
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",

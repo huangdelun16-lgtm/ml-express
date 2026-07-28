@@ -1,11 +1,10 @@
 import { XPRINTER_P203A } from '../constants/xprinterP203a';
 import {
-  labelHeightDots,
-  labelWidthDots,
   normalizeLabelContent,
   truncateLabelText,
   type NormalizedLabelContent,
 } from '../utils/labelPrintLayout';
+import type { PrintLabelSheetKind } from './printLabelSheets';
 import type { LabelPrintPayload } from './printerService';
 
 function escapeTsplText(value: string): string {
@@ -34,14 +33,14 @@ export function buildTsplInboundLabel(params: {
   heightMm?: number;
   gapMm?: number;
   copies?: number;
+  sheetKind?: PrintLabelSheetKind;
 }): string {
+  const sheetKind = params.sheetKind ?? 'barcode';
   const content = normalizeLabelContent(params.barcode, params.extras);
   const widthMm = params.widthMm ?? XPRINTER_P203A.defaultWidthMm;
   const heightMm = params.heightMm ?? XPRINTER_P203A.defaultHeightMm;
   const gapMm = params.gapMm ?? XPRINTER_P203A.defaultGapMm;
   const copies = Math.max(1, params.copies ?? 1);
-  const widthDots = labelWidthDots(widthMm);
-  const heightDots = labelHeightDots(heightMm);
 
   const lines: string[] = [
     `SIZE ${widthMm} mm, ${heightMm} mm`,
@@ -57,29 +56,45 @@ export function buildTsplInboundLabel(params: {
   ];
 
   let y = 8;
-  if (content.inputBarcode) {
+  const printCode =
+    sheetKind === 'express'
+      ? (content.inputBarcode || content.barcode).trim()
+      : content.barcode.trim();
+
+  if (sheetKind === 'barcode' && content.inputBarcode?.trim()) {
     lines.push(
-      `TEXT 12,${y},"2",0,1,1,"${escapeTsplText(truncateLabelText(content.inputBarcode, 22))}"`,
+      `TEXT 12,${y},"2",0,1,1,"${escapeTsplText(truncateLabelText(content.inputBarcode.trim(), 22))}"`,
     );
     y += 34;
   }
 
-  const barcodeHeight = content.inputBarcode ? 80 : 96;
-  // narrow=3 / wide=6：比 2/4 更易被手机相机识别自动生成的入库码（如 MDY…）
-  lines.push(
-    `BARCODE 12,${y},"128",${barcodeHeight},1,0,3,6,"${escapeTsplText(content.barcode)}"`,
-  );
-  y += barcodeHeight + 10;
-  lines.push(`TEXT 12,${y},"2",0,1,1,"${escapeTsplText(truncateLabelText(content.barcode, 24))}"`);
-  y += 30;
+  if (sheetKind === 'express' || sheetKind === 'pack' || sheetKind === 'inbound') {
+    const heading =
+      sheetKind === 'express' ? 'Express' : sheetKind === 'pack' ? 'PKG' : 'Inbound';
+    lines.push(`TEXT 12,${y},"2",0,1,1,"${escapeTsplText(heading)}"`);
+    y += 28;
+  }
 
-  for (const meta of buildMetaLines(content)) {
-    lines.push(`TEXT 12,${y},"1",0,1,1,"${escapeTsplText(meta)}"`);
+  if (sheetKind === 'express' && content.destination) {
+    lines.push(
+      `TEXT 12,${y},"1",0,1,1,"${escapeTsplText(truncateLabelText(`→ ${content.destination}`, 18))}"`,
+    );
     y += 22;
   }
 
-  const brandY = Math.min(heightDots - 24, Math.max(y + 4, heightDots - 28));
-  lines.push(`TEXT 12,${brandY},"0",0,1,1,"MARKET LINK"`);
+  if (sheetKind === 'pack' || sheetKind === 'inbound') {
+    for (const meta of buildMetaLines(content)) {
+      lines.push(`TEXT 12,${y},"1",0,1,1,"${escapeTsplText(meta)}"`);
+      y += 22;
+    }
+  }
+
+  const barcodeHeight = sheetKind === 'barcode' ? 96 : 80;
+  lines.push(
+    `BARCODE 12,${y},"128",${barcodeHeight},1,0,3,6,"${escapeTsplText(printCode)}"`,
+  );
+  y += barcodeHeight + 10;
+  lines.push(`TEXT 12,${y},"2",0,1,1,"${escapeTsplText(truncateLabelText(printCode, 24))}"`);
   lines.push(`PRINT ${copies}`);
 
   return `${lines.join('\r\n')}\r\n`;

@@ -7,6 +7,21 @@ export function resolvePrintError(t: TranslationDict, error: unknown): string {
   if (msg === 'BLUETOOTH_MODULE_UNAVAILABLE') {
     return t.settings.bluetoothPairHint;
   }
+  if (/printBluetooth.*null|null.*printBluetooth/i.test(msg)) {
+    return t.settings.bluetoothPairHint;
+  }
+  if (msg === 'IOS_XPRINTER_BT_UNSUPPORTED' || msg === 'IOS_BLE_MODULE_UNAVAILABLE') {
+    return t.settings.iosXprinterBtUnsupported;
+  }
+  if (msg === 'IOS_BLE_PRINTER_NOT_SELECTED') {
+    return t.settings.iosPrinterNotSelected;
+  }
+  if (msg === 'IOS_BLE_NOT_CONNECTED' || msg === 'IOS_BLE_CONNECT_FAILED') {
+    return t.settings.iosXprinterHint;
+  }
+  if (msg === 'PRINT_CANCELLED') {
+    return t.settings.printCancelled;
+  }
   if (msg === 'IOS_PRINTER_PICKER_ONLY') {
     return t.settings.iosSelectPrinter;
   }

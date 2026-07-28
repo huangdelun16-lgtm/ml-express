@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import LabelPrintPreviewCard from './LabelPrintPreviewCard';
+import BarcodeImage from './BarcodeImage';
 import { resolvePrintError, useTranslation } from '../i18n';
 import { printInboundBarcodeOnly } from '../services/printerService';
 
@@ -80,10 +80,11 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
           </View>
 
           <View style={styles.barcodeSection}>
-            <LabelPrintPreviewCard
-              barcode={data.barcode}
-              inputBarcode={data.inputBarcode}
-              destination={data.destination}
+            <BarcodeImage
+              code={data.barcode}
+              height={72}
+              maxWidth={260}
+              showCodeText
             />
           </View>
 
