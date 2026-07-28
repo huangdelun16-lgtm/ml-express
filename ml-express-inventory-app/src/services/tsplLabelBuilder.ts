@@ -1,11 +1,10 @@
-import { XPRINTER_P203A } from '../constants/xprinterP203a';
+import { XPRINTER_P203A, type PrintLabelSheetKind } from '../constants/xprinterP203a';
 import {
   normalizeLabelContent,
   truncateLabelText,
+  type LabelPrintPayload,
   type NormalizedLabelContent,
 } from '../utils/labelPrintLayout';
-import type { PrintLabelSheetKind } from './printLabelSheets';
-import type { LabelPrintPayload } from './printerService';
 
 function escapeTsplText(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');

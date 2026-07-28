@@ -1,5 +1,12 @@
 import { XPRINTER_P203A } from '../constants/xprinterP203a';
-import type { LabelPrintPayload } from '../services/printerService';
+
+export type LabelPrintPayload = {
+  name?: string;
+  productName?: string;
+  inputBarcode?: string;
+  destination?: string;
+  customerName?: string;
+};
 
 export type NormalizedLabelContent = {
   barcode: string;
@@ -30,12 +37,4 @@ export function truncateLabelText(text: string, maxLen: number): string {
 
 export function mmToDots(mm: number, dpi = XPRINTER_P203A.dpi): number {
   return Math.max(1, Math.round((mm / 25.4) * dpi));
-}
-
-export function labelWidthDots(widthMm: number): number {
-  return mmToDots(widthMm);
-}
-
-export function labelHeightDots(heightMm: number): number {
-  return mmToDots(heightMm);
 }

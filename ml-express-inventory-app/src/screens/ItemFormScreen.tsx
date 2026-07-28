@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import ItemFormFields from '../components/ItemFormFields';
 import InboundOrderFormBody from '../components/InboundOrderFormBody';
-import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import { useItemFormState } from '../hooks/useItemFormState';
 import { useAuth } from '../contexts/AuthContext';
 import { normalizePackDestination } from '../constants/destinationOptions';
@@ -32,7 +31,6 @@ import {
   parseUnit,
   parseWeight,
 } from '../utils/itemFieldFormat';
-import { inboundOrderBarcodeData } from '../utils/orderBarcodeData';
 import {
   formatInboundDateLabel,
   formatInboundDateYmd,
@@ -56,7 +54,6 @@ export default function ItemFormScreen({
   const isEdit = !!itemId;
   const form = useItemFormState();
   const [loading, setLoading] = useState(false);
-  const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
   const [editable, setEditable] = useState(true);
   const [ownerCode, setOwnerCode] = useState('');
   const [editItemRef, setEditItemRef] = useState<{
@@ -206,23 +203,6 @@ export default function ItemFormScreen({
     }
   };
 
-  const openPrintLabel = () => {
-    const name = isEdit ? productName : form.payload.name;
-    const barcode = isEdit ? inboundBarcode : form.payload.barcode;
-    if (!barcode || !name) {
-      Alert.alert(t.common.tip, t.itemForm.alertBarcode);
-      return;
-    }
-    setOrderBarcodeData(
-      inboundOrderBarcodeData({
-        name,
-        barcode,
-        destination: destination || undefined,
-        customer_name: recipientName || undefined,
-      }),
-    );
-  };
-
   const cancelOrder = () => {
     if (!itemId) return;
     Alert.alert(
@@ -329,9 +309,6 @@ export default function ItemFormScreen({
               <Text style={styles.btnText}>{loading ? t.itemForm.saving : t.itemForm.save}</Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.btnGhost} onPress={openPrintLabel}>
-            <Text style={styles.btnGhostText}>{t.itemForm.printLabel}</Text>
-          </Pressable>
           {isEdit && editable ? (
             <Pressable
               style={[styles.btnDanger, loading && styles.btnDisabled]}
@@ -343,12 +320,6 @@ export default function ItemFormScreen({
           ) : null}
         </View>
       </ScrollView>
-
-      <OrderBarcodeModal
-        visible={!!orderBarcodeData}
-        data={orderBarcodeData}
-        onClose={() => setOrderBarcodeData(null)}
-      />
     </KeyboardAvoidingView>
   );
 }

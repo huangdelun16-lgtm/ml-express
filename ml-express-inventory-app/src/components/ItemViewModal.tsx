@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -14,11 +13,8 @@ import {
   inboundInvoiceStyles,
   type InboundInvoiceData,
 } from './InboundInvoiceView';
-import { useAuth } from '../contexts/AuthContext';
-import { useIosBlePrinterGate } from '../hooks/useIosBlePrinterGate';
-import { resolvePrintError, useTranslation } from '../i18n';
+import { useTranslation } from '../i18n';
 import { getItemDetail } from '../services/inventoryService';
-import { printInboundBarcodeOnly } from '../services/printerService';
 import type { InventoryItemDetail } from '../types/inventory';
 
 type Props = {
@@ -54,8 +50,6 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
   const { t } = useTranslation();
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [printing, setPrinting] = useState(false);
-  const { runWithBleGate, blePicker } = useIosBlePrinterGate({ presentation: 'overlay' });
 
   const invoiceData = useMemo(
     () => (detail ? mapDetailToInvoice(detail) : null),
@@ -79,32 +73,6 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
       cancelled = true;
     };
   }, [visible, itemId]);
-
-  const printLabel = async () => {
-    if (!invoiceData?.barcode) return;
-    setPrinting(true);
-    await runWithBleGate(
-      async () => {
-        const ok = await printInboundBarcodeOnly(invoiceData.barcode, invoiceData.inputBarcode, {
-          name: invoiceData.productName,
-          destination: invoiceData.destination,
-          customerName: invoiceData.recipientName,
-        });
-        if (!ok) {
-          Alert.alert(t.common.tip, t.settings.printDisabled);
-          return;
-        }
-        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
-      },
-      {
-        setBusy: setPrinting,
-        onError: (e) => {
-          Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
-        },
-      },
-    );
-    setPrinting(false);
-  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -140,13 +108,10 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
 
             <InboundInvoiceFooter
               recipientPhone={invoiceData.recipientPhone}
-              printing={printing}
-              onPrint={() => void printLabel()}
               onClose={onClose}
             />
           </View>
         )}
-        {blePicker}
       </View>
     </Modal>
   );

@@ -1,36 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useFocusEffect } from '@react-navigation/native';
 import ChangePasswordModal from '../components/ChangePasswordModal';
-import IosBlePrinterPickerModal from '../components/IosBlePrinterPickerModal';
+import BluetoothScanModal from '../components/BluetoothScanModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
-import { useIosBlePrinterGate } from '../hooks/useIosBlePrinterGate';
-import { resolveAppError, resolvePrintError, useTranslation } from '../i18n';
-import {
-  getBluetoothCapabilityHint,
-  getPrinterSettings,
-  getXprinterP203aPreset,
-  pickIosLabelPrinter,
-  printBarcodeLabel,
-  savePrinterSettings,
-  type PrinterConnectionMode,
-  type PrinterSettings,
-} from '../services/printerService';
-import { isIosBleThermalAvailable } from '../services/iosBleThermalPrinter';
+import { resolveAppError, useTranslation } from '../i18n';
 import { probeCloudConnection } from '../services/cloudConnection';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
@@ -39,11 +24,8 @@ import {
   checkAndroidAppUpdate,
   openAndroidApkDownload,
 } from '../services/appUpdateService';
-
-const CONNECTION_OPTIONS: { mode: PrinterConnectionMode; labelKey: 'connectionSystem' | 'connectionBluetooth' }[] = [
-  { mode: 'system', labelKey: 'connectionSystem' },
-  { mode: 'bluetooth', labelKey: 'connectionBluetooth' },
-];
+import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
+import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 
 function SectionCard({
   icon,
@@ -113,25 +95,18 @@ export default function SettingsScreen() {
     hubCode,
     logout,
   } = useAuth();
-  const { t, fmt, language } = useTranslation();
-  const [settings, setSettings] = useState<PrinterSettings | null>(null);
+  const { t, fmt } = useTranslation();
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [pickingPrinter, setPickingPrinter] = useState(false);
-  const [blePickerVisible, setBlePickerVisible] = useState(false);
-  const [testingPrinter, setTestingPrinter] = useState(false);
+  const [bluetoothScanVisible, setBluetoothScanVisible] = useState(false);
+  const [connectedBluetooth, setConnectedBluetooth] = useState<ScannedBluetoothDevice | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<
     'checking' | 'online' | 'offline'
   >('checking');
   const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const { runWithBleGate, blePicker: bleGatePicker } = useIosBlePrinterGate();
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
-  const appVersion = Constants.expoConfig?.version ?? '1.8.3';
-  const buildVersion = Constants.nativeBuildVersion ?? '17';
-
-  useEffect(() => {
-    void getPrinterSettings().then(setSettings);
-  }, [storeCode, store?.id]);
+  const appVersion = Constants.expoConfig?.version ?? '1.8.4';
+  const buildVersion = Constants.nativeBuildVersion ?? '18';
 
   const checkConnection = useCallback(async () => {
     setConnectionStatus('checking');
@@ -142,49 +117,9 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       void checkConnection();
+      void getActiveBluetoothDevice().then(setConnectedBluetooth);
     }, [checkConnection]),
   );
-
-  const updatePrinter = async (patch: Partial<PrinterSettings>) => {
-    if (!settings) return;
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    await savePrinterSettings(next);
-  };
-
-  const handleTestPrint = async () => {
-    if (!settings?.enabled) {
-      Alert.alert(t.common.tip, t.settings.printDisabled);
-      return;
-    }
-    setTestingPrinter(true);
-    await runWithBleGate(
-      async () => {
-        const sent = await printBarcodeLabel({
-          name: 'ML Inventory',
-          barcode: `TEST${Date.now().toString().slice(-8)}`,
-          destination: hub || undefined,
-          customerName: operatorName ?? storeCode ?? undefined,
-        });
-        if (!sent) {
-          Alert.alert(t.common.tip, t.settings.printDisabled);
-          return;
-        }
-        Alert.alert(t.settings.testPrintSuccess, t.settings.printSentBody);
-        const next = await getPrinterSettings();
-        setSettings(next);
-      },
-      {
-        setBusy: setTestingPrinter,
-        onError: (e) => {
-          const msg = e instanceof Error ? e.message : String(e ?? '');
-          if (msg === 'PRINT_CANCELLED') return;
-          Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
-        },
-      },
-    );
-    setTestingPrinter(false);
-  };
 
   const handleLogout = () => {
     Alert.alert(t.settings.logoutTitle, t.settings.logoutConfirm, [
@@ -242,15 +177,6 @@ export default function SettingsScreen() {
       }
     })();
   };
-
-  if (!settings) {
-    return (
-      <View style={styles.loadingRoot}>
-        <ActivityIndicator size="large" color="#38bdf8" />
-        <Text style={styles.loadingText}>{t.settings.loading}</Text>
-      </View>
-    );
-  }
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -322,117 +248,30 @@ export default function SettingsScreen() {
         </Pressable>
       </SectionCard>
 
-      <SectionCard icon="🌐" title={t.language.title} accent="#0ea5e9">
-        <LanguageSwitcherRow />
-      </SectionCard>
-
-      <SectionCard icon="🖨️" title={t.settings.labelPrint} accent="#3b82f6">
-        <View style={styles.switchRow}>
-          <Text style={styles.fieldLabel}>{t.settings.enablePrint}</Text>
-          <Switch
-            value={settings.enabled}
-            onValueChange={(v) => updatePrinter({ enabled: v })}
-            trackColor={{ false: '#334155', true: '#2563eb' }}
-            thumbColor="#fff"
-          />
-        </View>
-        <Text style={styles.fieldLabel}>{t.settings.connectionMode}</Text>
-        <View style={styles.chips}>
-          {CONNECTION_OPTIONS.map(({ mode, labelKey }) => (
-            <Pressable
-              key={mode}
-              style={[styles.chip, settings.connectionMode === mode && styles.chipOn]}
-              onPress={() => void updatePrinter({ connectionMode: mode })}
-            >
-              <Text style={[styles.chipText, settings.connectionMode === mode && styles.chipTextOn]}>
-                {t.settings[labelKey]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {settings.connectionMode === 'bluetooth' ? (
-          <>
-            <Text style={styles.hintText}>{getBluetoothCapabilityHint(language, settings)}</Text>
-            <Text style={styles.hintText}>{t.settings.bluetoothPairHint}</Text>
-            {Platform.OS === 'android' ? (
-              <>
-                <Text style={styles.fieldLabel}>{t.settings.androidPrinterMac}</Text>
-                <TextInput
-                  style={styles.macInput}
-                  autoCapitalize="characters"
-                  placeholder={t.settings.androidPrinterMacPlaceholder}
-                  value={settings.androidBluetoothMac ?? ''}
-                  onChangeText={(v) => void updatePrinter({ androidBluetoothMac: v.trim() })}
-                />
-              </>
-            ) : null}
-            {Platform.OS === 'ios' ? (
-              <>
-                <Text style={styles.fieldLabel}>{t.settings.iosSelectPrinter}</Text>
-                <Text style={styles.hintText}>
-                  {settings.iosBlePrinterId?.trim() && settings.iosBlePrinterName
-                    ? fmt(t.settings.iosPrinterSelected, { name: settings.iosBlePrinterName })
-                    : t.settings.iosPrinterNotSelected}
-                </Text>
-                {isIosBleThermalAvailable() ? (
-                  <Pressable
-                    style={[styles.actionBtn, styles.actionBtnPrimary, pickingPrinter && styles.btnDisabled]}
-                    disabled={pickingPrinter}
-                    onPress={() => setBlePickerVisible(true)}
-                  >
-                    <Text style={styles.actionBtnPrimaryText}>{t.settings.iosScanBlePrinter}</Text>
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    style={[styles.actionBtn, styles.actionBtnPrimary, pickingPrinter && styles.btnDisabled]}
-                    disabled={pickingPrinter}
-                    onPress={() => {
-                      void (async () => {
-                        setPickingPrinter(true);
-                        try {
-                          const next = await pickIosLabelPrinter();
-                          setSettings(next);
-                        } catch (e: unknown) {
-                          Alert.alert(t.settings.printFailed, resolveAppError(t, e));
-                        } finally {
-                          setPickingPrinter(false);
-                        }
-                      })();
-                    }}
-                  >
-                    <Text style={styles.actionBtnPrimaryText}>{t.settings.iosSelectPrinter}</Text>
-                  </Pressable>
-                )}
-              </>
-            ) : null}
-          </>
+      <SectionCard
+        icon="📡"
+        title={t.settings.scanPrinterTitle}
+        accent="#38bdf8"
+        badge={connectedBluetooth ? t.settings.scanPrinterConnected : undefined}
+      >
+        <Text style={styles.hintText}>{t.settings.scanPrinterHint}</Text>
+        {connectedBluetooth ? (
+          <Text style={styles.connectedPrinterText}>
+            {fmt(t.settings.scanPrinterConnectedTo, { name: connectedBluetooth.name })}
+          </Text>
         ) : null}
         <Pressable
-          style={[styles.actionBtn, styles.actionBtnPrimary, { marginBottom: 10 }]}
-          onPress={() => void updatePrinter(getXprinterP203aPreset())}
-        >
-          <Text style={styles.actionBtnPrimaryText}>{t.settings.applyP203aPreset}</Text>
-        </Pressable>
-        <Text style={styles.fieldLabel}>{t.settings.copies}</Text>
-        <TextInput
-          style={styles.copiesInput}
-          keyboardType="number-pad"
-          value={String(settings.copies)}
-          onChangeText={(t) => {
-            const n = Math.max(1, Math.min(9, Number(t) || 1));
-            void updatePrinter({ copies: n });
-          }}
-        />
-        <Pressable
-          style={[styles.actionBtn, styles.actionBtnSecondary, testingPrinter && styles.btnDisabled]}
-          onPress={() => void handleTestPrint()}
-          disabled={testingPrinter}
+          style={[styles.actionBtn, styles.actionBtnPrimary]}
+          onPress={() => setBluetoothScanVisible(true)}
           accessibilityRole="button"
+          accessibilityLabel={t.settings.scanPrinterStart}
         >
-          <Text style={styles.actionBtnSecondaryText}>
-            {testingPrinter ? t.settings.sendingPrint : t.settings.testPrint}
-          </Text>
+          <Text style={styles.actionBtnPrimaryText}>{t.settings.scanPrinterStart}</Text>
         </Pressable>
+      </SectionCard>
+
+      <SectionCard icon="🌐" title={t.language.title} accent="#0ea5e9">
+        <LanguageSwitcherRow />
       </SectionCard>
 
       <SectionCard icon="ℹ️" title={t.settings.appInfo} accent="#8b5cf6">
@@ -472,27 +311,13 @@ export default function SettingsScreen() {
         }
       />
 
-      <IosBlePrinterPickerModal
-        visible={blePickerVisible}
-        onClose={() => setBlePickerVisible(false)}
-        title={t.settings.iosScanBlePrinter}
-        scanningLabel={t.settings.iosScanningBle}
-        emptyLabel={t.settings.iosBleScanEmpty}
-        connectLabel={t.settings.sendingPrint}
-        closeLabel={t.common.close}
-        onSelect={(device) => {
-          void (async () => {
-            await updatePrinter({
-              iosBlePrinterId: device.id,
-              iosBlePrinterName: device.name,
-              iosPrinterName: device.name,
-            });
-            setBlePickerVisible(false);
-            Alert.alert(t.common.tip, fmt(t.settings.iosPrinterSelected, { name: device.name }));
-          })();
+      <BluetoothScanModal
+        visible={bluetoothScanVisible}
+        onClose={() => setBluetoothScanVisible(false)}
+        onConnectionChange={() => {
+          void getActiveBluetoothDevice().then(setConnectedBluetooth);
         }}
       />
-      {bleGatePicker}
     </ScrollView>
   );
 }
@@ -500,14 +325,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#020617' },
   content: { padding: 16, paddingBottom: 40 },
-  loadingRoot: {
-    flex: 1,
-    backgroundColor: '#020617',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: { color: '#94a3b8', fontWeight: '700' },
   hero: {
     backgroundColor: '#0f172a',
     borderRadius: 20,
@@ -607,51 +424,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
   },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  fieldLabel: { color: '#f1f5f9', fontWeight: '800', fontSize: 14, marginBottom: 8 },
   hintText: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 10 },
-  warningText: { color: '#fbbf24', fontSize: 12, lineHeight: 18, marginBottom: 10, fontWeight: '700' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
-    backgroundColor: '#1e293b',
-  },
-  chipOn: { backgroundColor: '#2563eb', borderColor: '#3b82f6' },
-  chipText: { color: '#94a3b8', fontWeight: '800' },
-  chipTextOn: { color: '#fff' },
-  macInput: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
-    marginBottom: 12,
-    fontWeight: '700',
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  copiesInput: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 18,
+  connectedPrinterText: {
+    color: '#6ee7b7',
+    fontSize: 13,
+    fontWeight: '800',
     marginBottom: 10,
-    maxWidth: 88,
-    fontWeight: '900',
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   actionBtn: {
     borderRadius: 14,

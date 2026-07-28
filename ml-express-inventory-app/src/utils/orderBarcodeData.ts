@@ -1,6 +1,15 @@
 import type { OrderBarcodeData } from '../components/OrderBarcodeModal';
-import type { LabelPrintPayload } from '../services/printerService';
 import { packDestinationFromBarcode } from './packageNumber';
+
+export type PackBarcodePayload = {
+  name: string;
+  barcode: string;
+  spec?: string;
+  unit?: string;
+  weight?: string;
+  destination?: string;
+  customerName?: string;
+};
 
 export function inboundOrderBarcodeData(item: {
   name: string;
@@ -19,7 +28,7 @@ export function inboundOrderBarcodeData(item: {
   };
 }
 
-export function packOrderBarcodeData(payload: LabelPrintPayload): OrderBarcodeData {
+export function packOrderBarcodeData(payload: PackBarcodePayload): OrderBarcodeData {
   const dest = payload.destination || packDestinationFromBarcode(payload.barcode);
   return {
     productName: payload.name,
@@ -27,6 +36,5 @@ export function packOrderBarcodeData(payload: LabelPrintPayload): OrderBarcodeDa
     destination: dest || undefined,
     customerName: payload.customerName,
     kind: 'pack',
-    packLabel: payload,
   };
 }

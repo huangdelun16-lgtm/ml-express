@@ -144,19 +144,15 @@ export function InboundInvoiceContent({
 
 export function InboundInvoiceFooter({
   recipientPhone,
-  printing,
   signing,
   canSignDelivered,
   onSignDelivered,
-  onPrint,
   onClose,
 }: {
   recipientPhone?: string;
-  printing?: boolean;
   signing?: boolean;
   canSignDelivered?: boolean;
   onSignDelivered?: () => void;
-  onPrint: () => void;
   onClose: () => void;
 }) {
   const phone = recipientPhone?.trim() ?? '';
@@ -164,29 +160,14 @@ export function InboundInvoiceFooter({
 
   return (
     <View style={inboundInvoiceStyles.footer}>
-      <View style={inboundInvoiceStyles.footerRow}>
-        {phone ? (
-          <Pressable
-            style={[inboundInvoiceStyles.btnCall, inboundInvoiceStyles.footerBtnHalf]}
-            onPress={() => void callPhoneNumber(phone)}
-          >
-            <Text style={inboundInvoiceStyles.btnCallText}>📞 呼叫客户</Text>
-          </Pressable>
-        ) : null}
+      {phone ? (
         <Pressable
-          style={[
-            inboundInvoiceStyles.btnPrint,
-            phone ? inboundInvoiceStyles.footerBtnHalf : inboundInvoiceStyles.footerBtnFull,
-            printing && inboundInvoiceStyles.btnDisabled,
-          ]}
-          onPress={onPrint}
-          disabled={printing}
+          style={[inboundInvoiceStyles.btnCall, inboundInvoiceStyles.footerBtnFull]}
+          onPress={() => void callPhoneNumber(phone)}
         >
-          <Text style={inboundInvoiceStyles.btnPrintText}>
-            {printing ? '发送中…' : '🖨 打印标签'}
-          </Text>
+          <Text style={inboundInvoiceStyles.btnCallText}>📞 呼叫客户</Text>
         </Pressable>
-      </View>
+      ) : null}
       {showSign ? (
         <Pressable
           style={[

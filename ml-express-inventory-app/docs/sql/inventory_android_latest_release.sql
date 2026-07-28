@@ -6,10 +6,10 @@ VALUES (
   'inventory',
   'inventory.android.latest_release',
   jsonb_build_object(
-    'version', '1.8.3',
-    'versionCode', 17,
-    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.8.3-17.apk',
-    'releaseNotes', '修复打印选机弹窗；Expo Go 可系统打印预览；蓝牙连接超时提示'
+    'version', '1.8.4',
+    'versionCode', 18,
+    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.8.4-18.apk',
+    'releaseNotes', 'Scan Printer 蓝牙扫描与连接；Barcode 窗口蓝牙标签打印（TSPL）'
   ),
   'Inventory App Android 最新 APK 发布信息（versionCode 须大于旧版才会提示更新）',
   'admin'

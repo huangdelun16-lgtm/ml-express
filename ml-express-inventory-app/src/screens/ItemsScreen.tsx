@@ -19,8 +19,7 @@ import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBar
 import PackExpressModal from '../components/PackExpressModal';
 import RegionFilterBar from '../components/RegionFilterBar';
 import { useAuth } from '../contexts/AuthContext';
-import type { BatchPrintEntry, LabelPrintPayload } from '../services/printerService';
-import { printBatchLabels } from '../services/printerService';
+import { inboundOrderBarcodeData, packOrderBarcodeData, type PackBarcodePayload } from '../utils/orderBarcodeData';
 import {
   createPackedShipment,
   canEditItemCustomerProfileForStore,
@@ -48,11 +47,10 @@ import {
   resolveItemDestinationCode,
 } from '../utils/itemDestination';
 import { isExpressPackItem } from '../utils/packItem';
-import { inboundOrderBarcodeData, packOrderBarcodeData } from '../utils/orderBarcodeData';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
-import { resolveAppError, resolvePrintError, useTranslation, getItemCustomerProfileEditDeniedMessage } from '../i18n';
+import { resolveAppError, useTranslation, getItemCustomerProfileEditDeniedMessage } from '../i18n';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Nav = {
@@ -61,7 +59,7 @@ type Nav = {
 
 type ItemsRoute = RouteProp<RootStackParamList, 'Items'>;
 
-type ListMode = 'normal' | 'pack' | 'print' | 'sign';
+type ListMode = 'normal' | 'pack' | 'sign';
 
 export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const route = useRoute<ItemsRoute>();
@@ -77,7 +75,6 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [listMode, setListMode] = useState<ListMode>('normal');
   const [filterRegion, setFilterRegion] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [batchPrinting, setBatchPrinting] = useState(false);
   const [packModalVisible, setPackModalVisible] = useState(false);
   const [actionItem, setActionItem] = useState<InventoryItemListRow | null>(null);
   const [actionCanEdit, setActionCanEdit] = useState(false);
@@ -183,7 +180,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
   const selectActive = listMode !== 'normal';
   const selectAccent =
-    listMode === 'pack' ? '#7c3aed' : listMode === 'sign' ? '#059669' : '#0ea5e9';
+    listMode === 'pack' ? '#7c3aed' : '#059669';
 
   const toggleSelect = (id: string) => {
     if (listMode === 'sign' && store) {
@@ -215,58 +212,16 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     setPackModalVisible(false);
   };
 
-  const toBatchPrintEntry = (item: InventoryItemListRow): BatchPrintEntry => {
-    if (isExpressPackItem(item)) {
-      const dest = packDestinationFromBarcode(item.barcode) || item.destination;
-      return {
-        kind: 'pack',
-        barcode: item.barcode,
-        label: {
-          name: item.name,
-          barcode: item.barcode,
-          spec: item.spec,
-          unit: item.unit,
-          weight: item.weight,
-          destination: dest || undefined,
-          customerName: item.customer_name,
-        },
-      };
-    }
-    return {
-      kind: 'inbound',
-      barcode: item.barcode,
-      inputBarcode: item.input_barcode || undefined,
-      label: {
-        name: item.name,
-        barcode: item.barcode,
-        inputBarcode: item.input_barcode || undefined,
-        destination: item.destination || undefined,
-        customerName: item.customer_name,
-      },
-    };
+  const openPackBarcode = (payload: PackBarcodePayload, requireDone = false) => {
+    setOrderBarcodeData(packOrderBarcodeData(payload));
+    setOrderBarcodeRequireDone(requireDone);
   };
 
-  const handleBatchPrint = async () => {
-    if (selectedIds.size === 0) {
-      Alert.alert(t.common.tip, t.items.alertSelectPrint);
-      return;
-    }
-    setBatchPrinting(true);
-    try {
-      const entries = selectedItems.map(toBatchPrintEntry);
-      const ok = await printBatchLabels(entries);
-      if (!ok) {
-        Alert.alert(t.common.tip, t.settings.printDisabled);
-        return;
-      }
-      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody, [
-        { text: t.common.ok, onPress: exitSelectMode },
-      ]);
-    } catch (e: unknown) {
-      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
-    } finally {
-      setBatchPrinting(false);
-    }
+  const closeOrderBarcode = () => {
+    const wasPackFlow = orderBarcodeRequireDone;
+    setOrderBarcodeData(null);
+    setOrderBarcodeRequireDone(false);
+    if (wasPackFlow) setPackSuccessInfo(null);
   };
 
   const handleBatchSign = () => {
@@ -345,44 +300,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     );
   };
 
-  const openPackBarcode = (payload: LabelPrintPayload, requireDone = false) => {
-    setOrderBarcodeData(packOrderBarcodeData(payload));
-    setOrderBarcodeRequireDone(requireDone);
-  };
-
-  const openPackItemPrint = (item: InventoryItem) => {
-    const dest = packDestinationFromBarcode(item.barcode) || item.destination;
-    setActionItem(null);
-    openPackBarcode({
-      name: item.name,
-      barcode: item.barcode,
-      spec: item.spec,
-      unit: item.unit,
-      weight: item.weight,
-      destination: dest || undefined,
-      customerName: item.customer_name,
-    });
-  };
-
-  const openOrderItemPrint = (item: InventoryItem) => {
-    setActionItem(null);
-    setOrderBarcodeData(inboundOrderBarcodeData(item));
-    setOrderBarcodeRequireDone(false);
-  };
-
-  const handleItemPrint = (item: InventoryItem) => {
-    if (isExpressPackItem(item)) openPackItemPrint(item);
-    else openOrderItemPrint(item);
-  };
-
-  const closeOrderBarcode = () => {
-    const wasPackFlow = orderBarcodeRequireDone;
-    setOrderBarcodeData(null);
-    setOrderBarcodeRequireDone(false);
-    if (wasPackFlow) setPackSuccessInfo(null);
-  };
-
-  const handlePackPrintDone = () => {
+  const handlePackBarcodeDone = () => {
     setOrderBarcodeData(null);
     setOrderBarcodeRequireDone(false);
     setPackSuccessInfo(null);
@@ -448,14 +366,6 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
               <Text style={styles.packBtnText}>{t.items.packBtn}</Text>
             </Pressable>
             <Pressable
-              style={styles.printSelectBtn}
-              onPress={() => setListMode('print')}
-              accessibilityRole="button"
-              accessibilityLabel={t.items.multiSelect}
-            >
-              <Text style={styles.printSelectBtnText}>{t.items.multiSelect}</Text>
-            </Pressable>
-            <Pressable
               style={styles.signSelectBtn}
               onPress={() => {
                 setFilterRegion('');
@@ -511,35 +421,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
               </Text>
             </Pressable>
           </>
-        ) : (
-          <>
-            <Pressable
-              style={styles.ghostBtn}
-              onPress={exitSelectMode}
-              accessibilityRole="button"
-              accessibilityLabel={t.items.cancelSelect}
-            >
-              <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
-            </Pressable>
-            <Text style={styles.packHint}>{t.items.printHint}</Text>
-            <Pressable
-              style={[
-                styles.printBtn,
-                (selectedIds.size === 0 || batchPrinting) && styles.packBtnDisabled,
-              ]}
-              onPress={() => void handleBatchPrint()}
-              disabled={batchPrinting || selectedIds.size === 0}
-              accessibilityRole="button"
-              accessibilityLabel={fmt(t.items.printLabels, { count: selectedIds.size })}
-            >
-              <Text style={styles.printBtnText}>
-                {batchPrinting
-                  ? t.items.printing
-                  : fmt(t.items.printLabels, { count: selectedIds.size })}
-              </Text>
-            </Pressable>
-          </>
-        )}
+        ) : null}
       </View>
 
       {loadError ? (
@@ -786,7 +668,6 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           setActionItem(null);
           navigation.navigate('ItemForm', { itemId: id });
         }}
-        onPrint={actionItem ? () => handleItemPrint(actionItem) : undefined}
         canSignDelivered={
           !!actionItem &&
           !!store &&
@@ -828,7 +709,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         visible={!!orderBarcodeData}
         data={orderBarcodeData}
         onClose={closeOrderBarcode}
-        onDone={orderBarcodeRequireDone ? handlePackPrintDone : undefined}
+        onDone={orderBarcodeRequireDone ? handlePackBarcodeDone : undefined}
       />
 
       <CustomerSignFlowModal
@@ -910,15 +791,6 @@ const styles = StyleSheet.create({
   },
   packBtnDisabled: { opacity: 0.5 },
   packBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  printSelectBtn: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#0ea5e9',
-  },
-  printSelectBtnText: { color: '#38bdf8', fontWeight: '800', fontSize: 14 },
   signSelectBtn: {
     backgroundColor: '#0f172a',
     borderRadius: 10,
@@ -935,13 +807,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   signActionBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  printBtn: {
-    backgroundColor: '#0ea5e9',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  printBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   ghostBtn: {
     borderRadius: 10,
     paddingHorizontal: 12,

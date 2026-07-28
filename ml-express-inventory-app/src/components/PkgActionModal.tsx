@@ -11,7 +11,6 @@ type Props = {
   pack: PackedShipmentListRow | null;
   onClose: () => void;
   onEdit: () => void;
-  onPrint: () => void;
   onViewOrders?: () => void;
   onUnpack?: () => void;
   canEdit?: boolean;
@@ -24,7 +23,6 @@ export default function PkgActionModal({
   pack,
   onClose,
   onEdit,
-  onPrint,
   onViewOrders,
   onUnpack,
   canEdit = true,
@@ -97,9 +95,6 @@ export default function PkgActionModal({
               </Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.btnPrint} onPress={onPrint}>
-            <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
-          </Pressable>
           <Pressable style={styles.btnCancel} onPress={onClose}>
             <Text style={styles.btnCancelText}>{t.common.close}</Text>
           </Pressable>
@@ -200,14 +195,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   readonlyHintText: { color: '#94a3b8', fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  btnPrint: {
-    backgroundColor: '#2563eb',
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnUnpack: {
     backgroundColor: 'transparent',
     borderRadius: 14,

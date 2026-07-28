@@ -13,13 +13,11 @@ import { useAuth } from '../contexts/AuthContext';
 import PkgActionModal from '../components/PkgActionModal';
 import PkgEditModal from '../components/PkgEditModal';
 import PkgOrdersModal from '../components/PkgOrdersModal';
-import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import {
   cancelPackedShipment,
   listPackedShipmentRows,
 } from '../services/inventoryService';
-import { packOrderBarcodeData } from '../utils/orderBarcodeData';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { fmt, getPackStatusLabel, resolveAppError, useTranslation } from '../i18n';
 import { packStatusStyle, canEditPackedShipment } from '../utils/packDisplayStatus';
@@ -45,7 +43,6 @@ export default function PkgScreen() {
   const [actionPack, setActionPack] = useState<PackedShipmentListRow | null>(null);
   const [editPack, setEditPack] = useState<PackedShipmentListRow | null>(null);
   const [ordersPack, setOrdersPack] = useState<PackedShipmentListRow | null>(null);
-  const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
   const [unpacking, setUnpacking] = useState(false);
 
   const load = useCallback(async () => {
@@ -62,21 +59,6 @@ export default function PkgScreen() {
   useEffect(() => {
     void load();
   }, [search]);
-
-  const openPrint = (pack: PackedShipmentListRow) => {
-    const dest = packDestinationFromBarcode(pack.bundle_barcode);
-    setOrderBarcodeData(
-      packOrderBarcodeData({
-        name: pack.bundle_name,
-        barcode: pack.bundle_barcode,
-        spec: pack.spec,
-        unit: pack.unit,
-        weight: pack.weight,
-        destination: dest || undefined,
-      }),
-    );
-    setActionPack(null);
-  };
 
   return (
     <View style={styles.root}>
@@ -268,10 +250,6 @@ export default function PkgScreen() {
           setEditPack(actionPack);
           setActionPack(null);
         }}
-        onPrint={() => {
-          if (!actionPack) return;
-          openPrint(actionPack);
-        }}
         onViewOrders={() => {
           if (!actionPack) return;
           setOrdersPack(actionPack);
@@ -290,12 +268,6 @@ export default function PkgScreen() {
         visible={!!ordersPack}
         pack={ordersPack}
         onClose={() => setOrdersPack(null)}
-      />
-
-      <OrderBarcodeModal
-        visible={!!orderBarcodeData}
-        data={orderBarcodeData}
-        onClose={() => setOrderBarcodeData(null)}
       />
     </View>
   );

@@ -14,7 +14,6 @@ type Props = {
   onClose: () => void;
   onView: () => void;
   onEdit: () => void;
-  onPrint?: () => void;
   onSignDelivered?: () => void;
   canEdit?: boolean;
   canSignDelivered?: boolean;
@@ -27,7 +26,6 @@ export default function ItemActionModal({
   onClose,
   onView,
   onEdit,
-  onPrint,
   onSignDelivered,
   canEdit = true,
   canSignDelivered = false,
@@ -111,22 +109,10 @@ export default function ItemActionModal({
             </View>
           ) : null}
 
-          {showSign || onPrint ? (
-            <View style={styles.btnRow}>
-              {showSign ? (
-                <Pressable style={[styles.btnSign, onPrint ? styles.btnHalf : styles.btnFull]} onPress={onSignDelivered}>
-                  <Text style={styles.btnSignText}>{t.common.signedMark}</Text>
-                </Pressable>
-              ) : null}
-              {onPrint ? (
-                <Pressable
-                  style={[styles.btnPrint, showSign ? styles.btnHalf : styles.btnFull]}
-                  onPress={onPrint}
-                >
-                  <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
-                </Pressable>
-              ) : null}
-            </View>
+          {showSign ? (
+            <Pressable style={[styles.btnSign, styles.btnFull]} onPress={onSignDelivered}>
+              <Text style={styles.btnSignText}>{t.common.signedMark}</Text>
+            </Pressable>
           ) : null}
 
           <Pressable style={styles.btnCancel} onPress={onClose}>
@@ -233,13 +219,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnSignText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  btnPrint: {
-    backgroundColor: '#0ea5e9',
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnCancel: { paddingVertical: 10, alignItems: 'center' },
   btnCancelText: { color: '#64748b', fontWeight: '700', fontSize: 15 },
 });
