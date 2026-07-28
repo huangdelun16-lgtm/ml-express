@@ -13,7 +13,12 @@ import { useAuth } from '../contexts/AuthContext';
 import PkgActionModal from '../components/PkgActionModal';
 import PkgEditModal from '../components/PkgEditModal';
 import PkgOrdersModal from '../components/PkgOrdersModal';
+import LabelPrintModal from '../components/LabelPrintModal';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
+import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
+import { packOrderBarcodeData } from '../utils/orderBarcodeData';
+import type { OrderBarcodeData } from '../components/OrderBarcodeModal';
+import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 import {
   cancelPackedShipment,
   listPackedShipmentRows,
@@ -43,6 +48,8 @@ export default function PkgScreen() {
   const [actionPack, setActionPack] = useState<PackedShipmentListRow | null>(null);
   const [editPack, setEditPack] = useState<PackedShipmentListRow | null>(null);
   const [ordersPack, setOrdersPack] = useState<PackedShipmentListRow | null>(null);
+  const [packLabelPrintData, setPackLabelPrintData] = useState<OrderBarcodeData | null>(null);
+  const [connectedPrinter, setConnectedPrinter] = useState<ScannedBluetoothDevice | null>(null);
   const [unpacking, setUnpacking] = useState(false);
 
   const load = useCallback(async () => {
@@ -59,6 +66,14 @@ export default function PkgScreen() {
   useEffect(() => {
     void load();
   }, [search]);
+
+  useEffect(() => {
+    if (!actionPack) {
+      setConnectedPrinter(null);
+      return;
+    }
+    void getActiveBluetoothDevice().then(setConnectedPrinter);
+  }, [actionPack]);
 
   return (
     <View style={styles.root}>
@@ -255,6 +270,28 @@ export default function PkgScreen() {
           setOrdersPack(actionPack);
           setActionPack(null);
         }}
+        onPrint={
+          connectedPrinter && actionPack
+            ? () => {
+                const pack = actionPack;
+                const dest = packDestinationFromBarcode(pack.bundle_barcode);
+                setPackLabelPrintData(
+                  packOrderBarcodeData({
+                    name: pack.bundle_name,
+                    barcode: pack.bundle_barcode,
+                    destination: dest || undefined,
+                  }),
+                );
+              }
+            : undefined
+        }
+      />
+
+      <LabelPrintModal
+        visible={!!packLabelPrintData}
+        data={packLabelPrintData}
+        printer={connectedPrinter}
+        onClose={() => setPackLabelPrintData(null)}
       />
 
       <PkgEditModal

@@ -13,13 +13,16 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import ItemActionModal from '../components/ItemActionModal';
 import ItemViewModal from '../components/ItemViewModal';
+import LabelPrintModal from '../components/LabelPrintModal';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import PaidStampWatermark from '../components/PaidStampWatermark';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import PackExpressModal from '../components/PackExpressModal';
 import RegionFilterBar from '../components/RegionFilterBar';
 import { useAuth } from '../contexts/AuthContext';
-import { inboundOrderBarcodeData, packOrderBarcodeData, type PackBarcodePayload } from '../utils/orderBarcodeData';
+import { inboundOrderBarcodeData, packOrderBarcodeData, listItemOrderBarcodeData, type PackBarcodePayload } from '../utils/orderBarcodeData';
+import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
+import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 import {
   createPackedShipment,
   canEditItemCustomerProfileForStore,
@@ -87,6 +90,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     count: number;
   } | null>(null);
   const [orderBarcodeData, setOrderBarcodeData] = useState<OrderBarcodeData | null>(null);
+  const [itemLabelPrintData, setItemLabelPrintData] = useState<OrderBarcodeData | null>(null);
+  const [connectedPrinter, setConnectedPrinter] = useState<ScannedBluetoothDevice | null>(null);
   const requestIdRef = useRef(0);
   const activeRequestKeyRef = useRef('');
 
@@ -148,6 +153,14 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
       setActionCanEdit(ok);
     })();
   }, [actionItem, store, hubCode]);
+
+  useEffect(() => {
+    if (!actionItem) {
+      setConnectedPrinter(null);
+      return;
+    }
+    void getActiveBluetoothDevice().then(setConnectedPrinter);
+  }, [actionItem]);
 
   const displayedItems = useMemo(() => {
     let list = items.filter((i) => !isExpressPackItem(i));
@@ -687,6 +700,15 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
               }
             : undefined
         }
+        onPrint={
+          connectedPrinter && actionItem
+            ? () => {
+                const item = actionItem;
+                const isPack = isExpressPackItem(item);
+                setItemLabelPrintData(listItemOrderBarcodeData(item, isPack));
+              }
+            : undefined
+        }
       />
 
       <ItemViewModal
@@ -710,6 +732,13 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         data={orderBarcodeData}
         onClose={closeOrderBarcode}
         onDone={orderBarcodeRequireDone ? handlePackBarcodeDone : undefined}
+      />
+
+      <LabelPrintModal
+        visible={!!itemLabelPrintData}
+        data={itemLabelPrintData}
+        printer={connectedPrinter}
+        onClose={() => setItemLabelPrintData(null)}
       />
 
       <CustomerSignFlowModal

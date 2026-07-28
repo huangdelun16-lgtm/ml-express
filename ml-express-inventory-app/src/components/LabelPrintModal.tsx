@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import BarcodeImage from './BarcodeImage';
+import LabelBarcodeContent from './LabelBarcodeContent';
 import type { OrderBarcodeData } from './OrderBarcodeModal';
 import { useTranslation } from '../i18n';
 import type { TranslationDict } from '../i18n/translations';
@@ -45,8 +45,6 @@ export default function LabelPrintModal({ visible, data, printer, onClose }: Pro
     })();
   };
 
-  const expressNo = data.inputBarcode?.trim() ?? '';
-
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -57,18 +55,7 @@ export default function LabelPrintModal({ visible, data, printer, onClose }: Pro
             {fmt(t.settings.printWindowPrinter, { name: printer.name })}
           </Text>
 
-          <Text style={styles.productName} numberOfLines={2}>
-            {data.productName}
-          </Text>
-
-          <View style={styles.barcodeSection}>
-            {expressNo ? (
-              <Text style={styles.expressValue} selectable numberOfLines={2}>
-                {expressNo}
-              </Text>
-            ) : null}
-            <BarcodeImage code={data.barcode} height={72} maxWidth={260} showCodeText />
-          </View>
+          <LabelBarcodeContent data={data} />
 
           <Pressable
             style={[styles.printBtn, printing && styles.btnDisabled]}
@@ -136,31 +123,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 14,
-  },
-  productName: {
-    color: '#e2e8f0',
-    fontSize: 15,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  barcodeSection: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  expressValue: {
-    width: '100%',
-    color: '#0284c7',
-    fontSize: 14,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    textAlign: 'center',
-    marginBottom: 12,
   },
   printBtn: {
     backgroundColor: '#0284c7',

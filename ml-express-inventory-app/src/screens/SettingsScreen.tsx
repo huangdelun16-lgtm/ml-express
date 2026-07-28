@@ -105,8 +105,8 @@ export default function SettingsScreen() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
-  const appVersion = Constants.expoConfig?.version ?? '1.8.4';
-  const buildVersion = Constants.nativeBuildVersion ?? '18';
+  const appVersion = Constants.expoConfig?.version ?? '1.8.5';
+  const buildVersion = Constants.nativeBuildVersion ?? '19';
 
   const checkConnection = useCallback(async () => {
     setConnectionStatus('checking');

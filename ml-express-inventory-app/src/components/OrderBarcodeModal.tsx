@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import BarcodeImage from './BarcodeImage';
+import LabelBarcodeContent from './LabelBarcodeContent';
 import LabelPrintModal from './LabelPrintModal';
 import { useTranslation } from '../i18n';
 import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
@@ -58,8 +58,6 @@ export default function OrderBarcodeModal({
 
   if (!data) return null;
 
-  const expressNo = data.inputBarcode?.trim() ?? '';
-
   return (
     <>
       <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
@@ -67,14 +65,7 @@ export default function OrderBarcodeModal({
           <View style={styles.card}>
             <Text style={styles.title}>{title ?? t.stockIn.barcodeModalTitle}</Text>
 
-            <View style={styles.barcodeSection}>
-              {expressNo ? (
-                <Text style={styles.expressValue} selectable numberOfLines={2}>
-                  {expressNo}
-                </Text>
-              ) : null}
-              <BarcodeImage code={data.barcode} height={72} maxWidth={260} showCodeText />
-            </View>
+            <LabelBarcodeContent data={data} />
 
             {connectedPrinter ? (
               <Pressable
@@ -121,24 +112,6 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
   },
   title: { color: '#7dd3fc', fontSize: 22, fontWeight: '900', textAlign: 'center', marginBottom: 16 },
-  barcodeSection: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  expressValue: {
-    width: '100%',
-    color: '#0284c7',
-    fontSize: 14,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
   btnPrint: {
     backgroundColor: '#0284c7',
     borderRadius: 14,

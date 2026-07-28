@@ -8,7 +8,6 @@ import {
 import type { OrderBarcodeData } from '../components/OrderBarcodeModal';
 import { ensureConnectedBleDevice } from './bluetoothScanner';
 import { buildTsplInboundLabel } from './tsplLabelBuilder';
-import type { PrintLabelSheetKind } from '../constants/xprinterP203a';
 
 const CHUNK_SIZE = 180;
 const CHUNK_DELAY_MS = 25;
@@ -142,21 +141,12 @@ export async function sendTsplPayload(payload: string): Promise<void> {
   }
 }
 
-function sheetKindFromBarcode(data: OrderBarcodeData): PrintLabelSheetKind {
-  if (data.kind === 'pack') return 'pack';
-  if (data.kind === 'inbound') return 'inbound';
-  return 'barcode';
-}
-
 export async function printOrderBarcodeLabel(data: OrderBarcodeData): Promise<void> {
   const payload = buildTsplInboundLabel({
     barcode: data.barcode,
-    sheetKind: sheetKindFromBarcode(data),
+    sheetKind: 'barcode',
     extras: {
-      productName: data.productName,
       inputBarcode: data.inputBarcode,
-      destination: data.destination,
-      customerName: data.customerName,
     },
   });
   await sendTsplPayload(payload);

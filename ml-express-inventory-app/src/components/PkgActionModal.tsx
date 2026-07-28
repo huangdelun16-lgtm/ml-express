@@ -11,6 +11,7 @@ type Props = {
   pack: PackedShipmentListRow | null;
   onClose: () => void;
   onEdit: () => void;
+  onPrint?: () => void;
   onViewOrders?: () => void;
   onUnpack?: () => void;
   canEdit?: boolean;
@@ -23,6 +24,7 @@ export default function PkgActionModal({
   pack,
   onClose,
   onEdit,
+  onPrint,
   onViewOrders,
   onUnpack,
   canEdit = true,
@@ -93,6 +95,11 @@ export default function PkgActionModal({
               <Text style={styles.btnUnpackText}>
                 {unpacking ? t.common.processing : t.pkg.unpackTitle}
               </Text>
+            </Pressable>
+          ) : null}
+          {onPrint ? (
+            <Pressable style={styles.btnPrint} onPress={onPrint}>
+              <Text style={styles.btnPrintText}>{t.items.printBtn}</Text>
             </Pressable>
           ) : null}
           <Pressable style={styles.btnCancel} onPress={onClose}>
@@ -206,6 +213,14 @@ const styles = StyleSheet.create({
   },
   btnUnpackText: { color: '#f87171', fontWeight: '800', fontSize: 15 },
   btnBusy: { opacity: 0.6 },
+  btnPrint: {
+    backgroundColor: '#0284c7',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnOrdersText: { color: '#cbd5e1', fontWeight: '700', fontSize: 14 },
   btnCancel: { paddingVertical: 10, alignItems: 'center' },
   btnCancelText: { color: '#64748b', fontWeight: '700', fontSize: 15 },
