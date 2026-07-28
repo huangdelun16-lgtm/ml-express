@@ -6,10 +6,10 @@ VALUES (
   'inventory',
   'inventory.android.latest_release',
   jsonb_build_object(
-    'version', '1.8.2',
-    'versionCode', 16,
-    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.8.2-16.apk',
-    'releaseNotes', 'iOS 打印未选机时引导连接 P201A；蓝牙冷启动自动重连'
+    'version', '1.8.3',
+    'versionCode', 17,
+    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.8.3-17.apk',
+    'releaseNotes', '修复打印选机弹窗；Expo Go 可系统打印预览；蓝牙连接超时提示'
   ),
   'Inventory App Android 最新 APK 发布信息（versionCode 须大于旧版才会提示更新）',
   'admin'

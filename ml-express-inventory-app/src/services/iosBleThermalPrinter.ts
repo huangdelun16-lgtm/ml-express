@@ -7,6 +7,8 @@ type BleModule = typeof import('ml-xprinter-ble');
 
 let cachedModule: BleModule | null | undefined;
 
+const CONNECT_TIMEOUT_MS = 15000;
+
 function loadBleModule(): BleModule | null {
   if (cachedModule !== undefined) return cachedModule;
   if (Platform.OS !== 'ios') {
@@ -19,6 +21,20 @@ function loadBleModule(): BleModule | null {
     cachedModule = null;
   }
   return cachedModule;
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, code: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(code)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export function isIosBleThermalAvailable(): boolean {
@@ -52,7 +68,7 @@ export async function scanIosBlePrinters(
 export async function connectIosBlePrinter(deviceId: string): Promise<boolean> {
   const mod = loadBleModule();
   if (!mod) throw new Error('IOS_BLE_MODULE_UNAVAILABLE');
-  return mod.connectBlePrinter(deviceId);
+  return withTimeout(mod.connectBlePrinter(deviceId), CONNECT_TIMEOUT_MS, 'IOS_BLE_CONNECT_FAILED');
 }
 
 export async function disconnectIosBlePrinter(): Promise<void> {
@@ -85,8 +101,24 @@ export async function printIosBleLabel(params: {
   if (!deviceId) throw new Error('IOS_BLE_PRINTER_NOT_SELECTED');
 
   if (!mod.isBlePrinterConnected()) {
-    const ok = await mod.connectBlePrinter(deviceId);
-    if (!ok) throw new Error('IOS_BLE_CONNECT_FAILED');
+    try {
+      const ok = await withTimeout(
+        mod.connectBlePrinter(deviceId),
+        CONNECT_TIMEOUT_MS,
+        'IOS_BLE_CONNECT_FAILED',
+      );
+      if (!ok) throw new Error('IOS_BLE_CONNECT_FAILED');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error ?? '');
+      if (
+        msg === 'IOS_BLE_CONNECT_FAILED' ||
+        msg === 'IOS_BLE_PRINTER_NOT_FOUND' ||
+        /connect|timeout|not found/i.test(msg)
+      ) {
+        throw new Error('IOS_BLE_CONNECT_FAILED');
+      }
+      throw error;
+    }
   }
 
   const tspl = buildTsplInboundLabel({
@@ -102,5 +134,5 @@ export async function printIosBleLabel(params: {
     sheetKind: params.sheetKind ?? 'barcode',
   });
 
-  await mod.sendTsplPayload(tspl);
+  await withTimeout(mod.sendTsplPayload(tspl), CONNECT_TIMEOUT_MS, 'IOS_BLE_PRINT_FAILED');
 }

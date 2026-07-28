@@ -42,7 +42,7 @@ export default function OrderBarcodeModal({
 }: Props) {
   const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
-  const { runWithBleGate, blePicker } = useIosBlePrinterGate();
+  const { runWithBleGate, blePicker } = useIosBlePrinterGate({ presentation: 'overlay' });
 
   const printBarcode = async () => {
     if (!data?.barcode) return;
@@ -86,40 +86,38 @@ export default function OrderBarcodeModal({
   const expressNo = data.inputBarcode?.trim() ?? '';
 
   return (
-    <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
-        <View style={styles.overlay}>
-          <View style={styles.card}>
-            <Text style={styles.title}>{title ?? t.stockIn.barcodeModalTitle}</Text>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <Text style={styles.title}>{title ?? t.stockIn.barcodeModalTitle}</Text>
 
-            <View style={styles.barcodeSection}>
-              {expressNo ? (
-                <Text style={styles.expressValue} selectable numberOfLines={2}>
-                  {expressNo}
-                </Text>
-              ) : null}
-              <BarcodeImage code={data.barcode} height={72} maxWidth={260} showCodeText />
-            </View>
-
-            <Pressable
-              style={[styles.btnPrint, printing && styles.btnDisabled]}
-              onPress={() => void printBarcode()}
-              disabled={printing}
-            >
-              <Text style={styles.btnPrintText}>
-                {printing ? t.settings.sendingPrint : t.settings.labelPrintAction}
+          <View style={styles.barcodeSection}>
+            {expressNo ? (
+              <Text style={styles.expressValue} selectable numberOfLines={2}>
+                {expressNo}
               </Text>
-            </Pressable>
-            <Pressable style={styles.btnClose} onPress={finish}>
-              <Text style={styles.btnCloseText}>
-                {cancelLabel ?? (onDone ? t.common.done : t.common.close)}
-              </Text>
-            </Pressable>
+            ) : null}
+            <BarcodeImage code={data.barcode} height={72} maxWidth={260} showCodeText />
           </View>
+
+          <Pressable
+            style={[styles.btnPrint, printing && styles.btnDisabled]}
+            onPress={() => void printBarcode()}
+            disabled={printing}
+          >
+            <Text style={styles.btnPrintText}>
+              {printing ? t.settings.sendingPrint : t.settings.labelPrintAction}
+            </Text>
+          </Pressable>
+          <Pressable style={styles.btnClose} onPress={finish}>
+            <Text style={styles.btnCloseText}>
+              {cancelLabel ?? (onDone ? t.common.done : t.common.close)}
+            </Text>
+          </Pressable>
         </View>
-      </Modal>
-      {blePicker}
-    </>
+        {blePicker}
+      </View>
+    </Modal>
   );
 }
 
@@ -129,6 +127,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,23,42,0.78)',
     justifyContent: 'center',
     padding: 20,
+    position: 'relative',
   },
   card: {
     backgroundColor: '#1e293b',

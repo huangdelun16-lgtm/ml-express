@@ -126,8 +126,8 @@ export default function SettingsScreen() {
   const { runWithBleGate, blePicker: bleGatePicker } = useIosBlePrinterGate();
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
-  const appVersion = Constants.expoConfig?.version ?? '1.8.2';
-  const buildVersion = Constants.nativeBuildVersion ?? '16';
+  const appVersion = Constants.expoConfig?.version ?? '1.8.3';
+  const buildVersion = Constants.nativeBuildVersion ?? '17';
 
   useEffect(() => {
     void getPrinterSettings().then(setSettings);

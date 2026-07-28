@@ -23,6 +23,9 @@ export function resolvePrintError(t: TranslationDict, error: unknown): string {
   ) {
     return t.settings.iosXprinterHint;
   }
+  if (msg === 'IOS_BLE_PRINT_FAILED') {
+    return t.settings.printFailed;
+  }
   if (msg === 'PRINT_CANCELLED') {
     return t.settings.printCancelled;
   }

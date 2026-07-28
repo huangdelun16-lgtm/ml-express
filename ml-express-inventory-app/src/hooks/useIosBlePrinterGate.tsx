@@ -14,10 +14,16 @@ type PendingPrint = {
   setBusy?: (busy: boolean) => void;
 };
 
+type Options = {
+  /** 在已有 Modal 内使用 overlay，避免 iOS 第二层 Modal 不弹出 */
+  presentation?: 'modal' | 'overlay';
+};
+
 /**
  * iOS 蓝牙打印未选机时弹出搜索选机，保存后自动重试本次打印。
  */
-export function useIosBlePrinterGate() {
+export function useIosBlePrinterGate(options: Options = {}) {
+  const { presentation = 'modal' } = options;
   const { t } = useTranslation();
   const [pickerVisible, setPickerVisible] = useState(false);
   const pendingRef = useRef<PendingPrint | null>(null);
@@ -44,6 +50,7 @@ export function useIosBlePrinterGate() {
             onError: handlers.onError,
             setBusy: handlers.setBusy,
           };
+          handlers.setBusy?.(false);
           setPickerVisible(true);
           return;
         }
@@ -81,6 +88,12 @@ export function useIosBlePrinterGate() {
           } catch (error) {
             const msg = error instanceof Error ? error.message : String(error ?? '');
             if (msg === 'PRINT_CANCELLED') return;
+            // 选机后仍未选中（极少见）则再次打开选机
+            if (msg === 'IOS_BLE_PRINTER_NOT_SELECTED' && isIosBleThermalAvailable()) {
+              pendingRef.current = pending;
+              setPickerVisible(true);
+              return;
+            }
             pending.onError(error);
           } finally {
             pending.setBusy?.(false);
@@ -98,6 +111,7 @@ export function useIosBlePrinterGate() {
   const blePicker = (
     <IosBlePrinterPickerModal
       visible={pickerVisible}
+      presentation={presentation}
       onClose={handleClose}
       onSelect={handleSelect}
       title={t.settings.iosScanBlePrinter}
@@ -105,8 +119,9 @@ export function useIosBlePrinterGate() {
       emptyLabel={t.settings.iosBleScanEmpty}
       connectLabel={t.settings.sendingPrint}
       closeLabel={t.common.close}
+      connectFailedTitle={t.settings.printFailed}
     />
   );
 
-  return { runWithBleGate, blePicker };
+  return { runWithBleGate, blePicker, pickerVisible };
 }

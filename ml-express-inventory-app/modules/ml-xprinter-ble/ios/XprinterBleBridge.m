@@ -105,6 +105,22 @@ static const NSTimeInterval kConnectScanTimeoutSeconds = 12.0;
     return;
   }
   [[MBLEManager sharedInstance] MconnectDevice:peripheral];
+
+  __weak typeof(self) weakSelf = self;
+  NSString *targetId = [deviceId copy];
+  dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kConnectScanTimeoutSeconds * NSEC_PER_SEC)),
+      dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || !self.pendingConnectCompletion) return;
+        if (self.connectedPeripheral &&
+            [self.connectedPeripheral.identifier.UUIDString isEqualToString:targetId]) {
+          return;
+        }
+        void (^done)(BOOL, NSString * _Nullable) = self.pendingConnectCompletion;
+        self.pendingConnectCompletion = nil;
+        if (done) done(NO, @"IOS_BLE_CONNECT_FAILED");
+      });
 }
 
 - (void)beginReconnectScanForDeviceId:(NSString *)deviceId

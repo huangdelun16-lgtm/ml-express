@@ -33,7 +33,7 @@ type Props = {
 export default function StockInSuccessModal({ visible, data, onDone }: Props) {
   const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
-  const { runWithBleGate, blePicker } = useIosBlePrinterGate();
+  const { runWithBleGate, blePicker } = useIosBlePrinterGate({ presentation: 'overlay' });
 
   const printBarcode = async () => {
     if (!data?.barcode) return;
@@ -66,53 +66,51 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
   const meta = [data.spec, data.weight].filter(Boolean).join(' · ');
 
   return (
-    <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone}>
-        <View style={styles.overlay}>
-          <View style={styles.card}>
-            <View style={styles.iconCircle}>
-              <Text style={styles.icon}>✓</Text>
-            </View>
-            <Text style={styles.title}>{t.stockIn.inboundSuccess}</Text>
-            <Text style={styles.summary}>+{data.qty}</Text>
-
-            <View style={styles.infoBox}>
-              <InfoRow label={t.forms.inboundDate} value={data.inboundDateLabel} />
-              <InfoRow label={t.stockIn.finalDest} value={data.destination} />
-              {meta ? (
-                <InfoRow
-                  label={`${t.trackExpress.spec} / ${t.trackExpress.weight}`}
-                  value={meta}
-                />
-              ) : null}
-            </View>
-
-            <View style={styles.barcodeSection}>
-              <BarcodeImage
-                code={data.barcode}
-                height={72}
-                maxWidth={260}
-                showCodeText
-              />
-            </View>
-
-            <Pressable
-              style={[styles.btnPrint, printing && styles.btnDisabled]}
-              onPress={printBarcode}
-              disabled={printing}
-            >
-              <Text style={styles.btnPrintText}>
-                {printing ? t.items.printing : t.itemForm.printLabel}
-              </Text>
-            </Pressable>
-            <Pressable style={styles.btnDone} onPress={onDone}>
-              <Text style={styles.btnDoneText}>{t.nav.home}</Text>
-            </Pressable>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone}>
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.icon}>✓</Text>
           </View>
+          <Text style={styles.title}>{t.stockIn.inboundSuccess}</Text>
+          <Text style={styles.summary}>+{data.qty}</Text>
+
+          <View style={styles.infoBox}>
+            <InfoRow label={t.forms.inboundDate} value={data.inboundDateLabel} />
+            <InfoRow label={t.stockIn.finalDest} value={data.destination} />
+            {meta ? (
+              <InfoRow
+                label={`${t.trackExpress.spec} / ${t.trackExpress.weight}`}
+                value={meta}
+              />
+            ) : null}
+          </View>
+
+          <View style={styles.barcodeSection}>
+            <BarcodeImage
+              code={data.barcode}
+              height={72}
+              maxWidth={260}
+              showCodeText
+            />
+          </View>
+
+          <Pressable
+            style={[styles.btnPrint, printing && styles.btnDisabled]}
+            onPress={printBarcode}
+            disabled={printing}
+          >
+            <Text style={styles.btnPrintText}>
+              {printing ? t.items.printing : t.itemForm.printLabel}
+            </Text>
+          </Pressable>
+          <Pressable style={styles.btnDone} onPress={onDone}>
+            <Text style={styles.btnDoneText}>{t.nav.home}</Text>
+          </Pressable>
         </View>
-      </Modal>
-      {blePicker}
-    </>
+        {blePicker}
+      </View>
+    </Modal>
   );
 }
 
@@ -134,6 +132,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,23,42,0.78)',
     justifyContent: 'center',
     padding: 20,
+    position: 'relative',
   },
   card: {
     backgroundColor: '#1e293b',

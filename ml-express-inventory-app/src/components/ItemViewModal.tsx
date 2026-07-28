@@ -55,7 +55,7 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
-  const { runWithBleGate, blePicker } = useIosBlePrinterGate();
+  const { runWithBleGate, blePicker } = useIosBlePrinterGate({ presentation: 'overlay' });
 
   const invoiceData = useMemo(
     () => (detail ? mapDetailToInvoice(detail) : null),
@@ -107,50 +107,48 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
   };
 
   return (
-    <>
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-        <View style={inboundInvoiceStyles.overlay}>
-          {loading ? (
-            <View style={styles.centerBox}>
-              <ActivityIndicator color="#60a5fa" size="large" />
-              <Text style={styles.loadingText}>加载订单…</Text>
-            </View>
-          ) : !invoiceData ? (
-            <View style={styles.centerBox}>
-              <Text style={styles.emptyText}>订单不存在或已删除</Text>
-              <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
-                <Text style={inboundInvoiceStyles.btnCloseText}>关闭</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={inboundInvoiceStyles.sheet}>
-              <ScrollView
-                contentContainerStyle={inboundInvoiceStyles.scroll}
-                showsVerticalScrollIndicator={false}
-              >
-                <InboundInvoiceContent
-                  data={invoiceData}
-                  copyLabels={{
-                    copied: t.common.copied,
-                    tapToCopy: t.common.tapToCopy,
-                    expressNo: t.items.expressNo,
-                    inbound: t.items.inbound,
-                  }}
-                />
-              </ScrollView>
-
-              <InboundInvoiceFooter
-                recipientPhone={invoiceData.recipientPhone}
-                printing={printing}
-                onPrint={() => void printLabel()}
-                onClose={onClose}
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={inboundInvoiceStyles.overlay}>
+        {loading ? (
+          <View style={styles.centerBox}>
+            <ActivityIndicator color="#60a5fa" size="large" />
+            <Text style={styles.loadingText}>加载订单…</Text>
+          </View>
+        ) : !invoiceData ? (
+          <View style={styles.centerBox}>
+            <Text style={styles.emptyText}>订单不存在或已删除</Text>
+            <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
+              <Text style={inboundInvoiceStyles.btnCloseText}>关闭</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={inboundInvoiceStyles.sheet}>
+            <ScrollView
+              contentContainerStyle={inboundInvoiceStyles.scroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <InboundInvoiceContent
+                data={invoiceData}
+                copyLabels={{
+                  copied: t.common.copied,
+                  tapToCopy: t.common.tapToCopy,
+                  expressNo: t.items.expressNo,
+                  inbound: t.items.inbound,
+                }}
               />
-            </View>
-          )}
-        </View>
-      </Modal>
-      {blePicker}
-    </>
+            </ScrollView>
+
+            <InboundInvoiceFooter
+              recipientPhone={invoiceData.recipientPhone}
+              printing={printing}
+              onPrint={() => void printLabel()}
+              onClose={onClose}
+            />
+          </View>
+        )}
+        {blePicker}
+      </View>
+    </Modal>
   );
 }
 

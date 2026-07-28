@@ -371,9 +371,8 @@ async function printLabelJob(params: {
     return;
   }
 
-  if (isIosXprinterBluetoothMode(settings)) {
-    throw new Error('IOS_BLE_MODULE_UNAVAILABLE');
-  }
+  // Expo Go / 无原生 BLE 模块：回退系统 HTML 打印预览，便于调试布局。
+  // P201A 不支持 AirPrint，真机直连仍需含 ml-xprinter-ble 的 IPA / 开发构建。
 
   const html = await buildSheetHtml({
     kind: sheetKind,
@@ -583,10 +582,10 @@ export function getBluetoothCapabilityHint(language: Language, settings?: Printe
               ? 'iPhone BT TSPL တိုက်ရိုက်'
               : 'iPhone Bluetooth TSPL direct print'
           : language === 'zh'
-            ? '需重新安装含原生打印模块的 IPA'
+            ? '当前为 Expo Go：可预览系统打印；直连 P201A 需安装含原生模块的 IPA'
             : language === 'my'
-              ? 'Native print module IPA လိုအပ်'
-              : 'Rebuild IPA with native print module'
+              ? 'Expo Go: system print preview။ P201A တိုက်ရိုက် IPA လိုအပ်'
+              : 'Expo Go: system print preview; P201A BLE needs custom IPA'
         : language === 'zh'
           ? '请选择 AirPrint 标签机'
           : language === 'my'

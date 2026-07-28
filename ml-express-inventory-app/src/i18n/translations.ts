@@ -222,16 +222,17 @@ const zh = {
     iosPrinterSelected: '已选：{name}',
     iosPrinterNotSelected: '请先选择蓝牙标签机（P201A）',
     iosXprinterBtUnsupported:
-      '未找到 iOS 蓝牙打印模块。请安装最新版 IPA，并在设置中搜索连接 P201A。',
+      '当前环境无 iOS 蓝牙打印模块（如 Expo Go）。已改用系统打印预览；直连 P201A 请安装含原生模块的 IPA。',
     iosXprinterHint: '请先搜索并连接 P201A，再打印标签。',
     copyBarcodeForPrint: '复制条码',
     barcodeCopied: '条码已复制。',
     printCancelled: '已取消打印',
     bluetoothCapabilityHint: '蓝牙说明',
     bluetoothPairHint:
-      '请打开 P201A 电源。iPhone：在设置页点「搜索并连接蓝牙标签机」；Android：系统蓝牙配对后可选填 MAC。',
+      '请打开 P201A 电源。正式 IPA：点「搜索并连接蓝牙标签机」。Expo Go：可测系统打印预览，无法直连 P201A。',
     printSentTitle: '已发送打印',
-    printSentBody: '标签已通过蓝牙 TSPL 指令发送。若未出纸，请到设置重新搜索连接打印机。',
+    printSentBody:
+      '已发送。蓝牙直连：若未出纸请到设置重新连接。Expo Go / 系统打印：请在系统对话框中选择打印机或保存 PDF。',
     printDisabled: '打印已关闭，请在设置中启用。',
     printFailed: '打印失败',
     labelPrintAction: '打印标签',
@@ -243,7 +244,7 @@ const zh = {
     clearing: '清空中…',
     passwordUpdated: '密码已更新',
     passwordUpdatedMsg: '当前会话已刷新，下次登录请使用新密码。',
-    footer: 'ML Inventory v1.8.2 (16) · Market Link Express',
+    footer: 'ML Inventory v1.8.3 (17) · Market Link Express',
     regionTag: '区域 {hub}',
   },
   tracking: {
@@ -871,16 +872,17 @@ const en: typeof zh = {
     iosPrinterSelected: 'Selected: {name}',
     iosPrinterNotSelected: 'Select a Bluetooth label printer (P201A) first',
     iosXprinterBtUnsupported:
-      'iOS Bluetooth print module not found. Install the latest IPA and connect P201A in Settings.',
+      'No iOS Bluetooth print module (e.g. Expo Go). Using system print preview; install a custom IPA for P201A BLE.',
     iosXprinterHint: 'Scan and connect P201A before printing labels.',
     copyBarcodeForPrint: 'Copy barcode',
     barcodeCopied: 'Barcode copied.',
     printCancelled: 'Print cancelled',
     bluetoothCapabilityHint: 'Bluetooth notes',
     bluetoothPairHint:
-      'Power on P201A. iPhone: tap Scan & connect in Settings. Android: pair in system Bluetooth, optional MAC.',
+      'Power on P201A. Custom IPA: Scan & connect in Settings. Expo Go: system print preview only (no P201A BLE).',
     printSentTitle: 'Print sent',
-    printSentBody: 'If nothing printed, pick your paired Bluetooth label printer in the system dialog.',
+    printSentBody:
+      'Sent. BLE: reconnect in Settings if nothing prints. Expo Go / system print: pick a printer or Save as PDF.',
     printDisabled: 'Printing is off. Enable it in Settings.',
     printFailed: 'Print failed',
     labelPrintAction: 'Print label',
@@ -893,7 +895,7 @@ const en: typeof zh = {
     clearing: 'Clearing…',
     passwordUpdated: 'Password updated',
     passwordUpdatedMsg: 'Session refreshed. Use the new password next login.',
-    footer: 'ML Inventory v1.8.2 (16) · Market Link Express',
+    footer: 'ML Inventory v1.8.3 (17) · Market Link Express',
     regionTag: 'Region {hub}',
   },
   tracking: {
@@ -1529,16 +1531,17 @@ const my: typeof zh = {
     iosPrinterSelected: 'ရွေးပြီး — {name}',
     iosPrinterNotSelected: 'Bluetooth label printer (P201A) အရင်ရွေးပါ',
     iosXprinterBtUnsupported:
-      'iOS BT print module မတွေ့။ IPA အသစ် install ပြီး Settings တွင် P201A ချိတ်ပါ။',
+      'iOS BT print module မရှိ (Expo Go)။ System print preview သုံးမည်။ P201A တိုက်ရိုက် IPA လိုအပ်။',
     iosXprinterHint: 'P201A ရှာပြီး ချိတ်မှ print လုပ်ပါ။',
     copyBarcodeForPrint: 'ဘားကုဒ် copy',
     barcodeCopied: 'ဘားကုဒ် copy ပြီး။',
     printCancelled: 'ပရင့် ပယ်ဖျက်ပြီး',
     bluetoothCapabilityHint: 'Bluetooth မှတ်ချက်',
     bluetoothPairHint:
-      'P201A ဖွင့်ပါ။ iPhone: Settings → Scan & connect။ Android: system Bluetooth ချိတ်ပါ။',
+      'P201A ဖွင့်ပါ။ IPA: Settings → Scan & connect။ Expo Go: system print preview သာ (P201A BT မရ)။',
     printSentTitle: 'ပရင့်ပို့ပြီး',
-    printSentBody: 'မထွက်ပါက system dialog တွင် BT label printer ရွေးပါ။',
+    printSentBody:
+      'ပို့ပြီး။ BLE မထွက်ပါက Settings ပြန်ချိတ်။ Expo Go: system dialog တွင် printer/PDF ရွေးပါ။',
     printDisabled: 'ပရင့်ပိတ်ထား — Settings တွင် ဖွင့်ပါ။',
     printFailed: 'ပရင့် မအောင်မြင်',
     labelPrintAction: 'လေဘယ်ပရင့်ထုတ်',
@@ -1551,7 +1554,7 @@ const my: typeof zh = {
     clearing: 'ရှင်းနေသည်…',
     passwordUpdated: 'စကားဝှက်အပ်ဒိတ်ပြီးပါပြီ',
     passwordUpdatedMsg: 'ဆက်ရှင်အပ်ဒိတ်ပြီးပါပြီ။ နောက်ဝင်ရောက်ချိန်တွင် စကားဝှက်အသစ်သုံးပါ။',
-    footer: 'ML Inventory v1.8.2 (16) · Market Link Express',
+    footer: 'ML Inventory v1.8.3 (17) · Market Link Express',
     regionTag: 'ဒေသ {hub}',
   },
   tracking: {

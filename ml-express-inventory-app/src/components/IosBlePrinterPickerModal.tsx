@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -23,6 +24,9 @@ type Props = {
   emptyLabel: string;
   connectLabel: string;
   closeLabel: string;
+  connectFailedTitle?: string;
+  /** 嵌在已有 Modal 内时用 overlay，避免 iOS 第二层 Modal 不显示 */
+  presentation?: 'modal' | 'overlay';
 };
 
 export default function IosBlePrinterPickerModal({
@@ -34,6 +38,8 @@ export default function IosBlePrinterPickerModal({
   emptyLabel,
   connectLabel,
   closeLabel,
+  connectFailedTitle,
+  presentation = 'modal',
 }: Props) {
   const [devices, setDevices] = useState<IosBlePrinterDevice[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -64,8 +70,12 @@ export default function IosBlePrinterPickerModal({
           });
         });
         stopScanRef.current = stop;
-      } catch {
-        if (!cancelled) setScanning(false);
+      } catch (error) {
+        if (!cancelled) {
+          setScanning(false);
+          const msg = error instanceof Error ? error.message : String(error ?? '');
+          Alert.alert(connectFailedTitle ?? title, msg || emptyLabel);
+        }
       }
     })();
 
@@ -81,60 +91,82 @@ export default function IosBlePrinterPickerModal({
       stopScanRef.current?.();
       stopScanRef.current = null;
     };
-  }, [visible]);
+  }, [visible, connectFailedTitle, emptyLabel, title]);
 
   const pickDevice = (device: IosBlePrinterDevice) => {
     void (async () => {
       setConnectingId(device.id);
       try {
         const ok = await connectIosBlePrinter(device.id);
-        if (ok) onSelect(device);
+        if (ok) {
+          onSelect(device);
+          return;
+        }
+        Alert.alert(connectFailedTitle ?? title, emptyLabel);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error ?? '');
+        Alert.alert(connectFailedTitle ?? title, msg || emptyLabel);
       } finally {
         setConnectingId(null);
       }
     })();
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          <Text style={styles.title}>{title}</Text>
-          {scanning ? (
-            <View style={styles.scanRow}>
-              <ActivityIndicator color="#38bdf8" />
-              <Text style={styles.scanText}>{scanningLabel}</Text>
-            </View>
-          ) : null}
-          <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
-            {devices.length === 0 ? (
-              <Text style={styles.empty}>{emptyLabel}</Text>
-            ) : (
-              devices.map((device) => (
-                <Pressable
-                  key={device.id}
-                  style={[styles.item, connectingId === device.id && styles.itemBusy]}
-                  disabled={connectingId != null}
-                  onPress={() => pickDevice(device)}
-                >
-                  <Text style={styles.itemName}>{device.name}</Text>
-                  <Text style={styles.itemMeta}>
-                    {connectingId === device.id ? connectLabel : `RSSI ${device.rssi}`}
-                  </Text>
-                </Pressable>
-              ))
-            )}
-          </ScrollView>
-          <Pressable style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeText}>{closeLabel}</Text>
-          </Pressable>
-        </View>
+  if (!visible) return null;
+
+  const body = (
+    <View style={styles.overlay}>
+      <View style={styles.card}>
+        <Text style={styles.title}>{title}</Text>
+        {scanning ? (
+          <View style={styles.scanRow}>
+            <ActivityIndicator color="#38bdf8" />
+            <Text style={styles.scanText}>{scanningLabel}</Text>
+          </View>
+        ) : null}
+        <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
+          {devices.length === 0 ? (
+            <Text style={styles.empty}>{emptyLabel}</Text>
+          ) : (
+            devices.map((device) => (
+              <Pressable
+                key={device.id}
+                style={[styles.item, connectingId === device.id && styles.itemBusy]}
+                disabled={connectingId != null}
+                onPress={() => pickDevice(device)}
+              >
+                <Text style={styles.itemName}>{device.name}</Text>
+                <Text style={styles.itemMeta}>
+                  {connectingId === device.id ? connectLabel : `RSSI ${device.rssi}`}
+                </Text>
+              </Pressable>
+            ))
+          )}
+        </ScrollView>
+        <Pressable style={styles.closeBtn} onPress={onClose}>
+          <Text style={styles.closeText}>{closeLabel}</Text>
+        </Pressable>
       </View>
+    </View>
+  );
+
+  if (presentation === 'overlay') {
+    return <View style={styles.overlayHost}>{body}</View>;
+  }
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      {body}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  overlayHost: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    elevation: 100,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15,23,42,0.72)',

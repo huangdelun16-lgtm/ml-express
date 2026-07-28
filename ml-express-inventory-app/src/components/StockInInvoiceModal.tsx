@@ -28,7 +28,7 @@ type Props = {
 export default function StockInInvoiceModal({ visible, data, onClose }: Props) {
   const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
-  const { runWithBleGate, blePicker } = useIosBlePrinterGate();
+  const { runWithBleGate, blePicker } = useIosBlePrinterGate({ presentation: 'overlay' });
 
   const printLabel = async () => {
     if (!data?.barcode) return;
@@ -59,27 +59,25 @@ export default function StockInInvoiceModal({ visible, data, onClose }: Props) {
   if (!data) return null;
 
   return (
-    <>
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-        <View style={inboundInvoiceStyles.overlay}>
-          <View style={inboundInvoiceStyles.sheet}>
-            <ScrollView
-              contentContainerStyle={inboundInvoiceStyles.scroll}
-              showsVerticalScrollIndicator={false}
-            >
-              <InboundInvoiceContent data={data} />
-            </ScrollView>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={inboundInvoiceStyles.overlay}>
+        <View style={inboundInvoiceStyles.sheet}>
+          <ScrollView
+            contentContainerStyle={inboundInvoiceStyles.scroll}
+            showsVerticalScrollIndicator={false}
+          >
+            <InboundInvoiceContent data={data} />
+          </ScrollView>
 
-            <InboundInvoiceFooter
-              recipientPhone={data.recipientPhone}
-              printing={printing}
-              onPrint={() => void printLabel()}
-              onClose={onClose}
-            />
-          </View>
+          <InboundInvoiceFooter
+            recipientPhone={data.recipientPhone}
+            printing={printing}
+            onPrint={() => void printLabel()}
+            onClose={onClose}
+          />
         </View>
-      </Modal>
-      {blePicker}
-    </>
+        {blePicker}
+      </View>
+    </Modal>
   );
 }
