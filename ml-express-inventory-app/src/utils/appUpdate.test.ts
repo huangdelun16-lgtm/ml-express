@@ -5,14 +5,14 @@ describe('parseAndroidRelease', () => {
   it('parses release manifest object', () => {
     expect(
       parseAndroidRelease({
-        version: '1.8.1',
-        versionCode: 15,
+        version: '1.8.2',
+        versionCode: 16,
         apkUrl: 'https://example.com/ml-inventory.apk',
         releaseNotes: 'Fix hub receive',
       }),
     ).toEqual({
-      version: '1.8.1',
-      versionCode: 15,
+      version: '1.8.2',
+      versionCode: 16,
       apkUrl: 'https://example.com/ml-inventory.apk',
       releaseNotes: 'Fix hub receive',
     });

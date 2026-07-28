@@ -15,6 +15,7 @@ import {
   type InboundInvoiceData,
 } from './InboundInvoiceView';
 import { useAuth } from '../contexts/AuthContext';
+import { useIosBlePrinterGate } from '../hooks/useIosBlePrinterGate';
 import { resolvePrintError, useTranslation } from '../i18n';
 import { getItemDetail } from '../services/inventoryService';
 import { printInboundBarcodeOnly } from '../services/printerService';
@@ -54,6 +55,7 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const { runWithBleGate, blePicker } = useIosBlePrinterGate();
 
   const invoiceData = useMemo(
     () => (detail ? mapDetailToInvoice(detail) : null),
@@ -81,66 +83,74 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
   const printLabel = async () => {
     if (!invoiceData?.barcode) return;
     setPrinting(true);
-    try {
-      const ok = await printInboundBarcodeOnly(invoiceData.barcode, invoiceData.inputBarcode, {
-        name: invoiceData.productName,
-        destination: invoiceData.destination,
-        customerName: invoiceData.recipientName,
-      });
-      if (!ok) {
-        Alert.alert(t.common.tip, t.settings.printDisabled);
-        return;
-      }
-      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
-    } catch (e: unknown) {
-      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
-    } finally {
-      setPrinting(false);
-    }
+    await runWithBleGate(
+      async () => {
+        const ok = await printInboundBarcodeOnly(invoiceData.barcode, invoiceData.inputBarcode, {
+          name: invoiceData.productName,
+          destination: invoiceData.destination,
+          customerName: invoiceData.recipientName,
+        });
+        if (!ok) {
+          Alert.alert(t.common.tip, t.settings.printDisabled);
+          return;
+        }
+        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
+      },
+      {
+        setBusy: setPrinting,
+        onError: (e) => {
+          Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
+        },
+      },
+    );
+    setPrinting(false);
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={inboundInvoiceStyles.overlay}>
-        {loading ? (
-          <View style={styles.centerBox}>
-            <ActivityIndicator color="#60a5fa" size="large" />
-            <Text style={styles.loadingText}>加载订单…</Text>
-          </View>
-        ) : !invoiceData ? (
-          <View style={styles.centerBox}>
-            <Text style={styles.emptyText}>订单不存在或已删除</Text>
-            <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
-              <Text style={inboundInvoiceStyles.btnCloseText}>关闭</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={inboundInvoiceStyles.sheet}>
-            <ScrollView
-              contentContainerStyle={inboundInvoiceStyles.scroll}
-              showsVerticalScrollIndicator={false}
-            >
-              <InboundInvoiceContent
-                data={invoiceData}
-                copyLabels={{
-                  copied: t.common.copied,
-                  tapToCopy: t.common.tapToCopy,
-                  expressNo: t.items.expressNo,
-                  inbound: t.items.inbound,
-                }}
-              />
-            </ScrollView>
+    <>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <View style={inboundInvoiceStyles.overlay}>
+          {loading ? (
+            <View style={styles.centerBox}>
+              <ActivityIndicator color="#60a5fa" size="large" />
+              <Text style={styles.loadingText}>加载订单…</Text>
+            </View>
+          ) : !invoiceData ? (
+            <View style={styles.centerBox}>
+              <Text style={styles.emptyText}>订单不存在或已删除</Text>
+              <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
+                <Text style={inboundInvoiceStyles.btnCloseText}>关闭</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={inboundInvoiceStyles.sheet}>
+              <ScrollView
+                contentContainerStyle={inboundInvoiceStyles.scroll}
+                showsVerticalScrollIndicator={false}
+              >
+                <InboundInvoiceContent
+                  data={invoiceData}
+                  copyLabels={{
+                    copied: t.common.copied,
+                    tapToCopy: t.common.tapToCopy,
+                    expressNo: t.items.expressNo,
+                    inbound: t.items.inbound,
+                  }}
+                />
+              </ScrollView>
 
-            <InboundInvoiceFooter
-              recipientPhone={invoiceData.recipientPhone}
-              printing={printing}
-              onPrint={() => void printLabel()}
-              onClose={onClose}
-            />
-          </View>
-        )}
-      </View>
-    </Modal>
+              <InboundInvoiceFooter
+                recipientPhone={invoiceData.recipientPhone}
+                printing={printing}
+                onPrint={() => void printLabel()}
+                onClose={onClose}
+              />
+            </View>
+          )}
+        </View>
+      </Modal>
+      {blePicker}
+    </>
   );
 }
 

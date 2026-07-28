@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import BarcodeImage from './BarcodeImage';
+import { useIosBlePrinterGate } from '../hooks/useIosBlePrinterGate';
 import { resolvePrintError, useTranslation } from '../i18n';
 import type { LabelPrintPayload } from '../services/printerService';
 import { printInboundBarcodeOnly } from '../services/printerService';
@@ -41,32 +42,38 @@ export default function OrderBarcodeModal({
 }: Props) {
   const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
+  const { runWithBleGate, blePicker } = useIosBlePrinterGate();
 
   const printBarcode = async () => {
     if (!data?.barcode) return;
     setPrinting(true);
-    try {
-      const ok = await printInboundBarcodeOnly(
-        data.barcode,
-        data.inputBarcode?.trim() || undefined,
-        {
-          name: data.productName,
-          destination: data.destination,
-          customerName: data.customerName,
+    await runWithBleGate(
+      async () => {
+        const ok = await printInboundBarcodeOnly(
+          data.barcode,
+          data.inputBarcode?.trim() || undefined,
+          {
+            name: data.productName,
+            destination: data.destination,
+            customerName: data.customerName,
+          },
+        );
+        if (!ok) {
+          Alert.alert(t.common.tip, t.settings.printDisabled);
+          return;
+        }
+        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
+      },
+      {
+        setBusy: setPrinting,
+        onError: (e) => {
+          const msg = e instanceof Error ? e.message : String(e ?? '');
+          if (msg === 'PRINT_CANCELLED') return;
+          Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
         },
-      );
-      if (!ok) {
-        Alert.alert(t.common.tip, t.settings.printDisabled);
-        return;
-      }
-      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e ?? '');
-      if (msg === 'PRINT_CANCELLED') return;
-      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
-    } finally {
-      setPrinting(false);
-    }
+      },
+    );
+    setPrinting(false);
   };
 
   const finish = () => {
@@ -79,37 +86,40 @@ export default function OrderBarcodeModal({
   const expressNo = data.inputBarcode?.trim() ?? '';
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          <Text style={styles.title}>{title ?? t.stockIn.barcodeModalTitle}</Text>
+    <>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
+        <View style={styles.overlay}>
+          <View style={styles.card}>
+            <Text style={styles.title}>{title ?? t.stockIn.barcodeModalTitle}</Text>
 
-          <View style={styles.barcodeSection}>
-            {expressNo ? (
-              <Text style={styles.expressValue} selectable numberOfLines={2}>
-                {expressNo}
+            <View style={styles.barcodeSection}>
+              {expressNo ? (
+                <Text style={styles.expressValue} selectable numberOfLines={2}>
+                  {expressNo}
+                </Text>
+              ) : null}
+              <BarcodeImage code={data.barcode} height={72} maxWidth={260} showCodeText />
+            </View>
+
+            <Pressable
+              style={[styles.btnPrint, printing && styles.btnDisabled]}
+              onPress={() => void printBarcode()}
+              disabled={printing}
+            >
+              <Text style={styles.btnPrintText}>
+                {printing ? t.settings.sendingPrint : t.settings.labelPrintAction}
               </Text>
-            ) : null}
-            <BarcodeImage code={data.barcode} height={72} maxWidth={260} showCodeText />
+            </Pressable>
+            <Pressable style={styles.btnClose} onPress={finish}>
+              <Text style={styles.btnCloseText}>
+                {cancelLabel ?? (onDone ? t.common.done : t.common.close)}
+              </Text>
+            </Pressable>
           </View>
-
-          <Pressable
-            style={[styles.btnPrint, printing && styles.btnDisabled]}
-            onPress={() => void printBarcode()}
-            disabled={printing}
-          >
-            <Text style={styles.btnPrintText}>
-              {printing ? t.settings.sendingPrint : t.settings.labelPrintAction}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.btnClose} onPress={finish}>
-            <Text style={styles.btnCloseText}>
-              {cancelLabel ?? (onDone ? t.common.done : t.common.close)}
-            </Text>
-          </Pressable>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      {blePicker}
+    </>
   );
 }
 

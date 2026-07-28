@@ -16,7 +16,11 @@ export function resolvePrintError(t: TranslationDict, error: unknown): string {
   if (msg === 'IOS_BLE_PRINTER_NOT_SELECTED') {
     return t.settings.iosPrinterNotSelected;
   }
-  if (msg === 'IOS_BLE_NOT_CONNECTED' || msg === 'IOS_BLE_CONNECT_FAILED') {
+  if (
+    msg === 'IOS_BLE_NOT_CONNECTED' ||
+    msg === 'IOS_BLE_CONNECT_FAILED' ||
+    msg === 'IOS_BLE_PRINTER_NOT_FOUND'
+  ) {
     return t.settings.iosXprinterHint;
   }
   if (msg === 'PRINT_CANCELLED') {

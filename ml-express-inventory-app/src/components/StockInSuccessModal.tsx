@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import BarcodeImage from './BarcodeImage';
+import { useIosBlePrinterGate } from '../hooks/useIosBlePrinterGate';
 import { resolvePrintError, useTranslation } from '../i18n';
 import { printInboundBarcodeOnly } from '../services/printerService';
 
@@ -32,26 +33,32 @@ type Props = {
 export default function StockInSuccessModal({ visible, data, onDone }: Props) {
   const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
+  const { runWithBleGate, blePicker } = useIosBlePrinterGate();
 
   const printBarcode = async () => {
     if (!data?.barcode) return;
     setPrinting(true);
-    try {
-      const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode, {
-        name: data.productName,
-        destination: data.destination,
-        customerName: data.recipientName,
-      });
-      if (!ok) {
-        Alert.alert(t.common.tip, t.settings.printDisabled);
-        return;
-      }
-      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
-    } catch (e: unknown) {
-      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
-    } finally {
-      setPrinting(false);
-    }
+    await runWithBleGate(
+      async () => {
+        const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode, {
+          name: data.productName,
+          destination: data.destination,
+          customerName: data.recipientName,
+        });
+        if (!ok) {
+          Alert.alert(t.common.tip, t.settings.printDisabled);
+          return;
+        }
+        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
+      },
+      {
+        setBusy: setPrinting,
+        onError: (e) => {
+          Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
+        },
+      },
+    );
+    setPrinting(false);
   };
 
   if (!data) return null;
@@ -59,50 +66,53 @@ export default function StockInSuccessModal({ visible, data, onDone }: Props) {
   const meta = [data.spec, data.weight].filter(Boolean).join(' · ');
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone}>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.icon}>✓</Text>
-          </View>
-          <Text style={styles.title}>{t.stockIn.inboundSuccess}</Text>
-          <Text style={styles.summary}>+{data.qty}</Text>
+    <>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone}>
+        <View style={styles.overlay}>
+          <View style={styles.card}>
+            <View style={styles.iconCircle}>
+              <Text style={styles.icon}>✓</Text>
+            </View>
+            <Text style={styles.title}>{t.stockIn.inboundSuccess}</Text>
+            <Text style={styles.summary}>+{data.qty}</Text>
 
-          <View style={styles.infoBox}>
-            <InfoRow label={t.forms.inboundDate} value={data.inboundDateLabel} />
-            <InfoRow label={t.stockIn.finalDest} value={data.destination} />
-            {meta ? (
-              <InfoRow
-                label={`${t.trackExpress.spec} / ${t.trackExpress.weight}`}
-                value={meta}
+            <View style={styles.infoBox}>
+              <InfoRow label={t.forms.inboundDate} value={data.inboundDateLabel} />
+              <InfoRow label={t.stockIn.finalDest} value={data.destination} />
+              {meta ? (
+                <InfoRow
+                  label={`${t.trackExpress.spec} / ${t.trackExpress.weight}`}
+                  value={meta}
+                />
+              ) : null}
+            </View>
+
+            <View style={styles.barcodeSection}>
+              <BarcodeImage
+                code={data.barcode}
+                height={72}
+                maxWidth={260}
+                showCodeText
               />
-            ) : null}
-          </View>
+            </View>
 
-          <View style={styles.barcodeSection}>
-            <BarcodeImage
-              code={data.barcode}
-              height={72}
-              maxWidth={260}
-              showCodeText
-            />
+            <Pressable
+              style={[styles.btnPrint, printing && styles.btnDisabled]}
+              onPress={printBarcode}
+              disabled={printing}
+            >
+              <Text style={styles.btnPrintText}>
+                {printing ? t.items.printing : t.itemForm.printLabel}
+              </Text>
+            </Pressable>
+            <Pressable style={styles.btnDone} onPress={onDone}>
+              <Text style={styles.btnDoneText}>{t.nav.home}</Text>
+            </Pressable>
           </View>
-
-          <Pressable
-            style={[styles.btnPrint, printing && styles.btnDisabled]}
-            onPress={printBarcode}
-            disabled={printing}
-          >
-            <Text style={styles.btnPrintText}>
-              {printing ? t.items.printing : t.itemForm.printLabel}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.btnDone} onPress={onDone}>
-            <Text style={styles.btnDoneText}>{t.nav.home}</Text>
-          </Pressable>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      {blePicker}
+    </>
   );
 }
 

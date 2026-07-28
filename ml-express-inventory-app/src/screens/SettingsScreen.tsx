@@ -18,6 +18,7 @@ import ChangePasswordModal from '../components/ChangePasswordModal';
 import IosBlePrinterPickerModal from '../components/IosBlePrinterPickerModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
+import { useIosBlePrinterGate } from '../hooks/useIosBlePrinterGate';
 import { resolveAppError, resolvePrintError, useTranslation } from '../i18n';
 import {
   getBluetoothCapabilityHint,
@@ -122,10 +123,11 @@ export default function SettingsScreen() {
     'checking' | 'online' | 'offline'
   >('checking');
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const { runWithBleGate, blePicker: bleGatePicker } = useIosBlePrinterGate();
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
-  const appVersion = Constants.expoConfig?.version ?? '1.8.1';
-  const buildVersion = Constants.nativeBuildVersion ?? '15';
+  const appVersion = Constants.expoConfig?.version ?? '1.8.2';
+  const buildVersion = Constants.nativeBuildVersion ?? '16';
 
   useEffect(() => {
     void getPrinterSettings().then(setSettings);
@@ -156,25 +158,32 @@ export default function SettingsScreen() {
       return;
     }
     setTestingPrinter(true);
-    try {
-      const sent = await printBarcodeLabel({
-        name: 'ML Inventory',
-        barcode: `TEST${Date.now().toString().slice(-8)}`,
-        destination: hub || undefined,
-        customerName: operatorName ?? storeCode ?? undefined,
-      });
-      if (!sent) {
-        Alert.alert(t.common.tip, t.settings.printDisabled);
-        return;
-      }
-      Alert.alert(t.settings.testPrintSuccess, t.settings.printSentBody);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e ?? '');
-      if (msg === 'PRINT_CANCELLED') return;
-      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
-    } finally {
-      setTestingPrinter(false);
-    }
+    await runWithBleGate(
+      async () => {
+        const sent = await printBarcodeLabel({
+          name: 'ML Inventory',
+          barcode: `TEST${Date.now().toString().slice(-8)}`,
+          destination: hub || undefined,
+          customerName: operatorName ?? storeCode ?? undefined,
+        });
+        if (!sent) {
+          Alert.alert(t.common.tip, t.settings.printDisabled);
+          return;
+        }
+        Alert.alert(t.settings.testPrintSuccess, t.settings.printSentBody);
+        const next = await getPrinterSettings();
+        setSettings(next);
+      },
+      {
+        setBusy: setTestingPrinter,
+        onError: (e) => {
+          const msg = e instanceof Error ? e.message : String(e ?? '');
+          if (msg === 'PRINT_CANCELLED') return;
+          Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
+        },
+      },
+    );
+    setTestingPrinter(false);
   };
 
   const handleLogout = () => {
@@ -361,11 +370,9 @@ export default function SettingsScreen() {
               <>
                 <Text style={styles.fieldLabel}>{t.settings.iosSelectPrinter}</Text>
                 <Text style={styles.hintText}>
-                  {settings.iosBlePrinterName
+                  {settings.iosBlePrinterId?.trim() && settings.iosBlePrinterName
                     ? fmt(t.settings.iosPrinterSelected, { name: settings.iosBlePrinterName })
-                    : settings.iosPrinterName
-                      ? fmt(t.settings.iosPrinterSelected, { name: settings.iosPrinterName })
-                      : t.settings.iosPrinterNotSelected}
+                    : t.settings.iosPrinterNotSelected}
                 </Text>
                 {isIosBleThermalAvailable() ? (
                   <Pressable
@@ -485,6 +492,7 @@ export default function SettingsScreen() {
           })();
         }}
       />
+      {bleGatePicker}
     </ScrollView>
   );
 }

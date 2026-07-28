@@ -13,6 +13,7 @@ import {
   inboundInvoiceStyles,
   type InboundInvoiceData,
 } from './InboundInvoiceView';
+import { useIosBlePrinterGate } from '../hooks/useIosBlePrinterGate';
 import { resolvePrintError, useTranslation } from '../i18n';
 import { printInboundBarcodeOnly } from '../services/printerService';
 
@@ -27,49 +28,58 @@ type Props = {
 export default function StockInInvoiceModal({ visible, data, onClose }: Props) {
   const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
+  const { runWithBleGate, blePicker } = useIosBlePrinterGate();
 
   const printLabel = async () => {
     if (!data?.barcode) return;
     setPrinting(true);
-    try {
-      const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode, {
-        name: data.productName,
-        destination: data.destination,
-        customerName: data.recipientName,
-      });
-      if (!ok) {
-        Alert.alert(t.common.tip, t.settings.printDisabled);
-        return;
-      }
-      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
-    } catch (e: unknown) {
-      Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
-    } finally {
-      setPrinting(false);
-    }
+    await runWithBleGate(
+      async () => {
+        const ok = await printInboundBarcodeOnly(data.barcode, data.inputBarcode, {
+          name: data.productName,
+          destination: data.destination,
+          customerName: data.recipientName,
+        });
+        if (!ok) {
+          Alert.alert(t.common.tip, t.settings.printDisabled);
+          return;
+        }
+        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
+      },
+      {
+        setBusy: setPrinting,
+        onError: (e) => {
+          Alert.alert(t.settings.printFailed, resolvePrintError(t, e));
+        },
+      },
+    );
+    setPrinting(false);
   };
 
   if (!data) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={inboundInvoiceStyles.overlay}>
-        <View style={inboundInvoiceStyles.sheet}>
-          <ScrollView
-            contentContainerStyle={inboundInvoiceStyles.scroll}
-            showsVerticalScrollIndicator={false}
-          >
-            <InboundInvoiceContent data={data} />
-          </ScrollView>
+    <>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <View style={inboundInvoiceStyles.overlay}>
+          <View style={inboundInvoiceStyles.sheet}>
+            <ScrollView
+              contentContainerStyle={inboundInvoiceStyles.scroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <InboundInvoiceContent data={data} />
+            </ScrollView>
 
-          <InboundInvoiceFooter
-            recipientPhone={data.recipientPhone}
-            printing={printing}
-            onPrint={() => void printLabel()}
-            onClose={onClose}
-          />
+            <InboundInvoiceFooter
+              recipientPhone={data.recipientPhone}
+              printing={printing}
+              onPrint={() => void printLabel()}
+              onClose={onClose}
+            />
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      {blePicker}
+    </>
   );
 }
