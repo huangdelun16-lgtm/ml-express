@@ -6,10 +6,10 @@ VALUES (
   'inventory',
   'inventory.android.latest_release',
   jsonb_build_object(
-    'version', '1.8.8',
-    'versionCode', 21,
-    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.8.8-21.apk',
-    'releaseNotes', '打印预览页；按打印机保存标签布局（快递单号/条码/入库码位置）；Scan Printer 仅显示打印机'
+    'version', '1.8.9',
+    'versionCode', 22,
+    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.8.9-22.apk',
+    'releaseNotes', '打印预览支持拖动调整布局；0.13mm 精度；按打印机保存标签位置'
   ),
   'Inventory App Android 最新 APK 发布信息（versionCode 须大于旧版才会提示更新）',
   'admin'

@@ -4,6 +4,7 @@ import {
   clampLabelBarcodeLayout,
   DEFAULT_LABEL_BARCODE_LAYOUT,
   normalizeLabelBarcodeLayout,
+  setLayoutElementPosition,
 } from '../constants/labelBarcodeLayout';
 import { buildTsplInboundLabel } from '../services/tsplLabelBuilder';
 
@@ -23,6 +24,15 @@ describe('labelBarcodeLayout', () => {
   it('adjusts element positions in dots', () => {
     const next = adjustLayoutElement(DEFAULT_LABEL_BARCODE_LAYOUT, 'barcode', 'y', 8);
     expect(next.barcode.y).toBe(DEFAULT_LABEL_BARCODE_LAYOUT.barcode.y + 8);
+  });
+
+  it('sets element position directly', () => {
+    const next = setLayoutElementPosition(DEFAULT_LABEL_BARCODE_LAYOUT, 'barcode', {
+      x: 20,
+      y: 55,
+      height: 90,
+    });
+    expect(next.barcode).toEqual({ x: 20, y: 55, height: 90 });
   });
 });
 

@@ -13,7 +13,8 @@ export type LabelBarcodeLayoutConfig = {
   inboundCode: LabelElementPosition;
 };
 
-export const LABEL_LAYOUT_STEP_DOTS = 4;
+export const LABEL_LAYOUT_STEP_DOTS = 1;
+export const LABEL_LAYOUT_COARSE_STEP_DOTS = 4;
 
 export const DEFAULT_LABEL_BARCODE_LAYOUT: LabelBarcodeLayoutConfig = {
   version: 1,
@@ -96,6 +97,31 @@ export function normalizeLabelBarcodeLayout(raw: unknown): LabelBarcodeLayoutCon
     },
     inboundCode: { x: value.inboundCode.x, y: value.inboundCode.y },
   });
+}
+
+export function formatLayoutMm(dots: number): string {
+  return `${dotsToMm(dots).toFixed(2)} mm`;
+}
+
+export function setLayoutElementPosition(
+  layout: LabelBarcodeLayoutConfig,
+  target: 'expressNo' | 'barcode' | 'inboundCode',
+  patch: Partial<LabelElementPosition> & { height?: number },
+): LabelBarcodeLayoutConfig {
+  const next: LabelBarcodeLayoutConfig = {
+    version: 1,
+    expressNo: { ...layout.expressNo },
+    barcode: { ...layout.barcode },
+    inboundCode: { ...layout.inboundCode },
+  };
+
+  if (patch.x != null) next[target].x = patch.x;
+  if (patch.y != null) next[target].y = patch.y;
+  if (target === 'barcode' && patch.height != null) {
+    next.barcode.height = patch.height;
+  }
+
+  return clampLabelBarcodeLayout(next);
 }
 
 export function adjustLayoutElement(

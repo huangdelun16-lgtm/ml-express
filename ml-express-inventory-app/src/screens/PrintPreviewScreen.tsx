@@ -11,7 +11,9 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import BluetoothScanModal from '../components/BluetoothScanModal';
 import LabelLayoutAdjustRow from '../components/LabelLayoutAdjustRow';
-import LabelPrintPreview from '../components/LabelPrintPreview';
+import LabelPrintPreviewEditor, {
+  type LabelLayoutTarget,
+} from '../components/LabelPrintPreviewEditor';
 import { PRINT_PREVIEW_SAMPLE } from '../constants/printPreviewSample';
 import {
   adjustLayoutElement,
@@ -44,6 +46,7 @@ export default function PrintPreviewScreen() {
   const [saving, setSaving] = useState(false);
   const [layout, setLayout] = useState<LabelBarcodeLayoutConfig>(DEFAULT_LABEL_BARCODE_LAYOUT);
   const [savedLayout, setSavedLayout] = useState<LabelBarcodeLayoutConfig>(DEFAULT_LABEL_BARCODE_LAYOUT);
+  const [selectedTarget, setSelectedTarget] = useState<LabelLayoutTarget>('expressNo');
 
   const dirty = useMemo(() => !layoutsEqual(layout, savedLayout), [layout, savedLayout]);
 
@@ -140,10 +143,13 @@ export default function PrintPreviewScreen() {
         {dirty ? <Text style={styles.unsavedHint}>{t.settings.printPreviewUnsavedHint}</Text> : null}
 
         <View style={styles.previewPanel}>
-          <LabelPrintPreview
+          <LabelPrintPreviewEditor
             barcode={PRINT_PREVIEW_SAMPLE.barcode}
             expressNo={PRINT_PREVIEW_SAMPLE.inputBarcode}
             layout={layout}
+            selectedTarget={selectedTarget}
+            onSelectTarget={setSelectedTarget}
+            onLayoutChange={setLayout}
             widthMm={XPRINTER_P203A.defaultWidthMm}
             heightMm={XPRINTER_P203A.defaultHeightMm}
           />
@@ -151,11 +157,12 @@ export default function PrintPreviewScreen() {
 
         <View style={styles.settingsCard}>
           <Text style={styles.sectionTitle}>{t.settings.printPreviewLayoutTitle}</Text>
+          <Text style={styles.sectionHint}>{t.settings.printPreviewFineStepHint}</Text>
           <LabelLayoutAdjustRow
             label={t.settings.printPreviewExpressNo}
             xDots={layout.expressNo.x}
             yDots={layout.expressNo.y}
-            disabled={!connectedPrinter || printing || saving}
+            disabled={printing || saving}
             onAdjust={(axis, delta) => adjust('expressNo', axis, delta)}
           />
           <LabelLayoutAdjustRow
@@ -163,14 +170,14 @@ export default function PrintPreviewScreen() {
             xDots={layout.barcode.x}
             yDots={layout.barcode.y}
             heightDots={layout.barcode.height}
-            disabled={!connectedPrinter || printing || saving}
+            disabled={printing || saving}
             onAdjust={(axis, delta) => adjust('barcode', axis, delta)}
           />
           <LabelLayoutAdjustRow
             label={t.settings.printPreviewInboundCode}
             xDots={layout.inboundCode.x}
             yDots={layout.inboundCode.y}
-            disabled={!connectedPrinter || printing || saving}
+            disabled={printing || saving}
             onAdjust={(axis, delta) => adjust('inboundCode', axis, delta)}
           />
 
@@ -287,13 +294,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   previewPanel: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#cbd5e1',
     borderRadius: 16,
-    paddingVertical: 28,
-    paddingHorizontal: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#94a3b8',
   },
   settingsCard: {
     backgroundColor: '#0f172a',
@@ -310,6 +317,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 4,
+  },
+  sectionHint: {
+    color: '#64748b',
+    fontSize: 11,
+    lineHeight: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   layoutActions: {
     flexDirection: 'row',
