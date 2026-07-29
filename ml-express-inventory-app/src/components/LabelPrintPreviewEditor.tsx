@@ -10,9 +10,13 @@ import {
   dotsToMm,
   formatLayoutMm,
   getEffectiveElementWidthDots,
+  getBarcodePrintMetrics,
   labelHeightDots,
   labelWidthDots,
+  normalizeBarcodeScale,
+  normalizeTextScale,
   setLayoutElementPosition,
+  textElementSizeDots,
   TSPL_TEXT_LINE_HEIGHT_DOTS,
   type LabelBarcodeLayoutConfig,
   type LabelLayoutContentSizes,
@@ -62,12 +66,13 @@ export default function LabelPrintPreviewEditor({
   const express = expressNo?.trim() ?? '';
   const widthDots = labelWidthDots(widthMm);
   const scale = previewWidth / widthDots;
-  const barcodePreviewHeight = Math.max(20, Math.round(layout.barcode.height * scale));
+  const barcodeMetrics = getBarcodePrintMetrics(layout);
+  const barcodePreviewHeight = Math.max(20, Math.round(barcodeMetrics.height * scale));
 
   const layoutRef = useRef(layout);
   const onLayoutChangeRef = useRef(onLayoutChange);
   const onSelectTargetRef = useRef(onSelectTarget);
-  const dragStartRef = useRef({ x: 0, y: 0, height: 0 });
+  const dragStartRef = useRef({ x: 0, y: 0, height: 0, baseHeight: 96, scale: 1 });
 
   layoutRef.current = layout;
   onLayoutChangeRef.current = onLayoutChange;
@@ -107,16 +112,21 @@ export default function LabelPrintPreviewEditor({
         onSelectTargetRef.current(target);
         const current = layoutRef.current;
         if (target === 'barcode') {
+          const metrics = getBarcodePrintMetrics(current);
           dragStartRef.current = {
             x: current.barcode.x,
             y: current.barcode.y,
-            height: current.barcode.height,
+            height: metrics.height,
+            baseHeight: current.barcode.height,
+            scale: metrics.scale,
           };
         } else {
           dragStartRef.current = {
             x: current[target].x,
             y: current[target].y,
             height: 0,
+            baseHeight: 0,
+            scale: 1,
           };
         }
       },
@@ -137,16 +147,22 @@ export default function LabelPrintPreviewEditor({
         onMoveShouldSetPanResponder: () => editable,
         onPanResponderGrant: () => {
           onSelectTargetRef.current('barcode');
+          const current = layoutRef.current;
+          const metrics = getBarcodePrintMetrics(current);
           dragStartRef.current = {
-            x: layoutRef.current.barcode.x,
-            y: layoutRef.current.barcode.y,
-            height: layoutRef.current.barcode.height,
+            x: current.barcode.x,
+            y: current.barcode.y,
+            height: metrics.height,
+            baseHeight: current.barcode.height,
+            scale: metrics.scale,
           };
         },
         onPanResponderMove: (_, gesture) => {
-          const nextHeight = snapDots(dragStartRef.current.height + toDots(gesture.dy));
+          const start = dragStartRef.current;
+          const nextPrintHeight = snapDots(start.height + toDots(gesture.dy));
+          const nextScale = normalizeBarcodeScale(Math.max(1, Math.round(nextPrintHeight / start.baseHeight)));
           onLayoutChangeRef.current(
-            setLayoutElementPosition(layoutRef.current, 'barcode', { height: nextHeight }),
+            setLayoutElementPosition(layoutRef.current, 'barcode', { scale: nextScale }),
           );
         },
       }),
@@ -166,11 +182,14 @@ export default function LabelPrintPreviewEditor({
   const barcodeWidthDots = getEffectiveElementWidthDots(layout, 'barcode', layoutContent);
   const inboundWidthDots = getEffectiveElementWidthDots(layout, 'inboundCode', layoutContent);
 
+  const expressSized = textElementSizeDots(layout, 'expressNo', layoutContent);
+  const inboundSized = textElementSizeDots(layout, 'inboundCode', layoutContent);
+
   const selectedPos = layout[selectedTarget];
   const selectedMm =
     selectedTarget === 'barcode'
-      ? `X ${formatLayoutMm(layout.barcode.x)} · Y ${formatLayoutMm(layout.barcode.y)} · H ${formatLayoutMm(layout.barcode.height)}`
-      : `X ${formatLayoutMm(selectedPos.x)} · Y ${formatLayoutMm(selectedPos.y)}`;
+      ? `X ${formatLayoutMm(layout.barcode.x)} · Y ${formatLayoutMm(layout.barcode.y)} · ${barcodeMetrics.scale}× · H ${formatLayoutMm(barcodeMetrics.height)}`
+      : `X ${formatLayoutMm(selectedPos.x)} · Y ${formatLayoutMm(selectedPos.y)} · ${normalizeTextScale(layout[selectedTarget === 'expressNo' ? 'expressNo' : 'inboundCode'].scale)}×`;
 
   const renderHandle = (
     target: LabelLayoutTarget,
@@ -231,14 +250,17 @@ export default function LabelPrintPreviewEditor({
             {express
               ? renderHandle(
                   'expressNo',
-                  <Text style={styles.expressText} numberOfLines={1}>
+                  <Text
+                    style={[styles.expressText, { fontSize: 11 * expressSized.scale }]}
+                    numberOfLines={1}
+                  >
                     {express}
                   </Text>,
                   {
                     left: toPx(layout.expressNo.x),
                     top: toPx(layout.expressNo.y),
                     width: Math.max(24, toPx(expressWidthDots)),
-                    height: toPx(TSPL_TEXT_LINE_HEIGHT_DOTS),
+                    height: Math.max(18, toPx(expressSized.height)),
                   },
                   expressDrag.panHandlers,
                 )
@@ -268,14 +290,17 @@ export default function LabelPrintPreviewEditor({
 
             {renderHandle(
               'inboundCode',
-              <Text style={styles.barcodeText} numberOfLines={2}>
+              <Text
+                style={[styles.barcodeText, { fontSize: 10 * inboundSized.scale }]}
+                numberOfLines={2}
+              >
                 {barcode}
               </Text>,
               {
                 left: toPx(layout.inboundCode.x),
                 top: toPx(layout.inboundCode.y),
                 width: Math.max(24, toPx(inboundWidthDots)),
-                height: toPx(TSPL_TEXT_LINE_HEIGHT_DOTS),
+                height: Math.max(18, toPx(inboundSized.height)),
               },
               inboundDrag.panHandlers,
             )}
@@ -289,7 +314,7 @@ export default function LabelPrintPreviewEditor({
         {fmt(t.settings.printPreviewDotHint, {
           dots:
             selectedTarget === 'barcode'
-              ? `${layout.barcode.x}, ${layout.barcode.y}, H${layout.barcode.height}`
+              ? `${layout.barcode.x}, ${layout.barcode.y}, ${barcodeMetrics.scale}×, H${barcodeMetrics.height}`
               : `${selectedPos.x}, ${selectedPos.y}`,
           mmPerDot: dotsToMm(1).toFixed(3),
         })}

@@ -7,15 +7,26 @@ export type LabelElementPosition = {
   y: number;
 };
 
+export type LabelTextElement = LabelElementPosition & {
+  scale?: number;
+};
+
 export type LabelBarcodeLayoutConfig = {
   version: 1;
-  expressNo: LabelElementPosition;
-  barcode: LabelElementPosition & { height: number };
-  inboundCode: LabelElementPosition;
+  expressNo: LabelTextElement;
+  barcode: LabelElementPosition & { height: number; scale?: number };
+  inboundCode: LabelTextElement;
 };
 
 export const LABEL_LAYOUT_STEP_DOTS = 1;
+export const LABEL_TEXT_SCALE_MIN = 1;
+export const LABEL_TEXT_SCALE_MAX = 4;
+export const LABEL_BARCODE_HEIGHT_MIN = 48;
+export const LABEL_BARCODE_HEIGHT_MAX = 160;
+export const LABEL_BARCODE_BASE_HEIGHT_MIN = 24;
+export const LABEL_BARCODE_BASE_HEIGHT_MAX = 160;
 export const TSPL_BARCODE_NARROW = 3;
+export const TSPL_BARCODE_WIDE = 6;
 export const TSPL_TEXT_CHAR_WIDTH_DOTS = 12;
 export const TSPL_TEXT_LINE_HEIGHT_DOTS = 24;
 
@@ -72,6 +83,48 @@ function clampDots(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
 
+export function normalizeTextScale(scale?: number): number {
+  return clampDots(scale ?? 1, LABEL_TEXT_SCALE_MIN, LABEL_TEXT_SCALE_MAX);
+}
+
+export function normalizeBarcodeScale(scale?: number): number {
+  return normalizeTextScale(scale);
+}
+
+export type BarcodePrintMetrics = {
+  scale: number;
+  height: number;
+  narrow: number;
+  wide: number;
+};
+
+/** 条码打印尺寸：scale 同时放大窄条宽度与高度 */
+export function getBarcodePrintMetrics(layout: LabelBarcodeLayoutConfig): BarcodePrintMetrics {
+  const scale = normalizeBarcodeScale(layout.barcode.scale);
+  const baseHeight = layout.barcode.height;
+  return {
+    scale,
+    height: clampDots(Math.round(baseHeight * scale), LABEL_BARCODE_HEIGHT_MIN, LABEL_BARCODE_HEIGHT_MAX),
+    narrow: clampDots(Math.round(TSPL_BARCODE_NARROW * scale), 1, 12),
+    wide: clampDots(Math.round(TSPL_BARCODE_WIDE * scale), 2, 24),
+  };
+}
+
+export function textElementSizeDots(
+  layout: LabelBarcodeLayoutConfig,
+  target: 'expressNo' | 'inboundCode',
+  content: LabelLayoutContentSizes,
+): { width: number; height: number; scale: number } {
+  const scale = normalizeTextScale(layout[target].scale);
+  const text =
+    target === 'expressNo' ? content.expressNo ?? '' : content.inboundCode ?? content.barcode;
+  return {
+    scale,
+    width: estimateTextWidthDots(text) * scale,
+    height: TSPL_TEXT_LINE_HEIGHT_DOTS * scale,
+  };
+}
+
 export function clampLabelBarcodeLayout(
   layout: LabelBarcodeLayoutConfig,
   widthMm = XPRINTER_P203A.defaultWidthMm,
@@ -79,22 +132,29 @@ export function clampLabelBarcodeLayout(
 ): LabelBarcodeLayoutConfig {
   const maxX = labelWidthDots(widthMm) - 8;
   const maxY = labelHeightDots(heightMm) - 8;
-  const barcodeHeight = clampDots(layout.barcode.height, 48, 160);
+  const barcodeBaseHeight = clampDots(
+    layout.barcode.height,
+    LABEL_BARCODE_BASE_HEIGHT_MIN,
+    LABEL_BARCODE_BASE_HEIGHT_MAX,
+  );
 
   return {
     version: 1,
     expressNo: {
       x: clampDots(layout.expressNo.x, 0, maxX),
       y: clampDots(layout.expressNo.y, 0, maxY),
+      scale: normalizeTextScale(layout.expressNo.scale),
     },
     barcode: {
       x: clampDots(layout.barcode.x, 0, maxX),
       y: clampDots(layout.barcode.y, 0, maxY),
-      height: barcodeHeight,
+      height: barcodeBaseHeight,
+      scale: normalizeBarcodeScale(layout.barcode.scale),
     },
     inboundCode: {
       x: clampDots(layout.inboundCode.x, 0, maxX),
       y: clampDots(layout.inboundCode.y, 0, maxY),
+      scale: normalizeTextScale(layout.inboundCode.scale),
     },
   };
 }
@@ -118,13 +178,22 @@ export function normalizeLabelBarcodeLayout(raw: unknown): LabelBarcodeLayoutCon
 
   return clampLabelBarcodeLayout({
     version: 1,
-    expressNo: { x: value.expressNo.x, y: value.expressNo.y },
+    expressNo: {
+      x: value.expressNo.x,
+      y: value.expressNo.y,
+      scale: normalizeTextScale(value.expressNo.scale),
+    },
     barcode: {
       x: value.barcode.x,
       y: value.barcode.y,
       height: value.barcode.height,
+      scale: normalizeBarcodeScale(value.barcode.scale),
     },
-    inboundCode: { x: value.inboundCode.x, y: value.inboundCode.y },
+    inboundCode: {
+      x: value.inboundCode.x,
+      y: value.inboundCode.y,
+      scale: normalizeTextScale(value.inboundCode.scale),
+    },
   });
 }
 
@@ -177,19 +246,14 @@ function elementSizeDots(
   content: LabelLayoutContentSizes,
 ): { width: number; height: number } {
   if (target === 'barcode') {
+    const metrics = getBarcodePrintMetrics(layout);
     return {
-      width: estimateCode128WidthDots(content.barcode),
-      height: layout.barcode.height,
+      width: estimateCode128WidthDots(content.barcode, metrics.narrow),
+      height: metrics.height,
     };
   }
-  const text =
-    target === 'expressNo'
-      ? content.expressNo ?? ''
-      : content.inboundCode ?? content.barcode;
-  return {
-    width: estimateTextWidthDots(text),
-    height: TSPL_TEXT_LINE_HEIGHT_DOTS,
-  };
+  const sized = textElementSizeDots(layout, target, content);
+  return { width: sized.width, height: sized.height };
 }
 
 export function applyLayoutAlignment(
@@ -268,14 +332,20 @@ export function mergeAndCenterLabelLayout(
   const labelW = labelWidthDots(widthMm);
   const labelH = labelHeightDots(heightMm);
   const gap = 10;
-  const expressH = TSPL_TEXT_LINE_HEIGHT_DOTS;
-  const inboundH = TSPL_TEXT_LINE_HEIGHT_DOTS;
-  const barcodeH = layout.barcode.height;
+  const expressSized = textElementSizeDots(layout, 'expressNo', content);
+  const inboundSized = textElementSizeDots(layout, 'inboundCode', content);
+  const expressH = expressSized.height;
+  const inboundH = inboundSized.height;
+  const barcodeH = getBarcodePrintMetrics(layout).height;
   const hasExpress = Boolean(content.expressNo?.trim());
 
-  const expressW = estimateTextWidthDots(content.expressNo ?? '');
-  const barcodeW = estimateCode128WidthDots(content.barcode, TSPL_BARCODE_NARROW, labelW);
-  const inboundW = estimateTextWidthDots(content.inboundCode ?? content.barcode);
+  const expressW = expressSized.width;
+  const barcodeW = estimateCode128WidthDots(
+    content.barcode,
+    getBarcodePrintMetrics(layout).narrow,
+    labelW,
+  );
+  const inboundW = inboundSized.width;
 
   let stackHeight = barcodeH + gap + inboundH;
   if (hasExpress) stackHeight += expressH + gap;
@@ -300,7 +370,8 @@ export function mergeAndCenterLabelLayout(
   next.barcode = {
     x: centerElementXDots(labelW, barcodeW),
     y,
-    height: barcodeH,
+    height: layout.barcode.height,
+    scale: layout.barcode.scale,
   };
   y += barcodeH + gap;
 
@@ -348,7 +419,7 @@ export function buildDefaultCenteredLayout(
 export function setLayoutElementPosition(
   layout: LabelBarcodeLayoutConfig,
   target: 'expressNo' | 'barcode' | 'inboundCode',
-  patch: Partial<LabelElementPosition> & { height?: number },
+  patch: Partial<LabelElementPosition> & { height?: number; scale?: number },
 ): LabelBarcodeLayoutConfig {
   const next: LabelBarcodeLayoutConfig = {
     version: 1,
@@ -359,8 +430,11 @@ export function setLayoutElementPosition(
 
   if (patch.x != null) next[target].x = patch.x;
   if (patch.y != null) next[target].y = patch.y;
-  if (target === 'barcode' && patch.height != null) {
-    next.barcode.height = patch.height;
+  if (target === 'barcode') {
+    if (patch.height != null) next.barcode.height = patch.height;
+    if (patch.scale != null) next.barcode.scale = patch.scale;
+  } else if (patch.scale != null) {
+    next[target].scale = patch.scale;
   }
 
   return clampLabelBarcodeLayout(next);
@@ -369,7 +443,7 @@ export function setLayoutElementPosition(
 export function adjustLayoutElement(
   layout: LabelBarcodeLayoutConfig,
   target: 'expressNo' | 'barcode' | 'inboundCode',
-  axis: 'x' | 'y' | 'height',
+  axis: 'x' | 'y' | 'height' | 'scale',
   deltaDots: number,
 ): LabelBarcodeLayoutConfig {
   const next: LabelBarcodeLayoutConfig = {
@@ -378,8 +452,10 @@ export function adjustLayoutElement(
     barcode: { ...layout.barcode },
     inboundCode: { ...layout.inboundCode },
   };
-  if (target === 'barcode' && axis === 'height') {
-    next.barcode.height += deltaDots;
+  if (target === 'barcode' && axis === 'scale') {
+    next.barcode.scale = normalizeBarcodeScale((next.barcode.scale ?? 1) + deltaDots);
+  } else if (target !== 'barcode' && axis === 'scale') {
+    next[target].scale = normalizeTextScale((next[target].scale ?? 1) + deltaDots);
   } else if (axis === 'x' || axis === 'y') {
     next[target][axis] += deltaDots;
   }

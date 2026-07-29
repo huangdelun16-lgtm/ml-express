@@ -22,7 +22,11 @@ import {
   applyLayoutAlignment,
   buildDefaultCenteredLayout,
   clampLabelBarcodeLayout,
+  LABEL_TEXT_SCALE_MAX,
+  LABEL_TEXT_SCALE_MIN,
   mergeAndCenterLabelLayout,
+  normalizeBarcodeScale,
+  normalizeTextScale,
   type LabelBarcodeLayoutConfig,
   type LabelLayoutAlignH,
   type LabelLayoutAlignV,
@@ -109,11 +113,23 @@ export default function PrintPreviewScreen() {
 
   const adjust = (
     target: 'expressNo' | 'barcode' | 'inboundCode',
-    axis: 'x' | 'y' | 'height',
+    axis: 'x' | 'y' | 'height' | 'scale',
     deltaDots: number,
   ) => {
     setLayout((current) => adjustLayoutElement(current, target, axis, deltaDots));
   };
+
+  const adjustSelectedSize = (delta: number) => {
+    adjust(selectedTarget, 'scale', delta);
+  };
+
+  const selectedScale =
+    selectedTarget === 'barcode'
+      ? normalizeBarcodeScale(layout.barcode.scale)
+      : normalizeTextScale(layout[selectedTarget].scale);
+  const resizeValueText = `${selectedScale}×`;
+  const canDecreaseSize = selectedScale > LABEL_TEXT_SCALE_MIN;
+  const canIncreaseSize = selectedScale < LABEL_TEXT_SCALE_MAX;
 
   const moveSelected = (direction: 'up' | 'down' | 'left' | 'right', deltaDots: number) => {
     const axis = direction === 'left' || direction === 'right' ? 'x' : 'y';
@@ -263,15 +279,16 @@ export default function PrintPreviewScreen() {
               <Text style={styles.mergeCenterBtnText}>{t.settings.printPreviewMergeCenter}</Text>
             </Pressable>
 
-            {selectedTarget === 'barcode' ? (
-              <LabelLayoutHeightAdjustRow
-                label={t.settings.printPreviewBarcodeHeight}
-                valueDots={layout.barcode.height}
-                disabled={printing || saving}
-                tone="light"
-                onAdjust={(delta) => adjust('barcode', 'height', delta)}
-              />
-            ) : null}
+            <LabelLayoutHeightAdjustRow
+              label={t.settings.printPreviewResize}
+              valueText={resizeValueText}
+              step={1}
+              disabled={printing || saving}
+              tone="light"
+              canDecrease={canDecreaseSize}
+              canIncrease={canIncreaseSize}
+              onAdjust={adjustSelectedSize}
+            />
 
             <View style={styles.layoutActions}>
               <Pressable

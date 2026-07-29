@@ -1,6 +1,8 @@
 import { XPRINTER_P203A, type PrintLabelSheetKind } from '../constants/xprinterP203a';
 import {
   DEFAULT_LABEL_BARCODE_LAYOUT,
+  getBarcodePrintMetrics,
+  normalizeTextScale,
   type LabelBarcodeLayoutConfig,
 } from '../constants/labelBarcodeLayout';
 import {
@@ -12,6 +14,16 @@ import {
 
 function escapeTsplText(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function tsplTextLine(
+  x: number,
+  y: number,
+  scale: number,
+  text: string,
+): string {
+  const mul = normalizeTextScale(scale);
+  return `TEXT ${x},${y},"2",0,${mul},${mul},"${escapeTsplText(truncateLabelText(text, 24))}"`;
 }
 
 function buildMetaLines(content: NormalizedLabelContent): string[] {
@@ -69,14 +81,25 @@ export function buildTsplInboundLabel(params: {
   if (sheetKind === 'barcode') {
     if (content.inputBarcode?.trim()) {
       lines.push(
-        `TEXT ${layout.expressNo.x},${layout.expressNo.y},"2",0,1,1,"${escapeTsplText(truncateLabelText(content.inputBarcode.trim(), 22))}"`,
+        tsplTextLine(
+          layout.expressNo.x,
+          layout.expressNo.y,
+          layout.expressNo.scale ?? 1,
+          content.inputBarcode.trim(),
+        ),
       );
     }
+    const barcodeMetrics = getBarcodePrintMetrics(layout);
     lines.push(
-      `BARCODE ${layout.barcode.x},${layout.barcode.y},"128",${layout.barcode.height},1,0,3,6,"${escapeTsplText(printCode)}"`,
+      `BARCODE ${layout.barcode.x},${layout.barcode.y},"128",${barcodeMetrics.height},0,0,${barcodeMetrics.narrow},${barcodeMetrics.wide},"${escapeTsplText(printCode)}"`,
     );
     lines.push(
-      `TEXT ${layout.inboundCode.x},${layout.inboundCode.y},"2",0,1,1,"${escapeTsplText(truncateLabelText(printCode, 24))}"`,
+      tsplTextLine(
+        layout.inboundCode.x,
+        layout.inboundCode.y,
+        layout.inboundCode.scale ?? 1,
+        printCode,
+      ),
     );
     lines.push(`PRINT ${copies}`);
     return `${lines.join('\r\n')}\r\n`;
@@ -105,10 +128,10 @@ export function buildTsplInboundLabel(params: {
 
   const barcodeHeight = 80;
   lines.push(
-    `BARCODE 12,${y},"128",${barcodeHeight},1,0,3,6,"${escapeTsplText(printCode)}"`,
+    `BARCODE 12,${y},"128",${barcodeHeight},0,0,3,6,"${escapeTsplText(printCode)}"`,
   );
   y += barcodeHeight + 10;
-  lines.push(`TEXT 12,${y},"2",0,1,1,"${escapeTsplText(truncateLabelText(printCode, 24))}"`);
+  lines.push(tsplTextLine(12, y, 1, printCode));
   lines.push(`PRINT ${copies}`);
 
   return `${lines.join('\r\n')}\r\n`;

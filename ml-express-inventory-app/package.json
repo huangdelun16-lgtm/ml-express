@@ -1,6 +1,6 @@
 {
   "name": "ml-express-inventory-app",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "main": "index.js",
   "private": true,
   "scripts": {

@@ -1,20 +1,26 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatLayoutMm, LABEL_LAYOUT_STEP_DOTS } from '../constants/labelBarcodeLayout';
+import { LABEL_LAYOUT_STEP_DOTS } from '../constants/labelBarcodeLayout';
 
 type Props = {
   label: string;
-  valueDots: number;
+  valueText: string;
+  step?: number;
   disabled?: boolean;
   tone?: 'dark' | 'light';
-  onAdjust: (deltaDots: number) => void;
+  canDecrease?: boolean;
+  canIncrease?: boolean;
+  onAdjust: (delta: number) => void;
 };
 
 export default function LabelLayoutHeightAdjustRow({
   label,
-  valueDots,
+  valueText,
+  step = LABEL_LAYOUT_STEP_DOTS,
   disabled,
   tone = 'dark',
+  canDecrease = true,
+  canIncrease = true,
   onAdjust,
 }: Props) {
   const light = tone === 'light';
@@ -23,21 +29,25 @@ export default function LabelLayoutHeightAdjustRow({
       <Text style={[styles.label, light && styles.labelLight]}>{label}</Text>
       <View style={styles.stepper}>
         <Pressable
-          style={[styles.stepBtn, light && styles.stepBtnLight, disabled && styles.stepBtnDisabled]}
-          onPress={() => onAdjust(-LABEL_LAYOUT_STEP_DOTS)}
-          disabled={disabled}
+          style={[
+            styles.stepBtn,
+            light && styles.stepBtnLight,
+            (disabled || !canDecrease) && styles.stepBtnDisabled,
+          ]}
+          onPress={() => onAdjust(-step)}
+          disabled={disabled || !canDecrease}
         >
           <Text style={[styles.stepBtnText, light && styles.stepBtnTextLight]}>−</Text>
         </Pressable>
-        <Text style={[styles.axisValue, light && styles.axisValueLight]}>{formatLayoutMm(valueDots)}</Text>
+        <Text style={[styles.axisValue, light && styles.axisValueLight]}>{valueText}</Text>
         <Pressable
           style={[
             styles.stepBtn,
             light ? styles.stepBtnPrimaryLight : styles.stepBtnPrimary,
-            disabled && styles.stepBtnDisabled,
+            (disabled || !canIncrease) && styles.stepBtnDisabled,
           ]}
-          onPress={() => onAdjust(LABEL_LAYOUT_STEP_DOTS)}
-          disabled={disabled}
+          onPress={() => onAdjust(step)}
+          disabled={disabled || !canIncrease}
         >
           <Text style={[styles.stepBtnText, light ? styles.stepBtnPrimaryTextLight : styles.stepBtnPrimaryText]}>
             +
