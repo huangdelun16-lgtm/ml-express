@@ -2,7 +2,8 @@ import { XPRINTER_P203A, type PrintLabelSheetKind } from '../constants/xprinterP
 import {
   DEFAULT_LABEL_BARCODE_LAYOUT,
   getBarcodePrintMetrics,
-  normalizeTextScale,
+  getElementDimensions,
+  getTextPrintMul,
   type LabelBarcodeLayoutConfig,
 } from '../constants/labelBarcodeLayout';
 import {
@@ -19,11 +20,12 @@ function escapeTsplText(value: string): string {
 function tsplTextLine(
   x: number,
   y: number,
-  scale: number,
+  widthDots: number,
+  heightDots: number,
   text: string,
 ): string {
-  const mul = normalizeTextScale(scale);
-  return `TEXT ${x},${y},"2",0,${mul},${mul},"${escapeTsplText(truncateLabelText(text, 24))}"`;
+  const { xMul, yMul } = getTextPrintMul(widthDots, heightDots, text);
+  return `TEXT ${x},${y},"2",0,${xMul},${yMul},"${escapeTsplText(truncateLabelText(text, 24))}"`;
 }
 
 function buildMetaLines(content: NormalizedLabelContent): string[] {
@@ -79,17 +81,26 @@ export function buildTsplInboundLabel(params: {
       : content.barcode.trim();
 
   if (sheetKind === 'barcode') {
+    const layoutContent = {
+      expressNo: content.inputBarcode?.trim() ?? '',
+      barcode: printCode,
+      inboundCode: printCode,
+    };
+    const expressDims = getElementDimensions(layout, 'expressNo', layoutContent, widthMm);
+    const inboundDims = getElementDimensions(layout, 'inboundCode', layoutContent, widthMm);
+
     if (content.inputBarcode?.trim()) {
       lines.push(
         tsplTextLine(
           layout.expressNo.x,
           layout.expressNo.y,
-          layout.expressNo.scale ?? 1,
+          expressDims.widthDots,
+          expressDims.heightDots,
           content.inputBarcode.trim(),
         ),
       );
     }
-    const barcodeMetrics = getBarcodePrintMetrics(layout);
+    const barcodeMetrics = getBarcodePrintMetrics(layout, layoutContent, widthMm);
     lines.push(
       `BARCODE ${layout.barcode.x},${layout.barcode.y},"128",${barcodeMetrics.height},0,0,${barcodeMetrics.narrow},${barcodeMetrics.wide},"${escapeTsplText(printCode)}"`,
     );
@@ -97,7 +108,8 @@ export function buildTsplInboundLabel(params: {
       tsplTextLine(
         layout.inboundCode.x,
         layout.inboundCode.y,
-        layout.inboundCode.scale ?? 1,
+        inboundDims.widthDots,
+        inboundDims.heightDots,
         printCode,
       ),
     );
@@ -131,7 +143,7 @@ export function buildTsplInboundLabel(params: {
     `BARCODE 12,${y},"128",${barcodeHeight},0,0,3,6,"${escapeTsplText(printCode)}"`,
   );
   y += barcodeHeight + 10;
-  lines.push(tsplTextLine(12, y, 1, printCode));
+  lines.push(tsplTextLine(12, y, 12 * printCode.length, 24, printCode));
   lines.push(`PRINT ${copies}`);
 
   return `${lines.join('\r\n')}\r\n`;

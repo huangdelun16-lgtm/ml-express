@@ -5,11 +5,13 @@ import {
   buildDefaultCenteredLayout,
   centerAllLabelElements,
   mergeAndCenterLabelLayout,
-  centerTextLabelElement,
   clampLabelBarcodeLayout,
   DEFAULT_LABEL_BARCODE_LAYOUT,
+  dotsToMm,
   getBarcodePrintMetrics,
   getEffectiveElementWidthDots,
+  getElementDimensions,
+  mmToLayoutDots,
   normalizeLabelBarcodeLayout,
   setLayoutElementPosition,
 } from '../constants/labelBarcodeLayout';
@@ -35,17 +37,40 @@ describe('labelBarcodeLayout', () => {
   });
 
   it('adjusts element positions in dots', () => {
-    const next = adjustLayoutElement(DEFAULT_LABEL_BARCODE_LAYOUT, 'barcode', 'y', 8);
+    const next = adjustLayoutElement(
+      DEFAULT_LABEL_BARCODE_LAYOUT,
+      'barcode',
+      'y',
+      8,
+      SAMPLE_CONTENT,
+    );
     expect(next.barcode.y).toBe(DEFAULT_LABEL_BARCODE_LAYOUT.barcode.y + 8);
   });
 
-  it('scales barcode width and height together', () => {
-    const scaled = adjustLayoutElement(DEFAULT_LABEL_BARCODE_LAYOUT, 'barcode', 'scale', 1);
-    const metrics = getBarcodePrintMetrics(scaled);
-    expect(scaled.barcode.scale).toBe(2);
-    expect(metrics.narrow).toBe(6);
-    expect(metrics.wide).toBe(12);
-    expect(metrics.height).toBe(Math.min(160, DEFAULT_LABEL_BARCODE_LAYOUT.barcode.height * 2));
+  it('adjusts barcode width and height independently', () => {
+    const base = clampLabelBarcodeLayout({
+      ...DEFAULT_LABEL_BARCODE_LAYOUT,
+      barcode: { ...DEFAULT_LABEL_BARCODE_LAYOUT.barcode, widthDots: 200, height: 72 },
+    });
+    const before = getElementDimensions(base, 'barcode', SAMPLE_CONTENT);
+    const wider = adjustLayoutElement(
+      base,
+      'barcode',
+      'width',
+      mmToLayoutDots(2),
+      SAMPLE_CONTENT,
+    );
+    const taller = adjustLayoutElement(
+      base,
+      'barcode',
+      'height',
+      mmToLayoutDots(2),
+      SAMPLE_CONTENT,
+    );
+    const widerDims = getElementDimensions(wider, 'barcode', SAMPLE_CONTENT);
+    const tallerDims = getElementDimensions(taller, 'barcode', SAMPLE_CONTENT);
+    expect(widerDims.widthDots).toBeGreaterThan(before.widthDots);
+    expect(tallerDims.heightDots).toBeGreaterThan(before.heightDots);
   });
 
   it('sets element position directly', () => {
@@ -54,7 +79,7 @@ describe('labelBarcodeLayout', () => {
       y: 55,
       height: 90,
     });
-    expect(next.barcode).toEqual({ x: 20, y: 55, height: 90, scale: 1 });
+    expect(next.barcode).toEqual({ x: 20, y: 55, height: 90 });
   });
 
   it('centers default layout horizontally for sample label content', () => {
@@ -115,9 +140,31 @@ describe('labelBarcodeLayout', () => {
     );
   });
 
-  it('adjusts text scale for express number', () => {
-    const next = adjustLayoutElement(DEFAULT_LABEL_BARCODE_LAYOUT, 'expressNo', 'scale', 1);
-    expect(next.expressNo.scale).toBe(2);
+  it('adjusts text width and height for express number', () => {
+    const before = getElementDimensions(DEFAULT_LABEL_BARCODE_LAYOUT, 'expressNo', SAMPLE_CONTENT);
+    const next = adjustLayoutElement(
+      DEFAULT_LABEL_BARCODE_LAYOUT,
+      'expressNo',
+      'height',
+      mmToLayoutDots(1),
+      SAMPLE_CONTENT,
+    );
+    const after = getElementDimensions(next, 'expressNo', SAMPLE_CONTENT);
+    expect(after.heightDots).toBeGreaterThan(before.heightDots);
+    expect(dotsToMm(after.heightDots - before.heightDots)).toBeCloseTo(1, 0);
+  });
+
+  it('migrates legacy scale to width and height dots', () => {
+    const parsed = normalizeLabelBarcodeLayout({
+      version: 1,
+      expressNo: { x: 0, y: 0, scale: 2 },
+      barcode: { x: 0, y: 0, height: 80, scale: 2 },
+      inboundCode: { x: 0, y: 0, scale: 2 },
+    }, SAMPLE_CONTENT);
+    expect(parsed?.expressNo.widthDots).toBeDefined();
+    expect(parsed?.expressNo.heightDots).toBeDefined();
+    expect(parsed?.barcode.widthDots).toBeDefined();
+    expect(parsed?.barcode.height).toBe(160);
   });
 });
 
@@ -136,24 +183,28 @@ describe('buildTsplInboundLabel with layout', () => {
     });
 
     expect(payload).toContain(`TEXT ${layout.expressNo.x},${layout.expressNo.y},"2"`);
-    expect(payload).toContain('BARCODE 24,60,"128",88,0,0,3,6');
+    expect(payload).toContain('BARCODE 24,60,"128",88,0,0,');
     expect(payload).toContain('TEXT 24,170,"2"');
     expect(payload.match(/TEXT .*67499191994/g)?.length).toBe(1);
     expect(payload.match(/TEXT .*MDY060400290726/g)?.length).toBe(1);
   });
 
-  it('applies barcode scale to TSPL module width and height', () => {
+  it('applies barcode width dots to TSPL module width', () => {
     const layout = clampLabelBarcodeLayout({
       ...DEFAULT_LABEL_BARCODE_LAYOUT,
-      barcode: { x: 24, y: 60, height: 80, scale: 2 },
+      barcode: { x: 24, y: 60, height: 80, widthDots: 400 },
       inboundCode: { x: 24, y: 170 },
     });
+    const metrics = getBarcodePrintMetrics(layout, SAMPLE_CONTENT);
     const payload = buildTsplInboundLabel({
       barcode: 'MDY060400290726',
       sheetKind: 'barcode',
       layout,
     });
-    expect(payload).toContain('BARCODE 24,60,"128",160,0,0,6,12');
+    expect(payload).toContain(
+      `BARCODE 24,60,"128",80,0,0,${metrics.narrow},${metrics.wide}`,
+    );
+    expect(metrics.widthDots).toBeGreaterThan(200);
   });
 
   it('does not print human-readable text under barcode when inbound text is separate', () => {

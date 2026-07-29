@@ -12,7 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import BluetoothScanModal from '../components/BluetoothScanModal';
 import LabelPaperSpecEditor from '../components/LabelPaperSpecEditor';
 import LabelPreviewToolbar from '../components/LabelPreviewToolbar';
-import LabelLayoutHeightAdjustRow from '../components/LabelLayoutAdjustRow';
+import LabelLayoutSizeEditor from '../components/LabelLayoutSizeEditor';
 import LabelPrintPreviewEditor, {
   type LabelLayoutTarget,
 } from '../components/LabelPrintPreviewEditor';
@@ -22,11 +22,10 @@ import {
   applyLayoutAlignment,
   buildDefaultCenteredLayout,
   clampLabelBarcodeLayout,
-  LABEL_TEXT_SCALE_MAX,
-  LABEL_TEXT_SCALE_MIN,
+  dotsToMm,
+  getElementDimensions,
+  getElementSizeLimitsMm,
   mergeAndCenterLabelLayout,
-  normalizeBarcodeScale,
-  normalizeTextScale,
   type LabelBarcodeLayoutConfig,
   type LabelLayoutAlignH,
   type LabelLayoutAlignV,
@@ -111,31 +110,48 @@ export default function PrintPreviewScreen() {
     }, [refreshPrinter]),
   );
 
+  const layoutContent = previewLayoutContent();
+  const sizeLimits = getElementSizeLimitsMm(paper.widthMm);
+  const selectedDims = getElementDimensions(
+    layout,
+    selectedTarget,
+    layoutContent,
+    paper.widthMm,
+  );
+  const selectedLengthMm = dotsToMm(selectedDims.widthDots);
+  const selectedHeightMm = dotsToMm(selectedDims.heightDots);
+
   const adjust = (
     target: 'expressNo' | 'barcode' | 'inboundCode',
-    axis: 'x' | 'y' | 'height' | 'scale',
+    axis: 'x' | 'y' | 'width' | 'height',
     deltaDots: number,
   ) => {
-    setLayout((current) => adjustLayoutElement(current, target, axis, deltaDots));
+    setLayout((current) =>
+      adjustLayoutElement(
+        current,
+        target,
+        axis,
+        deltaDots,
+        layoutContent,
+        paper.widthMm,
+      ),
+    );
   };
-
-  const adjustSelectedSize = (delta: number) => {
-    adjust(selectedTarget, 'scale', delta);
-  };
-
-  const selectedScale =
-    selectedTarget === 'barcode'
-      ? normalizeBarcodeScale(layout.barcode.scale)
-      : normalizeTextScale(layout[selectedTarget].scale);
-  const resizeValueText = `${selectedScale}×`;
-  const canDecreaseSize = selectedScale > LABEL_TEXT_SCALE_MIN;
-  const canIncreaseSize = selectedScale < LABEL_TEXT_SCALE_MAX;
 
   const moveSelected = (direction: 'up' | 'down' | 'left' | 'right', deltaDots: number) => {
     const axis = direction === 'left' || direction === 'right' ? 'x' : 'y';
     const signed =
       direction === 'left' || direction === 'up' ? -deltaDots : deltaDots;
-    setLayout((current) => adjustLayoutElement(current, selectedTarget, axis, signed));
+    setLayout((current) =>
+      adjustLayoutElement(
+        current,
+        selectedTarget,
+        axis,
+        signed,
+        layoutContent,
+        paper.widthMm,
+      ),
+    );
   };
 
   const alignSelected = (alignment: {
@@ -279,15 +295,27 @@ export default function PrintPreviewScreen() {
               <Text style={styles.mergeCenterBtnText}>{t.settings.printPreviewMergeCenter}</Text>
             </Pressable>
 
-            <LabelLayoutHeightAdjustRow
-              label={t.settings.printPreviewResize}
-              valueText={resizeValueText}
-              step={1}
+            <LabelLayoutSizeEditor
+              lengthLabel={t.settings.printPreviewSizeLength}
+              heightLabel={t.settings.printPreviewSizeHeight}
+              lengthMm={selectedLengthMm}
+              heightMm={selectedHeightMm}
+              lengthMinMm={sizeLimits.widthMinMm}
+              lengthMaxMm={sizeLimits.widthMaxMm}
+              heightMinMm={
+                selectedTarget === 'barcode'
+                  ? sizeLimits.barcodeHeightMinMm
+                  : sizeLimits.heightMinMm
+              }
+              heightMaxMm={
+                selectedTarget === 'barcode'
+                  ? sizeLimits.barcodeHeightMaxMm
+                  : sizeLimits.heightMaxMm
+              }
               disabled={printing || saving}
               tone="light"
-              canDecrease={canDecreaseSize}
-              canIncrease={canIncreaseSize}
-              onAdjust={adjustSelectedSize}
+              onAdjustLength={(deltaDots) => adjust(selectedTarget, 'width', deltaDots)}
+              onAdjustHeight={(deltaDots) => adjust(selectedTarget, 'height', deltaDots)}
             />
 
             <View style={styles.layoutActions}>
