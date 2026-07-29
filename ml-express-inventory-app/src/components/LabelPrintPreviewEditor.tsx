@@ -1,7 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import {
   PanResponder,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -221,33 +220,6 @@ export default function LabelPrintPreviewEditor({
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.selectorRow}>
-        {(['expressNo', 'barcode', 'inboundCode'] as LabelLayoutTarget[]).map((target) => {
-          const active = selectedTarget === target;
-          const color = TARGET_COLORS[target];
-          const label =
-            target === 'expressNo'
-              ? t.settings.printPreviewExpressNo
-              : target === 'barcode'
-                ? t.settings.printPreviewBarcode
-                : t.settings.printPreviewInboundCode;
-          return (
-            <Pressable
-              key={target}
-              onPress={() => onSelectTarget(target)}
-              style={[
-                styles.selectorChip,
-                active && { backgroundColor: `${color}33`, borderColor: color },
-              ]}
-            >
-              <Text style={[styles.selectorChipText, active && { color: '#f8fafc' }]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {editable ? <Text style={styles.dragHint}>{t.settings.printPreviewDragHint}</Text> : null}
-
       <View style={styles.previewStage}>
         <Text style={styles.widthRuler}>{fmt(t.settings.printPreviewWidth, { mm: widthMm.toFixed(1) })}</Text>
         <View style={styles.canvasShadow}>
@@ -328,33 +300,6 @@ export default function LabelPrintPreviewEditor({
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', width: '100%' },
-  selectorRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'center',
-    marginBottom: 10,
-    width: '100%',
-  },
-  selectorChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#475569',
-  },
-  selectorChipText: {
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  dragHint: {
-    color: '#64748b',
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 10,
-    lineHeight: 18,
-  },
   widthRuler: {
     color: '#475569',
     fontSize: 12,

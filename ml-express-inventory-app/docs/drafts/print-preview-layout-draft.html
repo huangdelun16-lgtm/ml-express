@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>打印预览 · 布局草稿 v1.9.0</title>
+  <title>打印预览 · 草稿 v1.9.2 (25)（含纸条规格）</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -14,6 +14,7 @@
       padding: 24px 12px;
       color: #e5e7eb;
     }
+    .wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
     .phone {
       width: 390px;
       min-height: 844px;
@@ -38,18 +39,57 @@
       background: #cbd5e1; border-radius: 16px; padding: 20px 12px;
       border: 1px solid #94a3b8; margin-bottom: 16px;
     }
-    .chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
-    .chip {
-      padding: 6px 10px; border-radius: 999px; border: 1px solid #475569;
-      font-size: 12px; font-weight: 800; color: #64748b; background: rgba(15,23,42,.08);
+    .chips { display: none; }
+    .target-toolbar {
+      display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; width: 100%;
     }
-    .chip.active { color: #f8fafc; background: rgba(5,150,105,.35); border-color: #059669; }
+    .dropdown {
+      width: 38%; max-width: 148px; flex-shrink: 0;
+      display: flex; align-items: center; gap: 6px;
+      background: #0f172a; border: 1.5px solid #059669; border-radius: 9px;
+      padding: 6px 8px; color: #f8fafc; font-size: 11px; font-weight: 800;
+    }
+    .tools-wrap { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    .align-mini { display: grid; grid-template-columns: repeat(3, 24px); gap: 3px; }
+    .align-btn, .nudge-btn {
+      width: 24px; height: 24px; border-radius: 6px; background: #0f172a;
+      border: 1px solid #334155; color: #e2e8f0; font-size: 12px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .dropdown-dot { width: 7px; height: 7px; border-radius: 50%; background: #059669; flex-shrink: 0; }
+    .dropdown-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dropdown-chevron { color: #94a3b8; font-size: 9px; }
+    .nudge-mini { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .nudge-mini-mid { display: flex; gap: 2px; align-items: center; }
+    .nudge-dot { width: 4px; height: 4px; border-radius: 50%; background: #64748b; }
+    .preview-footer {
+      margin-top: 12px; padding-top: 12px; border-top: 1px solid #94a3b8; display: flex; flex-direction: column; gap: 10px;
+    }
+    .merge-chip {
+      align-self: flex-start; padding: 6px 10px; border-radius: 999px;
+      background: rgba(2,132,199,.15); border: 1px solid rgba(3,105,161,.45);
+      color: #0c4a6e; font-size: 11px; font-weight: 900;
+    }
+    .height-inline {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      color: #334155; font-size: 11px; font-weight: 800;
+    }
+    .preview-actions { display: flex; gap: 8px; }
+    .save-sm {
+      flex: 1; background: #059669; color: #ecfdf5; border: none; border-radius: 10px;
+      padding: 10px; font-weight: 900; font-size: 13px;
+    }
+    .reset-sm {
+      flex: 1; background: rgba(15,23,42,.06); color: #334155; border: 1px solid #475569;
+      border-radius: 10px; padding: 10px; font-weight: 800; font-size: 13px;
+    }
     .drag-hint { text-align: center; color: #64748b; font-size: 12px; margin-bottom: 10px; line-height: 1.4; }
     .ruler { text-align: center; color: #475569; font-size: 12px; font-weight: 800; margin: 8px 0; }
     .label-wrap { display: flex; justify-content: center; }
     .label {
-      width: 300px; height: 207px; background: #fff; border: 2px solid #334155;
+      width: 300px; background: #fff; border: 2px solid #334155;
       border-radius: 10px; position: relative; box-shadow: 0 4px 10px rgba(15,23,42,.18);
+      transition: height .25s ease;
     }
     .label::before {
       content: ""; position: absolute; inset: 0;
@@ -63,18 +103,23 @@
       display: flex; align-items: center; justify-content: center;
       font-family: ui-monospace, monospace; font-weight: 800; color: #0f172a;
     }
-    .el.express { left: 84px; top: 18px; width: 132px; height: 22px; border-color: rgba(37,99,235,.35); font-size: 11px; }
+    .el.express { left: 84px; top: 14px; width: 132px; height: 22px; border-color: rgba(37,99,235,.35); font-size: 11px; }
     .el.barcode {
-      left: 24px; top: 52px; width: 252px; height: 86px; border-color: #059669;
+      left: 24px; top: 44px; width: 252px; height: 72px; border-color: #059669;
       background: rgba(5,150,105,.08); flex-direction: column; gap: 4px;
     }
-    .el.inbound { left: 54px; top: 152px; width: 192px; height: 24px; border-color: rgba(217,119,6,.35); font-size: 10px; }
+    .el.inbound { left: 54px; top: 128px; width: 192px; height: 24px; border-color: rgba(217,119,6,.35); font-size: 10px; }
+    .label.size-40x30 { height: 155px; }
+    .label.size-40x30 .el.express { top: 10px; left: 54px; width: 132px; }
+    .label.size-40x30 .el.barcode { top: 34px; left: 14px; width: 272px; height: 58px; }
+    .label.size-40x30 .el.inbound { top: 102px; left: 24px; width: 192px; }
+    .label.size-58x40 { height: 207px; }
     .tag {
       position: absolute; top: -10px; left: 0; font-size: 9px; color: #fff;
       padding: 1px 5px; border-radius: 4px; font-weight: 900;
     }
     .tag.green { background: #059669; }
-    .bars { display: flex; width: 220px; height: 52px; overflow: hidden; }
+    .bars { display: flex; width: 220px; height: 44px; overflow: hidden; }
     .bars i { display: block; height: 100%; background: #000; }
     .bars i.w { background: #fff; }
     .coords { text-align: center; margin-top: 12px; color: #334155; font-size: 13px; font-weight: 900; font-family: monospace; }
@@ -83,9 +128,35 @@
       background: #0f172a; border: 1px solid #334155; border-radius: 16px;
       overflow: hidden; margin-bottom: 16px;
     }
-    .card-title { padding: 14px 16px 4px; font-size: 14px; font-weight: 900; }
-    .card-hint { padding: 0 16px 8px; font-size: 11px; color: #64748b; text-align: center; line-height: 1.4; }
-    .selected { text-align: center; color: #94a3b8; font-size: 12px; font-weight: 700; margin: 8px 0 12px; }
+    .card-title { padding: 12px 14px 2px; font-size: 14px; font-weight: 900; }
+    .card-hint { padding: 0 14px 8px; font-size: 10px; color: #64748b; text-align: center; line-height: 1.4; }
+
+    /* 纸条规格 */
+    .paper-wrap { padding: 10px 14px 12px; border-bottom: 1px solid #1e293b; }
+    .paper-summary {
+      text-align: center; color: #7dd3fc; font-size: 12px; font-weight: 800;
+      font-family: monospace; margin-bottom: 10px;
+    }
+    .preset-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 10px; }
+    .preset {
+      padding: 5px 10px; border-radius: 999px; border: 1px solid #475569;
+      background: #151f31; color: #94a3b8; font-size: 11px; font-weight: 800; cursor: pointer;
+    }
+    .preset.active { border-color: #0284c7; background: rgba(2,132,199,.15); color: #bae6fd; }
+    .paper-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 0; gap: 10px;
+    }
+    .paper-label { color: #cbd5e1; font-size: 12px; font-weight: 800; flex: 1; }
+    .stepper { display: flex; gap: 8px; align-items: center; }
+    .step {
+      width: 30px; height: 30px; border-radius: 8px; background: #1e293b;
+      border: 1px solid #475569; color: #e2e8f0; display: flex; align-items: center;
+      justify-content: center; font-size: 17px; font-weight: 900; cursor: pointer;
+    }
+    .step.plus { background: #0c4a6e; border-color: #0284c7; color: #7dd3fc; }
+    .paper-value { color: #f8fafc; font-size: 13px; font-weight: 900; min-width: 42px; text-align: center; font-family: monospace; }
+    .paper-tip { margin-top: 8px; color: #64748b; font-size: 10px; line-height: 15px; text-align: center; }
 
     .layout-row {
       display: flex; gap: 8px; padding: 8px 10px; justify-content: center; align-items: center;
@@ -103,12 +174,12 @@
       display: flex; align-items: center; justify-content: center;
     }
     .header-row {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; justify-content: space-between; align-items: flex-start;
       padding: 0 12px 8px; gap: 8px;
     }
     .target-badge {
       padding: 3px 8px; border-radius: 999px; background: #1e293b; border: 1px solid #334155;
-      color: #cbd5e1; font-size: 11px; font-weight: 800;
+      color: #cbd5e1; font-size: 11px; font-weight: 800; margin-top: 2px;
     }
     .quick-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex: 1; }
     .action-chip {
@@ -119,23 +190,23 @@
       background: rgba(2,132,199,.12); border-color: rgba(56,189,248,.35); color: #7dd3fc;
     }
     .vdivider { width: 1px; align-self: stretch; background: #334155; margin: 4px 0; }
-    .btn-wide { display: none; }
     .pad { display: flex; flex-direction: column; align-items: center; gap: 3px; }
     .pad-mid { display: flex; gap: 4px; align-items: center; }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: #475569; }
 
     .height-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px; border-top: 1px solid #1e293b; color: #38bdf8; font-size: 13px; font-weight: 900;
+      padding: 10px 14px; border-top: 1px solid #1e293b; color: #94a3b8; font-size: 12px; font-weight: 800;
     }
-    .stepper { display: flex; gap: 10px; align-items: center; }
-    .step { width: 36px; height: 36px; border-radius: 18px; background: #1e293b; border: 1px solid #475569; color: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; }
-    .step.plus { background: #0c4a6e; border-color: #0284c7; color: #7dd3fc; }
-    .mono { color: #f8fafc; font-family: monospace; font-size: 13px; min-width: 72px; text-align: center; }
-
-    .actions { display: flex; gap: 10px; padding: 14px 16px; }
+    .actions { display: flex; gap: 10px; padding: 14px; }
     .save { flex: 1; background: #059669; color: #ecfdf5; border: none; border-radius: 12px; padding: 12px; font-weight: 900; }
     .reset { flex: 1; background: transparent; color: #cbd5e1; border: 1px solid #475569; border-radius: 12px; padding: 12px; font-weight: 800; }
+
+    .device-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; color: #e2e8f0; font-size: 14px; font-weight: 700;
+    }
+    .device-val { color: #6ee7b7; font-size: 14px; font-weight: 800; }
 
     .footer { padding: 8px 16px 24px; border-top: 1px solid #1e293b; }
     .print { width: 100%; background: #2563eb; color: #fff; border: none; border-radius: 14px; padding: 16px; font-size: 17px; font-weight: 900; }
@@ -146,35 +217,68 @@
       box-shadow: 0 8px 24px rgba(124,58,237,.35);
     }
     .note {
-      max-width: 390px; margin-top: 16px; padding: 12px 14px; background: #1e293b;
+      max-width: 390px; padding: 12px 14px; background: #1e293b;
       border-radius: 12px; font-size: 12px; line-height: 1.6; color: #cbd5e1;
+    }
+    .gap-demo {
+      max-width: 390px; padding: 12px 14px; background: #0f172a; border: 1px solid #334155;
+      border-radius: 12px; font-size: 11px; color: #94a3b8; line-height: 1.5;
+    }
+    .gap-visual {
+      display: flex; align-items: center; gap: 4px; margin-top: 8px; justify-content: center;
+    }
+    .gap-label {
+      width: 80px; height: 36px; background: #fff; border-radius: 4px; border: 1px solid #64748b;
+    }
+    .gap-space {
+      width: 12px; height: 8px; background: #0284c7; border-radius: 2px;
+      position: relative;
+    }
+    .gap-space::after {
+      content: attr(data-gap); position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+      font-size: 9px; color: #7dd3fc; white-space: nowrap;
     }
   </style>
 </head>
 <body>
-  <div>
-    <div class="badge">草稿 · 未打包</div>
+  <div class="wrap">
+    <div class="badge">草稿 · v1.9.2 (25)</div>
     <div class="phone">
-      <div class="status">11:34 · Print Preview Draft</div>
+      <div class="status">13:58 · Print Preview Draft</div>
       <div class="nav">
         <div class="back">‹ Settings</div>
         <div class="title">Print Preview</div>
         <div></div>
       </div>
       <div class="content">
-        <div class="hint">Sample label layout — same format as order prints (58×40mm).</div>
         <div class="warn">Layout changed — save to apply on order prints.</div>
 
         <div class="preview-panel">
-          <div class="chips">
-            <div class="chip">Express no.</div>
-            <div class="chip active">Barcode</div>
-            <div class="chip">Inbound code</div>
+          <div class="target-toolbar">
+            <div class="dropdown">
+              <span class="dropdown-dot"></span>
+              <span class="dropdown-label">Barcode</span>
+              <span class="dropdown-chevron">▼</span>
+            </div>
+            <div class="tools-wrap">
+              <div class="align-mini">
+                <div class="align-btn">⤒</div><div class="align-btn">☰</div><div class="align-btn">⤓</div>
+                <div class="align-btn">⤉</div><div class="align-btn">◎</div><div class="align-btn">⤈</div>
+              </div>
+              <div class="nudge-mini">
+                <div class="nudge-btn">↑</div>
+                <div class="nudge-mini-mid">
+                  <div class="nudge-btn">←</div>
+                  <div class="nudge-dot"></div>
+                  <div class="nudge-btn">→</div>
+                </div>
+                <div class="nudge-btn">↓</div>
+              </div>
+            </div>
           </div>
-          <div class="drag-hint">Tap a chip to select, then drag on the label.<br/>Drag the green bar to resize barcode height.</div>
-          <div class="ruler">58.0mm</div>
+          <div class="ruler" id="widthRuler">58.0mm</div>
           <div class="label-wrap">
-            <div class="label">
+            <div class="label size-58x40" id="labelCanvas">
               <div class="el express">67499191994</div>
               <div class="el barcode">
                 <span class="tag green">Barcode</span>
@@ -183,65 +287,72 @@
                   <i style="width:4px"></i><i class="w" style="width:2px"></i><i style="width:6px"></i><i class="w" style="width:2px"></i>
                   <i style="width:3px"></i><i class="w" style="width:4px"></i><i style="width:5px"></i><i class="w" style="width:2px"></i>
                   <i style="width:7px"></i><i class="w" style="width:3px"></i><i style="width:4px"></i><i class="w" style="width:2px"></i>
-                  <i style="width:5px"></i><i class="w" style="width:3px"></i><i style="width:6px"></i><i class="w" style="width:2px"></i>
-                  <i style="width:4px"></i><i class="w" style="width:5px"></i><i style="width:3px"></i><i class="w" style="width:2px"></i>
-                  <i style="width:6px"></i><i class="w" style="width:3px"></i><i style="width:5px"></i><i class="w" style="width:4px"></i>
-                  <i style="width:3px"></i><i class="w" style="width:2px"></i><i style="width:7px"></i><i class="w" style="width:3px"></i>
-                  <i style="width:4px"></i><i class="w" style="width:2px"></i><i style="width:5px"></i><i class="w" style="width:3px"></i>
                 </div>
                 <div style="width:32px;height:5px;border-radius:3px;background:#059669;margin-top:2px"></div>
               </div>
               <div class="el inbound">MDY060400290726</div>
             </div>
           </div>
-          <div class="ruler">40.0mm</div>
+          <div class="ruler" id="heightRuler">40.0mm</div>
           <div class="coords">X 8.00 mm · Y 10.50 mm · H 12.00 mm</div>
+
+          <div class="preview-footer">
+            <span class="merge-chip">合并居中</span>
+            <div class="height-inline">
+              <span>条码高度</span>
+              <div class="stepper">
+                <div class="step">−</div><span class="paper-value" style="min-width:42px">12.0</span><div class="step plus">+</div>
+              </div>
+            </div>
+            <div class="preview-actions">
+              <button class="save-sm">Save layout</button>
+              <button class="reset-sm">Reset default</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 新增：纸条规格 -->
+        <div class="card">
+          <div class="card-title">纸条规格</div>
+          <div class="paper-wrap">
+            <div class="paper-summary" id="paperSummary">58×40 · gap 2mm</div>
+            <div class="preset-row">
+              <button class="preset active" data-w="58" data-h="40" data-g="2">58×40</button>
+              <button class="preset" data-w="40" data-h="30" data-g="2">40×30</button>
+              <button class="preset" data-w="40" data-h="20" data-g="2">40×20</button>
+              <button class="preset" data-w="50" data-h="30" data-g="2">50×30</button>
+            </div>
+            <div class="paper-row">
+              <span class="paper-label">标签宽度 (mm)</span>
+              <div class="stepper">
+                <div class="step" data-field="w" data-d="-1">−</div>
+                <span class="paper-value" id="valW">58</span>
+                <div class="step plus" data-field="w" data-d="1">+</div>
+              </div>
+            </div>
+            <div class="paper-row">
+              <span class="paper-label">标签高度 (mm)</span>
+              <div class="stepper">
+                <div class="step" data-field="h" data-d="-1">−</div>
+                <span class="paper-value" id="valH">40</span>
+                <div class="step plus" data-field="h" data-d="1">+</div>
+              </div>
+            </div>
+            <div class="paper-row">
+              <span class="paper-label">标签间隙 (mm)</span>
+              <div class="stepper">
+                <div class="step" data-field="g" data-d="-0.5">−</div>
+                <span class="paper-value" id="valG">2.0</span>
+                <div class="step plus" data-field="g" data-d="0.5">+</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="card">
-          <div class="card-title">Layout</div>
-          <div class="card-hint">左侧对齐网格可快速对齐；右侧方向键微调，每次 0.13mm（1 dot）。</div>
-          <div class="header-row">
-            <span class="target-badge">Barcode</span>
-            <div class="quick-actions">
-              <span class="action-chip">Center Text</span>
-              <span class="action-chip primary">Merge & Center</span>
-            </div>
-          </div>
-          <div class="layout-row">
-            <div class="panel">
-              <div class="panel-title">对齐</div>
-              <div class="grid">
-                <div class="btn">⤒</div><div class="btn">☰</div><div class="btn">⤓</div>
-                <div class="btn">⤉</div><div class="btn">◎</div><div class="btn">⤈</div>
-              </div>
-            </div>
-            <div class="vdivider"></div>
-            <div class="panel">
-              <div class="panel-title">微调</div>
-              <div class="pad">
-                <div class="btn">↑</div>
-                <div class="pad-mid">
-                  <div class="btn">←</div>
-                  <div class="dot"></div>
-                  <div class="btn">→</div>
-                </div>
-                <div class="btn">↓</div>
-              </div>
-            </div>
-          </div>
-          <div class="height-row">
-            <span>条码高度</span>
-            <div class="stepper">
-              <div class="step">−</div>
-              <div class="mono">12.00 mm</div>
-              <div class="step plus">+</div>
-            </div>
-          </div>
-          <div style="text-align:center;color:#64748b;font-size:11px;font-family:monospace;padding-bottom:12px">X 64 · Y 84 · H 96 dots</div>
-          <div class="actions">
-            <button class="save">Save layout</button>
-            <button class="reset">Reset default</button>
+          <div class="device-row">
+            <span>Device status</span>
+            <span class="device-val">Xprinter P201A ›</span>
           </div>
         </div>
       </div>
@@ -250,13 +361,62 @@
       </div>
     </div>
 
+    <div class="gap-demo">
+      <strong>间隙示意</strong>（TSPL GAP 命令控制走纸停位）
+      <div class="gap-visual">
+        <div class="gap-label"></div>
+        <div class="gap-space" id="gapSpace" data-gap="gap 2mm"></div>
+        <div class="gap-label"></div>
+        <div class="gap-space" data-gap="gap 2mm"></div>
+        <div class="gap-label"></div>
+      </div>
+      <p style="margin-top:10px">规格不对时，内容会印到上一张底部或下一张顶部（如你拍的实物图）。改对 <strong>高度 + 间隙</strong> 即可对齐每张标签。</p>
+    </div>
+
     <div class="note">
-      <strong>说明（草稿）</strong><br/>
-      1. 白色标签内：快递单号 / 条码 / 入库码 默认已水平居中。<br/>
-      2. Layout 区：左对齐网格 + 右方向键，类似你发的参考图。<br/>
-      3. 点「三项全部水平居中」可一键把三个元素都对齐到标签中间。<br/>
-      4. 这是静态预览，最终以 App 内效果为准。
+      <strong>草稿说明</strong><br/>
+      1. 上方预览会随「纸条规格」变化（可点 40×30 等预设试试）。<br/>
+      2. 保存时：纸条规格 + 布局 一起写入当前打印机。<br/>
+      3. 订单页打印也会用同一套 SIZE/GAP 参数。<br/>
+      4. 静态草稿，最终以 App 真机为准。
     </div>
   </div>
+
+  <script>
+    let w = 58, h = 40, g = 2;
+    const label = document.getElementById('labelCanvas');
+    const presets = document.querySelectorAll('.preset');
+
+    function render() {
+      document.getElementById('valW').textContent = w;
+      document.getElementById('valH').textContent = h;
+      document.getElementById('valG').textContent = g.toFixed(1);
+      document.getElementById('widthRuler').textContent = w.toFixed(1) + 'mm';
+      document.getElementById('heightRuler').textContent = h.toFixed(1) + 'mm';
+      document.getElementById('paperSummary').textContent = `${w}×${h} · gap ${g}mm`;
+      document.getElementById('gapSpace').setAttribute('data-gap', `gap ${g}mm`);
+      label.className = 'label ' + (w >= 50 ? 'size-58x40' : 'size-40x30');
+      label.style.height = Math.round(300 * (h / w)) + 'px';
+      presets.forEach(p => {
+        p.classList.toggle('active', +p.dataset.w === w && +p.dataset.h === h && +p.dataset.g === g);
+      });
+    }
+
+    presets.forEach(btn => btn.addEventListener('click', () => {
+      w = +btn.dataset.w; h = +btn.dataset.h; g = +btn.dataset.g;
+      render();
+    }));
+
+    document.querySelectorAll('.step[data-field]').forEach(btn => btn.addEventListener('click', () => {
+      const field = btn.dataset.field;
+      const d = +btn.dataset.d;
+      if (field === 'w') w = Math.max(20, Math.min(80, w + d));
+      if (field === 'h') h = Math.max(10, Math.min(80, h + d));
+      if (field === 'g') g = Math.max(0, Math.min(10, +(g + d).toFixed(1)));
+      render();
+    }));
+
+    render();
+  </script>
 </body>
 </html>

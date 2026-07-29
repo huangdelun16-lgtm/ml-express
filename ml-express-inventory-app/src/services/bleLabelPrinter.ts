@@ -7,9 +7,10 @@ import {
 } from '../constants/blePrinter';
 import type { OrderBarcodeData } from '../components/OrderBarcodeModal';
 import { ensureConnectedBleDevice, loadSavedBluetoothDevice } from './bluetoothScanner';
-import { loadLabelLayoutForPrinter } from './labelLayoutStorage';
+import { loadLabelPrinterSettings } from './labelLayoutStorage';
 import { buildTsplInboundLabel } from './tsplLabelBuilder';
 import type { LabelBarcodeLayoutConfig } from '../constants/labelBarcodeLayout';
+import type { LabelPaperSpec } from '../constants/labelPaperSpec';
 
 const CHUNK_SIZE = 180;
 const CHUNK_DELAY_MS = 25;
@@ -147,16 +148,21 @@ export async function printOrderBarcodeLabel(
   data: OrderBarcodeData,
   copies = 1,
   layoutOverride?: LabelBarcodeLayoutConfig,
+  paperOverride?: LabelPaperSpec,
 ): Promise<void> {
   const saved = await loadSavedBluetoothDevice();
-  const layout =
-    layoutOverride ??
-    (saved?.id ? await loadLabelLayoutForPrinter(saved.id) : undefined);
+  const settings = saved?.id ? await loadLabelPrinterSettings(saved.id) : null;
+  const paper = paperOverride ?? settings?.paper;
+  const layout = layoutOverride ?? settings?.layout;
+
   const payload = buildTsplInboundLabel({
     barcode: data.barcode,
     sheetKind: 'barcode',
     copies: Math.max(1, Math.min(9, copies)),
     layout,
+    widthMm: paper?.widthMm,
+    heightMm: paper?.heightMm,
+    gapMm: paper?.gapMm,
     extras: {
       inputBarcode: data.inputBarcode,
     },

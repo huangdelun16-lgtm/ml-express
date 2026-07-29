@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import BluetoothScanModal from '../components/BluetoothScanModal';
-import LabelLayoutControls from '../components/LabelLayoutControls';
+import LabelPaperSpecEditor from '../components/LabelPaperSpecEditor';
+import LabelPreviewToolbar from '../components/LabelPreviewToolbar';
 import LabelLayoutHeightAdjustRow from '../components/LabelLayoutAdjustRow';
 import LabelPrintPreviewEditor, {
   type LabelLayoutTarget,
@@ -20,28 +21,29 @@ import {
   adjustLayoutElement,
   applyLayoutAlignment,
   buildDefaultCenteredLayout,
+  clampLabelBarcodeLayout,
   mergeAndCenterLabelLayout,
-  centerTextLabelElement,
   type LabelBarcodeLayoutConfig,
   type LabelLayoutAlignH,
   type LabelLayoutAlignV,
 } from '../constants/labelBarcodeLayout';
-import { XPRINTER_P203A } from '../constants/xprinterP203a';
+import {
+  DEFAULT_LABEL_PAPER,
+  paperSpecsEqual,
+  type LabelPaperSpec,
+} from '../constants/labelPaperSpec';
 import { useTranslation } from '../i18n';
 import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
 import {
-  clearLabelLayoutForPrinter,
-  loadLabelLayoutForPrinter,
-  saveLabelLayoutForPrinter,
+  clearLabelPrinterSettings,
+  loadLabelPrinterSettings,
+  saveLabelPrinterSettings,
+  type LabelPrinterSettings,
 } from '../services/labelLayoutStorage';
 import { resolvePrintError, runBarcodeLabelPrint } from '../services/labelPrintFlow';
 import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 
 const MAX_COPIES = 9;
-
-function layoutsEqual(a: LabelBarcodeLayoutConfig, b: LabelBarcodeLayoutConfig): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
 
 function previewLayoutContent() {
   return {
@@ -51,8 +53,16 @@ function previewLayoutContent() {
   };
 }
 
-function defaultPreviewLayout() {
-  return buildDefaultCenteredLayout(previewLayoutContent());
+function defaultPreviewSettings(paper: LabelPaperSpec = DEFAULT_LABEL_PAPER): LabelPrinterSettings {
+  return {
+    version: 1,
+    paper,
+    layout: buildDefaultCenteredLayout(
+      previewLayoutContent(),
+      paper.widthMm,
+      paper.heightMm,
+    ),
+  };
 }
 
 export default function PrintPreviewScreen() {
@@ -62,23 +72,32 @@ export default function PrintPreviewScreen() {
   const [copies, setCopies] = useState(1);
   const [printing, setPrinting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [layout, setLayout] = useState<LabelBarcodeLayoutConfig>(defaultPreviewLayout());
-  const [savedLayout, setSavedLayout] = useState<LabelBarcodeLayoutConfig>(defaultPreviewLayout());
+  const [paper, setPaper] = useState<LabelPaperSpec>(DEFAULT_LABEL_PAPER);
+  const [savedPaper, setSavedPaper] = useState<LabelPaperSpec>(DEFAULT_LABEL_PAPER);
+  const [layout, setLayout] = useState<LabelBarcodeLayoutConfig>(defaultPreviewSettings().layout);
+  const [savedLayout, setSavedLayout] = useState<LabelBarcodeLayoutConfig>(defaultPreviewSettings().layout);
   const [selectedTarget, setSelectedTarget] = useState<LabelLayoutTarget>('expressNo');
 
-  const dirty = useMemo(() => !layoutsEqual(layout, savedLayout), [layout, savedLayout]);
+  const dirty = useMemo(
+    () => !paperSpecsEqual(paper, savedPaper) || JSON.stringify(layout) !== JSON.stringify(savedLayout),
+    [layout, savedLayout, paper, savedPaper],
+  );
 
   const refreshPrinter = useCallback(async () => {
     const device = await getActiveBluetoothDevice();
     setConnectedPrinter(device);
     if (device?.id) {
-      const stored = await loadLabelLayoutForPrinter(device.id);
-      setLayout(stored);
-      setSavedLayout(stored);
+      const stored = await loadLabelPrinterSettings(device.id);
+      setPaper(stored.paper);
+      setSavedPaper(stored.paper);
+      setLayout(stored.layout);
+      setSavedLayout(stored.layout);
     } else {
-      const centered = defaultPreviewLayout();
-      setLayout(centered);
-      setSavedLayout(centered);
+      const defaults = defaultPreviewSettings();
+      setPaper(defaults.paper);
+      setSavedPaper(defaults.paper);
+      setLayout(defaults.layout);
+      setSavedLayout(defaults.layout);
     }
   }, []);
 
@@ -108,18 +127,38 @@ export default function PrintPreviewScreen() {
     vertical?: LabelLayoutAlignV;
   }) => {
     setLayout((current) =>
-      applyLayoutAlignment(current, selectedTarget, alignment, previewLayoutContent()),
-    );
-  };
-
-  const centerTextSelected = () => {
-    setLayout((current) =>
-      centerTextLabelElement(current, selectedTarget, previewLayoutContent()),
+      applyLayoutAlignment(
+        current,
+        selectedTarget,
+        alignment,
+        previewLayoutContent(),
+        paper.widthMm,
+        paper.heightMm,
+      ),
     );
   };
 
   const mergeAndCenterAll = () => {
-    setLayout((current) => mergeAndCenterLabelLayout(current, previewLayoutContent()));
+    setLayout((current) =>
+      mergeAndCenterLabelLayout(
+        current,
+        previewLayoutContent(),
+        paper.widthMm,
+        paper.heightMm,
+      ),
+    );
+  };
+
+  const applyPaperSpec = (nextPaper: LabelPaperSpec) => {
+    setPaper(nextPaper);
+    setLayout((current) =>
+      mergeAndCenterLabelLayout(
+        clampLabelBarcodeLayout(current, nextPaper.widthMm, nextPaper.heightMm),
+        previewLayoutContent(),
+        nextPaper.widthMm,
+        nextPaper.heightMm,
+      ),
+    );
   };
 
   const handleSaveLayout = () => {
@@ -127,7 +166,12 @@ export default function PrintPreviewScreen() {
     setSaving(true);
     void (async () => {
       try {
-        await saveLabelLayoutForPrinter(connectedPrinter.id, layout);
+        await saveLabelPrinterSettings(connectedPrinter.id, {
+          version: 1,
+          paper,
+          layout,
+        });
+        setSavedPaper(paper);
         setSavedLayout(layout);
         Alert.alert(t.common.tip, t.settings.printPreviewLayoutSaved);
       } catch (error) {
@@ -139,10 +183,12 @@ export default function PrintPreviewScreen() {
   };
 
   const handleResetLayout = () => {
-    const centered = defaultPreviewLayout();
+    const defaults = defaultPreviewSettings();
     if (!connectedPrinter?.id) {
-      setLayout(centered);
-      setSavedLayout(centered);
+      setPaper(defaults.paper);
+      setSavedPaper(defaults.paper);
+      setLayout(defaults.layout);
+      setSavedLayout(defaults.layout);
       return;
     }
     Alert.alert(t.settings.printPreviewResetLayout, t.settings.printPreviewResetConfirm, [
@@ -152,9 +198,11 @@ export default function PrintPreviewScreen() {
         style: 'destructive',
         onPress: () => {
           void (async () => {
-            await clearLabelLayoutForPrinter(connectedPrinter.id);
-            setLayout(centered);
-            setSavedLayout(centered);
+            await clearLabelPrinterSettings(connectedPrinter.id);
+            setPaper(defaults.paper);
+            setSavedPaper(defaults.paper);
+            setLayout(defaults.layout);
+            setSavedLayout(defaults.layout);
             Alert.alert(t.common.tip, t.settings.printPreviewLayoutReset);
           })();
         },
@@ -172,7 +220,7 @@ export default function PrintPreviewScreen() {
     setPrinting(true);
     void (async () => {
       try {
-        await runBarcodeLabelPrint(PRINT_PREVIEW_SAMPLE, copies, layout);
+        await runBarcodeLabelPrint(PRINT_PREVIEW_SAMPLE, copies, layout, paper);
         Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
       } catch (error) {
         Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
@@ -185,10 +233,16 @@ export default function PrintPreviewScreen() {
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.hint}>{t.settings.printPreviewSampleHint}</Text>
         {dirty ? <Text style={styles.unsavedHint}>{t.settings.printPreviewUnsavedHint}</Text> : null}
 
         <View style={styles.previewPanel}>
+          <LabelPreviewToolbar
+            selectedTarget={selectedTarget}
+            disabled={printing || saving}
+            onSelectTarget={setSelectedTarget}
+            onMove={moveSelected}
+            onAlign={alignSelected}
+          />
           <LabelPrintPreviewEditor
             barcode={PRINT_PREVIEW_SAMPLE.barcode}
             expressNo={PRINT_PREVIEW_SAMPLE.inputBarcode}
@@ -196,59 +250,60 @@ export default function PrintPreviewScreen() {
             selectedTarget={selectedTarget}
             onSelectTarget={setSelectedTarget}
             onLayoutChange={setLayout}
-            widthMm={XPRINTER_P203A.defaultWidthMm}
-            heightMm={XPRINTER_P203A.defaultHeightMm}
+            widthMm={paper.widthMm}
+            heightMm={paper.heightMm}
           />
+
+          <View style={styles.previewFooter}>
+            <Pressable
+              style={[styles.mergeCenterBtn, (printing || saving) && styles.btnDisabled]}
+              onPress={mergeAndCenterAll}
+              disabled={printing || saving}
+            >
+              <Text style={styles.mergeCenterBtnText}>{t.settings.printPreviewMergeCenter}</Text>
+            </Pressable>
+
+            {selectedTarget === 'barcode' ? (
+              <LabelLayoutHeightAdjustRow
+                label={t.settings.printPreviewBarcodeHeight}
+                valueDots={layout.barcode.height}
+                disabled={printing || saving}
+                tone="light"
+                onAdjust={(delta) => adjust('barcode', 'height', delta)}
+              />
+            ) : null}
+
+            <View style={styles.layoutActions}>
+              <Pressable
+                style={[
+                  styles.saveLayoutBtn,
+                  (!connectedPrinter || saving || !dirty) && styles.btnDisabled,
+                ]}
+                onPress={handleSaveLayout}
+                disabled={!connectedPrinter || saving || !dirty}
+              >
+                <Text style={styles.saveLayoutBtnText}>
+                  {saving ? t.common.processing : t.settings.printPreviewSaveLayout}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.resetLayoutBtn, (!connectedPrinter || saving) && styles.btnDisabled]}
+                onPress={handleResetLayout}
+                disabled={!connectedPrinter || saving}
+              >
+                <Text style={styles.resetLayoutBtnText}>{t.settings.printPreviewResetLayout}</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
 
         <View style={styles.settingsCard}>
-          <Text style={styles.sectionTitle}>{t.settings.printPreviewLayoutTitle}</Text>
-          <Text style={styles.sectionHint}>{t.settings.printPreviewMovePadHint}</Text>
-          <LabelLayoutControls
-            selectedTarget={selectedTarget}
+          <Text style={styles.sectionTitle}>{t.settings.printPreviewPaperTitle}</Text>
+          <LabelPaperSpecEditor
+            paper={paper}
             disabled={printing || saving}
-            onMove={moveSelected}
-            onAlign={alignSelected}
-            onCenterText={centerTextSelected}
-            onMergeCenter={mergeAndCenterAll}
+            onChange={applyPaperSpec}
           />
-          {selectedTarget === 'barcode' ? (
-            <LabelLayoutHeightAdjustRow
-              label={t.settings.printPreviewBarcodeHeight}
-              valueDots={layout.barcode.height}
-              disabled={printing || saving}
-              onAdjust={(delta) => adjust('barcode', 'height', delta)}
-            />
-          ) : null}
-          <View style={styles.coordSummary}>
-            <Text style={styles.coordSummaryText}>
-              {selectedTarget === 'barcode'
-                ? `X ${layout.barcode.x} · Y ${layout.barcode.y} · H ${layout.barcode.height} dots`
-                : `X ${layout[selectedTarget].x} · Y ${layout[selectedTarget].y} dots`}
-            </Text>
-          </View>
-
-          <View style={styles.layoutActions}>
-            <Pressable
-              style={[
-                styles.saveLayoutBtn,
-                (!connectedPrinter || saving || !dirty) && styles.btnDisabled,
-              ]}
-              onPress={handleSaveLayout}
-              disabled={!connectedPrinter || saving || !dirty}
-            >
-              <Text style={styles.saveLayoutBtnText}>
-                {saving ? t.common.processing : t.settings.printPreviewSaveLayout}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.resetLayoutBtn, (!connectedPrinter || saving) && styles.btnDisabled]}
-              onPress={handleResetLayout}
-              disabled={!connectedPrinter || saving}
-            >
-              <Text style={styles.resetLayoutBtnText}>{t.settings.printPreviewResetLayout}</Text>
-            </Pressable>
-          </View>
         </View>
 
         <View style={styles.settingsCard}>
@@ -326,13 +381,6 @@ export default function PrintPreviewScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#020617' },
   content: { padding: 16, paddingBottom: 24 },
-  hint: {
-    color: '#94a3b8',
-    fontSize: 13,
-    lineHeight: 20,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
   unsavedHint: {
     color: '#fbbf24',
     fontSize: 12,
@@ -343,12 +391,33 @@ const styles = StyleSheet.create({
   previewPanel: {
     backgroundColor: '#cbd5e1',
     borderRadius: 16,
-    paddingVertical: 20,
+    paddingVertical: 16,
     paddingHorizontal: 12,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#94a3b8',
-    alignItems: 'center',
+    alignItems: 'stretch',
+  },
+  previewFooter: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#94a3b8',
+    gap: 10,
+  },
+  mergeCenterBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(2,132,199,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(3,105,161,0.45)',
+  },
+  mergeCenterBtnText: {
+    color: '#0c4a6e',
+    fontSize: 11,
+    fontWeight: '900',
   },
   settingsCard: {
     backgroundColor: '#0f172a',
@@ -366,47 +435,28 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 2,
   },
-  sectionHint: {
-    color: '#64748b',
-    fontSize: 10,
-    lineHeight: 15,
-    paddingHorizontal: 14,
-    paddingBottom: 4,
-    textAlign: 'center',
-  },
-  coordSummary: {
-    paddingHorizontal: 14,
-    paddingBottom: 8,
-  },
-  coordSummaryText: {
-    color: '#64748b',
-    fontSize: 11,
-    fontFamily: 'monospace',
-    textAlign: 'center',
-  },
   layoutActions: {
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    gap: 8,
   },
   saveLayoutBtn: {
     flex: 1,
     backgroundColor: '#059669',
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  saveLayoutBtnText: { color: '#ecfdf5', fontWeight: '900', fontSize: 14 },
+  saveLayoutBtnText: { color: '#ecfdf5', fontWeight: '900', fontSize: 13 },
   resetLayoutBtn: {
     flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#475569',
+    backgroundColor: 'rgba(15,23,42,0.06)',
   },
-  resetLayoutBtnText: { color: '#cbd5e1', fontWeight: '800', fontSize: 14 },
+  resetLayoutBtnText: { color: '#334155', fontWeight: '800', fontSize: 13 },
   btnDisabled: { opacity: 0.45 },
   settingRow: {
     flexDirection: 'row',
