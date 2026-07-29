@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LABEL_LAYOUT_MM_STEP, mmToLayoutDots } from '../constants/labelBarcodeLayout';
+import { LABEL_LAYOUT_MM_STEP, mmDeltaToLayoutDots } from '../constants/labelBarcodeLayout';
 
 type SizeRowProps = {
   label: string;
@@ -65,6 +65,10 @@ type Props = {
   lengthMaxMm: number;
   heightMinMm: number;
   heightMaxMm: number;
+  canDecreaseLength?: boolean;
+  canIncreaseLength?: boolean;
+  canDecreaseHeight?: boolean;
+  canIncreaseHeight?: boolean;
   disabled?: boolean;
   tone?: 'dark' | 'light';
   onAdjustLength: (deltaDots: number) => void;
@@ -80,6 +84,10 @@ export default function LabelLayoutSizeEditor({
   lengthMaxMm,
   heightMinMm,
   heightMaxMm,
+  canDecreaseLength = true,
+  canIncreaseLength = true,
+  canDecreaseHeight = true,
+  canIncreaseHeight = true,
   disabled,
   tone = 'dark',
   onAdjustLength,
@@ -94,18 +102,18 @@ export default function LabelLayoutSizeEditor({
         valueMm={formatMm(lengthMm)}
         disabled={disabled}
         tone={tone}
-        canDecrease={lengthMm - LABEL_LAYOUT_MM_STEP >= lengthMinMm - 0.001}
-        canIncrease={lengthMm + LABEL_LAYOUT_MM_STEP <= lengthMaxMm + 0.001}
-        onAdjust={(deltaMm) => onAdjustLength(mmToLayoutDots(deltaMm))}
+        canDecrease={canDecreaseLength}
+        canIncrease={canIncreaseLength}
+        onAdjust={(deltaMm) => onAdjustLength(mmDeltaToLayoutDots(deltaMm))}
       />
       <SizeRow
         label={heightLabel}
         valueMm={formatMm(heightMm)}
         disabled={disabled}
         tone={tone}
-        canDecrease={heightMm - LABEL_LAYOUT_MM_STEP >= heightMinMm - 0.001}
-        canIncrease={heightMm + LABEL_LAYOUT_MM_STEP <= heightMaxMm + 0.001}
-        onAdjust={(deltaMm) => onAdjustHeight(mmToLayoutDots(deltaMm))}
+        canDecrease={canDecreaseHeight}
+        canIncrease={canIncreaseHeight}
+        onAdjust={(deltaMm) => onAdjustHeight(mmDeltaToLayoutDots(deltaMm))}
       />
     </View>
   );

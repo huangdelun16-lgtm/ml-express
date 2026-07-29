@@ -51,16 +51,16 @@ export default function BarcodeImage({
 
 const styles = StyleSheet.create({
   wrap: {
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
     width: '100%',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     overflow: 'hidden',
   },
   canvas: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     overflow: 'hidden',
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
   },
   code: {
     marginTop: 10,

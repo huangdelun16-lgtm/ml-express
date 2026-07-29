@@ -21,6 +21,7 @@ import {
   adjustLayoutElement,
   applyLayoutAlignment,
   buildDefaultCenteredLayout,
+  canAdjustElementSize,
   clampLabelBarcodeLayout,
   dotsToMm,
   getElementDimensions,
@@ -312,6 +313,38 @@ export default function PrintPreviewScreen() {
                   ? sizeLimits.barcodeHeightMaxMm
                   : sizeLimits.heightMaxMm
               }
+              canDecreaseLength={canAdjustElementSize(
+                layout,
+                selectedTarget,
+                'width',
+                -1,
+                layoutContent,
+                paper.widthMm,
+              )}
+              canIncreaseLength={canAdjustElementSize(
+                layout,
+                selectedTarget,
+                'width',
+                1,
+                layoutContent,
+                paper.widthMm,
+              )}
+              canDecreaseHeight={canAdjustElementSize(
+                layout,
+                selectedTarget,
+                'height',
+                -1,
+                layoutContent,
+                paper.widthMm,
+              )}
+              canIncreaseHeight={canAdjustElementSize(
+                layout,
+                selectedTarget,
+                'height',
+                1,
+                layoutContent,
+                paper.widthMm,
+              )}
               disabled={printing || saving}
               tone="light"
               onAdjustLength={(deltaDots) => adjust(selectedTarget, 'width', deltaDots)}

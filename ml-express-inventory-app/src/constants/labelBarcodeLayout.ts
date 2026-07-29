@@ -102,6 +102,12 @@ export function mmToLayoutDots(mm: number): number {
   return mmToDots(mm);
 }
 
+/** 布局步进专用：保留正负号，避免 mmToDots 的 Math.max(1, …) 把减量变成 +1 dot */
+export function mmDeltaToLayoutDots(mm: number): number {
+  if (!Number.isFinite(mm) || mm === 0) return 0;
+  return Math.round((mm / 25.4) * XPRINTER_P203A.dpi);
+}
+
 function clampDots(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
@@ -204,9 +210,14 @@ export function getElementDimensions(
   const naturalW = defaultTextWidthDots(text);
   const naturalH = defaultTextHeightDots();
   const el = layout[target];
+  const { xMul, yMul } = getTextPrintMul(
+    el.widthDots ?? naturalW,
+    el.heightDots ?? naturalH,
+    text,
+  );
   return {
-    widthDots: el.widthDots ?? naturalW,
-    heightDots: el.heightDots ?? naturalH,
+    widthDots: xMul * naturalW,
+    heightDots: yMul * naturalH,
   };
 }
 
@@ -626,17 +637,73 @@ export function adjustLayoutElement(
   }
 
   const text = textForTarget(target, content);
+  const naturalW = defaultTextWidthDots(text);
+  const naturalH = defaultTextHeightDots();
   const dims = getElementDimensions(layout, target, content, widthMm);
-  next[target] = withResolvedTextSize(
-    {
-      ...next[target],
-      widthDots: axis === 'width' ? dims.widthDots + deltaDots : dims.widthDots,
-      heightDots: axis === 'height' ? dims.heightDots + deltaDots : dims.heightDots,
-    },
+  const stored = layout[target];
+  const { xMul, yMul } = getTextPrintMul(
+    stored.widthDots ?? dims.widthDots,
+    stored.heightDots ?? dims.heightDots,
     text,
-    widthMm,
   );
+
+  if (axis === 'width') {
+    let nextMul = clampDots(Math.round((dims.widthDots + deltaDots) / naturalW), 1, TSPL_TEXT_MUL_MAX);
+    if (deltaDots > 0 && nextMul <= xMul) {
+      nextMul = Math.min(TSPL_TEXT_MUL_MAX, xMul + 1);
+    } else if (deltaDots < 0 && nextMul >= xMul) {
+      nextMul = Math.max(1, xMul - 1);
+    }
+    next[target] = withResolvedTextSize(
+      { ...next[target], widthDots: nextMul * naturalW },
+      text,
+      widthMm,
+    );
+  } else {
+    let nextMul = clampDots(Math.round((dims.heightDots + deltaDots) / naturalH), 1, TSPL_TEXT_MUL_MAX);
+    if (deltaDots > 0 && nextMul <= yMul) {
+      nextMul = Math.min(TSPL_TEXT_MUL_MAX, yMul + 1);
+    } else if (deltaDots < 0 && nextMul >= yMul) {
+      nextMul = Math.max(1, yMul - 1);
+    }
+    next[target] = withResolvedTextSize(
+      { ...next[target], heightDots: nextMul * naturalH },
+      text,
+      widthMm,
+    );
+  }
   return clampLabelBarcodeLayout(next, widthMm);
+}
+
+export function canAdjustElementSize(
+  layout: LabelBarcodeLayoutConfig,
+  target: 'expressNo' | 'barcode' | 'inboundCode',
+  axis: 'width' | 'height',
+  direction: 1 | -1,
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+): boolean {
+  if (target === 'barcode') {
+    const metrics = getBarcodePrintMetrics(layout, content, widthMm);
+    if (axis === 'width') {
+      return direction > 0 ? metrics.narrow < 12 : metrics.narrow > 1;
+    }
+    const height = metrics.height;
+    return direction > 0 ? height < LABEL_BARCODE_HEIGHT_MAX : height > LABEL_BARCODE_HEIGHT_MIN;
+  }
+
+  const text = textForTarget(target, content);
+  const dims = getElementDimensions(layout, target, content, widthMm);
+  const stored = layout[target];
+  const { xMul, yMul } = getTextPrintMul(
+    stored.widthDots ?? dims.widthDots,
+    stored.heightDots ?? dims.heightDots,
+    text,
+  );
+  if (axis === 'width') {
+    return direction > 0 ? xMul < TSPL_TEXT_MUL_MAX : xMul > 1;
+  }
+  return direction > 0 ? yMul < TSPL_TEXT_MUL_MAX : yMul > 1;
 }
 
 export function getElementSizeLimitsMm(

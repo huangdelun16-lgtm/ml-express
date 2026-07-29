@@ -3,14 +3,15 @@ import {
   adjustLayoutElement,
   applyLayoutAlignment,
   buildDefaultCenteredLayout,
+  canAdjustElementSize,
   centerAllLabelElements,
   mergeAndCenterLabelLayout,
   clampLabelBarcodeLayout,
   DEFAULT_LABEL_BARCODE_LAYOUT,
-  dotsToMm,
   getBarcodePrintMetrics,
   getEffectiveElementWidthDots,
   getElementDimensions,
+  mmDeltaToLayoutDots,
   mmToLayoutDots,
   normalizeLabelBarcodeLayout,
   setLayoutElementPosition,
@@ -140,18 +141,24 @@ describe('labelBarcodeLayout', () => {
     );
   });
 
+  it('preserves sign when converting mm layout deltas', () => {
+    expect(mmDeltaToLayoutDots(-0.5)).toBeLessThan(0);
+    expect(mmDeltaToLayoutDots(0.5)).toBeGreaterThan(0);
+    expect(mmDeltaToLayoutDots(-0.5)).toBe(-mmDeltaToLayoutDots(0.5));
+  });
+
   it('adjusts text width and height for express number', () => {
     const before = getElementDimensions(DEFAULT_LABEL_BARCODE_LAYOUT, 'expressNo', SAMPLE_CONTENT);
     const next = adjustLayoutElement(
       DEFAULT_LABEL_BARCODE_LAYOUT,
       'expressNo',
       'height',
-      mmToLayoutDots(1),
+      mmDeltaToLayoutDots(0.5),
       SAMPLE_CONTENT,
     );
     const after = getElementDimensions(next, 'expressNo', SAMPLE_CONTENT);
     expect(after.heightDots).toBeGreaterThan(before.heightDots);
-    expect(dotsToMm(after.heightDots - before.heightDots)).toBeCloseTo(1, 0);
+    expect(canAdjustElementSize(next, 'expressNo', 'height', -1, SAMPLE_CONTENT)).toBe(true);
   });
 
   it('migrates legacy scale to width and height dots', () => {

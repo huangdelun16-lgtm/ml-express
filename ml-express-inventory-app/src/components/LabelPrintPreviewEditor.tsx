@@ -379,8 +379,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 2,
     minHeight: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    overflow: 'hidden',
   },
   elementTag: {
     position: 'absolute',
@@ -401,7 +402,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     fontFamily: 'monospace',
-    textAlign: 'center',
+    textAlign: 'left',
+    alignSelf: 'flex-start',
     width: '100%',
   },
   barcodeText: {
@@ -409,7 +411,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     fontFamily: 'monospace',
-    textAlign: 'center',
+    textAlign: 'left',
+    alignSelf: 'flex-start',
     width: '100%',
   },
   resizeHandle: {
