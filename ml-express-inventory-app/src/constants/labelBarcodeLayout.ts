@@ -26,6 +26,15 @@ export type LabelBarcodeLayoutConfig = {
 
 export const LABEL_LAYOUT_STEP_DOTS = 1;
 export const LABEL_LAYOUT_MM_STEP = 0.5;
+/** 合并居中：快递单号与条码间距（更紧） */
+export const MERGE_CENTER_EXPRESS_BARCODE_GAP = 2;
+/** 合并居中：条码与入库码间距 */
+export const MERGE_CENTER_BARCODE_TEXT_GAP = 4;
+/** @deprecated use MERGE_CENTER_*_GAP */
+export const MERGE_CENTER_LINE_GAP = MERGE_CENTER_BARCODE_TEXT_GAP;
+export const GROUP_TEXT_SCALE_STEP = 0.2;
+export const GROUP_TEXT_SCALE_MIN = 1;
+export const GROUP_TEXT_SCALE_MAX = 2;
 export const LABEL_BARCODE_HEIGHT_MIN = 48;
 export const LABEL_BARCODE_HEIGHT_MAX = 160;
 export const LABEL_ELEMENT_WIDTH_MM_MIN = 5;
@@ -175,6 +184,34 @@ function effectiveElementWidth(width: number, labelW: number): number {
 function centerElementXDots(labelW: number, elemW: number): number {
   const width = effectiveElementWidth(elemW, labelW);
   return Math.max(0, Math.round((labelW - width) / 2));
+}
+
+function textPrintWidthDots(
+  layout: LabelBarcodeLayoutConfig,
+  target: 'expressNo' | 'inboundCode',
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+): number {
+  const text = textForTarget(target, content);
+  const dims = getElementDimensions(layout, target, content, widthMm);
+  const el = layout[target];
+  const { xMul } = getTextPrintMul(
+    el.widthDots ?? dims.widthDots,
+    el.heightDots ?? dims.heightDots,
+    text,
+  );
+  return xMul * defaultTextWidthDots(text);
+}
+
+/** 在条码宽度范围内，按实际打印文字宽度水平居中 */
+function textXAlignedToBarcode(
+  barcodeX: number,
+  barcodeWidth: number,
+  textPrintWidth: number,
+  labelW: number,
+): number {
+  const centered = Math.round(barcodeX + (barcodeWidth - textPrintWidth) / 2);
+  return Math.max(0, Math.min(labelW - textPrintWidth, centered));
 }
 
 function textForTarget(
@@ -454,17 +491,32 @@ export function mergeAndCenterLabelLayout(
 ): LabelBarcodeLayoutConfig {
   const labelW = labelWidthDots(widthMm);
   const labelH = labelHeightDots(heightMm);
-  const gap = 10;
-  const expressDims = getElementDimensions(layout, 'expressNo', content, widthMm);
-  const inboundDims = getElementDimensions(layout, 'inboundCode', content, widthMm);
-  const barcodeDims = getElementDimensions(layout, 'barcode', content, widthMm);
   const hasExpress = Boolean(content.expressNo?.trim());
 
-  let stackHeight = barcodeDims.heightDots + gap + inboundDims.heightDots;
-  if (hasExpress) stackHeight += expressDims.heightDots + gap;
-  const startY = Math.max(4, Math.round((labelH - stackHeight) / 2));
+  const expressDims = getElementDimensions(layout, 'expressNo', content, widthMm);
+  const barcodeDims = getElementDimensions(layout, 'barcode', content, widthMm);
+  const inboundDims = getElementDimensions(layout, 'inboundCode', content, widthMm);
+  const barcodeHeight = layout.barcode.height;
 
-  let y = startY;
+  let expressGap = hasExpress ? MERGE_CENTER_EXPRESS_BARCODE_GAP : 0;
+  let textGap = MERGE_CENTER_BARCODE_TEXT_GAP;
+
+  const stackHeightFor = (expressG: number, barTextG: number) =>
+    barcodeHeight +
+    barTextG +
+    inboundDims.heightDots +
+    (hasExpress ? expressDims.heightDots + expressG : 0);
+
+  let stackHeight = stackHeightFor(expressGap, textGap);
+  if (stackHeight > labelH - 4) {
+    const overflow = stackHeight - (labelH - 4);
+    textGap = Math.max(2, textGap - Math.ceil(overflow / 2));
+    expressGap = hasExpress ? Math.max(1, expressGap - Math.floor(overflow / 2)) : 0;
+    stackHeight = stackHeightFor(expressGap, textGap);
+  }
+
+  const startY = Math.max(0, Math.round((labelH - stackHeight) / 2));
+
   const next: LabelBarcodeLayoutConfig = {
     version: 1,
     expressNo: { ...layout.expressNo },
@@ -472,27 +524,35 @@ export function mergeAndCenterLabelLayout(
     inboundCode: { ...layout.inboundCode },
   };
 
-  if (hasExpress) {
-    next.expressNo = {
-      ...layout.expressNo,
-      x: centerElementXDots(labelW, expressDims.widthDots),
-      y,
-    };
-    y += expressDims.heightDots + gap;
-  }
+  let y = startY;
+
+  const barcodeWidth = barcodeDims.widthDots;
+  const barcodeX = centerElementXDots(labelW, barcodeWidth);
+  const barcodeY = hasExpress ? y + expressDims.heightDots + expressGap : y;
 
   next.barcode = {
     ...layout.barcode,
-    x: centerElementXDots(labelW, barcodeDims.widthDots),
-    y,
+    x: barcodeX,
+    y: barcodeY,
   };
-  y += barcodeDims.heightDots + gap;
 
+  const inboundPrintW = textPrintWidthDots(layout, 'inboundCode', content, widthMm);
   next.inboundCode = {
     ...layout.inboundCode,
-    x: centerElementXDots(labelW, inboundDims.widthDots),
-    y,
+    x: textXAlignedToBarcode(barcodeX, barcodeWidth, inboundPrintW, labelW),
+    y: barcodeY + barcodeHeight + textGap,
+    widthDots: inboundPrintW,
   };
+
+  if (hasExpress) {
+    const expressPrintW = textPrintWidthDots(layout, 'expressNo', content, widthMm);
+    next.expressNo = {
+      ...layout.expressNo,
+      x: textXAlignedToBarcode(barcodeX, barcodeWidth, expressPrintW, labelW),
+      y: barcodeY - expressGap - expressDims.heightDots,
+      widthDots: expressPrintW,
+    };
+  }
 
   return clampLabelBarcodeLayout(next, widthMm, heightMm);
 }
@@ -612,15 +672,17 @@ export function adjustLayoutElement(
   if (target === 'barcode') {
     const dims = getElementDimensions(layout, 'barcode', content, widthMm);
     if (axis === 'width') {
-      const code = content.barcode.trim();
-      const modules = Math.max(1, getCode128TotalModules(code));
+      const modules = barcodeModuleCount(content);
       const metrics = getBarcodePrintMetrics(layout, content, widthMm);
-      const currentNarrow = metrics.narrow;
-      let nextNarrow = clampDots(Math.round((dims.widthDots + deltaDots) / modules), 1, 12);
-      if (deltaDots > 0 && nextNarrow <= currentNarrow) {
-        nextNarrow = Math.min(12, currentNarrow + 1);
-      } else if (deltaDots < 0 && nextNarrow >= currentNarrow) {
-        nextNarrow = Math.max(1, currentNarrow - 1);
+      const maxNarrow = barcodeMaxNarrow(content, widthMm);
+      let nextNarrow = metrics.narrow;
+      if (deltaDots > 0) {
+        nextNarrow = Math.min(maxNarrow, metrics.narrow + 1);
+      } else if (deltaDots < 0) {
+        nextNarrow = Math.max(barcodeMinNarrow(), metrics.narrow - 1);
+      }
+      if (nextNarrow === metrics.narrow) {
+        return layout;
       }
       next.barcode = withResolvedBarcodeSize(
         {
@@ -630,6 +692,7 @@ export function adjustLayoutElement(
         content,
         widthMm,
       );
+      return clampLabelBarcodeLayout(next, widthMm);
     } else {
       next.barcode.height = clampBarcodeHeightDots(next.barcode.height + deltaDots);
     }
@@ -685,8 +748,10 @@ export function canAdjustElementSize(
 ): boolean {
   if (target === 'barcode') {
     const metrics = getBarcodePrintMetrics(layout, content, widthMm);
+    const maxNarrow = barcodeMaxNarrow(content, widthMm);
     if (axis === 'width') {
-      return direction > 0 ? metrics.narrow < 12 : metrics.narrow > 1;
+      if (maxNarrow <= barcodeMinNarrow()) return false;
+      return direction > 0 ? metrics.narrow < maxNarrow : metrics.narrow > barcodeMinNarrow();
     }
     const height = metrics.height;
     return direction > 0 ? height < LABEL_BARCODE_HEIGHT_MAX : height > LABEL_BARCODE_HEIGHT_MIN;
@@ -704,6 +769,223 @@ export function canAdjustElementSize(
     return direction > 0 ? xMul < TSPL_TEXT_MUL_MAX : xMul > 1;
   }
   return direction > 0 ? yMul < TSPL_TEXT_MUL_MAX : yMul > 1;
+}
+
+function barcodeModuleCount(content: LabelLayoutContentSizes): number {
+  return Math.max(1, getCode128TotalModules(content.barcode.trim()));
+}
+
+export function barcodeMaxNarrow(
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+): number {
+  const modules = barcodeModuleCount(content);
+  const maxWidth = labelWidthDots(widthMm) - 8;
+  return Math.min(12, Math.max(1, Math.floor(maxWidth / modules)));
+}
+
+export function barcodeMinNarrow(): number {
+  return 1;
+}
+
+export type LabelGroupBounds = {
+  x: number;
+  y: number;
+  widthDots: number;
+  heightDots: number;
+};
+
+function labelGroupTargets(
+  content: LabelLayoutContentSizes,
+): Array<'expressNo' | 'barcode' | 'inboundCode'> {
+  return content.expressNo?.trim()
+    ? ['expressNo', 'barcode', 'inboundCode']
+    : ['barcode', 'inboundCode'];
+}
+
+export function getLabelGroupBounds(
+  layout: LabelBarcodeLayoutConfig,
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+): LabelGroupBounds {
+  const targets = labelGroupTargets(content);
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const target of targets) {
+    const dims = getElementDimensions(layout, target, content, widthMm);
+    const pos = layout[target];
+    const width = getEffectiveElementWidthDots(layout, target, content, widthMm);
+    minX = Math.min(minX, pos.x);
+    minY = Math.min(minY, pos.y);
+    maxX = Math.max(maxX, pos.x + width);
+    maxY = Math.max(maxY, pos.y + dims.heightDots);
+  }
+
+  if (!Number.isFinite(minX)) {
+    return { x: 0, y: 0, widthDots: 0, heightDots: 0 };
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    widthDots: Math.max(0, maxX - minX),
+    heightDots: Math.max(0, maxY - minY),
+  };
+}
+
+export function moveLabelGroup(
+  layout: LabelBarcodeLayoutConfig,
+  deltaX: number,
+  deltaY: number,
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+  heightMm = XPRINTER_P203A.defaultHeightMm,
+): LabelBarcodeLayoutConfig {
+  const next: LabelBarcodeLayoutConfig = {
+    version: 1,
+    expressNo: { ...layout.expressNo },
+    barcode: { ...layout.barcode },
+    inboundCode: { ...layout.inboundCode },
+  };
+
+  for (const target of labelGroupTargets(content)) {
+    next[target].x += deltaX;
+    next[target].y += deltaY;
+  }
+
+  return clampLabelBarcodeLayout(next, widthMm, heightMm);
+}
+
+export function alignLabelGroup(
+  layout: LabelBarcodeLayoutConfig,
+  alignment: { horizontal?: LabelLayoutAlignH; vertical?: LabelLayoutAlignV },
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+  heightMm = XPRINTER_P203A.defaultHeightMm,
+): LabelBarcodeLayoutConfig {
+  const labelW = labelWidthDots(widthMm);
+  const labelH = labelHeightDots(heightMm);
+  const bounds = getLabelGroupBounds(layout, content, widthMm);
+  const margin = 4;
+
+  let targetX = bounds.x;
+  let targetY = bounds.y;
+
+  if (alignment.horizontal === 'left') {
+    targetX = 0;
+  } else if (alignment.horizontal === 'center') {
+    targetX = centerElementXDots(labelW, bounds.widthDots);
+  } else if (alignment.horizontal === 'right') {
+    targetX = Math.max(0, labelW - bounds.widthDots - margin);
+  }
+
+  if (alignment.vertical === 'top') {
+    targetY = 0;
+  } else if (alignment.vertical === 'middle') {
+    targetY = Math.round((labelH - bounds.heightDots) / 2);
+  } else if (alignment.vertical === 'bottom') {
+    targetY = Math.max(0, labelH - bounds.heightDots - margin);
+  }
+
+  return moveLabelGroup(
+    layout,
+    targetX - bounds.x,
+    targetY - bounds.y,
+    content,
+    widthMm,
+    heightMm,
+  );
+}
+
+function snapGroupTextScale(scale: number): number {
+  return Math.round(scale * 5) / 5;
+}
+
+export function formatGroupTextScale(scale: number): string {
+  const snapped = snapGroupTextScale(scale);
+  return Number.isInteger(snapped) ? `×${snapped}` : `×${snapped.toFixed(1)}`;
+}
+
+export function getGroupTextScaleMul(
+  layout: LabelBarcodeLayoutConfig,
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+): number {
+  const dims = getElementDimensions(layout, 'inboundCode', content, widthMm);
+  const heightDots = layout.inboundCode.heightDots ?? dims.heightDots;
+  const scale = heightDots / TSPL_TEXT_LINE_HEIGHT_DOTS;
+  return snapGroupTextScale(scale);
+}
+
+function applyGroupTextScaleToTarget(
+  layout: LabelBarcodeLayoutConfig,
+  target: 'expressNo' | 'inboundCode',
+  scale: number,
+  content: LabelLayoutContentSizes,
+  widthMm: number,
+): LabelBarcodeLayoutConfig {
+  const text = textForTarget(target, content);
+  const naturalW = defaultTextWidthDots(text);
+  const heightDots = Math.round(scale * TSPL_TEXT_LINE_HEIGHT_DOTS);
+  const widthDots = Math.round(scale * naturalW);
+  return {
+    ...layout,
+    [target]: withResolvedTextSize(
+      { ...layout[target], widthDots, heightDots },
+      text,
+      widthMm,
+    ),
+  };
+}
+
+export function adjustGroupTextScale(
+  layout: LabelBarcodeLayoutConfig,
+  direction: 1 | -1,
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+  heightMm = XPRINTER_P203A.defaultHeightMm,
+): LabelBarcodeLayoutConfig {
+  const current = getGroupTextScaleMul(layout, content, widthMm);
+  const next = snapGroupTextScale(current + direction * GROUP_TEXT_SCALE_STEP);
+  const clamped = Math.max(GROUP_TEXT_SCALE_MIN, Math.min(GROUP_TEXT_SCALE_MAX, next));
+  if (clamped === current) {
+    return layout;
+  }
+
+  let nextLayout = layout;
+  if (content.expressNo?.trim()) {
+    nextLayout = applyGroupTextScaleToTarget(
+      nextLayout,
+      'expressNo',
+      clamped,
+      content,
+      widthMm,
+    );
+  }
+  nextLayout = applyGroupTextScaleToTarget(
+    nextLayout,
+    'inboundCode',
+    clamped,
+    content,
+    widthMm,
+  );
+  return clampLabelBarcodeLayout(nextLayout, widthMm, heightMm);
+}
+
+export function canAdjustGroupTextScale(
+  layout: LabelBarcodeLayoutConfig,
+  direction: 1 | -1,
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+): boolean {
+  const current = getGroupTextScaleMul(layout, content, widthMm);
+  if (direction > 0) {
+    return current < GROUP_TEXT_SCALE_MAX;
+  }
+  return current > GROUP_TEXT_SCALE_MIN;
 }
 
 export function getElementSizeLimitsMm(

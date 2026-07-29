@@ -263,16 +263,16 @@ export default function SettingsScreen() {
             <Text style={styles.connectedPrinterText}>
               {fmt(t.settings.scanPrinterConnectedTo, { name: connectedBluetooth.name })}
             </Text>
-            <Pressable
-              style={styles.previewChip}
-              onPress={() => navigation.navigate('PrintPreview')}
-              accessibilityRole="button"
-              accessibilityLabel={t.settings.printPreviewOpen}
-            >
-              <Text style={styles.previewChipText}>{t.settings.printPreviewOpen}</Text>
-            </Pressable>
           </View>
         ) : null}
+        <Pressable
+          style={[styles.actionBtn, styles.actionBtnSecondary]}
+          onPress={() => navigation.navigate('PrintPreview')}
+          accessibilityRole="button"
+          accessibilityLabel={t.settings.printPreviewOpen}
+        >
+          <Text style={styles.actionBtnSecondaryText}>{t.settings.printPreviewOpen}</Text>
+        </Pressable>
         <Pressable
           style={[styles.actionBtn, styles.actionBtnPrimary]}
           onPress={() => setBluetoothScanVisible(true)}

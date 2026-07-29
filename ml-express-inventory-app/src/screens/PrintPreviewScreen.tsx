@@ -13,19 +13,23 @@ import BluetoothScanModal from '../components/BluetoothScanModal';
 import LabelPaperSpecEditor from '../components/LabelPaperSpecEditor';
 import LabelPreviewToolbar from '../components/LabelPreviewToolbar';
 import LabelLayoutSizeEditor from '../components/LabelLayoutSizeEditor';
-import LabelPrintPreviewEditor, {
-  type LabelLayoutTarget,
-} from '../components/LabelPrintPreviewEditor';
+import LabelPrintPreviewEditor from '../components/LabelPrintPreviewEditor';
 import { PRINT_PREVIEW_PACK_SAMPLE, PRINT_PREVIEW_SAMPLE, type PrintPreviewMode } from '../constants/printPreviewSample';
 import {
+  adjustGroupTextScale,
   adjustLayoutElement,
-  applyLayoutAlignment,
+  alignLabelGroup,
+  barcodeMaxNarrow,
+  barcodeMinNarrow,
   canAdjustElementSize,
+  canAdjustGroupTextScale,
   clampLabelBarcodeLayout,
-  dotsToMm,
-  getElementDimensions,
-  getElementSizeLimitsMm,
+  getBarcodePrintMetrics,
+  formatGroupTextScale,
+  getGroupTextScaleMul,
   mergeAndCenterLabelLayout,
+  moveLabelGroup,
+  TSPL_TEXT_LINE_HEIGHT_DOTS,
   type LabelBarcodeLayoutConfig,
   type LabelLayoutAlignH,
   type LabelLayoutAlignV,
@@ -100,7 +104,6 @@ export default function PrintPreviewScreen() {
   const [savedPackageLayout, setSavedPackageLayout] = useState<LabelBarcodeLayoutConfig>(
     defaultPreviewSettings().packageLayout,
   );
-  const [selectedTarget, setSelectedTarget] = useState<LabelLayoutTarget>('expressNo');
 
   const layout = printMode === 'express' ? expressLayout : packageLayout;
   const setLayout = printMode === 'express' ? setExpressLayout : setPackageLayout;
@@ -143,59 +146,69 @@ export default function PrintPreviewScreen() {
   );
 
   const layoutContent = previewLayoutContent(printMode);
-  const sizeLimits = getElementSizeLimitsMm(paper.widthMm);
-  const selectedDims = getElementDimensions(
-    layout,
-    selectedTarget,
-    layoutContent,
-    paper.widthMm,
-  );
-  const selectedLengthMm = dotsToMm(selectedDims.widthDots);
-  const selectedHeightMm = dotsToMm(selectedDims.heightDots);
+  const barcodeMetrics = getBarcodePrintMetrics(layout, layoutContent, paper.widthMm);
+  const textScaleMul = getGroupTextScaleMul(layout, layoutContent, paper.widthMm);
+  const barcodeWidthLocked =
+    barcodeMaxNarrow(layoutContent, paper.widthMm) <= barcodeMinNarrow();
 
-  const adjust = (
-    target: 'expressNo' | 'barcode' | 'inboundCode',
-    axis: 'x' | 'y' | 'width' | 'height',
-    deltaDots: number,
+  const adjustBarcode = (
+    axis: 'width' | 'height',
+    direction: 1 | -1,
   ) => {
+    const delta =
+      axis === 'width'
+        ? direction
+        : direction * TSPL_TEXT_LINE_HEIGHT_DOTS;
     setLayout((current) =>
       adjustLayoutElement(
         current,
-        target,
+        'barcode',
         axis,
-        deltaDots,
+        delta,
         layoutContent,
         paper.widthMm,
       ),
     );
   };
 
-  const moveSelected = (direction: 'up' | 'down' | 'left' | 'right', deltaDots: number) => {
-    const axis = direction === 'left' || direction === 'right' ? 'x' : 'y';
-    const signed =
-      direction === 'left' || direction === 'up' ? -deltaDots : deltaDots;
+  const adjustTextScale = (direction: 1 | -1) => {
     setLayout((current) =>
-      adjustLayoutElement(
+      adjustGroupTextScale(
         current,
-        selectedTarget,
-        axis,
-        signed,
+        direction,
         layoutContent,
         paper.widthMm,
+        paper.heightMm,
       ),
     );
   };
 
-  const alignSelected = (alignment: {
+  const moveGroup = (direction: 'up' | 'down' | 'left' | 'right', deltaDots: number) => {
+    const deltaX =
+      direction === 'left' ? -deltaDots : direction === 'right' ? deltaDots : 0;
+    const deltaY =
+      direction === 'up' ? -deltaDots : direction === 'down' ? deltaDots : 0;
+    setLayout((current) =>
+      moveLabelGroup(
+        current,
+        deltaX,
+        deltaY,
+        layoutContent,
+        paper.widthMm,
+        paper.heightMm,
+      ),
+    );
+  };
+
+  const alignGroup = (alignment: {
     horizontal?: LabelLayoutAlignH;
     vertical?: LabelLayoutAlignV;
   }) => {
     setLayout((current) =>
-      applyLayoutAlignment(
+      alignLabelGroup(
         current,
-        selectedTarget,
         alignment,
-        previewLayoutContent(printMode),
+        layoutContent,
         paper.widthMm,
         paper.heightMm,
       ),
@@ -215,9 +228,6 @@ export default function PrintPreviewScreen() {
 
   const handlePrintModeChange = (mode: PrintPreviewMode) => {
     setPrintMode(mode);
-    if (mode === 'package' && selectedTarget === 'expressNo') {
-      setSelectedTarget('barcode');
-    }
   };
 
   const applyPaperSpec = (nextPaper: LabelPaperSpec) => {
@@ -317,21 +327,16 @@ export default function PrintPreviewScreen() {
         <View style={styles.previewPanel}>
           <LabelPreviewToolbar
             printMode={printMode}
-            selectedTarget={selectedTarget}
             disabled={printing || saving}
             onPrintModeChange={handlePrintModeChange}
-            onSelectTarget={setSelectedTarget}
-            onMove={moveSelected}
-            onAlign={alignSelected}
+            onMove={moveGroup}
+            onAlign={alignGroup}
           />
           <LabelPrintPreviewEditor
             barcode={previewSample.barcode}
             expressNo={printMode === 'express' ? previewSample.inputBarcode : undefined}
             layout={layout}
-            selectedTarget={selectedTarget}
-            onSelectTarget={setSelectedTarget}
             onLayoutChange={setLayout}
-            printMode={printMode}
             widthMm={paper.widthMm}
             heightMm={paper.heightMm}
           />
@@ -346,59 +351,66 @@ export default function PrintPreviewScreen() {
             </Pressable>
 
             <LabelLayoutSizeEditor
-              lengthLabel={t.settings.printPreviewSizeLength}
-              heightLabel={t.settings.printPreviewSizeHeight}
-              lengthMm={selectedLengthMm}
-              heightMm={selectedHeightMm}
-              lengthMinMm={sizeLimits.widthMinMm}
-              lengthMaxMm={sizeLimits.widthMaxMm}
-              heightMinMm={
-                selectedTarget === 'barcode'
-                  ? sizeLimits.barcodeHeightMinMm
-                  : sizeLimits.heightMinMm
-              }
-              heightMaxMm={
-                selectedTarget === 'barcode'
-                  ? sizeLimits.barcodeHeightMaxMm
-                  : sizeLimits.heightMaxMm
-              }
-              canDecreaseLength={canAdjustElementSize(
+              barcodeWidthLabel={t.settings.printPreviewBarcodeNarrow}
+              barcodeHeightLabel={t.settings.printPreviewBarcodeHeightDots}
+              textScaleLabel={t.settings.printPreviewTextScale}
+              barcodeWidthDisplay={`narrow ${barcodeMetrics.narrow}`}
+              barcodeHeightDisplay={`${barcodeMetrics.height} dots`}
+              textScaleDisplay={formatGroupTextScale(textScaleMul)}
+              canDecreaseBarcodeWidth={canAdjustElementSize(
                 layout,
-                selectedTarget,
+                'barcode',
                 'width',
                 -1,
                 layoutContent,
                 paper.widthMm,
               )}
-              canIncreaseLength={canAdjustElementSize(
+              canIncreaseBarcodeWidth={canAdjustElementSize(
                 layout,
-                selectedTarget,
+                'barcode',
                 'width',
                 1,
                 layoutContent,
                 paper.widthMm,
               )}
-              canDecreaseHeight={canAdjustElementSize(
+              canDecreaseBarcodeHeight={canAdjustElementSize(
                 layout,
-                selectedTarget,
+                'barcode',
                 'height',
                 -1,
                 layoutContent,
                 paper.widthMm,
               )}
-              canIncreaseHeight={canAdjustElementSize(
+              canIncreaseBarcodeHeight={canAdjustElementSize(
                 layout,
-                selectedTarget,
+                'barcode',
                 'height',
+                1,
+                layoutContent,
+                paper.widthMm,
+              )}
+              canDecreaseTextScale={canAdjustGroupTextScale(
+                layout,
+                -1,
+                layoutContent,
+                paper.widthMm,
+              )}
+              canIncreaseTextScale={canAdjustGroupTextScale(
+                layout,
                 1,
                 layoutContent,
                 paper.widthMm,
               )}
               disabled={printing || saving}
               tone="light"
-              onAdjustLength={(deltaDots) => adjust(selectedTarget, 'width', deltaDots)}
-              onAdjustHeight={(deltaDots) => adjust(selectedTarget, 'height', deltaDots)}
+              onAdjustBarcodeWidth={(direction) => adjustBarcode('width', direction)}
+              onAdjustBarcodeHeight={(direction) => adjustBarcode('height', direction)}
+              onAdjustTextScale={adjustTextScale}
             />
+
+            {barcodeWidthLocked ? (
+              <Text style={styles.widthLockedHint}>{t.settings.printPreviewBarcodeWidthLocked}</Text>
+            ) : null}
 
             <View style={styles.layoutActions}>
               <Pressable
@@ -545,6 +557,12 @@ const styles = StyleSheet.create({
     color: '#0c4a6e',
     fontSize: 11,
     fontWeight: '900',
+  },
+  widthLockedHint: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
   },
   settingsCard: {
     backgroundColor: '#0f172a',

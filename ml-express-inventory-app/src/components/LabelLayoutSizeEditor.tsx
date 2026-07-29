@@ -1,25 +1,24 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LABEL_LAYOUT_MM_STEP, mmDeltaToLayoutDots } from '../constants/labelBarcodeLayout';
 
 type SizeRowProps = {
   label: string;
-  valueMm: string;
+  valueDisplay: string;
   disabled?: boolean;
   tone?: 'dark' | 'light';
   canDecrease?: boolean;
   canIncrease?: boolean;
-  onAdjust: (deltaMm: number) => void;
+  onStep: (direction: 1 | -1) => void;
 };
 
 function SizeRow({
   label,
-  valueMm,
+  valueDisplay,
   disabled,
   tone = 'dark',
   canDecrease = true,
   canIncrease = true,
-  onAdjust,
+  onStep,
 }: SizeRowProps) {
   const light = tone === 'light';
   return (
@@ -32,19 +31,19 @@ function SizeRow({
             light && styles.stepBtnLight,
             (disabled || !canDecrease) && styles.stepBtnDisabled,
           ]}
-          onPress={() => onAdjust(-LABEL_LAYOUT_MM_STEP)}
+          onPress={() => onStep(-1)}
           disabled={disabled || !canDecrease}
         >
           <Text style={[styles.stepBtnText, light && styles.stepBtnTextLight]}>−</Text>
         </Pressable>
-        <Text style={[styles.axisValue, light && styles.axisValueLight]}>{valueMm}</Text>
+        <Text style={[styles.axisValue, light && styles.axisValueLight]}>{valueDisplay}</Text>
         <Pressable
           style={[
             styles.stepBtn,
             light ? styles.stepBtnPrimaryLight : styles.stepBtnPrimary,
             (disabled || !canIncrease) && styles.stepBtnDisabled,
           ]}
-          onPress={() => onAdjust(LABEL_LAYOUT_MM_STEP)}
+          onPress={() => onStep(1)}
           disabled={disabled || !canIncrease}
         >
           <Text style={[styles.stepBtnText, light ? styles.stepBtnPrimaryTextLight : styles.stepBtnPrimaryText]}>
@@ -57,63 +56,72 @@ function SizeRow({
 }
 
 type Props = {
-  lengthLabel: string;
-  heightLabel: string;
-  lengthMm: number;
-  heightMm: number;
-  lengthMinMm: number;
-  lengthMaxMm: number;
-  heightMinMm: number;
-  heightMaxMm: number;
-  canDecreaseLength?: boolean;
-  canIncreaseLength?: boolean;
-  canDecreaseHeight?: boolean;
-  canIncreaseHeight?: boolean;
+  barcodeWidthLabel: string;
+  barcodeHeightLabel: string;
+  textScaleLabel: string;
+  barcodeWidthDisplay: string;
+  barcodeHeightDisplay: string;
+  textScaleDisplay: string;
+  canDecreaseBarcodeWidth?: boolean;
+  canIncreaseBarcodeWidth?: boolean;
+  canDecreaseBarcodeHeight?: boolean;
+  canIncreaseBarcodeHeight?: boolean;
+  canDecreaseTextScale?: boolean;
+  canIncreaseTextScale?: boolean;
   disabled?: boolean;
   tone?: 'dark' | 'light';
-  onAdjustLength: (deltaDots: number) => void;
-  onAdjustHeight: (deltaDots: number) => void;
+  onAdjustBarcodeWidth: (direction: 1 | -1) => void;
+  onAdjustBarcodeHeight: (direction: 1 | -1) => void;
+  onAdjustTextScale: (direction: 1 | -1) => void;
 };
 
 export default function LabelLayoutSizeEditor({
-  lengthLabel,
-  heightLabel,
-  lengthMm,
-  heightMm,
-  lengthMinMm,
-  lengthMaxMm,
-  heightMinMm,
-  heightMaxMm,
-  canDecreaseLength = true,
-  canIncreaseLength = true,
-  canDecreaseHeight = true,
-  canIncreaseHeight = true,
+  barcodeWidthLabel,
+  barcodeHeightLabel,
+  textScaleLabel,
+  barcodeWidthDisplay,
+  barcodeHeightDisplay,
+  textScaleDisplay,
+  canDecreaseBarcodeWidth = true,
+  canIncreaseBarcodeWidth = true,
+  canDecreaseBarcodeHeight = true,
+  canIncreaseBarcodeHeight = true,
+  canDecreaseTextScale = true,
+  canIncreaseTextScale = true,
   disabled,
   tone = 'dark',
-  onAdjustLength,
-  onAdjustHeight,
+  onAdjustBarcodeWidth,
+  onAdjustBarcodeHeight,
+  onAdjustTextScale,
 }: Props) {
-  const formatMm = (mm: number) => `${mm.toFixed(1)} mm`;
-
   return (
     <View style={styles.wrap}>
       <SizeRow
-        label={lengthLabel}
-        valueMm={formatMm(lengthMm)}
+        label={barcodeWidthLabel}
+        valueDisplay={barcodeWidthDisplay}
         disabled={disabled}
         tone={tone}
-        canDecrease={canDecreaseLength}
-        canIncrease={canIncreaseLength}
-        onAdjust={(deltaMm) => onAdjustLength(mmDeltaToLayoutDots(deltaMm))}
+        canDecrease={canDecreaseBarcodeWidth}
+        canIncrease={canIncreaseBarcodeWidth}
+        onStep={onAdjustBarcodeWidth}
       />
       <SizeRow
-        label={heightLabel}
-        valueMm={formatMm(heightMm)}
+        label={barcodeHeightLabel}
+        valueDisplay={barcodeHeightDisplay}
         disabled={disabled}
         tone={tone}
-        canDecrease={canDecreaseHeight}
-        canIncrease={canIncreaseHeight}
-        onAdjust={(deltaMm) => onAdjustHeight(mmDeltaToLayoutDots(deltaMm))}
+        canDecrease={canDecreaseBarcodeHeight}
+        canIncrease={canIncreaseBarcodeHeight}
+        onStep={onAdjustBarcodeHeight}
+      />
+      <SizeRow
+        label={textScaleLabel}
+        valueDisplay={textScaleDisplay}
+        disabled={disabled}
+        tone={tone}
+        canDecrease={canDecreaseTextScale}
+        canIncrease={canIncreaseTextScale}
+        onStep={onAdjustTextScale}
       />
     </View>
   );
@@ -161,9 +169,9 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     fontSize: 12,
     fontWeight: '800',
-    minWidth: 64,
+    minWidth: 72,
     textAlign: 'center',
     fontFamily: 'monospace',
   },
-  axisValueLight: { color: '#0f172a', minWidth: 56, fontSize: 11 },
+  axisValueLight: { color: '#0f172a', minWidth: 64, fontSize: 11 },
 });

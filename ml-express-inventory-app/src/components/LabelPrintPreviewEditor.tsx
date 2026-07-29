@@ -7,44 +7,34 @@ import {
 } from 'react-native';
 import BarcodeImage from './BarcodeImage';
 import {
-  dotsToMm,
-  formatLayoutMm,
-  formatLayoutMmShort,
   getEffectiveElementWidthDots,
   getBarcodePrintMetrics,
   getElementDimensions,
+  formatGroupTextScale,
+  getGroupTextScaleMul,
+  getLabelGroupBounds,
   labelHeightDots,
   labelWidthDots,
-  setLayoutElementPosition,
+  moveLabelGroup,
   TSPL_TEXT_LINE_HEIGHT_DOTS,
   type LabelBarcodeLayoutConfig,
   type LabelLayoutContentSizes,
 } from '../constants/labelBarcodeLayout';
 import { XPRINTER_P203A } from '../constants/xprinterP203a';
-import type { PrintPreviewMode } from '../constants/printPreviewSample';
 import { useTranslation } from '../i18n';
-
-export type LabelLayoutTarget = 'expressNo' | 'barcode' | 'inboundCode';
 
 type Props = {
   barcode: string;
   expressNo?: string;
   layout: LabelBarcodeLayoutConfig;
-  selectedTarget: LabelLayoutTarget;
-  onSelectTarget: (target: LabelLayoutTarget) => void;
   onLayoutChange: (layout: LabelBarcodeLayoutConfig) => void;
   editable?: boolean;
   widthMm?: number;
   heightMm?: number;
   previewWidth?: number;
-  printMode?: PrintPreviewMode;
 };
 
-const TARGET_COLORS: Record<LabelLayoutTarget, string> = {
-  expressNo: '#2563eb',
-  barcode: '#059669',
-  inboundCode: '#d97706',
-};
+const GROUP_COLOR = '#2563eb';
 
 function snapDots(value: number): number {
   return Math.round(value);
@@ -54,14 +44,11 @@ export default function LabelPrintPreviewEditor({
   barcode,
   expressNo,
   layout,
-  selectedTarget,
-  onSelectTarget,
   onLayoutChange,
   editable = true,
   widthMm = XPRINTER_P203A.defaultWidthMm,
   heightMm = XPRINTER_P203A.defaultHeightMm,
   previewWidth = 300,
-  printMode = 'express',
 }: Props) {
   const { t, fmt } = useTranslation();
   const previewHeight = Math.round(previewWidth * (heightMm / widthMm));
@@ -77,18 +64,20 @@ export default function LabelPrintPreviewEditor({
 
   const barcodeMetrics = getBarcodePrintMetrics(layout, layoutContent, widthMm);
   const barcodePreviewHeight = Math.max(20, Math.round(barcodeMetrics.height * scale));
+  const groupBounds = getLabelGroupBounds(layout, layoutContent, widthMm);
+  const textScaleMul = getGroupTextScaleMul(layout, layoutContent, widthMm);
 
   const layoutRef = useRef(layout);
   const onLayoutChangeRef = useRef(onLayoutChange);
-  const onSelectTargetRef = useRef(onSelectTarget);
-  const dragStartRef = useRef({ x: 0, y: 0, baseHeight: 96 });
+  const dragStartRef = useRef({ groupX: 0, groupY: 0 });
   const widthMmRef = useRef(widthMm);
+  const heightMmRef = useRef(heightMm);
   const layoutContentRef = useRef(layoutContent);
 
   layoutRef.current = layout;
   onLayoutChangeRef.current = onLayoutChange;
-  onSelectTargetRef.current = onSelectTarget;
   widthMmRef.current = widthMm;
+  heightMmRef.current = heightMm;
   layoutContentRef.current = layoutContent;
 
   const toPx = (dots: number) => dots * scale;
@@ -117,58 +106,36 @@ export default function LabelPrintPreviewEditor({
     return lines;
   }, [heightMm, previewHeight, previewWidth, scale, widthMm]);
 
-  const makeDragResponder = (target: LabelLayoutTarget) =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => editable,
-      onMoveShouldSetPanResponder: () => editable,
-      onPanResponderGrant: () => {
-        onSelectTargetRef.current(target);
-        const current = layoutRef.current;
-        dragStartRef.current = {
-          x: current[target].x,
-          y: current[target].y,
-          baseHeight: target === 'barcode' ? current.barcode.height : 0,
-        };
-      },
-      onPanResponderMove: (_, gesture) => {
-        const start = dragStartRef.current;
-        const nextX = snapDots(start.x + toDots(gesture.dx));
-        const nextY = snapDots(start.y + toDots(gesture.dy));
-        onLayoutChangeRef.current(
-          setLayoutElementPosition(
-            layoutRef.current,
-            target,
-            { x: nextX, y: nextY },
-            layoutContentRef.current,
-            widthMmRef.current,
-          ),
-        );
-      },
-    });
-
-  const barcodeResize = useMemo(
+  const groupDrag = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => editable,
         onMoveShouldSetPanResponder: () => editable,
         onPanResponderGrant: () => {
-          onSelectTargetRef.current('barcode');
-          dragStartRef.current = {
-            x: layoutRef.current.barcode.x,
-            y: layoutRef.current.barcode.y,
-            baseHeight: layoutRef.current.barcode.height,
-          };
+          const bounds = getLabelGroupBounds(
+            layoutRef.current,
+            layoutContentRef.current,
+            widthMmRef.current,
+          );
+          dragStartRef.current = { groupX: bounds.x, groupY: bounds.y };
         },
         onPanResponderMove: (_, gesture) => {
           const start = dragStartRef.current;
-          const nextHeight = snapDots(start.baseHeight + toDots(gesture.dy));
+          const nextX = snapDots(start.groupX + toDots(gesture.dx));
+          const nextY = snapDots(start.groupY + toDots(gesture.dy));
+          const bounds = getLabelGroupBounds(
+            layoutRef.current,
+            layoutContentRef.current,
+            widthMmRef.current,
+          );
           onLayoutChangeRef.current(
-            setLayoutElementPosition(
+            moveLabelGroup(
               layoutRef.current,
-              'barcode',
-              { height: nextHeight },
+              nextX - bounds.x,
+              nextY - bounds.y,
               layoutContentRef.current,
               widthMmRef.current,
+              heightMmRef.current,
             ),
           );
         },
@@ -176,73 +143,17 @@ export default function LabelPrintPreviewEditor({
     [editable],
   );
 
-  const expressDrag = useMemo(() => makeDragResponder('expressNo'), [editable]);
-  const barcodeDrag = useMemo(() => makeDragResponder('barcode'), [editable]);
-  const inboundDrag = useMemo(() => makeDragResponder('inboundCode'), [editable]);
-
-  const expressWidthDots = getEffectiveElementWidthDots(layout, 'expressNo', layoutContent, widthMm);
   const barcodeWidthDots = getEffectiveElementWidthDots(layout, 'barcode', layoutContent, widthMm);
-  const inboundWidthDots = getEffectiveElementWidthDots(layout, 'inboundCode', layoutContent, widthMm);
 
   const expressDims = getElementDimensions(layout, 'expressNo', layoutContent, widthMm);
   const inboundDims = getElementDimensions(layout, 'inboundCode', layoutContent, widthMm);
-  const selectedDims = getElementDimensions(layout, selectedTarget, layoutContent, widthMm);
 
   const expressFontScale = expressDims.heightDots / TSPL_TEXT_LINE_HEIGHT_DOTS;
   const inboundFontScale = inboundDims.heightDots / TSPL_TEXT_LINE_HEIGHT_DOTS;
 
-  const selectedPos = layout[selectedTarget];
-  const selectedMm =
-    `X ${formatLayoutMm(selectedPos.x)} · Y ${formatLayoutMm(selectedPos.y)} · ` +
-    `L ${formatLayoutMmShort(selectedDims.widthDots)} · H ${formatLayoutMmShort(selectedDims.heightDots)}`;
-
-  const renderHandle = (
-    target: LabelLayoutTarget,
-    children: React.ReactNode,
-    boxStyle: {
-      left: number;
-      top: number;
-      width: number;
-      height: number;
-    },
-    panHandlers: ReturnType<typeof PanResponder.create>['panHandlers'],
-    extra?: React.ReactNode,
-  ) => {
-    const active = selectedTarget === target;
-    const color = TARGET_COLORS[target];
-    return (
-      <View
-        {...panHandlers}
-        style={[
-          styles.elementBox,
-          {
-            left: boxStyle.left,
-            top: boxStyle.top,
-            width: boxStyle.width,
-            height: boxStyle.height,
-            borderColor: active ? color : 'rgba(148,163,184,0.35)',
-            backgroundColor: active ? `${color}18` : 'transparent',
-          },
-        ]}
-      >
-        {active ? (
-          <View style={[styles.elementTag, { backgroundColor: color }]}>
-            <Text style={styles.elementTagText}>
-              {target === 'expressNo'
-                ? t.settings.printPreviewExpressNo
-                : target === 'barcode'
-                  ? t.settings.printPreviewBarcode
-                  : printMode === 'package'
-                    ? t.items.packNo
-                    : t.settings.printPreviewInboundCode}
-            </Text>
-          </View>
-        ) : null}
-        {children}
-        {extra}
-      </View>
-    );
-  };
+  const groupReadout =
+    `X ${groupBounds.x} · Y ${groupBounds.y} · ` +
+    `narrow ${barcodeMetrics.narrow} · H ${barcodeMetrics.height} dots · ${formatGroupTextScale(textScaleMul)}`;
 
   return (
     <View style={styles.wrap}>
@@ -254,74 +165,101 @@ export default function LabelPrintPreviewEditor({
               {gridLines}
             </View>
 
-            {express
-              ? renderHandle(
-                  'expressNo',
-                  <Text
-                    style={[styles.expressText, { fontSize: 11 * expressFontScale }]}
-                    numberOfLines={1}
-                  >
-                    {express}
-                  </Text>,
+            {express ? (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.contentLayer,
+                  styles.expressLayer,
                   {
-                    left: toPx(layout.expressNo.x),
+                    left: toPx(layout.barcode.x),
                     top: toPx(layout.expressNo.y),
-                    width: Math.max(24, toPx(expressWidthDots)),
+                    width: Math.max(24, toPx(barcodeWidthDots)),
                     height: Math.max(18, toPx(expressDims.heightDots)),
                   },
-                  expressDrag.panHandlers,
-                )
-              : null}
+                ]}
+              >
+                <Text
+                  style={[styles.expressText, { fontSize: 11 * expressFontScale }]}
+                  numberOfLines={1}
+                >
+                  {express}
+                </Text>
+              </View>
+            ) : null}
 
-            {renderHandle(
-              'barcode',
+            <View
+              pointerEvents="none"
+              style={[
+                styles.contentLayer,
+                {
+                  left: toPx(layout.barcode.x),
+                  top: toPx(layout.barcode.y),
+                  width: Math.max(24, toPx(barcodeWidthDots)),
+                  height: barcodePreviewHeight + 4,
+                },
+              ]}
+            >
               <BarcodeImage
                 code={barcode}
                 height={barcodePreviewHeight}
                 maxWidth={Math.max(24, toPx(barcodeWidthDots))}
                 showCodeText={false}
-              />,
-              {
-                left: toPx(layout.barcode.x),
-                top: toPx(layout.barcode.y),
-                width: Math.max(24, toPx(barcodeWidthDots)),
-                height: barcodePreviewHeight + 10,
-              },
-              barcodeDrag.panHandlers,
-              selectedTarget === 'barcode' && editable ? (
-                <View {...barcodeResize.panHandlers} style={styles.resizeHandle}>
-                  <View style={styles.resizeGrip} />
-                </View>
-              ) : null,
-            )}
+              />
+            </View>
 
-            {renderHandle(
-              'inboundCode',
+            <View
+              pointerEvents="none"
+              style={[
+                styles.contentLayer,
+                styles.inboundLayer,
+                {
+                  left: toPx(layout.barcode.x),
+                  top: toPx(layout.inboundCode.y),
+                  width: Math.max(24, toPx(barcodeWidthDots)),
+                  height: Math.max(18, toPx(inboundDims.heightDots)),
+                },
+              ]}
+            >
               <Text
                 style={[styles.barcodeText, { fontSize: 10 * inboundFontScale }]}
                 numberOfLines={2}
               >
                 {barcode}
-              </Text>,
-              {
-                left: toPx(layout.inboundCode.x),
-                top: toPx(layout.inboundCode.y),
-                width: Math.max(24, toPx(inboundWidthDots)),
-                height: Math.max(18, toPx(inboundDims.heightDots)),
-              },
-              inboundDrag.panHandlers,
-            )}
+              </Text>
+            </View>
+
+            <View
+              {...groupDrag.panHandlers}
+              style={[
+                styles.groupBox,
+                {
+                  left: toPx(groupBounds.x),
+                  top: toPx(groupBounds.y),
+                  width: Math.max(24, toPx(groupBounds.widthDots)),
+                  height: Math.max(24, toPx(groupBounds.heightDots)),
+                  borderColor: GROUP_COLOR,
+                  backgroundColor: `${GROUP_COLOR}12`,
+                },
+              ]}
+            >
+              <View style={[styles.groupTag, { backgroundColor: GROUP_COLOR }]}>
+                <Text style={styles.groupTagText}>{t.settings.printPreviewLabelGroup}</Text>
+              </View>
+            </View>
           </View>
         </View>
         <Text style={styles.heightRuler}>{fmt(t.settings.printPreviewHeight, { mm: heightMm.toFixed(1) })}</Text>
       </View>
 
-      <Text style={styles.coordReadout}>{selectedMm}</Text>
+      <Text style={styles.coordReadout}>{groupReadout}</Text>
       <Text style={styles.dotReadout}>
-        {fmt(t.settings.printPreviewDotHint, {
-          dots:
-            `${selectedPos.x}, ${selectedPos.y}, W${selectedDims.widthDots}, H${selectedDims.heightDots}`,
-          mmPerDot: dotsToMm(1).toFixed(3),
+        {fmt(t.settings.printPreviewGroupDotHint, {
+          w: groupBounds.widthDots,
+          h: groupBounds.heightDots,
+          narrow: barcodeMetrics.narrow,
+          barcodeH: barcodeMetrics.height,
+          textMul: textScaleMul,
         })}
       </Text>
     </View>
@@ -377,27 +315,32 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(148,163,184,0.35)',
   },
-  elementBox: {
+  contentLayer: {
     position: 'absolute',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderRadius: 4,
-    padding: 2,
-    minHeight: 18,
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
     overflow: 'hidden',
   },
-  elementTag: {
+  expressLayer: {
+    justifyContent: 'flex-end',
+  },
+  inboundLayer: {
+    justifyContent: 'flex-start',
+  },
+  groupBox: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 6,
+  },
+  groupTag: {
     position: 'absolute',
     top: -10,
     left: 0,
     borderRadius: 4,
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 1,
     zIndex: 2,
   },
-  elementTagText: {
+  groupTagText: {
     color: '#fff',
     fontSize: 9,
     fontWeight: '900',
@@ -407,8 +350,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     fontFamily: 'monospace',
-    textAlign: 'left',
-    alignSelf: 'flex-start',
+    textAlign: 'center',
+    alignSelf: 'center',
     width: '100%',
   },
   barcodeText: {
@@ -416,24 +359,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     fontFamily: 'monospace',
-    textAlign: 'left',
-    alignSelf: 'flex-start',
+    textAlign: 'center',
+    alignSelf: 'center',
     width: '100%',
-  },
-  resizeHandle: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: -8,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resizeGrip: {
-    width: 32,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: '#059669',
   },
   heightRuler: {
     color: '#475569',
