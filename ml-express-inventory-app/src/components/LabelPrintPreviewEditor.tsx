@@ -10,10 +10,13 @@ import BarcodeImage from './BarcodeImage';
 import {
   dotsToMm,
   formatLayoutMm,
+  getEffectiveElementWidthDots,
   labelHeightDots,
   labelWidthDots,
   setLayoutElementPosition,
+  TSPL_TEXT_LINE_HEIGHT_DOTS,
   type LabelBarcodeLayoutConfig,
+  type LabelLayoutContentSizes,
 } from '../constants/labelBarcodeLayout';
 import { XPRINTER_P203A } from '../constants/xprinterP203a';
 import { useTranslation } from '../i18n';
@@ -155,6 +158,15 @@ export default function LabelPrintPreviewEditor({
   const barcodeDrag = useMemo(() => makeDragResponder('barcode'), [editable]);
   const inboundDrag = useMemo(() => makeDragResponder('inboundCode'), [editable]);
 
+  const layoutContent: LabelLayoutContentSizes = {
+    expressNo: express,
+    barcode,
+    inboundCode: barcode,
+  };
+  const expressWidthDots = getEffectiveElementWidthDots(layout, 'expressNo', layoutContent);
+  const barcodeWidthDots = getEffectiveElementWidthDots(layout, 'barcode', layoutContent);
+  const inboundWidthDots = getEffectiveElementWidthDots(layout, 'inboundCode', layoutContent);
+
   const selectedPos = layout[selectedTarget];
   const selectedMm =
     selectedTarget === 'barcode'
@@ -253,8 +265,8 @@ export default function LabelPrintPreviewEditor({
                   {
                     left: toPx(layout.expressNo.x),
                     top: toPx(layout.expressNo.y),
-                    width: Math.max(40, previewWidth - toPx(layout.expressNo.x) - 2),
-                    height: 22,
+                    width: Math.max(24, toPx(expressWidthDots)),
+                    height: toPx(TSPL_TEXT_LINE_HEIGHT_DOTS),
                   },
                   expressDrag.panHandlers,
                 )
@@ -265,13 +277,13 @@ export default function LabelPrintPreviewEditor({
               <BarcodeImage
                 code={barcode}
                 height={barcodePreviewHeight}
-                maxWidth={Math.max(40, previewWidth - toPx(layout.barcode.x) - 8)}
+                maxWidth={Math.max(24, toPx(barcodeWidthDots))}
                 showCodeText={false}
               />,
               {
                 left: toPx(layout.barcode.x),
                 top: toPx(layout.barcode.y),
-                width: Math.max(40, previewWidth - toPx(layout.barcode.x) - 2),
+                width: Math.max(24, toPx(barcodeWidthDots)),
                 height: barcodePreviewHeight + 10,
               },
               barcodeDrag.panHandlers,
@@ -290,8 +302,8 @@ export default function LabelPrintPreviewEditor({
               {
                 left: toPx(layout.inboundCode.x),
                 top: toPx(layout.inboundCode.y),
-                width: Math.max(40, previewWidth - toPx(layout.inboundCode.x) - 2),
-                height: 30,
+                width: Math.max(24, toPx(inboundWidthDots)),
+                height: toPx(TSPL_TEXT_LINE_HEIGHT_DOTS),
               },
               inboundDrag.panHandlers,
             )}
@@ -397,6 +409,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 2,
     minHeight: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   elementTag: {
     position: 'absolute',
@@ -417,12 +431,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     fontFamily: 'monospace',
+    textAlign: 'center',
+    width: '100%',
   },
   barcodeText: {
     color: '#0f172a',
     fontSize: 10,
     fontWeight: '800',
     fontFamily: 'monospace',
+    textAlign: 'center',
+    width: '100%',
   },
   resizeHandle: {
     position: 'absolute',

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>打印预览 · 布局草稿 v1.9.0</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #111827;
+      display: flex;
+      justify-content: center;
+      padding: 24px 12px;
+      color: #e5e7eb;
+    }
+    .phone {
+      width: 390px;
+      min-height: 844px;
+      background: #020617;
+      border-radius: 36px;
+      border: 8px solid #1f2937;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,.45);
+    }
+    .status { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #64748b; }
+    .nav {
+      display: grid; grid-template-columns: 80px 1fr 80px; align-items: center;
+      padding: 0 16px 8px; font-size: 14px;
+    }
+    .nav .back { color: #60a5fa; }
+    .nav .title { text-align: center; font-weight: 800; font-size: 17px; }
+    .content { padding: 0 16px 16px; }
+    .hint { color: #94a3b8; font-size: 13px; text-align: center; line-height: 1.5; margin-bottom: 8px; }
+    .warn { color: #fbbf24; font-size: 12px; font-weight: 700; text-align: center; margin-bottom: 12px; }
+
+    .preview-panel {
+      background: #cbd5e1; border-radius: 16px; padding: 20px 12px;
+      border: 1px solid #94a3b8; margin-bottom: 16px;
+    }
+    .chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
+    .chip {
+      padding: 6px 10px; border-radius: 999px; border: 1px solid #475569;
+      font-size: 12px; font-weight: 800; color: #64748b; background: rgba(15,23,42,.08);
+    }
+    .chip.active { color: #f8fafc; background: rgba(5,150,105,.35); border-color: #059669; }
+    .drag-hint { text-align: center; color: #64748b; font-size: 12px; margin-bottom: 10px; line-height: 1.4; }
+    .ruler { text-align: center; color: #475569; font-size: 12px; font-weight: 800; margin: 8px 0; }
+    .label-wrap { display: flex; justify-content: center; }
+    .label {
+      width: 300px; height: 207px; background: #fff; border: 2px solid #334155;
+      border-radius: 10px; position: relative; box-shadow: 0 4px 10px rgba(15,23,42,.18);
+    }
+    .label::before {
+      content: ""; position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(148,163,184,.35) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,.35) 1px, transparent 1px);
+      background-size: 52px 52px; border-radius: 8px;
+    }
+    .el {
+      position: absolute; border: 1.5px dashed; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: ui-monospace, monospace; font-weight: 800; color: #0f172a;
+    }
+    .el.express { left: 84px; top: 18px; width: 132px; height: 22px; border-color: rgba(37,99,235,.35); font-size: 11px; }
+    .el.barcode {
+      left: 24px; top: 52px; width: 252px; height: 86px; border-color: #059669;
+      background: rgba(5,150,105,.08); flex-direction: column; gap: 4px;
+    }
+    .el.inbound { left: 54px; top: 152px; width: 192px; height: 24px; border-color: rgba(217,119,6,.35); font-size: 10px; }
+    .tag {
+      position: absolute; top: -10px; left: 0; font-size: 9px; color: #fff;
+      padding: 1px 5px; border-radius: 4px; font-weight: 900;
+    }
+    .tag.green { background: #059669; }
+    .bars { display: flex; width: 220px; height: 52px; overflow: hidden; }
+    .bars i { display: block; height: 100%; background: #000; }
+    .bars i.w { background: #fff; }
+    .coords { text-align: center; margin-top: 12px; color: #334155; font-size: 13px; font-weight: 900; font-family: monospace; }
+
+    .card {
+      background: #0f172a; border: 1px solid #334155; border-radius: 16px;
+      overflow: hidden; margin-bottom: 16px;
+    }
+    .card-title { padding: 14px 16px 4px; font-size: 14px; font-weight: 900; }
+    .card-hint { padding: 0 16px 8px; font-size: 11px; color: #64748b; text-align: center; line-height: 1.4; }
+    .selected { text-align: center; color: #94a3b8; font-size: 12px; font-weight: 700; margin: 8px 0 12px; }
+
+    .layout-row {
+      display: flex; gap: 8px; padding: 8px 10px; justify-content: center; align-items: center;
+      background: #0b1220; border: 1px solid #1e293b; border-radius: 12px; margin: 0 12px 10px;
+    }
+    .panel { flex: 0 0 auto; text-align: center; min-width: 112px; }
+    .panel-title {
+      color: #64748b; font-size: 9px; font-weight: 800; margin-bottom: 6px;
+      letter-spacing: .6px; text-transform: uppercase;
+    }
+    .grid { display: grid; grid-template-columns: repeat(3, 34px); gap: 4px; justify-content: center; }
+    .btn {
+      width: 34px; height: 34px; border-radius: 8px; background: #151f31;
+      border: 1px solid #334155; color: #cbd5e1; font-size: 14px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .header-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 12px 8px; gap: 8px;
+    }
+    .target-badge {
+      padding: 3px 8px; border-radius: 999px; background: #1e293b; border: 1px solid #334155;
+      color: #cbd5e1; font-size: 11px; font-weight: 800;
+    }
+    .quick-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex: 1; }
+    .action-chip {
+      padding: 4px 8px; border-radius: 999px; background: #151f31; border: 1px solid #334155;
+      color: #cbd5e1; font-size: 10px; font-weight: 800;
+    }
+    .action-chip.primary {
+      background: rgba(2,132,199,.12); border-color: rgba(56,189,248,.35); color: #7dd3fc;
+    }
+    .vdivider { width: 1px; align-self: stretch; background: #334155; margin: 4px 0; }
+    .btn-wide { display: none; }
+    .pad { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .pad-mid { display: flex; gap: 4px; align-items: center; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #475569; }
+
+    .height-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-top: 1px solid #1e293b; color: #38bdf8; font-size: 13px; font-weight: 900;
+    }
+    .stepper { display: flex; gap: 10px; align-items: center; }
+    .step { width: 36px; height: 36px; border-radius: 18px; background: #1e293b; border: 1px solid #475569; color: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; }
+    .step.plus { background: #0c4a6e; border-color: #0284c7; color: #7dd3fc; }
+    .mono { color: #f8fafc; font-family: monospace; font-size: 13px; min-width: 72px; text-align: center; }
+
+    .actions { display: flex; gap: 10px; padding: 14px 16px; }
+    .save { flex: 1; background: #059669; color: #ecfdf5; border: none; border-radius: 12px; padding: 12px; font-weight: 900; }
+    .reset { flex: 1; background: transparent; color: #cbd5e1; border: 1px solid #475569; border-radius: 12px; padding: 12px; font-weight: 800; }
+
+    .footer { padding: 8px 16px 24px; border-top: 1px solid #1e293b; }
+    .print { width: 100%; background: #2563eb; color: #fff; border: none; border-radius: 14px; padding: 16px; font-size: 17px; font-weight: 900; }
+
+    .badge {
+      position: fixed; top: 16px; right: 16px; background: #7c3aed; color: #fff;
+      padding: 8px 12px; border-radius: 999px; font-size: 12px; font-weight: 800;
+      box-shadow: 0 8px 24px rgba(124,58,237,.35);
+    }
+    .note {
+      max-width: 390px; margin-top: 16px; padding: 12px 14px; background: #1e293b;
+      border-radius: 12px; font-size: 12px; line-height: 1.6; color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="badge">草稿 · 未打包</div>
+    <div class="phone">
+      <div class="status">11:34 · Print Preview Draft</div>
+      <div class="nav">
+        <div class="back">‹ Settings</div>
+        <div class="title">Print Preview</div>
+        <div></div>
+      </div>
+      <div class="content">
+        <div class="hint">Sample label layout — same format as order prints (58×40mm).</div>
+        <div class="warn">Layout changed — save to apply on order prints.</div>
+
+        <div class="preview-panel">
+          <div class="chips">
+            <div class="chip">Express no.</div>
+            <div class="chip active">Barcode</div>
+            <div class="chip">Inbound code</div>
+          </div>
+          <div class="drag-hint">Tap a chip to select, then drag on the label.<br/>Drag the green bar to resize barcode height.</div>
+          <div class="ruler">58.0mm</div>
+          <div class="label-wrap">
+            <div class="label">
+              <div class="el express">67499191994</div>
+              <div class="el barcode">
+                <span class="tag green">Barcode</span>
+                <div class="bars">
+                  <i style="width:3px"></i><i class="w" style="width:2px"></i><i style="width:5px"></i><i class="w" style="width:3px"></i>
+                  <i style="width:4px"></i><i class="w" style="width:2px"></i><i style="width:6px"></i><i class="w" style="width:2px"></i>
+                  <i style="width:3px"></i><i class="w" style="width:4px"></i><i style="width:5px"></i><i class="w" style="width:2px"></i>
+                  <i style="width:7px"></i><i class="w" style="width:3px"></i><i style="width:4px"></i><i class="w" style="width:2px"></i>
+                  <i style="width:5px"></i><i class="w" style="width:3px"></i><i style="width:6px"></i><i class="w" style="width:2px"></i>
+                  <i style="width:4px"></i><i class="w" style="width:5px"></i><i style="width:3px"></i><i class="w" style="width:2px"></i>
+                  <i style="width:6px"></i><i class="w" style="width:3px"></i><i style="width:5px"></i><i class="w" style="width:4px"></i>
+                  <i style="width:3px"></i><i class="w" style="width:2px"></i><i style="width:7px"></i><i class="w" style="width:3px"></i>
+                  <i style="width:4px"></i><i class="w" style="width:2px"></i><i style="width:5px"></i><i class="w" style="width:3px"></i>
+                </div>
+                <div style="width:32px;height:5px;border-radius:3px;background:#059669;margin-top:2px"></div>
+              </div>
+              <div class="el inbound">MDY060400290726</div>
+            </div>
+          </div>
+          <div class="ruler">40.0mm</div>
+          <div class="coords">X 8.00 mm · Y 10.50 mm · H 12.00 mm</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Layout</div>
+          <div class="card-hint">左侧对齐网格可快速对齐；右侧方向键微调，每次 0.13mm（1 dot）。</div>
+          <div class="header-row">
+            <span class="target-badge">Barcode</span>
+            <div class="quick-actions">
+              <span class="action-chip">Center Text</span>
+              <span class="action-chip primary">Merge & Center</span>
+            </div>
+          </div>
+          <div class="layout-row">
+            <div class="panel">
+              <div class="panel-title">对齐</div>
+              <div class="grid">
+                <div class="btn">⤒</div><div class="btn">☰</div><div class="btn">⤓</div>
+                <div class="btn">⤉</div><div class="btn">◎</div><div class="btn">⤈</div>
+              </div>
+            </div>
+            <div class="vdivider"></div>
+            <div class="panel">
+              <div class="panel-title">微调</div>
+              <div class="pad">
+                <div class="btn">↑</div>
+                <div class="pad-mid">
+                  <div class="btn">←</div>
+                  <div class="dot"></div>
+                  <div class="btn">→</div>
+                </div>
+                <div class="btn">↓</div>
+              </div>
+            </div>
+          </div>
+          <div class="height-row">
+            <span>条码高度</span>
+            <div class="stepper">
+              <div class="step">−</div>
+              <div class="mono">12.00 mm</div>
+              <div class="step plus">+</div>
+            </div>
+          </div>
+          <div style="text-align:center;color:#64748b;font-size:11px;font-family:monospace;padding-bottom:12px">X 64 · Y 84 · H 96 dots</div>
+          <div class="actions">
+            <button class="save">Save layout</button>
+            <button class="reset">Reset default</button>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="print">Print</button>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>说明（草稿）</strong><br/>
+      1. 白色标签内：快递单号 / 条码 / 入库码 默认已水平居中。<br/>
+      2. Layout 区：左对齐网格 + 右方向键，类似你发的参考图。<br/>
+      3. 点「三项全部水平居中」可一键把三个元素都对齐到标签中间。<br/>
+      4. 这是静态预览，最终以 App 内效果为准。
+    </div>
+  </div>
+</body>
+</html>

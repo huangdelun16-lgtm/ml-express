@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import BluetoothScanModal from '../components/BluetoothScanModal';
-import LabelLayoutDirectionPad from '../components/LabelLayoutDirectionPad';
+import LabelLayoutControls from '../components/LabelLayoutControls';
 import LabelLayoutHeightAdjustRow from '../components/LabelLayoutAdjustRow';
 import LabelPrintPreviewEditor, {
   type LabelLayoutTarget,
@@ -18,8 +18,13 @@ import LabelPrintPreviewEditor, {
 import { PRINT_PREVIEW_SAMPLE } from '../constants/printPreviewSample';
 import {
   adjustLayoutElement,
-  DEFAULT_LABEL_BARCODE_LAYOUT,
+  applyLayoutAlignment,
+  buildDefaultCenteredLayout,
+  mergeAndCenterLabelLayout,
+  centerTextLabelElement,
   type LabelBarcodeLayoutConfig,
+  type LabelLayoutAlignH,
+  type LabelLayoutAlignV,
 } from '../constants/labelBarcodeLayout';
 import { XPRINTER_P203A } from '../constants/xprinterP203a';
 import { useTranslation } from '../i18n';
@@ -38,6 +43,18 @@ function layoutsEqual(a: LabelBarcodeLayoutConfig, b: LabelBarcodeLayoutConfig):
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function previewLayoutContent() {
+  return {
+    expressNo: PRINT_PREVIEW_SAMPLE.inputBarcode,
+    barcode: PRINT_PREVIEW_SAMPLE.barcode,
+    inboundCode: PRINT_PREVIEW_SAMPLE.barcode,
+  };
+}
+
+function defaultPreviewLayout() {
+  return buildDefaultCenteredLayout(previewLayoutContent());
+}
+
 export default function PrintPreviewScreen() {
   const { t } = useTranslation();
   const [connectedPrinter, setConnectedPrinter] = useState<ScannedBluetoothDevice | null>(null);
@@ -45,8 +62,8 @@ export default function PrintPreviewScreen() {
   const [copies, setCopies] = useState(1);
   const [printing, setPrinting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [layout, setLayout] = useState<LabelBarcodeLayoutConfig>(DEFAULT_LABEL_BARCODE_LAYOUT);
-  const [savedLayout, setSavedLayout] = useState<LabelBarcodeLayoutConfig>(DEFAULT_LABEL_BARCODE_LAYOUT);
+  const [layout, setLayout] = useState<LabelBarcodeLayoutConfig>(defaultPreviewLayout());
+  const [savedLayout, setSavedLayout] = useState<LabelBarcodeLayoutConfig>(defaultPreviewLayout());
   const [selectedTarget, setSelectedTarget] = useState<LabelLayoutTarget>('expressNo');
 
   const dirty = useMemo(() => !layoutsEqual(layout, savedLayout), [layout, savedLayout]);
@@ -59,8 +76,9 @@ export default function PrintPreviewScreen() {
       setLayout(stored);
       setSavedLayout(stored);
     } else {
-      setLayout(DEFAULT_LABEL_BARCODE_LAYOUT);
-      setSavedLayout(DEFAULT_LABEL_BARCODE_LAYOUT);
+      const centered = defaultPreviewLayout();
+      setLayout(centered);
+      setSavedLayout(centered);
     }
   }, []);
 
@@ -85,6 +103,25 @@ export default function PrintPreviewScreen() {
     setLayout((current) => adjustLayoutElement(current, selectedTarget, axis, signed));
   };
 
+  const alignSelected = (alignment: {
+    horizontal?: LabelLayoutAlignH;
+    vertical?: LabelLayoutAlignV;
+  }) => {
+    setLayout((current) =>
+      applyLayoutAlignment(current, selectedTarget, alignment, previewLayoutContent()),
+    );
+  };
+
+  const centerTextSelected = () => {
+    setLayout((current) =>
+      centerTextLabelElement(current, selectedTarget, previewLayoutContent()),
+    );
+  };
+
+  const mergeAndCenterAll = () => {
+    setLayout((current) => mergeAndCenterLabelLayout(current, previewLayoutContent()));
+  };
+
   const handleSaveLayout = () => {
     if (!connectedPrinter?.id || saving) return;
     setSaving(true);
@@ -102,9 +139,10 @@ export default function PrintPreviewScreen() {
   };
 
   const handleResetLayout = () => {
+    const centered = defaultPreviewLayout();
     if (!connectedPrinter?.id) {
-      setLayout(DEFAULT_LABEL_BARCODE_LAYOUT);
-      setSavedLayout(DEFAULT_LABEL_BARCODE_LAYOUT);
+      setLayout(centered);
+      setSavedLayout(centered);
       return;
     }
     Alert.alert(t.settings.printPreviewResetLayout, t.settings.printPreviewResetConfirm, [
@@ -115,8 +153,8 @@ export default function PrintPreviewScreen() {
         onPress: () => {
           void (async () => {
             await clearLabelLayoutForPrinter(connectedPrinter.id);
-            setLayout(DEFAULT_LABEL_BARCODE_LAYOUT);
-            setSavedLayout(DEFAULT_LABEL_BARCODE_LAYOUT);
+            setLayout(centered);
+            setSavedLayout(centered);
             Alert.alert(t.common.tip, t.settings.printPreviewLayoutReset);
           })();
         },
@@ -166,10 +204,13 @@ export default function PrintPreviewScreen() {
         <View style={styles.settingsCard}>
           <Text style={styles.sectionTitle}>{t.settings.printPreviewLayoutTitle}</Text>
           <Text style={styles.sectionHint}>{t.settings.printPreviewMovePadHint}</Text>
-          <LabelLayoutDirectionPad
+          <LabelLayoutControls
             selectedTarget={selectedTarget}
             disabled={printing || saving}
             onMove={moveSelected}
+            onAlign={alignSelected}
+            onCenterText={centerTextSelected}
+            onMergeCenter={mergeAndCenterAll}
           />
           {selectedTarget === 'barcode' ? (
             <LabelLayoutHeightAdjustRow
@@ -321,21 +362,21 @@ const styles = StyleSheet.create({
     color: '#e2e8f0',
     fontSize: 14,
     fontWeight: '900',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 4,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 2,
   },
   sectionHint: {
     color: '#64748b',
-    fontSize: 11,
-    lineHeight: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    fontSize: 10,
+    lineHeight: 15,
+    paddingHorizontal: 14,
+    paddingBottom: 4,
     textAlign: 'center',
   },
   coordSummary: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 14,
+    paddingBottom: 8,
   },
   coordSummaryText: {
     color: '#64748b',

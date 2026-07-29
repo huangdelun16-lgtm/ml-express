@@ -1,12 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   adjustLayoutElement,
+  applyLayoutAlignment,
+  buildDefaultCenteredLayout,
+  centerAllLabelElements,
+  mergeAndCenterLabelLayout,
+  centerTextLabelElement,
   clampLabelBarcodeLayout,
   DEFAULT_LABEL_BARCODE_LAYOUT,
+  getEffectiveElementWidthDots,
   normalizeLabelBarcodeLayout,
   setLayoutElementPosition,
 } from '../constants/labelBarcodeLayout';
 import { buildTsplInboundLabel } from '../services/tsplLabelBuilder';
+
+const SAMPLE_CONTENT = {
+  expressNo: '67499191994',
+  barcode: 'MDY060400290726',
+  inboundCode: 'MDY060400290726',
+};
 
 describe('labelBarcodeLayout', () => {
   it('normalizes and clamps saved layout', () => {
@@ -34,6 +46,64 @@ describe('labelBarcodeLayout', () => {
     });
     expect(next.barcode).toEqual({ x: 20, y: 55, height: 90 });
   });
+
+  it('centers default layout horizontally for sample label content', () => {
+    const layout = buildDefaultCenteredLayout(SAMPLE_CONTENT);
+    const labelW = 464;
+
+    expect(layout.expressNo.x).toBe(
+      Math.round((labelW - getEffectiveElementWidthDots(layout, 'expressNo', SAMPLE_CONTENT)) / 2),
+    );
+    expect(layout.barcode.x).toBe(
+      Math.round((labelW - getEffectiveElementWidthDots(layout, 'barcode', SAMPLE_CONTENT)) / 2),
+    );
+    expect(layout.inboundCode.x).toBe(
+      Math.round((labelW - getEffectiveElementWidthDots(layout, 'inboundCode', SAMPLE_CONTENT)) / 2),
+    );
+  });
+
+  it('aligns selected element to horizontal center', () => {
+    const leftAligned = {
+      ...DEFAULT_LABEL_BARCODE_LAYOUT,
+      expressNo: { x: 4, y: DEFAULT_LABEL_BARCODE_LAYOUT.expressNo.y },
+    };
+    const centered = applyLayoutAlignment(
+      leftAligned,
+      'expressNo',
+      { horizontal: 'center' },
+      SAMPLE_CONTENT,
+    );
+    expect(centered.expressNo.x).toBeGreaterThan(leftAligned.expressNo.x);
+  });
+
+  it('centers all three elements horizontally', () => {
+    const shifted = clampLabelBarcodeLayout({
+      ...DEFAULT_LABEL_BARCODE_LAYOUT,
+      expressNo: { x: 4, y: DEFAULT_LABEL_BARCODE_LAYOUT.expressNo.y },
+      barcode: { ...DEFAULT_LABEL_BARCODE_LAYOUT.barcode, x: 4 },
+      inboundCode: { x: 4, y: DEFAULT_LABEL_BARCODE_LAYOUT.inboundCode.y },
+    });
+    const centered = centerAllLabelElements(shifted, SAMPLE_CONTENT);
+    expect(centered.expressNo.x).toBeGreaterThan(4);
+    expect(centered.barcode.x).toBeGreaterThan(4);
+    expect(centered.inboundCode.x).toBeGreaterThan(4);
+  });
+
+  it('merge and center stacks all elements on the label', () => {
+    const shifted = clampLabelBarcodeLayout({
+      ...DEFAULT_LABEL_BARCODE_LAYOUT,
+      expressNo: { x: 0, y: 180 },
+      barcode: { x: 0, y: 40, height: 96 },
+      inboundCode: { x: 0, y: 250 },
+    });
+    const merged = mergeAndCenterLabelLayout(shifted, SAMPLE_CONTENT);
+    expect(merged.barcode.x).toBeGreaterThan(0);
+    expect(merged.expressNo.y).toBeLessThan(merged.barcode.y);
+    expect(merged.barcode.y).toBeLessThan(merged.inboundCode.y);
+    expect(merged.expressNo.x).toBe(
+      Math.round((464 - getEffectiveElementWidthDots(merged, 'expressNo', SAMPLE_CONTENT)) / 2),
+    );
+  });
 });
 
 describe('buildTsplInboundLabel with layout', () => {
@@ -50,7 +120,7 @@ describe('buildTsplInboundLabel with layout', () => {
       extras: { inputBarcode: '67499191994' },
     });
 
-    expect(payload).toContain('TEXT 12,8,"2"');
+    expect(payload).toContain(`TEXT ${layout.expressNo.x},${layout.expressNo.y},"2"`);
     expect(payload).toContain('BARCODE 24,60,"128",88');
     expect(payload).toContain('TEXT 24,170,"2"');
   });
