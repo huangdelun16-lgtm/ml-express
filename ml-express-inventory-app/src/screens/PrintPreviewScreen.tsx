@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import BluetoothScanModal from '../components/BluetoothScanModal';
-import LabelLayoutAdjustRow from '../components/LabelLayoutAdjustRow';
+import LabelLayoutDirectionPad from '../components/LabelLayoutDirectionPad';
+import LabelLayoutHeightAdjustRow from '../components/LabelLayoutAdjustRow';
 import LabelPrintPreviewEditor, {
   type LabelLayoutTarget,
 } from '../components/LabelPrintPreviewEditor';
@@ -75,6 +76,13 @@ export default function PrintPreviewScreen() {
     deltaDots: number,
   ) => {
     setLayout((current) => adjustLayoutElement(current, target, axis, deltaDots));
+  };
+
+  const moveSelected = (direction: 'up' | 'down' | 'left' | 'right', deltaDots: number) => {
+    const axis = direction === 'left' || direction === 'right' ? 'x' : 'y';
+    const signed =
+      direction === 'left' || direction === 'up' ? -deltaDots : deltaDots;
+    setLayout((current) => adjustLayoutElement(current, selectedTarget, axis, signed));
   };
 
   const handleSaveLayout = () => {
@@ -157,29 +165,27 @@ export default function PrintPreviewScreen() {
 
         <View style={styles.settingsCard}>
           <Text style={styles.sectionTitle}>{t.settings.printPreviewLayoutTitle}</Text>
-          <Text style={styles.sectionHint}>{t.settings.printPreviewFineStepHint}</Text>
-          <LabelLayoutAdjustRow
-            label={t.settings.printPreviewExpressNo}
-            xDots={layout.expressNo.x}
-            yDots={layout.expressNo.y}
+          <Text style={styles.sectionHint}>{t.settings.printPreviewMovePadHint}</Text>
+          <LabelLayoutDirectionPad
+            selectedTarget={selectedTarget}
             disabled={printing || saving}
-            onAdjust={(axis, delta) => adjust('expressNo', axis, delta)}
+            onMove={moveSelected}
           />
-          <LabelLayoutAdjustRow
-            label={t.settings.printPreviewBarcode}
-            xDots={layout.barcode.x}
-            yDots={layout.barcode.y}
-            heightDots={layout.barcode.height}
-            disabled={printing || saving}
-            onAdjust={(axis, delta) => adjust('barcode', axis, delta)}
-          />
-          <LabelLayoutAdjustRow
-            label={t.settings.printPreviewInboundCode}
-            xDots={layout.inboundCode.x}
-            yDots={layout.inboundCode.y}
-            disabled={printing || saving}
-            onAdjust={(axis, delta) => adjust('inboundCode', axis, delta)}
-          />
+          {selectedTarget === 'barcode' ? (
+            <LabelLayoutHeightAdjustRow
+              label={t.settings.printPreviewBarcodeHeight}
+              valueDots={layout.barcode.height}
+              disabled={printing || saving}
+              onAdjust={(delta) => adjust('barcode', 'height', delta)}
+            />
+          ) : null}
+          <View style={styles.coordSummary}>
+            <Text style={styles.coordSummaryText}>
+              {selectedTarget === 'barcode'
+                ? `X ${layout.barcode.x} · Y ${layout.barcode.y} · H ${layout.barcode.height} dots`
+                : `X ${layout[selectedTarget].x} · Y ${layout[selectedTarget].y} dots`}
+            </Text>
+          </View>
 
           <View style={styles.layoutActions}>
             <Pressable
@@ -301,6 +307,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#94a3b8',
+    alignItems: 'center',
   },
   settingsCard: {
     backgroundColor: '#0f172a',
@@ -324,6 +331,17 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     paddingHorizontal: 16,
     paddingBottom: 8,
+    textAlign: 'center',
+  },
+  coordSummary: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  coordSummaryText: {
+    color: '#64748b',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    textAlign: 'center',
   },
   layoutActions: {
     flexDirection: 'row',

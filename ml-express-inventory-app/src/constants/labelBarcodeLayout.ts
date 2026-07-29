@@ -14,7 +14,6 @@ export type LabelBarcodeLayoutConfig = {
 };
 
 export const LABEL_LAYOUT_STEP_DOTS = 1;
-export const LABEL_LAYOUT_COARSE_STEP_DOTS = 4;
 
 export const DEFAULT_LABEL_BARCODE_LAYOUT: LabelBarcodeLayoutConfig = {
   version: 1,

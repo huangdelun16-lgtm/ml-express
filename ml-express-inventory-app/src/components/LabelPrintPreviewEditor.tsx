@@ -236,8 +236,8 @@ export default function LabelPrintPreviewEditor({
 
       {editable ? <Text style={styles.dragHint}>{t.settings.printPreviewDragHint}</Text> : null}
 
-      <Text style={styles.widthRuler}>{fmt(t.settings.printPreviewWidth, { mm: widthMm.toFixed(1) })}</Text>
-      <View style={styles.previewRow}>
+      <View style={styles.previewStage}>
+        <Text style={styles.widthRuler}>{fmt(t.settings.printPreviewWidth, { mm: widthMm.toFixed(1) })}</Text>
         <View style={styles.canvasShadow}>
           <View style={[styles.labelCanvas, { width: previewWidth, height: previewHeight }]}>
             <View style={styles.gridLayer} pointerEvents="none">
@@ -297,13 +297,7 @@ export default function LabelPrintPreviewEditor({
             )}
           </View>
         </View>
-
-        <View style={styles.heightRulerCol}>
-          <View style={[styles.heightRulerLine, { height: previewHeight }]} />
-          <Text style={styles.heightRulerText}>
-            {fmt(t.settings.printPreviewHeight, { mm: heightMm.toFixed(1) })}
-          </Text>
-        </View>
+        <Text style={styles.heightRuler}>{fmt(t.settings.printPreviewHeight, { mm: heightMm.toFixed(1) })}</Text>
       </View>
 
       <Text style={styles.coordReadout}>{selectedMm}</Text>
@@ -328,6 +322,7 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: 'center',
     marginBottom: 10,
+    width: '100%',
   },
   selectorChip: {
     paddingHorizontal: 10,
@@ -354,11 +349,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 8,
     letterSpacing: 0.4,
+    textAlign: 'center',
   },
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+  previewStage: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    width: '100%',
   },
   canvasShadow: {
     borderRadius: 10,
@@ -367,6 +363,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
+    alignSelf: 'center',
   },
   labelCanvas: {
     backgroundColor: '#ffffff',
@@ -442,22 +439,12 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#059669',
   },
-  heightRulerCol: {
-    alignItems: 'center',
-    paddingTop: 6,
-  },
-  heightRulerLine: {
-    width: 2,
-    backgroundColor: '#475569',
-    borderRadius: 1,
-  },
-  heightRulerText: {
+  heightRuler: {
     color: '#475569',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     marginTop: 8,
-    transform: [{ rotate: '90deg' }],
-    width: 72,
+    letterSpacing: 0.4,
     textAlign: 'center',
   },
   coordReadout: {
