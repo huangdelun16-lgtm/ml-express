@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { PrintPreviewMode } from '../constants/printPreviewSample';
 import {
   LABEL_LAYOUT_STEP_DOTS,
   type LabelLayoutAlignH,
@@ -10,12 +11,18 @@ import type { LabelLayoutTarget } from './LabelPrintPreviewEditor';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
-const TARGETS: LabelLayoutTarget[] = ['expressNo', 'barcode', 'inboundCode'];
+const EXPRESS_TARGETS: LabelLayoutTarget[] = ['expressNo', 'barcode', 'inboundCode'];
+const PACKAGE_TARGETS: LabelLayoutTarget[] = ['barcode', 'inboundCode'];
 
 const TARGET_COLORS: Record<LabelLayoutTarget, string> = {
   expressNo: '#2563eb',
   barcode: '#059669',
   inboundCode: '#d97706',
+};
+
+const MODE_COLORS: Record<PrintPreviewMode, string> = {
+  express: '#2563eb',
+  package: '#d97706',
 };
 
 type AlignButton = {
@@ -42,31 +49,41 @@ const ALIGN_BUTTONS: AlignButton[] = [
 ];
 
 type Props = {
+  printMode: PrintPreviewMode;
   selectedTarget: LabelLayoutTarget;
   disabled?: boolean;
+  onPrintModeChange: (mode: PrintPreviewMode) => void;
   onSelectTarget: (target: LabelLayoutTarget) => void;
   onMove: (direction: Direction, deltaDots: number) => void;
   onAlign: (alignment: { horizontal?: LabelLayoutAlignH; vertical?: LabelLayoutAlignV }) => void;
 };
 
 export default function LabelPreviewToolbar({
+  printMode,
   selectedTarget,
   disabled,
+  onPrintModeChange,
   onSelectTarget,
   onMove,
   onAlign,
 }: Props) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [targetOpen, setTargetOpen] = useState(false);
+  const [modeOpen, setModeOpen] = useState(false);
 
-  const targetLabel = (target: LabelLayoutTarget) =>
-    target === 'expressNo'
-      ? t.settings.printPreviewExpressNo
-      : target === 'barcode'
-        ? t.settings.printPreviewBarcode
-        : t.settings.printPreviewInboundCode;
+  const targets = printMode === 'express' ? EXPRESS_TARGETS : PACKAGE_TARGETS;
+
+  const targetLabel = (target: LabelLayoutTarget) => {
+    if (target === 'expressNo') return t.settings.printPreviewExpressNo;
+    if (target === 'barcode') return t.settings.printPreviewBarcode;
+    return printMode === 'package' ? t.items.packNo : t.settings.printPreviewInboundCode;
+  };
+
+  const modeLabel = (mode: PrintPreviewMode) =>
+    mode === 'express' ? t.settings.printPreviewPrintExpress : t.settings.printPreviewPrintPackage;
 
   const activeColor = TARGET_COLORS[selectedTarget];
+  const activeModeColor = MODE_COLORS[printMode];
 
   const press = (direction: Direction) => {
     if (disabled) return;
@@ -75,48 +92,102 @@ export default function LabelPreviewToolbar({
 
   return (
     <View style={styles.row}>
-      <View style={styles.dropdownWrap}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.trigger,
-            { borderColor: activeColor },
-            pressed && !disabled && styles.triggerPressed,
-            disabled && styles.btnDisabled,
-          ]}
-          onPress={() => !disabled && setOpen((value) => !value)}
-          disabled={disabled}
-          accessibilityLabel={targetLabel(selectedTarget)}
-        >
-          <View style={[styles.triggerDot, { backgroundColor: activeColor }]} />
-          <Text style={styles.triggerText} numberOfLines={1}>
-            {targetLabel(selectedTarget)}
-          </Text>
-          <Text style={styles.chevron}>{open ? '▲' : '▼'}</Text>
-        </Pressable>
-        {open ? (
-          <View style={styles.panel}>
-            {TARGETS.map((target) => {
-              const active = selectedTarget === target;
-              const color = TARGET_COLORS[target];
-              return (
-                <Pressable
-                  key={target}
-                  style={[styles.option, active && { backgroundColor: `${color}22` }]}
-                  onPress={() => {
-                    onSelectTarget(target);
-                    setOpen(false);
-                  }}
-                >
-                  <View style={[styles.optionDot, { backgroundColor: color }]} />
-                  <Text style={[styles.optionText, active && { color: '#f8fafc' }]}>
-                    {targetLabel(target)}
-                  </Text>
-                  {active ? <Text style={[styles.check, { color }]}>✓</Text> : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : null}
+      <View style={styles.dropdownColumn}>
+        <View style={styles.dropdownWrap}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.trigger,
+              { borderColor: activeColor },
+              pressed && !disabled && styles.triggerPressed,
+              disabled && styles.btnDisabled,
+            ]}
+            onPress={() => {
+              if (disabled) return;
+              setModeOpen(false);
+              setTargetOpen((value) => !value);
+            }}
+            disabled={disabled}
+            accessibilityLabel={targetLabel(selectedTarget)}
+          >
+            <View style={[styles.triggerDot, { backgroundColor: activeColor }]} />
+            <Text style={styles.triggerText} numberOfLines={1}>
+              {targetLabel(selectedTarget)}
+            </Text>
+            <Text style={styles.chevron}>{targetOpen ? '▲' : '▼'}</Text>
+          </Pressable>
+          {targetOpen ? (
+            <View style={styles.panel}>
+              {targets.map((target) => {
+                const active = selectedTarget === target;
+                const color = TARGET_COLORS[target];
+                return (
+                  <Pressable
+                    key={target}
+                    style={[styles.option, active && { backgroundColor: `${color}22` }]}
+                    onPress={() => {
+                      onSelectTarget(target);
+                      setTargetOpen(false);
+                    }}
+                  >
+                    <View style={[styles.optionDot, { backgroundColor: color }]} />
+                    <Text style={[styles.optionText, active && { color: '#f8fafc' }]}>
+                      {targetLabel(target)}
+                    </Text>
+                    {active ? <Text style={[styles.check, { color }]}>✓</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
+
+        <View style={[styles.dropdownWrap, styles.modeDropdownWrap]}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.trigger,
+              { borderColor: activeModeColor },
+              pressed && !disabled && styles.triggerPressed,
+              disabled && styles.btnDisabled,
+            ]}
+            onPress={() => {
+              if (disabled) return;
+              setTargetOpen(false);
+              setModeOpen((value) => !value);
+            }}
+            disabled={disabled}
+            accessibilityLabel={modeLabel(printMode)}
+          >
+            <View style={[styles.triggerDot, { backgroundColor: activeModeColor }]} />
+            <Text style={styles.triggerText} numberOfLines={1}>
+              {modeLabel(printMode)}
+            </Text>
+            <Text style={styles.chevron}>{modeOpen ? '▲' : '▼'}</Text>
+          </Pressable>
+          {modeOpen ? (
+            <View style={styles.panel}>
+              {(['express', 'package'] as PrintPreviewMode[]).map((mode) => {
+                const active = printMode === mode;
+                const color = MODE_COLORS[mode];
+                return (
+                  <Pressable
+                    key={mode}
+                    style={[styles.option, active && { backgroundColor: `${color}22` }]}
+                    onPress={() => {
+                      onPrintModeChange(mode);
+                      setModeOpen(false);
+                    }}
+                  >
+                    <View style={[styles.optionDot, { backgroundColor: color }]} />
+                    <Text style={[styles.optionText, active && { color: '#f8fafc' }]}>
+                      {modeLabel(mode)}
+                    </Text>
+                    {active ? <Text style={[styles.check, { color }]}>✓</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.toolsWrap}>
@@ -207,11 +278,18 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  dropdownWrap: {
+  dropdownColumn: {
     width: '38%',
     maxWidth: 148,
     flexShrink: 0,
+    gap: 6,
     zIndex: 2,
+  },
+  dropdownWrap: {
+    width: '100%',
+  },
+  modeDropdownWrap: {
+    zIndex: 3,
   },
   trigger: {
     flexDirection: 'row',

@@ -21,6 +21,7 @@ import {
   type LabelLayoutContentSizes,
 } from '../constants/labelBarcodeLayout';
 import { XPRINTER_P203A } from '../constants/xprinterP203a';
+import type { PrintPreviewMode } from '../constants/printPreviewSample';
 import { useTranslation } from '../i18n';
 
 export type LabelLayoutTarget = 'expressNo' | 'barcode' | 'inboundCode';
@@ -36,6 +37,7 @@ type Props = {
   widthMm?: number;
   heightMm?: number;
   previewWidth?: number;
+  printMode?: PrintPreviewMode;
 };
 
 const TARGET_COLORS: Record<LabelLayoutTarget, string> = {
@@ -59,6 +61,7 @@ export default function LabelPrintPreviewEditor({
   widthMm = XPRINTER_P203A.defaultWidthMm,
   heightMm = XPRINTER_P203A.defaultHeightMm,
   previewWidth = 300,
+  printMode = 'express',
 }: Props) {
   const { t, fmt } = useTranslation();
   const previewHeight = Math.round(previewWidth * (heightMm / widthMm));
@@ -229,7 +232,9 @@ export default function LabelPrintPreviewEditor({
                 ? t.settings.printPreviewExpressNo
                 : target === 'barcode'
                   ? t.settings.printPreviewBarcode
-                  : t.settings.printPreviewInboundCode}
+                  : printMode === 'package'
+                    ? t.items.packNo
+                    : t.settings.printPreviewInboundCode}
             </Text>
           </View>
         ) : null}

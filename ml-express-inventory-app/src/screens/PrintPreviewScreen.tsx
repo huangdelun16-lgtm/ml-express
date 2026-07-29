@@ -16,11 +16,10 @@ import LabelLayoutSizeEditor from '../components/LabelLayoutSizeEditor';
 import LabelPrintPreviewEditor, {
   type LabelLayoutTarget,
 } from '../components/LabelPrintPreviewEditor';
-import { PRINT_PREVIEW_SAMPLE } from '../constants/printPreviewSample';
+import { PRINT_PREVIEW_PACK_SAMPLE, PRINT_PREVIEW_SAMPLE, type PrintPreviewMode } from '../constants/printPreviewSample';
 import {
   adjustLayoutElement,
   applyLayoutAlignment,
-  buildDefaultCenteredLayout,
   canAdjustElementSize,
   clampLabelBarcodeLayout,
   dotsToMm,
@@ -40,6 +39,8 @@ import { useTranslation } from '../i18n';
 import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
 import {
   clearLabelPrinterSettings,
+  defaultExpressLayout,
+  defaultPackageLayout,
   loadLabelPrinterSettings,
   saveLabelPrinterSettings,
   type LabelPrinterSettings,
@@ -49,7 +50,7 @@ import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 
 const MAX_COPIES = 9;
 
-function previewLayoutContent() {
+function expressPreviewLayoutContent() {
   return {
     expressNo: PRINT_PREVIEW_SAMPLE.inputBarcode,
     barcode: PRINT_PREVIEW_SAMPLE.barcode,
@@ -57,15 +58,23 @@ function previewLayoutContent() {
   };
 }
 
+function packagePreviewLayoutContent() {
+  return {
+    barcode: PRINT_PREVIEW_PACK_SAMPLE.barcode,
+    inboundCode: PRINT_PREVIEW_PACK_SAMPLE.barcode,
+  };
+}
+
+function previewLayoutContent(mode: PrintPreviewMode) {
+  return mode === 'express' ? expressPreviewLayoutContent() : packagePreviewLayoutContent();
+}
+
 function defaultPreviewSettings(paper: LabelPaperSpec = DEFAULT_LABEL_PAPER): LabelPrinterSettings {
   return {
-    version: 1,
+    version: 2,
     paper,
-    layout: buildDefaultCenteredLayout(
-      previewLayoutContent(),
-      paper.widthMm,
-      paper.heightMm,
-    ),
+    expressLayout: defaultExpressLayout(paper),
+    packageLayout: defaultPackageLayout(paper),
   };
 }
 
@@ -76,15 +85,33 @@ export default function PrintPreviewScreen() {
   const [copies, setCopies] = useState(1);
   const [printing, setPrinting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [printMode, setPrintMode] = useState<PrintPreviewMode>('express');
   const [paper, setPaper] = useState<LabelPaperSpec>(DEFAULT_LABEL_PAPER);
   const [savedPaper, setSavedPaper] = useState<LabelPaperSpec>(DEFAULT_LABEL_PAPER);
-  const [layout, setLayout] = useState<LabelBarcodeLayoutConfig>(defaultPreviewSettings().layout);
-  const [savedLayout, setSavedLayout] = useState<LabelBarcodeLayoutConfig>(defaultPreviewSettings().layout);
+  const [expressLayout, setExpressLayout] = useState<LabelBarcodeLayoutConfig>(
+    defaultPreviewSettings().expressLayout,
+  );
+  const [savedExpressLayout, setSavedExpressLayout] = useState<LabelBarcodeLayoutConfig>(
+    defaultPreviewSettings().expressLayout,
+  );
+  const [packageLayout, setPackageLayout] = useState<LabelBarcodeLayoutConfig>(
+    defaultPreviewSettings().packageLayout,
+  );
+  const [savedPackageLayout, setSavedPackageLayout] = useState<LabelBarcodeLayoutConfig>(
+    defaultPreviewSettings().packageLayout,
+  );
   const [selectedTarget, setSelectedTarget] = useState<LabelLayoutTarget>('expressNo');
 
+  const layout = printMode === 'express' ? expressLayout : packageLayout;
+  const setLayout = printMode === 'express' ? setExpressLayout : setPackageLayout;
+  const previewSample = printMode === 'express' ? PRINT_PREVIEW_SAMPLE : PRINT_PREVIEW_PACK_SAMPLE;
+
   const dirty = useMemo(
-    () => !paperSpecsEqual(paper, savedPaper) || JSON.stringify(layout) !== JSON.stringify(savedLayout),
-    [layout, savedLayout, paper, savedPaper],
+    () =>
+      !paperSpecsEqual(paper, savedPaper) ||
+      JSON.stringify(expressLayout) !== JSON.stringify(savedExpressLayout) ||
+      JSON.stringify(packageLayout) !== JSON.stringify(savedPackageLayout),
+    [expressLayout, packageLayout, paper, savedExpressLayout, savedPackageLayout, savedPaper],
   );
 
   const refreshPrinter = useCallback(async () => {
@@ -94,14 +121,18 @@ export default function PrintPreviewScreen() {
       const stored = await loadLabelPrinterSettings(device.id);
       setPaper(stored.paper);
       setSavedPaper(stored.paper);
-      setLayout(stored.layout);
-      setSavedLayout(stored.layout);
+      setExpressLayout(stored.expressLayout);
+      setSavedExpressLayout(stored.expressLayout);
+      setPackageLayout(stored.packageLayout);
+      setSavedPackageLayout(stored.packageLayout);
     } else {
       const defaults = defaultPreviewSettings();
       setPaper(defaults.paper);
       setSavedPaper(defaults.paper);
-      setLayout(defaults.layout);
-      setSavedLayout(defaults.layout);
+      setExpressLayout(defaults.expressLayout);
+      setSavedExpressLayout(defaults.expressLayout);
+      setPackageLayout(defaults.packageLayout);
+      setSavedPackageLayout(defaults.packageLayout);
     }
   }, []);
 
@@ -111,7 +142,7 @@ export default function PrintPreviewScreen() {
     }, [refreshPrinter]),
   );
 
-  const layoutContent = previewLayoutContent();
+  const layoutContent = previewLayoutContent(printMode);
   const sizeLimits = getElementSizeLimitsMm(paper.widthMm);
   const selectedDims = getElementDimensions(
     layout,
@@ -164,7 +195,7 @@ export default function PrintPreviewScreen() {
         current,
         selectedTarget,
         alignment,
-        previewLayoutContent(),
+        previewLayoutContent(printMode),
         paper.widthMm,
         paper.heightMm,
       ),
@@ -175,23 +206,34 @@ export default function PrintPreviewScreen() {
     setLayout((current) =>
       mergeAndCenterLabelLayout(
         current,
-        previewLayoutContent(),
+        previewLayoutContent(printMode),
         paper.widthMm,
         paper.heightMm,
       ),
     );
   };
 
+  const handlePrintModeChange = (mode: PrintPreviewMode) => {
+    setPrintMode(mode);
+    if (mode === 'package' && selectedTarget === 'expressNo') {
+      setSelectedTarget('barcode');
+    }
+  };
+
   const applyPaperSpec = (nextPaper: LabelPaperSpec) => {
     setPaper(nextPaper);
-    setLayout((current) =>
+    const recenter = (
+      current: LabelBarcodeLayoutConfig,
+      content: ReturnType<typeof previewLayoutContent>,
+    ) =>
       mergeAndCenterLabelLayout(
         clampLabelBarcodeLayout(current, nextPaper.widthMm, nextPaper.heightMm),
-        previewLayoutContent(),
+        content,
         nextPaper.widthMm,
         nextPaper.heightMm,
-      ),
-    );
+      );
+    setExpressLayout((current) => recenter(current, expressPreviewLayoutContent()));
+    setPackageLayout((current) => recenter(current, packagePreviewLayoutContent()));
   };
 
   const handleSaveLayout = () => {
@@ -200,12 +242,14 @@ export default function PrintPreviewScreen() {
     void (async () => {
       try {
         await saveLabelPrinterSettings(connectedPrinter.id, {
-          version: 1,
+          version: 2,
           paper,
-          layout,
+          expressLayout,
+          packageLayout,
         });
         setSavedPaper(paper);
-        setSavedLayout(layout);
+        setSavedExpressLayout(expressLayout);
+        setSavedPackageLayout(packageLayout);
         Alert.alert(t.common.tip, t.settings.printPreviewLayoutSaved);
       } catch (error) {
         Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
@@ -217,11 +261,16 @@ export default function PrintPreviewScreen() {
 
   const handleResetLayout = () => {
     const defaults = defaultPreviewSettings();
-    if (!connectedPrinter?.id) {
+    const applyDefaults = () => {
       setPaper(defaults.paper);
       setSavedPaper(defaults.paper);
-      setLayout(defaults.layout);
-      setSavedLayout(defaults.layout);
+      setExpressLayout(defaults.expressLayout);
+      setSavedExpressLayout(defaults.expressLayout);
+      setPackageLayout(defaults.packageLayout);
+      setSavedPackageLayout(defaults.packageLayout);
+    };
+    if (!connectedPrinter?.id) {
+      applyDefaults();
       return;
     }
     Alert.alert(t.settings.printPreviewResetLayout, t.settings.printPreviewResetConfirm, [
@@ -232,10 +281,7 @@ export default function PrintPreviewScreen() {
         onPress: () => {
           void (async () => {
             await clearLabelPrinterSettings(connectedPrinter.id);
-            setPaper(defaults.paper);
-            setSavedPaper(defaults.paper);
-            setLayout(defaults.layout);
-            setSavedLayout(defaults.layout);
+            applyDefaults();
             Alert.alert(t.common.tip, t.settings.printPreviewLayoutReset);
           })();
         },
@@ -253,7 +299,7 @@ export default function PrintPreviewScreen() {
     setPrinting(true);
     void (async () => {
       try {
-        await runBarcodeLabelPrint(PRINT_PREVIEW_SAMPLE, copies, layout, paper);
+        await runBarcodeLabelPrint(previewSample, copies, layout, paper);
         Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
       } catch (error) {
         Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
@@ -270,19 +316,22 @@ export default function PrintPreviewScreen() {
 
         <View style={styles.previewPanel}>
           <LabelPreviewToolbar
+            printMode={printMode}
             selectedTarget={selectedTarget}
             disabled={printing || saving}
+            onPrintModeChange={handlePrintModeChange}
             onSelectTarget={setSelectedTarget}
             onMove={moveSelected}
             onAlign={alignSelected}
           />
           <LabelPrintPreviewEditor
-            barcode={PRINT_PREVIEW_SAMPLE.barcode}
-            expressNo={PRINT_PREVIEW_SAMPLE.inputBarcode}
+            barcode={previewSample.barcode}
+            expressNo={printMode === 'express' ? previewSample.inputBarcode : undefined}
             layout={layout}
             selectedTarget={selectedTarget}
             onSelectTarget={setSelectedTarget}
             onLayoutChange={setLayout}
+            printMode={printMode}
             widthMm={paper.widthMm}
             heightMm={paper.heightMm}
           />
