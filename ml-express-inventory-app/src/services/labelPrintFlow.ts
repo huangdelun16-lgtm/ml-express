@@ -3,6 +3,7 @@ import type { OrderBarcodeData } from '../components/OrderBarcodeModal';
 import type { TranslationDict } from '../i18n/translations';
 import { loadSavedBluetoothDevice } from './bluetoothScanner';
 import { printOrderBarcodeLabel } from './bleLabelPrinter';
+import type { LabelBarcodeLayoutConfig } from '../constants/labelBarcodeLayout';
 
 export function resolvePrintError(t: TranslationDict, error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error ?? '');
@@ -12,8 +13,12 @@ export function resolvePrintError(t: TranslationDict, error: unknown): string {
   return msg || t.settings.printFailed;
 }
 
-export async function runBarcodeLabelPrint(data: OrderBarcodeData): Promise<void> {
-  await printOrderBarcodeLabel(data);
+export async function runBarcodeLabelPrint(
+  data: OrderBarcodeData,
+  copies = 1,
+  layout?: LabelBarcodeLayoutConfig,
+): Promise<void> {
+  await printOrderBarcodeLabel(data, copies, layout);
 }
 
 export function runBarcodeLabelPrintWithAlert(

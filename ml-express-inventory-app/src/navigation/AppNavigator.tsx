@@ -9,6 +9,7 @@ import MovementsScreen from '../screens/MovementsScreen';
 import CrossBorderFinanceScreen from '../screens/CrossBorderFinanceScreen';
 import CameraScanScreen from '../screens/CameraScanScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import PrintPreviewScreen from '../screens/PrintPreviewScreen';
 import PkgScreen from '../screens/PkgScreen';
 import TrackExpressScreen from '../screens/TrackExpressScreen';
 import HubReceiveScreen from '../screens/HubReceiveScreen';
@@ -25,6 +26,7 @@ export type RootStackParamList = {
   CrossBorderFinance: { initialTab?: 'transport' | 'pending' | 'agency' | 'manual' | 'all' } | undefined;
   CameraScan: undefined;
   Settings: undefined;
+  PrintPreview: undefined;
   Pkg: undefined;
   TrackExpress: { presetCode?: string } | undefined;
   HubReceive: undefined;
@@ -66,6 +68,11 @@ export default function AppNavigator() {
       />
       <Stack.Screen name="CameraScan" component={CameraScanScreen} options={{ title: t.nav.cameraScan }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t.nav.settings }} />
+      <Stack.Screen
+        name="PrintPreview"
+        component={PrintPreviewScreen}
+        options={{ title: t.nav.printPreview }}
+      />
     </Stack.Navigator>
   );
 }

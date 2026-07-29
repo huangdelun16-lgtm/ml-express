@@ -10,12 +10,14 @@ import {
   View,
 } from 'react-native';
 import Constants from 'expo-constants';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import BluetoothScanModal from '../components/BluetoothScanModal';
 import LanguageSwitcherRow from '../components/LanguageSwitcherRow';
 import { useAuth } from '../contexts/AuthContext';
 import { resolveAppError, useTranslation } from '../i18n';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { probeCloudConnection } from '../services/cloudConnection';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
@@ -96,6 +98,7 @@ export default function SettingsScreen() {
     logout,
   } = useAuth();
   const { t, fmt } = useTranslation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [bluetoothScanVisible, setBluetoothScanVisible] = useState(false);
   const [connectedBluetooth, setConnectedBluetooth] = useState<ScannedBluetoothDevice | null>(null);
@@ -105,8 +108,8 @@ export default function SettingsScreen() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
-  const appVersion = Constants.expoConfig?.version ?? '1.8.7';
-  const buildVersion = Constants.nativeBuildVersion ?? '20';
+  const appVersion = Constants.expoConfig?.version ?? '1.8.8';
+  const buildVersion = Constants.nativeBuildVersion ?? '21';
 
   const checkConnection = useCallback(async () => {
     setConnectionStatus('checking');
@@ -256,9 +259,19 @@ export default function SettingsScreen() {
       >
         <Text style={styles.hintText}>{t.settings.scanPrinterHint}</Text>
         {connectedBluetooth ? (
-          <Text style={styles.connectedPrinterText}>
-            {fmt(t.settings.scanPrinterConnectedTo, { name: connectedBluetooth.name })}
-          </Text>
+          <View style={styles.connectedRow}>
+            <Text style={styles.connectedPrinterText}>
+              {fmt(t.settings.scanPrinterConnectedTo, { name: connectedBluetooth.name })}
+            </Text>
+            <Pressable
+              style={styles.previewChip}
+              onPress={() => navigation.navigate('PrintPreview')}
+              accessibilityRole="button"
+              accessibilityLabel={t.settings.printPreviewOpen}
+            >
+              <Text style={styles.previewChipText}>{t.settings.printPreviewOpen}</Text>
+            </Pressable>
+          </View>
         ) : null}
         <Pressable
           style={[styles.actionBtn, styles.actionBtnPrimary]}
@@ -425,12 +438,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   hintText: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 10 },
+  connectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 10,
+  },
   connectedPrinterText: {
     color: '#6ee7b7',
     fontSize: 13,
     fontWeight: '800',
-    marginBottom: 10,
+    flex: 1,
   },
+  previewChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#0c4a6e',
+    borderWidth: 1,
+    borderColor: '#0284c7',
+  },
+  previewChipText: { color: '#7dd3fc', fontWeight: '900', fontSize: 12 },
   actionBtn: {
     borderRadius: 14,
     paddingVertical: 15,

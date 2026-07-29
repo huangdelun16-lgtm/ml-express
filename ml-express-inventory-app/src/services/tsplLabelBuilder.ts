@@ -1,5 +1,9 @@
 import { XPRINTER_P203A, type PrintLabelSheetKind } from '../constants/xprinterP203a';
 import {
+  DEFAULT_LABEL_BARCODE_LAYOUT,
+  type LabelBarcodeLayoutConfig,
+} from '../constants/labelBarcodeLayout';
+import {
   normalizeLabelContent,
   truncateLabelText,
   type LabelPrintPayload,
@@ -33,6 +37,7 @@ export function buildTsplInboundLabel(params: {
   gapMm?: number;
   copies?: number;
   sheetKind?: PrintLabelSheetKind;
+  layout?: LabelBarcodeLayoutConfig;
 }): string {
   const sheetKind = params.sheetKind ?? 'barcode';
   const content = normalizeLabelContent(params.barcode, params.extras);
@@ -40,6 +45,7 @@ export function buildTsplInboundLabel(params: {
   const heightMm = params.heightMm ?? XPRINTER_P203A.defaultHeightMm;
   const gapMm = params.gapMm ?? XPRINTER_P203A.defaultGapMm;
   const copies = Math.max(1, params.copies ?? 1);
+  const layout = params.layout ?? DEFAULT_LABEL_BARCODE_LAYOUT;
 
   const lines: string[] = [
     `SIZE ${widthMm} mm, ${heightMm} mm`,
@@ -60,11 +66,20 @@ export function buildTsplInboundLabel(params: {
       ? (content.inputBarcode || content.barcode).trim()
       : content.barcode.trim();
 
-  if (sheetKind === 'barcode' && content.inputBarcode?.trim()) {
+  if (sheetKind === 'barcode') {
+    if (content.inputBarcode?.trim()) {
+      lines.push(
+        `TEXT ${layout.expressNo.x},${layout.expressNo.y},"2",0,1,1,"${escapeTsplText(truncateLabelText(content.inputBarcode.trim(), 22))}"`,
+      );
+    }
     lines.push(
-      `TEXT 12,${y},"2",0,1,1,"${escapeTsplText(truncateLabelText(content.inputBarcode.trim(), 22))}"`,
+      `BARCODE ${layout.barcode.x},${layout.barcode.y},"128",${layout.barcode.height},1,0,3,6,"${escapeTsplText(printCode)}"`,
     );
-    y += 34;
+    lines.push(
+      `TEXT ${layout.inboundCode.x},${layout.inboundCode.y},"2",0,1,1,"${escapeTsplText(truncateLabelText(printCode, 24))}"`,
+    );
+    lines.push(`PRINT ${copies}`);
+    return `${lines.join('\r\n')}\r\n`;
   }
 
   if (sheetKind === 'express' || sheetKind === 'pack' || sheetKind === 'inbound') {
@@ -88,7 +103,7 @@ export function buildTsplInboundLabel(params: {
     }
   }
 
-  const barcodeHeight = sheetKind === 'barcode' ? 96 : 80;
+  const barcodeHeight = 80;
   lines.push(
     `BARCODE 12,${y},"128",${barcodeHeight},1,0,3,6,"${escapeTsplText(printCode)}"`,
   );
