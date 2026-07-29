@@ -50,17 +50,8 @@ export async function getActiveBluetoothDevice(): Promise<ScannedBluetoothDevice
   const saved = await loadSavedBluetoothDevice();
   if (!saved) return null;
 
-  const ble = getManager();
-  try {
-    const isConnected = await ble.isDeviceConnected(saved.id);
-    if (!isConnected) {
-      await persistConnectedDevice(null);
-      return null;
-    }
-    return saved;
-  } catch {
-    return saved;
-  }
+  // Saved device means user paired in Settings; reconnect happens on print.
+  return saved;
 }
 
 export function deviceFromBle(device: Device): ScannedBluetoothDevice {

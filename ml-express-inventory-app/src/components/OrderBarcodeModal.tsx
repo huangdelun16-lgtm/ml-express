@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -7,10 +9,9 @@ import {
   View,
 } from 'react-native';
 import LabelBarcodeContent from './LabelBarcodeContent';
-import LabelPrintModal from './LabelPrintModal';
 import { useTranslation } from '../i18n';
-import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
-import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
+import { loadSavedBluetoothDevice } from '../services/bluetoothScanner';
+import { resolvePrintError, runBarcodeLabelPrint } from '../services/labelPrintFlow';
 
 export type OrderBarcodeData = {
   productName: string;
@@ -39,61 +40,75 @@ export default function OrderBarcodeModal({
   cancelLabel,
 }: Props) {
   const { t } = useTranslation();
-  const [connectedPrinter, setConnectedPrinter] = useState<ScannedBluetoothDevice | null>(null);
-  const [printModalVisible, setPrintModalVisible] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
-    if (!visible) {
-      setPrintModalVisible(false);
-      return;
-    }
-    void getActiveBluetoothDevice().then(setConnectedPrinter);
+    if (!visible) setPrinting(false);
   }, [visible]);
 
   const finish = () => {
-    setPrintModalVisible(false);
+    setPrinting(false);
     onDone?.();
     onClose();
+  };
+
+  const handlePrint = () => {
+    if (printing || !data) return;
+    setPrinting(true);
+    void (async () => {
+      try {
+        const saved = await loadSavedBluetoothDevice();
+        if (!saved) {
+          Alert.alert(t.settings.printFailed, t.settings.scanPrinterNotConfigured);
+          return;
+        }
+        await runBarcodeLabelPrint(data);
+        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody, [
+          { text: t.common.ok },
+        ]);
+      } catch (error) {
+        Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
+      } finally {
+        setPrinting(false);
+      }
+    })();
   };
 
   if (!data) return null;
 
   return (
-    <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
-        <View style={styles.overlay}>
-          <View style={styles.card}>
-            <Text style={styles.title}>{title ?? t.stockIn.barcodeModalTitle}</Text>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <Text style={styles.title}>{title ?? t.stockIn.barcodeModalTitle}</Text>
 
-            <LabelBarcodeContent data={data} />
+          <LabelBarcodeContent data={data} />
 
-            {connectedPrinter ? (
-              <Pressable
-                style={styles.btnPrint}
-                onPress={() => setPrintModalVisible(true)}
-                accessibilityRole="button"
-                accessibilityLabel={t.itemForm.printLabel}
-              >
-                <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
-              </Pressable>
-            ) : null}
+          <Pressable
+            style={[styles.btnPrint, printing && styles.btnDisabled]}
+            onPress={handlePrint}
+            disabled={printing}
+            accessibilityRole="button"
+            accessibilityLabel={t.itemForm.printLabel}
+          >
+            {printing ? (
+              <View style={styles.printBtnInner}>
+                <ActivityIndicator color="#fff" />
+                <Text style={styles.btnPrintText}>{t.settings.printWindowSending}</Text>
+              </View>
+            ) : (
+              <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
+            )}
+          </Pressable>
 
-            <Pressable style={styles.btnClose} onPress={finish}>
-              <Text style={styles.btnCloseText}>
-                {cancelLabel ?? (onDone ? t.common.done : t.common.close)}
-              </Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.btnClose} onPress={finish} disabled={printing}>
+            <Text style={styles.btnCloseText}>
+              {cancelLabel ?? (onDone ? t.common.done : t.common.close)}
+            </Text>
+          </Pressable>
         </View>
-      </Modal>
-
-      <LabelPrintModal
-        visible={printModalVisible}
-        data={data}
-        printer={connectedPrinter}
-        onClose={() => setPrintModalVisible(false)}
-      />
-    </>
+      </View>
+    </Modal>
   );
 }
 
@@ -119,7 +134,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  printBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  btnDisabled: { opacity: 0.65 },
   btnClose: {
     borderRadius: 14,
     paddingVertical: 14,

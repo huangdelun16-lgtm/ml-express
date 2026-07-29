@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,7 @@ import {
   mergeScannedDevices,
   type ScannedBluetoothDevice,
 } from '../utils/bluetoothDeviceMerge';
+import { filterLikelyBlePrinters } from '../utils/blePrinterDeviceFilter';
 import {
   connectBluetoothDevice,
   disconnectBluetoothDevice,
@@ -71,7 +72,7 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
 
         const stop = await startBluetoothScan((found) => {
           if (cancelled) return;
-          setDevices((prev) => mergeScannedDevices(prev, found));
+          setDevices((prev) => mergeScannedDevices(prev, filterLikelyBlePrinters(found)));
         });
         stopScanRef.current = stop;
       } catch (error) {
@@ -112,7 +113,7 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
         const granted = await requestBluetoothScanPermissions();
         if (!granted) throw new Error('BLUETOOTH_PERMISSION_DENIED');
         const stop = await startBluetoothScan((found) => {
-          setDevices((prev) => mergeScannedDevices(prev, found));
+          setDevices((prev) => mergeScannedDevices(prev, filterLikelyBlePrinters(found)));
         });
         stopScanRef.current = stop;
         setTimeout(() => {
@@ -178,6 +179,14 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
     })();
   };
 
+  const visibleDevices = useMemo(() => {
+    const filtered = filterLikelyBlePrinters(devices);
+    if (connectedDevice && !filtered.some((device) => device.id === connectedDevice.id)) {
+      return [connectedDevice, ...filtered];
+    }
+    return filtered;
+  }, [devices, connectedDevice]);
+
   if (!visible) return null;
 
   return (
@@ -217,14 +226,14 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
                 </View>
               ) : (
                 <Text style={styles.doneText}>
-                  {devices.length > 0
-                    ? fmt(t.settings.scanPrinterFound, { count: devices.length })
+                  {visibleDevices.length > 0
+                    ? fmt(t.settings.scanPrinterFound, { count: visibleDevices.length })
                     : t.settings.scanPrinterEmpty}
                 </Text>
               )}
 
               <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
-                {devices.map((device) => {
+                {visibleDevices.map((device) => {
                   const isConnected = connectedDevice?.id === device.id;
                   const isConnecting = connectingId === device.id;
 

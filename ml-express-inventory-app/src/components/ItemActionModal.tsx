@@ -118,8 +118,8 @@ export default function ItemActionModal({
           ) : null}
 
           {onPrint ? (
-            <Pressable style={[styles.btnPrint, styles.btnFull]} onPress={onPrint}>
-              <Text style={styles.btnPrintText}>{t.items.printBtn}</Text>
+            <Pressable style={styles.btnPrint} onPress={onPrint}>
+              <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
             </Pressable>
           ) : null}
 

@@ -99,7 +99,7 @@ export default function PkgActionModal({
           ) : null}
           {onPrint ? (
             <Pressable style={styles.btnPrint} onPress={onPrint}>
-              <Text style={styles.btnPrintText}>{t.items.printBtn}</Text>
+              <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
             </Pressable>
           ) : null}
           <Pressable style={styles.btnCancel} onPress={onClose}>

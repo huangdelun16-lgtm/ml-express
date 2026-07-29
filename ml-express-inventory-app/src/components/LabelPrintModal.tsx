@@ -11,9 +11,9 @@ import {
 import LabelBarcodeContent from './LabelBarcodeContent';
 import type { OrderBarcodeData } from './OrderBarcodeModal';
 import { useTranslation } from '../i18n';
-import type { TranslationDict } from '../i18n/translations';
-import { printOrderBarcodeLabel } from '../services/bleLabelPrinter';
 import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
+import { printOrderBarcodeLabel } from '../services/bleLabelPrinter';
+import { resolvePrintError } from '../services/labelPrintFlow';
 
 type Props = {
   visible: boolean;
@@ -79,14 +79,6 @@ export default function LabelPrintModal({ visible, data, printer, onClose }: Pro
       </View>
     </Modal>
   );
-}
-
-function resolvePrintError(t: TranslationDict, error: unknown): string {
-  const msg = error instanceof Error ? error.message : String(error ?? '');
-  if (msg === 'BLE_PRINTER_NOT_CONNECTED') return t.settings.scanPrinterConnectFailed;
-  if (msg === 'BLE_WRITE_CHAR_NOT_FOUND') return t.settings.printWindowWriteCharMissing;
-  if (/connect|timeout|not connected/i.test(msg)) return t.settings.scanPrinterConnectFailed;
-  return msg || t.settings.printFailed;
 }
 
 const styles = StyleSheet.create({
