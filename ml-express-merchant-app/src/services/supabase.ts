@@ -703,14 +703,18 @@ export const deliveryStoreService = {
   },
 
   async getStoreById(storeId: string) {
+    if (!storeId) return null;
     try {
       const { data, error } = await supabase
         .from("delivery_stores")
         .select("*")
         .eq("id", storeId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        LoggerService.error("获取店铺详情失败:", error);
+        return null;
+      }
       return data;
     } catch (error) {
       LoggerService.error("获取店铺详情失败:", error);

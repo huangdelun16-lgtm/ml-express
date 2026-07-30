@@ -1,6 +1,6 @@
 {
   "name": "ml-express-merchant-app",
-  "version": "2.4.0",
+  "version": "2.4.2",
   "main": "index.js",
   "scripts": {
     "sync:shared": "node ../shared/sync.mjs --out src/services/_shared",
@@ -11,7 +11,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build:web": "npm run sync:shared && npx expo export --platform web"
+    "build:web": "npm run sync:shared && npx expo export --platform web",
+    "build:ios": "eas build --platform ios --profile production --non-interactive",
+    "build:ios:local": "eas build --platform ios --profile production --local",
+    "download:ios": "eas build:download --platform ios --latest"
   },
   "dependencies": {
     "@babel/runtime": "^7.25.0",
@@ -48,6 +51,7 @@
     "qrcode": "^1.5.3",
     "react": "19.1.0",
     "react-native": "0.81.4",
+    "react-native-ble-plx": "^3.5.1",
     "react-native-maps": "1.20.1",
     "react-native-qrcode-svg": "^6.3.2",
     "react-native-safe-area-context": "~5.6.0",

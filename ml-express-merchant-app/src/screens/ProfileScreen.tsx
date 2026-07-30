@@ -45,6 +45,8 @@ import BackToHomeButton from "../components/BackToHomeButton";
 import { theme } from "../config/theme";
 import Skeleton, { StatsCardSkeleton } from "../components/Skeleton";
 import { printerService, PrinterSettings } from "../services/PrinterService";
+import BluetoothScanModal from "../components/BluetoothScanModal";
+import { getActiveBluetoothDevice } from "../services/bluetoothScanner";
 
 // 🚀 新增：充值二维码图片资源映射（使用线上URL，避免本地资源编译问题）
 const RECHARGE_QR_BASE_URL = "https://market-link-express.com";
@@ -525,19 +527,46 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：打印机设置状态
   const [showPrinterModal, setShowPrinterModal] = useState(false);
-  const [printerSettings, setPrinterSettings] = useState<PrinterSettings>({
-    enabled: false,
-    type: "system",
-    address: "",
-    autoPrint: true,
-    copies: 1,
-  });
-  // 🚀 新增：打开打印机设置
-  const handleOpenPrinterSettings = async () => {
-    const settings = await printerService.getSettings();
-    setPrinterSettings(settings);
+  const [bluetoothScanVisible, setBluetoothScanVisible] = useState(false);
+  const [connectedBluetooth, setConnectedBluetooth] = useState<{ id: string; name: string } | null>(null);
+
+  const handleOpenPrinterSettings = () => {
     setShowPrinterModal(true);
   };
+
+  const handleStartPrinterScan = () => {
+    setShowPrinterModal(false);
+    setBluetoothScanVisible(true);
+  };
+
+  const refreshConnectedBluetooth = useCallback(async () => {
+    const device = await getActiveBluetoothDevice();
+    setConnectedBluetooth(device ? { id: device.id, name: device.name } : null);
+
+    const current = await printerService.getSettings();
+    if (device) {
+      const updated: PrinterSettings = {
+        ...current,
+        enabled: true,
+        type: "bluetooth",
+        address: device.id,
+      };
+      await printerService.saveSettings(updated);
+      return;
+    }
+
+    const updated: PrinterSettings = {
+      ...current,
+      enabled: false,
+      address: "",
+    };
+    await printerService.saveSettings(updated);
+  }, []);
+
+  useEffect(() => {
+    if (userType !== "merchant") return;
+    void refreshConnectedBluetooth();
+  }, [userType, refreshConnectedBluetooth]);
 
   // 🚀 新增：加载店铺评价逻辑
   const loadStoreReviews = async () => {
@@ -1157,9 +1186,9 @@ export default function ProfileScreen({ navigation }: any) {
 
           // 🚀 加载店铺详细信息
           try {
-            const { data: store, error } =
-              await deliveryStoreService.getStoreById(user.id);
-            if (!error && store) {
+            const storeId = user.store_id || user.id;
+            const store = await deliveryStoreService.getStoreById(storeId);
+            if (store) {
               setStoreInfo(store);
               setBusinessStatus({
                 is_closed_today: store.is_closed_today || false,
@@ -2226,10 +2255,6 @@ export default function ProfileScreen({ navigation }: any) {
       if (settings) {
         setNotificationSettings(JSON.parse(settings));
       }
-
-      // 🚀 同时加载打印机设置
-      const printer = await printerService.getSettings();
-      setPrinterSettings(printer);
     } catch (error) {
       LoggerService.error("加载通知设置失败:", error);
     }
@@ -2249,20 +2274,6 @@ export default function ProfileScreen({ navigation }: any) {
     } catch (error) {
       LoggerService.error("保存通知设置失败:", error);
       showToast(t.settingsSaveFailed, "error");
-    }
-  };
-
-  // 🚀 新增：保存打印机设置
-  const handleSavePrinterSettings = async () => {
-    try {
-      await printerService.saveSettings(printerSettings);
-      setShowPrinterModal(false);
-      showToast(
-        language === "zh" ? "打印机设置已保存" : "Printer settings saved",
-        "success",
-      );
-    } catch (error) {
-      showToast(language === "zh" ? "保存失败" : "Save failed", "error");
     }
   };
 
@@ -3361,15 +3372,15 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={handleOpenPrinterSettings}
           >
             <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🖨️</Text>
+              <Text style={styles.settingIcon}>🔍</Text>
               <Text
                 style={[styles.settingLabel, isDarkMode && styles.darkText]}
               >
                 {language === "zh"
-                  ? "小票打印机设置"
+                  ? "小票机"
                   : language === "en"
-                    ? "Printer Settings"
-                    : "ပရင်တာဆက်တင်များ"}
+                    ? "Receipt Printer"
+                    : "Receipt Printer"}
               </Text>
             </View>
             <View style={styles.settingRight}>
@@ -3377,14 +3388,14 @@ export default function ProfileScreen({ navigation }: any) {
                 style={[
                   styles.notificationToggle,
                   {
-                    backgroundColor: printerSettings.enabled
+                    backgroundColor: connectedBluetooth
                       ? "#3b82f6"
                       : "#d1d5db",
                   },
                 ]}
               >
                 <Text style={styles.notificationToggleText}>
-                  {printerSettings.enabled ? "ON" : "OFF"}
+                  {connectedBluetooth ? "ON" : "OFF"}
                 </Text>
               </View>
               <Text
@@ -3573,7 +3584,7 @@ export default function ProfileScreen({ navigation }: any) {
       {renderAnomalyListModal()}
       {renderVacationModal()}
 
-      {/* 🚀 新增：打印机设置模态框 */}
+      {/* 小票机：仅保留扫描入口 */}
       <Modal
         visible={showPrinterModal}
         transparent
@@ -3585,10 +3596,10 @@ export default function ProfileScreen({ navigation }: any) {
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, isDarkMode && styles.darkText]}>
                 {language === "zh"
-                  ? "小票打印机设置"
+                  ? "小票打印机"
                   : language === "en"
-                    ? "Printer Settings"
-                    : "ပရင်တာဆက်တင်များ"}
+                    ? "Receipt Printer"
+                    : "Receipt Printer"}
               </Text>
               <TouchableOpacity
                 onPress={() => setShowPrinterModal(false)}
@@ -3602,209 +3613,19 @@ export default function ProfileScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              style={{ maxHeight: 500 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* 启用打印机 */}
-              <View style={styles.printerSettingRow}>
-                <View>
-                  <Text
-                    style={[
-                      styles.printerSettingLabel,
-                      isDarkMode && styles.darkText,
-                    ]}
-                  >
-                    {language === "zh" ? "启用打印功能" : "Enable Printing"}
-                  </Text>
-                  <Text style={styles.printerSettingDesc}>
-                    {language === "zh"
-                      ? "接单后是否自动执行打印"
-                      : "Print automatically after accepting"}
-                  </Text>
-                </View>
-                <Switch
-                  value={printerSettings.enabled}
-                  onValueChange={(val) =>
-                    setPrinterSettings({ ...printerSettings, enabled: val })
-                  }
-                  trackColor={{ false: "#cbd5e1", true: "#3b82f6" }}
-                />
-              </View>
-
-              {/* 打印机类型 */}
-              <View style={styles.printerSettingSection}>
-                <Text style={styles.printerSectionTitle}>
-                  {language === "zh" ? "连接方式" : "Connection"}
-                </Text>
-                <View style={styles.printerTypeGrid}>
-                  {[
-                    {
-                      id: "system",
-                      label: language === "zh" ? "系统打印" : "System",
-                      icon: "apps-outline",
-                    },
-                    {
-                      id: "wifi",
-                      label: language === "zh" ? "WiFi/网络" : "WiFi",
-                      icon: "wifi-outline",
-                    },
-                    {
-                      id: "bluetooth",
-                      label: language === "zh" ? "蓝牙" : "Bluetooth",
-                      icon: "bluetooth-outline",
-                    },
-                  ].map((type) => (
-                    <TouchableOpacity
-                      key={type.id}
-                      style={[
-                        styles.printerTypeCard,
-                        printerSettings.type === type.id &&
-                          styles.printerTypeCardActive,
-                      ]}
-                      onPress={() =>
-                        setPrinterSettings({
-                          ...printerSettings,
-                          type: type.id as any,
-                        })
-                      }
-                    >
-                      <Ionicons
-                        name={type.icon as any}
-                        size={24}
-                        color={
-                          printerSettings.type === type.id
-                            ? "#3b82f6"
-                            : "#64748b"
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.printerTypeLabel,
-                          printerSettings.type === type.id &&
-                            styles.printerTypeLabelActive,
-                        ]}
-                      >
-                        {type.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* 地址输入 (针对 WiFi 或 蓝牙) */}
-              {(printerSettings.type === "wifi" ||
-                printerSettings.type === "bluetooth") && (
-                <View style={styles.printerSettingSection}>
-                  <Text style={styles.printerSectionTitle}>
-                    {printerSettings.type === "wifi"
-                      ? language === "zh"
-                        ? "打印机 IP 地址"
-                        : "Printer IP Address"
-                      : language === "zh"
-                        ? "打印机 MAC 地址"
-                        : "Printer MAC Address"}
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.printerInput,
-                      isDarkMode && styles.darkSearchInput,
-                    ]}
-                    placeholder={
-                      printerSettings.type === "wifi"
-                        ? "例如: 192.168.1.100"
-                        : "例如: 00:11:22:33:44:55"
-                    }
-                    placeholderTextColor="#94a3b8"
-                    value={printerSettings.address}
-                    onChangeText={(val) =>
-                      setPrinterSettings({ ...printerSettings, address: val })
-                    }
-                    autoCapitalize={
-                      printerSettings.type === "bluetooth"
-                        ? "characters"
-                        : "none"
-                    }
-                  />
-                  <Text style={styles.printerHint}>
-                    {printerSettings.type === "wifi"
-                      ? language === "zh"
-                        ? "提示：请确保手机和打印机在同一个 WiFi 下"
-                        : "Note: Ensure phone and printer are on the same WiFi."
-                      : language === "zh"
-                        ? "提示：请先在手机设置中完成蓝牙配对"
-                        : "Note: Pair the printer in phone settings first."}
-                  </Text>
-                </View>
-              )}
-
-              {/* 打印份数 */}
-              <View style={styles.printerSettingRow}>
-                <Text
-                  style={[
-                    styles.printerSettingLabel,
-                    isDarkMode && styles.darkText,
-                  ]}
-                >
-                  {language === "zh" ? "打印份数" : "Number of Copies"}
-                </Text>
-                <View style={styles.quantityContainer}>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setPrinterSettings({
-                        ...printerSettings,
-                        copies: Math.max(1, printerSettings.copies - 1),
-                      })
-                    }
-                    style={styles.qtyBtn}
-                  >
-                    <Text style={styles.qtyBtnText}>-</Text>
-                  </TouchableOpacity>
-                  <Text style={[styles.qtyText, isDarkMode && styles.darkText]}>
-                    {printerSettings.copies}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setPrinterSettings({
-                        ...printerSettings,
-                        copies: Math.min(5, printerSettings.copies + 1),
-                      })
-                    }
-                    style={styles.qtyBtn}
-                  >
-                    <Text style={styles.qtyBtnText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
+            <View style={{ paddingVertical: 28, paddingHorizontal: 8 }}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => setShowPrinterModal(false)}
-              >
-                <Text style={styles.modalButtonText}>{t.cancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  styles.modalButtonConfirm,
-                  { flex: 2 },
-                ]}
-                onPress={handleSavePrinterSettings}
+                style={styles.printerScanEntryBtn}
+                onPress={handleStartPrinterScan}
+                accessibilityLabel={
+                  language === "zh" ? "小票机" : "Receipt printer scan"
+                }
               >
                 <LinearGradient
-                  colors={["#3b82f6", "#2563eb"]}
-                  style={styles.modalButtonGradient}
+                  colors={["#0ea5e9", "#2563eb"]}
+                  style={styles.printerScanEntryGradient}
                 >
-                  <Text
-                    style={[
-                      styles.modalButtonText,
-                      styles.modalButtonTextConfirm,
-                    ]}
-                  >
-                    {language === "zh" ? "立即保存设置" : "Save Settings Now"}
-                  </Text>
+                  <Text style={styles.printerScanEntryText}>🔍小票机</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -3812,7 +3633,14 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {renderAnomalyListModal()}
+      <BluetoothScanModal
+        visible={bluetoothScanVisible}
+        language={language}
+        onClose={() => setBluetoothScanVisible(false)}
+        onConnectionChange={() => {
+          void refreshConnectedBluetooth();
+        }}
+      />
 
       {/* 🚀 新增：自定义时间选择器模态框 */}
       <Modal
@@ -6382,6 +6210,27 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: "italic",
   },
+  printerHint: {
+    fontSize: 11,
+    color: "#f59e0b",
+    marginTop: 8,
+    fontStyle: "italic",
+  },
+  printerScanEntryBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  printerScanEntryGradient: {
+    paddingVertical: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  printerScanEntryText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
   quantityContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -6632,6 +6481,27 @@ const styles = StyleSheet.create({
     color: "#f59e0b",
     marginTop: 8,
     fontStyle: "italic",
+  },
+  printerHint: {
+    fontSize: 11,
+    color: "#f59e0b",
+    marginTop: 8,
+    fontStyle: "italic",
+  },
+  printerScanEntryBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  printerScanEntryGradient: {
+    paddingVertical: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  printerScanEntryText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 0.5,
   },
   quantityContainer: {
     flexDirection: "row",
