@@ -19,7 +19,7 @@ import {
   mergeScannedDevices,
   type ScannedBluetoothDevice,
 } from '../utils/bluetoothDeviceMerge';
-import { filterLikelyBlePrinters } from '../utils/blePrinterDeviceFilter';
+import { filterLikelyBlePrinters, getBlePrinterDisplayName } from '../utils/blePrinterDeviceFilter';
 import {
   connectBluetoothDevice,
   disconnectBluetoothDevice,
@@ -27,6 +27,7 @@ import {
   requestBluetoothScanPermissions,
   startBluetoothScan,
 } from '../services/bluetoothScanner';
+import ReceiptPrintPreviewModal from './ReceiptPrintPreviewModal';
 
 type Props = {
   visible: boolean;
@@ -35,7 +36,7 @@ type Props = {
   onConnectionChange?: () => void;
 };
 
-const SCAN_DURATION_MS = 15000;
+const SCAN_DURATION_MS = 20000;
 
 function isNativeBleAvailable(): boolean {
   return Constants.appOwnership !== 'expo';
@@ -61,6 +62,7 @@ export default function BluetoothScanModal({
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [connectedDevice, setConnectedDevice] = useState<ScannedBluetoothDevice | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const stopScanRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -69,6 +71,7 @@ export default function BluetoothScanModal({
       stopScanRef.current = null;
       setScanning(false);
       setConnectingId(null);
+      setPreviewVisible(false);
       return;
     }
 
@@ -166,7 +169,7 @@ export default function BluetoothScanModal({
         onConnectionChange?.();
         Alert.alert(
           strings.title,
-          fmtScanPrinter(strings.connectedTo, { name: connected.name }),
+          fmtScanPrinter(strings.connectedTo, { name: labelFor(connected) }),
         );
       } catch (error) {
         Alert.alert(strings.connectFailed, resolveScanError(strings, error));
@@ -201,6 +204,9 @@ export default function BluetoothScanModal({
     return filtered;
   }, [devices, connectedDevice]);
 
+  const labelFor = (device: ScannedBluetoothDevice) =>
+    getBlePrinterDisplayName(device, strings.unnamedPrinter);
+
   if (!visible) return null;
 
   return (
@@ -217,8 +223,14 @@ export default function BluetoothScanModal({
               {connectedDevice ? (
                 <View style={styles.connectedBanner}>
                   <Text style={styles.connectedText}>
-                    {fmtScanPrinter(strings.connectedTo, { name: connectedDevice.name })}
+                    {fmtScanPrinter(strings.connectedTo, { name: labelFor(connectedDevice) })}
                   </Text>
+                  <Pressable
+                    style={styles.previewBtn}
+                    onPress={() => setPreviewVisible(true)}
+                  >
+                    <Text style={styles.previewBtnText}>{strings.printPreview}</Text>
+                  </Pressable>
                   <Pressable
                     style={[styles.disconnectBtn, disconnecting && styles.btnDisabled]}
                     onPress={handleDisconnect}
@@ -264,7 +276,7 @@ export default function BluetoothScanModal({
                     >
                       <View style={styles.itemHead}>
                         <Text style={styles.itemName} numberOfLines={2}>
-                          {device.name}
+                          {labelFor(device)}
                         </Text>
                         {isConnected ? (
                           <Text style={styles.itemBadge}>{strings.connected}</Text>
@@ -303,6 +315,12 @@ export default function BluetoothScanModal({
           </Pressable>
         </View>
       </View>
+
+      <ReceiptPrintPreviewModal
+        visible={previewVisible}
+        language={language}
+        onClose={() => setPreviewVisible(false)}
+      />
     </Modal>
   );
 }
@@ -352,6 +370,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   connectedText: { color: '#6ee7b7', fontWeight: '800', fontSize: 13, textAlign: 'center' },
+  previewBtn: {
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#0284c7',
+  },
+  previewBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   disconnectBtn: {
     borderRadius: 10,
     paddingVertical: 10,

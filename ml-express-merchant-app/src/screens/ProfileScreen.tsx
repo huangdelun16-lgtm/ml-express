@@ -46,6 +46,8 @@ import { theme } from "../config/theme";
 import Skeleton, { StatsCardSkeleton } from "../components/Skeleton";
 import { printerService, PrinterSettings } from "../services/PrinterService";
 import BluetoothScanModal from "../components/BluetoothScanModal";
+import ReceiptPrintPreviewModal from "../components/ReceiptPrintPreviewModal";
+import { getScanPrinterStrings } from "../i18n/scanPrinterStrings";
 import { getActiveBluetoothDevice } from "../services/bluetoothScanner";
 
 // 🚀 新增：充值二维码图片资源映射（使用线上URL，避免本地资源编译问题）
@@ -528,6 +530,7 @@ export default function ProfileScreen({ navigation }: any) {
   // 🚀 新增：打印机设置状态
   const [showPrinterModal, setShowPrinterModal] = useState(false);
   const [bluetoothScanVisible, setBluetoothScanVisible] = useState(false);
+  const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
   const [connectedBluetooth, setConnectedBluetooth] = useState<{ id: string; name: string } | null>(null);
 
   const handleOpenPrinterSettings = () => {
@@ -3613,7 +3616,38 @@ export default function ProfileScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            <View style={{ paddingVertical: 28, paddingHorizontal: 8 }}>
+            <View style={{ paddingVertical: 28, paddingHorizontal: 8, gap: 14 }}>
+              {connectedBluetooth ? (
+                <>
+                  <Text
+                    style={[
+                      styles.printerConnectedHint,
+                      isDarkMode && styles.darkText,
+                    ]}
+                  >
+                    {language === "zh"
+                      ? `已连接：${connectedBluetooth.name}`
+                      : `Connected: ${connectedBluetooth.name}`}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.printerPreviewEntryBtn}
+                    onPress={() => {
+                      setShowPrinterModal(false);
+                      setReceiptPreviewVisible(true);
+                    }}
+                    accessibilityLabel={getScanPrinterStrings(language).printPreview}
+                  >
+                    <LinearGradient
+                      colors={["#059669", "#047857"]}
+                      style={styles.printerScanEntryGradient}
+                    >
+                      <Text style={styles.printerScanEntryText}>
+                        🖨️ {getScanPrinterStrings(language).printPreview}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </>
+              ) : null}
               <TouchableOpacity
                 style={styles.printerScanEntryBtn}
                 onPress={handleStartPrinterScan}
@@ -3640,6 +3674,12 @@ export default function ProfileScreen({ navigation }: any) {
         onConnectionChange={() => {
           void refreshConnectedBluetooth();
         }}
+      />
+
+      <ReceiptPrintPreviewModal
+        visible={receiptPreviewVisible}
+        language={language}
+        onClose={() => setReceiptPreviewVisible(false)}
       />
 
       {/* 🚀 新增：自定义时间选择器模态框 */}
@@ -6220,6 +6260,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
   },
+  printerPreviewEntryBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  printerConnectedHint: {
+    textAlign: "center",
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#059669",
+  },
   printerScanEntryGradient: {
     paddingVertical: 18,
     alignItems: "center",
@@ -6491,6 +6541,16 @@ const styles = StyleSheet.create({
   printerScanEntryBtn: {
     borderRadius: 16,
     overflow: "hidden",
+  },
+  printerPreviewEntryBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  printerConnectedHint: {
+    textAlign: "center",
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#059669",
   },
   printerScanEntryGradient: {
     paddingVertical: 18,
