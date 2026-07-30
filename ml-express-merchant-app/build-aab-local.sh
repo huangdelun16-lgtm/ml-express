@@ -9,7 +9,7 @@ echo "🚀 开始本地构建 Android App Bundle..."
 
 # 检查是否在正确的目录
 if [ ! -f "app.json" ]; then
-    echo "❌ 错误: 请在 ml-express-client 目录下运行此脚本"
+    echo "❌ 错误: 请在 ml-express-merchant-app 目录下运行此脚本"
     exit 1
 fi
 
@@ -39,11 +39,11 @@ if [ ! -d "android" ]; then
 fi
 
 # 检查签名配置
-if [ ! -f "android/app/release.keystore" ]; then
-    echo "⚠️  警告: 未找到 release.keystore"
+if [ ! -f "android/app/upload-release.keystore" ]; then
+    echo "⚠️  警告: 未找到 upload-release.keystore"
     echo "请先配置签名密钥："
     echo "1. 从 EAS 下载: eas credentials --platform android --profile production"
-    echo "2. 或创建新的: keytool -genkeypair -v -storetype PKCS12 -keystore android/app/release.keystore -alias release -keyalg RSA -keysize 2048 -validity 10000"
+    echo "2. 或创建新的: keytool -genkeypair -v -storetype PKCS12 -keystore android/app/upload-release.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000"
     echo ""
     read -p "是否使用 debug keystore 继续构建？(y/n) " -n 1 -r
     echo

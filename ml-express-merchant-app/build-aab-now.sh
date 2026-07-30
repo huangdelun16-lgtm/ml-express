@@ -20,8 +20,8 @@ if [ ! -d "$ANDROID_HOME" ]; then
 fi
 
 # 检查 Keystore
-if [ ! -f "android/app/release.keystore" ]; then
-    echo "❌ 错误: Keystore 文件未找到"
+if [ ! -f "android/app/upload-release.keystore" ]; then
+    echo "❌ 错误: Keystore 文件未找到 (android/app/upload-release.keystore)"
     exit 1
 fi
 

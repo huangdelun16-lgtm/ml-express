@@ -8,7 +8,7 @@
 
 set -e
 
-echo "🚀 开始构建客户端App AAB文件..."
+echo "🚀 开始构建商家端 App AAB 文件..."
 echo ""
 
 # 检查并设置Expo Token
@@ -35,8 +35,7 @@ cd "$(dirname "$0")"
 
 # 显示当前版本信息
 echo "📋 当前版本信息："
-echo "   - Version: 1.1.0"
-echo "   - Version Code: 自动递增"
+node -e "const a=require('./app.json'); console.log('   - Version:', a.expo.version); console.log('   - Android versionCode:', a.expo.android.versionCode); console.log('   - iOS buildNumber:', a.expo.ios.buildNumber);"
 echo ""
 
 # 检查EAS CLI
