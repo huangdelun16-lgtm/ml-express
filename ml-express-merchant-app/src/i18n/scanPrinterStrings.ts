@@ -43,6 +43,12 @@ export type ScanPrinterStrings = {
   printPreviewSent: string;
   printPreviewFailed: string;
   printPreviewNotEnabled: string;
+  printPreviewPaperSize: string;
+  printPreviewPaper58: string;
+  printPreviewPaper80: string;
+  printPreviewPaperHint: string;
+  printPreviewBleNotConnected: string;
+  printPreviewBleWriteFailed: string;
 };
 
 const zh: ScanPrinterStrings = {
@@ -90,6 +96,12 @@ const zh: ScanPrinterStrings = {
   printPreviewSent: '已发送打印任务，请查看打印机输出。',
   printPreviewFailed: '打印失败，请确认打印机仍已连接并重试。',
   printPreviewNotEnabled: '请先在设置中连接蓝牙打印机后再打印。',
+  printPreviewPaperSize: '纸条宽度',
+  printPreviewPaper58: '58mm 小票纸',
+  printPreviewPaper80: '80mm 小票纸',
+  printPreviewPaperHint: '请按您实际使用的热敏纸宽度选择，预览与打印将同步调整。',
+  printPreviewBleNotConnected: '蓝牙打印机未连接，请返回重新连接后再打印。',
+  printPreviewBleWriteFailed: '无法写入打印机，请确认设备支持 ESC/POS 小票协议并重试。',
 };
 
 const en: ScanPrinterStrings = {
@@ -137,6 +149,12 @@ const en: ScanPrinterStrings = {
   printPreviewSent: 'Print job sent. Check your printer.',
   printPreviewFailed: 'Print failed. Make sure the printer is still connected.',
   printPreviewNotEnabled: 'Connect a Bluetooth printer in Settings before printing.',
+  printPreviewPaperSize: 'Paper width',
+  printPreviewPaper58: '58mm receipt',
+  printPreviewPaper80: '80mm receipt',
+  printPreviewPaperHint: 'Choose the thermal paper width used by your printer.',
+  printPreviewBleNotConnected: 'Bluetooth printer not connected. Go back and connect first.',
+  printPreviewBleWriteFailed: 'Could not write to printer. Make sure it supports ESC/POS receipts.',
 };
 
 const my: ScanPrinterStrings = {
@@ -184,6 +202,12 @@ const my: ScanPrinterStrings = {
   printPreviewSent: 'Print job sent.',
   printPreviewFailed: 'Print failed.',
   printPreviewNotEnabled: 'Connect a Bluetooth printer first.',
+  printPreviewPaperSize: 'Paper width',
+  printPreviewPaper58: '58mm receipt',
+  printPreviewPaper80: '80mm receipt',
+  printPreviewPaperHint: 'Choose your thermal paper width.',
+  printPreviewBleNotConnected: 'Bluetooth printer not connected.',
+  printPreviewBleWriteFailed: 'Could not write to printer.',
 };
 
 export function getScanPrinterStrings(language: string): ScanPrinterStrings {

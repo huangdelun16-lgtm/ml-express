@@ -11,10 +11,17 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QRCode from 'react-native-qrcode-svg';
+import {
+  RECEIPT_PAPER_PRESETS,
+  type ReceiptPaperWidthMm,
+} from '../constants/receiptPaper';
 import { getScanPrinterStrings } from '../i18n/scanPrinterStrings';
 import { printerService } from '../services/PrinterService';
 import {
-  buildMerchantReceiptHtml,
+  loadReceiptPaperWidth,
+  saveReceiptPaperWidth,
+} from '../services/receiptPaperSettings';
+import {
   computeReceiptTotals,
   createSampleReceiptData,
   type MerchantReceiptData,
@@ -35,11 +42,19 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+function resolvePrintError(strings: ReturnType<typeof getScanPrinterStrings>, error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error ?? '');
+  if (msg === 'BLE_PRINTER_NOT_CONNECTED') return strings.printPreviewBleNotConnected;
+  if (msg === 'BLE_WRITE_CHAR_NOT_FOUND') return strings.printPreviewBleWriteFailed;
+  return strings.printPreviewFailed;
+}
+
 export default function ReceiptPrintPreviewModal({ visible, language, onClose }: Props) {
   const strings = getScanPrinterStrings(language);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [receipt, setReceipt] = useState<MerchantReceiptData | null>(null);
+  const [paperWidth, setPaperWidth] = useState<ReceiptPaperWidthMm>(58);
 
   useEffect(() => {
     if (!visible) return;
@@ -48,11 +63,13 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
     setLoading(true);
 
     void (async () => {
-      const [storeName, storePhone] = await Promise.all([
+      const [storeName, storePhone, savedPaper] = await Promise.all([
         AsyncStorage.getItem('userName'),
         AsyncStorage.getItem('userPhone'),
+        loadReceiptPaperWidth(),
       ]);
       if (cancelled) return;
+      setPaperWidth(savedPaper);
       setReceipt(
         createSampleReceiptData({
           storeName: storeName || undefined,
@@ -67,10 +84,16 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
     };
   }, [visible]);
 
+  const paperPreset = RECEIPT_PAPER_PRESETS[paperWidth];
   const totals = useMemo(
     () => (receipt ? computeReceiptTotals(receipt) : null),
     [receipt],
   );
+
+  const handlePaperChange = (width: ReceiptPaperWidthMm) => {
+    setPaperWidth(width);
+    void saveReceiptPaperWidth(width);
+  };
 
   const handlePrint = () => {
     if (!receipt || printing) return;
@@ -78,15 +101,21 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
     setPrinting(true);
     void (async () => {
       try {
-        const html = buildMerchantReceiptHtml(receipt);
-        const ok = await printerService.printOrder(html, receipt.orderId);
+        const settings = await printerService.getSettings();
+        if (!settings.enabled || settings.type !== 'bluetooth') {
+          Alert.alert(strings.printPreviewTitle, strings.printPreviewNotEnabled);
+          return;
+        }
+
+        await saveReceiptPaperWidth(paperWidth);
+        const ok = await printerService.printMerchantReceipt(receipt);
         if (!ok) {
           Alert.alert(strings.printPreviewTitle, strings.printPreviewNotEnabled);
           return;
         }
         Alert.alert(strings.printPreviewTitle, strings.printPreviewSent);
-      } catch {
-        Alert.alert(strings.printPreviewTitle, strings.printPreviewFailed);
+      } catch (error) {
+        Alert.alert(strings.printPreviewTitle, resolvePrintError(strings, error));
       } finally {
         setPrinting(false);
       }
@@ -102,13 +131,35 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
           <Text style={styles.title}>{strings.printPreviewTitle}</Text>
           <Text style={styles.hint}>{strings.printPreviewHint}</Text>
 
+          <View style={styles.paperSection}>
+            <Text style={styles.paperLabel}>{strings.printPreviewPaperSize}</Text>
+            <View style={styles.paperRow}>
+              {([58, 80] as ReceiptPaperWidthMm[]).map((width) => {
+                const active = paperWidth === width;
+                const label = width === 58 ? strings.printPreviewPaper58 : strings.printPreviewPaper80;
+                return (
+                  <Pressable
+                    key={width}
+                    style={[styles.paperChip, active && styles.paperChipActive]}
+                    onPress={() => handlePaperChange(width)}
+                  >
+                    <Text style={[styles.paperChipText, active && styles.paperChipTextActive]}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.paperHint}>{strings.printPreviewPaperHint}</Text>
+          </View>
+
           {loading || !receipt || !totals ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator color="#38bdf8" />
             </View>
           ) : (
             <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-              <View style={styles.ticket}>
+              <View style={[styles.ticket, { maxWidth: paperPreset.previewWidth, alignSelf: 'center' }]}>
                 {receipt.isSample ? (
                   <Text style={styles.sampleBanner}>{strings.printPreviewSample}</Text>
                 ) : null}
@@ -164,7 +215,7 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
                 ) : null}
 
                 <View style={styles.qrBox}>
-                  <QRCode value={receipt.orderId} size={120} />
+                  <QRCode value={receipt.orderId} size={paperWidth === 58 ? 96 : 120} />
                   <Text style={styles.qrHint}>{strings.printPreviewQrHint}</Text>
                 </View>
 
@@ -220,7 +271,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
+    marginBottom: 10,
+  },
+  paperSection: {
     marginBottom: 12,
+    gap: 8,
+  },
+  paperLabel: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  paperRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  paperChip: {
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#475569',
+    backgroundColor: '#0f172a',
+  },
+  paperChipActive: {
+    borderColor: '#38bdf8',
+    backgroundColor: '#0c4a6e',
+  },
+  paperChipText: {
+    color: '#94a3b8',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  paperChipTextActive: {
+    color: '#e0f2fe',
+  },
+  paperHint: {
+    color: '#64748b',
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   loadingBox: {
     minHeight: 180,
@@ -228,10 +321,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scroll: {
-    maxHeight: 420,
+    maxHeight: 380,
     marginBottom: 12,
   },
   ticket: {
+    width: '100%',
     backgroundColor: '#fffef7',
     borderRadius: 12,
     padding: 14,

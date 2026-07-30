@@ -191,3 +191,28 @@ export async function disconnectBluetoothDevice(): Promise<void> {
   }
   await persistConnectedDevice(null);
 }
+
+export async function ensureConnectedBleDevice(): Promise<Device> {
+  if (connectedDevice) {
+    try {
+      if (await connectedDevice.isConnected()) {
+        return connectedDevice;
+      }
+    } catch {
+      connectedDevice = null;
+    }
+  }
+
+  const saved = await loadSavedBluetoothDevice();
+  if (!saved?.id) {
+    throw new Error('BLE_PRINTER_NOT_CONNECTED');
+  }
+
+  const ble = getManager();
+  await waitForBluetoothReady(ble);
+  const device = await ble.connectToDevice(saved.id, { timeout: CONNECT_TIMEOUT_MS });
+  await device.discoverAllServicesAndCharacteristics();
+  connectedDevice = device;
+  await persistConnectedDevice(deviceFromBle(device));
+  return device;
+}
