@@ -1,6 +1,9 @@
 export type MerchantReceiptItem = {
   label: string;
   qty: number;
+  /** 单价（展示用；COD 单商品行不计入合计） */
+  unitPrice?: number;
+  /** 行合计（计入小票总计的行，如 COD / Item Cost） */
   price?: number;
 };
 
@@ -152,8 +155,8 @@ export function createSampleReceiptData(input: {
     receiverAddress: '仰光 · Kamayut · 示例路 123 号',
     paymentMethod: 'balance',
     items: [
-      { label: '示例商品 A', qty: 1, price: 8500 },
-      { label: '示例商品 B', qty: 2, price: 12000 },
+      { label: 'Sample Item A', qty: 1, unitPrice: 8500, price: 8500 },
+      { label: 'Sample Item B', qty: 2, unitPrice: 6000, price: 12000 },
     ],
     deliveryFee: 2500,
     notes: '少辣 · 尽快送达',

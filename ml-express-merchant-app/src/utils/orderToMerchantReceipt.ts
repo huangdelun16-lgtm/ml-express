@@ -30,17 +30,27 @@ export function parsePrintableItemsFromDescription(
   return itemsMatch[1].split(', ').map((item) => {
     const match = item.match(/^(.+?)\s*x(\d+)$/i);
     if (!match) {
-      return { label: item.trim(), qty: 1, price: undefined };
+      const name = item.trim();
+      if (!name) return null;
+      const unitPrice = productPriceMap?.[name];
+      return {
+        label: name,
+        qty: 1,
+        unitPrice,
+        price: unitPrice,
+      };
     }
     const name = match[1].trim();
+    if (!name) return null;
     const qty = Number(match[2]) || 1;
     const unitPrice = productPriceMap?.[name];
     return {
       label: name,
       qty,
+      unitPrice,
       price: unitPrice ? unitPrice * qty : undefined,
     };
-  });
+  }).filter((item): item is MerchantReceiptItem => item != null);
 }
 
 export function parseDeliveryFeeMmk(price: string | undefined): number {
@@ -81,10 +91,11 @@ export function orderToMerchantReceipt(
   let itemTotal = 0;
 
   if (codAmount > 0) {
-    // COD 单：商品行仅作打包核对（不重复计价），代收款单独一行；合计 = 跑腿费 + COD
+    // COD 单：商品行带序号+单价展示，不计入合计；代收款单独一行
     items = productItems.map((item) => ({
       label: item.label,
       qty: item.qty,
+      unitPrice: item.unitPrice,
       price: undefined,
     }));
     items.push({ label: 'COD Collect', qty: 1, price: codAmount });

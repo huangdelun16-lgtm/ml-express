@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -21,6 +21,12 @@ import QRCode from 'react-native-qrcode-svg';
 import { supabase, merchantService } from '../services/supabase';
 import { printerService } from '../services/PrinterService';
 import { theme } from '../config/theme';
+import { computeReceiptTotals } from '../utils/merchantReceiptTemplate';
+import {
+  orderToMerchantReceipt,
+  type OrderPrintSource,
+} from '../utils/orderToMerchantReceipt';
+import { buildReceiptItemDisplays } from '../utils/receiptItemFormat';
 
 const { width } = Dimensions.get('window');
 const FOOTER_SPACE = 120;
@@ -179,6 +185,24 @@ export const OrderAlertModal = ({
 
   const orderData = orders[selectedIndex]; // 🚀 当前选中的订单数据
 
+  const resolveProductPriceMap = async (): Promise<Record<string, number>> => {
+    if (Object.keys(productPriceMap).length > 0) return productPriceMap;
+    if (!orderData?.delivery_store_id) return {};
+    const products = await merchantService.getStoreProducts(orderData.delivery_store_id);
+    return products.reduce<Record<string, number>>((acc, product) => {
+      acc[product.name] = product.price;
+      return acc;
+    }, {});
+  };
+
+  const receiptSummary = useMemo(() => {
+    if (!orderData) return null;
+    const receipt = orderToMerchantReceipt(orderData as OrderPrintSource, productPriceMap);
+    const totals = computeReceiptTotals(receipt);
+    const displays = buildReceiptItemDisplays(receipt.items);
+    return { receipt, totals, displays };
+  }, [orderData, productPriceMap]);
+
   useEffect(() => {
     let isActive = true;
     const loadProducts = async () => {
@@ -208,7 +232,8 @@ export const OrderAlertModal = ({
       return false;
     }
 
-    return printerService.printReceipt(orderData, { productPriceMap });
+    const priceMap = await resolveProductPriceMap();
+    return printerService.printReceipt(orderData, { productPriceMap: priceMap });
   };
 
   const handleAccept = async () => {
@@ -348,30 +373,15 @@ export const OrderAlertModal = ({
     );
   };
 
-  // 🚀 解析商品列表显示
+  // 🚀 商品列表（与小票打印格式一致：序号 + 单价）
   const renderItems = () => {
-    if (!orderData?.description) return null;
-    const itemsMatch = orderData.description.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
-    if (!itemsMatch || !itemsMatch[1]) return null;
-    
-    const items = itemsMatch[1].split(', ');
-    const itemPayMatch = orderData.description.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
-    const itemCost = itemPayMatch?.[1] ? parseFloat(itemPayMatch[1].replace(/,/g, '')) : 0;
-    const deliveryFee = parseFloat(orderData?.price?.replace(/[^0-9.]/g, '') || '0');
-    const parsedItems = items.map((item: string) => {
-      const match = item.match(/^(.+?)\s*x(\d+)$/i);
-      if (!match) {
-        return { label: item, qty: 1, price: undefined };
-      }
-      const name = match[1].trim();
-      const qty = Number(match[2]) || 1;
-      const unitPrice = productPriceMap[name];
-      return { label: name, qty, price: unitPrice ? unitPrice * qty : undefined };
-    });
-    const computedItemTotal = parsedItems.reduce((sum, item) => sum + (item.price || 0), 0);
-    const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
-    const totalFee = deliveryFee + finalItemTotal;
-    
+    if (!receiptSummary?.displays.length) return null;
+    const { receipt, totals, displays } = receiptSummary;
+    const deliveryLabel =
+      language === 'zh' ? '跑腿费' : language === 'my' ? 'ပို့ဆောင်ခ' : 'Delivery Fee';
+    const totalLabel =
+      language === 'zh' ? '合计' : language === 'my' ? 'စုစုပေါင်း' : 'Total';
+
     return (
       <View style={styles.infoSection}>
         <View style={styles.sectionHeader}>
@@ -379,26 +389,27 @@ export const OrderAlertModal = ({
           <Text style={styles.sectionTitle}>{language === 'zh' ? '商品信息' : 'Items'}</Text>
         </View>
         <View style={styles.itemBox}>
-          {parsedItems.map((item, index) => (
+          {displays.map((display, index) => (
             <View
-              key={`${item.label}-${index}`}
-              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}
+              key={`${display.lineText}-${index}`}
+              style={styles.itemRow}
             >
-              <Text style={styles.itemText}>• {item.label} x{item.qty}</Text>
-              <Text style={styles.value}>
-                {item.price ? `${item.price.toLocaleString()} MMK` : '-'}
+              <Text style={styles.itemText}>{display.lineText}</Text>
+              <Text style={[styles.value, display.isSummary && styles.summaryValue]}>
+                {display.amountText === '-' ? '—' : display.amountText}
               </Text>
             </View>
           ))}
-          <View style={{ height: 8 }} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={styles.cardLabel}>{language === 'zh' ? '跑腿费' : language === 'my' ? 'ပို့ဆောင်ခ' : 'Delivery Fee'}</Text>
-            <Text style={styles.value}>{deliveryFee.toLocaleString()} MMK</Text>
+          <View style={styles.itemDivider} />
+          <View style={styles.itemRow}>
+            <Text style={styles.cardLabel}>{deliveryLabel}</Text>
+            <Text style={styles.value}>{receipt.deliveryFee.toLocaleString()} MMK</Text>
           </View>
-          <View style={{ height: 8 }} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={styles.cardLabel}>{language === 'zh' ? '统计' : language === 'my' ? 'စုစုပေါင်း' : 'Total'}</Text>
-            <Text style={styles.value}>{totalFee.toLocaleString()} MMK</Text>
+          <View style={styles.itemRow}>
+            <Text style={[styles.cardLabel, styles.totalLabel]}>{totalLabel}</Text>
+            <Text style={[styles.value, styles.totalValue]}>
+              {totals.totalFee.toLocaleString()} MMK
+            </Text>
           </View>
         </View>
       </View>
@@ -669,7 +680,12 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 14, color: '#64748b', fontWeight: '600' },
 
   itemBox: { backgroundColor: 'white', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  itemText: { fontSize: 14, color: '#1e293b', fontWeight: '600', marginBottom: 6 },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 },
+  itemText: { fontSize: 14, color: '#1e293b', fontWeight: '600', flex: 1 },
+  itemDivider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 8 },
+  summaryValue: { fontWeight: '900' },
+  totalLabel: { fontWeight: '900', color: '#1e293b' },
+  totalValue: { fontSize: 16, fontWeight: '900', color: '#2563eb' },
 
   paymentBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
   paymentText: { color: 'white', fontSize: 12, fontWeight: '900' },

@@ -9,6 +9,10 @@ import {
   paymentTextForEscPos,
   toEscPosSafeText,
 } from './escposText';
+import {
+  buildReceiptItemDisplays,
+  formatReceiptItemEscPosLine,
+} from './receiptItemFormat';
 
 const ESC = 0x1b;
 const GS = 0x1d;
@@ -131,10 +135,9 @@ export function buildEscPosReceiptBytes(
   appendSeparator(bytes, maxChars);
 
   appendKeyValue(bytes, ESCPOS_RECEIPT_LABELS.pay, paymentText, maxChars);
-  for (const item of data.items) {
-    const priceText = item.price ? `${item.price.toLocaleString()} MMK` : '-';
-    appendLine(bytes, `${itemLabelForEscPos(item.label)} x${item.qty}`, maxChars);
-    appendLine(bytes, `  ${priceText}`, maxChars);
+  const itemDisplays = buildReceiptItemDisplays(data.items, itemLabelForEscPos);
+  for (const display of itemDisplays) {
+    appendLine(bytes, formatReceiptItemEscPosLine(display, maxChars), maxChars);
   }
   appendKeyValue(
     bytes,

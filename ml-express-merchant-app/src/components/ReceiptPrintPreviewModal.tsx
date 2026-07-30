@@ -32,6 +32,7 @@ import {
   type OrderPrintSource,
 } from '../utils/orderToMerchantReceipt';
 import { itemLabelForEscPos, paymentTextForEscPos } from '../utils/escposText';
+import { buildReceiptItemDisplays } from '../utils/receiptItemFormat';
 
 type Props = {
   visible: boolean;
@@ -118,6 +119,12 @@ export default function ReceiptPrintPreviewModal({
     if (isOrderMode) return paymentTextForEscPos(receipt.paymentMethod);
     return totals.paymentText;
   }, [receipt, totals, isOrderMode]);
+
+  const itemDisplays = useMemo(() => {
+    if (!receipt) return [];
+    const labelFn = isOrderMode ? itemLabelForEscPos : undefined;
+    return buildReceiptItemDisplays(receipt.items, labelFn);
+  }, [receipt, isOrderMode]);
 
   const handlePaperChange = (width: ReceiptPaperWidthMm) => {
     setPaperWidth(width);
@@ -209,13 +216,11 @@ export default function ReceiptPrintPreviewModal({
                 <View style={styles.divider} />
                 <Row label={strings.printPreviewPayment} value={paymentDisplay} />
 
-                {receipt.items.map((item) => (
-                  <View key={`${item.label}-${item.qty}`} style={styles.itemRow}>
-                    <Text style={styles.itemLabel}>
-                      {isOrderMode ? itemLabelForEscPos(item.label) : item.label} x{item.qty}
-                    </Text>
-                    <Text style={styles.itemPrice}>
-                      {item.price ? `${item.price.toLocaleString()} MMK` : '—'}
+                {itemDisplays.map((display, index) => (
+                  <View key={`${display.lineText}-${index}`} style={styles.itemRow}>
+                    <Text style={styles.itemLabel}>{display.lineText}</Text>
+                    <Text style={[styles.itemPrice, display.isSummary && styles.itemPriceSummary]}>
+                      {display.amountText === '-' ? '—' : display.amountText}
                     </Text>
                   </View>
                 ))}
@@ -427,6 +432,11 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontSize: 13,
     fontWeight: '700',
+    minWidth: 48,
+    textAlign: 'right',
+  },
+  itemPriceSummary: {
+    fontWeight: '900',
   },
   totalRow: {
     flexDirection: 'row',
