@@ -26,7 +26,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import * as MediaLibrary from "expo-media-library";
 import ViewShot, { captureRef } from "react-native-view-shot";
-import { packageService } from "../services/supabase";
+import { packageService, merchantService } from "../services/supabase";
 import { useApp } from "../contexts/AppContext";
 import { useLoading } from "../contexts/LoadingContext";
 import Toast from "../components/Toast";
@@ -123,14 +123,32 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     if (!order) return;
     try {
       showLoading(language === "zh" ? "正在打印..." : "Printing...", "package");
-      const success = await printerService.printReceipt(order);
+
+      let productPriceMap: Record<string, number> | undefined;
+      const storeId = (order as { delivery_store_id?: string }).delivery_store_id;
+      if (storeId) {
+        const products = await merchantService.getStoreProducts(storeId);
+        productPriceMap = products.reduce<Record<string, number>>((acc, product) => {
+          acc[product.name] = product.price;
+          return acc;
+        }, {});
+      }
+
+      const success = await printerService.printReceipt(order, { productPriceMap });
       hideLoading();
       if (success) {
         showToast(
           language === "zh" ? "打印指令已发送" : "Print command sent",
           "success",
         );
+        return;
       }
+      showToast(
+        language === "zh"
+          ? "打印失败，请先在设置中连接蓝牙小票机"
+          : "Print failed. Connect your receipt printer in Settings first.",
+        "error",
+      );
     } catch (error) {
       hideLoading();
       LoggerService.error("重打小票失败:", error);

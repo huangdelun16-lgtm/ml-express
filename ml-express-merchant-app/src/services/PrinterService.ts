@@ -4,6 +4,10 @@ import LoggerService from './LoggerService';
 import { printMerchantReceiptViaBle } from './bleReceiptPrinter';
 import { loadReceiptPaperWidth } from './receiptPaperSettings';
 import { buildMerchantReceiptHtml, type MerchantReceiptData } from '../utils/merchantReceiptTemplate';
+import {
+  orderToMerchantReceipt,
+  type OrderPrintSource,
+} from '../utils/orderToMerchantReceipt';
 
 export interface PrinterSettings {
   enabled: boolean;
@@ -62,6 +66,14 @@ export const printerService = {
       LoggerService.error(`打印小票 ${data.orderId} 失败:`, error);
       throw error;
     }
+  },
+
+  async printReceipt(
+    order: OrderPrintSource,
+    options?: { productPriceMap?: Record<string, number> },
+  ): Promise<boolean> {
+    const receipt = orderToMerchantReceipt(order, options?.productPriceMap);
+    return this.printMerchantReceipt(receipt);
   },
 
   async printOrder(html: string, orderId: string, receiptData?: MerchantReceiptData): Promise<boolean> {

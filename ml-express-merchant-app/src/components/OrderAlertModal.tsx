@@ -26,47 +26,69 @@ const { width } = Dimensions.get('window');
 const FOOTER_SPACE = 120;
 
 // 🚀 双向滑动确认组件 (右滑接单/左滑取消)
-const SwipeAcceptDecline = ({ onAccept, onDecline, language }: any) => {
+const SwipeAcceptDecline = ({ onAccept, onDecline, language, disabled }: any) => {
   const pan = useRef(new Animated.ValueXY()).current;
+  const actionLockRef = useRef(false);
   const buttonWidth = width - 80;
   const handleWidth = 100;
   const swipeRange = (buttonWidth - handleWidth) / 2;
   const swipeThreshold = swipeRange * 0.7;
 
+  const resetHandle = () => {
+    pan.stopAnimation();
+    pan.setValue({ x: 0, y: 0 });
+  };
+
+  const runAction = (action: 'accept' | 'decline') => {
+    if (disabled || actionLockRef.current) {
+      resetHandle();
+      return;
+    }
+    actionLockRef.current = true;
+    const targetX = action === 'accept' ? swipeRange * 2 : -swipeRange * 2;
+    Animated.spring(pan, { toValue: { x: targetX, y: 0 }, useNativeDriver: false }).start(() => {
+      resetHandle();
+      if (action === 'accept') onAccept();
+      else onDecline();
+      setTimeout(() => {
+        actionLockRef.current = false;
+      }, 800);
+    });
+  };
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => !disabled,
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        !disabled && (Math.abs(gestureState.dx) > 4 || Math.abs(gestureState.dy) > 4),
       onPanResponderGrant: () => {
-        pan.setOffset({ x: (pan.x as any)._value, y: 0 });
+        pan.stopAnimation();
+        pan.setOffset({ x: (pan.x as any)._value ?? 0, y: 0 });
         pan.setValue({ x: 0, y: 0 });
       },
       onPanResponderMove: Animated.event([null, { dx: pan.x }], { useNativeDriver: false }),
-      onPanResponderRelease: (e, gestureState) => {
+      onPanResponderRelease: (_, gestureState) => {
         pan.flattenOffset();
-        
         if (gestureState.dx > swipeThreshold) {
-          // 右滑接单
-          console.log('✅ 触发右滑接单');
-          Animated.spring(pan, { toValue: { x: swipeRange * 2, y: 0 }, useNativeDriver: false }).start(() => {
-            onAccept();
-            pan.setValue({ x: 0, y: 0 });
-          });
+          runAction('accept');
         } else if (gestureState.dx < -swipeThreshold) {
-          // 左滑取消
-          console.log('❌ 触发左滑取消');
-          Animated.spring(pan, { toValue: { x: -swipeRange * 2, y: 0 }, useNativeDriver: false }).start(() => {
-            onDecline();
-            pan.setValue({ x: 0, y: 0 });
-          });
+          runAction('decline');
         } else {
-          // 回弹
-          console.log('↩️ 滑动距离不足，回弹');
           Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
         }
       },
-    })
+      onPanResponderTerminate: () => {
+        pan.flattenOffset();
+        Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+      },
+    }),
   ).current;
+
+  useEffect(() => {
+    if (!disabled) return;
+    resetHandle();
+    actionLockRef.current = false;
+  }, [disabled]);
 
   const translateX = pan.x.interpolate({
     inputRange: [-buttonWidth, buttonWidth],
@@ -111,16 +133,49 @@ export const OrderAlertModal = ({
   onAccepted,
   onDeclineSuccess 
 }: any) => {
-  const [selectedIndex, setSelectedIndex] = useState(0); // 🚀 当前选择的订单索引
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [productPriceMap, setProductPriceMap] = useState<Record<string, number>>({});
+  const processingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearProcessingTimer = () => {
+    if (processingTimerRef.current) {
+      clearTimeout(processingTimerRef.current);
+      processingTimerRef.current = null;
+    }
+  };
+
+  const beginProcessing = () => {
+    clearProcessingTimer();
+    setIsProcessing(true);
+    processingTimerRef.current = setTimeout(() => {
+      setIsProcessing(false);
+    }, 45000);
+  };
+
+  const endProcessing = () => {
+    clearProcessingTimer();
+    setIsProcessing(false);
+  };
+
+  useEffect(() => {
+    if (visible) return;
+    endProcessing();
+    setSelectedIndex(0);
+  }, [visible]);
+
+  useEffect(() => {
+    return () => {
+      clearProcessingTimer();
+    };
+  }, []);
 
   // 🚀 当订单数组变化时，确保索引合法
   useEffect(() => {
     if (selectedIndex >= orders.length) {
       setSelectedIndex(Math.max(0, orders.length - 1));
     }
-  }, [orders.length]);
+  }, [orders.length, selectedIndex]);
 
   const orderData = orders[selectedIndex]; // 🚀 当前选中的订单数据
 
@@ -145,129 +200,22 @@ export const OrderAlertModal = ({
     };
   }, [orderData?.delivery_store_id]);
 
-  const getPrintableItems = () => {
-    if (!orderData?.description) return [];
-    const itemsMatch = orderData.description.match(/\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/);
-    if (!itemsMatch || !itemsMatch[1]) return [];
-    const items = itemsMatch[1].split(', ');
-    return items.map((item: string) => {
-      const match = item.match(/^(.+?)\s*x(\d+)$/i);
-      if (!match) {
-        return { label: item, qty: 1, price: undefined };
-      }
-      const name = match[1].trim();
-      const qty = Number(match[2]) || 1;
-      const unitPrice = productPriceMap[name];
-      return { label: name, qty, price: unitPrice ? unitPrice * qty : undefined };
-    });
-  };
+  const handlePrintOrder = async (): Promise<boolean> => {
+    if (!orderData) return false;
 
-  const handlePrintOrder = async () => {
-    const qrUrl = orderData?.id
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${orderData.id}`
-      : '';
-    const items = getPrintableItems();
-    const itemPayMatch = orderData?.description?.match(/\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/);
-    const itemCost = itemPayMatch?.[1] ? parseFloat(itemPayMatch[1].replace(/,/g, '')) : 0;
-    const deliveryFee = parseFloat(orderData?.price?.replace(/[^0-9.]/g, '') || '0');
-    const computedItemTotal = items.reduce((sum, item) => sum + (item.price || 0), 0);
-    const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
-    const totalFee = deliveryFee + finalItemTotal;
-    const paymentText = orderData?.payment_method === 'cash' ? '现金支付' : '余额支付';
-    const orderIdShort = orderData?.id ? `#${orderData.id.slice(-5)}` : '';
-    const html = `
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <style>
-            * { box-sizing: border-box; }
-            body { margin: 0; padding: 0; font-family: Arial, sans-serif; color: #111827; }
-            .ticket { width: 100%; max-width: 420px; margin: 0 auto; padding: 8px; }
-            .title { text-align: center; font-size: 22px; font-weight: 900; margin-bottom: 4px; }
-            .subtitle { text-align: center; font-size: 14px; color: #374151; margin-bottom: 8px; }
-            .section { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #9ca3af; }
-            .row { display: flex; justify-content: space-between; align-items: flex-start; font-size: 14px; margin: 4px 0; }
-            .label { color: #4b5563; }
-            .value { font-weight: 700; text-align: right; }
-            .items { margin-top: 6px; }
-            .item { display: flex; justify-content: space-between; font-size: 14px; margin: 6px 0; }
-            .total { font-size: 18px; font-weight: 900; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; }
-            .note-box { background: #f3f4f6; padding: 8px; border-radius: 4px; margin-top: 8px; border: 1px solid #d1d5db; }
-            .note-label { font-size: 12px; font-weight: 700; color: #1f2937; margin-bottom: 4px; display: block; }
-            .note-text { font-size: 14px; color: #dc2626; font-weight: 900; }
-            .qr { display: flex; flex-direction: column; align-items: center; margin-top: 12px; }
-            .qr img { width: 140px; height: 140px; }
-            .qr-code { font-size: 12px; font-weight: 700; margin-top: 4px; }
-            .footer-msg { text-align: center; font-size: 12px; color: #6b7280; margin-top: 16px; border-top: 1px solid #eee; padding-top: 8px; }
-          </style>
-        </head>
-        <body>
-          <div class="ticket">
-            <div class="title">MARKET LINK EXPRESS</div>
-            <div class="subtitle">*** 商家存根 / Merchant Copy ***</div>
-            <div style="text-align: center; font-size: 24px; font-weight: 900; margin: 10px 0;">#${orderData?.id?.slice(-5)}</div>
+    const settings = await printerService.getSettings();
+    if (!settings.enabled) {
+      return false;
+    }
 
-            <div class="section">
-              <div class="row"><div class="label">下单时间</div><div class="value">${new Date(orderData?.created_at).toLocaleString()}</div></div>
-              <div class="row"><div class="label">订单编号</div><div class="value">${orderData?.id}</div></div>
-            </div>
-
-            <div class="section">
-              <div class="row"><div class="label">商家</div><div class="value">${orderData?.sender_name || '-'}</div></div>
-              <div class="row"><div class="label">电话</div><div class="value">${orderData?.sender_phone || '-'}</div></div>
-            </div>
-
-            <div class="section">
-              <div class="row"><div class="label">收件人</div><div class="value">${orderData?.receiver_name || '-'}</div></div>
-              <div class="row"><div class="label">电话</div><div class="value">${orderData?.receiver_phone || '-'}</div></div>
-              <div class="row"><div class="label">地址</div><div class="value">${orderData?.receiver_address || '-'}</div></div>
-            </div>
-
-            <div class="section">
-              <div class="row"><div class="label">支付方式</div><div class="value">${paymentText}</div></div>
-              <div class="items">
-                ${(items.length === 0)
-                  ? '<div class="item"><div class="label">商品</div><div class="value">-</div></div>'
-                  : items.map(item => `
-                      <div class="item">
-                        <div>${item.label} x${item.qty}</div>
-                        <div class="value">${item.price ? `${item.price.toLocaleString()} MMK` : '-'}</div>
-                      </div>
-                    `).join('')}
-              </div>
-              <div class="row"><div class="label">跑腿费</div><div class="value">${deliveryFee.toLocaleString()} MMK</div></div>
-              <div class="row total"><div class="label">合计金额</div><div class="value">${totalFee.toLocaleString()} MMK</div></div>
-            </div>
-
-            ${orderData?.notes ? `
-              <div class="note-box">
-                <span class="note-label">备注:</span>
-                <div class="note-text">${orderData.notes}</div>
-              </div>
-            ` : ''}
-
-            ${qrUrl ? `
-              <div class="qr">
-                <img src="${qrUrl}" />
-                <div class="qr-code">扫描取件 / Scan to Pickup</div>
-              </div>
-            ` : ''}
-
-            <div class="footer-msg">感谢您的配合，祝生意兴隆！</div>
-          </div>
-        </body>
-      </html>
-    `;
-    
-    // 🚀 使用新服务进行打印
-    await printerService.printOrder(html, orderData?.id);
+    return printerService.printReceipt(orderData, { productPriceMap });
   };
 
   const handleAccept = async () => {
     if (!orderData || isProcessing) return;
-    setIsProcessing(true);
+    beginProcessing();
     try {
-      const newStatus = '打包中'; // 🚀 改为“打包中”
+      const newStatus = '打包中';
       const { error } = await supabase
         .from('packages')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -275,19 +223,37 @@ export const OrderAlertModal = ({
 
       if (error) throw error;
       onStatusUpdate?.();
-      try {
-        await handlePrintOrder();
-      } catch (printError) {
-        console.error('打印失败:', printError);
-        Alert.alert('错误', '打印失败，请检查打印机连接');
-      }
       onAccepted?.(orderData);
-      // 注意：App.tsx 中 onAccepted 会调用 removePendingOrder，所以这里不需要手动处理索引
+      endProcessing();
+
+      const settings = await printerService.getSettings();
+      if (settings.autoPrint) {
+        void (async () => {
+          try {
+            const printed = await handlePrintOrder();
+            if (!printed) {
+              Alert.alert(
+                language === 'zh' ? '小票未打印' : 'Receipt not printed',
+                language === 'zh'
+                  ? '订单已接单，但打印机未连接或未就绪。请到「小票机」连接后在订单详情「重新打印小票」。'
+                  : 'Order accepted, but printer is not connected. Reprint from order details.',
+              );
+            }
+          } catch (printError) {
+            console.error('打印失败:', printError);
+            Alert.alert(
+              language === 'zh' ? '小票打印失败' : 'Print failed',
+              language === 'zh'
+                ? '订单已接单，但自动打印失败。请到订单详情点击「重新打印小票」。'
+                : 'Order accepted, but auto-print failed. Reprint from order details.',
+            );
+          }
+        })();
+      }
     } catch (error) {
       console.error('接单失败:', error);
+      endProcessing();
       Alert.alert('错误', '接单失败，请检查网络');
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -330,7 +296,7 @@ export const OrderAlertModal = ({
           text: language === 'zh' ? '确定拒绝' : 'Decline', 
           style: 'destructive',
           onPress: async () => {
-            setIsProcessing(true);
+            beginProcessing();
             try {
               // 1. 更新订单状态为已取消
               const { error: orderError } = await supabase
@@ -374,7 +340,7 @@ export const OrderAlertModal = ({
               console.error('拒绝接单失败:', err);
               Alert.alert('错误', '操作失败，请重试');
             } finally {
-              setIsProcessing(false);
+              endProcessing();
             }
           }
         }
@@ -501,18 +467,20 @@ export const OrderAlertModal = ({
     );
   };
 
-  if (!orderData && visible) {
-    return (
-      <Modal visible={visible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <ActivityIndicator size="large" color="white" />
-        </View>
-      </Modal>
-    );
+  if (!visible) return null;
+
+  if (!orderData) {
+    return null;
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      presentationStyle="overFullScreen"
+    >
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContent, { padding: 0, overflow: 'hidden', height: '90%', position: 'relative' }]}>
           <LinearGradient colors={['#1e3a8a', '#2563eb']} style={styles.header}>
@@ -639,6 +607,7 @@ export const OrderAlertModal = ({
           <View style={[styles.footer, styles.footerFixed]}>
             <SwipeAcceptDecline 
               language={language}
+              disabled={isProcessing}
               onAccept={handleAccept}
               onDecline={handleDecline}
             />

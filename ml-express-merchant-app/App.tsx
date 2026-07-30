@@ -8,7 +8,6 @@ import {
   TouchableOpacity, 
   Platform,
   DeviceEventEmitter,
-  Vibration,
   Image
 } from 'react-native';
 
@@ -64,14 +63,19 @@ const linking = {
 import { analytics, EventType } from './src/services/AnalyticsService';
 
 function AppContent({ onLayoutRootView }: any) {
-  const { language, showOrderAlert, setShowOrderAlert, pendingOrders, removePendingOrder } = useApp();
+  const {
+    language,
+    showOrderAlert,
+    pendingOrders,
+    removePendingOrder,
+    dismissOrderAlert,
+  } = useApp();
 
   const handleCloseAlert = () => {
-    setShowOrderAlert(false);
-    Vibration.cancel(); 
-    const Speech = require('expo-speech');
-    Speech.stop(); 
+    dismissOrderAlert();
   };
+
+  const alertVisible = showOrderAlert && pendingOrders.length > 0;
 
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
@@ -108,7 +112,7 @@ function AppContent({ onLayoutRootView }: any) {
 
       {/* 🚀 全局订单提醒 (商户端核心功能) */}
       <OrderAlertModal 
-        visible={showOrderAlert}
+        visible={alertVisible}
         orders={pendingOrders}
         language={language}
         onClose={handleCloseAlert}
