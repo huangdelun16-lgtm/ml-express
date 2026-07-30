@@ -118,10 +118,9 @@ export function isLikelyBlePrinterDevice(device: ScannedBluetoothDevice): boolea
   const name = device.name?.trim() ?? '';
 
   if (name && isObviousNonPrinter(name)) return false;
-  if (name && hasPrinterKeyword(name)) return true;
-  if (isUnnamedPrinterBroadcast(device)) return true;
 
-  return false;
+  // 扫描列表尽量宽松：排除手机/耳机等，其余 BLE 设备均展示供用户手动选择
+  return true;
 }
 
 export function filterLikelyBlePrinters(devices: ScannedBluetoothDevice[]): ScannedBluetoothDevice[] {

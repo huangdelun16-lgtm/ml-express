@@ -8,6 +8,7 @@ export { mergeScannedDevices } from '../utils/bluetoothDeviceMerge';
 
 const CONNECTED_DEVICE_KEY = 'merchant_connected_bluetooth_device';
 const CONNECT_TIMEOUT_MS = 15000;
+const BLUETOOTH_READY_TIMEOUT_MS = 12000;
 
 let manager: BleManager | null = null;
 let connectedDevice: Device | null = null;
@@ -88,19 +89,67 @@ export async function getBluetoothState(): Promise<State> {
   return getManager().state();
 }
 
+function mapBluetoothStateError(state: State): Error | null {
+  if (state === 'PoweredOff') return new Error('BLUETOOTH_OFF');
+  if (state === 'Unauthorized') return new Error('BLUETOOTH_PERMISSION_DENIED');
+  if (state === 'Unsupported') return new Error('BLUETOOTH_UNSUPPORTED');
+  return null;
+}
+
+async function waitForBluetoothReady(ble: BleManager): Promise<void> {
+  const initial = await ble.state();
+  if (initial === 'PoweredOn') return;
+
+  const immediateError = mapBluetoothStateError(initial);
+  if (immediateError) throw immediateError;
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      subscription.remove();
+      reject(new Error('BLUETOOTH_READY_TIMEOUT'));
+    }, BLUETOOTH_READY_TIMEOUT_MS);
+
+    const subscription = ble.onStateChange((state) => {
+      if (settled) return;
+      if (state === 'PoweredOn') {
+        settled = true;
+        clearTimeout(timer);
+        subscription.remove();
+        resolve();
+        return;
+      }
+      const stateError = mapBluetoothStateError(state);
+      if (stateError) {
+        settled = true;
+        clearTimeout(timer);
+        subscription.remove();
+        reject(stateError);
+      }
+    }, true);
+  });
+}
+
 export async function startBluetoothScan(
   onDevices: (devices: ScannedBluetoothDevice[]) => void,
+  onError?: (error: Error) => void,
 ): Promise<() => void> {
   const ble = getManager();
-  const state = await ble.state();
-  if (state !== 'PoweredOn') {
-    throw new Error('BLUETOOTH_OFF');
-  }
+  await waitForBluetoothReady(ble);
 
   const devices = new Map<string, ScannedBluetoothDevice>();
+  let lastScanError: Error | null = null;
 
   ble.startDeviceScan(null, { allowDuplicates: true }, (error, device) => {
-    if (error || !device) return;
+    if (error) {
+      lastScanError = error instanceof Error ? error : new Error(String(error));
+      onError?.(lastScanError);
+      return;
+    }
+    if (!device) return;
+
     devices.set(device.id, deviceFromBle(device));
     onDevices([...devices.values()].sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999)));
   });

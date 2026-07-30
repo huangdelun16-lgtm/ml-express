@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.4.3</string>
+    <string>2.4.4</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -33,7 +33,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>14</string>
+    <string>15</string>
     <key>GMSApiKey</key>
     <string>AIzaSyDUGaYA0yNPDJC9QZ5Uo6dsmvW3WIHSJqc</string>
     <key>ITSAppUsesNonExemptEncryption</key>
@@ -61,6 +61,10 @@
     <string>MARKET LINK EXPRESS需要访问您的相册以保存二维码和包裹图片。</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>MARKET LINK EXPRESS需要访问您的相册以保存付款二维码。</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>MARKET LINK MERCHANT 需要使用蓝牙扫描并连接附近的小票打印机、标签打印机等设备。</string>
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>MARKET LINK MERCHANT 需要使用蓝牙扫描并连接附近的小票打印机、标签打印机等设备。</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UILaunchStoryboardName</key>

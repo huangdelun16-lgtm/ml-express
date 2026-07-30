@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK MERCHANT",
     "slug": "ml-express-merchants",
-    "version": "2.4.3",
+    "version": "2.4.4",
     "scheme": "ml-express-merchants",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,18 +19,19 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.merchants",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages. / 需要位置信息以提供准确的配送服务。 / တိကျသော ပို့ဆောင်ရေးဝန်ဆောင်မှုအတွက် တည်နေရာလိုအပ်ပါသည်။",
         "NSCameraUsageDescription": "MARKET LINK EXPRESS needs access to your camera to scan QR codes and take delivery verification photos. / 需要访问相机以扫描二维码和拍照。 / QR ကုဒ်စကင်ဖတ်ရန် ကင်မရာလိုအပ်ပါသည်။",
         "NSPhotoLibraryUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save QR codes and delivery proof photos. / 需要访问相册以保存图片。 / ဓာတ်ပုံသိမ်းဆည်းရန် ဓာတ်ပုံပြခန်းလိုအပ်ပါသည်။",
         "NSPhotoLibraryAddUsageDescription": "MARKET LINK EXPRESS needs access to your photo library to save payment QR codes. / 需要相册权限以保存付款二维码。 / ငွေပေးချေမှု QR ကုဒ်သိမ်းဆည်းရန် ဓာတ်ပုံပြခန်းလိုအပ်ပါသည်။",
-        "NSBluetoothAlwaysUsageDescription": "MARKET LINK MERCHANT uses Bluetooth to scan nearby receipt printers.",
+        "NSBluetoothAlwaysUsageDescription": "MARKET LINK MERCHANT 需要使用蓝牙扫描并连接附近的小票打印机、标签打印机等设备。 / Uses Bluetooth to scan and connect nearby receipt and label printers.",
+        "NSBluetoothPeripheralUsageDescription": "MARKET LINK MERCHANT 需要使用蓝牙扫描并连接附近的小票打印机、标签打印机等设备。 / Uses Bluetooth to scan and connect nearby receipt and label printers.",
         "CFBundleDisplayName": "MARKET LINK MERCHANT",
         "CFBundleName": "MARKET LINK MERCHANT",
-        "CFBundleShortVersionString": "2.4.3",
-        "CFBundleVersion": "14",
+        "CFBundleShortVersionString": "2.4.4",
+        "CFBundleVersion": "15",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
         "UIRequiredDeviceCapabilities": [
@@ -62,7 +63,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.merchants",
-      "versionCode": 14,
+      "versionCode": 15,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -95,7 +96,7 @@
         {
           "isBackgroundEnabled": false,
           "modes": ["central"],
-          "bluetoothAlwaysPermission": "MARKET LINK MERCHANT uses Bluetooth to scan nearby receipt printers."
+          "bluetoothAlwaysPermission": "MARKET LINK MERCHANT 需要使用蓝牙扫描并连接附近的小票打印机、标签打印机等设备。"
         }
       ]
     ],

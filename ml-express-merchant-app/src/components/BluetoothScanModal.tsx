@@ -46,6 +46,8 @@ function resolveScanError(strings: ScanPrinterStrings, error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error ?? '');
   if (msg === 'BLUETOOTH_OFF') return strings.bluetoothOff;
   if (msg === 'BLUETOOTH_PERMISSION_DENIED') return strings.permissionDenied;
+  if (msg === 'BLUETOOTH_UNSUPPORTED') return strings.unavailable;
+  if (msg === 'BLUETOOTH_READY_TIMEOUT') return strings.bluetoothStarting;
   if (/timeout|timed out|connect/i.test(msg)) return strings.connectFailed;
   return msg || strings.failed;
 }
@@ -90,10 +92,17 @@ export default function BluetoothScanModal({
           throw new Error('BLUETOOTH_PERMISSION_DENIED');
         }
 
-        const stop = await startBluetoothScan((found) => {
-          if (cancelled) return;
-          setDevices((prev) => mergeScannedDevices(prev, filterLikelyBlePrinters(found)));
-        });
+        const stop = await startBluetoothScan(
+          (found) => {
+            if (cancelled) return;
+            setDevices((prev) => mergeScannedDevices(prev, filterLikelyBlePrinters(found)));
+          },
+          (error) => {
+            if (cancelled) return;
+            setScanning(false);
+            Alert.alert(strings.title, resolveScanError(strings, error));
+          },
+        );
         stopScanRef.current = stop;
       } catch (error) {
         if (cancelled) return;
@@ -132,9 +141,15 @@ export default function BluetoothScanModal({
       try {
         const granted = await requestBluetoothScanPermissions();
         if (!granted) throw new Error('BLUETOOTH_PERMISSION_DENIED');
-        const stop = await startBluetoothScan((found) => {
-          setDevices((prev) => mergeScannedDevices(prev, filterLikelyBlePrinters(found)));
-        });
+        const stop = await startBluetoothScan(
+          (found) => {
+            setDevices((prev) => mergeScannedDevices(prev, filterLikelyBlePrinters(found)));
+          },
+          (error) => {
+            setScanning(false);
+            Alert.alert(strings.title, resolveScanError(strings, error));
+          },
+        );
         stopScanRef.current = stop;
         setTimeout(() => {
           stopScanRef.current?.();

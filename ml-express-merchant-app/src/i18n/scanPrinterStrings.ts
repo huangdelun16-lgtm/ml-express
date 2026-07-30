@@ -10,6 +10,7 @@ export type ScanPrinterStrings = {
   unavailable: string;
   bluetoothOff: string;
   permissionDenied: string;
+  bluetoothStarting: string;
   failed: string;
   modalHint: string;
   connecting: string;
@@ -55,7 +56,8 @@ const zh: ScanPrinterStrings = {
   rescan: '重新搜索',
   unavailable: 'Expo Go 不支持蓝牙扫描，请使用含原生模块的开发版或正式 IPA/APK。',
   bluetoothOff: '请先打开手机蓝牙后再搜索。',
-  permissionDenied: '未授予蓝牙或定位权限，无法搜索附近设备。',
+  permissionDenied: '未授予蓝牙权限，请在系统设置中允许 MARKET LINK MERCHANT 使用蓝牙。',
+  bluetoothStarting: '蓝牙尚未就绪，请确认手机蓝牙已开启后重试。',
   failed: '蓝牙搜索失败，请稍后重试。',
   modalHint: '显示附近疑似蓝牙打印机（含未广播名称的设备）。点击即可连接；搜索约 20 秒后自动停止。',
   connecting: '连接中…',
@@ -101,7 +103,8 @@ const en: ScanPrinterStrings = {
   rescan: 'Scan again',
   unavailable: 'Bluetooth scan is not available in Expo Go. Use a dev build or production IPA/APK with native modules.',
   bluetoothOff: 'Turn on Bluetooth on this phone before scanning.',
-  permissionDenied: 'Bluetooth or location permission was denied. Scan cannot start.',
+  permissionDenied: 'Bluetooth permission was denied. Allow Bluetooth access for MARKET LINK MERCHANT in Settings.',
+  bluetoothStarting: 'Bluetooth is not ready yet. Turn on Bluetooth and try again.',
   failed: 'Bluetooth scan failed. Please try again.',
   modalHint: 'Shows nearby devices that may be Bluetooth printers, including ones without a broadcast name. Tap to connect; scan stops after ~20 seconds.',
   connecting: 'Connecting…',
@@ -147,7 +150,8 @@ const my: ScanPrinterStrings = {
   rescan: 'ထပ်မံ ရှာမည်',
   unavailable: 'Expo Go တွင် Bluetooth scan မရနိုင်ပါ။ Native module ပါ dev build သို့မဟုတ် IPA/APK သုံးပါ။',
   bluetoothOff: 'Scan မလုပ်မီ ဖုန်း Bluetooth ဖွင့်ပါ။',
-  permissionDenied: 'Bluetooth/Location ခွင့်ပြုချက် မရရှိပါ။',
+  permissionDenied: 'Bluetooth ခွင့်ပြုချက် မရရှိပါ။ Settings တွင် Bluetooth ခွင့်ပြုပါ။',
+  bluetoothStarting: 'Bluetooth အဆင်သင့်မဖြစ်သေးပါ။ Bluetooth ဖွင့်ပြီး ထပ်စမ်းပါ။',
   failed: 'Bluetooth scan မအောင်မြင်ပါ။',
   modalHint: 'Bluetooth printer ဖြစ်နိုင်သော device များကို ပြပါသည် (နာမည်မပါ device များ ပါဝင်)။ ~20 စက္ကန့်အကြာ scan ရပ်ပါမည်။',
   connecting: 'ချိတ်ဆက်နေသည်…',
