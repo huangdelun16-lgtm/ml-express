@@ -1,4 +1,5 @@
 import type { MerchantReceiptData, MerchantReceiptItem } from './merchantReceiptTemplate';
+import { parseDeclaredItemCostMmk } from './parseOrderPackingItems';
 
 export type OrderPrintSource = {
   id: string;
@@ -15,13 +16,15 @@ export type OrderPrintSource = {
   cod_amount?: number;
 };
 
+/** 与 parseOrderPackingItems / 商家 Web 端对齐 */
+const SELECTED_PRODUCTS_RE =
+  /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်း|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ|商品清单): (.*?)\]/;
+
 export function parsePrintableItemsFromDescription(
   description: string,
   productPriceMap?: Record<string, number>,
 ): MerchantReceiptItem[] {
-  const itemsMatch = description.match(
-    /\[(?:已选商品|Selected|Selected Products|ရွေးချယ်ထားသောပစ္စည်းများ|ကုန်ပစ္စည်းများ): (.*?)\]/,
-  );
+  const itemsMatch = description.match(SELECTED_PRODUCTS_RE);
   if (!itemsMatch?.[1]) return [];
 
   return itemsMatch[1].split(', ').map((item) => {
@@ -40,14 +43,27 @@ export function parsePrintableItemsFromDescription(
   });
 }
 
-export function parseItemCostFromDescription(description: string): number {
-  const match = description.match(
-    /\[(?:商品费用|Item Cost|ကုန်ပစ္စည်းဖိုး|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း)\s*[\(（]?.*?[\)）]?\s*:\s*(.*?)\s*MMK\]/i,
-  );
-  if (match?.[1]) {
-    return parseFloat(match[1].replace(/,/g, ''));
+export function parseDeliveryFeeMmk(price: string | undefined): number {
+  return parseFloat(price?.replace(/[^0-9.]/g, '') || '0');
+}
+
+/** 与 App 订单列表 / 商家 Web 展示一致：跑腿费 + 商品代收款(COD) 或 跑腿费 + 商品费 */
+export function computeMerchantOrderTotalMmk(
+  order: Pick<OrderPrintSource, 'price' | 'description' | 'cod_amount'>,
+  productPriceMap?: Record<string, number>,
+): number {
+  const deliveryFee = parseDeliveryFeeMmk(order.price);
+  const codAmount = Number(order.cod_amount || 0);
+  if (codAmount > 0) {
+    return deliveryFee + codAmount;
   }
-  return 0;
+
+  const productItems = parsePrintableItemsFromDescription(order.description || '', productPriceMap);
+  const declaredItemCost = parseDeclaredItemCostMmk(order.description);
+  const computedItemTotal = productItems.reduce((sum, item) => sum + (item.price || 0), 0);
+  const itemTotal =
+    declaredItemCost != null && declaredItemCost > 0 ? declaredItemCost : computedItemTotal;
+  return deliveryFee + itemTotal;
 }
 
 export function orderToMerchantReceipt(
@@ -56,21 +72,33 @@ export function orderToMerchantReceipt(
 ): MerchantReceiptData {
   const description = order.description || '';
   const productItems = parsePrintableItemsFromDescription(description, productPriceMap);
-  const itemCost = parseItemCostFromDescription(description);
+  const declaredItemCost = parseDeclaredItemCostMmk(description);
   const codAmount = Number(order.cod_amount || 0);
-  const deliveryFee = parseFloat(order.price?.replace(/[^0-9.]/g, '') || '0');
-
-  let items: MerchantReceiptItem[] = [...productItems];
+  const deliveryFee = parseDeliveryFeeMmk(order.price);
   const productSum = productItems.reduce((sum, item) => sum + (item.price || 0), 0);
 
-  if (productItems.length > 0 && itemCost > 0 && productSum === 0) {
-    items = [{ label: '商品费用', qty: 1, price: itemCost }];
-  } else if (productItems.length === 0 && itemCost > 0) {
-    items = [{ label: '商品费用', qty: 1, price: itemCost }];
-  }
+  let items: MerchantReceiptItem[] = [];
+  let itemTotal = 0;
 
   if (codAmount > 0) {
-    items.push({ label: '代收款 COD', qty: 1, price: codAmount });
+    // COD 单：商品行仅作打包核对（不重复计价），代收款单独一行；合计 = 跑腿费 + COD
+    items = productItems.map((item) => ({
+      label: item.label,
+      qty: item.qty,
+      price: undefined,
+    }));
+    items.push({ label: 'COD Collect', qty: 1, price: codAmount });
+    itemTotal = codAmount;
+  } else if (productItems.length > 0 && declaredItemCost != null && declaredItemCost > 0 && productSum === 0) {
+    items = [{ label: 'Item Cost', qty: 1, price: declaredItemCost }];
+    itemTotal = declaredItemCost;
+  } else if (productItems.length === 0 && declaredItemCost != null && declaredItemCost > 0) {
+    items = [{ label: 'Item Cost', qty: 1, price: declaredItemCost }];
+    itemTotal = declaredItemCost;
+  } else {
+    items = [...productItems];
+    itemTotal =
+      declaredItemCost != null && declaredItemCost > 0 ? declaredItemCost : productSum;
   }
 
   return {
@@ -83,6 +111,7 @@ export function orderToMerchantReceipt(
     receiverAddress: order.receiver_address?.trim() || '-',
     paymentMethod: order.payment_method || 'cash',
     items,
+    itemTotal,
     deliveryFee,
     notes: order.notes?.trim() || undefined,
     isSample: false,

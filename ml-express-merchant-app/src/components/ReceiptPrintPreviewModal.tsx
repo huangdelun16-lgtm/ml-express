@@ -21,16 +21,24 @@ import {
   loadReceiptPaperWidth,
   saveReceiptPaperWidth,
 } from '../services/receiptPaperSettings';
+import ReceiptPaperSizePicker from './ReceiptPaperSizePicker';
 import {
   computeReceiptTotals,
   createSampleReceiptData,
   type MerchantReceiptData,
 } from '../utils/merchantReceiptTemplate';
+import {
+  orderToMerchantReceipt,
+  type OrderPrintSource,
+} from '../utils/orderToMerchantReceipt';
+import { itemLabelForEscPos, paymentTextForEscPos } from '../utils/escposText';
 
 type Props = {
   visible: boolean;
   language: string;
   onClose: () => void;
+  order?: OrderPrintSource | null;
+  productPriceMap?: Record<string, number>;
 };
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -49,8 +57,15 @@ function resolvePrintError(strings: ReturnType<typeof getScanPrinterStrings>, er
   return strings.printPreviewFailed;
 }
 
-export default function ReceiptPrintPreviewModal({ visible, language, onClose }: Props) {
+export default function ReceiptPrintPreviewModal({
+  visible,
+  language,
+  onClose,
+  order = null,
+  productPriceMap,
+}: Props) {
   const strings = getScanPrinterStrings(language);
+  const isOrderMode = Boolean(order);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [receipt, setReceipt] = useState<MerchantReceiptData | null>(null);
@@ -63,13 +78,21 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
     setLoading(true);
 
     void (async () => {
-      const [storeName, storePhone, savedPaper] = await Promise.all([
-        AsyncStorage.getItem('userName'),
-        AsyncStorage.getItem('userPhone'),
-        loadReceiptPaperWidth(),
-      ]);
+      const savedPaper = await loadReceiptPaperWidth();
       if (cancelled) return;
       setPaperWidth(savedPaper);
+
+      if (order) {
+        setReceipt(orderToMerchantReceipt(order, productPriceMap));
+        setLoading(false);
+        return;
+      }
+
+      const [storeName, storePhone] = await Promise.all([
+        AsyncStorage.getItem('userName'),
+        AsyncStorage.getItem('userPhone'),
+      ]);
+      if (cancelled) return;
       setReceipt(
         createSampleReceiptData({
           storeName: storeName || undefined,
@@ -82,13 +105,19 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
     return () => {
       cancelled = true;
     };
-  }, [visible]);
+  }, [visible, order, productPriceMap]);
 
   const paperPreset = RECEIPT_PAPER_PRESETS[paperWidth];
   const totals = useMemo(
     () => (receipt ? computeReceiptTotals(receipt) : null),
     [receipt],
   );
+
+  const paymentDisplay = useMemo(() => {
+    if (!receipt || !totals) return '';
+    if (isOrderMode) return paymentTextForEscPos(receipt.paymentMethod);
+    return totals.paymentText;
+  }, [receipt, totals, isOrderMode]);
 
   const handlePaperChange = (width: ReceiptPaperWidthMm) => {
     setPaperWidth(width);
@@ -114,6 +143,7 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
           return;
         }
         Alert.alert(strings.printPreviewTitle, strings.printPreviewSent);
+        if (isOrderMode) onClose();
       } catch (error) {
         Alert.alert(strings.printPreviewTitle, resolvePrintError(strings, error));
       } finally {
@@ -124,34 +154,26 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
 
   if (!visible) return null;
 
+  const hintText = isOrderMode ? strings.printPreviewOrderHint : strings.printPreviewHint;
+  const printBtnText = isOrderMode ? strings.printPreviewConfirmPrint : strings.printPreviewPrint;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.title}>{strings.printPreviewTitle}</Text>
-          <Text style={styles.hint}>{strings.printPreviewHint}</Text>
+          <Text style={styles.hint}>{hintText}</Text>
+          {isOrderMode ? (
+            <Text style={styles.escPosNote}>{strings.printPreviewEscPosNote}</Text>
+          ) : null}
 
-          <View style={styles.paperSection}>
-            <Text style={styles.paperLabel}>{strings.printPreviewPaperSize}</Text>
-            <View style={styles.paperRow}>
-              {([58, 80] as ReceiptPaperWidthMm[]).map((width) => {
-                const active = paperWidth === width;
-                const label = width === 58 ? strings.printPreviewPaper58 : strings.printPreviewPaper80;
-                return (
-                  <Pressable
-                    key={width}
-                    style={[styles.paperChip, active && styles.paperChipActive]}
-                    onPress={() => handlePaperChange(width)}
-                  >
-                    <Text style={[styles.paperChipText, active && styles.paperChipTextActive]}>
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.paperHint}>{strings.printPreviewPaperHint}</Text>
-          </View>
+          <ReceiptPaperSizePicker
+            language={language}
+            value={paperWidth}
+            onChange={handlePaperChange}
+            sectionLabel={strings.printPreviewPaperSize}
+            hint={`${strings.printPreviewPaperHint} ${strings.printPreviewPaperWifiHint}`}
+          />
 
           {loading || !receipt || !totals ? (
             <View style={styles.loadingBox}>
@@ -185,12 +207,12 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
                 <Row label={strings.printPreviewAddress} value={receipt.receiverAddress} />
 
                 <View style={styles.divider} />
-                <Row label={strings.printPreviewPayment} value={totals.paymentText} />
+                <Row label={strings.printPreviewPayment} value={paymentDisplay} />
 
                 {receipt.items.map((item) => (
                   <View key={`${item.label}-${item.qty}`} style={styles.itemRow}>
                     <Text style={styles.itemLabel}>
-                      {item.label} x{item.qty}
+                      {isOrderMode ? itemLabelForEscPos(item.label) : item.label} x{item.qty}
                     </Text>
                     <Text style={styles.itemPrice}>
                       {item.price ? `${item.price.toLocaleString()} MMK` : '—'}
@@ -231,7 +253,7 @@ export default function ReceiptPrintPreviewModal({ visible, language, onClose }:
               disabled={printing || loading || !receipt}
             >
               <Text style={styles.primaryBtnText}>
-                {printing ? strings.printPreviewPrinting : strings.printPreviewPrint}
+                {printing ? strings.printPreviewPrinting : printBtnText}
               </Text>
             </Pressable>
             <Pressable style={styles.secondaryBtn} onPress={onClose}>
@@ -271,7 +293,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
+    marginBottom: 6,
+  },
+  escPosNote: {
+    color: '#fbbf24',
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
     marginBottom: 10,
+    paddingHorizontal: 8,
   },
   paperSection: {
     marginBottom: 12,

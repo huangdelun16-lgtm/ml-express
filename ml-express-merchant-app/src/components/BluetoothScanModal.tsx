@@ -27,6 +27,12 @@ import {
   requestBluetoothScanPermissions,
   startBluetoothScan,
 } from '../services/bluetoothScanner';
+import {
+  loadReceiptPaperWidth,
+  saveReceiptPaperWidth,
+} from '../services/receiptPaperSettings';
+import type { ReceiptPaperWidthMm } from '../constants/receiptPaper';
+import ReceiptPaperSizePicker from './ReceiptPaperSizePicker';
 import ReceiptPrintPreviewModal from './ReceiptPrintPreviewModal';
 
 type Props = {
@@ -65,7 +71,13 @@ export default function BluetoothScanModal({
   const [connectedDevice, setConnectedDevice] = useState<ScannedBluetoothDevice | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [paperWidth, setPaperWidth] = useState<ReceiptPaperWidthMm>(58);
   const stopScanRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    void loadReceiptPaperWidth().then(setPaperWidth);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -211,6 +223,11 @@ export default function BluetoothScanModal({
     })();
   };
 
+  const handlePaperChange = (width: ReceiptPaperWidthMm) => {
+    setPaperWidth(width);
+    void saveReceiptPaperWidth(width);
+  };
+
   const visibleDevices = useMemo(() => {
     const filtered = filterLikelyBlePrinters(devices);
     if (connectedDevice && !filtered.some((device) => device.id === connectedDevice.id)) {
@@ -230,6 +247,15 @@ export default function BluetoothScanModal({
         <View style={styles.card}>
           <Text style={styles.title}>{strings.title}</Text>
           <Text style={styles.hint}>{strings.modalHint}</Text>
+
+          <ReceiptPaperSizePicker
+            language={language}
+            value={paperWidth}
+            onChange={handlePaperChange}
+            sectionLabel={strings.printPreviewPaperSize}
+            hint={`${strings.printPreviewPaperHint} ${strings.printPreviewPaperWifiHint}`}
+            compact
+          />
 
           {!isNativeBleAvailable() ? (
             <Text style={styles.unavailable}>{strings.unavailable}</Text>

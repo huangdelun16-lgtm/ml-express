@@ -47,8 +47,12 @@ export type ScanPrinterStrings = {
   printPreviewPaper58: string;
   printPreviewPaper80: string;
   printPreviewPaperHint: string;
+  printPreviewPaperWifiHint: string;
   printPreviewBleNotConnected: string;
   printPreviewBleWriteFailed: string;
+  printPreviewOrderHint: string;
+  printPreviewConfirmPrint: string;
+  printPreviewEscPosNote: string;
 };
 
 const zh: ScanPrinterStrings = {
@@ -100,8 +104,12 @@ const zh: ScanPrinterStrings = {
   printPreviewPaper58: '58mm 小票纸',
   printPreviewPaper80: '80mm 小票纸',
   printPreviewPaperHint: '请按您实际使用的热敏纸宽度选择，预览与打印将同步调整。',
+  printPreviewPaperWifiHint: '76 / 80 / 110mm 也适用于部分 Wi-Fi 热敏打印机；蓝牙小票机常用 57 / 58mm。',
   printPreviewBleNotConnected: '蓝牙打印机未连接，请返回重新连接后再打印。',
   printPreviewBleWriteFailed: '无法写入打印机，请确认设备支持 ESC/POS 小票协议并重试。',
+  printPreviewOrderHint: '请确认小票内容无误后再打印到已连接的蓝牙打印机。',
+  printPreviewConfirmPrint: '确认打印',
+  printPreviewEscPosNote: '热敏小票机仅稳定支持英文/数字，地址中的缅文等非英文字符打印时可能被省略。',
 };
 
 const en: ScanPrinterStrings = {
@@ -153,8 +161,12 @@ const en: ScanPrinterStrings = {
   printPreviewPaper58: '58mm receipt',
   printPreviewPaper80: '80mm receipt',
   printPreviewPaperHint: 'Choose the thermal paper width used by your printer.',
+  printPreviewPaperWifiHint: '76 / 80 / 110mm also work for many Wi-Fi thermal printers; BLE receipts often use 57 / 58mm.',
   printPreviewBleNotConnected: 'Bluetooth printer not connected. Go back and connect first.',
   printPreviewBleWriteFailed: 'Could not write to printer. Make sure it supports ESC/POS receipts.',
+  printPreviewOrderHint: 'Review the receipt below, then print to your connected Bluetooth printer.',
+  printPreviewConfirmPrint: 'Confirm print',
+  printPreviewEscPosNote: 'Thermal printers support ASCII best; non-English address text may be omitted on paper.',
 };
 
 const my: ScanPrinterStrings = {
@@ -206,8 +218,12 @@ const my: ScanPrinterStrings = {
   printPreviewPaper58: '58mm receipt',
   printPreviewPaper80: '80mm receipt',
   printPreviewPaperHint: 'Choose your thermal paper width.',
+  printPreviewPaperWifiHint: '76 / 80 / 110mm for many Wi-Fi thermal printers; 57 / 58mm for BLE.',
   printPreviewBleNotConnected: 'Bluetooth printer not connected.',
   printPreviewBleWriteFailed: 'Could not write to printer.',
+  printPreviewOrderHint: 'Receipt အား စစ်ဆေးပြီး Bluetooth printer သို့ print လုပ်ပါ။',
+  printPreviewConfirmPrint: 'Confirm print',
+  printPreviewEscPosNote: 'Thermal printer များတွင် ASCII အင်္ဂလိပ်စာသာ တည်ငြိမ်စွာ ထွက်ပါသည်။',
 };
 
 export function getScanPrinterStrings(language: string): ScanPrinterStrings {

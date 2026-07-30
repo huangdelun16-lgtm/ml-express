@@ -31,7 +31,7 @@ import { useApp } from "../contexts/AppContext";
 import { useLoading } from "../contexts/LoadingContext";
 import Toast from "../components/Toast";
 import BackToHomeButton from "../components/BackToHomeButton";
-import { printerService } from "../services/PrinterService";
+import ReceiptPrintPreviewModal from "../components/ReceiptPrintPreviewModal";
 import { type AppLang, getJourneyCopy, getJourneyLabels } from "../utils/orderJourney";
 
 const { width } = Dimensions.get("window");
@@ -66,6 +66,7 @@ interface Order {
   store_receive_code?: string;
   cod_amount?: number;
   payment_method?: "qr" | "cash" | "balance";
+  delivery_store_id?: string;
 }
 
 interface TrackingEvent {
@@ -117,42 +118,29 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [isSettleSaving, setIsSettleSaving] = useState(false); // 🚀 新增：COD 结算状态
+  const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
+  const [reprintPriceMap, setReprintPriceMap] = useState<Record<string, number>>({});
 
-  // 🚀 新增：手动补打小票
+  // 🚀 新增：手动补打小票 — 先打开打印预览，确认后再打印
   const handleReprintReceipt = async () => {
     if (!order) return;
     try {
-      showLoading(language === "zh" ? "正在打印..." : "Printing...", "package");
-
-      let productPriceMap: Record<string, number> | undefined;
-      const storeId = (order as { delivery_store_id?: string }).delivery_store_id;
-      if (storeId) {
-        const products = await merchantService.getStoreProducts(storeId);
+      let productPriceMap: Record<string, number> = {};
+      if (order.delivery_store_id) {
+        showLoading(language === "zh" ? "加载小票..." : "Loading receipt...", "package");
+        const products = await merchantService.getStoreProducts(order.delivery_store_id);
         productPriceMap = products.reduce<Record<string, number>>((acc, product) => {
           acc[product.name] = product.price;
           return acc;
         }, {});
+        hideLoading();
       }
-
-      const success = await printerService.printReceipt(order, { productPriceMap });
-      hideLoading();
-      if (success) {
-        showToast(
-          language === "zh" ? "打印指令已发送" : "Print command sent",
-          "success",
-        );
-        return;
-      }
-      showToast(
-        language === "zh"
-          ? "打印失败，请先在设置中连接蓝牙小票机"
-          : "Print failed. Connect your receipt printer in Settings first.",
-        "error",
-      );
+      setReprintPriceMap(productPriceMap);
+      setReceiptPreviewVisible(true);
     } catch (error) {
       hideLoading();
-      LoggerService.error("重打小票失败:", error);
-      showToast(language === "zh" ? "打印失败" : "Print failed", "error");
+      LoggerService.error("加载小票预览失败:", error);
+      showToast(language === "zh" ? "加载小票失败" : "Failed to load receipt", "error");
     }
   };
 
@@ -2192,6 +2180,14 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         visible={toastVisible}
         duration={3000}
         onHide={() => setToastVisible(false)}
+      />
+
+      <ReceiptPrintPreviewModal
+        visible={receiptPreviewVisible}
+        language={language}
+        order={order}
+        productPriceMap={reprintPriceMap}
+        onClose={() => setReceiptPreviewVisible(false)}
       />
     </View>
   );
