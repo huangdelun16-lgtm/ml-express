@@ -18,6 +18,7 @@ import {
   resolveCustomerExchangeRate,
   resolveCustomerProxyFeePercent,
   rowHasExportContent,
+  sumProxyPurchaseRowsRmb,
   type CustomerDepositEntry,
   type CustomerDepositStore,
   type CustomerExchangeRateStore,
@@ -127,6 +128,28 @@ function rowHasContent(row: ProxyPurchaseRow): boolean {
   return rowHasExportContent(row);
 }
 
+type SummaryExportScope = 'settled' | 'open' | 'date';
+
+function filterSummaryExportRows(
+  rows: ProxyPurchaseRow[],
+  customerKey: string,
+  scope: SummaryExportScope,
+  orderDate?: string,
+): ProxyPurchaseRow[] {
+  return rows.filter((row) => {
+    if (!rowHasExportContent(row)) return false;
+    if (row.customerName.trim() !== customerKey) return false;
+    if (scope === 'settled') return isProxyPurchaseRowSettled(row);
+    if (scope === 'open') return !isProxyPurchaseRowSettled(row);
+    if (scope === 'date') {
+      const date = orderDate?.trim();
+      if (!date) return false;
+      return row.orderDate.trim() === date;
+    }
+    return false;
+  });
+}
+
 function formatSettledAt(iso: string | undefined, language: 'zh' | 'en' | 'my'): string {
   if (!iso?.trim()) return '';
   const d = new Date(iso);
@@ -226,6 +249,8 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   const [listPage, setListPage] = useState(1);
   const [exportSelected, setExportSelected] = useState<Record<string, boolean>>({});
   const [settleFilter, setSettleFilter] = useState<'all' | 'open' | 'settled'>('all');
+  const [summaryExportScope, setSummaryExportScope] = useState<SummaryExportScope>('settled');
+  const [summaryExportDate, setSummaryExportDate] = useState('');
   const [summaryCustomerKey, setSummaryCustomerKey] = useState<string | null>(SUMMARY_ALL_CUSTOMERS);
 
   const currentOwner = useCallback(
@@ -904,7 +929,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     return map;
   }, [rows]);
 
-  const selectedCustomerDeposit = useMemo(() => {
+  const selectedCustomerDepositOriginal = useMemo(() => {
     if (summaryCustomerKey === null) return 0;
     if (summaryCustomerKey === SUMMARY_ALL_CUSTOMERS) {
       return round2(
@@ -917,44 +942,65 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     return getCustomerDepositTotal(customerDeposits, summaryCustomerKey);
   }, [customerDeposits, summaryCustomerKey]);
 
-  const summaryCustomerShoppingRows = useMemo(() => {
-    if (summaryCustomerKey === null) return [];
+  const selectedCustomerSettled = useMemo(() => {
+    if (summaryCustomerKey === null) return 0;
     if (summaryCustomerKey === SUMMARY_ALL_CUSTOMERS) {
-      return openBillingRows.filter((row) => rowHasExportContent(row));
+      return sumProxyPurchaseRowsRmb(rows, feeForCustomer, { settled: true });
     }
-    return openBillingRows.filter(
-      (row) => row.customerName.trim() === summaryCustomerKey && rowHasExportContent(row),
-    );
-  }, [openBillingRows, summaryCustomerKey]);
+    return sumProxyPurchaseRowsRmb(rows, feeForCustomer, {
+      customerKey: summaryCustomerKey,
+      settled: true,
+    });
+  }, [rows, summaryCustomerKey, feeForCustomer]);
 
-  const selectedCustomerShopping = useMemo(() => {
+  const selectedCustomerDepositRemaining = useMemo(
+    () => round2(selectedCustomerDepositOriginal - selectedCustomerSettled),
+    [selectedCustomerDepositOriginal, selectedCustomerSettled],
+  );
+
+  const summaryExportRows = useMemo(() => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey)) return [];
+    return filterSummaryExportRows(rows, summaryCustomerKey, summaryExportScope, summaryExportDate);
+  }, [rows, summaryCustomerKey, summaryExportScope, summaryExportDate]);
+
+  const summaryExportTotalRmb = useMemo(() => {
     let total = 0;
-    summaryCustomerShoppingRows.forEach((row) => {
+    summaryExportRows.forEach((row) => {
       total += calcLineTotalRmb(parseNum(row.unitPrice), feeForCustomer(row.customerName.trim()));
     });
     return round2(total);
-  }, [summaryCustomerShoppingRows, feeForCustomer]);
+  }, [summaryExportRows, feeForCustomer]);
 
-  const selectedCustomerBalance = useMemo(
-    () => round2(selectedCustomerDeposit - selectedCustomerShopping),
-    [selectedCustomerDeposit, selectedCustomerShopping],
-  );
+  const summaryExportDateOptions = useMemo(() => {
+    if (!isSpecificSummaryCustomer(summaryCustomerKey)) return [];
+    const dates = new Set<string>();
+    rows.forEach((row) => {
+      if (row.customerName.trim() !== summaryCustomerKey) return;
+      if (!rowHasExportContent(row)) return;
+      const d = row.orderDate.trim();
+      if (d) dates.add(d);
+    });
+    return Array.from(dates).sort((a, b) => b.localeCompare(a));
+  }, [rows, summaryCustomerKey]);
+
+  const selectedCustomerBalance = selectedCustomerDepositRemaining;
 
   const selectedCustomerBalanceMmk = useMemo(() => {
     if (summaryCustomerKey === null) return 0;
     if (summaryCustomerKey === SUMMARY_ALL_CUSTOMERS) {
       const names = new Set<string>();
       Object.keys(customerDeposits).forEach((name) => names.add(name));
-      openBillingRows.forEach((row) => names.add(row.customerName.trim()));
+      rows.forEach((row) => {
+        if (isProxyPurchaseRowSettled(row)) names.add(row.customerName.trim());
+      });
       let total = 0;
       names.forEach((name) => {
         const deposit = getCustomerDepositTotal(customerDeposits, name);
-        let shopping = 0;
-        openBillingRows.forEach((row) => {
-          if (row.customerName.trim() !== name) return;
-          shopping += calcLineTotalRmb(parseNum(row.unitPrice), feeForCustomer(name));
+        const settled = sumProxyPurchaseRowsRmb(rows, feeForCustomer, {
+          customerKey: name,
+          settled: true,
         });
-        total += Math.round(round2(deposit - shopping) * rateForCustomer(name));
+        total += Math.round(round2(deposit - settled) * rateForCustomer(name));
       });
       return total;
     }
@@ -962,11 +1008,17 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
   }, [
     customerDeposits,
     feeForCustomer,
-    openBillingRows,
+    rows,
     rateForCustomer,
     selectedCustomerBalance,
     summaryCustomerKey,
   ]);
+
+  useEffect(() => {
+    if (summaryExportScope !== 'date') return;
+    if (summaryExportDate && summaryExportDateOptions.includes(summaryExportDate)) return;
+    setSummaryExportDate(summaryExportDateOptions[0] ?? '');
+  }, [summaryExportScope, summaryExportDate, summaryExportDateOptions]);
 
   useEffect(() => {
     if (customerDirectory.length === 0) {
@@ -1031,6 +1083,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           totalRmb: 'Customer balance',
           totalRmbByCustomer: 'Per customer',
           customerDeposit: 'Deposit',
+          customerSettled: 'Settled',
+          depositOriginalTotal: 'Total deposited',
+          depositSettledDeduct: 'Settled purchases',
+          depositBalance: 'Deposit balance',
           customerShopping: 'Purchases',
           depositDate: 'Date',
           depositAmount: 'Amount',
@@ -1045,13 +1101,20 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           depositEmpty: 'No remittance records yet.',
           depositAddEntry: 'Add remittance',
           depositAmountInvalid: 'Enter a valid deposit amount.',
-          exportNoneCustomer: 'No open orders for this customer to export.',
+          exportNoneCustomer: 'No rows to export for this customer.',
+          exportNoneSettled: 'No settled orders to export for this customer.',
+          exportNoneOpen: 'No open orders to export for this customer.',
+          exportNoneDate: 'Pick a date, or no orders on that date.',
+          summaryExportSettled: 'Settled',
+          summaryExportOpen: 'Open',
+          summaryExportByDate: '📅 Date',
           summaryPhone: 'Phone',
           summaryPhonePlaceholder: 'Customer phone',
           selectCustomer: 'Select customer',
           allCustomers: 'All',
           ordersForCustomer: 'Showing orders for {name}',
           grandTotalLabel: 'Balance',
+          grandTotalHint: 'Deposit − settled',
           unnamedCustomer: '(No customer)',
           totalMmk: 'In MMK',
           rateHint: 'Shown in Excel footer',
@@ -1092,8 +1155,8 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
           batchSettle: 'Batch settle',
           settledBadge: 'Settled',
           settledViewOnly: 'Settled — read only',
-          confirmSettle: 'Mark this order as settled? It will be removed from the RMB total but kept for export.',
-          confirmBatchSettle: 'Settle selected open orders? They will be removed from the RMB total but kept for export.',
+          confirmSettle: 'Mark this order as settled? The amount will be deducted from the customer deposit balance.',
+          confirmBatchSettle: 'Settle selected open orders? Amounts will be deducted from the customer deposit balance.',
           noRowsToSettle: 'Select at least one unsettled order with data.',
           unsettle: 'Undo settle',
           unsettleShort: 'Undo',
@@ -1148,6 +1211,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             totalRmb: 'Balance',
             totalRmbByCustomer: 'Per customer',
             customerDeposit: 'Deposit',
+            customerSettled: 'Settled',
+            depositOriginalTotal: 'Total deposited',
+            depositSettledDeduct: 'Settled purchases',
+            depositBalance: 'Deposit balance',
             customerShopping: 'Purchases',
             depositDate: 'Date',
             depositAmount: 'Amount',
@@ -1163,13 +1230,20 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             depositEmpty: 'No records.',
             depositAddEntry: 'Add',
             depositAmountInvalid: 'Enter amount.',
-            exportNoneCustomer: 'No orders to export.',
+            exportNoneCustomer: 'No rows to export.',
+            exportNoneSettled: 'No settled orders.',
+            exportNoneOpen: 'No open orders.',
+            exportNoneDate: 'Pick a date first.',
+            summaryExportSettled: 'Settled',
+            summaryExportOpen: 'Open',
+            summaryExportByDate: '📅 Date',
             summaryPhone: 'Phone',
             summaryPhonePlaceholder: 'Phone number',
             selectCustomer: 'Customer',
             allCustomers: 'All',
             ordersForCustomer: 'Orders: {name}',
             grandTotalLabel: 'Balance',
+          grandTotalHint: 'Deposit − settled',
             unnamedCustomer: '(No customer)',
             totalMmk: 'MMK',
             rateHint: 'Excel footer',
@@ -1265,6 +1339,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             totalRmb: '人民币合计',
             totalRmbByCustomer: '单客户结算',
             customerDeposit: '客户订金',
+            customerSettled: '已结清',
+            depositOriginalTotal: '累计订金',
+            depositSettledDeduct: '已结清扣款',
+            depositBalance: '订金余额',
             customerShopping: '客户购物',
             depositDate: '日期',
             depositAmount: '金额',
@@ -1280,13 +1358,20 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             depositEmpty: '暂无汇款记录。',
             depositAddEntry: '添加汇款',
             depositAmountInvalid: '请填写有效的订金金额。',
-            exportNoneCustomer: '当前客户没有可导出的未结清订单。',
+            exportNoneCustomer: '当前客户没有可导出的订单。',
+            exportNoneSettled: '当前客户没有可导出的已结清订单。',
+            exportNoneOpen: '当前客户没有可导出的未结清订单。',
+            exportNoneDate: '请选择日期，或该日期没有可导出订单。',
+            summaryExportSettled: '已结清',
+            summaryExportOpen: '未结清',
+            summaryExportByDate: '📅日期',
             summaryPhone: '电话',
             summaryPhonePlaceholder: '填写客户电话',
             selectCustomer: '选择客户',
             allCustomers: '全部',
             ordersForCustomer: '仅显示 {name} 的订单',
             grandTotalLabel: '总合计',
+            grandTotalHint: '订金 − 已结清',
             unnamedCustomer: '（未填客户）',
             totalMmk: '缅币约合',
             rateHint: '导出 Excel 时显示在底部',
@@ -1327,14 +1412,14 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
             batchSettle: '批量结清',
             settledBadge: '已结清',
             settledViewOnly: '已结清，不可编辑',
-            confirmSettle: '确认结清此订单？结清后不计入人民币合计，但仍保留可再次导出。',
-            confirmBatchSettle: '确认批量结清当前范围内已勾选的未结清订单？结清后不计入人民币合计，但仍保留可再次导出。',
+            confirmSettle: '确认结清此订单？结清后将从客户订金余额中扣除对应金额。',
+            confirmBatchSettle: '确认批量结清已勾选的未结清订单？结清后将从客户订金余额中扣除对应金额。',
             noRowsToSettle: '请先勾选至少一条未结清的有效订单。',
             unsettle: '撤销结清',
             unsettleShort: '撤销',
             batchUnsettle: '批量撤销结清',
-            confirmUnsettle: '确认撤销此订单的结清状态？撤销后将重新计入人民币合计。',
-            confirmBatchUnsettle: '确认批量撤销已勾选订单的结清状态？撤销后将重新计入人民币合计。',
+            confirmUnsettle: '确认撤销此订单的结清状态？撤销后将恢复客户订金余额。',
+            confirmBatchUnsettle: '确认批量撤销已勾选订单的结清状态？撤销后将恢复客户订金余额。',
             noRowsToUnsettle: '请先勾选至少一条已结清订单。',
             confirmDeleteSettledRow: '确认删除这条已结清订单？删除后无法恢复。',
             filterAll: '全部',
@@ -1446,17 +1531,31 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       window.alert(t.exportNoneCustomer);
       return;
     }
-    if (summaryCustomerShoppingRows.length === 0) {
-      window.alert(t.exportNoneCustomer);
+    if (summaryExportScope === 'date' && !summaryExportDate.trim()) {
+      window.alert(t.exportNoneDate);
+      return;
+    }
+    if (summaryExportRows.length === 0) {
+      window.alert(
+        summaryExportScope === 'settled'
+          ? t.exportNoneSettled
+          : summaryExportScope === 'open'
+            ? t.exportNoneOpen
+            : t.exportNoneDate,
+      );
       return;
     }
     setExportBusy(true);
     try {
+      const dateHint =
+        summaryExportScope === 'date' && summaryExportDate.trim()
+          ? summaryExportDate.trim()
+          : summaryExportScope;
       await exportProxyPurchaseExcel({
-        rows: summaryCustomerShoppingRows,
+        rows: summaryExportRows,
         proxyFeePercent: feeForCustomer(summaryCustomerKey),
         exchangeRate: rateForCustomer(summaryCustomerKey),
-        filenameHint: summaryCustomerKey || 'supplier',
+        filenameHint: `${summaryCustomerKey}_${dateHint}`,
       });
     } catch (err) {
       console.error(err);
@@ -1466,13 +1565,16 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     }
   }, [
     summaryCustomerKey,
-    summaryCustomerShoppingRows,
+    summaryExportScope,
+    summaryExportDate,
+    summaryExportRows,
     feeForCustomer,
     rateForCustomer,
-    feePctNum,
-    rateNum,
     t.exportFail,
     t.exportNoneCustomer,
+    t.exportNoneDate,
+    t.exportNoneOpen,
+    t.exportNoneSettled,
   ]);
 
   const renderStatusSelect = (row: ProxyPurchaseRow) => {
@@ -2488,7 +2590,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
               >
                 <span style={{ opacity: 0.85 }}>{t.customerDeposit}</span>
                 <span style={{ fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: '#93c5fd' }}>
-                  ¥{selectedCustomerDeposit.toFixed(2)}{isSpecificSummaryCustomer(summaryCustomerKey) ? ' ›' : ''}
+                  ¥{selectedCustomerDepositRemaining.toFixed(2)}{isSpecificSummaryCustomer(summaryCustomerKey) ? ' ›' : ''}
                 </span>
               </button>
               <div
@@ -2503,11 +2605,16 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                   background: 'rgba(234, 179, 8, 0.08)',
                 }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => void handleSummaryCustomerExport()}
-                    disabled={exportBusy || !isSpecificSummaryCustomer(summaryCustomerKey) || summaryCustomerShoppingRows.length === 0}
+                    disabled={
+                      exportBusy ||
+                      !isSpecificSummaryCustomer(summaryCustomerKey) ||
+                      (summaryExportScope === 'date' && !summaryExportDate.trim()) ||
+                      summaryExportRows.length === 0
+                    }
                     style={{
                       padding: '3px 8px',
                       borderRadius: 8,
@@ -2517,11 +2624,17 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                       fontSize: 11,
                       fontWeight: 800,
                       cursor:
-                        exportBusy || !isSpecificSummaryCustomer(summaryCustomerKey) || summaryCustomerShoppingRows.length === 0
+                        exportBusy ||
+                        !isSpecificSummaryCustomer(summaryCustomerKey) ||
+                        (summaryExportScope === 'date' && !summaryExportDate.trim()) ||
+                        summaryExportRows.length === 0
                           ? 'not-allowed'
                           : 'pointer',
                       opacity:
-                        exportBusy || !isSpecificSummaryCustomer(summaryCustomerKey) || summaryCustomerShoppingRows.length === 0
+                        exportBusy ||
+                        !isSpecificSummaryCustomer(summaryCustomerKey) ||
+                        (summaryExportScope === 'date' && !summaryExportDate.trim()) ||
+                        summaryExportRows.length === 0
                           ? 0.55
                           : 1,
                       whiteSpace: 'nowrap',
@@ -2529,10 +2642,49 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                   >
                     {exportBusy ? '…' : t.exportExcel}
                   </button>
-                  <span style={{ opacity: 0.82, whiteSpace: 'nowrap' }}>{t.customerShopping}</span>
+                  <select
+                    className="proxy-purchase-cell-input"
+                    value={summaryExportScope}
+                    onChange={(e) => {
+                      const next = e.target.value as SummaryExportScope;
+                      setSummaryExportScope(next);
+                      if (next === 'date' && !summaryExportDate && summaryExportDateOptions[0]) {
+                        setSummaryExportDate(summaryExportDateOptions[0]);
+                      }
+                    }}
+                    disabled={!isSpecificSummaryCustomer(summaryCustomerKey)}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '4px 6px',
+                      minWidth: 72,
+                      maxWidth: 110,
+                      opacity: isSpecificSummaryCustomer(summaryCustomerKey) ? 1 : 0.55,
+                    }}
+                  >
+                    <option value="settled">{t.summaryExportSettled}</option>
+                    <option value="open">{t.summaryExportOpen}</option>
+                    <option value="date">{t.summaryExportByDate}</option>
+                  </select>
+                  {summaryExportScope === 'date' ? (
+                    <input
+                      className="proxy-purchase-cell-input"
+                      type="date"
+                      value={summaryExportDate}
+                      onChange={(e) => setSummaryExportDate(e.target.value)}
+                      disabled={!isSpecificSummaryCustomer(summaryCustomerKey)}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '4px 6px',
+                        width: isMobile ? 118 : 128,
+                        opacity: isSpecificSummaryCustomer(summaryCustomerKey) ? 1 : 0.55,
+                      }}
+                    />
+                  ) : null}
                 </div>
                 <span style={{ fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: '#fde68a' }}>
-                  ¥{selectedCustomerShopping.toFixed(2)}
+                  ¥{summaryExportTotalRmb.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -2547,7 +2699,10 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
                 gap: 8,
               }}
             >
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#f8fafc' }}>{t.grandTotalLabel}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#f8fafc' }}>
+                {t.grandTotalLabel}
+                <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, opacity: 0.55 }}>({t.grandTotalHint})</span>
+              </span>
               <span
                 style={{
                   fontSize: isMobile ? 20 : 22,
@@ -2856,20 +3011,59 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
 
             <div
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '8px 10px',
+                display: 'grid',
+                gap: 6,
                 marginBottom: 10,
-                borderRadius: 10,
-                background: 'rgba(37, 99, 235, 0.14)',
-                border: '1px solid rgba(96, 165, 250, 0.24)',
               }}
             >
-              <span style={{ fontSize: 12, opacity: 0.85 }}>{t.customerDeposit}</span>
-              <span style={{ fontSize: 18, fontWeight: 900, color: '#93c5fd', fontVariantNumeric: 'tabular-nums' }}>
-                ¥{selectedCustomerDeposit.toFixed(2)}
-              </span>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'rgba(30, 41, 59, 0.55)',
+                  border: '1px solid rgba(148, 163, 184, 0.16)',
+                }}
+              >
+                <span style={{ fontSize: 12, opacity: 0.85 }}>{t.depositOriginalTotal}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>
+                  ¥{selectedCustomerDepositOriginal.toFixed(2)}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'rgba(234, 179, 8, 0.08)',
+                  border: '1px solid rgba(250, 204, 21, 0.22)',
+                }}
+              >
+                <span style={{ fontSize: 12, opacity: 0.85 }}>{t.depositSettledDeduct}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#fde68a', fontVariantNumeric: 'tabular-nums' }}>
+                  −¥{selectedCustomerSettled.toFixed(2)}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'rgba(37, 99, 235, 0.14)',
+                  border: '1px solid rgba(96, 165, 250, 0.24)',
+                }}
+              >
+                <span style={{ fontSize: 12, opacity: 0.85 }}>{t.depositBalance}</span>
+                <span style={{ fontSize: 18, fontWeight: 900, color: '#93c5fd', fontVariantNumeric: 'tabular-nums' }}>
+                  ¥{selectedCustomerDepositRemaining.toFixed(2)}
+                </span>
+              </div>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: 10, paddingRight: 2 }}>

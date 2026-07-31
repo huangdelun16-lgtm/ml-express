@@ -196,6 +196,25 @@ export function calcLineTotalRmb(unitPrice: number, feePercent: number): number 
   return round2(unitPrice + calcProxyFee(unitPrice, feePercent));
 }
 
+/** 汇总订单行人民币合计（含代购费）；可按客户、结清状态筛选 */
+export function sumProxyPurchaseRowsRmb(
+  rows: ProxyPurchaseRow[],
+  feePercentForCustomer: (customerName: string) => number,
+  opts?: {
+    customerKey?: string;
+    settled?: boolean;
+  },
+): number {
+  let total = 0;
+  for (const row of rows) {
+    if (opts?.settled !== undefined && isProxyPurchaseRowSettled(row) !== opts.settled) continue;
+    if (opts?.customerKey !== undefined && row.customerName.trim() !== opts.customerKey) continue;
+    if (!rowHasExportContent(row)) continue;
+    total += calcLineTotalRmb(parseNum(row.unitPrice), feePercentForCustomer(row.customerName.trim()));
+  }
+  return round2(total);
+}
+
 const XL_BORDER = {
   top: { style: 'thin' as const, color: { argb: 'FF94A3B8' } },
   left: { style: 'thin' as const, color: { argb: 'FF94A3B8' } },
