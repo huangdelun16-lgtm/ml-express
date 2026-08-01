@@ -6,6 +6,7 @@ import CrossBorderAccountManagementModal from '../components/CrossBorderAccountM
 import CrossBorderPricingModal from '../components/CrossBorderPricingModal';
 import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
 import CrossBorderClearTestDataModal from '../components/CrossBorderClearTestDataModal';
+import CreateCrossBorderCustomerModal from '../components/CreateCrossBorderCustomerModal';
 import CustomerExpressItemsModal from '../components/CustomerExpressItemsModal';
 import StoreFinanceDetailModal from '../components/StoreFinanceDetailModal';
 import StationReconciliationModal from '../components/StationReconciliationModal';
@@ -15,7 +16,9 @@ import {
   fetchInventoryConsoleOverview,
   fetchInventoryConsolePacks,
   fetchInventoryCustomerSummaries,
+  fetchCrossBorderRegisteredCustomers,
   type CreateCrossBorderAccountResult,
+  type CrossBorderRegisteredCustomer,
   type UpdateCrossBorderAccountResult,
   type InventoryConsoleData,
   type InventoryCustomerSummary,
@@ -46,6 +49,21 @@ function formatDateTime(value?: string | null, lang: string = 'zh'): string {
       hour: '2-digit',
       minute: '2-digit',
     });
+  } catch {
+    return value;
+  }
+}
+
+function formatIsoDate(value?: string | null, lang: string = 'zh'): string {
+  if (!value) return '—';
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return value;
+  try {
+    const loc = lang === 'en' ? 'en-US' : 'zh-CN';
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).toLocaleDateString(
+      loc,
+      { year: 'numeric', month: 'short', day: 'numeric' },
+    );
   } catch {
     return value;
   }
@@ -159,13 +177,18 @@ const CrossBorderLogisticsPage: React.FC = () => {
     null,
   );
   const [customerSummaries, setCustomerSummaries] = useState<InventoryCustomerSummary[]>([]);
+  const [registeredCustomers, setRegisteredCustomers] = useState<CrossBorderRegisteredCustomer[]>(
+    [],
+  );
   const [customersLoading, setCustomersLoading] = useState(false);
+  const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [customerModalTarget, setCustomerModalTarget] = useState<InventoryCustomerSummary | null>(
     null,
   );
   const [lastCreated, setLastCreated] = useState<CreateCrossBorderAccountResult | null>(null);
   const [storesPage, setStoresPage] = useState(1);
   const [customersPage, setCustomersPage] = useState(1);
+  const [registeredCustomersPage, setRegisteredCustomersPage] = useState(1);
   const [packsPage, setPacksPage] = useState(1);
   const [financePage, setFinancePage] = useState(1);
   const [tablePageSize, setTablePageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -190,10 +213,15 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const loadCustomers = useCallback(async () => {
     setCustomersLoading(true);
     try {
-      const result = await fetchInventoryCustomerSummaries();
-      setCustomerSummaries(result.summaries);
+      const [inventoryResult, registeredResult] = await Promise.all([
+        fetchInventoryCustomerSummaries(),
+        fetchCrossBorderRegisteredCustomers(),
+      ]);
+      setCustomerSummaries(inventoryResult.summaries);
+      setRegisteredCustomers(registeredResult);
     } catch {
       setCustomerSummaries([]);
+      setRegisteredCustomers([]);
     } finally {
       setCustomersLoading(false);
     }
@@ -390,6 +418,11 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const pagedCustomers = useMemo(
     () => paginateSlice(customerSummaries, customersPage, tablePageSize),
     [customerSummaries, customersPage, tablePageSize],
+  );
+
+  const pagedRegisteredCustomers = useMemo(
+    () => paginateSlice(registeredCustomers, registeredCustomersPage, tablePageSize),
+    [registeredCustomers, registeredCustomersPage, tablePageSize],
   );
 
   const pagedPacks = useMemo(
@@ -940,13 +973,75 @@ const CrossBorderLogisticsPage: React.FC = () => {
           <section className="cbl-card" ref={customersSectionRef}>
             <div className="cbl-card__head">
               <h2 className="cbl-card__title">{isEn ? 'Customers' : '客户信息'}</h2>
+              <div className="cbl-card__head-actions">
+                <button
+                  type="button"
+                  className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                  onClick={() => setShowCreateCustomerModal(true)}
+                >
+                  {isEn ? '+ Add customer' : '+ 添加客户'}
+                </button>
+              </div>
             </div>
             <div className="cbl-card__body">
               <p className="cbl-card-hint">
                 {isEn
-                  ? 'Aggregated from Inventory App「Express details」cloud data. Click a name for all parcels.'
-                  : '汇总 Inventory App「快递明细」云端订单。点击客户姓名查看其全部快递。'}
+                  ? 'Registered customers and Inventory App「Express details」aggregates. Click a name for parcels.'
+                  : '登记客户与 Inventory App「快递明细」汇总。点击客户姓名查看其全部快递。'}
               </p>
+
+              {registeredCustomers.length ? (
+                <>
+                  <h3 className="cbl-customer-section-title">
+                    {isEn ? 'Registered customers' : '登记客户'}
+                  </h3>
+                  <div className="cbl-table-wrap">
+                    <table className="cbl-table cbl-table--customers">
+                      <thead>
+                        <tr>
+                          <th>{isEn ? 'Customer code' : '客户编码'}</th>
+                          <th>{isEn ? 'Name' : '客户姓名'}</th>
+                          <th>{isEn ? 'Phone' : '电话'}</th>
+                          <th>{isEn ? 'Delivery city' : '送货城市'}</th>
+                          <th>{isEn ? 'Salesperson' : '推销员'}</th>
+                          <th>{isEn ? 'Applied' : '申请日期'}</th>
+                          <th>{isEn ? 'Notes' : '备注'}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedRegisteredCustomers.map((row) => (
+                          <tr key={row.id}>
+                            <td>
+                              <span className="cbl-code">{row.customer_code}</span>
+                            </td>
+                            <td>{row.customer_name}</td>
+                            <td>{row.phone || '—'}</td>
+                            <td>
+                              {hubLabel(row.delivery_region_id)}
+                              <span className="cbl-dim"> · {row.delivery_area_code}</span>
+                            </td>
+                            <td>{row.salesperson_employee_code || '—'}</td>
+                            <td className="cbl-dim">{formatIsoDate(row.application_date, language)}</td>
+                            <td className="cbl-dim">{row.address_notes || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <CblTablePagination
+                    page={registeredCustomersPage}
+                    pageSize={tablePageSize}
+                    totalItems={registeredCustomers.length}
+                    onPageChange={setRegisteredCustomersPage}
+                    onPageSizeChange={setTablePageSize}
+                    isEn={isEn}
+                  />
+                </>
+              ) : null}
+
+              <h3 className="cbl-customer-section-title">
+                {isEn ? 'Express summary' : '快递明细汇总'}
+              </h3>
               {customersLoading ? (
                 <div className="cbl-empty">{isEn ? 'Loading customers…' : '加载客户信息…'}</div>
               ) : customerSummaries.length ? (
@@ -1156,6 +1251,15 @@ const CrossBorderLogisticsPage: React.FC = () => {
         open={customerModalTarget != null}
         onClose={() => setCustomerModalTarget(null)}
         customer={customerModalTarget}
+      />
+
+      <CreateCrossBorderCustomerModal
+        open={showCreateCustomerModal}
+        onClose={() => setShowCreateCustomerModal(false)}
+        onCreated={(customer) => {
+          setRegisteredCustomers((prev) => [customer, ...prev]);
+          setRegisteredCustomersPage(1);
+        }}
       />
 
       <StoreFinanceDetailModal

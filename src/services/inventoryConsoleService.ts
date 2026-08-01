@@ -641,3 +641,174 @@ export async function clearInventoryTestData(
   }
   return payload as InventoryTestDataClearResult;
 }
+
+export type CrossBorderSalesperson = {
+  id: string;
+  name: string;
+  region_id: string;
+  work_area_code: string;
+  employee_code: string;
+  phone: string;
+  address: string;
+  join_date: string;
+  status: 'active' | 'inactive';
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CrossBorderSalespersonDraft = {
+  name: string;
+  region_id: string;
+  work_area_code: string;
+  employee_code: string;
+  phone: string;
+  address: string;
+  join_date: string;
+  status: 'active' | 'inactive';
+};
+
+export type UpdateCrossBorderSalespersonPayload = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  join_date: string;
+  status: 'active' | 'inactive';
+};
+
+export async function fetchCrossBorderSalespersons(): Promise<CrossBorderSalesperson[]> {
+  const response = await fetch('/.netlify/functions/inventory-admin-salespersons', {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载推销员失败 (${response.status})`);
+  }
+  return (payload.salespersons ?? []) as CrossBorderSalesperson[];
+}
+
+export async function fetchCrossBorderSalespersonDetail(
+  id: string,
+): Promise<CrossBorderSalesperson> {
+  const url = new URL('/.netlify/functions/inventory-admin-salespersons', window.location.origin);
+  url.searchParams.set('id', id);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载推销员失败 (${response.status})`);
+  }
+  return payload.salesperson as CrossBorderSalesperson;
+}
+
+export async function createCrossBorderSalesperson(
+  draft: CrossBorderSalespersonDraft,
+): Promise<CrossBorderSalesperson> {
+  const response = await fetch('/.netlify/functions/inventory-admin-salespersons', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `创建失败 (${response.status})`);
+  }
+  return payload.salesperson as CrossBorderSalesperson;
+}
+
+export async function updateCrossBorderSalesperson(
+  payload: UpdateCrossBorderSalespersonPayload,
+): Promise<CrossBorderSalesperson> {
+  const response = await fetch('/.netlify/functions/inventory-admin-salespersons', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `保存失败 (${response.status})`);
+  }
+  return body.salesperson as CrossBorderSalesperson;
+}
+
+export async function deleteCrossBorderSalesperson(id: string): Promise<{
+  ok: boolean;
+  id: string;
+  name: string;
+  employee_code: string;
+}> {
+  const url = new URL('/.netlify/functions/inventory-admin-salespersons', window.location.origin);
+  url.searchParams.set('id', id);
+
+  const response = await fetch(url.toString(), {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `删除失败 (${response.status})`);
+  }
+  return body as { ok: boolean; id: string; name: string; employee_code: string };
+}
+
+export type CrossBorderRegisteredCustomer = {
+  id: string;
+  customer_name: string;
+  phone: string;
+  delivery_region_id: string;
+  delivery_area_code: string;
+  address_notes: string;
+  salesperson_employee_code: string;
+  application_date: string;
+  customer_code: string;
+  status: 'active' | 'inactive';
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CrossBorderRegisteredCustomerDraft = {
+  customer_name: string;
+  phone: string;
+  delivery_region_id: string;
+  delivery_area_code: string;
+  address_notes: string;
+  salesperson_employee_code: string;
+  application_date: string;
+  customer_code: string;
+};
+
+export async function fetchCrossBorderRegisteredCustomers(): Promise<
+  CrossBorderRegisteredCustomer[]
+> {
+  const response = await fetch('/.netlify/functions/inventory-admin-cross-border-customers', {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载登记客户失败 (${response.status})`);
+  }
+  return (payload.customers ?? []) as CrossBorderRegisteredCustomer[];
+}
+
+export async function createCrossBorderRegisteredCustomer(
+  draft: CrossBorderRegisteredCustomerDraft,
+): Promise<CrossBorderRegisteredCustomer> {
+  const response = await fetch('/.netlify/functions/inventory-admin-cross-border-customers', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(draft),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `创建失败 (${response.status})`);
+  }
+  return payload.customer as CrossBorderRegisteredCustomer;
+}
