@@ -29,14 +29,22 @@ export default function BarcodeImage({
   const totalModules = getCode128TotalModules(trimmed);
   if (runs.length === 0 || totalModules <= 0) return null;
 
+  const modulePx = Math.max(1, Math.floor(maxWidth / totalModules));
+  const canvasWidth = totalModules * modulePx;
+
   return (
     <View style={[styles.wrap, centered && styles.wrapCentered, { maxWidth }]}>
-      <View style={[styles.canvas, centered && styles.canvasCentered, { width: maxWidth, height }]}>
+      <View
+        style={[
+          styles.canvas,
+          { width: canvasWidth, height, alignSelf: centered ? 'center' : 'flex-start' },
+        ]}
+      >
         {runs.map((run, index) => (
           <View
             key={`${run.black ? 'b' : 'w'}-${index}-${run.modules}`}
             style={{
-              flex: run.modules,
+              width: run.modules * modulePx,
               height,
               backgroundColor: run.black ? '#000' : '#fff',
             }}
@@ -67,10 +75,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#fff',
     overflow: 'hidden',
-    alignSelf: 'flex-start',
-  },
-  canvasCentered: {
-    alignSelf: 'center',
   },
   code: {
     marginTop: 10,

@@ -7,6 +7,16 @@ export function normalizeScanCode(raw: string): string {
   return cleaned.toUpperCase();
 }
 
+/** 从相机回调提取最可靠的扫码文本（兼容 Android raw 字段） */
+export function extractScanPayload(data: string, raw?: string | null): string {
+  const candidates = [data, raw ?? '']
+    .map((value) => normalizeScanCode(value))
+    .filter(Boolean);
+  if (candidates.length === 0) return '';
+  const unique = [...new Set(candidates)];
+  return unique.sort((a, b) => b.length - a.length)[0] ?? '';
+}
+
 export function vibrateScanSuccess(): void {
   try {
     Vibration.vibrate(40);

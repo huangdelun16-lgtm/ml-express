@@ -1,3 +1,4 @@
+import { MIN_PRINT_BARCODE_NARROW } from './barcodeScan';
 import { XPRINTER_P203A } from './xprinterP203a';
 import { mmToDots } from '../utils/labelPrintLayout';
 import { getCode128TotalModules } from '../utils/barcodeImage';
@@ -263,19 +264,32 @@ export function getBarcodePrintMetrics(
   content: LabelLayoutContentSizes,
   widthMm = XPRINTER_P203A.defaultWidthMm,
 ): BarcodePrintMetrics {
-  const labelW = labelWidthDots(widthMm);
   const code = content.barcode.trim();
   const modules = Math.max(1, getCode128TotalModules(code));
-  const targetWidth =
-    layout.barcode.widthDots ?? defaultBarcodeWidthDots(code, widthMm);
-  const narrow = clampDots(Math.round(targetWidth / modules), 1, 12);
+  const maxNarrow = barcodeMaxNarrow(content, widthMm);
+  const minNarrow = Math.min(barcodeMinNarrow(), maxNarrow);
+
+  let narrow: number;
+  if (layout.barcode.widthDots != null) {
+    narrow = clampDots(Math.round(layout.barcode.widthDots / modules), minNarrow, maxNarrow);
+  } else {
+    narrow = clampDots(Math.min(TSPL_BARCODE_NARROW, maxNarrow), minNarrow, maxNarrow);
+  }
+
+  let height = clampBarcodeHeightDots(layout.barcode.height);
+  if (narrow <= 1) {
+    height = Math.max(height, 112);
+  } else if (narrow === 2) {
+    height = Math.max(height, 104);
+  }
+
   const wide = clampDots(
     Math.round(narrow * (TSPL_BARCODE_WIDE / TSPL_BARCODE_NARROW)),
     2,
     24,
   );
   return {
-    height: clampBarcodeHeightDots(layout.barcode.height),
+    height,
     narrow,
     wide,
     widthDots: modules * narrow,
@@ -785,7 +799,7 @@ export function barcodeMaxNarrow(
 }
 
 export function barcodeMinNarrow(): number {
-  return 1;
+  return MIN_PRINT_BARCODE_NARROW;
 }
 
 export type LabelGroupBounds = {

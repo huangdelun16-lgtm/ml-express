@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { DEFAULT_SCAN_COOLDOWN_MS } from '../constants/barcodeScan';
-import { normalizeScanCode, shouldAcceptScan, vibrateScanSuccess } from '../utils/barcodeScan';
+import { extractScanPayload, shouldAcceptScan, vibrateScanSuccess } from '../utils/barcodeScan';
 
 export function useBarcodeScanner(
   onScan: (code: string) => void,
@@ -11,8 +11,8 @@ export function useBarcodeScanner(
   const lastAtRef = useRef(0);
 
   const handleScan = useCallback(
-    (raw: string) => {
-      const code = normalizeScanCode(raw);
+    (raw: string, rawAlt?: string | null) => {
+      const code = extractScanPayload(raw, rawAlt);
       if (
         !shouldAcceptScan(code, lastCodeRef.current, lastAtRef.current, cooldownMs, locked)
       ) {

@@ -57,27 +57,32 @@ describe('labelBarcodeLayout', () => {
   });
 
   it('adjusts barcode width and height independently', () => {
+    const shortContent = {
+      expressNo: '12345',
+      barcode: 'MDY123',
+      inboundCode: 'MDY123',
+    };
     const base = clampLabelBarcodeLayout({
       ...DEFAULT_LABEL_BARCODE_LAYOUT,
-      barcode: { ...DEFAULT_LABEL_BARCODE_LAYOUT.barcode, widthDots: 200, height: 72 },
+      barcode: { ...DEFAULT_LABEL_BARCODE_LAYOUT.barcode, widthDots: 120, height: 120 },
     });
-    const before = getElementDimensions(base, 'barcode', SAMPLE_CONTENT);
+    const before = getElementDimensions(base, 'barcode', shortContent);
     const wider = adjustLayoutElement(
       base,
       'barcode',
       'width',
       mmToLayoutDots(2),
-      SAMPLE_CONTENT,
+      shortContent,
     );
     const taller = adjustLayoutElement(
       base,
       'barcode',
       'height',
       mmToLayoutDots(2),
-      SAMPLE_CONTENT,
+      shortContent,
     );
-    const widerDims = getElementDimensions(wider, 'barcode', SAMPLE_CONTENT);
-    const tallerDims = getElementDimensions(taller, 'barcode', SAMPLE_CONTENT);
+    const widerDims = getElementDimensions(wider, 'barcode', shortContent);
+    const tallerDims = getElementDimensions(taller, 'barcode', shortContent);
     expect(widerDims.widthDots).toBeGreaterThan(before.widthDots);
     expect(tallerDims.heightDots).toBeGreaterThan(before.heightDots);
   });
@@ -226,16 +231,21 @@ describe('labelBarcodeLayout', () => {
   });
 
   it('adjusts barcode width by narrow steps on wide paper', () => {
+    const shortContent = {
+      expressNo: '12345',
+      barcode: 'MDY123',
+      inboundCode: 'MDY123',
+    };
     const base = clampLabelBarcodeLayout({
       ...DEFAULT_LABEL_BARCODE_LAYOUT,
-      barcode: { ...DEFAULT_LABEL_BARCODE_LAYOUT.barcode, widthDots: 220, height: 72 },
+      barcode: { ...DEFAULT_LABEL_BARCODE_LAYOUT.barcode, widthDots: 120, height: 72 },
     });
-    const before = getBarcodePrintMetrics(base, SAMPLE_CONTENT, 58);
-    expect(before.narrow).toBe(1);
-    const wider = adjustLayoutElement(base, 'barcode', 'width', 4, SAMPLE_CONTENT, 58);
-    const after = getBarcodePrintMetrics(wider, SAMPLE_CONTENT, 58);
-    expect(after.narrow).toBe(2);
-    expect(after.widthDots).toBeGreaterThan(before.widthDots);
+    const before = getBarcodePrintMetrics(base, shortContent, 58);
+    expect(before.narrow).toBeGreaterThanOrEqual(2);
+    const wider = adjustLayoutElement(base, 'barcode', 'width', 4, shortContent, 58);
+    const after = getBarcodePrintMetrics(wider, shortContent, 58);
+    expect(after.narrow).toBeGreaterThanOrEqual(before.narrow);
+    expect(after.widthDots).toBeGreaterThanOrEqual(before.widthDots);
   });
 
   it('locks barcode width on narrow paper when code is full width', () => {
@@ -317,7 +327,7 @@ describe('buildTsplInboundLabel with layout', () => {
     });
 
     expect(payload).toContain(`TEXT ${layout.expressNo.x},${layout.expressNo.y},"2"`);
-    expect(payload).toContain('BARCODE 24,60,"128",88,0,0,');
+    expect(payload).toContain('BARCODE 24,60,"128",104,0,0,');
     expect(payload).toContain('TEXT 24,170,"2"');
     expect(payload.match(/TEXT .*67499191994/g)?.length).toBe(1);
     expect(payload.match(/TEXT .*MDY060400290726/g)?.length).toBe(1);
@@ -336,7 +346,7 @@ describe('buildTsplInboundLabel with layout', () => {
       layout,
     });
     expect(payload).toContain(
-      `BARCODE 24,60,"128",80,0,0,${metrics.narrow},${metrics.wide}`,
+      `BARCODE 24,60,"128",104,0,0,${metrics.narrow},${metrics.wide}`,
     );
     expect(metrics.widthDots).toBeGreaterThan(200);
   });

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -10,8 +10,11 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { BARCODE_SCAN_TYPES } from '../constants/barcodeScan';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import {
+  BARCODE_SCAN_TYPES,
+  LABEL_BARCODE_SCAN_TYPES,
+} from '../constants/barcodeScan';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { useTranslation } from '../i18n';
 
@@ -24,7 +27,13 @@ type Props = {
   active?: boolean;
   /** 仅相机区域，不显示底部手动输入条 */
   compact?: boolean;
+  /** 优先识别 Code128（app 自打标签） */
+  preferLabelBarcodes?: boolean;
 };
+
+const ZOOM_MIN = 0;
+const ZOOM_MAX = 0.65;
+const ZOOM_STEP = 0.08;
 
 export default function BarcodeScannerView({
   onScan,
@@ -34,18 +43,28 @@ export default function BarcodeScannerView({
   style,
   active = true,
   compact = false,
+  preferLabelBarcodes = true,
 }: Props) {
   const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
-  const [torch, setTorch] = React.useState(false);
-  const [manual, setManual] = React.useState('');
-  const [flash, setFlash] = React.useState<string | null>(null);
+  const [torch, setTorch] = useState(false);
+  const [zoom, setZoom] = useState(0.12);
+  const [manual, setManual] = useState('');
+  const [flash, setFlash] = useState<string | null>(null);
+  const [modernAvailable, setModernAvailable] = useState(false);
   const autoRequestedRef = useRef(false);
+  const modernSubRef = useRef<{ remove: () => void } | null>(null);
   const { handleScan, reset, locked } = useBarcodeScanner((code) => {
     setFlash(code);
     onScan(code);
     setTimeout(() => setFlash(null), 900);
   });
+
+  const scanTypes = preferLabelBarcodes ? LABEL_BARCODE_SCAN_TYPES : BARCODE_SCAN_TYPES;
+
+  useEffect(() => {
+    setModernAvailable(CameraView.isModernBarcodeScannerAvailable);
+  }, []);
 
   useEffect(() => {
     if (!active || !permission || permission.granted) return;
@@ -60,9 +79,35 @@ export default function BarcodeScannerView({
     }
   }, [permission?.granted]);
 
+  useEffect(() => {
+    if (!active) return;
+    const sub = CameraView.onModernBarcodeScanned((event) => {
+      handleScan(event.data);
+    });
+    modernSubRef.current = sub;
+    return () => {
+      sub.remove();
+      modernSubRef.current = null;
+    };
+  }, [active, handleScan]);
+
   const submitManual = () => {
     const ok = handleScan(manual);
     if (ok) setManual('');
+  };
+
+  const onCameraBarcode = (result: BarcodeScanningResult) => {
+    handleScan(result.data, result.raw);
+  };
+
+  const launchModernScanner = () => {
+    if (!modernAvailable || locked) return;
+    void CameraView.launchScanner({
+      barcodeTypes: [...scanTypes],
+      isHighlightingEnabled: true,
+      isPinchToZoomEnabled: true,
+      isGuidanceEnabled: true,
+    });
   };
 
   const resolvedTitle = title ?? t.scanner.aimTitle;
@@ -110,8 +155,10 @@ export default function BarcodeScannerView({
             style={styles.camera}
             facing="back"
             enableTorch={torch}
-            onBarcodeScanned={locked ? undefined : ({ data }) => handleScan(data)}
-            barcodeScannerSettings={{ barcodeTypes: [...BARCODE_SCAN_TYPES] }}
+            zoom={zoom}
+            autofocus="off"
+            onBarcodeScanned={locked ? undefined : onCameraBarcode}
+            barcodeScannerSettings={{ barcodeTypes: [...scanTypes] }}
           />
         ) : (
           <View style={styles.camera} />
@@ -120,6 +167,7 @@ export default function BarcodeScannerView({
         <View style={styles.overlay} pointerEvents="none">
           <Text style={styles.overlayTitle}>{resolvedTitle}</Text>
           <Text style={styles.overlaySub}>{resolvedSubtitle}</Text>
+          <Text style={styles.overlayTip}>{t.scanner.labelScanTip}</Text>
           <View style={styles.frame}>
             <View style={[styles.corner, styles.cTL]} />
             <View style={[styles.corner, styles.cTR]} />
@@ -133,12 +181,35 @@ export default function BarcodeScannerView({
           ) : null}
         </View>
 
-        <Pressable
-          style={[styles.torchBtn, torch && styles.torchOn]}
-          onPress={() => setTorch((v) => !v)}
-        >
-          <Text style={styles.torchText}>{torch ? t.scanner.torchOff : t.scanner.torchOn}</Text>
-        </Pressable>
+        <View style={styles.topActions}>
+          {modernAvailable ? (
+            <Pressable style={styles.modernBtn} onPress={launchModernScanner} disabled={locked}>
+              <Text style={styles.modernBtnText}>{t.scanner.modernScan}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            style={[styles.torchBtn, torch && styles.torchOn]}
+            onPress={() => setTorch((v) => !v)}
+          >
+            <Text style={styles.torchText}>{torch ? t.scanner.torchOff : t.scanner.torchOn}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.zoomRow}>
+          <Pressable
+            style={styles.zoomBtn}
+            onPress={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100))}
+          >
+            <Text style={styles.zoomBtnText}>−</Text>
+          </Pressable>
+          <Text style={styles.zoomLabel}>{t.scanner.zoomHint}</Text>
+          <Pressable
+            style={styles.zoomBtn}
+            onPress={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100))}
+          >
+            <Text style={styles.zoomBtnText}>+</Text>
+          </Pressable>
+        </View>
       </View>
 
       {compact ? null : (
@@ -168,7 +239,8 @@ export default function BarcodeScannerView({
   );
 }
 
-const FRAME = 260;
+const FRAME_W = 300;
+const FRAME_H = 120;
 const CORNER = 22;
 
 const styles = StyleSheet.create({
@@ -182,10 +254,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   overlayTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '900', marginBottom: 6 },
-  overlaySub: { color: 'rgba(248,250,252,0.75)', fontSize: 12, textAlign: 'center', marginBottom: 20 },
+  overlaySub: { color: 'rgba(248,250,252,0.75)', fontSize: 12, textAlign: 'center', marginBottom: 4 },
+  overlayTip: {
+    color: '#fcd34d',
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 14,
+    lineHeight: 16,
+    paddingHorizontal: 12,
+  },
   frame: {
-    width: FRAME,
-    height: FRAME * 0.55,
+    width: FRAME_W,
+    height: FRAME_H,
     position: 'relative',
   },
   corner: {
@@ -200,17 +280,30 @@ const styles = StyleSheet.create({
   cBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
   flashBox: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 72,
     backgroundColor: 'rgba(34,197,94,0.92)',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   flashText: { color: '#fff', fontWeight: '900', fontSize: 14, fontFamily: 'monospace' },
-  torchBtn: {
+  topActions: {
     position: 'absolute',
     top: 12,
     right: 12,
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  modernBtn: {
+    backgroundColor: 'rgba(37,99,235,0.92)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  modernBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  torchBtn: {
     backgroundColor: 'rgba(15,23,42,0.72)',
     borderRadius: 20,
     paddingHorizontal: 12,
@@ -220,6 +313,30 @@ const styles = StyleSheet.create({
   },
   torchOn: { backgroundColor: 'rgba(37,99,235,0.85)' },
   torchText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  zoomRow: {
+    position: 'absolute',
+    bottom: 16,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(15,23,42,0.72)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  zoomBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(51,65,85,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomBtnText: { color: '#fff', fontSize: 20, fontWeight: '900', lineHeight: 22 },
+  zoomLabel: { color: '#e2e8f0', fontSize: 11, fontWeight: '700', minWidth: 72, textAlign: 'center' },
   panel: {
     backgroundColor: '#0f172a',
     padding: 14,
