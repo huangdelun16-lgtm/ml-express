@@ -73,6 +73,7 @@ import MerchantPackingModal from "../components/orders/MerchantPackingModal";
 import MerchantExportStatementModal from "../components/profile/MerchantExportStatementModal";
 import MerchantRechargeModals from "../components/profile/MerchantRechargeModals";
 import MerchantScheduledTimePickerModal from "../components/profile/MerchantScheduledTimePickerModal";
+import MerchantPrinterModal from "../components/profile/MerchantPrinterModal";
 import "../styles/merchantProfilePage.css";
 import "../components/orders/merchantOrderModals.css";
 
@@ -394,6 +395,7 @@ const ProfilePage: React.FC = () => {
 
   // 🚀 新增：编辑资料状态
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showPrinterModal, setShowPrinterModal] = useState(false);
   const [editProfileForm, setEditProfileForm] = useState({
     name: "",
     phone: "",
@@ -2931,6 +2933,44 @@ const ProfilePage: React.FC = () => {
                       : language === "en"
                         ? "Products"
                         : "ပစ္စည်းစီမံရန်"}
+                  </button>
+
+                  <button
+                    onClick={() => setShowPrinterModal(true)}
+                    style={{
+                      background: "rgba(14, 165, 233, 0.12)",
+                      color: "white",
+                      border: "1px solid rgba(14, 165, 233, 0.35)",
+                      padding: "0.6rem 1.5rem",
+                      borderRadius: "14px",
+                      fontSize: "0.95rem",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      transition: "all 0.3s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.6rem",
+                      whiteSpace: "nowrap",
+                      backdropFilter: "blur(10px)",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background =
+                        "rgba(14, 165, 233, 0.22)";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background =
+                        "rgba(14, 165, 233, 0.12)";
+                      e.currentTarget.style.transform = "translateY(0)";
+                    }}
+                  >
+                    <span style={{ fontSize: "1.1rem" }}>🖨️</span>
+                    {language === "zh"
+                      ? "打印机"
+                      : language === "en"
+                        ? "Printer"
+                        : "Printer"}
                   </button>
                 </div>
               </div>
@@ -9150,6 +9190,14 @@ const ProfilePage: React.FC = () => {
         onFormatChange={setExportFormat}
         onMethodChange={setExportMethod}
         onExport={handleExportStatement}
+      />
+
+      <MerchantPrinterModal
+        open={showPrinterModal}
+        language={lang}
+        storeName={currentUser?.name || storeInfo?.store_name}
+        storePhone={currentUser?.phone || storeInfo?.phone || storeInfo?.manager_phone}
+        onClose={() => setShowPrinterModal(false)}
       />
 
     </>

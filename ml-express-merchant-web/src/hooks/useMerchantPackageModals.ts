@@ -5,6 +5,7 @@ import { MERCHANT_ORDER_STATUS } from '../constants/merchantOrderStatus';
 import type { MerchantLanguage } from '../constants/merchantOrderStatus';
 import { getPackingModalModel } from '../utils/parseOrderPackingItems';
 import { printMerchantReceipt } from '../utils/printMerchantReceipt';
+import { loadPrinterSettings } from '../services/printerSettings';
 
 interface UseMerchantPackageModalsOptions {
   language: MerchantLanguage;
@@ -89,12 +90,28 @@ export function useMerchantPackageModals({
           MERCHANT_ORDER_STATUS.PACKING,
         );
         if (success) {
-          await printMerchantReceipt(pkgToAccept, productPriceMap, language);
+          const printerSettings = loadPrinterSettings();
+          if (printerSettings.autoPrint) {
+            try {
+              await printMerchantReceipt(pkgToAccept, productPriceMap, language);
+            } catch (printError) {
+              LoggerService.warn('接单后自动打印失败', printError);
+              alert(
+                language === 'zh'
+                  ? '接单成功，但小票打印失败。请到「我的账号 → 打印机」检查设置后重试。'
+                  : 'Order accepted, but receipt print failed. Check Printer settings.',
+              );
+            }
+          }
           removePendingOrder?.(pkgToAccept.id);
           alert(
             language === 'zh'
-              ? '接单成功！小票已自动打印，请开始打包商品。'
-              : 'Order accepted! Receipt printed.',
+              ? printerSettings.autoPrint
+                ? '接单成功！小票已发送打印，请开始打包商品。'
+                : '接单成功！请开始打包商品。'
+              : printerSettings.autoPrint
+                ? 'Order accepted! Print job sent.'
+                : 'Order accepted!',
           );
           onPackageStatusChange?.(pkgToAccept.id, MERCHANT_ORDER_STATUS.PACKING);
           if (!targetPkg) {
