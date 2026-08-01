@@ -10,6 +10,10 @@ import { ensureConnectedBleDevice, loadSavedBluetoothDevice } from './bluetoothS
 import { loadLabelPrinterSettings, layoutForPrintKind } from './labelLayoutStorage';
 import { buildTsplInboundLabel } from './tsplLabelBuilder';
 import type { LabelBarcodeLayoutConfig } from '../constants/labelBarcodeLayout';
+import {
+  DEFAULT_LABEL_BARCODE_LAYOUT,
+  mergeAndCenterLabelLayout,
+} from '../constants/labelBarcodeLayout';
 import type { LabelPaperSpec } from '../constants/labelPaperSpec';
 
 const CHUNK_SIZE = 180;
@@ -153,9 +157,23 @@ export async function printOrderBarcodeLabel(
   const saved = await loadSavedBluetoothDevice();
   const settings = saved?.id ? await loadLabelPrinterSettings(saved.id) : null;
   const paper = paperOverride ?? settings?.paper;
-  const layout =
+  const baseLayout =
     layoutOverride ??
-    layoutForPrintKind(settings, data.kind === 'pack' ? 'pack' : 'inbound');
+    layoutForPrintKind(settings, data.kind === 'pack' ? 'pack' : 'inbound') ??
+    DEFAULT_LABEL_BARCODE_LAYOUT;
+
+  const printCode = data.barcode.trim();
+  const layoutContent = {
+    expressNo: data.inputBarcode?.trim() ?? '',
+    barcode: printCode,
+    inboundCode: printCode,
+  };
+  const layout = mergeAndCenterLabelLayout(
+    baseLayout,
+    layoutContent,
+    paper?.widthMm,
+    paper?.heightMm,
+  );
 
   const payload = buildTsplInboundLabel({
     barcode: data.barcode,

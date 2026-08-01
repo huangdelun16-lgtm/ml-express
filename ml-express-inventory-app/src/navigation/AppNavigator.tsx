@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
 import StockInScreen from '../screens/StockInScreen';
+import PackagingStockInScreen from '../screens/PackagingStockInScreen';
 import StockOutScreen from '../screens/StockOutScreen';
 import ItemsScreen from '../screens/ItemsScreen';
 import ItemFormScreen from '../screens/ItemFormScreen';
@@ -19,6 +20,7 @@ import { useTranslation } from '../i18n';
 export type RootStackParamList = {
   Home: undefined;
   StockIn: { presetBarcode?: string } | undefined;
+  PackagingStockIn: undefined;
   StockOut: { presetBarcode?: string } | undefined;
   Items: undefined;
   ItemForm: { itemId?: string } | undefined;
@@ -53,6 +55,11 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="StockIn" component={StockInScreen} options={{ title: t.nav.stockIn }} />
+      <Stack.Screen
+        name="PackagingStockIn"
+        component={PackagingStockInScreen}
+        options={{ title: t.nav.packagingStockIn }}
+      />
       <Stack.Screen name="StockOut" component={StockOutScreen} options={{ title: t.nav.stockOut }} />
       <Stack.Screen name="HubReceive" component={HubReceiveScreen} options={{ title: t.nav.hubReceive }} />
       <Stack.Screen name="ShipmentTrack" component={ShipmentTrackScreen} options={{ title: t.nav.shipmentTrack }} />

@@ -217,12 +217,19 @@ export async function listPackableItems(search?: string, scope?: { store: Invent
 export async function createPackedShipment(params: {
   operator: string;
   originStore: OriginStoreRef;
-  itemIds: string[];
+  itemIds?: string[];
+  itemLines?: { itemId: string; qty: number }[];
   bundle: { barcode: string; name: string; spec: string; unit: string; weight: string; note: string };
   actingStore?: InventoryStoreSession;
 }): Promise<{ bundleItem: InventoryItem; pack: PackedShipment }> {
-  const items = await Promise.all(params.itemIds.map((id) => getItemById(id)));
-  if (items.some((item) => !item || item.qty_on_hand < 1)) throw new Error('选中的订单不可打包');
+  const normalizedLines =
+    params.itemLines ??
+    (params.itemIds ?? []).map((itemId) => ({ itemId, qty: 1 }));
+  if (normalizedLines.length === 0) throw new Error('选中的订单不可打包');
+  const items = await Promise.all(normalizedLines.map((line) => getItemById(line.itemId)));
+  if (items.some((item, i) => !item || item.qty_on_hand < normalizedLines[i].qty)) {
+    throw new Error('选中的订单不可打包');
+  }
   const ts = nowIso();
   const bundleItem: InventoryItem = {
     ...params.bundle,
@@ -241,11 +248,13 @@ export async function createPackedShipment(params: {
     owner_store_code: params.originStore.storeCode, created_at: ts,
   };
   const lines: PackedShipmentItem[] = [];
-  for (const item of items as InventoryItem[]) {
+  for (let i = 0; i < normalizedLines.length; i += 1) {
+    const item = items[i] as InventoryItem;
+    const qty = normalizedLines[i].qty;
     lines.push({
       id: newId(), pack_id: pack.id, item_id: item.id, item_barcode: item.barcode,
       input_barcode: item.input_barcode, item_name: item.name, destination: item.final_destination ?? '',
-      customer_name: item.recipient_name ?? '', owner_store_code: item.owner_store_code, qty: 1,
+      customer_name: item.recipient_name ?? '', owner_store_code: item.owner_store_code, qty,
     });
   }
   const savedBundle = await createPackAtomic({

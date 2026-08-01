@@ -61,6 +61,13 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
 
   const tiles = [
     { title: t.home.tileStockIn, icon: '📥', screen: 'StockIn', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+    {
+      title: t.home.tilePackagingStockIn,
+      icon: '📦',
+      screen: 'PackagingStockIn',
+      color: '#f59e0b',
+      bg: 'rgba(245,158,11,0.12)',
+    },
     { title: t.home.tileItems, icon: '📋', screen: 'Items', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
     { title: t.home.tilePkg, icon: '📦', screen: 'Pkg', color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
     { title: t.home.tileStockOut, icon: '🚚', screen: 'StockOut', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },

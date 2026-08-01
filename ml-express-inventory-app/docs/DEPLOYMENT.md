@@ -3,7 +3,7 @@
 面向 **生产 Supabase 项目**（与 Admin Web / 商户端共用：`uopkyuluxnrewvlmutam`）。  
 每次发布 Inventory App 新功能前，按本清单逐项勾选。
 
-当前客户端版本：**v1.9.3 (26)**。Inventory App 为在线专用，Supabase 是唯一业务数据源。
+当前客户端版本：**v1.9.7 (30)**。Inventory App 为在线专用，Supabase 是唯一业务数据源。
 
 ---
 
@@ -187,7 +187,7 @@ eas submit --platform ios --profile production
 2. 在 Supabase SQL Editor 执行 `docs/sql/inventory_android_latest_release.sql`，填入真实 `apkUrl`，并确保 `versionCode` **大于** 用户已安装版本
 3. 用户点击设置中的 **「更新最新版本」** → 若有新版本则打开下载链接；下载完成后在系统「下载」中安装 APK
 
-每次发布新 APK 后只需更新 `system_settings` 中 `inventory.android.latest_release` 一条记录，**无需**重新发版 App 即可让旧版用户看到更新提示（旧版 App 需已包含此功能，自 v1.6.0 起；当前 **v1.9.3 (26)**）。
+每次发布新 APK 后只需更新 `system_settings` 中 `inventory.android.latest_release` 一条记录，**无需**重新发版 App 即可让旧版用户看到更新提示（旧版 App 需已包含此功能，自 v1.6.0 起；当前 **v1.9.7 (30)**）。
 
 ---
 

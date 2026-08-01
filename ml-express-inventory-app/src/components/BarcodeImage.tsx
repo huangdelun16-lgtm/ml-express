@@ -8,6 +8,8 @@ type Props = {
   showCodeText?: boolean;
   /** 条码区域最大宽度，始终等比缩放进此宽度内 */
   maxWidth?: number;
+  /** 在容器内水平居中（用于标签预览弹窗） */
+  centered?: boolean;
 };
 
 /**
@@ -18,6 +20,7 @@ export default function BarcodeImage({
   height = 80,
   showCodeText = true,
   maxWidth = 280,
+  centered = false,
 }: Props) {
   const trimmed = code.trim();
   if (!trimmed) return null;
@@ -27,8 +30,8 @@ export default function BarcodeImage({
   if (runs.length === 0 || totalModules <= 0) return null;
 
   return (
-    <View style={[styles.wrap, { maxWidth }]}>
-      <View style={[styles.canvas, { width: maxWidth, height }]}>
+    <View style={[styles.wrap, centered && styles.wrapCentered, { maxWidth }]}>
+      <View style={[styles.canvas, centered && styles.canvasCentered, { width: maxWidth, height }]}>
         {runs.map((run, index) => (
           <View
             key={`${run.black ? 'b' : 'w'}-${index}-${run.modules}`}
@@ -56,11 +59,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     overflow: 'hidden',
   },
+  wrapCentered: {
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
   canvas: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     overflow: 'hidden',
     alignSelf: 'flex-start',
+  },
+  canvasCentered: {
+    alignSelf: 'center',
   },
   code: {
     marginTop: 10,
@@ -70,6 +80,6 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     letterSpacing: 0.5,
     textAlign: 'center',
-    maxWidth: '100%',
+    alignSelf: 'stretch',
   },
 });
