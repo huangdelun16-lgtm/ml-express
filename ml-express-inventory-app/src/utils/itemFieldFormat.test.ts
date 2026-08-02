@@ -35,4 +35,16 @@ describe('resolveItemCardQty', () => {
       }),
     ).toBe(1);
   });
+
+  it('多个入库已打包订单库存为 0', () => {
+    expect(
+      resolveItemCardQty({
+        qty_on_hand: 0,
+        unit: '2 Pcs',
+        stocked_in: true,
+        packed: true,
+        packed_at: '2026-08-02T10:00:00.000Z',
+      }),
+    ).toBe(0);
+  });
 });

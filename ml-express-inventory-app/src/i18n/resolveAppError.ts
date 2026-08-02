@@ -17,7 +17,7 @@ export function formatServiceError(
   code: ServiceErrorCode,
   params?: Record<string, string | number>,
 ): string {
-  const resolvedParams = { ...params };
+  const resolvedParams = { ...(params ?? {}) };
   if (code === 'cloudPkgAlreadyStatus' && params?.statusKey) {
     resolvedParams.status = getPkgStatusLabel(t, params.statusKey as PkgTrackingStatus);
   }

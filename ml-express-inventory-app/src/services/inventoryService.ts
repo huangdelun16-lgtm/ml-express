@@ -6,13 +6,20 @@ import type { InventoryStoreSession } from './authService';
 import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import { svc, isServiceError } from '../errors/serviceError';
 import { newId, nowIso } from './database';
+import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   applyMovement, clearInventoryCloudCache, createPack, createPackAtomic, deletePack,
   getItemByBarcode as cloudGetItemByBarcode,
-  getItemById as cloudGetItemById, getInventorySnapshot, listMovementsForItem as cloudListMovementsForItem,
-  listPacks, loadShipmentsAtomic, upsertItem as cloudUpsertItem,
+  getItemById as cloudGetItemById, getInventorySnapshot, inventoryItemFromCloudRow,
+  listMovementsForItem as cloudListMovementsForItem,
+  listPacks, loadShipmentsAtomic, mergePackagingStockInIntoCache, packDetailFromCloudPackRow,
+  refreshCache, upsertItem as cloudUpsertItem,
 } from './inventoryCloudStore';
-import { deleteCloudPackedShipment, fetchCloudTodayMovementTotals } from './inventoryCloudApi';
+import {
+  deleteCloudPackedShipment,
+  fetchCloudTodayMovementTotals,
+  packagingStockInBatchAtomic,
+} from './inventoryCloudApi';
 import {
   buildPackageNumberBody, formatPackageSequence, isPackageBarcode, packDestinationFromBarcode,
   parsePackageBarcode,
@@ -274,6 +281,77 @@ export async function createPackedShipment(params: {
     );
   }
   return { bundleItem: savedBundle, pack: { ...pack, bundle_item_id: savedBundle.id } };
+}
+
+/** 多个入库：原子创建已打包订单（库存 0）与快递包（整包重量）。 */
+export async function submitPackagingStockIn(params: {
+  operator: string;
+  store: InventoryStoreSession;
+  destination: string;
+  recipientName: string;
+  recipientPhone: string;
+  inboundAt: string;
+  lineNote: string;
+  bundle: {
+    barcode: string;
+    name: string;
+    spec: string;
+    unit: string;
+    weight: string;
+    note: string;
+  };
+  lines: { barcode: string; inputBarcode: string; name: string; qty: number }[];
+}): Promise<{ bundleItem: InventoryItem }> {
+  if (params.lines.length === 0) throw new Error('选中的订单不可打包');
+  const dest = params.destination.trim().toUpperCase();
+  if (!dest) throw new Error('请选择最终目的地');
+
+  const storeCode = params.store.storeCode.trim().toUpperCase();
+  const hub = resolveStoreHubCode(params.store);
+
+  const rpcResult = await packagingStockInBatchAtomic({
+    store: params.store,
+    operationId: inventoryOperationId('packaging-stock-in', params.bundle.barcode),
+    payload: {
+      store_code: storeCode,
+      store_name: params.store.storeName,
+      operator: params.operator,
+      destination: dest,
+      recipient_name: params.recipientName.trim(),
+      recipient_phone: params.recipientPhone.trim(),
+      inbound_at: params.inboundAt,
+      line_note: params.lineNote,
+      bundle: {
+        barcode: params.bundle.barcode.trim(),
+        name: params.bundle.name,
+        spec: params.bundle.spec,
+        unit: params.bundle.unit,
+        weight: params.bundle.weight,
+        note: params.bundle.note,
+      },
+      lines: params.lines.map((line) => ({
+        barcode: line.barcode.trim(),
+        input_barcode: line.inputBarcode.trim(),
+        name: line.name.trim() || line.inputBarcode.trim(),
+        qty: line.qty,
+      })),
+    },
+  });
+
+  const bundleItem = inventoryItemFromCloudRow(rpcResult.bundleItem);
+  const lineItems = rpcResult.lineItems.map(inventoryItemFromCloudRow);
+  const allItems = [bundleItem, ...lineItems];
+  const pack = packDetailFromCloudPackRow(rpcResult.pack, allItems);
+
+  mergePackagingStockInIntoCache(params.store, hub, {
+    bundleItem,
+    pack,
+    lineItems,
+  });
+
+  void refreshCache(params.store, hub, { force: true }).catch(() => {});
+
+  return { bundleItem };
 }
 
 export async function listPackedShipments(

@@ -90,7 +90,9 @@ type AtomicRpcResult = {
   idempotent?: boolean;
   item?: Record<string, unknown>;
   bundle_item?: Record<string, unknown>;
+  pack?: Record<string, unknown>;
   pack_id?: string;
+  line_items?: Record<string, unknown>[];
   count?: number;
   trip_number?: string;
 };
@@ -104,7 +106,27 @@ function toNullableTs(value?: string | null): string | null {
   return v ? v : null;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function parseRpcJsonResult(data: unknown): AtomicRpcResult {
+  if (typeof data === 'string') {
+    try {
+      return JSON.parse(data) as AtomicRpcResult;
+    } catch {
+      return {};
+    }
+  }
+  if (data && typeof data === 'object' && !Array.isArray(data)) return data as AtomicRpcResult;
+  return {};
+}
+
 function rowToCloudItem(row: Record<string, unknown>): CloudStoreItemRow {
+  if (!row || typeof row !== 'object') {
+    throw new Error('invalid cloud item row');
+  }
   return {
     id: String(row.id),
     barcode: String(row.barcode),
@@ -209,6 +231,108 @@ export async function createCloudPackedShipmentAtomic(params: {
   return { bundleItem: rowToCloudItem(result.bundle_item), packId: String(result.pack_id) };
 }
 
+/** 多个入库：订单直接已入库+已打包（库存 0），整包重量写在快递包上。 */
+export async function packagingStockInBatchAtomic(params: {
+  store: InventoryStoreSession;
+  operationId: string;
+  payload: Record<string, unknown>;
+}): Promise<{
+  bundleItem: CloudStoreItemRow;
+  packId: string;
+  pack: CloudPackRow;
+  lineItems: CloudStoreItemRow[];
+}> {
+  if (!isSupabaseConfigured()) throw svc('supabaseTrackingNotConfigured');
+  await ensureInventoryCloudAuth();
+  const { data, error } = await supabase.rpc('inventory_packaging_stock_in_batch', {
+    p_operation_id: params.operationId,
+    p_payload: params.payload,
+  });
+  if (error) {
+    throw new Error(error.message || '多个入库 RPC 失败');
+  }
+  const result = parseRpcJsonResult(data);
+  const bundleRow = asRecord(result.bundle_item);
+  const packId = result.pack_id ? String(result.pack_id) : '';
+  if (!bundleRow || !packId) {
+    throw new Error(
+      '多个入库 RPC 未返回快递包数据。请在 Supabase 执行 migration：20260802120000、20260802130000、20260802140000',
+    );
+  }
+
+  const packRow = asRecord(result.pack);
+  let lineRows = Array.isArray(result.line_items)
+    ? result.line_items.map(asRecord).filter((row): row is Record<string, unknown> => row !== null)
+    : [];
+
+  if (lineRows.length === 0 && Array.isArray(params.payload.lines)) {
+    const bundleCode = String(bundleRow.barcode ?? '').trim().toUpperCase();
+    const dest = String(params.payload.destination ?? bundleRow.final_destination ?? '').trim().toUpperCase();
+    const storeCode = String(params.payload.store_code ?? bundleRow.owner_store_code ?? '').trim().toUpperCase();
+    const recipient = String(params.payload.recipient_name ?? bundleRow.recipient_name ?? '');
+    const lineNote = String(params.payload.line_note ?? '');
+    const inboundAt = String(params.payload.inbound_at ?? bundleRow.created_at ?? new Date().toISOString());
+    lineRows = (params.payload.lines as Record<string, unknown>[]).map((line) => ({
+      id: String(line.id ?? `${packId}:${String(line.barcode ?? '').trim().toUpperCase()}`),
+      barcode: String(line.barcode ?? '').trim().toUpperCase(),
+      input_barcode: String(line.input_barcode ?? ''),
+      name: String(line.name ?? line.input_barcode ?? ''),
+      spec: '',
+      unit: `${Math.max(Number(line.qty) || 1, 1)} Pcs`,
+      weight: '',
+      qty_on_hand: 0,
+      min_qty: 0,
+      note: lineNote,
+      owner_store_code: storeCode,
+      recipient_name: recipient,
+      final_destination: dest,
+      packed_at: inboundAt,
+      packed_bundle_barcode: bundleCode,
+      created_at: inboundAt,
+      updated_at: inboundAt,
+    }));
+  }
+
+  const parseLineQty = (line: Record<string, unknown>) => {
+    const direct = Number(line.qty);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const unit = String(line.unit ?? '');
+    const matched = unit.match(/^(\d+(?:\.\d+)?)/);
+    return matched ? Number(matched[1]) || 1 : 1;
+  };
+
+  const bundleItem = rowToCloudItem(bundleRow);
+  return {
+    bundleItem,
+    packId,
+    pack: {
+      id: packId,
+      bundle_item_id: String(bundleRow.id ?? packRow?.bundle_item_id ?? ''),
+      bundle_barcode: String(bundleRow.barcode ?? packRow?.bundle_barcode ?? ''),
+      bundle_name: String(bundleRow.name ?? packRow?.bundle_name ?? ''),
+      operator: String(packRow?.operator ?? params.payload.operator ?? ''),
+      note: String(packRow?.note ?? bundleRow.note ?? ''),
+      owner_store_id: packRow?.owner_store_id ? String(packRow.owner_store_id) : null,
+      owner_store_code: String(packRow?.owner_store_code ?? bundleRow.owner_store_code ?? ''),
+      transport_fee: String(packRow?.transport_fee ?? ''),
+      truck_leg_destination: String(packRow?.truck_leg_destination ?? ''),
+      loaded_at: packRow?.loaded_at ? String(packRow.loaded_at) : null,
+      created_at: String(packRow?.created_at ?? bundleRow.created_at ?? ''),
+      updated_at: String(packRow?.updated_at ?? bundleRow.updated_at ?? ''),
+      inventory_packed_shipment_items: lineRows.map((line) => ({
+        id: `${packId}:${String(line.barcode ?? '')}`,
+        pack_id: packId,
+        item_id: line.id ? String(line.id) : null,
+        item_barcode: String(line.barcode ?? ''),
+        item_name: String(line.name ?? ''),
+        qty: parseLineQty(line),
+        created_at: String(line.created_at ?? ''),
+      })),
+    },
+    lineItems: lineRows.map((line) => rowToCloudItem(line)),
+  };
+}
+
 /** 包库存、装车标记和云端追踪在同一事务中提交。 */
 export async function loadCloudShipmentsAtomic(params: {
   operationId: string;
@@ -229,42 +353,23 @@ export async function loadCloudShipmentsAtomic(params: {
 }
 
 export async function fetchCloudStoreItems(
-  store: InventoryStoreSession,
-  hubCode: string,
+  _store: InventoryStoreSession,
+  _hubCode: string,
 ): Promise<CloudStoreItemRow[]> {
   if (!isSupabaseConfigured()) return [];
-  const storeCode = store.storeCode.trim().toUpperCase();
-  const ownerKey = ownershipKeyFromStoreCode(storeCode);
-  const hub = hubCode.trim().toUpperCase();
+  await ensureInventoryCloudAuth();
   const itemMap = new Map<string, CloudStoreItemRow>();
 
-  const ownerCodes = ownerKey === storeCode ? [storeCode] : [storeCode, ownerKey];
-  const queries = ownerCodes.map((ownerCode) =>
-    supabase
-      .from('inventory_store_items')
-      .select('*')
-      .eq('owner_store_code', ownerCode)
-      .order('updated_at', { ascending: false })
-      .limit(800),
-  );
-  if (hub) {
-    queries.push(
-      supabase
-        .from('inventory_store_items')
-        .select('*')
-        .eq('final_destination', hub)
-        .order('updated_at', { ascending: false })
-        .limit(800),
-    );
-  }
-
-  const results = await Promise.all(queries);
-  for (const { data, error } of results) {
-    if (error) throw new Error(error.message);
-    for (const row of data ?? []) {
-      const item = rowToCloudItem(row as Record<string, unknown>);
-      itemMap.set(item.id, item);
-    }
+  // 依赖 RLS（owner / hub 目的地 / 到站 custody），不用 eq(owner_store_code) 避免店码格式不一致漏行
+  const { data, error } = await supabase
+    .from('inventory_store_items')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(800);
+  if (error) throw new Error(error.message);
+  for (const row of data ?? []) {
+    const item = rowToCloudItem(row as Record<string, unknown>);
+    itemMap.set(item.id, item);
   }
 
   return Array.from(itemMap.values());
@@ -340,72 +445,39 @@ export async function fetchCloudTodayMovementTotals(): Promise<{ todayIn: number
 }
 
 export async function fetchCloudPackedShipments(
-  store: InventoryStoreSession,
-  hubCode?: string,
+  _store: InventoryStoreSession,
+  _hubCode?: string,
 ): Promise<CloudPackRow[]> {
   if (!isSupabaseConfigured()) return [];
-  const storeCode = store.storeCode.trim().toUpperCase();
-  const ownerKey = ownershipKeyFromStoreCode(storeCode);
-  const hub = hubCode?.trim().toUpperCase() ?? '';
-  const packMap = new Map<string, CloudPackRow>();
+  await ensureInventoryCloudAuth();
+  const { data: packs, error: packErr } = await supabase
+    .from('inventory_packed_shipments')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (packErr) throw new Error(packErr.message);
+  if (!packs?.length) return [];
 
-  const ownerCodes = ownerKey === storeCode ? [storeCode] : [storeCode, ownerKey];
-  const ownerResults = await Promise.all(
-    ownerCodes.map((ownerCode) =>
-      supabase
-        .from('inventory_packed_shipments')
-        .select('*, inventory_packed_shipment_items(*)')
-        .eq('owner_store_code', ownerCode)
-        .order('created_at', { ascending: false })
-        .limit(200),
-    ),
-  );
-  for (const { data, error } of ownerResults) {
-    if (error) throw new Error(error.message);
-    for (const row of data ?? []) {
-      const pack = row as CloudPackRow;
-      packMap.set(pack.bundle_barcode.trim().toUpperCase(), pack);
-    }
+  const packIds = packs.map((p) => String((p as { id: string }).id));
+  const { data: lines, error: lineErr } = await supabase
+    .from('inventory_packed_shipment_items')
+    .select('*')
+    .in('pack_id', packIds);
+  if (lineErr) throw new Error(lineErr.message);
+
+  const linesByPack = new Map<string, CloudPackLineRow[]>();
+  for (const row of lines ?? []) {
+    const line = row as CloudPackLineRow;
+    const packId = String(line.pack_id);
+    const bucket = linesByPack.get(packId) ?? [];
+    bucket.push(line);
+    linesByPack.set(packId, bucket);
   }
 
-  if (hub) {
-    const { data: hubItems, error: hubItemErr } = await supabase
-      .from('inventory_store_items')
-      .select('barcode')
-      .eq('final_destination', hub)
-      .limit(500);
-    if (hubItemErr) throw new Error(hubItemErr.message);
-
-    const itemBarcodes = (hubItems ?? [])
-      .map((r) => String((r as { barcode: string }).barcode).trim())
-      .filter(Boolean);
-    if (itemBarcodes.length > 0) {
-      const { data: lineRows, error: lineErr } = await supabase
-        .from('inventory_packed_shipment_items')
-        .select('pack_id')
-        .in('item_barcode', itemBarcodes);
-      if (lineErr) throw new Error(lineErr.message);
-
-      const packIds = [
-        ...new Set(
-          (lineRows ?? []).map((r) => String((r as { pack_id: string }).pack_id)).filter(Boolean),
-        ),
-      ];
-      if (packIds.length > 0) {
-        const { data: hubPacks, error: hubPackErr } = await supabase
-          .from('inventory_packed_shipments')
-          .select('*, inventory_packed_shipment_items(*)')
-          .in('id', packIds);
-        if (hubPackErr) throw new Error(hubPackErr.message);
-        for (const row of hubPacks ?? []) {
-          const pack = row as CloudPackRow;
-          packMap.set(pack.bundle_barcode.trim().toUpperCase(), pack);
-        }
-      }
-    }
-  }
-
-  return Array.from(packMap.values());
+  return packs.map((row) => ({
+    ...(row as CloudPackRow),
+    inventory_packed_shipment_items: linesByPack.get(String((row as { id: string }).id)) ?? [],
+  }));
 }
 
 export async function upsertCloudStoreItem(

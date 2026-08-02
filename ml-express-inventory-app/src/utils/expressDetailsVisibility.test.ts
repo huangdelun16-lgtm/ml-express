@@ -73,6 +73,29 @@ describe('expressDetailsVisibility', () => {
     expect(isVisibleInExpressDetailsList(row, mdy, 'MDY')).toBe(true);
   });
 
+  it('MUSE 多个入库订单（已打包、库存 0）仍可见于快递明细与打包列表', () => {
+    const muse = store('MUSE001');
+    const row = listRow({
+      final_destination: 'YGN',
+      owner_store_code: 'MUSE001',
+      qty_on_hand: 0,
+      packed: true,
+      stocked_in: true,
+      parent_pack_barcode: 'PKG26YGN10001',
+    });
+    expect(isVisibleInExpressDetailsList(row, muse, 'MUSE')).toBe(true);
+    expect(
+      isVisibleInPackedList(
+        {
+          bundle_barcode: 'PKG26YGN10001',
+          owner_store_code: 'MUSE001',
+        },
+        muse,
+        'MUSE',
+      ),
+    ).toBe(true);
+  });
+
   it('YGN 打包列表不显示发往 MDY 的包', () => {
     const ygn = store('YGN001');
     expect(

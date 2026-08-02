@@ -6,6 +6,7 @@ import type {
   StockMovement,
 } from '../types/inventory';
 import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
+import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   applyCloudStockMovementAtomic,
   createCloudPackedShipmentAtomic,
@@ -48,9 +49,32 @@ const PLATFORM_WIPE_KEY = 'inventory.platform_test_data_cleared_at';
 const PLATFORM_WIPE_ACK = '@inventory_ack_test_data_cleared_at';
 
 function resolveScope(store: InventoryStoreSession, hubCode?: string): CacheScope {
+  const hub = (hubCode?.trim() || resolveStoreHubCode(store)).trim().toUpperCase();
   return {
     storeCode: store.storeCode.trim().toUpperCase(),
-    hubCode: (hubCode ?? store.hubCode ?? store.region).trim().toUpperCase(),
+    hubCode: hub,
+  };
+}
+
+function mergeInventoryCaches(existing: InventoryCache, incoming: InventoryCache): InventoryCache {
+  const itemMap = new Map(existing.items.map((item) => [item.barcode.trim().toUpperCase(), item]));
+  for (const item of incoming.items) {
+    const key = item.barcode.trim().toUpperCase();
+    const prev = itemMap.get(key);
+    if (!prev || item.updated_at >= prev.updated_at) itemMap.set(key, item);
+  }
+
+  const packMap = new Map(existing.packs.map((pack) => [pack.bundle_barcode.trim().toUpperCase(), pack]));
+  for (const pack of incoming.packs) {
+    const key = pack.bundle_barcode.trim().toUpperCase();
+    const prev = packMap.get(key);
+    if (!prev || pack.created_at >= prev.created_at) packMap.set(key, pack);
+  }
+
+  return {
+    items: Array.from(itemMap.values()),
+    packs: Array.from(packMap.values()),
+    movements: incoming.movements.length > 0 ? incoming.movements : existing.movements,
   };
 }
 
@@ -136,6 +160,14 @@ function packFromRow(row: CloudPackRow, items: InventoryItem[]): PackedShipmentD
   };
 }
 
+export function inventoryItemFromCloudRow(row: CloudStoreItemRow): InventoryItem {
+  return rowToItem(row);
+}
+
+export function packDetailFromCloudPackRow(row: CloudPackRow, items: InventoryItem[]): PackedShipmentDetail {
+  return packFromRow(row, items);
+}
+
 async function loadMovements(items: InventoryItem[]): Promise<StockMovement[]> {
   if (items.length === 0) return [];
   return (await fetchCloudMovementsForItems(items.map((item) => item.id))).map(rowToMovement);
@@ -180,11 +212,15 @@ async function ensureCache(
     await applyPlatformWipeIfPending();
     const hub = scope.hubCode;
     const snapshot = await fetchSnapshot(session, hub, includeMovements);
-    cache = snapshot;
+    if (cache && scopeMatches(cacheScope, scope)) {
+      cache = mergeInventoryCaches(cache, snapshot);
+    } else {
+      cache = snapshot;
+    }
     cacheScope = scope;
     cacheFetchedAt = Date.now();
-    cacheHasMovements = includeMovements;
-    return snapshot;
+    cacheHasMovements = includeMovements || cacheHasMovements;
+    return cache;
   })().finally(() => {
     refreshPromise = null;
   });
@@ -398,4 +434,40 @@ export function clearInventoryCloudCache(): void {
   cacheFetchedAt = 0;
   cacheHasMovements = false;
   refreshPromise = null;
+}
+
+/** 多个入库 RPC 成功后，用服务端返回的真实行写入内存缓存 */
+export function mergePackagingStockInIntoCache(
+  store: InventoryStoreSession,
+  hubCode: string,
+  input: {
+    bundleItem: InventoryItem;
+    pack: PackedShipmentDetail;
+    lineItems: InventoryItem[];
+  },
+): void {
+  const scope = resolveScope(store, hubCode);
+  const mergeItems = (existing: InventoryItem[]) => {
+    const map = new Map(existing.map((item) => [item.barcode.trim().toUpperCase(), item]));
+    map.set(input.bundleItem.barcode.trim().toUpperCase(), input.bundleItem);
+    for (const item of input.lineItems) map.set(item.barcode.trim().toUpperCase(), item);
+    return Array.from(map.values());
+  };
+  const mergePacks = (existing: PackedShipmentDetail[]) => {
+    const map = new Map(existing.map((p) => [p.bundle_barcode.trim().toUpperCase(), p]));
+    map.set(input.pack.bundle_barcode.trim().toUpperCase(), input.pack);
+    return Array.from(map.values());
+  };
+
+  if (!cache || !scopeMatches(cacheScope, scope)) {
+    cache = { items: mergeItems([]), movements: [], packs: mergePacks([]) };
+    cacheScope = scope;
+  } else {
+    cache = {
+      ...cache,
+      items: mergeItems(cache.items),
+      packs: mergePacks(cache.packs),
+    };
+  }
+  cacheFetchedAt = Date.now();
 }

@@ -111,17 +111,19 @@ export default function ItemActionModal({
             </View>
           ) : null}
 
-          {showSign ? (
-            <Pressable style={[styles.btnSign, styles.btnFull]} onPress={onSignDelivered}>
-              <Text style={styles.btnSignText}>{t.common.signedMark}</Text>
-            </Pressable>
-          ) : null}
+          <View style={styles.actionStack}>
+            {showSign ? (
+              <Pressable style={styles.btnSign} onPress={onSignDelivered}>
+                <Text style={styles.btnSignText}>{t.common.signedMark}</Text>
+              </Pressable>
+            ) : null}
 
-          {onPrint ? (
-            <Pressable style={styles.btnPrint} onPress={onPrint}>
-              <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
-            </Pressable>
-          ) : null}
+            {onPrint ? (
+              <Pressable style={styles.btnPrint} onPress={onPrint}>
+                <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
+              </Pressable>
+            ) : null}
+          </View>
 
           <Pressable style={styles.btnCancel} onPress={onClose}>
             <Text style={styles.btnCancelText}>{t.common.close}</Text>
@@ -220,6 +222,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   readonlyHintText: { color: '#94a3b8', fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  actionStack: {
+    gap: 10,
+    marginBottom: 10,
+  },
   btnSign: {
     backgroundColor: '#059669',
     borderRadius: 14,
@@ -232,7 +238,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-    marginBottom: 10,
   },
   btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnCancel: { paddingVertical: 10, alignItems: 'center' },

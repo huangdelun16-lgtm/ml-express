@@ -22,13 +22,11 @@ import { DimensionSpecField, LockedSuffixField } from '../components/StructuredI
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import {
-  applyStockMovement,
-  createPackedShipment,
   generatePackageNumber,
   getItemByBarcode,
   getStockInPrefillByCode,
+  submitPackagingStockIn,
 } from '../services/inventoryService';
-import type { InventoryItem } from '../types/inventory';
 import { generateUniqueInboundBarcode } from '../utils/inboundBarcode';
 import { normalizeScanCode, vibrateScanSuccess } from '../utils/barcodeScan';
 import {
@@ -306,43 +304,16 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     return parts.join(' · ');
   };
 
-  const ensureLineItem = async (line: PackagingScanLine): Promise<InventoryItem> => {
+  const resolveLineBarcode = async (line: PackagingScanLine): Promise<string> => {
     const dest = normalizePackDestination(batchDestination);
     if (!dest) throw new Error(t.stockIn.alertDestination);
-    const n = line.count;
     if (line.existingItemId) {
       const existing = await getItemByBarcode(line.existingBarcode || line.code);
-      if (existing && existing.qty_on_hand >= n && !existing.packed_at?.trim()) {
-        return existing;
+      if (existing && !existing.packed_at?.trim() && existing.qty_on_hand <= 0) {
+        return existing.barcode;
       }
     }
-    const barcode = await generateUniqueInboundBarcode(dest, async (code) => !!(await getItemByBarcode(code)));
-    const inboundAt = inboundDateToIso(packDate);
-    const { item } = await applyStockMovement({
-      barcode,
-      type: 'in',
-      qty: n,
-      operator: operatorName ?? t.common.operator,
-      note: buildLineNote(),
-      recipientName: recipientName.trim(),
-      recipientPhone: recipientPhone.trim(),
-      destination: dest,
-      detailAddress: '',
-      packaging: '',
-      inputBarcode: line.code,
-      inboundAt,
-      originStore: store
-        ? { id: store.id, storeCode: store.storeCode, storeName: store.storeName }
-        : undefined,
-      actingStore: store ?? undefined,
-      createIfMissing: {
-        name: line.productName.trim() || line.code,
-        spec: '',
-        unit: `${n} Pcs`,
-        weight: '',
-      },
-    });
-    return item;
+    return generateUniqueInboundBarcode(dest, async (code) => !!(await getItemByBarcode(code)));
   };
 
   const submit = async () => {
@@ -362,13 +333,20 @@ export default function PackagingStockInScreen({ navigation }: Props) {
 
     setLoading(true);
     try {
-      const itemLines: { itemId: string; qty: number }[] = [];
-      for (const line of lines) {
-        const item = await ensureLineItem(line);
-        itemLines.push({ itemId: item.id, qty: line.count });
-      }
-
       if (!store) throw new Error(t.common.loginStoreFirst);
+
+      const dest = normalizePackDestination(batchDestination);
+      const inboundAt = inboundDateToIso(packDate);
+      const lineNote = buildLineNote();
+      const stockInLines: { barcode: string; inputBarcode: string; name: string; qty: number }[] = [];
+      for (const line of lines) {
+        stockInLines.push({
+          barcode: await resolveLineBarcode(line),
+          inputBarcode: line.code,
+          name: line.productName.trim() || line.code,
+          qty: line.count,
+        });
+      }
 
       const packNo = await generatePackageNumber(
         batchDestination.trim(),
@@ -376,14 +354,14 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         normalizePackageOriginPrefix(store.storeCode || hubCode || 'PKG'),
       );
 
-      const { bundleItem } = await createPackedShipment({
+      const { bundleItem } = await submitPackagingStockIn({
         operator: operatorName ?? t.common.operator,
-        originStore: {
-          id: store.id,
-          storeCode: store.storeCode,
-          storeName: store.storeName,
-        },
-        itemLines,
+        store,
+        destination: dest,
+        recipientName: recipientName.trim(),
+        recipientPhone: recipientPhone.trim(),
+        inboundAt,
+        lineNote,
         bundle: {
           barcode: packNo,
           name: fmt(t.packagingStockIn.packName, { name: recipientName.trim() }),
@@ -395,7 +373,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
             phone: recipientPhone.trim(),
           }),
         },
-        actingStore: store,
+        lines: stockInLines,
       });
 
       await saveStockInContactDraft({

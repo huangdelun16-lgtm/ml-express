@@ -56,6 +56,9 @@ supabase db push
 | `20260716190000_inventory_authenticate_store_ambiguity_fix.sql` | 修复登录 RPC 的 `store_code` 列名歧义 |
 | `20260717103000_inventory_truck_trip_number.sql` | 装车车次 `trip_number` + `inventory_load_shipments` 扩展 |
 | `20260717113000_inventory_trip_sequences_rls_fix.sql` | **装车必跑**：车次序号表 SECURITY DEFINER，修复 RLS 装车失败 |
+| `20260802120000_inventory_packaging_stock_in_batch.sql` | **多个入库必跑**：原子创建已打包订单（库存 0）与快递包 |
+| `20260802130000_inventory_packaging_stock_in_owner_fix.sql` | **多个入库必跑**：店码归一化校验 + 打包明细 RLS 修复 |
+| `20260802140000_inventory_packaging_stock_in_batch_result.sql` | **多个入库必跑**：RPC 返回 pack + line_items，App 提交后立即可见 |
 
 **单设备登录（最小 SQL）：**
 
