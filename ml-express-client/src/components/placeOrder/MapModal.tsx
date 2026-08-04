@@ -1,8 +1,7 @@
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import LoggerService from './../../services/LoggerService';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, ScrollView, Platform } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { errorService } from '../../services/ErrorService';
 import AutocompleteSuggestionItem from './AutocompleteSuggestionItem';
 
 interface MapModalProps {
@@ -56,6 +55,52 @@ const MapModal = memo<MapModalProps>(({
   onPlaceChange,
   markerTitle,
 }) => {
+  const mapRef = useRef<MapView>(null);
+  const mapReadyRef = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapLoadTimedOut, setMapLoadTimedOut] = useState(false);
+  // 每次打开 Modal 时重建 MapView，避免 Android 上二次打开空白/转圈
+  const [mapInstanceKey, setMapInstanceKey] = useState(0);
+
+  useEffect(() => {
+    if (!visible) {
+      mapReadyRef.current = false;
+      setMapReady(false);
+      setMapLoadTimedOut(false);
+      return;
+    }
+    mapReadyRef.current = false;
+    setMapReady(false);
+    setMapLoadTimedOut(false);
+    setMapInstanceKey((k) => k + 1);
+
+    const timer = setTimeout(() => {
+      if (!mapReadyRef.current) {
+        setMapLoadTimedOut(true);
+        LoggerService.warn('Android/iOS MapView 加载超时，请检查 Google Maps API Key 与包名限制');
+      }
+    }, 12000);
+
+    return () => clearTimeout(timer);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !mapReady || !selectedLocation) return;
+    const lat = selectedLocation.latitude;
+    const lng = selectedLocation.longitude;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude: lat,
+        longitude: lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      350
+    );
+  }, [visible, mapReady, selectedLocation?.latitude, selectedLocation?.longitude]);
+
   const handleMapPress = useCallback((e: any) => {
     onLocationChange(e.nativeEvent.coordinate);
     onPlaceChange(null);
@@ -115,6 +160,29 @@ const MapModal = memo<MapModalProps>(({
     if (language === 'en') return 'Selected Location';
     return 'ရွေးချယ်ထားသောနေရာ';
   }, [language]);
+
+  const loadErrorText = useMemo(() => {
+    if (language === 'zh') {
+      return '地图加载失败。请检查网络，或确认 Android Google Maps API Key 与包名配置正确。';
+    }
+    if (language === 'en') {
+      return 'Map failed to load. Check network or Android Google Maps API key / package config.';
+    }
+    return 'မြေပုံဖွင့်၍မရပါ။ ကွန်ရက် သို့မဟုတ် API Key ကို စစ်ဆေးပါ။';
+  }, [language]);
+
+  const retryText = useMemo(() => {
+    if (language === 'zh') return '重试';
+    if (language === 'en') return 'Retry';
+    return 'ပြန်ကြိုးစားရန်';
+  }, [language]);
+
+  const handleRetry = useCallback(() => {
+    mapReadyRef.current = false;
+    setMapReady(false);
+    setMapLoadTimedOut(false);
+    setMapInstanceKey((k) => k + 1);
+  }, []);
 
   return (
     <Modal
@@ -193,38 +261,55 @@ const MapModal = memo<MapModalProps>(({
           )}
         </View>
 
-        <MapView
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          style={styles.map}
-          initialRegion={mapRegion}
-          region={mapRegion}
-          showsUserLocation={true}
-          showsMyLocationButton={false}
-          showsCompass={true}
-          showsScale={true}
-          loadingEnabled={true}
-          mapType="standard"
-          onPress={handleMapPress}
-          onPoiClick={handlePoiClick}
-          onMapReady={() => {
-            if (__DEV__) {
-              LoggerService.debug('地图已准备就绪');
-            }
-          }}
-        >
-          {selectedLocation && (
-            <Marker
-              coordinate={{
-                latitude: selectedLocation.latitude || 21.9588,
-                longitude: selectedLocation.longitude || 96.0891
+        <View style={{ flex: 1 }}>
+          {visible && (
+            <MapView
+              key={`map-${mapInstanceKey}`}
+              ref={mapRef}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+              style={styles.map}
+              initialRegion={mapRegion}
+              showsUserLocation={true}
+              showsMyLocationButton={false}
+              showsCompass={true}
+              showsScale={true}
+              loadingEnabled={true}
+              mapType="standard"
+              onPress={handleMapPress}
+              onPoiClick={handlePoiClick}
+              onMapReady={() => {
+                mapReadyRef.current = true;
+                setMapReady(true);
+                setMapLoadTimedOut(false);
+                if (__DEV__) {
+                  LoggerService.debug('地图已准备就绪');
+                }
               }}
-              draggable
-              onDragEnd={handleMarkerDragEnd}
-              title={markerTitle || "选择的位置"}
-              description={markerTitle ? "店铺注册位置" : "拖动或点击地图调整位置"}
-            />
+            >
+              {selectedLocation && (
+                <Marker
+                  coordinate={{
+                    latitude: selectedLocation.latitude || 21.9588,
+                    longitude: selectedLocation.longitude || 96.0891
+                  }}
+                  draggable
+                  onDragEnd={handleMarkerDragEnd}
+                  title={markerTitle || "选择的位置"}
+                  description={markerTitle ? "店铺注册位置" : "拖动或点击地图调整位置"}
+                />
+              )}
+            </MapView>
           )}
-        </MapView>
+
+          {!mapReady && mapLoadTimedOut && (
+            <View style={localStyles.mapErrorOverlay}>
+              <Text style={localStyles.mapErrorText}>{loadErrorText}</Text>
+              <TouchableOpacity style={localStyles.retryButton} onPress={handleRetry}>
+                <Text style={localStyles.retryButtonText}>{retryText}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
         {selectedPlace && (
           <View style={styles.selectedPlaceInfo}>
@@ -249,7 +334,34 @@ const MapModal = memo<MapModalProps>(({
   );
 });
 
+const localStyles = StyleSheet.create({
+  mapErrorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(248, 250, 252, 0.96)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  mapErrorText: {
+    fontSize: 14,
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+
 MapModal.displayName = 'MapModal';
 
 export default MapModal;
-
