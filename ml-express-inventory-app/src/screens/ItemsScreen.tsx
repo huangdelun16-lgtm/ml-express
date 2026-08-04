@@ -13,6 +13,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import ItemActionModal from '../components/ItemActionModal';
 import ItemViewModal from '../components/ItemViewModal';
+import PackagingStockInBarcodeText from '../components/PackagingStockInBarcodeText';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import PaidStampWatermark from '../components/PaidStampWatermark';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
@@ -275,6 +276,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         storeCode: store.storeCode,
         storeName: store.storeName,
       },
+      actingStore: store,
       itemIds: [...selectedIds],
       bundle,
     });
@@ -628,9 +630,12 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
                     ]}
                   >
                     <Text style={styles.tagYellowLabel}>{t.items.inbound}</Text>
-                    <Text style={styles.tagYellowValue} numberOfLines={1}>
-                      {item.barcode}
-                    </Text>
+                    <PackagingStockInBarcodeText
+                      barcode={item.barcode}
+                      variant="list"
+                      numberOfLines={1}
+                      style={styles.tagYellowValue}
+                    />
                   </View>
                 </View>
 
@@ -985,6 +990,13 @@ const styles = StyleSheet.create({
   },
   meta: { color: '#64748b', fontSize: 11, marginTop: 4, fontFamily: 'monospace' },
   qtyBox: { alignItems: 'flex-end', minWidth: 34 },
+  packSeq: {
+    color: '#34d399',
+    fontSize: 13,
+    fontWeight: '900',
+    fontFamily: 'monospace',
+    marginBottom: 2,
+  },
   qty: { color: '#fbbf24', fontSize: 17, fontWeight: '900', lineHeight: 19 },
   unit: { color: '#94a3b8', fontSize: 10, marginTop: 0 },
 });

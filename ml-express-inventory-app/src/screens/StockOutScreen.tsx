@@ -20,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useTranslation, resolveAppError } from '../i18n';
 import { applyTruckLoadOutbound, listOutboundPackages } from '../services/inventoryService';
+import { refreshCache } from '../services/inventoryCloudStore';
 import type { PackedShipmentDetail } from '../types/inventory';
 import OutboundDateField from '../components/OutboundDateField';
 import { formatDisplayDate, isValidIsoDate, todayIsoDate } from '../utils/dateFormat';
@@ -64,6 +65,9 @@ export default function StockOutScreen({ navigation }: Props) {
     setLoadingPacks(true);
     try {
       const scope = store && hubCode ? { store, hubCode } : undefined;
+      if (scope) {
+        await refreshCache(scope.store, scope.hubCode, { force: true });
+      }
       setPacks(await listOutboundPackages(scope));
     } finally {
       setLoadingPacks(false);
@@ -215,6 +219,7 @@ export default function StockOutScreen({ navigation }: Props) {
         count: result.count,
         totalWeight,
         tripNumber: result.tripNumber,
+        transportFee: transportFee.trim(),
         cloudStatus,
         cloudError: result.cloudError
           ? resolveAppError(t, new Error(result.cloudError))
@@ -316,6 +321,9 @@ export default function StockOutScreen({ navigation }: Props) {
                 dest: destination.trim().toUpperCase(),
               })}
             </Text>
+          ) : null}
+          {packageCount > 0 ? (
+            <Text style={styles.fieldHint}>{fmt(t.stockOut.tripFeeHint, { count: packageCount })}</Text>
           ) : null}
 
           <Text style={styles.label}>{t.stockOut.tripNumber}</Text>

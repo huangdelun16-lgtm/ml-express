@@ -2,6 +2,14 @@
  * Inventory App「快递明细」客户汇总（云端 inventory_store_items + 入库流水）
  */
 
+const {
+  buildCrossBorderCustomerRegistry,
+  resolveRegisteredCustomer,
+  looksLikeCustomerCode,
+  normalizeCustomerName,
+  normalizeCustomerPhone,
+} = require('./crossBorderCustomerRegistry');
+
 function parseAmount(raw) {
   if (raw == null) return 0;
   const s = String(raw).trim();
@@ -79,14 +87,15 @@ function customerKey(name, phone) {
   return `${n}__${p}`;
 }
 
-function normalizeCustomerName(name) {
-  return String(name || '').trim() || '未登记客户';
-}
-
-function normalizeCustomerPhone(phone) {
-  const p = String(phone || '').trim();
-  if (!p || p === '—' || p === '-') return '—';
-  return p;
+async function loadCrossBorderCustomerRegistry(supabase) {
+  const { data, error } = await supabase
+    .from('cross_border_customers')
+    .select('customer_code, customer_name, phone, delivery_area_code')
+    .eq('status', 'active');
+  if (error) {
+    return { registry: buildCrossBorderCustomerRegistry([]), warning: `登记客户读取失败：${error.message}` };
+  }
+  return { registry: buildCrossBorderCustomerRegistry(data ?? []), warning: null };
 }
 
 function normalizeOwnerKey(key) {
@@ -196,6 +205,7 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     id: item.id,
     customerName,
     customerPhone: phone,
+    customerCode: String(inbound?.customer_code || '').trim().toUpperCase(),
     customerKey: customerKey(customerName, phone),
     productName: String(item.name || '').trim() || '—',
     expressBarcode: String(item.input_barcode || '').trim() || '—',
@@ -242,7 +252,7 @@ async function loadExpressItemsDataset(supabase) {
     const { data: movRows, error: movErr } = await supabase
       .from('inventory_stock_movements')
       .select(
-        'item_id, type, qty, note, recipient_name, recipient_phone, destination, packaging, origin_store_code, origin_store_name, created_at',
+        'item_id, type, qty, note, recipient_name, recipient_phone, destination, packaging, origin_store_code, origin_store_name, customer_code, created_at',
       )
       .eq('type', 'in')
       .in('item_id', itemIds);
@@ -291,17 +301,33 @@ async function loadExpressItemsDataset(supabase) {
   return { rows, warnings };
 }
 
-function aggregateCustomerSummaries(rows) {
+function aggregateCustomerSummaries(rows, registry) {
   const map = {};
   for (const row of rows) {
-    const name = normalizeCustomerName(row.customerName);
-    const phone = normalizeCustomerPhone(row.customerPhone);
-    const key = customerKey(name, phone);
+    const registered = resolveRegisteredCustomer(row, registry);
+    let key;
+    let customerName;
+    let customerPhone;
+    let customerCode;
+
+    if (registered) {
+      customerCode = registered.customer_code;
+      key = `code:${customerCode}`;
+      customerName = registered.customer_name;
+      customerPhone = registered.phone;
+    } else {
+      customerName = normalizeCustomerName(row.customerName);
+      customerPhone = normalizeCustomerPhone(row.customerPhone);
+      key = customerKey(customerName, customerPhone);
+      customerCode = looksLikeCustomerCode(customerName) ? customerName.trim().toUpperCase() : '';
+    }
+
     if (!map[key]) {
       map[key] = {
         customerKey: key,
-        customerName: name,
-        customerPhone: phone,
+        customerCode,
+        customerName,
+        customerPhone,
         totalPieces: 0,
         totalWeightKg: 0,
         totalFee: 0,
@@ -325,27 +351,49 @@ function aggregateCustomerSummaries(rows) {
 }
 
 async function fetchCustomerSummaries(supabase) {
-  const { rows, warnings } = await loadExpressItemsDataset(supabase);
+  const warnings = [];
+  const { registry, warning: registryWarning } = await loadCrossBorderCustomerRegistry(supabase);
+  if (registryWarning) warnings.push(registryWarning);
+  const { rows, warnings: loadWarnings } = await loadExpressItemsDataset(supabase);
+  warnings.push(...loadWarnings);
   return {
-    summaries: aggregateCustomerSummaries(rows),
+    summaries: aggregateCustomerSummaries(rows, registry),
     warnings,
   };
 }
 
-async function fetchCustomerItems(supabase, customerName, customerPhone) {
-  const { rows, warnings } = await loadExpressItemsDataset(supabase);
-  const targetName = normalizeCustomerName(customerName);
-  const targetPhone = normalizeCustomerPhone(customerPhone);
+async function fetchCustomerItems(supabase, customerName, customerPhone, customerCode) {
+  const warnings = [];
+  const { registry, warning: registryWarning } = await loadCrossBorderCustomerRegistry(supabase);
+  if (registryWarning) warnings.push(registryWarning);
+  const { rows, warnings: loadWarnings } = await loadExpressItemsDataset(supabase);
+  warnings.push(...loadWarnings);
+
+  const codeUpper = String(customerCode || '').trim().toUpperCase();
+  const registered = codeUpper && registry?.byCode?.[codeUpper] ? registry.byCode[codeUpper] : null;
+  const targetName = registered ? registered.customer_name : normalizeCustomerName(customerName);
+  const targetPhone = registered ? registered.phone : normalizeCustomerPhone(customerPhone);
+  const targetCode = registered ? registered.customer_code : codeUpper;
+
   const items = rows
-    .filter(
-      (r) =>
+    .filter((r) => {
+      if (targetCode) {
+        const rowRegistered = resolveRegisteredCustomer(r, registry);
+        if (rowRegistered && rowRegistered.customer_code === targetCode) return true;
+        if (String(r.customerCode || '').trim().toUpperCase() === targetCode) return true;
+        if (String(r.customerName || '').trim().toUpperCase() === targetCode) return true;
+        return false;
+      }
+      return (
         normalizeCustomerName(r.customerName) === targetName &&
-        normalizeCustomerPhone(r.customerPhone) === targetPhone,
-    )
+        normalizeCustomerPhone(r.customerPhone) === targetPhone
+      );
+    })
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   return {
     customerName: targetName,
     customerPhone: targetPhone,
+    customerCode: targetCode,
     items,
     warnings,
   };
@@ -355,4 +403,5 @@ module.exports = {
   fetchCustomerSummaries,
   fetchCustomerItems,
   customerKey,
+  aggregateCustomerSummaries,
 };

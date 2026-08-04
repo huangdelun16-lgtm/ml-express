@@ -5,6 +5,11 @@ import {
   buildCrossBorderFinanceSummary,
   buildStationReconciliationSummary,
 } from './stationReconciliation';
+import {
+  buildTripFeeGroupMap,
+  isTripTransportFeePaid,
+  tripTransportGroupKey,
+} from './tripTransportFee';
 
 export type FinanceItemRow = {
   id: string;
@@ -37,6 +42,7 @@ export type FinancePackageRow = {
   origin_store_name?: string | null;
   destination_code?: string | null;
   leg_destination_code?: string | null;
+  trip_number?: string | null;
   transport_fee?: string | number | null;
   truck_loaded_at?: string | null;
   updated_at?: string | null;
@@ -256,6 +262,8 @@ export function buildFinanceLedgerEntries(
   }
 
   const transportSeen = new Set<string>();
+  const transportTripSeen = new Set<string>();
+  const tripGroupMap = buildTripFeeGroupMap(dataset.packages);
   for (const pkg of dataset.packages) {
     const packBarcode = String(pkg.pack_barcode || '').trim().toUpperCase();
     const legDestination = normalizeDestinationCode(
@@ -268,22 +276,39 @@ export function buildFinanceLedgerEntries(
     ) {
       continue;
     }
-    transportSeen.add(packBarcode);
-    const fee = parseFinanceAmount(pkg.transport_fee);
-    const paid = dataset.paidTransportBarcodes.has(packBarcode);
+
+    const tripNumber = String(pkg.trip_number || '').trim().toUpperCase();
+    const tripKey = tripTransportGroupKey(tripNumber, packBarcode, pkg);
+    if (transportTripSeen.has(tripKey)) continue;
+
+    const group = tripGroupMap.get(tripKey);
+    const packBarcodes = group?.packBarcodes ?? [packBarcode];
+    for (const code of packBarcodes) transportSeen.add(code);
+    transportTripSeen.add(tripKey);
+
+    const fee = group?.fee ?? parseFinanceAmount(pkg.transport_fee);
+    const paid = isTripTransportFeePaid(packBarcodes, dataset.paidTransportBarcodes);
     const originKey = ownershipKeyFromStoreCode(pkg.origin_store_code || '');
     const originLabel = ownerLabel(originKey, String(pkg.origin_store_name || ''));
+    const packCount = group?.packCount ?? 1;
+    const subtitle =
+      tripNumber && packCount > 1
+        ? `${originLabel} → ${legDestination} · 车次 ${tripNumber} · ${packCount} 包`
+        : tripNumber
+          ? `${originLabel} → ${legDestination} · 车次 ${tripNumber} · ${packBarcode}`
+          : `${originLabel} → ${legDestination} · ${packBarcode}`;
+
     entries.push({
-      id: `transport:${packBarcode}`,
+      id: tripNumber ? `transport:trip:${tripNumber}` : `transport:${packBarcode}`,
       category: 'transport_cost',
       title: '运输成本 · 装车车费',
-      subtitle: `${originLabel} → ${legDestination} · ${packBarcode}`,
+      subtitle,
       amount: paid ? 0 : fee,
       amountDisplay: paid ? '已支付' : fee > 0 ? `−${formatMmk(fee)}` : '待登记车费',
       transportFee: fee,
       paid,
       occurredAt: String(pkg.truck_loaded_at || pkg.updated_at || ''),
-      barcode: packBarcode,
+      barcode: group?.primaryPackBarcode || packBarcode,
       itemName: String(pkg.pack_name || packBarcode),
       destination: legDestination,
       originKey,

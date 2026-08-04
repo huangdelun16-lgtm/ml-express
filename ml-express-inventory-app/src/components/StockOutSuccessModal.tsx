@@ -9,6 +9,7 @@ export type StockOutSuccessData = {
   count: number;
   totalWeight: string;
   tripNumber?: string;
+  transportFee?: string;
   cloudStatus: CloudSyncStatus;
   cloudError?: string;
   packBarcodes: string[];
@@ -117,6 +118,14 @@ export default function StockOutSuccessModal({
               {fmt(t.stockOut.successTrip, { trip: data.tripNumber })}
             </Text>
           ) : null}
+          {data.transportFee?.trim() ? (
+            <Text style={styles.tripFee}>
+              {fmt(t.stockOut.successTripFee, {
+                fee: data.transportFee.trim(),
+                count: data.count,
+              })}
+            </Text>
+          ) : null}
 
           {needsCloudAction ? (
             <>
@@ -215,6 +224,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     fontFamily: 'monospace',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  tripFee: {
+    color: '#fde68a',
+    fontSize: 14,
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 14,
   },

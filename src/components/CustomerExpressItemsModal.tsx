@@ -59,7 +59,11 @@ const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer })
     if (!open || !customer) return;
     setLoading(true);
     setError(null);
-    void fetchInventoryCustomerItems(customer.customerName, customer.customerPhone)
+    void fetchInventoryCustomerItems(
+      customer.customerCode ? '' : customer.customerName,
+      customer.customerPhone,
+      customer.customerCode,
+    )
       .then((data) => setItems(data.items))
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : '加载失败');

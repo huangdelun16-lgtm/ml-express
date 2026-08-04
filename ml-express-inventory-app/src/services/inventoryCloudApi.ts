@@ -5,6 +5,7 @@ import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authServ
 import { isSupabaseConfigured, supabase } from './supabase';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { generateUuid, toNullableUuid } from '../utils/uuid';
+import { isInventoryOperationLogDuplicateError } from '../utils/inventoryReliability';
 
 export type CloudStoreItemRow = {
   id: string;
@@ -197,7 +198,18 @@ export async function applyCloudStockMovementAtomic(
     p_item: itemToRpcPayload(item, ownedByAuthStore ? toNullableUuid(authStore.id) : null),
     p_movement: { ...movement, origin_store_id: toNullableUuid(movement.origin_store_id) },
   });
-  if (error || !data) throw error?.message ? new Error(error.message) : svc('syncItemFailed');
+  if (error) {
+    if (isInventoryOperationLogDuplicateError(error)) {
+      const { data: row, error: fetchErr } = await supabase
+        .from('inventory_store_items')
+        .select('*')
+        .eq('barcode', item.barcode.trim())
+        .maybeSingle();
+      if (!fetchErr && row) return rowToCloudItem(row as Record<string, unknown>);
+    }
+    throw new Error(error.message);
+  }
+  if (!data) throw svc('syncItemFailed');
   const result = data as AtomicRpcResult;
   if (!result.item) throw svc('syncItemFailed');
   return rowToCloudItem(result.item);
@@ -226,9 +238,13 @@ export async function createCloudPackedShipmentAtomic(params: {
     p_lines: params.lines,
   });
   if (error || !data) throw error?.message ? new Error(error.message) : svc('syncPackFailed');
-  const result = data as AtomicRpcResult;
-  if (!result.bundle_item || !result.pack_id) throw svc('syncPackFailed');
-  return { bundleItem: rowToCloudItem(result.bundle_item), packId: String(result.pack_id) };
+  const result = parseRpcJsonResult(data);
+  const bundleRow = asRecord(result.bundle_item);
+  const packId = result.pack_id ? String(result.pack_id) : '';
+  if (!bundleRow || !packId) {
+    throw new Error('打包 RPC 未返回快递包数据，请检查网络后重试');
+  }
+  return { bundleItem: rowToCloudItem(bundleRow), packId };
 }
 
 /** 多个入库：订单直接已入库+已打包（库存 0），整包重量写在快递包上。 */
@@ -343,13 +359,72 @@ export async function loadCloudShipmentsAtomic(params: {
     p_operation_id: params.operationId,
     p_payload: params.payload,
   });
-  if (error || !data) throw error?.message ? new Error(error.message) : svc('pkgSyncFailed');
-  const result = data as AtomicRpcResult;
+  if (error) throw new Error(error.message || '装车出库 RPC 失败');
+  const result = parseRpcJsonResult(data);
   return {
     count: Number(result.count) || 0,
     trip_number: result.trip_number ? String(result.trip_number) : undefined,
     idempotent: Boolean(result.idempotent),
   };
+}
+
+/** 装车前校验：快递包必须已写入 Supabase（不能仅存在于 App 内存缓存） */
+export async function fetchCloudPackByBarcode(barcode: string): Promise<{ id: string; bundle_barcode: string } | null> {
+  if (!isSupabaseConfigured()) return null;
+  await ensureInventoryCloudAuth();
+  const code = barcode.trim().toUpperCase();
+  if (!code) return null;
+  const { data, error } = await supabase
+    .from('inventory_packed_shipments')
+    .select('id, bundle_barcode')
+    .eq('bundle_barcode', code)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (data) return { id: String((data as { id: string }).id), bundle_barcode: String((data as { bundle_barcode: string }).bundle_barcode) };
+  return null;
+}
+
+/** 按条码拉取单个快递包及明细（目的站读到站包 note / 包内序号） */
+export async function fetchCloudPackDetailByBarcode(barcode: string): Promise<CloudPackRow | null> {
+  if (!isSupabaseConfigured()) return null;
+  await ensureInventoryCloudAuth();
+  const code = barcode.trim().toUpperCase();
+  if (!code) return null;
+  const { data: pack, error: packErr } = await supabase
+    .from('inventory_packed_shipments')
+    .select('*')
+    .eq('bundle_barcode', code)
+    .maybeSingle();
+  if (packErr) throw new Error(packErr.message);
+  if (!pack) return null;
+
+  const packId = String((pack as { id: string }).id);
+  const { data: lines, error: lineErr } = await supabase
+    .from('inventory_packed_shipment_items')
+    .select('*')
+    .eq('pack_id', packId);
+  if (lineErr) throw new Error(lineErr.message);
+
+  return {
+    ...(pack as CloudPackRow),
+    inventory_packed_shipment_items: (lines ?? []) as CloudPackLineRow[],
+  };
+}
+
+export async function assertCloudPacksExist(barcodes: string[]): Promise<void> {
+  const missing: string[] = [];
+  for (const raw of barcodes) {
+    const code = raw.trim().toUpperCase();
+    if (!code) continue;
+    const row = await fetchCloudPackByBarcode(code);
+    if (!row) missing.push(code);
+  }
+  if (missing.length === 0) return;
+  throw new Error(
+    missing.length === 1
+      ? `快递包 ${missing[0]} 未在云端登记，无法装车。请返回「快递明细」重新打包该批订单后再试。`
+      : `以下快递包未在云端登记，无法装车：${missing.join('、')}。请重新打包后再装车。`,
+  );
 }
 
 export async function fetchCloudStoreItems(

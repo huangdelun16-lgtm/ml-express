@@ -13,6 +13,10 @@ import {
   type UpdateCrossBorderAccountResult,
 } from '../services/inventoryConsoleService';
 import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
+import {
+  compareSalespersonEmployeeCodes,
+  formatSalespersonEmployeeCodeDisplay,
+} from '../utils/crossBorderSalespersons';
 import '../styles/crossBorderLogistics.css';
 
 type Props = {
@@ -125,11 +129,7 @@ const CrossBorderAccountManagementModal: React.FC<Props> = ({
 
   const handleSalespersonCreated = (row: CrossBorderSalesperson) => {
     setSalespersons((prev) =>
-      [...prev, row].sort((a, b) =>
-        a.work_area_code === b.work_area_code
-          ? a.employee_code.localeCompare(b.employee_code)
-          : a.work_area_code.localeCompare(b.work_area_code),
-      ),
+      [...prev, row].sort((a, b) => compareSalespersonEmployeeCodes(a.employee_code, b.employee_code)),
     );
     setShowCreateSalesperson(false);
   };
@@ -141,8 +141,8 @@ const CrossBorderAccountManagementModal: React.FC<Props> = ({
 
   const handleDeleteSalesperson = async (row: CrossBorderSalesperson) => {
     const confirmMessage = isEn
-      ? `Confirm delete salesperson "${row.name}" (${row.employee_code})?\n\nThis cannot be undone.`
-      : `确认删除推销员「${row.name}」（${row.employee_code}）吗？\n\n此操作不可撤销。`;
+      ? `Confirm delete salesperson "${row.name}" (${formatSalespersonEmployeeCodeDisplay(row.employee_code)})?\n\nThis cannot be undone.`
+      : `确认删除推销员「${row.name}」（${formatSalespersonEmployeeCodeDisplay(row.employee_code)}）吗？\n\n此操作不可撤销。`;
     if (!window.confirm(confirmMessage)) return;
 
     setActionError(null);
@@ -354,7 +354,7 @@ const CrossBorderAccountManagementModal: React.FC<Props> = ({
                     {salespersons.map((row) => (
                       <tr key={row.id}>
                         <td>
-                          <span className="cbl-code">{row.employee_code}</span>
+                          <span className="cbl-code">{formatSalespersonEmployeeCodeDisplay(row.employee_code)}</span>
                         </td>
                         <td>{row.name}</td>
                         <td>

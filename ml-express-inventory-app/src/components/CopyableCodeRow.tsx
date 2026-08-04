@@ -1,6 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import PackagingStockInBarcodeText from './PackagingStockInBarcodeText';
+import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
 
 type Props = {
   label: string;
@@ -40,17 +42,27 @@ export default function CopyableCodeRow({
     >
       <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>{label}</Text>
       <View style={styles.valueRow}>
-        <Text
-          style={[
-            styles.value,
-            isDark ? styles.valueDark : styles.valueLight,
-            monospace && styles.mono,
-          ]}
-          selectable
-          numberOfLines={2}
-        >
-          {trimmed}
-        </Text>
+        {isPackagingStockInLineBarcode(trimmed) ? (
+          <PackagingStockInBarcodeText
+            barcode={trimmed}
+            variant={isDark ? 'dark' : 'light'}
+            style={[styles.value, styles.packagingValue, monospace && styles.mono]}
+            numberOfLines={2}
+            selectable
+          />
+        ) : (
+          <Text
+            style={[
+              styles.value,
+              isDark ? styles.valueDark : styles.valueLight,
+              monospace && styles.mono,
+            ]}
+            selectable
+            numberOfLines={2}
+          >
+            {trimmed}
+          </Text>
+        )}
         <Text style={[styles.action, copied && styles.actionCopied]}>
           {copied ? copiedLabel : '📋'}
         </Text>
@@ -98,6 +110,9 @@ const styles = StyleSheet.create({
   valueDark: { color: '#e2e8f0' },
   valueLight: { color: '#0f172a' },
   mono: { fontFamily: 'monospace' },
+  packagingValue: {
+    fontSize: 15,
+  },
   action: {
     fontSize: 16,
     minWidth: 28,

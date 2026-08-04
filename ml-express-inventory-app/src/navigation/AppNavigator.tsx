@@ -31,7 +31,7 @@ export type RootStackParamList = {
   PrintPreview: undefined;
   Pkg: undefined;
   TrackExpress: { presetCode?: string } | undefined;
-  HubReceive: undefined;
+  HubReceive: { openPackBarcode?: string } | undefined;
   ShipmentTrack: undefined;
 };
 

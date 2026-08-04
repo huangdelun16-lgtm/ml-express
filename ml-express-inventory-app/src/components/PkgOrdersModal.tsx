@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import PackagingStockInBarcodeText from './PackagingStockInBarcodeText';
 import { useTranslation } from '../i18n';
 import type { PackedShipmentDetail } from '../types/inventory';
 import { resolvePackOrderCount } from '../utils/itemFieldFormat';
@@ -46,9 +47,12 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
                     </View>
                     <View style={styles.tagYellow}>
                       <Text style={styles.tagYellowLabel}>{t.forms.inboundSlip}</Text>
-                      <Text style={styles.tagYellowValue} numberOfLines={1} selectable>
-                        {line.item_barcode}
-                      </Text>
+                      <PackagingStockInBarcodeText
+                        barcode={line.item_barcode}
+                        variant="list"
+                        numberOfLines={1}
+                        selectable
+                      />
                     </View>
                   </View>
                 </View>

@@ -34,6 +34,7 @@ export function InboundFormField({
   returnKeyType,
   onSubmitEditing,
   blurOnSubmit,
+  autoCapitalize,
 }: {
   label: string;
   value: string;
@@ -47,6 +48,7 @@ export function InboundFormField({
   returnKeyType?: TextInputProps['returnKeyType'];
   onSubmitEditing?: TextInputProps['onSubmitEditing'];
   blurOnSubmit?: boolean;
+  autoCapitalize?: TextInputProps['autoCapitalize'];
 }) {
   return (
     <View style={styles.field}>
@@ -65,6 +67,7 @@ export function InboundFormField({
         placeholder={placeholder}
         placeholderTextColor="#94a3b8"
         keyboardType={keyboard}
+        autoCapitalize={autoCapitalize}
         multiline={multiline}
         returnKeyType={returnKeyType}
         onSubmitEditing={onSubmitEditing}

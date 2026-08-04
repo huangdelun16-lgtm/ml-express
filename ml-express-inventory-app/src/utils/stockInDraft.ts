@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KEY = 'stock_in_contact_draft';
 
 export type StockInContactDraft = {
+  customerCode: string;
   recipientName: string;
   recipientPhone: string;
   destination: string;
@@ -11,6 +12,7 @@ export type StockInContactDraft = {
 };
 
 const EMPTY_DRAFT: StockInContactDraft = {
+  customerCode: '',
   recipientName: '',
   recipientPhone: '',
   destination: '',

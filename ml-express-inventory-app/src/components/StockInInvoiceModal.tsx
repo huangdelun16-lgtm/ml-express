@@ -28,6 +28,7 @@ export default function StockInInvoiceModal({ visible, data, onClose }: Props) {
       <View style={inboundInvoiceStyles.overlay}>
         <View style={inboundInvoiceStyles.sheet}>
           <ScrollView
+            style={inboundInvoiceStyles.scrollView}
             contentContainerStyle={inboundInvoiceStyles.scroll}
             showsVerticalScrollIndicator={false}
           >

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFormFieldChain } from '../hooks/useFormFieldChain';
 import {
   Alert,
@@ -46,6 +46,10 @@ import {
 } from '../utils/crossBorderPricing';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { fmt, resolveAppError, useTranslation } from '../i18n';
+import {
+  applyCrossBorderCustomerToForm,
+  useCrossBorderCustomerLookup,
+} from '../hooks/useCrossBorderCustomerLookup';
 
 type Route = { params?: { presetBarcode?: string } };
 type Step = 1 | 2 | 3;
@@ -90,6 +94,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [specH, setSpecH] = useState('');
   const [weightN, setWeightN] = useState('');
   const [packaging, setPackaging] = useState('');
+  const [customerCode, setCustomerCode] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [destination, setDestination] = useState('');
@@ -105,9 +110,24 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [barcodeModalData, setBarcodeModalData] = useState<OrderBarcodeData | null>(null);
   const [lookupHint, setLookupHint] = useState('');
+  const [customerLookupHint, setCustomerLookupHint] = useState('');
   const [scanLoading, setScanLoading] = useState(false);
 
-  const step2Chain = useFormFieldChain(['name', 'phone', 'product']);
+  const applyCustomerRegistry = useCallback((match: Parameters<typeof applyCrossBorderCustomerToForm>[0]) => {
+    applyCrossBorderCustomerToForm(match, {
+      setRecipientName,
+      setRecipientPhone,
+      setDestination: (v) => setDestination(normalizePackDestination(v)),
+    });
+    setCustomerLookupHint(
+      fmt(t.stockIn.customerCodeMatched, { name: match.customer_name, phone: match.phone }),
+    );
+  }, [t]);
+
+  const { lookup: lookupCustomerCode, lookupNow: lookupCustomerCodeNow } =
+    useCrossBorderCustomerLookup(applyCustomerRegistry);
+
+  const step2Chain = useFormFieldChain(['code', 'name', 'phone', 'product']);
   const step3Chain = useFormFieldChain([
     'detail',
     'specL',
@@ -160,6 +180,7 @@ export default function StockInScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     void loadStockInContactDraft().then((d) => {
+      setCustomerCode(d.customerCode);
       setRecipientName(d.recipientName);
       setRecipientPhone(d.recipientPhone);
       setDestination(normalizePackDestination(d.destination));
@@ -321,6 +342,7 @@ export default function StockInScreen({ route, navigation }: Props) {
       const fullNote = buildNote();
 
       await saveStockInContactDraft({
+        customerCode: customerCode.trim().toUpperCase(),
         recipientName: recipientName.trim(),
         recipientPhone: recipientPhone.trim(),
         destination: dest,
@@ -337,6 +359,7 @@ export default function StockInScreen({ route, navigation }: Props) {
         note: fullNote,
         recipientName: recipientName.trim(),
         recipientPhone: recipientPhone.trim(),
+        customerCode: customerCode.trim(),
         destination: dest,
         detailAddress: detailAddress.trim(),
         packaging,
@@ -442,6 +465,29 @@ export default function StockInScreen({ route, navigation }: Props) {
           <>
             <ScanRefBanner code={scan} hint={t.stockIn.scannedBarcode} />
             <InboundFormSection title={t.stockIn.customerSection} accent="#0891b2">
+              <InboundFormField
+                label={t.stockIn.customerCode}
+                value={customerCode}
+                onChange={(v) => {
+                  setCustomerCode(v.toUpperCase());
+                  setCustomerLookupHint('');
+                  lookupCustomerCode(v);
+                }}
+                placeholder={t.stockIn.customerCodePlaceholder}
+                autoCapitalize="characters"
+                inputRef={step2Chain.propsFor('code').inputRef}
+                returnKeyType={step2Chain.propsFor('code').returnKeyType}
+                onSubmitEditing={() => {
+                  void lookupCustomerCodeNow(customerCode);
+                  step2Chain.propsFor('code').onSubmitEditing?.();
+                }}
+                blurOnSubmit={step2Chain.propsFor('code').blurOnSubmit}
+              />
+              {customerLookupHint ? (
+                <Text style={styles.lookupHint}>{customerLookupHint}</Text>
+              ) : (
+                <Text style={styles.customerCodeHint}>{t.stockIn.customerCodeHint}</Text>
+              )}
               <InboundFormField
                 label={t.stockIn.nameRequired}
                 value={recipientName}
@@ -668,6 +714,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 24 },
   lookupHint: { color: '#6ee7b7', fontSize: 13, marginTop: 8, fontWeight: '700' },
+  customerCodeHint: { color: '#64748b', fontSize: 12, marginTop: 4, marginBottom: 4, lineHeight: 18 },
   lookupMeta: { color: '#94a3b8', fontSize: 12, marginTop: 4, lineHeight: 18 },
   scanBanner: {
     backgroundColor: '#1e293b',

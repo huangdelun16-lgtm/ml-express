@@ -13,6 +13,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { verifyAdminToken } = require('./verify-admin');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { aggregateFinanceForTransitStores } = require('./utils/inventoryFinanceAggregate');
+const { buildTripFeeGroupMap } = require('./utils/tripTransportFee');
 const {
   PACK_DISPLAY_LABEL,
   resolvePackDisplayStatusFromTracking,
@@ -78,7 +79,9 @@ async function sumAllTransportFees(supabase) {
 
   const { data: rows, error: scanErr } = await supabase
     .from('inventory_pkg_tracking')
-    .select('transport_fee')
+    .select(
+      'pack_barcode, trip_number, transport_fee, truck_loaded_at, origin_store_code, leg_destination_code, destination_code',
+    )
     .neq('status', 'cancelled')
     .limit(3000);
 
@@ -87,9 +90,10 @@ async function sumAllTransportFees(supabase) {
     return 0;
   }
 
+  const groupMap = buildTripFeeGroupMap(rows || []);
   let total = 0;
-  for (const row of rows || []) {
-    total += parseTransportFeeAmount(row.transport_fee);
+  for (const group of groupMap.values()) {
+    total += group.fee;
   }
   return Math.round(total);
 }
@@ -189,6 +193,7 @@ function normalizePackRow(row, qtyOnHand) {
           ? PACK_DISPLAY_LABEL[displayStatus]
           : null,
     transport_fee: transportFee,
+    trip_number: String(row.trip_number || '').trim() || null,
     truck_outbound_date: row.truck_outbound_date ?? null,
     truck_loaded_at: row.truck_loaded_at ?? null,
     hub_received_at: row.hub_received_at ?? null,

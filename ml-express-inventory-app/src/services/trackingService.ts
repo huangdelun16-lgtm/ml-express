@@ -14,7 +14,8 @@ import { extractDestinationCode } from '../utils/inboundBarcode';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { isPackageBarcode, packDestinationFromBarcode } from '../utils/packageNumber';
 import { toNullableUuid } from '../utils/uuid';
-import { inventoryOperationId } from '../utils/inventoryReliability';
+import { inventoryOperationId, isInventoryOperationLogDuplicateError } from '../utils/inventoryReliability';
+import { withInventoryCloudWrite } from './cloudWriteGuard';
 
 type OriginStore = {
   id: string;
@@ -276,17 +277,19 @@ async function maybeFinalizePkg(
   const hasReleased = orders.some((o) => o.status === 'released_at_hub');
   const finalStatus: PkgTrackingStatus = hasReleased ? 'split_at_hub' : 'completed';
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from('inventory_pkg_tracking')
-    .update({
-      status: finalStatus,
-      completed_at: now,
-      updated_at: now,
-    })
-    .eq('id', pkgId)
-    .in('status', ['hub_received', 'completed']);
+  await withInventoryCloudWrite(async () => {
+    const { error } = await supabase
+      .from('inventory_pkg_tracking')
+      .update({
+        status: finalStatus,
+        completed_at: now,
+        updated_at: now,
+      })
+      .eq('id', pkgId)
+      .in('status', ['hub_received', 'completed']);
 
-  if (error) throw new Error(error.message);
+    if (error) throwTrackingCloudWriteError(error);
+  });
   return true;
 }
 
@@ -556,7 +559,27 @@ export async function listOutboundPackagesFromOrigin(
   return result;
 }
 
+const confirmHubReceivedInFlight = new Map<string, Promise<PkgTrackingDetail>>();
+
 export async function confirmPkgHubReceived(
+  packBarcode: string,
+  store: InventoryStoreSession,
+  hubCode: string,
+): Promise<PkgTrackingDetail> {
+  const code = packBarcode.trim().toUpperCase();
+  if (!code) throw svc('pkgNotFoundNeedLoad');
+
+  const inflight = confirmHubReceivedInFlight.get(code);
+  if (inflight) return inflight;
+
+  const promise = confirmPkgHubReceivedOnce(code, store, hubCode).finally(() => {
+    confirmHubReceivedInFlight.delete(code);
+  });
+  confirmHubReceivedInFlight.set(code, promise);
+  return promise;
+}
+
+async function confirmPkgHubReceivedOnce(
   packBarcode: string,
   store: InventoryStoreSession,
   hubCode: string,
@@ -566,7 +589,10 @@ export async function confirmPkgHubReceived(
 
   const dest = hubCode.trim().toUpperCase();
   const legDest = resolvePackLegDestination(detail);
-  if (legDest !== dest) {
+  const allOrdersForHub =
+    detail.orders.length > 0 &&
+    detail.orders.every((o) => resolveOrderDestinationCode(o) === dest);
+  if (!allOrdersForHub && legDest !== dest) {
     throw svc('pkgLegDestMismatch', {
       legDest: legDest || detail.destination_code,
       hub: dest,
@@ -586,7 +612,15 @@ export async function confirmPkgHubReceived(
     p_store_name: store.storeName,
     p_hub_code: dest,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (isInventoryOperationLogDuplicateError(error)) {
+      const updated = await getPkgTrackingDetail(detail.pack_barcode);
+      if (updated?.status === 'hub_received' || updated?.status === 'completed' || updated?.status === 'split_at_hub') {
+        return updated;
+      }
+    }
+    throw new Error(error.message);
+  }
   const updated = await getPkgTrackingDetail(detail.pack_barcode);
   if (!updated) throw svc('pkgNotFoundNeedLoad');
   return updated;
@@ -598,7 +632,7 @@ async function applyOrderHubReceived(
   hubCode: string,
   knownPkg?: PkgTrackingDetail,
 ): Promise<{ order: OrderTrackingRecord; pkg: PkgTrackingDetail }> {
-  const pkg = knownPkg ?? (await getPkgTrackingDetail(order.pack_barcode));
+  let pkg = knownPkg ?? (await getPkgTrackingDetail(order.pack_barcode));
   if (!pkg) throw svc('linkedPkgNotFound');
 
   const dest = hubCode.trim().toUpperCase();
@@ -616,7 +650,7 @@ async function applyOrderHubReceived(
     });
   }
   if (pkg.status === 'in_transit') {
-    throw svc('scanPkgFirstBeforeOrders');
+    pkg = await confirmPkgHubReceived(pkg.pack_barcode, store, hubCode);
   }
   if (order.status === 'hub_received') {
     return { order, pkg };
@@ -626,18 +660,20 @@ async function applyOrderHubReceived(
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from('inventory_order_tracking')
-    .update({
-      status: 'hub_received',
-      hub_received_at: now,
-      hub_received_by_store_code: store.storeCode,
-      hub_received_by_store_name: store.storeName,
-      updated_at: now,
-    })
-    .eq('id', order.id);
+  await withInventoryCloudWrite(async () => {
+    const { error } = await supabase
+      .from('inventory_order_tracking')
+      .update({
+        status: 'hub_received',
+        hub_received_at: now,
+        hub_received_by_store_code: store.storeCode,
+        hub_received_by_store_name: store.storeName,
+        updated_at: now,
+      })
+      .eq('id', order.id);
 
-  if (error) throw new Error(error.message);
+    if (error) throwTrackingCloudWriteError(error);
+  });
 
   const updatedOrder: OrderTrackingRecord = {
     ...order,

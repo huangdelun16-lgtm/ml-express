@@ -200,6 +200,30 @@ async function signInInventoryAuth(email: string, password: string): Promise<voi
   if (error) throw svc('cloudLoginFailed', { detail: error.message });
 }
 
+/** 主动刷新 Supabase JWT（写操作前调用，避免 RLS 误报需重新登录） */
+export async function refreshInventoryCloudSession(): Promise<InventoryStoreSession> {
+  if (!isSupabaseConfigured()) {
+    throw new InventoryAuthRequiredError('supabaseNotConfigured');
+  }
+  const {
+    data: { session: currentSession },
+  } = await supabase.auth.getSession();
+  if (!currentSession) {
+    throw new InventoryAuthRequiredError('authSessionExpired');
+  }
+
+  const expiresAtMs = (currentSession.expires_at ?? 0) * 1000;
+  const shouldRefresh = !expiresAtMs || expiresAtMs < Date.now() + 120_000;
+  if (shouldRefresh) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data.session?.user) {
+      throw new InventoryAuthRequiredError('authSessionExpired');
+    }
+  }
+
+  return ensureInventoryCloudAuth();
+}
+
 /** 同步 / 写云端前校验：必须已登录且 JWT 含 inventory_store_id + hub_code */
 export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession> {
   if (!isSupabaseConfigured()) {
@@ -216,6 +240,24 @@ export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession>
 
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   const user = userErr ? session.user : userData?.user ?? session.user;
+
+  if (userErr && isInventoryCloudAuthError(userErr)) {
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr || !refreshed.session?.user) {
+      throw new InventoryAuthRequiredError('authSessionExpired');
+    }
+    const retryUser = refreshed.session.user;
+    const fromRefreshed = sessionFromAuthMetadata(retryUser);
+    if (!fromRefreshed?.hubCode || !fromRefreshed.sessionId) {
+      throw new InventoryAuthRequiredError('authJwtMissingHubCode');
+    }
+    const okRefreshed = await validateStoreStillAllowed(fromRefreshed.id);
+    if (!okRefreshed) throw new InventoryAuthRequiredError('storeDisabled');
+    const storedRefreshed = await loadStoredSession();
+    const mergedRefreshed = storedRefreshed ? { ...storedRefreshed, ...fromRefreshed } : fromRefreshed;
+    await saveSession(mergedRefreshed);
+    return mergedRefreshed;
+  }
 
   const fromMeta = sessionFromAuthMetadata(user);
   if (!fromMeta?.hubCode || !fromMeta.sessionId) {

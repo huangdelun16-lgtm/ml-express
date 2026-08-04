@@ -2,6 +2,13 @@
  * 按中转站汇总 Inventory App「财务流水」指标（与 App financeLedgerService 逻辑对齐，基于云端表）
  */
 
+const {
+  buildTripFeeGroupMap,
+  isTripTransportFeePaid,
+  buildTransportSubtitle,
+  tripTransportGroupKey,
+} = require('./tripTransportFee');
+
 const HUB_BY_REGION = {
   muse: 'MSE',
   mandalay: 'MDY',
@@ -253,13 +260,24 @@ function buildTransportEntry(params) {
     occurredAt,
     paid = false,
     direction = 'inbound',
+    tripNumber = '',
+    packCount = 1,
+    packBarcodes = [],
   } = params;
   return {
     id,
     category: 'transport_cost',
     title: direction === 'outbound' ? '运输成本 · 发运车费' : '运输成本 · 装车车费',
-    subtitle: `${originLabel} → ${legDest} · ${packBarcode}`,
+    subtitle: buildTransportSubtitle({
+      originLabel,
+      legDest,
+      tripNumber,
+      packCount,
+      packBarcode,
+      packBarcodes,
+    }),
     transportFee: fee,
+    tripNumber: tripNumber || undefined,
     paid,
     amount: paid ? 0 : fee,
     amountDisplay: paid
@@ -676,7 +694,7 @@ function filterCrossBorderFinanceEntries(entries) {
   );
 }
 
-function collectCloudTransportEntry(pkg, storeCode, hubCode, transportSeen, transportPaidBarcodes) {
+function collectCloudTransportEntry(pkg, storeCode, hubCode, transportSeen, transportTripSeen, tripGroupMap, transportPaidBarcodes) {
   const legDest = normalizeDestinationCode(
     pkg.leg_destination_code || pkg.destination_code || '',
   );
@@ -685,20 +703,29 @@ function collectCloudTransportEntry(pkg, storeCode, hubCode, transportSeen, tran
   const packBarcode = String(pkg.pack_barcode || '').trim().toUpperCase();
   if (!packBarcode || transportSeen.has(packBarcode)) return null;
 
+  const tripNumber = String(pkg.trip_number || '').trim().toUpperCase();
+  const tripKey = tripTransportGroupKey(tripNumber, packBarcode, pkg);
+  if (transportTripSeen.has(tripKey)) return null;
+
   const isInboundLeg = destinationCodesMatch(legDest, hubCode);
   // 本段车费由运达站承担，与 inventory_pkg_tracking 一条记录一致；发站不重复计入
   if (!isInboundLeg) return null;
 
-  transportSeen.add(packBarcode);
+  const group = tripGroupMap.get(tripKey);
+  const packBarcodes = group?.packBarcodes ?? [packBarcode];
+  const packCount = group?.packCount ?? 1;
+  for (const code of packBarcodes) transportSeen.add(code);
+  transportTripSeen.add(tripKey);
+
   const originKey = ownershipKeyFromStoreCode(pkg.origin_store_code || '');
-  const fee = parseAmount(pkg.transport_fee);
+  const fee = group?.fee ?? parseAmount(pkg.transport_fee);
   const originLabel =
     String(pkg.origin_store_name || '').trim() || ownershipLabelFromKey(originKey);
-  const paid = transportPaidBarcodes.has(packBarcode);
+  const paid = isTripTransportFeePaid(tripNumber, packBarcodes, transportPaidBarcodes);
 
   return buildTransportEntry({
-    id: `transport:cloud:${packBarcode}`,
-    packBarcode: pkg.pack_barcode,
+    id: tripNumber ? `transport:trip:${tripNumber}` : `transport:cloud:${packBarcode}`,
+    packBarcode: group?.primaryPackBarcode || pkg.pack_barcode,
     packName: pkg.pack_name || pkg.pack_barcode,
     fee,
     legDest,
@@ -706,6 +733,9 @@ function collectCloudTransportEntry(pkg, storeCode, hubCode, transportSeen, tran
     occurredAt: pkg.truck_loaded_at || pkg.updated_at || '',
     direction: 'inbound',
     paid,
+    tripNumber,
+    packCount,
+    packBarcodes,
   });
 }
 
@@ -717,7 +747,20 @@ function buildAllFinanceEntries(store, dataset) {
   const entries = [];
   const orderSeen = new Set();
   const transportSeen = new Set();
+  const transportTripSeen = new Set();
   const transportPaidBarcodes = dataset.transportPaidBarcodes || new Set();
+  const tripSourceRows = [
+    ...(dataset.packages || []),
+    ...(dataset.packedShipments || []).map((row) => ({
+      pack_barcode: row.bundle_barcode,
+      trip_number: row.trip_number,
+      transport_fee: row.transport_fee,
+      truck_loaded_at: row.loaded_at,
+      origin_store_code: row.owner_store_code,
+      leg_destination_code: row.truck_leg_destination,
+    })),
+  ];
+  const tripGroupMap = buildTripFeeGroupMap(tripSourceRows);
 
   for (const row of dataset.movements) {
     const barcode = String(row.barcode || '').toUpperCase();
@@ -777,20 +820,35 @@ function buildAllFinanceEntries(store, dataset) {
     // 与云端追踪一致：本段车费只记在运达站，发站出库不重复扣减
     if (!isInboundLeg) continue;
 
-    transportSeen.add(packBarcode);
+    const tripNumber = String(row.trip_number || '').trim().toUpperCase();
+    const tripKey = tripTransportGroupKey(tripNumber, packBarcode, {
+      truck_loaded_at: row.loaded_at,
+      origin_store_code: row.owner_store_code,
+      leg_destination_code: row.truck_leg_destination,
+    });
+    if (transportTripSeen.has(tripKey)) continue;
+
+    const group = tripGroupMap.get(tripKey);
+    const packBarcodes = group?.packBarcodes ?? [packBarcode];
+    for (const code of packBarcodes) transportSeen.add(code);
+    transportTripSeen.add(tripKey);
+
     const originLabel = ownershipLabelFromKey(ownerKey);
-    const paid = transportPaidBarcodes.has(packBarcode);
+    const paid = isTripTransportFeePaid(tripNumber, packBarcodes, transportPaidBarcodes);
     entries.push(
       buildTransportEntry({
-        id: `transport:pack:${String(row.id || packBarcode)}`,
-        packBarcode: row.bundle_barcode,
+        id: tripNumber ? `transport:trip:${tripNumber}` : `transport:pack:${String(row.id || packBarcode)}`,
+        packBarcode: group?.primaryPackBarcode || row.bundle_barcode,
         packName: row.bundle_name || row.bundle_barcode,
-        fee,
+        fee: group?.fee ?? fee,
         legDest,
         originLabel,
         occurredAt: row.loaded_at || '',
         direction: 'inbound',
         paid,
+        tripNumber,
+        packCount: group?.packCount ?? 1,
+        packBarcodes,
       }),
     );
   }
@@ -801,6 +859,8 @@ function buildAllFinanceEntries(store, dataset) {
       storeCode,
       hubCode,
       transportSeen,
+      transportTripSeen,
+      tripGroupMap,
       transportPaidBarcodes,
     );
     if (transportEntry) entries.push(transportEntry);
@@ -985,7 +1045,7 @@ async function loadFinanceDataset(supabase) {
     supabase
       .from('inventory_pkg_tracking')
       .select(
-        'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, truck_loaded_at, updated_at, status',
+        'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, trip_number, truck_loaded_at, updated_at, status',
       )
       .in('status', ['in_transit', 'hub_received', 'completed', 'split_at_hub']),
     supabase
@@ -998,7 +1058,7 @@ async function loadFinanceDataset(supabase) {
     supabase
       .from('inventory_packed_shipments')
       .select(
-        'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, loaded_at, item:inventory_store_items(qty_on_hand)',
+        'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, trip_number, loaded_at, item:inventory_store_items(qty_on_hand)',
       )
       .order('created_at', { ascending: false })
       .limit(400),

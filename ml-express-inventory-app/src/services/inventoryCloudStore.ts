@@ -6,12 +6,15 @@ import type {
   StockMovement,
 } from '../types/inventory';
 import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
+import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   applyCloudStockMovementAtomic,
   createCloudPackedShipmentAtomic,
   deleteCloudPackedShipment,
   fetchCloudMovementsForItems,
+  fetchCloudPackByBarcode,
+  fetchCloudPackDetailByBarcode,
   fetchCloudPackedShipments,
   fetchCloudStoreItems,
   getCloudItemIdByBarcode,
@@ -56,12 +59,28 @@ function resolveScope(store: InventoryStoreSession, hubCode?: string): CacheScop
   };
 }
 
+function mergeInventoryItem(prev: InventoryItem | undefined, incoming: InventoryItem): InventoryItem {
+  if (!prev) return incoming;
+  const prevPacked = Boolean(prev.packed_at?.trim()) || Boolean(prev.packed_bundle_barcode?.trim());
+  const incomingPacked = Boolean(incoming.packed_at?.trim()) || Boolean(incoming.packed_bundle_barcode?.trim());
+  if (prevPacked && !incomingPacked && incoming.qty_on_hand > 0) {
+    return {
+      ...incoming,
+      qty_on_hand: prev.qty_on_hand,
+      packed_at: prev.packed_at,
+      packed_bundle_barcode: prev.packed_bundle_barcode,
+      updated_at: prev.updated_at,
+    };
+  }
+  if (incoming.updated_at >= prev.updated_at) return incoming;
+  return prev;
+}
+
 function mergeInventoryCaches(existing: InventoryCache, incoming: InventoryCache): InventoryCache {
   const itemMap = new Map(existing.items.map((item) => [item.barcode.trim().toUpperCase(), item]));
   for (const item of incoming.items) {
     const key = item.barcode.trim().toUpperCase();
-    const prev = itemMap.get(key);
-    if (!prev || item.updated_at >= prev.updated_at) itemMap.set(key, item);
+    itemMap.set(key, mergeInventoryItem(itemMap.get(key), item));
   }
 
   const packMap = new Map(existing.packs.map((pack) => [pack.bundle_barcode.trim().toUpperCase(), pack]));
@@ -166,6 +185,27 @@ export function inventoryItemFromCloudRow(row: CloudStoreItemRow): InventoryItem
 
 export function packDetailFromCloudPackRow(row: CloudPackRow, items: InventoryItem[]): PackedShipmentDetail {
   return packFromRow(row, items);
+}
+
+/** 缓存未命中时按条码补拉快递包（写入内存缓存供列表/详情复用） */
+export async function ensurePackInCacheByBarcode(
+  barcode: string,
+  items: InventoryItem[],
+): Promise<PackedShipmentDetail | null> {
+  const code = barcode.trim().toUpperCase();
+  if (!code) return null;
+  const cached = cache?.packs.find((p) => p.bundle_barcode.trim().toUpperCase() === code);
+  if (cached) return cached;
+
+  const row = await fetchCloudPackDetailByBarcode(code);
+  if (!row) return null;
+  const pack = packFromRow(row, items);
+  if (cache) {
+    const map = new Map(cache.packs.map((p) => [p.bundle_barcode.trim().toUpperCase(), p]));
+    map.set(code, pack);
+    cache = { ...cache, packs: Array.from(map.values()) };
+  }
+  return pack;
 }
 
 async function loadMovements(items: InventoryItem[]): Promise<StockMovement[]> {
@@ -341,9 +381,11 @@ export async function applyMovement(
   item: InventoryItem,
   movement: StockMovement,
   store?: InventoryStoreSession,
+  operationId?: string,
 ): Promise<InventoryItem> {
   const session = store ?? await ensureInventoryCloudReady();
-  const saved = rowToItem(await applyCloudStockMovementAtomic(session, item, movement, movement.id));
+  const opId = operationId?.trim() || movement.id;
+  const saved = rowToItem(await applyCloudStockMovementAtomic(session, item, movement, opId));
   const savedMovement: StockMovement = {
     ...movement,
     item_id: saved.id,
@@ -376,8 +418,11 @@ export async function createPackAtomic(params: {
   originStore: { id: string; storeCode: string; storeName: string };
   operationId: string;
   store?: InventoryStoreSession;
+  hubCode?: string;
 }): Promise<InventoryItem> {
   const session = params.store ?? await ensureInventoryCloudReady();
+  const scope = resolveScope(session, params.hubCode);
+  const sourceItems = await Promise.all(params.lines.map((line) => getItemById(line.item_id)));
   const result = await createCloudPackedShipmentAtomic({
     store: session,
     bundle: params.bundle,
@@ -390,8 +435,49 @@ export async function createPackAtomic(params: {
     originStore: params.originStore,
     operationId: params.operationId,
   });
-  clearInventoryCloudCache();
-  return rowToItem(result.bundleItem);
+  const bundleItem = inventoryItemFromCloudRow(result.bundleItem);
+  const packedAt = bundleItem.updated_at || params.pack.created_at;
+  const updatedLineItems: InventoryItem[] = params.lines.map((line, index) => {
+    const item = sourceItems[index];
+    if (!item) throw new Error('打包订单未在缓存中找到，请下拉刷新后重试');
+    return {
+      ...item,
+      qty_on_hand: Math.max(0, item.qty_on_hand - line.qty),
+      packed_at: packedAt,
+      packed_bundle_barcode: bundleItem.barcode,
+      updated_at: packedAt,
+    };
+  });
+  const packDetail: PackedShipmentDetail = {
+    id: result.packId,
+    bundle_item_id: bundleItem.id,
+    bundle_barcode: bundleItem.barcode,
+    bundle_name: bundleItem.name,
+    operator: params.pack.operator,
+    note: params.pack.note ?? '',
+    owner_store_code: bundleItem.owner_store_code || params.pack.owner_store_code,
+    transport_fee: params.pack.transport_fee ?? '',
+    truck_leg_destination: params.pack.truck_leg_destination ?? '',
+    created_at: params.pack.created_at || bundleItem.created_at,
+    spec: bundleItem.spec,
+    unit: bundleItem.unit,
+    weight: bundleItem.weight,
+    items: params.lines.map((line) => ({ ...line, pack_id: result.packId })),
+    bundle_qty_on_hand: bundleItem.qty_on_hand > 0 ? bundleItem.qty_on_hand : 1,
+    loaded: false,
+  };
+  mergePackagingStockInIntoCache(session, scope.hubCode, {
+    bundleItem,
+    pack: packDetail,
+    lineItems: updatedLineItems,
+  });
+  const cloudPack = await fetchCloudPackByBarcode(bundleItem.barcode);
+  if (!cloudPack) {
+    throw new Error(
+      `打包已提交但云端未找到快递包 ${bundleItem.barcode.trim().toUpperCase()}，请检查网络后重新打包`,
+    );
+  }
+  return bundleItem;
 }
 
 export async function loadShipmentsAtomic(params: {
@@ -426,6 +512,88 @@ export async function deletePack(barcode: string): Promise<void> {
   await ensureInventoryCloudReady();
   await deleteCloudPackedShipment(barcode);
   clearInventoryCloudCache();
+}
+
+/**
+ * 装车提交前补同步：本地缓存有快递包但 Supabase 缺行时，依次补写 bundle、明细订单与打包记录。
+ */
+export async function ensureCloudPackRegistered(
+  pack: PackedShipmentDetail,
+  store: InventoryStoreSession,
+): Promise<boolean> {
+  if (await fetchCloudPackByBarcode(pack.bundle_barcode)) return true;
+
+  const ownerCode = pack.owner_store_code?.trim() || store.storeCode;
+  const packDest = packDestinationFromBarcode(pack.bundle_barcode);
+
+  let bundleId = await getCloudItemIdByBarcode(pack.bundle_barcode);
+  if (!bundleId) {
+    const bundle =
+      (await getItemByBarcode(pack.bundle_barcode)) ??
+      (pack.bundle_item_id ? await getItemById(pack.bundle_item_id) : null);
+    if (bundle) {
+      bundleId = await upsertCloudStoreItem(store, {
+        ...bundle,
+        owner_store_code: bundle.owner_store_code?.trim() || ownerCode,
+        final_destination: bundle.final_destination?.trim() || packDest || bundle.final_destination,
+        destination: bundle.destination?.trim() || packDest || bundle.destination,
+        qty_on_hand: Math.max(bundle.qty_on_hand, 1),
+      });
+    }
+  }
+  if (!bundleId) return false;
+
+  const syncedLines: {
+    item_barcode: string;
+    item_name: string;
+    qty: number;
+    cloud_item_id: string | null;
+  }[] = [];
+  for (const line of pack.items) {
+    let cloudItemId = await getCloudItemIdByBarcode(line.item_barcode);
+    if (!cloudItemId) {
+      const inner =
+        (line.item_id ? await getItemById(line.item_id) : null) ??
+        (await getItemByBarcode(line.item_barcode));
+      if (inner) {
+        cloudItemId = await upsertCloudStoreItem(store, {
+          ...inner,
+          owner_store_code: inner.owner_store_code?.trim() || ownerCode,
+          final_destination: inner.final_destination?.trim() || packDest || inner.final_destination,
+          destination: inner.destination?.trim() || packDest || inner.destination,
+          packed_at: inner.packed_at?.trim() || pack.created_at,
+          packed_bundle_barcode: inner.packed_bundle_barcode?.trim() || pack.bundle_barcode,
+          qty_on_hand: 0,
+        });
+      }
+    }
+    syncedLines.push({
+      item_barcode: line.item_barcode,
+      item_name: line.item_name,
+      qty: line.qty,
+      cloud_item_id: cloudItemId,
+    });
+  }
+
+  await upsertCloudPackedShipment(
+    store,
+    {
+      id: pack.id,
+      bundle_item_id: pack.bundle_item_id,
+      bundle_barcode: pack.bundle_barcode,
+      bundle_name: pack.bundle_name,
+      operator: pack.operator,
+      note: pack.note ?? '',
+      owner_store_code: ownerCode,
+      transport_fee: pack.transport_fee ?? '',
+      truck_leg_destination: pack.truck_leg_destination ?? '',
+      created_at: pack.created_at,
+    },
+    bundleId,
+    syncedLines,
+    null,
+  );
+  return Boolean(await fetchCloudPackByBarcode(pack.bundle_barcode));
 }
 
 export function clearInventoryCloudCache(): void {

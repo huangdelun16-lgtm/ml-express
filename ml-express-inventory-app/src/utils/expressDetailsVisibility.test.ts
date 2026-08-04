@@ -63,14 +63,52 @@ describe('expressDetailsVisibility', () => {
     expect(isVisibleInExpressDetailsList(row, ygn, 'YGN')).toBe(false);
   });
 
-  it('MDY 中转站可见经本站中转的订单', () => {
+  it('MDY 中转站：在 inbound 包内、未释放的中转订单不进快递明细', () => {
     const mdy = store('MDY001');
     const row = listRow({
       final_destination: 'YGN',
       owner_store_code: 'MUSE001',
       parent_pack_barcode: 'PKG26MDY105310001',
+      hub_arrived: false,
+      hub_transit_released: false,
+    });
+    expect(isVisibleInExpressDetailsList(row, mdy, 'MDY')).toBe(false);
+  });
+
+  it('MDY 中转站：释放后的中转订单可见于快递明细', () => {
+    const mdy = store('MDY001');
+    const row = listRow({
+      final_destination: 'YGN',
+      owner_store_code: 'MUSE001',
+      parent_pack_barcode: '',
+      hub_arrived: false,
+      hub_transit_released: true,
     });
     expect(isVisibleInExpressDetailsList(row, mdy, 'MDY')).toBe(true);
+  });
+
+  it('LSO 目的站：未入库的本站订单不进快递明细', () => {
+    const lso = store('LSO001');
+    const row = listRow({
+      final_destination: 'LSO',
+      owner_store_code: 'MUSE001',
+      parent_pack_barcode: 'RUI26LSO20001',
+      hub_arrived: false,
+    });
+    expect(isVisibleInExpressDetailsList(row, lso, 'LSO')).toBe(false);
+  });
+
+  it('LSO 目的站：入库后的本站订单可见于快递明细', () => {
+    const lso = store('LSO001');
+    const row = listRow({
+      final_destination: 'LSO',
+      owner_store_code: 'MUSE001',
+      parent_pack_barcode: '',
+      hub_arrived: true,
+      qty_on_hand: 1,
+      packed: false,
+    });
+    expect(isVisibleInExpressDetailsList(row, lso, 'LSO')).toBe(true);
   });
 
   it('MUSE 多个入库订单（已打包、库存 0）仍可见于快递明细与打包列表', () => {
@@ -92,6 +130,20 @@ describe('expressDetailsVisibility', () => {
         },
         muse,
         'MUSE',
+      ),
+    ).toBe(true);
+  });
+
+  it('RUILI 发站可见 LSO 目的地快递包', () => {
+    const ruili = store('RUILI001');
+    expect(
+      isVisibleInPackedList(
+        {
+          bundle_barcode: 'RUI26LSO30001',
+          owner_store_code: 'RUILI001',
+        },
+        ruili,
+        'RUI',
       ),
     ).toBe(true);
   });
@@ -120,6 +172,18 @@ describe('expressDetailsVisibility', () => {
           owner_store_code: 'MUSE001',
           final_destination: '',
           packed_bundle_barcode: 'PKG26YGN105310001',
+        },
+        ygn,
+        'YGN',
+      ),
+    ).toBe(false);
+    expect(
+      shouldMergeCloudItemToLocal(
+        {
+          barcode: 'YGN260531120000',
+          owner_store_code: 'MUSE001',
+          final_destination: '',
+          hub_arrived_at: '2026-08-02T00:00:00.000Z',
         },
         ygn,
         'YGN',

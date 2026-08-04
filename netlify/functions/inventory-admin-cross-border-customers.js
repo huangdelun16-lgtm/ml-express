@@ -44,11 +44,11 @@ function formatApplicationDateCompact(isoDate) {
 
 function salespersonNumericSuffix(employeeCode) {
   const code = String(employeeCode ?? '').trim().toUpperCase();
-  const match = code.match(/^[A-Z]+-(\d+)$/);
-  if (match) return String(Number.parseInt(match[1], 10)).padStart(3, '0');
-  const digits = code.replace(/\D/g, '');
-  if (!digits) return '000';
-  return digits.slice(-3).padStart(3, '0');
+  const plain = code.match(/^(\d+)$/);
+  if (plain) return String(Number.parseInt(plain[1], 10)).padStart(3, '0');
+  const legacy = code.match(/^[A-Z]+-(\d+)$/);
+  if (legacy) return String(Number.parseInt(legacy[1], 10)).padStart(3, '0');
+  return '000';
 }
 
 function buildCustomerCode(deliveryAreaCode, applicationDate, salespersonEmployeeCode) {

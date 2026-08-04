@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -27,7 +27,7 @@ import {
   getStockInPrefillByCode,
   submitPackagingStockIn,
 } from '../services/inventoryService';
-import { generateUniqueInboundBarcode } from '../utils/inboundBarcode';
+import { generatePackagingStockInLineBarcodes } from '../utils/inboundBarcode';
 import { normalizeScanCode, vibrateScanSuccess } from '../utils/barcodeScan';
 import {
   formatSpec,
@@ -35,7 +35,7 @@ import {
   parseWeight,
   sanitizeNumberInput,
 } from '../utils/itemFieldFormat';
-import { inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
+import { inboundBarcodeTimestampFromPackDate, inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
 import { normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
@@ -46,6 +46,10 @@ import {
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { normalizePackageOriginPrefix } from '../utils/packageNumber';
 import { fmt, resolveAppError, useTranslation } from '../i18n';
+import {
+  applyCrossBorderCustomerToForm,
+  useCrossBorderCustomerLookup,
+} from '../hooks/useCrossBorderCustomerLookup';
 
 type Step = 1 | 2 | 3;
 
@@ -86,8 +90,10 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   };
 
   const [step, setStep] = useState<Step>(1);
+  const [customerCode, setCustomerCode] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
+  const [customerLookupHint, setCustomerLookupHint] = useState('');
   const [packDate, setPackDate] = useState(todayInMyanmar());
   const [scanInput, setScanInput] = useState('');
   const [lines, setLines] = useState<PackagingScanLine[]>([]);
@@ -131,8 +137,26 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     return Number.isFinite(fee) && fee > 0 ? Math.round(fee * 100) / 100 : 0;
   }, [totalFee]);
 
+  const applyCustomerRegistry = useCallback(
+    (match: Parameters<typeof applyCrossBorderCustomerToForm>[0]) => {
+      applyCrossBorderCustomerToForm(match, {
+        setRecipientName,
+        setRecipientPhone,
+        setDestination: (v) => setBatchDestination(normalizePackDestination(v)),
+      });
+      setCustomerLookupHint(
+        fmt(t.stockIn.customerCodeMatched, { name: match.customer_name, phone: match.phone }),
+      );
+    },
+    [t],
+  );
+
+  const { lookup: lookupCustomerCode, lookupNow: lookupCustomerCodeNow } =
+    useCrossBorderCustomerLookup(applyCustomerRegistry);
+
   useEffect(() => {
     void loadStockInContactDraft().then((d) => {
+      setCustomerCode(d.customerCode);
       setRecipientName(d.recipientName);
       setRecipientPhone(d.recipientPhone);
       setBatchDestination(normalizePackDestination(d.destination));
@@ -304,18 +328,6 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     return parts.join(' · ');
   };
 
-  const resolveLineBarcode = async (line: PackagingScanLine): Promise<string> => {
-    const dest = normalizePackDestination(batchDestination);
-    if (!dest) throw new Error(t.stockIn.alertDestination);
-    if (line.existingItemId) {
-      const existing = await getItemByBarcode(line.existingBarcode || line.code);
-      if (existing && !existing.packed_at?.trim() && existing.qty_on_hand <= 0) {
-        return existing.barcode;
-      }
-    }
-    return generateUniqueInboundBarcode(dest, async (code) => !!(await getItemByBarcode(code)));
-  };
-
   const submit = async () => {
     if (loading) return;
     if (!batchDestination.trim()) {
@@ -338,15 +350,19 @@ export default function PackagingStockInScreen({ navigation }: Props) {
       const dest = normalizePackDestination(batchDestination);
       const inboundAt = inboundDateToIso(packDate);
       const lineNote = buildLineNote();
-      const stockInLines: { barcode: string; inputBarcode: string; name: string; qty: number }[] = [];
-      for (const line of lines) {
-        stockInLines.push({
-          barcode: await resolveLineBarcode(line),
-          inputBarcode: line.code,
-          name: line.productName.trim() || line.code,
-          qty: line.count,
-        });
-      }
+      const barcodeAt = inboundBarcodeTimestampFromPackDate(packDate);
+      const lineBarcodes = await generatePackagingStockInLineBarcodes(
+        dest,
+        lines.length,
+        barcodeAt,
+        async (code) => !!(await getItemByBarcode(code)),
+      );
+      const stockInLines = lines.map((line, index) => ({
+        barcode: lineBarcodes[index],
+        inputBarcode: line.code,
+        name: line.productName.trim() || line.code,
+        qty: line.count,
+      }));
 
       const packNo = await generatePackageNumber(
         batchDestination.trim(),
@@ -360,6 +376,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         destination: dest,
         recipientName: recipientName.trim(),
         recipientPhone: recipientPhone.trim(),
+        customerCode: customerCode.trim(),
         inboundAt,
         lineNote,
         bundle: {
@@ -377,6 +394,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
       });
 
       await saveStockInContactDraft({
+        customerCode: customerCode.trim().toUpperCase(),
         recipientName: recipientName.trim(),
         recipientPhone: recipientPhone.trim(),
         destination: batchDestination.trim(),
@@ -437,6 +455,23 @@ export default function PackagingStockInScreen({ navigation }: Props) {
 
         {step === 1 ? (
           <InboundFormSection title={t.packagingStockIn.customerSection} accent="#0891b2">
+            <InboundFormField
+              label={t.stockIn.customerCode}
+              value={customerCode}
+              onChange={(v) => {
+                setCustomerCode(v.toUpperCase());
+                setCustomerLookupHint('');
+                lookupCustomerCode(v);
+              }}
+              placeholder={t.stockIn.customerCodePlaceholder}
+              autoCapitalize="characters"
+              onSubmitEditing={() => void lookupCustomerCodeNow(customerCode)}
+            />
+            {customerLookupHint ? (
+              <Text style={styles.lookupHint}>{customerLookupHint}</Text>
+            ) : (
+              <Text style={styles.customerCodeHint}>{t.stockIn.customerCodeHint}</Text>
+            )}
             <InboundFormField
               label={t.stockIn.nameRequired}
               value={recipientName}
@@ -685,6 +720,8 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 24 },
   scanHint: { color: '#94a3b8', fontSize: 12, marginTop: 8, lineHeight: 18 },
+  lookupHint: { color: '#6ee7b7', fontSize: 13, marginTop: 8, fontWeight: '700' },
+  customerCodeHint: { color: '#64748b', fontSize: 12, marginTop: 4, marginBottom: 4, lineHeight: 18 },
   emptyScan: { color: '#64748b', fontSize: 13, marginTop: 12, textAlign: 'center' },
   scanRow: {
     marginTop: 10,

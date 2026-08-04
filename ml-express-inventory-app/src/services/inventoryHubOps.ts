@@ -12,8 +12,22 @@ import {
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { shouldPersistInboundOrderAtHub } from '../utils/expressDetailsVisibility';
+import { inventoryOperationId } from '../utils/inventoryReliability';
 
 export type OriginStoreRef = { id: string; storeCode: string; storeName: string };
+
+const importInboundPackInFlight = new Map<string, Promise<boolean>>();
+
+function hubDeliverOperationId(packBarcode: string, orderBarcode: string): string {
+  return inventoryOperationId(
+    'hub-deliver',
+    `${packBarcode.trim().toUpperCase()}:${orderBarcode.trim().toUpperCase()}`,
+  );
+}
+
+function hubPackBundleInboundOperationId(packBarcode: string): string {
+  return inventoryOperationId('hub-pack-in', packBarcode.trim().toUpperCase());
+}
 
 type StockOps = {
   upsertItem: (
@@ -32,6 +46,7 @@ type StockOps = {
     actingStore?: InventoryStoreSession;
     inputBarcode?: string;
     recipientName?: string;
+    operationId?: string;
   }) => Promise<{ item: InventoryItem; movement: StockMovement }>;
   getItemByBarcode: (barcode: string) => Promise<InventoryItem | null>;
   getItemById: (id: string) => Promise<InventoryItem | null>;
@@ -103,6 +118,7 @@ async function upsertInboundSnapshotFromHubOrder(
       },
       inboundAt,
       actingStore: params.actingStore,
+      operationId: hubDeliverOperationId(params.detail.pack_barcode, params.order.order_barcode),
     });
   }
 }
@@ -187,6 +203,7 @@ export async function deliverLocalHubOrderToInventory(
       originStore,
       inboundAt: hubArrivedAt,
       actingStore: params.store,
+      operationId: hubDeliverOperationId(params.pkg.pack_barcode, params.order.order_barcode),
     });
   }
 }
@@ -257,6 +274,7 @@ export async function deliverTransitOrderAtHubStation(
       originStore,
       inboundAt: hubStationAt,
       actingStore: params.store,
+      operationId: hubDeliverOperationId(params.pkg.pack_barcode, params.order.order_barcode),
     });
   }
 }
@@ -432,7 +450,59 @@ export async function deliverHubOrderInboundAtStation(
   throw new Error(`无法解析订单 ${params.order.order_barcode} 的目的地`);
 }
 
+/** 确认到站后：本站目的地订单自动交付至「快递明细」，无需弹窗逐单点「入库」 */
+export async function autoDeliverLocalHubOrdersOnPackReceived(
+  ops: StockOps,
+  params: {
+    packBarcode: string;
+    store: InventoryStoreSession;
+    hubCode: string;
+    operator: string;
+    knownPkg?: PkgTrackingDetail;
+  },
+): Promise<PkgTrackingDetail> {
+  const { confirmOrderInPackById, getPkgTrackingDetail } = await import('./trackingService');
+  let pkg = params.knownPkg ?? (await getPkgTrackingDetail(params.packBarcode));
+  if (!pkg) throw new Error(`未找到快递包 ${params.packBarcode}`);
+
+  const hub = params.hubCode.trim().toUpperCase();
+  for (const order of pkg.orders) {
+    const orderDest = resolveOrderDestinationCode(order);
+    if (orderDest !== hub || order.status !== 'in_transit') continue;
+    const result = await confirmOrderInPackById(order.id, params.store, hub, { pkg, order });
+    await deliverHubOrderInboundAtStation(ops, {
+      order: result.order,
+      pkg: result.pkg,
+      store: params.store,
+      hubCode: hub,
+      operator: params.operator,
+    });
+    pkg = result.pkg;
+  }
+
+  return (await getPkgTrackingDetail(params.packBarcode)) ?? pkg;
+}
+
 export async function importInboundPackToLocal(
+  ops: StockOps,
+  detail: PkgTrackingDetail,
+  store: InventoryStoreSession,
+  operator: string,
+): Promise<boolean> {
+  const packCode = detail.pack_barcode.trim().toUpperCase();
+  if (!packCode) return false;
+
+  const inflight = importInboundPackInFlight.get(packCode);
+  if (inflight) return inflight;
+
+  const promise = importInboundPackToLocalOnce(ops, detail, store, operator).finally(() => {
+    importInboundPackInFlight.delete(packCode);
+  });
+  importInboundPackInFlight.set(packCode, promise);
+  return promise;
+}
+
+async function importInboundPackToLocalOnce(
   ops: StockOps,
   detail: PkgTrackingDetail,
   store: InventoryStoreSession,
@@ -502,6 +572,7 @@ export async function importInboundPackToLocal(
         originStore: hubOrigin,
         inboundAt: detail.hub_received_at ?? undefined,
         actingStore: store,
+        operationId: hubPackBundleInboundOperationId(packBarcode),
       });
       bundleItem = (await ops.getItemByBarcode(packBarcode))!;
     }
@@ -576,8 +647,7 @@ export async function importInboundPackToLocal(
       store,
     );
 
-    const shouldLink =
-      (isLocal && order.status === 'hub_received') || (!isLocal && order.status === 'in_transit');
+    const shouldLink = !isLocal && order.status === 'in_transit';
     if (shouldLink) {
       packLines.push({
         id: newId(),
@@ -619,12 +689,7 @@ export async function importInboundPackToLocal(
     }
   }
 
-  const mergedLines = [
-    ...(existingPack?.items ?? []).filter(
-      (line) => !packLines.some((l) => l.item_barcode === line.item_barcode),
-    ),
-    ...packLines,
-  ];
+  const mergedLines = packLines;
   const packRow = existingPack ?? (await ops.getPackedShipmentByBarcode(packBarcode));
   if (packRow) {
     await createPack(

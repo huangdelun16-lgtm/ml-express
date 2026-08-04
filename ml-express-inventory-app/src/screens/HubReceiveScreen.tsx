@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,20 +9,26 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScanInputBar from '../components/ScanInputBar';
 import HubReceiveOrdersModal from '../components/HubReceiveOrdersModal';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import { useAuth } from '../contexts/AuthContext';
-import { getOrderStatusLabel, getPkgStatusLabel, getTransportFeeDisplay, formatOrderNotFoundHint, formatPkgNotFoundHint, resolveAppError, useTranslation } from '../i18n';
+import type { RootStackParamList } from '../navigation/AppNavigator';
+import { getPkgStatusLabel, getTransportFeeDisplay, formatOrderNotFoundHint, formatPkgNotFoundHint, resolveAppError, useTranslation } from '../i18n';
 import {
   deliverHubOrderInboundAtStation,
+  ensurePackHubReceivedAtStation,
   importInboundPackToLocal,
   maybeAutoReleaseTransitAfterAllInbound,
   releaseHubTransitOrders,
 } from '../services/inventoryService';
 import {
+  claimTripFeeAnchorIfUnset,
   isHubTransportFeePaid,
   markHubTransportFeePaid,
+  resolveTripGroupKey,
+  resolveTripSiblingBarcodes,
 } from '../services/hubTransportFeeService';
 import { isSupabaseConfigured, getSupabaseConfigHint } from '../services/supabase';
 import { ensureHubReceiveCloudReady } from '../services/hubReceiveGate';
@@ -31,18 +37,20 @@ import { prefetchInventoryCache } from '../services/inventoryCloudStore';
 import {
   confirmOrderHubReceived,
   confirmOrderInPackById,
-  confirmPkgHubReceived,
   getOrderTrackingByBarcode,
   getPkgTrackingDetail,
 } from '../services/trackingService';
 import type { PkgTrackingDetail } from '../types/tracking';
+import { isDestinationHubPack, listPendingPackInboundOrders } from '../utils/hubReceivePack';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 
-export default function HubReceiveScreen() {
+export default function HubReceiveScreen({ route }: NativeStackScreenProps<RootStackParamList, 'HubReceive'>) {
   const { t, fmt } = useTranslation();
+  const openPackBarcode = route.params?.openPackBarcode?.trim().toUpperCase() ?? '';
+  const openedFromRouteRef = useRef('');
   const { store, hubCode: authHubCode, operatorName } = useAuth();
   const hubCode = authHubCode ?? (store ? resolveStoreHubCode(store) : '');
   const operator = operatorName ?? t.common.operator;
@@ -52,14 +60,25 @@ export default function HubReceiveScreen() {
   const [ordersModalVisible, setOrdersModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
+  const [confirmingHubReceive, setConfirmingHubReceive] = useState(false);
+  const [batchInbounding, setBatchInbounding] = useState(false);
   const [payingTransportFee, setPayingTransportFee] = useState(false);
   const [transportFeePaid, setTransportFeePaid] = useState(false);
+  const [tripPackCount, setTripPackCount] = useState(1);
+  const [tripFeeAnchorPack, setTripFeeAnchorPack] = useState(true);
   const [releasingTransit, setReleasingTransit] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [modalSuccess, setModalSuccess] = useState('');
 
   const refreshTransportFeePaid = useCallback(async (packBarcode: string) => {
-    setTransportFeePaid(await isHubTransportFeePaid(packBarcode));
+    const packCode = packBarcode.trim().toUpperCase();
+    const siblings = await resolveTripSiblingBarcodes(packCode);
+    const groupKey = await resolveTripGroupKey(packCode);
+    const anchor = claimTripFeeAnchorIfUnset(groupKey, packCode);
+    setTripPackCount(siblings.length);
+    setTripFeeAnchorPack(anchor === packCode);
+    setTransportFeePaid(await isHubTransportFeePaid(packCode));
   }, []);
 
   const refreshCloudStatus = useCallback(async () => {
@@ -80,8 +99,8 @@ export default function HubReceiveScreen() {
     }, [refreshCloudStatus, store, hubCode]),
   );
 
-  const preflightHubReceive = useCallback(async (): Promise<boolean> => {
-    const gate = await ensureHubReceiveCloudReady();
+  const preflightHubReceive = useCallback(async (options?: { forWrite?: boolean }): Promise<boolean> => {
+    const gate = await ensureHubReceiveCloudReady(options);
     if (!gate.ok) {
       setError(
         gate.reason === 'notConfigured'
@@ -136,17 +155,33 @@ export default function HubReceiveScreen() {
 
   const finishInboundFlow = useCallback(
     async (pkg: PkgTrackingDetail) => {
-      await applyOrderSuccess(pkg, { skipPackImport: true });
-      if (!store) return;
+      if (!store) {
+        await applyOrderSuccess(pkg, { skipPackImport: true });
+        return;
+      }
+
+      if (pkg.status !== 'in_transit') {
+        try {
+          await importInboundPackToLocal(pkg, store, operator);
+        } catch (e: unknown) {
+          const syncErr = resolveAppError(t, e);
+          setError(fmt(t.hubReceive.orderConfirmedSyncFailed, { err: syncErr }));
+        }
+      }
+
+      const refreshed = await getPkgTrackingDetail(pkg.pack_barcode);
+      const latest = refreshed ?? pkg;
+      setActivePack(latest);
+      await applyOrderSuccess(latest, { skipPackImport: true });
 
       const { releasedCount } = await maybeAutoReleaseTransitAfterAllInbound({
-        packBarcode: pkg.pack_barcode,
+        packBarcode: latest.pack_barcode,
         store,
         hubCode,
         operator,
       });
       if (releasedCount > 0) {
-        const updated = await getPkgTrackingDetail(pkg.pack_barcode);
+        const updated = await getPkgTrackingDetail(latest.pack_barcode);
         if (updated) {
           setActivePack(updated);
           setMessage(fmt(t.hubReceive.allInboundReleased, { count: releasedCount }));
@@ -157,13 +192,110 @@ export default function HubReceiveScreen() {
     [applyOrderSuccess, store, hubCode, operator, t, fmt],
   );
 
-  const openPackOrdersModal = useCallback(
-    (detail: PkgTrackingDetail) => {
-      setActivePack(detail);
-      setOrdersModalVisible(true);
-      void refreshTransportFeePaid(detail.pack_barcode);
+  const ensurePackHubReceived = useCallback(
+    async (packBarcode: string, knownPkg?: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
+      if (!store) throw new Error(t.hubReceive.supabaseMissing);
+      try {
+        return await ensurePackHubReceivedAtStation({
+          packBarcode,
+          store,
+          hubCode,
+          operator,
+          knownPkg,
+        });
+      } catch (e: unknown) {
+        const syncErr = resolveAppError(t, e);
+        setError(fmt(t.hubReceive.packConfirmedSyncFailed, { err: syncErr }));
+        throw e;
+      }
     },
-    [refreshTransportFeePaid],
+    [store, hubCode, operator, t, fmt],
+  );
+
+  const openPackOrdersModal = useCallback(
+    async (detail: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
+      let pkg = detail;
+      if (store) {
+        try {
+          if (!(await preflightHubReceive({ forWrite: detail.status === 'in_transit' }))) {
+            setActivePack(detail);
+            setOrdersModalVisible(true);
+            return detail;
+          }
+          pkg = await ensurePackHubReceived(pkg.pack_barcode, pkg);
+        } catch (e: unknown) {
+          setError(resolveAppError(t, e));
+        }
+      }
+      setActivePack(pkg);
+      setOrdersModalVisible(true);
+      setModalSuccess('');
+      void refreshTransportFeePaid(pkg.pack_barcode);
+      return pkg;
+    },
+    [store, ensurePackHubReceived, refreshTransportFeePaid, t],
+  );
+
+  useEffect(() => {
+    if (!openPackBarcode || !store || openedFromRouteRef.current === openPackBarcode) return;
+    openedFromRouteRef.current = openPackBarcode;
+    void (async () => {
+      setError('');
+      setMessage('');
+      if (!(await preflightHubReceive())) return;
+      setLoading(true);
+      try {
+        const detail = await getPkgTrackingDetail(openPackBarcode);
+        if (!detail) {
+          setError(formatPkgNotFoundHint(t, openPackBarcode, hubCode));
+          return;
+        }
+        const opened = await openPackOrdersModal(detail);
+        setMessage(fmt(t.hubReceive.packIdentified, { barcode: opened.pack_barcode, count: opened.item_count }));
+      } catch (e: unknown) {
+        setError(resolveAppError(t, e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [openPackBarcode, store, hubCode, openPackOrdersModal, preflightHubReceive, t, fmt]);
+
+  const resolvePackForInbound = useCallback(
+    async (pkg: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
+      if (pkg.status !== 'in_transit') return pkg;
+      setConfirmingHubReceive(true);
+      try {
+        const updated = await ensurePackHubReceived(pkg.pack_barcode, pkg);
+        setActivePack(updated);
+        return updated;
+      } finally {
+        setConfirmingHubReceive(false);
+      }
+    },
+    [ensurePackHubReceived],
+  );
+
+  const inboundSingleOrder = useCallback(
+    async (orderId: string, knownPack?: PkgTrackingDetail | null) => {
+      if (!store) return;
+      const pack = knownPack ?? activePack;
+      if (!pack) return;
+      const knownOrder = pack.orders.find((line) => line.id === orderId);
+      const { order, pkg } = await confirmOrderInPackById(orderId, store, hubCode, {
+        pkg,
+        order: knownOrder,
+      });
+      await deliverHubOrderInboundAtStation({
+        order,
+        pkg,
+        store,
+        hubCode,
+        operator,
+      });
+      await finishInboundFlow(pkg);
+      return pkg;
+    },
+    [store, activePack, hubCode, operator, finishInboundFlow],
   );
 
   const handlePackScan = async (code: string) => {
@@ -173,7 +305,7 @@ export default function HubReceiveScreen() {
     if (!(await preflightHubReceive())) return;
     setLoading(true);
     try {
-      const detail = await getPkgTrackingDetail(code);
+      let detail = await getPkgTrackingDetail(code);
       if (!detail) {
         setError(formatPkgNotFoundHint(t, code, hubCode));
         setActivePack(null);
@@ -181,46 +313,15 @@ export default function HubReceiveScreen() {
         return;
       }
 
-      openPackOrdersModal(detail);
+      const opened = await openPackOrdersModal(detail);
 
-      if (detail.status === 'in_transit') {
-        setMessage(
-          fmt(t.hubReceive.packIdentified, {
-            barcode: detail.pack_barcode,
-            count: detail.item_count,
-          }),
-        );
+      if (isDestinationHubPack(opened, hubCode)) {
+        setMessage(fmt(t.hubReceive.destPackOpened, { barcode: opened.pack_barcode, count: opened.item_count }));
+      } else if (opened.status === 'hub_received') {
+        setMessage(fmt(t.hubReceive.packOpened, { barcode: opened.pack_barcode, count: opened.item_count }));
       } else {
-        setMessage(
-          fmt(t.hubReceive.packOpened, {
-            barcode: detail.pack_barcode,
-            count: detail.item_count,
-          }),
-        );
+        setMessage(fmt(t.hubReceive.packIdentified, { barcode: opened.pack_barcode, count: opened.item_count }));
       }
-    } catch (e: unknown) {
-      setError(resolveAppError(t, e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConfirmPack = async () => {
-    if (!store || !activePack || loading) return;
-    if (!(await preflightHubReceive())) return;
-    setLoading(true);
-    setError('');
-    try {
-      const updated = await confirmPkgHubReceived(activePack.pack_barcode, store, hubCode);
-      try {
-        await importInboundPackToLocal(updated, store, operator);
-      } catch (e: unknown) {
-        const syncErr = resolveAppError(t, e);
-        setError(fmt(t.hubReceive.packConfirmedSyncFailed, { err: syncErr }));
-      }
-      setActivePack(updated);
-      setMessage(fmt(t.hubReceive.packConfirmed, { barcode: updated.pack_barcode }));
-      showTaskSuccess(t.hubReceive.packConfirmSuccess, t.hubReceive.packConfirmSuccessMsg);
     } catch (e: unknown) {
       setError(resolveAppError(t, e));
     } finally {
@@ -243,7 +344,7 @@ export default function HubReceiveScreen() {
         return;
       }
 
-      const detail = await getPkgTrackingDetail(order.pack_barcode);
+      let detail = await getPkgTrackingDetail(order.pack_barcode);
       if (!detail) {
         setError(
           fmt(t.hubReceive.orderPackMissing, {
@@ -256,46 +357,14 @@ export default function HubReceiveScreen() {
         return;
       }
 
-      openPackOrdersModal(detail);
-
-      if (detail.status === 'in_transit') {
-        setMessage(
-          fmt(t.hubReceive.orderLookupFound, {
-            order: order.order_barcode,
-            pack: detail.pack_barcode,
-          }),
-        );
-        return;
-      }
-
-      if (order.status === 'in_transit') {
-        const { order: confirmed, pkg } = await confirmOrderInPackById(order.id, store, hubCode, {
-          pkg: detail,
-          order,
-        });
-        setActivePack(pkg);
-        await deliverHubOrderInboundAtStation({
-          order: confirmed,
-          pkg,
-          store,
-          hubCode,
-          operator,
-        });
-        showTaskSuccess(
-          t.hubReceive.inboundSuccess,
-          fmt(t.hubReceive.inboundSuccessMsg, { barcode: confirmed.order_barcode }),
-        );
-        await finishInboundFlow(pkg);
-        setScan('');
-        return;
-      }
-
+      await openPackOrdersModal(detail);
       setMessage(
-        fmt(t.hubReceive.orderProcessed, {
-          barcode: order.order_barcode,
-          status: getOrderStatusLabel(t, order.status),
+        fmt(t.hubReceive.orderLookupFound, {
+          order: order.order_barcode,
+          pack: detail.pack_barcode,
         }),
       );
+      return;
     } catch (e: unknown) {
       setError(resolveAppError(t, e));
     } finally {
@@ -332,39 +401,65 @@ export default function HubReceiveScreen() {
   };
 
   const handleConfirmOrder = async (orderId: string) => {
-    if (!store || confirmingOrderId || loading) return;
+    if (!store || !activePack || confirmingOrderId || batchInbounding || loading || confirmingHubReceive) return;
     setError('');
-    if (!(await preflightHubReceive())) return;
+    setModalSuccess('');
+    if (!(await preflightHubReceive({ forWrite: true }))) return;
+    const orderLine = activePack.orders.find((line) => line.id === orderId);
+    const orderBarcode = orderLine?.order_barcode ?? '';
     setConfirmingOrderId(orderId);
     try {
-      const knownOrder = activePack?.orders.find((line) => line.id === orderId);
-      const { order, pkg } = await confirmOrderInPackById(orderId, store, hubCode, {
-        pkg: activePack ?? undefined,
-        order: knownOrder,
-      });
-      setActivePack(pkg);
-      setMessage(
-        fmt(t.hubReceive.processedProgress, {
-          done: pkg.received_order_count,
-          total: pkg.item_count,
-        }),
-      );
-      await deliverHubOrderInboundAtStation({
-        order,
-        pkg,
-        store,
-        hubCode,
-        operator,
-      });
-      showTaskSuccess(
-        t.hubReceive.inboundSuccess,
-        fmt(t.hubReceive.inboundSuccessMsg, { barcode: order.order_barcode }),
-      );
-      await finishInboundFlow(pkg);
+      const pkg = await resolvePackForInbound(activePack);
+      await inboundSingleOrder(orderId, pkg);
+      const successMsg = orderBarcode
+        ? fmt(t.hubReceive.inboundSuccessMsg, { barcode: orderBarcode })
+        : t.hubReceive.inboundSuccess;
+      setModalSuccess(successMsg);
+      showTaskSuccess(t.hubReceive.inboundSuccess, successMsg);
     } catch (e: unknown) {
       setError(resolveAppError(t, e));
     } finally {
       setConfirmingOrderId(null);
+    }
+  };
+
+  const handleBatchInbound = async () => {
+    if (!store || !activePack || confirmingOrderId || batchInbounding || loading || confirmingHubReceive) return;
+    setError('');
+    setModalSuccess('');
+    if (!(await preflightHubReceive({ forWrite: true }))) return;
+    setBatchInbounding(true);
+    try {
+      const pkg =
+        activePack.status === 'in_transit'
+          ? await resolvePackForInbound(activePack)
+          : activePack;
+      const pendingOrders = listPendingPackInboundOrders(pkg, hubCode);
+      if (pendingOrders.length === 0) {
+        throw new Error(t.hubReceive.batchInboundNothingPending);
+      }
+      let latest = pkg;
+      for (const order of pendingOrders) {
+        const result = await confirmOrderInPackById(order.id, store, hubCode, { pkg: latest, order });
+        latest = result.pkg;
+        await deliverHubOrderInboundAtStation({
+          order: result.order,
+          pkg: result.pkg,
+          store,
+          hubCode,
+          operator,
+        });
+      }
+      await finishInboundFlow(latest);
+      const refreshed = await getPkgTrackingDetail(latest.pack_barcode);
+      if (refreshed) setActivePack(refreshed);
+      const successMsg = fmt(t.hubReceive.batchInboundSuccessMsg, { count: pendingOrders.length });
+      setModalSuccess(successMsg);
+      showTaskSuccess(t.hubReceive.batchInboundSuccess, successMsg);
+    } catch (e: unknown) {
+      setError(resolveAppError(t, e));
+    } finally {
+      setBatchInbounding(false);
     }
   };
 
@@ -390,6 +485,7 @@ export default function HubReceiveScreen() {
             setError('');
             void (async () => {
               try {
+                if (!(await preflightHubReceive())) return;
                 await markHubTransportFeePaid({
                   packBarcode: activePack.pack_barcode,
                   fee: activePack.transport_fee,
@@ -399,12 +495,13 @@ export default function HubReceiveScreen() {
                   store,
                 });
                 setTransportFeePaid(true);
-                showTaskSuccess(
-                  t.hubReceive.paySuccess,
-                  fmt(t.hubReceive.paySuccessMsg, { fee: feeDisplay }),
-                );
-                setMessage(fmt(t.hubReceive.feePaidMsg, { barcode: activePack.pack_barcode }));
-                setOrdersModalVisible(false);
+                const paidMsg =
+                  tripPackCount > 1
+                    ? t.hubReceive.tripFeePaidMsg
+                    : fmt(t.hubReceive.feePaidMsg, { barcode: activePack.pack_barcode });
+                setModalSuccess(paidMsg);
+                showTaskSuccess(t.hubReceive.paySuccess, fmt(t.hubReceive.paySuccessMsg, { fee: feeDisplay }));
+                setMessage(paidMsg);
               } catch (e: unknown) {
                 setError(resolveAppError(t, e));
               } finally {
@@ -515,7 +612,7 @@ export default function HubReceiveScreen() {
       {activePack && !ordersModalVisible ? (
         <Pressable
           style={styles.reopenBtn}
-          onPress={() => setOrdersModalVisible(true)}
+          onPress={() => void openPackOrdersModal(activePack)}
           accessibilityRole="button"
           accessibilityLabel={`${activePack.pack_barcode}，${t.common.continueDispatch}`}
         >
@@ -534,12 +631,21 @@ export default function HubReceiveScreen() {
         store={store}
         loading={loading}
         confirmingOrderId={confirmingOrderId}
+        confirmingHubReceive={confirmingHubReceive}
+        batchInbounding={batchInbounding}
         payingTransportFee={payingTransportFee}
         transportFeePaid={transportFeePaid}
+        tripPackCount={tripPackCount}
+        tripFeeAnchorPack={tripFeeAnchorPack}
         releasingTransit={releasingTransit}
-        onClose={() => setOrdersModalVisible(false)}
-        onConfirmPack={() => void handleConfirmPack()}
+        errorText={ordersModalVisible ? error : undefined}
+        successText={modalSuccess || undefined}
+        onClose={() => {
+          setOrdersModalVisible(false);
+          setModalSuccess('');
+        }}
         onConfirmOrder={(orderId) => void handleConfirmOrder(orderId)}
+        onBatchInbound={() => void handleBatchInbound()}
         onPayTransportFee={handlePayTransportFee}
         onReleaseTransit={() => void handleReleaseTransit()}
       />

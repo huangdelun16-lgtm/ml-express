@@ -41,3 +41,76 @@ export async function generateUniqueInboundBarcode(
   }
   return `${generateInboundBarcode(destination)}${Date.now().toString(36).slice(-2).toUpperCase()}`;
 }
+
+/** 多个入库：同批次共用基础入库号，每行追加 (总件数-序号)，如 MDY131412040826(3-2) */
+export function formatPackagingStockInLineBarcode(
+  baseBarcode: string,
+  total: number,
+  index: number,
+): string {
+  return `${baseBarcode}(${total}-${index})`;
+}
+
+export function parsePackagingStockInLineBarcode(barcode: string): {
+  base: string;
+  total: number;
+  index: number;
+} | null {
+  const trimmed = barcode.trim();
+  const match = trimmed.match(/^(.+)\((\d+)-(\d+)\)$/);
+  if (!match) return null;
+  const total = Number(match[2]);
+  const index = Number(match[3]);
+  if (!Number.isFinite(total) || !Number.isFinite(index) || total < 1 || index < 1 || index > total) {
+    return null;
+  }
+  return { base: match[1], total, index };
+}
+
+export function isPackagingStockInLineBarcode(barcode: string): boolean {
+  return parsePackagingStockInLineBarcode(barcode) !== null;
+}
+
+/** 展示用：拆成基础入库号与 (3-1) 序号后缀 */
+export function splitPackagingStockInLineBarcodeDisplay(barcode: string): {
+  base: string;
+  suffix: string | null;
+} {
+  const parsed = parsePackagingStockInLineBarcode(barcode);
+  if (!parsed) return { base: barcode, suffix: null };
+  return {
+    base: parsed.base,
+    suffix: `(${parsed.total}-${parsed.index})`,
+  };
+}
+
+/** 一次生成多个入库整批入库条码（共享同一基础号） */
+export async function generatePackagingStockInLineBarcodes(
+  destination: string,
+  lineCount: number,
+  at: Date,
+  exists: (barcode: string) => Promise<boolean>,
+): Promise<string[]> {
+  if (lineCount <= 0) return [];
+
+  let base = generateInboundBarcode(destination, at);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidates = Array.from({ length: lineCount }, (_, i) =>
+      formatPackagingStockInLineBarcode(base, lineCount, i + 1),
+    );
+    let conflict = false;
+    for (const code of candidates) {
+      if (await exists(code)) {
+        conflict = true;
+        break;
+      }
+    }
+    if (!conflict) return candidates;
+    base = `${generateInboundBarcode(destination, at)}${attempt}`;
+  }
+
+  const fallbackBase = `${generateInboundBarcode(destination, at)}${Date.now().toString(36).slice(-2).toUpperCase()}`;
+  return Array.from({ length: lineCount }, (_, i) =>
+    formatPackagingStockInLineBarcode(fallbackBase, lineCount, i + 1),
+  );
+}

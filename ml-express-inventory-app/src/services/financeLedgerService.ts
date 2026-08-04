@@ -165,7 +165,7 @@ async function loadFinanceDataset(
         supabase
           .from('inventory_pkg_tracking')
           .select(
-            'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, truck_loaded_at, updated_at',
+            'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, trip_number, transport_fee, truck_loaded_at, updated_at',
           )
           .or(packageScope)
           .in('status', ['in_transit', 'hub_received', 'completed', 'split_at_hub'])

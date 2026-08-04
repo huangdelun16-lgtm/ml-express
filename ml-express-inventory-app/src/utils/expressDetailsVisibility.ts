@@ -3,7 +3,7 @@ import type { InventoryItemListRow } from '../types/inventory';
 import { extractDestinationCode } from './inboundBarcode';
 import { isCustomerSignedItem } from './itemFieldFormat';
 import { resolveItemDestinationCode } from './itemDestination';
-import { isPackageBarcode, packDestinationFromBarcode } from './packageNumber';
+import { packDestinationFromBarcode } from './packageNumber';
 import {
   isAdminStore,
   ownershipKeyFromStoreCode,
@@ -31,10 +31,6 @@ type CloudPackRef = PackVisibilityRef;
 
 /** 目的站（非中转）：到站包裹内只写入本站最终目的地订单 */
 const DESTINATION_ONLY_HUBS = new Set(['YGN', 'TGI']);
-
-function isInboundPackBarcode(barcode: string): boolean {
-  return isPackageBarcode(barcode);
-}
 
 /** 是否为本站账号自己入库登记（发站视角：可见自己装车出库的全部目的地订单） */
 function isLocalInboundItem(
@@ -79,8 +75,8 @@ export function shouldPersistInboundOrderAtHub(
  * 快递明细列表可见性
  *
  * - 发站账号（原始入库）：可见本店登记的全部订单（含 MDY、YGN 等各目的地）
- * - 中转站：仅本站最终目的地订单 + 经本站中转的订单（待释放/待转出/已中转）
- * - 最终目的站：仅最终目的地为本站的订单，不显示其它地区订单（含其它站已签收）
+ * - 中转站：本站已入库订单 + 已释放/已转出的中转订单
+ * - 最终目的站：仅 hub_arrived 的本站目的地订单
  */
 export function isVisibleInExpressDetailsList(
   item: InventoryItemListRow,
@@ -111,12 +107,6 @@ export function isVisibleInExpressDetailsList(
 
   if (item.hub_transit_released || item.hub_transit_shipped) {
     return isTransitElsewhere && !DESTINATION_ONLY_HUBS.has(hub);
-  }
-
-  const inboundPack = item.parent_pack_barcode?.trim() ?? '';
-  if (isInboundPackBarcode(inboundPack) && !item.hub_transit_shipped) {
-    if (isTransitElsewhere && !DESTINATION_ONLY_HUBS.has(hub)) return true;
-    if (isFinalDestHere) return true;
   }
 
   return false;
@@ -154,15 +144,6 @@ export function shouldMergeCloudItemToLocal(
 
   if (row.hub_transit_released_at?.trim() || row.hub_transit_shipped_at?.trim()) {
     return isTransitElsewhere && !DESTINATION_ONLY_HUBS.has(hub);
-  }
-
-  const inboundPack = row.packed_bundle_barcode?.trim() ?? '';
-  const inInboundPack =
-    isInboundPackBarcode(inboundPack) && !row.hub_transit_shipped_at?.trim();
-
-  if (inInboundPack) {
-    if (isTransitElsewhere && !DESTINATION_ONLY_HUBS.has(hub)) return true;
-    if (isFinalDestHere) return true;
   }
 
   return false;

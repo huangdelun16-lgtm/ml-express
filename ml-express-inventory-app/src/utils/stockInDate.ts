@@ -32,6 +32,20 @@ export function formatInboundDateYmd(date: Date): string {
   }).format(date);
 }
 
+/** 入库条码用时间戳：表单日期（年月日）+ 当前缅甸时分秒 */
+export function inboundBarcodeTimestampFromPackDate(packDate: Date): Date {
+  const ymd = formatInboundDateYmd(packDate);
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: YANGON,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  return new Date(`${ymd}T${get('hour')}:${get('minute')}:${get('second')}.000+06:30`);
+}
+
 /** 将入库日期与当前缅甸时间合并为 ISO 时间戳 */
 export function inboundDateToIso(date: Date): string {
   const ymd = formatInboundDateYmd(date);

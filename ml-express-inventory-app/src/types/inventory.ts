@@ -63,6 +63,8 @@ export interface InventoryItemListRow extends InventoryItem {
   customer_signed: boolean;
   /** 所属快递包包装号（已打包时由列表查询填充） */
   parent_pack_barcode?: string;
+  /** 多个入库包内序号，如 3-1（总件数-当前序号） */
+  pack_item_label?: string;
 }
 
 export interface StockMovement {
@@ -78,6 +80,8 @@ export interface StockMovement {
   note: string;
   recipient_name: string;
   recipient_phone: string;
+  /** 跨境登记客户编码 */
+  customer_code?: string;
   destination: string;
   /** 收件详细地址（与目的地地区码分开存储） */
   detail_address: string;
@@ -170,6 +174,8 @@ export interface InventoryItemDetail extends InventoryItem {
   total_fee?: string;
   payment_label?: string;
   inbound_note?: string;
+  /** 入库流水原始 note（含「 · 打包入 」等系统段，用于识别多个入库） */
+  inbound_movement_note?: string;
   /** 签收留痕（已签收后展示） */
   sign_receipt?: CustomerSignReceipt;
   /** 若为打包生成的包裹，附带打包明细 */

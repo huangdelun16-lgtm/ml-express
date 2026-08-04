@@ -59,6 +59,13 @@ supabase db push
 | `20260802120000_inventory_packaging_stock_in_batch.sql` | **多个入库必跑**：原子创建已打包订单（库存 0）与快递包 |
 | `20260802130000_inventory_packaging_stock_in_owner_fix.sql` | **多个入库必跑**：店码归一化校验 + 打包明细 RLS 修复 |
 | `20260802140000_inventory_packaging_stock_in_batch_result.sql` | **多个入库必跑**：RPC 返回 pack + line_items，App 提交后立即可见 |
+| `20260802150000_inventory_load_shipments_barcode_normalize.sql` | **装车出库建议跑**：快递包号归一化 + 打包幂等修复 |
+| `20260803120000_cross_border_customer_lookup.sql` | **客户编码必跑**：登记客户表 + App 按编码查电话 RPC + 入库流水 `customer_code` |
+| `20260803130000_inventory_admin_transport_fee_trip_dedupe.sql` | **财务必跑**：Admin 总支出按车次去重车费（同一 trip 只计一次） |
+| `20260804120000_inventory_load_shipments_restore_trip_number.sql` | **装车必跑**：恢复装车 RPC 的 `trip_number`（同车多包关联；修复车费重复支付/记账） |
+| `20260804130000_inventory_operation_log_hub_receive_race.sql` | **到站必跑**：修复同车第二包打开/入库时 operation_log 主键冲突 |
+| `20260804150000_inventory_operation_log_on_conflict.sql` | **到站必跑**：operation_log ON CONFLICT 兜底（未部署上一版时也可单独跑） |
+| `20260804140000_inventory_admin_transport_fee_load_batch_dedupe.sql` | **Admin 财务必跑**：overview 车费合计在无 trip_number 时按装车批次去重 |
 
 **单设备登录（最小 SQL）：**
 

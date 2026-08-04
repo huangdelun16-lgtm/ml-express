@@ -110,6 +110,7 @@ export type InventoryPackRow = {
   display_status?: 'pending_load' | 'loaded' | 'arrived' | 'completed' | null;
   display_status_label?: string | null;
   transport_fee?: number | null;
+  trip_number?: string | null;
   truck_outbound_date?: string | null;
   truck_loaded_at?: string | null;
   hub_received_at?: string | null;
@@ -133,6 +134,8 @@ export type InventoryConsoleStats = {
 
 export type InventoryCustomerSummary = {
   customerKey: string;
+  /** 登记客户编码（与登记客户表一致时合并汇总） */
+  customerCode?: string;
   customerName: string;
   customerPhone: string;
   totalPieces: number;
@@ -424,15 +427,21 @@ export async function fetchInventoryCustomerSummaries(): Promise<{
 export async function fetchInventoryCustomerItems(
   customerName: string,
   customerPhone: string,
+  customerCode?: string,
 ): Promise<{
   customerName: string;
   customerPhone: string;
+  customerCode?: string;
   items: InventoryCustomerExpressItem[];
   warnings?: string[];
 }> {
   const url = new URL('/.netlify/functions/inventory-admin-customers', window.location.origin);
-  url.searchParams.set('customerName', customerName);
-  url.searchParams.set('customerPhone', customerPhone);
+  if (customerCode?.trim()) {
+    url.searchParams.set('customerCode', customerCode.trim());
+  } else {
+    url.searchParams.set('customerName', customerName);
+    url.searchParams.set('customerPhone', customerPhone);
+  }
 
   const response = await fetch(url.toString(), {
     method: 'GET',

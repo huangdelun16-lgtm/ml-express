@@ -9,7 +9,7 @@ import {
   buildCrossBorderCustomerCode,
   todayIsoDate,
 } from '../utils/crossBorderCustomerCode';
-import { hubForRegionId } from '../utils/crossBorderSalespersons';
+import { hubForRegionId, formatSalespersonEmployeeCodeDisplay } from '../utils/crossBorderSalespersons';
 import {
   createCrossBorderRegisteredCustomer,
   fetchCrossBorderSalespersons,
@@ -105,6 +105,14 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({ open, onClose, onCrea
     e.preventDefault();
     if (!form.customer_name.trim()) {
       setError(isEn ? 'Enter customer name.' : '请填写客户名称。');
+      return;
+    }
+    if (customerCode && form.customer_name.trim().toUpperCase() === customerCode) {
+      setError(
+        isEn
+          ? 'Customer name cannot be the same as customer code. Use the real name.'
+          : '客户姓名不能与客户编码相同，请填写真实姓名。',
+      );
       return;
     }
     if (!form.salesperson_employee_code.trim()) {
@@ -238,7 +246,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({ open, onClose, onCrea
                 </option>
                 {salespersons.map((row) => (
                   <option key={row.id} value={row.employee_code}>
-                    {row.employee_code} · {row.name}
+                    {formatSalespersonEmployeeCodeDisplay(row.employee_code)} · {row.name}
                   </option>
                 ))}
               </select>

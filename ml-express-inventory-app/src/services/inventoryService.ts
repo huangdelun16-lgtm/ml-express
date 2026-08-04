@@ -9,13 +9,15 @@ import { newId, nowIso } from './database';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   applyMovement, clearInventoryCloudCache, createPack, createPackAtomic, deletePack,
+  ensureCloudPackRegistered,
   getItemByBarcode as cloudGetItemByBarcode,
   getItemById as cloudGetItemById, getInventorySnapshot, inventoryItemFromCloudRow,
   listMovementsForItem as cloudListMovementsForItem,
   listPacks, loadShipmentsAtomic, mergePackagingStockInIntoCache, packDetailFromCloudPackRow,
-  refreshCache, upsertItem as cloudUpsertItem,
+  refreshCache, upsertItem as cloudUpsertItem, ensurePackInCacheByBarcode,
 } from './inventoryCloudStore';
 import {
+  assertCloudPacksExist,
   deleteCloudPackedShipment,
   fetchCloudTodayMovementTotals,
   packagingStockInBatchAtomic,
@@ -36,6 +38,8 @@ import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
 import { parseInboundMovementNote } from '../utils/inboundMovementNote';
+import { findParentPackForItem, resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
+import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
 import type { CustomerSignPickupType, CustomerSignReceiptInput } from '../types/customerSignReceipt';
 import {
   parseSignatureStrokes,
@@ -43,11 +47,15 @@ import {
   validateCustomerSignReceipt,
 } from '../types/customerSignReceipt';
 import {
+  confirmPkgHubReceived,
+  getPkgTrackingDetail,
   listPkgTrackingStatusMap,
   markHubTransitOrdersRepacked,
   pushTruckLoadTracking,
 } from './trackingService';
+import { refreshInventoryCloudSession } from './authService';
 import {
+  autoDeliverLocalHubOrdersOnPackReceived as hubAutoDeliverLocal,
   deliverHubOrderInboundAtStation as hubDeliverOrder,
   importInboundPackToLocal as hubImportPack,
   maybeAutoReleaseTransitAfterAllInbound as hubMaybeAutoRelease,
@@ -66,25 +74,42 @@ const hubOps = {
   getPackedShipmentByBarcode,
 };
 
-const listRowLight = (item: InventoryItem, packs: PackedShipmentDetail[]): InventoryItemListRow => ({
-  ...item,
-  stocked_in:
-    item.qty_on_hand > 0 ||
-    Boolean(item.hub_arrived_at?.trim()) ||
-    Boolean(item.packed_at?.trim()) ||
-    Boolean(item.customer_signed_at?.trim()) ||
-    Boolean(item.hub_transit_released_at?.trim()),
-  packed: Boolean(item.packed_at),
-  hub_arrived: Boolean(item.hub_arrived_at),
-  hub_transit_released: Boolean(item.hub_transit_released_at),
-  hub_transit_shipped: Boolean(item.hub_transit_shipped_at),
-  hub_transit_hub_inbound: Boolean(item.hub_transit_released_at?.trim()) && !item.hub_transit_shipped_at?.trim(),
-  customer_signed: Boolean(item.customer_signed_at),
-  parent_pack_barcode:
-    item.packed_bundle_barcode ||
-    packs.find((p) => p.items.some((line) => line.item_id === item.id))?.bundle_barcode ||
-    '',
-});
+const listRowLight = (
+  item: InventoryItem,
+  packs: PackedShipmentDetail[],
+  allItems: InventoryItem[],
+): InventoryItemListRow => {
+  const parentPack = findParentPackForItem(item, packs, allItems);
+  const packed = Boolean(item.packed_at?.trim()) || Boolean(parentPack);
+  const parentPackBarcode =
+    item.packed_bundle_barcode?.trim() ||
+    parentPack?.bundle_barcode?.trim() ||
+    '';
+  const packItemLabel =
+    isPackagingStockInLineBarcode(item.barcode)
+      ? undefined
+      : parentPack
+        ? resolvePackagingStockInItemLabel(item.id, item.barcode, parentPack)
+        : undefined;
+  return {
+    ...item,
+    qty_on_hand: packed && !item.hub_arrived_at?.trim() ? 0 : item.qty_on_hand,
+    stocked_in:
+      item.qty_on_hand > 0 ||
+      Boolean(item.hub_arrived_at?.trim()) ||
+      packed ||
+      Boolean(item.customer_signed_at?.trim()) ||
+      Boolean(item.hub_transit_released_at?.trim()),
+    packed,
+    hub_arrived: Boolean(item.hub_arrived_at),
+    hub_transit_released: Boolean(item.hub_transit_released_at),
+    hub_transit_shipped: Boolean(item.hub_transit_shipped_at),
+    hub_transit_hub_inbound: Boolean(item.hub_transit_released_at?.trim()) && !item.hub_transit_shipped_at?.trim(),
+    customer_signed: Boolean(item.customer_signed_at),
+    parent_pack_barcode: parentPackBarcode,
+    pack_item_label: packItemLabel,
+  };
+};
 
 async function all(scope?: { store: InventoryStoreSession; hubCode: string }, includeMovements = false) {
   return getInventorySnapshot(scope?.store, scope?.hubCode, { includeMovements });
@@ -96,9 +121,31 @@ export async function listItems(
 ): Promise<InventoryItemListRow[]> {
   const { items, packs } = await all(scope, false);
   const q = search?.trim().toLowerCase();
+
+  const packByBarcode = new Map(packs.map((p) => [p.bundle_barcode.trim().toUpperCase(), p]));
+  const hydratedPacks = [...packs];
+  const missingBundleCodes = [
+    ...new Set(
+      items
+        .map((row) => row.packed_bundle_barcode?.trim().toUpperCase() || '')
+        .filter((code) => code && !packByBarcode.has(code)),
+    ),
+  ];
+  for (const code of missingBundleCodes.slice(0, 24)) {
+    try {
+      const pack = await ensurePackInCacheByBarcode(code, items);
+      if (pack && !packByBarcode.has(code)) {
+        packByBarcode.set(code, pack);
+        hydratedPacks.push(pack);
+      }
+    } catch {
+      // 单包补拉失败不阻断快递明细列表（如 RLS 临时异常）
+    }
+  }
+
   const rows = items
     .filter((item) => !isPackageBarcode(item.barcode))
-    .map((i) => listRowLight(i, packs))
+    .map((i) => listRowLight(i, hydratedPacks, items))
     .filter((i) => !q || [i.barcode, i.input_barcode, i.name, i.spec, i.recipient_name, i.final_destination].join(' ').toLowerCase().includes(q));
   if (!scope) return rows;
   return rows.filter((item) => isVisibleInExpressDetailsList(item, scope.store, scope.hubCode));
@@ -160,9 +207,12 @@ export async function applyStockMovement(params: {
   inputBarcode?: string;
   recipientName?: string;
   recipientPhone?: string;
+  customerCode?: string;
   detailAddress?: string;
   packaging?: string;
   createIfMissing?: Partial<InventoryItem>;
+  /** 幂等键；默认使用 movement.id */
+  operationId?: string;
 }): Promise<{ item: InventoryItem; movement: StockMovement }> {
   const qty = Math.abs(Number(params.qty));
   if (!qty) throw new Error('数量必须大于 0');
@@ -204,6 +254,7 @@ export async function applyStockMovement(params: {
     id: newId(), item_id: pendingItem.id, barcode: pendingItem.barcode, item_name: pendingItem.name,
     type: params.type, qty, qty_before: before, qty_after: after, operator: params.operator,
     note: params.note ?? '', recipient_name: params.recipientName ?? '', recipient_phone: params.recipientPhone ?? '',
+    customer_code: params.customerCode?.trim().toUpperCase() ?? '',
     destination: params.destination ?? '', detail_address: params.detailAddress ?? '', packaging: params.packaging ?? '',
     input_barcode: params.inputBarcode ?? pendingItem.input_barcode,
     origin_store_id: params.originStore?.id ?? params.actingStore?.id ?? '',
@@ -211,7 +262,7 @@ export async function applyStockMovement(params: {
     origin_store_name: params.originStore?.storeName ?? params.actingStore?.storeName ?? '',
     created_at: ts,
   };
-  const saved = await applyMovement(pendingItem, movement, params.actingStore);
+  const saved = await applyMovement(pendingItem, movement, params.actingStore, params.operationId);
   movement.item_id = saved.id;
   movement.qty_after = saved.qty_on_hand;
   return { item: saved, movement };
@@ -271,8 +322,9 @@ export async function createPackedShipment(params: {
     originStore: params.originStore,
     operationId: inventoryOperationId('pack', pack.bundle_barcode),
     store: params.actingStore,
+    hubCode: params.actingStore ? resolveStoreHubCode(params.actingStore) : undefined,
   });
-  const hubCode = params.actingStore?.hubCode || params.actingStore?.region || '';
+  const hubCode = params.actingStore ? resolveStoreHubCode(params.actingStore) : '';
   if (hubCode) {
     await markHubTransitOrdersRepacked(
       lines.map((line) => ({ order_barcode: line.item_barcode })),
@@ -292,6 +344,7 @@ export async function submitPackagingStockIn(params: {
   recipientPhone: string;
   inboundAt: string;
   lineNote: string;
+  customerCode?: string;
   bundle: {
     barcode: string;
     name: string;
@@ -319,6 +372,7 @@ export async function submitPackagingStockIn(params: {
       destination: dest,
       recipient_name: params.recipientName.trim(),
       recipient_phone: params.recipientPhone.trim(),
+      customer_code: params.customerCode?.trim().toUpperCase() ?? '',
       inbound_at: params.inboundAt,
       line_note: params.lineNote,
       bundle: {
@@ -348,8 +402,6 @@ export async function submitPackagingStockIn(params: {
     pack,
     lineItems,
   });
-
-  void refreshCache(params.store, hub, { force: true }).catch(() => {});
 
   return { bundleItem };
 }
@@ -414,6 +466,17 @@ export async function applyTruckLoadOutbound(params: {
 }): Promise<{ count: number; cloudSynced: boolean; cloudError?: string; tripNumber?: string }> {
   const ts = nowIso();
   if (!params.originStore) throw svc('pkgSyncFailed');
+  if (params.actingStore) {
+    for (const pack of params.packs) {
+      const synced = await ensureCloudPackRegistered(pack, params.actingStore);
+      if (!synced) {
+        throw new Error(
+          `快递包 ${pack.bundle_barcode.trim().toUpperCase()} 未在云端登记，无法装车。请返回「打包」确认该包存在，或重新打包后再试。`,
+        );
+      }
+    }
+  }
+  await assertCloudPacksExist(params.packs.map((pack) => pack.bundle_barcode));
   const tripPrefix = params.actingStore ? resolveTripNumberPrefix(params.actingStore) : 'PKG';
   const note = `装车出库\n日期 ${params.outboundDate}\n目的地 ${params.destination}${params.transportFee ? `\n车费 ${params.transportFee} MMK` : ''}`;
   const loadResult = await loadShipmentsAtomic({
@@ -448,14 +511,23 @@ export async function applyTruckLoadOutbound(params: {
 }
 
 export async function listOutboundPackages(scope?: { store: InventoryStoreSession; hubCode: string }): Promise<PackedShipmentDetail[]> {
-  const packs = await listPacks(scope?.store, scope?.hubCode);
-  const statuses = await listPkgTrackingStatusMap(packs.map((p) => p.bundle_barcode));
-  return packs.filter((pack) =>
+  // 与「打包」列表同源：发站可见 MDY/LSO/YGN 等各目的地未装车包，不因云端缺行静默隐藏
+  const packs = await listPackedShipments(undefined, scope);
+  const statuses = await listPkgTrackingStatusMap(packs.map((p) => p.bundle_barcode)).catch(
+    () => ({} as Record<string, import('../types/tracking').PkgTrackingStatus | null>),
+  );
+  const candidates = packs.filter((pack) =>
     canSelectPackedShipmentForTruckLoad({
       loaded: pack.loaded,
       cloud_status: statuses[pack.bundle_barcode.trim().toUpperCase()] ?? null,
     }),
   );
+  if (scope?.store) {
+    await Promise.allSettled(
+      candidates.map((pack) => ensureCloudPackRegistered(pack, scope.store!)),
+    );
+  }
+  return candidates;
 }
 
 export async function cancelPackedShipment(
@@ -570,9 +642,23 @@ export async function listMovements(limit = 100): Promise<StockMovement[]> {
 export async function getItemDetail(id: string): Promise<InventoryItemDetail | null> {
   const item = await getItemById(id);
   if (!item) return null;
+  const { items, packs } = await all(undefined, false);
   const moves = await cloudListMovementsForItem(id);
   const inbound = moves.find((m) => m.type === 'in');
   const parsedNote = parseInboundMovementNote(inbound?.note ?? '');
+
+  let pack =
+    findParentPackForItem(item, packs, items) ??
+    (item.packed_bundle_barcode?.trim()
+      ? await ensurePackInCacheByBarcode(item.packed_bundle_barcode, items)
+      : null) ??
+    (await getPackedShipmentByBundleItemId(id)) ??
+    (await getPackedShipmentContainingItem(id));
+
+  const packNoteParsed = pack?.note?.trim() ? parseInboundMovementNote(pack.note) : {};
+  const totalFee = parsedNote.totalFee ?? packNoteParsed.totalFee;
+  const paymentLabel = parsedNote.paymentLabel ?? packNoteParsed.paymentLabel;
+
   const signReceipt = item.customer_signed_at?.trim()
     ? {
         signPhone: item.customer_sign_phone?.trim() ?? '',
@@ -592,10 +678,11 @@ export async function getItemDetail(id: string): Promise<InventoryItemDetail | n
     inbound_date_label: inbound?.created_at ?? '',
     inbound_store_name: inbound?.origin_store_name ?? '',
     inbound_note: parsedNote.userNote ?? inbound?.note ?? '',
-    total_fee: parsedNote.totalFee,
-    payment_label: parsedNote.paymentLabel,
+    inbound_movement_note: inbound?.note ?? '',
+    total_fee: totalFee,
+    payment_label: paymentLabel,
     sign_receipt: signReceipt,
-    pack: await getPackedShipmentByBundleItemId(id),
+    pack,
   };
 }
 
@@ -785,6 +872,43 @@ export async function importInboundPackToLocal(
   return hubImportPack(hubOps, detail, store, operator);
 }
 
+const ensurePackHubReceivedInFlight = new Map<string, Promise<PkgTrackingDetail>>();
+
+/** 到站确认 + 本地导入：模块级去重，避免并发/StrictMode 重复写 operation_log */
+export async function ensurePackHubReceivedAtStation(params: {
+  packBarcode: string;
+  store: InventoryStoreSession;
+  hubCode: string;
+  operator: string;
+  knownPkg?: PkgTrackingDetail;
+}): Promise<PkgTrackingDetail> {
+  const code = params.packBarcode.trim().toUpperCase();
+  if (!code) throw new Error('快递包号无效');
+
+  const inflight = ensurePackHubReceivedInFlight.get(code);
+  if (inflight) return inflight;
+
+  const promise = (async () => {
+    if (params.knownPkg?.status === 'in_transit' || !params.knownPkg) {
+      await refreshInventoryCloudSession();
+    }
+    let pkg = params.knownPkg ?? (await getPkgTrackingDetail(code));
+    if (!pkg) throw new Error(`未找到快递包 ${code}`);
+
+    if (pkg.status === 'in_transit') {
+      pkg = await confirmPkgHubReceived(code, params.store, params.hubCode);
+    }
+
+    await hubImportPack(hubOps, pkg, params.store, params.operator);
+    return (await getPkgTrackingDetail(code)) ?? pkg;
+  })().finally(() => {
+    ensurePackHubReceivedInFlight.delete(code);
+  });
+
+  ensurePackHubReceivedInFlight.set(code, promise);
+  return promise;
+}
+
 export async function deliverHubOrderInboundAtStation(params: {
   order: OrderTrackingRecord;
   pkg: PkgTrackingDetail;
@@ -793,6 +917,16 @@ export async function deliverHubOrderInboundAtStation(params: {
   operator: string;
 }): Promise<void> {
   return hubDeliverOrder(hubOps, params);
+}
+
+export async function autoDeliverLocalHubOrdersOnPackReceived(params: {
+  packBarcode: string;
+  store: InventoryStoreSession;
+  hubCode: string;
+  operator: string;
+  knownPkg?: PkgTrackingDetail;
+}): Promise<PkgTrackingDetail> {
+  return hubAutoDeliverLocal(hubOps, params);
 }
 
 export async function maybeAutoReleaseTransitAfterAllInbound(params: {

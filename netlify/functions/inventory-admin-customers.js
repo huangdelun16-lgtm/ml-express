@@ -76,10 +76,16 @@ exports.handler = async (event) => {
 
   const customerName = event.queryStringParameters?.customerName;
   const customerPhone = event.queryStringParameters?.customerPhone;
+  const customerCode = event.queryStringParameters?.customerCode;
 
   try {
-    if (customerName !== undefined) {
-      const result = await fetchCustomerItems(supabase, customerName, customerPhone ?? '');
+    if (customerName !== undefined || customerCode !== undefined) {
+      const result = await fetchCustomerItems(
+        supabase,
+        customerName ?? '',
+        customerPhone ?? '',
+        customerCode ?? '',
+      );
       return {
         statusCode: 200,
         headers,

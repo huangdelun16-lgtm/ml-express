@@ -15,6 +15,12 @@ import { getOrderStatusLabel, getPkgStatusLabel, getTransportFeeDisplay, useTran
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { parseTransportFeeAmount } from '../services/hubTransportFeeService';
 import { canReleaseTransitManually } from '../utils/inventoryReliability';
+import {
+  areAllPackOrdersProcessed,
+  countPendingPackInboundOrders,
+  isDestinationHubPack,
+  resolvePackLegDestinationCode,
+} from '../utils/hubReceivePack';
 
 function hubOrderStatusLabel(
   line: PkgTrackingDetail['orders'][number],
@@ -34,12 +40,18 @@ type Props = {
   store: InventoryStoreSession | null;
   loading: boolean;
   confirmingOrderId: string | null;
+  confirmingHubReceive: boolean;
+  batchInbounding: boolean;
   payingTransportFee: boolean;
   transportFeePaid: boolean;
+  tripPackCount?: number;
+  tripFeeAnchorPack?: boolean;
   releasingTransit: boolean;
+  errorText?: string;
+  successText?: string;
   onClose: () => void;
-  onConfirmPack: () => void;
   onConfirmOrder: (orderId: string) => void;
+  onBatchInbound: () => void;
   onPayTransportFee: () => void;
   onReleaseTransit: () => void;
 };
@@ -51,12 +63,18 @@ export default function HubReceiveOrdersModal({
   store,
   loading,
   confirmingOrderId,
+  confirmingHubReceive,
+  batchInbounding,
   payingTransportFee,
   transportFeePaid,
+  tripPackCount = 1,
+  tripFeeAnchorPack = true,
   releasingTransit,
+  errorText,
+  successText,
   onClose,
-  onConfirmPack,
   onConfirmOrder,
+  onBatchInbound,
   onPayTransportFee,
   onReleaseTransit,
 }: Props) {
@@ -65,47 +83,46 @@ export default function HubReceiveOrdersModal({
 
   const layout = useMemo(() => {
     const cardMax = windowHeight * 0.92;
-    const headerEstimate = needsPackConfirmEstimate(pack);
-    const footerEstimate = 148;
+    const headerEstimate = 108;
+    const footerEstimate = 196;
     const orderListMax = Math.max(180, cardMax - headerEstimate - footerEstimate);
     return { cardMax, orderListMax };
-  }, [windowHeight, pack?.status, pack?.orders.length]);
+  }, [windowHeight, pack?.orders.length]);
 
   if (!pack || !store) return null;
 
-  const packReceived =
-    pack.status === 'hub_received' ||
-    pack.status === 'completed' ||
-    pack.status === 'split_at_hub';
-  const packDone = pack.status === 'completed' || pack.status === 'split_at_hub';
-  const needsPackConfirm = pack.status === 'in_transit';
+  const destinationPack = isDestinationHubPack(pack, hubCode);
+  const ordersAllProcessed = areAllPackOrdersProcessed(pack);
+  const pendingInboundCount = countPendingPackInboundOrders(pack, hubCode);
 
-  const ordersAllProcessed = pack.orders.every((o) => o.status !== 'in_transit');
-  const legDest = pack.leg_destination_code || pack.destination_code || hubCode;
+  const legDest = resolvePackLegDestinationCode(pack) || hubCode;
   const feeDisplay = getTransportFeeDisplay(t, pack.transport_fee);
   const feeAmount = parseTransportFeeAmount(pack.transport_fee);
-  const canPayTransportFee =
-    packReceived &&
-    ordersAllProcessed &&
-    !transportFeePaid &&
-    feeAmount > 0 &&
-    !needsPackConfirm;
-  const needsFeePayment =
-    ordersAllProcessed && feeAmount > 0 && !transportFeePaid && !needsPackConfirm;
-  const canDismiss = !needsFeePayment;
+  const hasPendingInbound = destinationPack && pendingInboundCount > 0;
+  const allInboundDone = ordersAllProcessed && !hasPendingInbound;
+  const needsFeePayment = allInboundDone && feeAmount > 0 && !transportFeePaid;
+  const showPayFeeButton = destinationPack && needsFeePayment && tripFeeAnchorPack;
+  const showTripFeeWaitHint =
+    destinationPack && allInboundDone && feeAmount > 0 && !transportFeePaid && !tripFeeAnchorPack;
   const transitOrders = pack.orders.filter((line) => resolveOrderDestinationCode(line) !== hubCode);
   const canReleaseTransit = canReleaseTransitManually({
     packageStatus: pack.status,
     hasTransitOrders: transitOrders.length > 0,
-    hasUnreleasedTransitOrders: transitOrders.some((line) => line.status === 'hub_received'),
+    hasUnreleasedTransitOrders: transitOrders.some((line) => line.status !== 'released_at_hub'),
   });
+  const showCloseButton =
+    !hasPendingInbound && allInboundDone && !needsFeePayment && !canReleaseTransit;
+  const canDismiss = showCloseButton;
+  const canBatchInbound = destinationPack && pendingInboundCount > 0;
+  const actionBusy =
+    loading || confirmingHubReceive || batchInbounding || payingTransportFee || releasingTransit;
 
   const handleDismiss = () => {
     if (canDismiss) onClose();
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         {canDismiss ? (
           <Pressable style={styles.backdrop} onPress={handleDismiss} accessibilityLabel={t.common.close} />
@@ -113,6 +130,15 @@ export default function HubReceiveOrdersModal({
           <View style={styles.backdrop} />
         )}
         <View style={[styles.card, { maxHeight: layout.cardMax }]}>
+          <Pressable
+            style={styles.closeXBtn}
+            onPress={onClose}
+            hitSlop={12}
+            accessibilityLabel={t.common.close}
+            accessibilityRole="button"
+          >
+            <Text style={styles.closeXText}>✕</Text>
+          </Pressable>
           <View style={styles.headerBlock}>
             <View style={styles.titleRow}>
               <Text style={styles.title}>{t.hubReceive.modalTitle}</Text>
@@ -129,22 +155,15 @@ export default function HubReceiveOrdersModal({
                 {pack.origin_store_code} → {legDest}
               </Text>
               <Text style={styles.feeInline}>{feeDisplay}</Text>
-              {transportFeePaid ? (
+              {transportFeePaid && ordersAllProcessed ? (
                 <Text style={styles.feePaidChip}>{t.common.paid}</Text>
+              ) : tripPackCount > 1 ? (
+                <Text style={styles.tripPackChip}>
+                  {fmt(t.hubReceive.tripPackCount, { count: tripPackCount })}
+                </Text>
               ) : null}
             </View>
 
-            {needsPackConfirm ? (
-              <Pressable
-                style={[styles.packConfirmBtn, loading && styles.btnBusy]}
-                onPress={onConfirmPack}
-                disabled={loading}
-              >
-                <Text style={styles.packConfirmBtnText}>
-                  {loading ? t.common.processing : t.hubReceive.modalConfirmPack}
-                </Text>
-              </Pressable>
-            ) : null}
           </View>
 
           <ScrollView
@@ -161,9 +180,9 @@ export default function HubReceiveOrdersModal({
               const isDone =
                 line.status === 'hub_received' || line.status === 'released_at_hub';
               const canInbound =
-                packReceived &&
-                pack.status === 'hub_received' &&
-                line.status === 'in_transit';
+                destinationPack &&
+                line.status === 'in_transit' &&
+                isLocal;
               const isConfirming = confirmingOrderId === line.id;
 
               return (
@@ -219,9 +238,9 @@ export default function HubReceiveOrdersModal({
                   </View>
                   {canInbound ? (
                     <Pressable
-                      style={[styles.inboundBtn, isConfirming && styles.btnBusy]}
+                      style={[styles.inboundBtn, (isConfirming || actionBusy) && styles.btnBusy]}
                       onPress={() => onConfirmOrder(line.id)}
-                      disabled={isConfirming || loading}
+                      disabled={isConfirming || actionBusy}
                     >
                       <Text style={styles.inboundBtnText}>
                         {isConfirming ? '…' : t.hubReceive.modalInbound}
@@ -238,64 +257,83 @@ export default function HubReceiveOrdersModal({
           </ScrollView>
 
           <View style={styles.footerBlock}>
+            {errorText ? (
+              <View style={styles.feedbackError}>
+                <Text style={styles.feedbackErrorText}>{errorText}</Text>
+              </View>
+            ) : null}
+            {successText ? (
+              <View style={styles.feedbackOk}>
+                <Text style={styles.feedbackOkText}>{successText}</Text>
+              </View>
+            ) : null}
+
             {canReleaseTransit ? (
               <Pressable
-                style={[styles.transitBtn, (releasingTransit || loading) && styles.btnBusy]}
+                style={[styles.transitBtn, actionBusy && styles.btnBusy]}
                 onPress={onReleaseTransit}
-                disabled={releasingTransit || loading}
+                disabled={actionBusy}
               >
                 <Text style={styles.transitBtnText}>
                   {releasingTransit ? t.common.processing : t.hubReceive.modalReleaseTransit}
                 </Text>
               </Pressable>
             ) : null}
-            {canPayTransportFee ? (
+
+            {canBatchInbound ? (
               <Pressable
-                style={[styles.payFeeBtn, (payingTransportFee || loading) && styles.btnBusy]}
+                style={[styles.batchInboundBtn, actionBusy && styles.btnBusy]}
+                onPress={onBatchInbound}
+                disabled={actionBusy || Boolean(confirmingOrderId)}
+              >
+                <Text style={styles.batchInboundBtnText}>
+                  {batchInbounding || confirmingHubReceive
+                    ? t.common.processing
+                    : t.hubReceive.modalBatchInbound}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {showTripFeeWaitHint ? (
+              <View style={styles.tripFeeHint}>
+                <Text style={styles.tripFeeHintText}>{t.hubReceive.tripFeePayOnPrimary}</Text>
+              </View>
+            ) : null}
+
+            {showPayFeeButton ? (
+              <Pressable
+                style={[styles.payFeeBtn, actionBusy && styles.btnBusy]}
                 onPress={onPayTransportFee}
-                disabled={payingTransportFee || loading}
+                disabled={actionBusy}
               >
                 <Text style={styles.payFeeBtnText}>
                   {payingTransportFee
                     ? t.common.processing
-                    : fmt(t.hubReceive.modalPayFee, { fee: feeDisplay })}
+                    : tripPackCount > 1
+                      ? fmt(t.hubReceive.modalPayTripFee, { fee: feeDisplay, count: tripPackCount })
+                      : fmt(t.hubReceive.modalPayFee, { fee: feeDisplay })}
                 </Text>
               </Pressable>
-            ) : transportFeePaid ? (
-              <View style={styles.feePaidRow}>
-                <Text style={styles.feePaidText}>{t.common.feePaid}</Text>
-              </View>
+            ) : showCloseButton ? (
+              <Pressable
+                style={styles.closeBtn}
+                onPress={onClose}
+                accessibilityLabel={t.common.close}
+              >
+                <Text style={styles.closeBtnText}>{t.common.close}</Text>
+              </Pressable>
             ) : null}
 
-            {loading && !confirmingOrderId && !payingTransportFee ? (
+            {actionBusy && !payingTransportFee && !releasingTransit && !batchInbounding && !confirmingOrderId ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator color="#38bdf8" size="small" />
               </View>
             ) : null}
-
-            <Pressable
-              style={[styles.closeBtn, !canDismiss && styles.closeBtnDisabled]}
-              onPress={handleDismiss}
-              disabled={!canDismiss}
-            >
-              <Text style={styles.closeBtnText}>
-                {needsFeePayment
-                  ? t.common.payFeeFirst
-                  : packDone || transportFeePaid
-                    ? t.common.done
-                    : t.common.close}
-              </Text>
-            </Pressable>
           </View>
         </View>
       </View>
     </Modal>
   );
-}
-
-function needsPackConfirmEstimate(pack: PkgTrackingDetail | null): number {
-  if (!pack) return 120;
-  return pack.status === 'in_transit' ? 168 : 108;
 }
 
 const styles = StyleSheet.create({
@@ -320,11 +358,51 @@ const styles = StyleSheet.create({
   },
   headerBlock: {
     flexShrink: 0,
+    paddingTop: 4,
+    paddingRight: 36,
+  },
+  closeXBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(51,65,85,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#475569',
+  },
+  closeXText: {
+    color: '#e2e8f0',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   footerBlock: {
     flexShrink: 0,
     marginTop: 2,
   },
+  feedbackError: {
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.35)',
+  },
+  feedbackErrorText: { color: '#fca5a5', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  feedbackOk: {
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.35)',
+  },
+  feedbackOkText: { color: '#86efac', fontSize: 12, lineHeight: 17, fontWeight: '700' },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -363,14 +441,24 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  packConfirmBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: 'center',
-    marginTop: 10,
+  tripPackChip: {
+    color: '#fde68a',
+    fontSize: 10,
+    fontWeight: '900',
+    backgroundColor: 'rgba(245,158,11,0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  packConfirmBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  tripFeeHint: {
+    marginTop: 8,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.35)',
+  },
+  tripFeeHintText: { color: '#fde68a', fontSize: 12, lineHeight: 17, fontWeight: '700' },
   orderScroll: {
     marginTop: 6,
   },
@@ -443,6 +531,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inboundBtnText: { color: '#fff', fontWeight: '900', fontSize: 11 },
+  batchInboundBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  batchInboundBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   doneMark: {
     width: 30,
     height: 30,

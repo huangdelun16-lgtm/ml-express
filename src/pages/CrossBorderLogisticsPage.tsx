@@ -30,10 +30,12 @@ import {
   type CrossBorderExpenseCategory,
 } from '../services/inventoryConsoleService';
 import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
+import { formatSalespersonEmployeeCodeDisplay } from '../utils/crossBorderSalespersons';
 import {
   PACK_DISPLAY_STATUS_LABELS,
   packDisplayStatusBadgeClass,
 } from '../utils/packDisplayStatus';
+import { buildTripFeeGroupMap, isPrimaryTripFeePack, tripTransportGroupKey } from '../utils/tripTransportFee';
 import '../styles/crossBorderLogistics.css';
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -77,6 +79,40 @@ function formatMmK(n?: number | null): string {
 function formatPackTransportFee(fee?: number | null): string {
   if (fee == null || !Number.isFinite(fee) || fee <= 0) return '—';
   return formatMmK(fee);
+}
+
+function formatPackTransportFeeForRow(
+  pack: InventoryPackRow,
+  tripGroupMap: ReturnType<typeof buildTripFeeGroupMap>,
+  isEn: boolean,
+): string {
+  const trip = pack.trip_number?.trim().toUpperCase() ?? '';
+  const loadBatch = {
+    truck_loaded_at: pack.truck_loaded_at,
+    origin_store_code: pack.origin_store_code,
+    leg_destination_code: pack.leg_destination_code,
+    destination_code: pack.destination_code,
+  };
+  const groupKey = tripTransportGroupKey(trip, pack.pack_barcode, loadBatch);
+  const group = tripGroupMap.get(groupKey);
+  const isPrimary = isPrimaryTripFeePack(pack.pack_barcode, trip, tripGroupMap, loadBatch);
+  if (!isPrimary) {
+    if (trip) return isEn ? `In trip ${trip}` : `含于车次 ${trip}`;
+    if (group && group.packCount > 1) {
+      return isEn ? `In same load (${group.packCount} pkgs)` : `含于同车 ${group.packCount} 包`;
+    }
+    return '—';
+  }
+  const feeLabel = formatPackTransportFee(group?.fee ?? pack.transport_fee);
+  if (group && group.packCount > 1) {
+    if (trip) {
+      return isEn
+        ? `${feeLabel} · ${group.packCount} pkgs/trip`
+        : `${feeLabel} · 本车次 ${group.packCount} 包`;
+    }
+    return isEn ? `${feeLabel} · ${group.packCount} pkgs/load` : `${feeLabel} · 本车 ${group.packCount} 包`;
+  }
+  return feeLabel;
 }
 
 function stationCashFlow(finance?: InventoryTransitStoreFinance) {
@@ -409,6 +445,21 @@ const CrossBorderLogisticsPage: React.FC = () => {
 
   const transitStores = data?.transitStores ?? [];
   const recentPacks = data?.recentPacks ?? [];
+  const packTripGroupMap = useMemo(
+    () =>
+      buildTripFeeGroupMap(
+        recentPacks.map((pack) => ({
+          pack_barcode: pack.pack_barcode,
+          trip_number: pack.trip_number,
+          transport_fee: pack.transport_fee,
+          truck_loaded_at: pack.truck_loaded_at,
+          origin_store_code: pack.origin_store_code,
+          leg_destination_code: pack.leg_destination_code,
+          destination_code: pack.destination_code,
+        })),
+      ),
+    [recentPacks],
+  );
 
   const pagedTransitStores = useMemo(
     () => paginateSlice(transitStores, storesPage, tablePageSize),
@@ -987,7 +1038,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
               <p className="cbl-card-hint">
                 {isEn
                   ? 'Registered customers and Inventory App「Express details」aggregates. Click a name for parcels.'
-                  : '登记客户与 Inventory App「快递明细」汇总。点击客户姓名查看其全部快递。'}
+                  : '登记客户与 Inventory App「快递明细」汇总（按客户编码合并）。App 填写客户编码后自动带出电话。'}
               </p>
 
               {registeredCustomers.length ? (
@@ -1020,7 +1071,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
                               {hubLabel(row.delivery_region_id)}
                               <span className="cbl-dim"> · {row.delivery_area_code}</span>
                             </td>
-                            <td>{row.salesperson_employee_code || '—'}</td>
+                            <td>{formatSalespersonEmployeeCodeDisplay(row.salesperson_employee_code) || '—'}</td>
                             <td className="cbl-dim">{formatIsoDate(row.application_date, language)}</td>
                             <td className="cbl-dim">{row.address_notes || '—'}</td>
                           </tr>
@@ -1050,7 +1101,9 @@ const CrossBorderLogisticsPage: React.FC = () => {
                   <table className="cbl-table cbl-table--customers">
                     <thead>
                       <tr>
-                        <th>{isEn ? 'Customer' : '客户姓名'}</th>
+                        <th>{isEn ? 'Customer code' : '客户编码'}</th>
+                        <th>{isEn ? 'Customer name' : '客户姓名'}</th>
+                        <th>{isEn ? 'Phone' : '电话'}</th>
                         <th>{isEn ? 'Total pieces' : '总件数'}</th>
                         <th>{isEn ? 'Total weight' : '总重量'}</th>
                         <th>{isEn ? 'Total fee' : '总费用'}</th>
@@ -1060,19 +1113,22 @@ const CrossBorderLogisticsPage: React.FC = () => {
                       {pagedCustomers.map((row) => (
                         <tr key={row.customerKey}>
                           <td>
+                            {row.customerCode ? (
+                              <span className="cbl-code">{row.customerCode}</span>
+                            ) : (
+                              <span className="cbl-dim">—</span>
+                            )}
+                          </td>
+                          <td>
                             <button
                               type="button"
                               className="cbl-customer-name-btn"
                               onClick={() => setCustomerModalTarget(row)}
                             >
                               <span className="cbl-customer-name-btn__name">{row.customerName}</span>
-                              {row.customerPhone && row.customerPhone !== '—' ? (
-                                <span className="cbl-customer-name-btn__phone">
-                                  {row.customerPhone}
-                                </span>
-                              ) : null}
                             </button>
                           </td>
+                          <td>{row.customerPhone && row.customerPhone !== '—' ? row.customerPhone : '—'}</td>
                           <td>{row.totalPieces}</td>
                           <td>
                             {row.totalWeightKg > 0 ? `${row.totalWeightKg} Kg` : '—'}
@@ -1141,10 +1197,11 @@ const CrossBorderLogisticsPage: React.FC = () => {
                   <thead>
                     <tr>
                       <th>{isEn ? 'Pack' : '包装号'}</th>
+                      <th>{isEn ? 'Trip' : '车次'}</th>
                       <th>{isEn ? 'Route' : '路线'}</th>
                       <th>{isEn ? 'Leg' : '本段'}</th>
                       <th>{isEn ? 'Items' : '件数'}</th>
-                      <th>{isEn ? 'Fee' : '车费'}</th>
+                      <th>{isEn ? 'Trip fee' : '车费'}</th>
                       <th>{isEn ? 'Status' : '状态'}</th>
                       {!isMobile && <th>{isEn ? 'Loaded' : '装车'}</th>}
                     </tr>
@@ -1158,6 +1215,13 @@ const CrossBorderLogisticsPage: React.FC = () => {
                             <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
                               {pack.pack_name}
                             </div>
+                          )}
+                        </td>
+                        <td>
+                          {pack.trip_number ? (
+                            <span className="cbl-code">{pack.trip_number}</span>
+                          ) : (
+                            <span className="cbl-dim">—</span>
                           )}
                         </td>
                         <td>
@@ -1178,7 +1242,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
                             </span>
                           ) : null}
                         </td>
-                        <td>{formatPackTransportFee(pack.transport_fee)}</td>
+                        <td>{formatPackTransportFeeForRow(pack, packTripGroupMap, isEn)}</td>
                         <td>
                           <span className={packTransportStatusBadgeClass(pack)}>
                             {packTransportStatusLabel(pack, isEn)}

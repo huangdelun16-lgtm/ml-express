@@ -16,6 +16,7 @@ import {
 import { useTranslation } from '../i18n';
 import { getItemDetail } from '../services/inventoryService';
 import type { InventoryItemDetail } from '../types/inventory';
+import { resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
 
 type Props = {
   visible: boolean;
@@ -43,6 +44,12 @@ function mapDetailToInvoice(detail: InventoryItemDetail): InboundInvoiceData {
     note: detail.inbound_note,
     storeName: detail.inbound_store_name?.trim() || undefined,
     signReceipt: detail.sign_receipt,
+    packItemLabel: resolvePackagingStockInItemLabel(
+      detail.id,
+      detail.barcode,
+      detail.pack,
+      detail.inbound_movement_note,
+    ),
   };
 }
 
@@ -92,11 +99,13 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
         ) : (
           <View style={inboundInvoiceStyles.sheet}>
             <ScrollView
+              style={inboundInvoiceStyles.scrollView}
               contentContainerStyle={inboundInvoiceStyles.scroll}
               showsVerticalScrollIndicator={false}
             >
               <InboundInvoiceContent
                 data={invoiceData}
+                packItemSeqLabel={t.items.packItemSeq}
                 copyLabels={{
                   copied: t.common.copied,
                   tapToCopy: t.common.tapToCopy,

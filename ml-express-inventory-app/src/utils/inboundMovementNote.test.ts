@@ -15,6 +15,12 @@ describe('parseInboundMovementNote', () => {
     expect(parsed.paymentLabel).toBe('到付');
   });
 
+  it('parses packaging stock-in pack note total fee', () => {
+    const parsed = parseInboundMovementNote('多个入库 · 总费用 50000 MMK · 09');
+    expect(parsed.totalFee).toBe('50000');
+    expect(parsed.userNote).toBe('多个入库 · 09');
+  });
+
   it('detects fee or payment in note', () => {
     expect(inboundNoteHasFeeOrPayment('Total fee 100 MMK · Prepaid')).toBe(true);
     expect(inboundNoteHasFeeOrPayment('仅备注')).toBe(false);

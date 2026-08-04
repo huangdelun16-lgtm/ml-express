@@ -23,6 +23,21 @@ import { splitOutboundByTrip, type TruckTripSummary } from '../utils/truckTripGr
 
 type Tab = 'inbound' | 'outbound';
 
+function isActiveInboundTrackingPack(pack: PkgTrackingDetail): boolean {
+  if (pack.status === 'completed' || pack.status === 'cancelled' || pack.status === 'split_at_hub') {
+    return false;
+  }
+  if (pack.status === 'in_transit') return true;
+  return pack.orders.some((order) => order.status === 'in_transit');
+}
+
+function isActiveOutboundTrackingPack(pack: PkgTrackingDetail): boolean {
+  if (pack.status === 'completed' || pack.status === 'cancelled' || pack.status === 'split_at_hub') {
+    return false;
+  }
+  return pack.status === 'in_transit' || pack.status === 'hub_received';
+}
+
 type Nav = { navigate: (name: string, params?: { presetCode?: string }) => void };
 
 type OutboundListItem =
@@ -111,8 +126,8 @@ export default function ShipmentTrackScreen({ navigation }: { navigation: Nav })
       listInboundPackages(hubCode),
       listOutboundPackagesFromOrigin(store.storeCode),
     ]);
-    setInbound(inList);
-    setOutbound(outList);
+    setInbound(inList.filter((pack) => isActiveInboundTrackingPack(pack)));
+    setOutbound(outList.filter((pack) => isActiveOutboundTrackingPack(pack)));
   }, [store, hubCode]);
 
   useFocusEffect(

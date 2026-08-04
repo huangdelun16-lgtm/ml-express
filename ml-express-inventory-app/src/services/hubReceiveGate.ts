@@ -1,4 +1,5 @@
 import { probeCloudConnection } from './cloudConnection';
+import { refreshInventoryCloudSession } from './authService';
 import { isCloudReachable } from '../utils/networkReachability';
 import { isSupabaseConfigured } from './supabase';
 
@@ -15,9 +16,25 @@ export function invalidateHubReceiveCloudGate(): void {
 }
 
 /** 到站签收前：必须能连上云端追踪（弱网时快速失败） */
-export async function ensureHubReceiveCloudReady(options?: { force?: boolean }): Promise<HubCloudGateResult> {
+export async function ensureHubReceiveCloudReady(options?: {
+  force?: boolean;
+  /** 写操作前强制 refresh JWT，避免缓存 gate 导致 RLS 误报 */
+  forWrite?: boolean;
+}): Promise<HubCloudGateResult> {
   if (!isSupabaseConfigured()) {
     return { ok: false, reason: 'notConfigured' };
+  }
+  if (options?.forWrite) {
+    if (!(await isCloudReachable())) {
+      return { ok: false, reason: 'offline' };
+    }
+    try {
+      await refreshInventoryCloudSession();
+      lastGateOkAt = Date.now();
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'notAuthenticated' };
+    }
   }
   if (!options?.force && Date.now() - lastGateOkAt < GATE_OK_TTL_MS) {
     return { ok: true };

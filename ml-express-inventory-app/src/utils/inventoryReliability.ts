@@ -1,3 +1,9 @@
+/** PostgreSQL operation_log 主键冲突：并发重试时视为已成功写入。 */
+export function isInventoryOperationLogDuplicateError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error ?? '');
+  return /inventory_operation_log_pkey/i.test(msg);
+}
+
 /** 将稳定业务键映射为 UUID，供 PostgreSQL operation_id 幂等锁使用。 */
 export function inventoryOperationId(kind: string, businessKey: string): string {
   const input = `${kind.trim().toLowerCase()}:${businessKey.trim().toUpperCase()}`;

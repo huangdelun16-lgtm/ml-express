@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import CopyableCodeRow from './CopyableCodeRow';
 import { SignaturePreview } from './SignaturePad';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
+import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
 import { callPhoneNumber } from '../utils/phoneCall';
 import type { CustomerSignReceipt } from '../types/customerSignReceipt';
 import { pickupTypeLabel } from '../types/customerSignReceipt';
@@ -25,6 +26,8 @@ export type InboundInvoiceData = {
   note?: string;
   storeName?: string;
   signReceipt?: CustomerSignReceipt;
+  /** 多个入库包内序号，如 3-1 */
+  packItemLabel?: string;
 };
 
 function formatSignTime(iso: string): string {
@@ -57,9 +60,12 @@ export function InvoiceRow({
 export function InboundInvoiceContent({
   data,
   copyLabels,
+  packItemSeqLabel,
 }: {
   data: InboundInvoiceData;
   copyLabels?: { copied: string; tapToCopy: string; expressNo: string; inbound: string };
+  /** 包内序号行标签，默认「包内序号」 */
+  packItemSeqLabel?: string;
 }) {
   return (
     <>
@@ -68,6 +74,12 @@ export function InboundInvoiceContent({
         <Text style={styles.invoiceTitle}>订单详情 / INVOICE</Text>
         {data.storeName ? <Text style={styles.invoiceStore}>{data.storeName}</Text> : null}
         <Text style={styles.invoiceDate}>{data.inboundDateLabel}</Text>
+        {data.packItemLabel && !isPackagingStockInLineBarcode(data.barcode) ? (
+          <View style={styles.packSeqBadge}>
+            <Text style={styles.packSeqLabel}>{packItemSeqLabel ?? '包内序号'}</Text>
+            <Text style={styles.packSeqValue}>{data.packItemLabel}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.divider} />
@@ -162,7 +174,7 @@ export function InboundInvoiceFooter({
     <View style={inboundInvoiceStyles.footer}>
       {phone ? (
         <Pressable
-          style={[inboundInvoiceStyles.btnCall, inboundInvoiceStyles.footerBtnFull]}
+          style={inboundInvoiceStyles.btnCall}
           onPress={() => void callPhoneNumber(phone)}
         >
           <Text style={inboundInvoiceStyles.btnCallText}>📞 呼叫客户</Text>
@@ -200,16 +212,35 @@ export const inboundInvoiceStyles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    height: '92%',
     maxHeight: '92%',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    overflow: 'hidden',
   },
-  scroll: { padding: 20, paddingBottom: 8 },
+  scrollView: {
+    flex: 1,
+  },
+  scroll: { padding: 20, paddingBottom: 16 },
   invoiceHeader: { alignItems: 'center', marginBottom: 12 },
   invoiceBrand: { color: '#059669', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
   invoiceTitle: { color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 4 },
   invoiceStore: { color: '#64748b', fontSize: 12, marginTop: 6 },
   invoiceDate: { color: '#0f172a', fontSize: 14, fontWeight: '800', marginTop: 8 },
+  packSeqBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  packSeqLabel: { color: '#047857', fontSize: 13, fontWeight: '800' },
+  packSeqValue: { color: '#059669', fontSize: 20, fontWeight: '900', fontFamily: 'monospace' },
   divider: { height: 1, backgroundColor: '#cbd5e1', marginVertical: 14 },
   row: {
     flexDirection: 'row',
@@ -270,6 +301,7 @@ export const inboundInvoiceStyles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   footer: {
+    flexShrink: 0,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 24,
@@ -304,7 +336,6 @@ export const inboundInvoiceStyles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-    marginBottom: 10,
   },
   btnSignText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnClose: {

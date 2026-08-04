@@ -43,6 +43,15 @@ function normalizeStatus(value) {
   return status === 'inactive' ? 'inactive' : 'active';
 }
 
+function normalizeEmployeeCode(raw) {
+  const code = String(raw ?? '').trim().toUpperCase();
+  const legacy = code.match(/^[A-Z]+-(\d+)$/);
+  if (legacy) return String(Number.parseInt(legacy[1], 10)).padStart(3, '0');
+  const plain = code.match(/^(\d+)$/);
+  if (plain) return String(Number.parseInt(plain[1], 10)).padStart(3, '0');
+  return '';
+}
+
 async function verifyAuth(event) {
   const token = getAdminTokenFromEvent(event);
   const auth = await verifyAdminToken(token, ['admin', 'manager', 'operator', 'finance'], [
@@ -140,7 +149,7 @@ exports.handler = async (event) => {
       const name = String(body.name || '').trim();
       const region_id = String(body.region_id || '').trim();
       const work_area_code = String(body.work_area_code || '').trim().toUpperCase();
-      const employee_code = String(body.employee_code || '').trim().toUpperCase();
+      const employee_code = normalizeEmployeeCode(body.employee_code);
       const phone = String(body.phone || '').trim();
       const address = String(body.address || '').trim();
       const join_date = String(body.join_date || '').trim();
@@ -160,7 +169,7 @@ exports.handler = async (event) => {
           body: JSON.stringify({ error: '请选择工作区域' }),
         };
       }
-      if (!/^[A-Z]+-\d{3,}$/.test(employee_code)) {
+      if (!employee_code || !/^\d{3,}$/.test(employee_code)) {
         return {
           statusCode: 400,
           headers,

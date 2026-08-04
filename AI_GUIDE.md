@@ -17,6 +17,7 @@
 8. [商家 App `ml-express-merchant-app`](#8-商家-app-ml-express-merchant-app)
 9. [骑手/员工 App `ml-express-mobile-app`](#9-骑手员工-app-ml-express-mobile-app)
 10. [Inventory 中转站 App `ml-express-inventory-app`](#10-inventory-中转站-app-ml-express-inventory-app)
+    - [10.2 A 发站出库 / B 到站签收（必读）](#102-业务双线划分a-发站出库--b-到站签收)
 11. [Admin 跨境物流控制台](#11-admin-跨境物流控制台)
 12. [中转物流业务流（MUSE → MDY → YGN）](#12-中转物流业务流muse--mdy--ygn)
 13. [共享代码层 `/shared`](#13-共享代码层-shared)
@@ -235,13 +236,13 @@ flowchart TB
 
 | 维度 | 说明 |
 |------|------|
-| **定位** | 跨境包裹全链路：入库→打包→装车→到站→签收 |
+| **定位** | 跨境包裹：**A 发站出库**（入库→打包→装车）+ **B 到站签收**（到站→车费→中转→签收），见 §10.2 |
 | **入口** | `App.tsx`：AuthProvider → Login / `AppNavigator` |
 | **认证** | **唯一使用 Supabase Auth JWT 的移动端**；`inventory-store-login` Edge Function |
 | **数据** | **在线专用**：`inventory_*` 表 + RPC 幂等事务；45s 内存缓存（`inventoryCloudStore`） |
 | **不写 shared** | `sync:shared` 为空操作 |
-| **测试** | `vitest`（单元测试，`npm test`） |
-| **详细** | 见 §10（屏幕、区域可见性、打印、签收流程） |
+| **测试** | `vitest`（单元测试，`npm test`）；**A 基本完成，B 待系统测试** |
+| **详细** | §10.2 A/B 划分、§10.4 屏幕、§10.7 区域可见性 |
 
 ### 3.1.8 共享层（`/shared/`）
 
@@ -672,6 +673,15 @@ npm run build:aab   # Android AAB 生产包
 
 独立 Expo 应用，供 Admin 创建的 **中转站合伙店铺**（`delivery_stores.store_type = transit_station`）使用。详细云端设计见 **`ml-express-inventory-app/docs/CLOUD_DATA_ARCHITECTURE.md`**（若存在）。
 
+> **Inventory 业务必须切成两条线（勿混）** — 详见 **[§10.2](#102-业务双线划分a-发站出库--b-到站签收)**：
+>
+> | 代号 | 业务含义 | 状态（2026-08） |
+> |------|----------|-----------------|
+> | **A** | **入库** → 填写 **客户信息** → 填写 **货物信息** → **打包** → **装车** 发往下一枢纽/目的站 | ✅ **基本完成**（仍在打磨缓存 / RPC / RLS） |
+> | **B** | **到货签收** → **支付车费** → **中转包裹**（释放/再打包）→ **客户签收** | 🧪 **待系统测试** |
+>
+> **分界点**：A 在装车 RPC 成功、PKG 写入 `inventory_pkg_tracking.status = in_transit` 时结束；B 从到站确认 / 扫描 PKG 开始。
+
 ### 10.1 定位与数据策略
 
 | 项 | 值 |
@@ -691,11 +701,121 @@ npm run build:aab   # Android AAB 生产包
 
 **不参与 `/shared` sync**（独立业务线）。
 
-### 10.2 目录结构
+### 10.2 业务双线划分（A 发站出库 / B 到站签收）⭐
+
+**维护者速记（与用户口径一致）**
+
+- **A**：入库、填写客户信息、填写货物信息、（快递明细）打包、装车到目的地  
+- **B**：到货签收、支付车费、中转包裹、客户签收  
+
+Inventory App 在业务上必须拆成 **两条独立链路**。改需求、修 Bug、写 migration 时，**先判断属于 A 还是 B**，勿把发站逻辑与到站逻辑混在同一补丁里。
+
+| 维度 | **A — 发站出库（Origin / Outbound）** | **B — 到站签收（Hub / Inbound & Delivery）** |
+|------|--------------------------------------|-----------------------------------------------|
+| **一句话** | 从本站点 **收货登记 → 打包 → 装车发往下一枢纽/目的站** | 包裹 **到站 → 付车费 → 分拨/中转 → 客户签收** |
+| **典型角色** | 木姐 **MUSE**、瑞丽 **RUILI** 等 **发站** | **MDY** 中转站、**YGN/TGI** 目的站 |
+| **开发状态（2026-08）** | ✅ **基本完成**，仍在打磨缓存/RPC/RLS | 🧪 **待系统测试** |
+| **业务边界** | A 在 `inventory_load_shipments` 成功、PKG 进入 `in_transit` 时 **结束** | B 从 `inventory_pkg_tracking.status = in_transit` 被到站扫描/确认时 **开始** |
+
+#### A — 发站出库（入库 → 客户/货物信息 → 装车）
+
+**用户路径（屏幕）**
+
+| 顺序 | 屏幕 | 说明 |
+|------|------|------|
+| 1 | `StockInScreen` **入库** | 填写 **客户信息** + **货物信息**，生成入库条码；可打印标签 |
+| 1′ | `PackagingStockInScreen` **多个入库** | 批量扫码；订单 **直接已入库+已打包**（库存 0），整包重量在 PKG 上 |
+| 2 | `ItemsScreen` **快递明细** | 查看本店可见订单；**打包快递**（`PackExpressModal`） |
+| 3 | `PkgScreen` **打包** | 已生成 PKG 列表；编辑/拆包/打印 |
+| 4 | `StockOutScreen` **装车出库** | 选 PKG、本段目的地、车费；确认后写入在途追踪 |
+| 辅 | `ShipmentTrackScreen` **在途追踪** | 发站视角查看已发出 PKG |
+| 辅 | `MovementsScreen` **流水** | 出入库流水 |
+
+**核心服务 / RPC（只改 A 时动这些）**
+
+| 环节 | 关键代码 | Supabase RPC / 表 |
+|------|----------|-------------------|
+| 单票入库 | `inventoryService.applyStockMovement`（type=in） | `inventory_apply_stock_movement` |
+| 多个入库 | `submitPackagingStockIn` → `packagingStockInBatchAtomic` | `inventory_packaging_stock_in_batch` |
+| 快递明细打包 | `createPackedShipment` → `createPackAtomic` | `inventory_create_packed_shipment` |
+| 装车出库 | `applyTruckLoadOutbound` → `loadShipmentsAtomic` | `inventory_load_shipments` → 写 `inventory_pkg_tracking`（`in_transit`） |
+| 列表/缓存 | `inventoryCloudStore`、`expressDetailsVisibility` | `inventory_store_items`、`inventory_packed_shipments` |
+
+**A 的常见坑（已踩过）**
+
+- App 内存缓存与 Supabase 不一致：PKG **只在缓存、不在云端** → 装车报 `packed shipment not found`；打包/装车前必须 **校验云端已有 PKG**。
+- `hubCode` scope 不一致（`resolveStoreHubCode` vs `store.region`）→ 列表空白。
+- 发站账号用 **店码归一化 RLS**（`inventory_owner_code_matches`）；相关 migration 见 `ml-express-inventory-app/docs/DEPLOYMENT.md`。
+
+```mermaid
+flowchart LR
+  subgraph A ["A 发站出库（基本完成）"]
+    A1[入库 / 多个入库] --> A2[快递明细]
+    A2 --> A3[打包]
+    A3 --> A4[装车出库]
+    A4 --> A5[(PKG in_transit)]
+  end
+```
+
+#### B — 到站签收（到货 → 车费 → 中转 → 客户签收）
+
+**用户路径（屏幕）**
+
+| 顺序 | 屏幕 | 说明 |
+|------|------|------|
+| 1 | `HubReceiveScreen` **到站收货** | 扫 PKG/订单；**确认到站**；打开分拨弹窗 |
+| 2 | `HubReceiveOrdersModal` 等 | 本站目的地订单 → **确认入库**；其它站 → **释放中转** |
+| 3 | 车费 | **支付车费**（`hubTransportFeeService` / 到站流程内） |
+| 4 | 中转 | 释放后的订单回到 **快递明细**，可 **再打包 → 再装车**（重新进入 A 的后段） |
+| 5 | `ItemsScreen` + `CustomerSignFlowModal` | 目的站 **客户签收**（本人/代收 + 签名） |
+| 辅 | `CrossBorderFinanceScreen` **跨境财务** | 站点账本、待入账、车费 |
+| 辅 | `TrackExpressScreen` **追踪快递** | 单笔查询 |
+
+**核心服务 / RPC（只改 B 时动这些）**
+
+| 环节 | 关键代码 | Supabase RPC / 表 |
+|------|----------|-------------------|
+| 到站收包 | `trackingService.confirmPkgHubReceived` | `inventory_confirm_pkg_hub_received` |
+| 到站收单 | `confirmOrderHubReceived` / `confirmOrderInPackById` | 订单追踪更新 |
+| 释放中转 | `releaseTransitOrdersAtHub`、`releaseHubTransitOrders` | `inventory_order_tracking` |
+| 到站入库 | `importInboundPackToLocal`（历史命名，实际写 Supabase） | `inventoryHubOps` |
+| 客户签收 | `markCustomerSigned`、`CustomerSignFlowModal` | `customer_signed_at`、`sign_receipt_json` 等 |
+| 车费 | `hubTransportFeeService` | `inventory_hub_transport_fee_payments` |
+| 追踪读写 | `trackingService.ts` 全文件 | `inventory_pkg_tracking`、`inventory_order_tracking` |
+
+**B 的测试重点（待验证）**
+
+- MDY 到站：PKG 分拨、**付车费**、MDY 订单入库 vs YGN 订单 **释放中转**。
+- YGN 目的站：仅见 YGN 订单/PKG（`expressDetailsVisibility`）；**批量签收**、签收留痕上传。
+- 释放中转后能否再走 A（再打包、再装车）闭环。
+- RLS：到站 custody、`hub_arrived_at`、店码归一化（`20260622120000`、`20260708120000` 等）。
+
+```mermaid
+flowchart LR
+  subgraph B ["B 到站签收（待系统测试）"]
+    B0[(PKG in_transit)] --> B1[到站收货]
+    B1 --> B2{目的地}
+    B2 -->|本站| B3[确认入库]
+    B2 -->|其它站| B4[释放中转]
+    B1 --> B5[支付车费]
+    B3 --> B6[客户签收]
+    B4 --> B7[再打包装车 → 回到 A]
+  end
+```
+
+#### A / B 分工原则（给 AI / 维护者）
+
+1. **先问属于 A 还是 B**，再打开对应屏幕与服务文件；不要把「打包缓存」和「到站追踪」混在一个函数里修。
+2. **A 的数据主表**：`inventory_store_items`、`inventory_packed_shipments`、`inventory_stock_movements`；装车成功后写入 **`inventory_pkg_tracking`**。
+3. **B 的数据主表**：`inventory_pkg_tracking`、`inventory_order_tracking`、`inventory_hub_transport_fee_payments`；到站后才会大量改 `hub_arrived_at`、释放/签收字段。
+4. **区域可见性**（§10.7）对 A、B **都生效**，但发站与中继/目的站看到的列表不同——改列表过滤时说明是 A 侧还是 B 侧账号场景。
+5. **完整链路**见 §12（MUSE → MDY → YGN）；§12 是 A+B 串联，本节是 **职责切开**。
+
+### 10.3 目录结构
 
 ```
 ml-express-inventory-app/src/
-├── screens/           # 业务页（见 10.3）
+├── screens/           # 业务页（见 10.4；A/B 划分见 10.2）
 ├── components/        # HubReceiveOrdersModal、CustomerSignFlowModal、SignaturePad、PackExpressModal…
 ├── contexts/          # AuthContext、LanguageContext
 ├── i18n/              # translations.ts、format.ts、types.ts
@@ -723,25 +843,28 @@ ml-express-inventory-app/src/
 └── types/             # inventory.ts, tracking.ts
 ```
 
-### 10.3 屏幕与导航（`AppNavigator.tsx`）
+### 10.4 屏幕与导航（`AppNavigator.tsx`）
 
-| Screen | 标题 | 职责 |
-|--------|------|------|
-| `HomeScreen` | ML Inventory | 入口、统计、快捷入口 |
-| `StockInScreen` | 入库 | 登记订单、生成入库条码；成功后自动弹 Barcode 打印（可取消） |
-| `ItemsScreen` | **快递明细** | 订单列表、打包快递、多选打印 |
-| `PkgScreen` | **打包** | 已打包 PKG 列表、编辑/拆包/打印 |
-| `StockOutScreen` | **装车出库** | 选 PKG、选本段目的地、发车 |
-| `HubReceiveScreen` | **到站收货** | 扫 PKG/订单、确认到站、分拨、付车费 |
-| `ShipmentTrackScreen` | 在途追踪 | 发站视角看在途包 |
-| `TrackExpressScreen` | 追踪快递 | 单笔查询 |
-| `MovementsScreen` | 流水 | 出入库流水 |
-| `CrossBorderFinanceScreen` | **跨境财务** | 站点账本/待入账/车费 |
-| `CameraScanScreen` | 通用扫码 | 系统相机权限 |
-| `SettingsScreen` | 设置 | 站点连接、语言、P203A 打印测试、版本支持、改密/退出 |
-| `ItemFormScreen` | 商品 | 编辑订单字段 |
+> **A / B 归属**：见 §10.2。下表「链路」列标注该屏幕 primarily 属于 A（发站）还是 B（到站）。
 
-### 10.4 核心业务流程
+| Screen | 标题 | 链路 | 职责 |
+|--------|------|------|------|
+| `HomeScreen` | ML Inventory | — | 入口、统计、快捷入口 |
+| `StockInScreen` | 入库 | **A** | 登记订单、生成入库条码；成功后自动弹 Barcode 打印（可取消） |
+| `PackagingStockInScreen` | 多个入库 | **A** | 批量入库并直接生成已打包 PKG |
+| `ItemsScreen` | **快递明细** | **A**（B 亦用） | 订单列表、打包快递、多选打印；目的站 **批量签收**（B） |
+| `PkgScreen` | **打包** | **A** | 已打包 PKG 列表、编辑/拆包/打印 |
+| `StockOutScreen` | **装车出库** | **A** | 选 PKG、选本段目的地、发车 |
+| `HubReceiveScreen` | **到站收货** | **B** | 扫 PKG/订单、确认到站、分拨、付车费 |
+| `ShipmentTrackScreen` | 在途追踪 | A/B | 发站/在途视角看在途包 |
+| `TrackExpressScreen` | 追踪快递 | B | 单笔查询 |
+| `MovementsScreen` | 流水 | A | 出入库流水 |
+| `CrossBorderFinanceScreen` | **跨境财务** | B | 站点账本/待入账/车费 |
+| `CameraScanScreen` | 通用扫码 | A/B | 系统相机权限 |
+| `SettingsScreen` | 设置 | — | 站点连接、语言、P203A 打印测试、版本支持、改密/退出 |
+| `ItemFormScreen` | 商品 | A | 编辑订单字段 |
+
+### 10.5 核心业务流程（A + B 串联）
 
 ```mermaid
 flowchart LR
@@ -756,16 +879,17 @@ flowchart LR
   H -->|其它站| J[释放中转 → 再打包 → 再装车]
 ```
 
-| 步骤 | 关键函数 / 文件 |
-|------|-----------------|
-| 入库 | `inventoryService.applyStockMovement`（type=in） |
-| 打包 | `createPackedShipment` → `inventory_create_packed_shipment` 事务 RPC |
-| 装车 | `applyTruckLoadOutbound` → `inventory_load_shipments` 事务 RPC |
-| 到站收包 | `trackingService.confirmPkgHubReceived` |
-| 到站收单 | `confirmOrderHubReceived` / `confirmOrderInPackById` |
-| 释放中转 | `releaseTransitOrdersAtHub` + `inventoryService.releaseHubTransitOrders` |
-| 列表读取 | `inventoryCloudStore` 45 秒内存缓存 → `inventoryCloudApi` |
-| 到站入库 | `importInboundPackToLocal`（历史命名，实际直接写 Supabase） |
+| 步骤 | 链路 | 关键函数 / 文件 |
+|------|------|-----------------|
+| 入库 | A | `inventoryService.applyStockMovement`（type=in） |
+| 多个入库 | A | `submitPackagingStockIn` → `inventory_packaging_stock_in_batch` |
+| 打包 | A | `createPackedShipment` → `inventory_create_packed_shipment` |
+| 装车 | A | `applyTruckLoadOutbound` → `inventory_load_shipments` |
+| 到站收包 | B | `trackingService.confirmPkgHubReceived` |
+| 到站收单 | B | `confirmOrderHubReceived` / `confirmOrderInPackById` |
+| 释放中转 | B | `releaseTransitOrdersAtHub` + `inventoryService.releaseHubTransitOrders` |
+| 列表读取 | A/B | `inventoryCloudStore` 45 秒内存缓存 → `inventoryCloudApi` |
+| 到站入库 | B | `importInboundPackToLocal`（历史命名，实际直接写 Supabase） |
 
 **核心写入事务**：
 1. `ensureInventoryCloudAuth()` 校验 JWT 与当前单设备 session
@@ -773,7 +897,7 @@ flowchart LR
 3. RPC 在单事务内更新库存、流水、PKG/订单追踪；重复请求返回同一结果
 4. 成功后清理 45 秒内存缓存，失败不保留半完成状态
 
-### 10.5 在线数据架构
+### 10.6 在线数据架构
 
 ```
 Inventory 页面 / 业务操作
@@ -784,7 +908,7 @@ inventoryService.ts → inventoryCloudApi.ts → Supabase inventory_*
 
 **单设备会话**：基础字段来自 `20260621120000_inventory_single_device_session`，强制 JWT session 绑定与密码哈希见 `20260716180000_inventory_auth_security_hardening`；`InventorySessionMonitor` 检测被踢下线。
 
-### 10.6 区域可见性（重要）
+### 10.7 区域可见性（重要）
 
 逻辑集中在 **`src/utils/expressDetailsVisibility.ts`** + **`packDisplayStatus.ts`**：
 
@@ -802,7 +926,7 @@ inventoryService.ts → inventoryCloudApi.ts → Supabase inventory_*
 
 **目的站集合**（仅最终目的地、非中转）：`YGN`、`TGI`（见 `DESTINATION_ONLY_HUBS`）。
 
-### 10.7 打包列表状态（`packDisplayStatus.ts`）
+### 10.8 打包列表状态（`packDisplayStatus.ts`）
 
 | display_status | 中文 | 条件概要 |
 |----------------|------|----------|
@@ -813,7 +937,7 @@ inventoryService.ts → inventoryCloudApi.ts → Supabase inventory_*
 
 云端追踪状态：`inventory_pkg_tracking.status` → `in_transit` | `hub_received` | `completed` | `split_at_hub` | `cancelled`。
 
-### 10.8 蓝牙标签打印（Xprinter P203A）
+### 10.9 蓝牙标签打印（Xprinter P203A）
 
 | 文件 | 职责 |
 |------|------|
@@ -825,7 +949,7 @@ inventoryService.ts → inventoryCloudApi.ts → Supabase inventory_*
 
 Settings 可选「蓝牙直连」模式；入库成功后可弹 `OrderBarcodeModal` 打印标签。
 
-### 10.10 目的站客户签收（v1.6+）
+### 10.10 目的站客户签收（v1.6+，**B 链路**）
 
 目的站将订单标记「已签收」前，弹出 **`CustomerSignFlowModal`** 采集签收留痕：
 
@@ -913,6 +1037,8 @@ eas build --platform android --profile apk
 ---
 
 ## 12. 中转物流业务流（MUSE → MDY → YGN）
+
+> **A / B 切开**：§10.2 — **A** 负责木姐入库→打包→装车发出；**B** 负责曼德勒到站分拨/车费→再装车，以及仰光到站签收。本节是 **A+B 串联** 的完整故事线。
 
 典型场景：木姐 **MUSE** 发站入库 → 打包 → 装车；经 **MDY** 中转 → 最终 **YGN** 目的。
 
@@ -1132,19 +1258,21 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 ## 18. 给 AI / 维护者的改代码提示
 
 1. **先确认业务线**：`inventory_*`/装车/到站 → Inventory App 或 Admin 跨境；跑腿单 → City + `packages`。
-2. **改路由**：后台 Router **v6**（`/admin/*`）；会员/商家 Web Router **v7**。
-3. **改 Inventory 区域可见性**：`expressDetailsVisibility.ts` → `listItems` / `listPackedShipments`。
-4. **改 Inventory 状态**：`packDisplayStatus.ts` + `trackingService`。
-5. **改 Inventory 在线读写/装车**：`inventoryService.ts` + `inventoryCloudApi.ts` + `trackingService.ts`，并检查 RLS migration。
-6. **改 Admin 跨境 UI/API**：`CrossBorderLogisticsPage.tsx` + `inventoryConsoleService.ts` + `netlify/functions/inventory-admin-*`。
-7. **改中转站账号**：Admin 跨境账号管理（**不要**在合伙店铺页创建 `transit_station`）。
-8. **改计费/商品审核/充值 QR**：只改 `/shared/src`，再 `npm run sync:shared`。
-9. **改 Supabase schema**：新增 migration，同步 §14.4；Inventory 需考虑 RLS 与断网失败处理。
-10. **Inventory EAS 发布**：改 `app.json` version/buildNumber + `eas build`；Support URL 保持可访问。
-11. **改打印**：`tsplLabelBuilder.ts` + `bluetoothThermalPrinter.ts` + `printerService.ts`。
-12. **勿提交** `.env`、keystore、`.temp/`、`upload-release.keystore`；仅用户要求时 commit。
-13. **改 Google Play 媒体权限**：client `app.json blockedPermissions` + `mediaAccess.ts` + `AndroidManifest.xml tools:node="remove"`。
-14. **改 Inventory 签收**：`CustomerSignFlowModal` + migration `20260720140000` + `markCustomerSigned`。
+2. **Inventory 先分 A / B（§10.2）**：**A** = 入库/多个入库/快递明细/打包/装车；**B** = 到站收货/付车费/释放中转/客户签收/跨境财务。改 A 勿动 B 的 `trackingService`，改 B 勿动 A 的 `createPackedShipment` / `applyTruckLoadOutbound`，除非明确跨边界 Bug。
+3. **改路由**：后台 Router **v6**（`/admin/*`）；会员/商家 Web Router **v7**。
+4. **改 Inventory 区域可见性**：`expressDetailsVisibility.ts` → `listItems` / `listPackedShipments`。
+5. **改 Inventory 状态**：`packDisplayStatus.ts` + `trackingService`。
+6. **改 Inventory A 侧读写（入库/打包/装车）**：`inventoryService.ts` + `inventoryCloudApi.ts` + `inventoryCloudStore.ts`，并检查 RLS migration（`DEPLOYMENT.md`）。
+7. **改 Inventory B 侧读写（到站/追踪/签收）**：`trackingService.ts` + `inventoryHubOps.ts` + `HubReceiveScreen.tsx`，并检查 `inventory_pkg_tracking` / `inventory_order_tracking` RLS。
+8. **改 Admin 跨境 UI/API**：`CrossBorderLogisticsPage.tsx` + `inventoryConsoleService.ts` + `netlify/functions/inventory-admin-*`。
+9. **改中转站账号**：Admin 跨境账号管理（**不要**在合伙店铺页创建 `transit_station`）。
+10. **改计费/商品审核/充值 QR**：只改 `/shared/src`，再 `npm run sync:shared`。
+11. **改 Supabase schema**：新增 migration，同步 §14.4；Inventory 需考虑 RLS 与断网失败处理。
+12. **Inventory EAS 发布**：改 `app.json` version/buildNumber + `eas build`；Support URL 保持可访问。
+13. **改打印**：`tsplLabelBuilder.ts` + `bluetoothThermalPrinter.ts` + `printerService.ts`。
+14. **勿提交** `.env`、keystore、`.temp/`、`upload-release.keystore`；仅用户要求时 commit。
+15. **改 Google Play 媒体权限**：client `app.json blockedPermissions` + `mediaAccess.ts` + `AndroidManifest.xml tools:node="remove"`。
+16. **改 Inventory B 签收**：`CustomerSignFlowModal` + migration `20260720140000` + `markCustomerSigned`。
 
 ---
 
@@ -1152,14 +1280,18 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 | 我想… | 先看 |
 |--------|------|
-| Inventory 订单列表过滤 | `expressDetailsVisibility.ts` → `inventoryService.listItems` |
-| Inventory PKG 列表 / 装车候选 | `packDisplayStatus.ts` → `listOutboundPackages` |
-| 装车在线写入 | `inventoryService.applyTruckLoadOutbound` |
-| 云端 RLS 错误识别 | `cloudAuthErrors.ts` → `trackingService.throwTrackingCloudWriteError` |
-| 到站收货 UI | `HubReceiveScreen.tsx`、`HubReceiveOrdersModal.tsx` |
-| 装车出库 UI | `StockOutScreen.tsx`、`applyTruckLoadOutbound` |
+| **Inventory A/B 职责划分** | **§10.2**（发站 vs 到站，改需求前必读） |
+| Inventory A：订单列表过滤 | `expressDetailsVisibility.ts` → `inventoryService.listItems` |
+| Inventory A：PKG 列表 / 装车候选 | `packDisplayStatus.ts` → `listOutboundPackages` |
+| Inventory A：装车在线写入 | `inventoryService.applyTruckLoadOutbound` |
+| Inventory A：多个入库 | `PackagingStockInScreen` → `submitPackagingStockIn` |
+| Inventory B：到站收货 UI | `HubReceiveScreen.tsx`、`HubReceiveOrdersModal.tsx` |
+| Inventory B：追踪 / 到站 RPC | `trackingService.ts` |
+| Inventory B：客户签收 | `CustomerSignFlowModal.tsx`、`customerBatchSign.ts`、`markCustomerSigned` |
+| Inventory B：车费 | `hubTransportFeeService.ts` |
+| Inventory 云端 RLS 错误识别 | `cloudAuthErrors.ts` → `trackingService.throwTrackingCloudWriteError` |
 | Inventory 云端 CRUD | `inventoryCloudApi.ts` |
-| 在途追踪读写 | `trackingService.ts` |
+| Inventory 内存缓存 | `inventoryCloudStore.ts` |
 | 蓝牙标签打印 | `printerService.ts`、`tsplLabelBuilder.ts` |
 | Admin 跨境控制台 | `CrossBorderLogisticsPage.tsx`、`inventoryConsoleService.ts` |
 | 跨境账号 CRUD | `CrossBorderAccountManagementModal.tsx`、`inventory-admin-update-account.js` |
@@ -1232,4 +1364,4 @@ cd ml-express-inventory-app && npm run typecheck
 
 ---
 
-*最后更新：2026-07-21 — 补充 §3.1 各子项目架构详解；同步 client 2.5.2 (66) Google Play 媒体权限、Inventory 1.6.0 (12) 客户签收、47 migrations、CI 门禁。*
+*最后更新：2026-08-02 — Inventory §10.2 明确 **A（发站：入库→客户/货物→装车）** 与 **B（到站：签收→车费→中转→客户签收）** 双线；A 基本完成、B 待系统测试。*
