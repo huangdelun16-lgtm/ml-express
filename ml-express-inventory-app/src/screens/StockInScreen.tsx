@@ -303,11 +303,12 @@ export default function StockInScreen({ route, navigation }: Props) {
     setTotalFeeManual(false);
   };
 
+  /** 财务/Admin 只认中文业务标签；多语言 UI 文案勿写入 note */
   const buildNote = () => {
     const parts: string[] = [];
-    if (totalFee.trim()) parts.push(`${t.stockIn.totalFee} ${totalFee.trim()} MMK`);
-    if (payCod) parts.push(t.stockIn.cod);
-    if (payPrepaid) parts.push(t.stockIn.prepaid);
+    if (totalFee.trim()) parts.push(`总费用 ${totalFee.trim()} MMK`);
+    if (payCod) parts.push('到付');
+    if (payPrepaid) parts.push('预付');
     if (note.trim()) parts.push(note.trim());
     return parts.join(' · ');
   };

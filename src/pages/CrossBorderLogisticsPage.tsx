@@ -438,10 +438,24 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const expensePagination = crossBorderFinance?.pagination;
   const expenseTotalItems = expensePagination?.totalItems ?? expenseSummary?.entryCount ?? 0;
 
-  const totalCustomerIncome = useMemo(
-    () => customerSummaries.reduce((sum, row) => sum + (row.totalFee || 0), 0),
-    [customerSummaries],
-  );
+  /** 总收入/总支出与下方「跨境财务」同源：全站汇总 */
+  const totalIncomeAllStations = useMemo(() => {
+    if (!expenseSummary) return null;
+    return (
+      (expenseSummary.collectedTotal ?? 0) +
+      (expenseSummary.pendingInflowTotal ?? 0) +
+      (expenseSummary.manualIncomeTotal ?? 0)
+    );
+  }, [expenseSummary]);
+
+  const totalExpenseAllStations = useMemo(() => {
+    if (!expenseSummary) return null;
+    return (
+      (expenseSummary.transportUnpaidTotal ?? 0) +
+      (expenseSummary.transportPaidTotal ?? 0) +
+      (expenseSummary.manualExpenseTotal ?? 0)
+    );
+  }, [expenseSummary]);
 
   const transitStores = data?.transitStores ?? [];
   const recentPacks = data?.recentPacks ?? [];
@@ -692,18 +706,18 @@ const CrossBorderLogisticsPage: React.FC = () => {
               {isEn ? 'Total income' : '总收入'}
             </h2>
             <p className="cbl-io-overview-card__amount">
-              {customersLoading && customerSummaries.length === 0 ? (
+              {financeLoading && totalIncomeAllStations == null ? (
                 <span className="cbl-dim">{isEn ? 'Loading…' : '加载中…'}</span>
               ) : (
                 <>
-                  {formatMmK(totalCustomerIncome)} <span>MMK</span>
+                  {formatMmK(totalIncomeAllStations ?? 0)} <span>MMK</span>
                 </>
               )}
             </p>
             <p className="cbl-io-overview-card__hint">
               {isEn
-                ? 'Sum of「Total fee」in Customer list (Inventory express details).'
-                : '汇总「客户信息」卡片中所有客户的总费用。'}
+                ? 'All stations · Collected + Pending inflow + Other income (same as「Cross-border finance」).'
+                : '所有站点合计 · 已收 + 待入账 + 其它收入（与下方「跨境财务」同源）。'}
             </p>
           </section>
           <section className="cbl-io-overview-card cbl-io-overview-card--out">
@@ -711,12 +725,18 @@ const CrossBorderLogisticsPage: React.FC = () => {
               {isEn ? 'Total expense' : '总支出'}
             </h2>
             <p className="cbl-io-overview-card__amount">
-              {formatMmK(data?.transportFeeTotal ?? 0)} <span>MMK</span>
+              {financeLoading && totalExpenseAllStations == null ? (
+                <span className="cbl-dim">{isEn ? 'Loading…' : '加载中…'}</span>
+              ) : (
+                <>
+                  {formatMmK(totalExpenseAllStations ?? 0)} <span>MMK</span>
+                </>
+              )}
             </p>
             <p className="cbl-io-overview-card__hint">
               {isEn
-                ? 'Registered truck fees in transport details. See「Cross-border finance」below for full expense ledger.'
-                : '运输明细登记的车费合计。完整开销明细见下方「跨境财务」。'}
+                ? 'All stations · Unpaid truck + Paid truck + Other expense (same as「Cross-border finance」).'
+                : '所有站点合计 · 待付车费 + 已付车费 + 其它支出（与下方「跨境财务」同源）。'}
             </p>
           </section>
         </div>
@@ -750,10 +770,24 @@ const CrossBorderLogisticsPage: React.FC = () => {
             <div className="cbl-expense-summary">
               <div className="cbl-expense-summary__item">
                 <span className="cbl-expense-summary__label">
+                  {isEn ? 'Pending inflow' : '待入账'}
+                </span>
+                <strong>{formatMmK(expenseSummary?.pendingInflowTotal ?? 0)}</strong>
+              </div>
+              <div className="cbl-expense-summary__item">
+                <span className="cbl-expense-summary__label">
                   {isEn ? 'Collected' : '已收'}
                 </span>
                 <strong className="cbl-expense-summary__in">
                   +{formatMmK(expenseSummary?.collectedTotal ?? 0)}
+                </strong>
+              </div>
+              <div className="cbl-expense-summary__item">
+                <span className="cbl-expense-summary__label">
+                  {isEn ? 'Other income' : '其它收入'}
+                </span>
+                <strong className="cbl-expense-summary__in">
+                  +{formatMmK(expenseSummary?.manualIncomeTotal ?? 0)}
                 </strong>
               </div>
               <div className="cbl-expense-summary__item">
@@ -767,20 +801,6 @@ const CrossBorderLogisticsPage: React.FC = () => {
                   {isEn ? 'Truck · paid' : '已付车费'}
                 </span>
                 <strong>{formatMmK(expenseSummary?.transportPaidTotal ?? 0)}</strong>
-              </div>
-              <div className="cbl-expense-summary__item">
-                <span className="cbl-expense-summary__label">
-                  {isEn ? 'Pending inflow' : '待入账'}
-                </span>
-                <strong>{formatMmK(expenseSummary?.pendingInflowTotal ?? 0)}</strong>
-              </div>
-              <div className="cbl-expense-summary__item">
-                <span className="cbl-expense-summary__label">
-                  {isEn ? 'Other income' : '其它收入'}
-                </span>
-                <strong className="cbl-expense-summary__in">
-                  +{formatMmK(expenseSummary?.manualIncomeTotal ?? 0)}
-                </strong>
               </div>
               <div className="cbl-expense-summary__item">
                 <span className="cbl-expense-summary__label">
@@ -873,7 +893,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
           <section className="cbl-card">
             <div className="cbl-card__head">
               <h2 className="cbl-card__title">
-                {isEn ? 'Transit stations' : '中转站'}
+                {isEn ? 'Station details' : '站点明细'}
               </h2>
               <div className="cbl-card__head-actions">
                 {financeLoading ? (

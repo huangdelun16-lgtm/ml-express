@@ -17,6 +17,7 @@ const HUB_BY_REGION = {
   naypyidaw: 'NPW',
   taunggyi: 'TGI',
   lashio: 'LSO',
+  ruili: 'RUI',
 };
 
 function hubCodeForRegion(regionId) {
@@ -32,6 +33,16 @@ function parseAmount(raw) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizePaymentLabel(raw) {
+  const p = String(raw || '').trim();
+  if (!p) return undefined;
+  const lower = p.toLowerCase();
+  if (p === '到付' || lower === 'cod') return '到付';
+  if (p === '预付' || lower === 'prepaid' || p === 'ကြိုပေးချေ') return '预付';
+  return p;
+}
+
+/** 与 Inventory App inboundMovementNote / financeLedgerAggregate 同源（中/英/缅） */
 function parseInboundMovementNote(note) {
   const trimmed = String(note || '').trim();
   if (!trimmed) return {};
@@ -39,16 +50,113 @@ function parseInboundMovementNote(note) {
   let totalFee;
   let paymentLabel;
   for (const part of parts) {
-    const feeMatch = part.match(/^总费用\s+([\d.]+)\s*MMK$/i);
+    const feeMatch = part.match(/^(?:总费用|Total fee|ပို့ဆောင်ခ)\s+([\d.]+)\s*MMK$/i);
     if (feeMatch) {
       totalFee = feeMatch[1];
       continue;
     }
-    if (part === '到付' || part === '预付') {
-      paymentLabel = part;
+    const normalized = normalizePaymentLabel(part);
+    if (normalized === '到付' || normalized === '预付') {
+      paymentLabel = normalized;
     }
   }
   return { totalFee, paymentLabel };
+}
+
+function parsePackagingStockInLineBarcode(barcode) {
+  const trimmed = String(barcode || '').trim();
+  const match = trimmed.match(/^(.+)\((\d+)-(\d+)\)$/);
+  if (!match) return null;
+  const total = Number(match[2]);
+  const index = Number(match[3]);
+  if (!Number.isFinite(total) || !Number.isFinite(index) || total < 1 || index < 1 || index > total) {
+    return null;
+  }
+  return { base: match[1], total, index };
+}
+
+function extractPackedBundleFromNote(note) {
+  const match = String(note || '').match(/打包入\s+([A-Z0-9()_-]+)/i);
+  return match?.[1]?.trim().toUpperCase() || '';
+}
+
+function enrichInboundNoteWithPackFee(note, packedBundleBarcode, packNotesByBarcode, packFeeAssigned) {
+  const trimmed = String(note || '').trim();
+  const parsed = parseInboundMovementNote(trimmed);
+  if (parsed.totalFee) return trimmed;
+  const bundle =
+    String(packedBundleBarcode || '').trim().toUpperCase() ||
+    extractPackedBundleFromNote(trimmed) ||
+    '';
+  if (!bundle || !packNotesByBarcode) return trimmed;
+  const packNote = packNotesByBarcode[bundle];
+  if (!packNote) return trimmed;
+  const packParsed = parseInboundMovementNote(packNote);
+  if (!packParsed.totalFee) return trimmed;
+  if (packFeeAssigned && packFeeAssigned.has(bundle)) {
+    if (parsed.paymentLabel || !packParsed.paymentLabel) return trimmed;
+    return trimmed ? `${packParsed.paymentLabel} · ${trimmed}` : packParsed.paymentLabel;
+  }
+  if (packFeeAssigned) packFeeAssigned.add(bundle);
+  const feePart = `总费用 ${packParsed.totalFee} MMK`;
+  if (!trimmed) {
+    return packParsed.paymentLabel ? `${feePart} · ${packParsed.paymentLabel}` : feePart;
+  }
+  return `${feePart} · ${trimmed}`;
+}
+
+function collapsePackagingStockInOrderEntries(entries) {
+  const groups = new Map();
+  const rest = [];
+  for (const entry of entries) {
+    const isOrder =
+      entry.category === 'order_prepaid' ||
+      entry.category === 'order_collected' ||
+      entry.category === 'order_income_cod';
+    const parsed = isOrder ? parsePackagingStockInLineBarcode(entry.barcode) : null;
+    if (!parsed) {
+      rest.push(entry);
+      continue;
+    }
+    const list = groups.get(parsed.base) || [];
+    list.push(entry);
+    groups.set(parsed.base, list);
+  }
+  for (const [base, list] of groups.entries()) {
+    const amount = Math.max(0, ...list.map((row) => Number(row.amount) || 0));
+    const anyCollected = list.some((row) => row.category === 'order_collected');
+    const anyPrepaid = list.some((row) => row.category === 'order_prepaid');
+    const category = anyCollected
+      ? 'order_collected'
+      : anyPrepaid
+        ? 'order_prepaid'
+        : 'order_income_cod';
+    const primary =
+      list.find((row) => parsePackagingStockInLineBarcode(row.barcode)?.index === 1) || list[0];
+    const title =
+      category === 'order_prepaid'
+        ? '订单 · 已付款'
+        : category === 'order_collected'
+          ? '订单收入 · 已签收收款'
+          : '订单收入 · 到付待收';
+    rest.push({
+      ...primary,
+      id: `order:pack:${base}`,
+      category,
+      title,
+      amount,
+      amountDisplay:
+        amount > 0
+          ? `+${formatMmk(amount)}`
+          : category === 'order_collected'
+            ? '已收款'
+            : category === 'order_prepaid'
+              ? '已付款'
+              : '到付待收',
+      barcode: primary.barcode || `${base}(1-1)`,
+    });
+  }
+  return rest;
 }
 
 function normalizeOwnerKey(key) {
@@ -56,9 +164,11 @@ function normalizeOwnerKey(key) {
   if (!code) return '';
   if (code.startsWith('ADMIN')) return 'ADMIN';
   if (code.startsWith('MUSE') || code === 'MSE' || code === 'MUS') return 'MUSE';
+  if (code.startsWith('RUILI') || code === 'RUI') return 'RUILI';
   const letters = code.replace(/[0-9]/g, '');
   const token = letters.length >= 3 ? letters.slice(0, 3) : code.slice(0, 3);
   if (token === 'MSE' || token === 'MUS') return 'MUSE';
+  if (token === 'RUI') return 'RUILI';
   return token;
 }
 
@@ -67,8 +177,10 @@ function normalizeDestinationCode(code) {
   if (!raw) return '';
   const museAliases = ['MSE', 'MUS', 'MUSE'];
   if (museAliases.includes(raw) || raw.startsWith('MUSE')) return 'MSE';
+  if (raw === 'RUI' || raw.startsWith('RUILI')) return 'RUI';
   const key = normalizeOwnerKey(raw);
   if (key === 'MUSE') return 'MSE';
+  if (key === 'RUILI') return 'RUI';
   return key || raw.slice(0, 3);
 }
 
@@ -113,8 +225,22 @@ function ownershipLabelFromKey(key) {
 }
 
 function buildOrderLedgerEntry(params) {
-  const { movement, finalDestination, customerSigned, customerName, occurredAt } = params;
-  const parsed = parseInboundMovementNote(movement.note);
+  const {
+    movement,
+    finalDestination,
+    customerSigned,
+    customerName,
+    occurredAt,
+    packedBundleBarcode,
+    packNotesByBarcode,
+  } = params;
+  const enrichedNote = enrichInboundNoteWithPackFee(
+    movement.note,
+    packedBundleBarcode || extractPackedBundleFromNote(String(movement.note || '')),
+    packNotesByBarcode,
+    params.packFeeAssigned,
+  );
+  const parsed = parseInboundMovementNote(enrichedNote);
   const fee = parseAmount(parsed.totalFee);
   const payment = parsed.paymentLabel || '';
   const dest = finalDestination || movement.destination || '';
@@ -197,14 +323,26 @@ function buildOrderLedgerEntry(params) {
   return null;
 }
 
-function buildLocalOriginInboundEntry(movement, storeCode) {
+function buildLocalOriginInboundEntry(
+  movement,
+  storeCode,
+  packedBundleBarcode,
+  packNotesByBarcode,
+  packFeeAssigned,
+) {
   const currentKey = ownershipKeyFromStoreCode(storeCode);
   const originKey = String(movement.origin_store_code || '').trim()
     ? ownershipKeyFromStoreCode(movement.origin_store_code)
     : currentKey;
   if (originKey !== currentKey) return null;
 
-  const parsed = parseInboundMovementNote(movement.note);
+  const enrichedNote = enrichInboundNoteWithPackFee(
+    movement.note,
+    packedBundleBarcode || extractPackedBundleFromNote(String(movement.note || '')),
+    packNotesByBarcode,
+    packFeeAssigned,
+  );
+  const parsed = parseInboundMovementNote(enrichedNote);
   const fee = parseAmount(parsed.totalFee);
   const payment = parsed.paymentLabel || '';
   const dest = String(movement.destination || '').trim();
@@ -762,11 +900,27 @@ function buildAllFinanceEntries(store, dataset) {
   ];
   const tripGroupMap = buildTripFeeGroupMap(tripSourceRows);
 
-  for (const row of dataset.movements) {
+  const packNotesByBarcode = dataset.packNotesByBarcode || {};
+  const packFeeAssigned = new Set();
+
+  const inboundRows = (dataset.movements || [])
+    .filter((row) => !String(row.barcode || '').toUpperCase().startsWith('PKG'))
+    .slice()
+    .sort((a, b) =>
+      String(a.barcode || '')
+        .toUpperCase()
+        .localeCompare(String(b.barcode || '').toUpperCase()),
+    );
+
+  for (const row of inboundRows) {
     const barcode = String(row.barcode || '').toUpperCase();
-    if (barcode.startsWith('PKG')) continue;
 
     const item = row.item || {};
+    const packedBundle = String(
+      item.packed_bundle_barcode || extractPackedBundleFromNote(String(row.note || '')),
+    )
+      .trim()
+      .toUpperCase();
     const movement = {
       note: row.note,
       destination: row.destination,
@@ -788,6 +942,9 @@ function buildAllFinanceEntries(store, dataset) {
         customerSigned,
         customerName,
         occurredAt: row.created_at,
+        packedBundleBarcode: packedBundle,
+        packNotesByBarcode,
+        packFeeAssigned,
       });
       if (entry && !orderSeen.has(barcode)) {
         orderSeen.add(barcode);
@@ -796,7 +953,13 @@ function buildAllFinanceEntries(store, dataset) {
       continue;
     }
 
-    const originEntry = buildLocalOriginInboundEntry(movement, storeCode);
+    const originEntry = buildLocalOriginInboundEntry(
+      movement,
+      storeCode,
+      packedBundle,
+      packNotesByBarcode,
+      packFeeAssigned,
+    );
     if (originEntry && !orderSeen.has(barcode)) {
       orderSeen.add(barcode);
       entries.push(originEntry);
@@ -897,12 +1060,20 @@ function buildAllFinanceEntries(store, dataset) {
       const localItem = dataset.itemsByBarcode[orderBarcode];
       const customerSigned = Boolean(String(localItem?.customer_signed_at || '').trim());
 
+      const packedBundle = String(
+        localItem?.packed_bundle_barcode || pkg.pack_barcode || '',
+      )
+        .trim()
+        .toUpperCase();
       const entry = buildOrderLedgerEntry({
         movement: pseudoMovement,
         finalDestination: orderDest,
         customerSigned,
         customerName: order.recipient_name,
         occurredAt: order.inbound_at,
+        packedBundleBarcode: packedBundle,
+        packNotesByBarcode,
+        packFeeAssigned,
       });
       if (entry) {
         orderSeen.add(orderBarcode);
@@ -917,8 +1088,21 @@ function buildAllFinanceEntries(store, dataset) {
     entries.push(buildStockOpEntry(row));
   }
 
-  entries.sort((a, b) => new Date(b.occurredAt || 0).getTime() - new Date(a.occurredAt || 0).getTime());
-  return entries;
+  const orderEntries = entries.filter(
+    (e) =>
+      e.category === 'order_prepaid' ||
+      e.category === 'order_collected' ||
+      e.category === 'order_income_cod',
+  );
+  const otherEntries = entries.filter(
+    (e) =>
+      e.category !== 'order_prepaid' &&
+      e.category !== 'order_collected' &&
+      e.category !== 'order_income_cod',
+  );
+  const merged = [...collapsePackagingStockInOrderEntries(orderEntries), ...otherEntries];
+  merged.sort((a, b) => new Date(b.occurredAt || 0).getTime() - new Date(a.occurredAt || 0).getTime());
+  return merged;
 }
 
 function computeFinanceFromCachedEntries(store, allEntries, financeEntries) {
@@ -1015,6 +1199,40 @@ function pushQueryWarning(warnings, label, error) {
   }
 }
 
+async function fetchAllRows(supabase, table, select, options = {}) {
+  const pageSize = options.pageSize || 500;
+  const maxPages = options.maxPages || 40;
+  const rows = [];
+  for (let page = 0; page < maxPages; page += 1) {
+    const from = page * pageSize;
+    let query = supabase.from(table).select(select).range(from, from + pageSize - 1);
+    if (options.eq) {
+      for (const [key, value] of Object.entries(options.eq)) {
+        query = query.eq(key, value);
+      }
+    }
+    if (options.in) {
+      for (const [key, value] of Object.entries(options.in)) {
+        query = query.in(key, value);
+      }
+    }
+    if (options.order) {
+      for (const ord of options.order) {
+        query = query.order(ord.column, {
+          ascending: Boolean(ord.ascending),
+          nullsFirst: ord.nullsFirst,
+        });
+      }
+    }
+    const { data, error } = await query;
+    if (error) return { data: rows, error };
+    const pageRows = data || [];
+    rows.push(...pageRows);
+    if (pageRows.length < pageSize) return { data: rows, error: null };
+  }
+  return { data: rows, error: null };
+}
+
 async function loadFinanceDataset(supabase) {
   const warnings = [];
 
@@ -1027,48 +1245,71 @@ async function loadFinanceDataset(supabase) {
     transportPayResult,
     manualResult,
   ] = await Promise.all([
-    supabase
-      .from('inventory_stock_movements')
-      .select(
-        'id, barcode, type, note, destination, origin_store_code, recipient_name, item_name, created_at, item:inventory_store_items!inner(final_destination, recipient_name, customer_signed_at, barcode)',
-      )
-      .eq('type', 'in')
-      .order('created_at', { ascending: false })
-      .limit(800),
-    supabase
-      .from('inventory_stock_movements')
-      .select(
-        'id, type, note, barcode, item_name, qty, operator, destination, origin_store_name, created_at',
-      )
-      .order('created_at', { ascending: false })
-      .limit(120),
-    supabase
-      .from('inventory_pkg_tracking')
-      .select(
-        'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, trip_number, truck_loaded_at, updated_at, status',
-      )
-      .in('status', ['in_transit', 'hub_received', 'completed', 'split_at_hub']),
-    supabase
-      .from('inventory_order_tracking')
-      .select(
-        'pack_barcode, order_barcode, order_name, destination_code, inbound_note, inbound_at, recipient_name',
-      )
-      .order('inbound_at', { ascending: false })
-      .limit(2000),
-    supabase
-      .from('inventory_packed_shipments')
-      .select(
-        'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, trip_number, loaded_at, item:inventory_store_items(qty_on_hand)',
-      )
-      .order('created_at', { ascending: false })
-      .limit(400),
+    fetchAllRows(
+      supabase,
+      'inventory_stock_movements',
+      'id, barcode, type, note, destination, origin_store_code, recipient_name, item_name, created_at, item:inventory_store_items!inner(final_destination, recipient_name, customer_signed_at, barcode, packed_bundle_barcode)',
+      {
+        eq: { type: 'in' },
+        order: [{ column: 'created_at', ascending: false }],
+        pageSize: 500,
+        maxPages: 40,
+      },
+    ),
+    fetchAllRows(
+      supabase,
+      'inventory_stock_movements',
+      'id, type, note, barcode, item_name, qty, operator, destination, origin_store_name, created_at',
+      {
+        order: [{ column: 'created_at', ascending: false }],
+        pageSize: 200,
+        maxPages: 10,
+      },
+    ),
+    fetchAllRows(
+      supabase,
+      'inventory_pkg_tracking',
+      'pack_barcode, pack_name, origin_store_code, origin_store_name, destination_code, leg_destination_code, transport_fee, trip_number, truck_loaded_at, updated_at, status',
+      {
+        in: { status: ['in_transit', 'hub_received', 'completed', 'split_at_hub'] },
+        pageSize: 500,
+        maxPages: 20,
+      },
+    ),
+    fetchAllRows(
+      supabase,
+      'inventory_order_tracking',
+      'pack_barcode, order_barcode, order_name, destination_code, inbound_note, inbound_at, recipient_name',
+      {
+        order: [{ column: 'inbound_at', ascending: false }],
+        pageSize: 500,
+        maxPages: 40,
+      },
+    ),
+    fetchAllRows(
+      supabase,
+      'inventory_packed_shipments',
+      'bundle_barcode, bundle_name, owner_store_code, transport_fee, truck_leg_destination, trip_number, loaded_at, note, item:inventory_store_items(qty_on_hand)',
+      {
+        order: [{ column: 'created_at', ascending: false }],
+        pageSize: 400,
+        maxPages: 20,
+      },
+    ),
     supabase.from('inventory_hub_transport_fee_payments').select('pack_barcode'),
-    supabase
-      .from('cross_border_manual_entries')
-      .select('id, entry_date, kind, amount, currency, category, note, created_by, created_at')
-      .order('entry_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(500),
+    fetchAllRows(
+      supabase,
+      'cross_border_manual_entries',
+      'id, entry_date, kind, amount, currency, category, note, created_by, created_at',
+      {
+        order: [
+          { column: 'entry_date', ascending: false },
+          { column: 'created_at', ascending: false },
+        ],
+        pageSize: 250,
+        maxPages: 10,
+      },
+    ),
   ]);
 
   pushQueryWarning(warnings, '财务流水读取失败', movementsResult.error);
@@ -1103,19 +1344,28 @@ async function loadFinanceDataset(supabase) {
   }
 
   let itemsByBarcode = {};
-  if (itemBarcodes.size > 0) {
+  const barcodeList = [...itemBarcodes];
+  for (let i = 0; i < barcodeList.length; i += 200) {
+    const chunk = barcodeList.slice(i, i + 200);
     const { data: itemRows, error: itemErr } = await supabase
       .from('inventory_store_items')
-      .select('barcode, customer_signed_at')
-      .in('barcode', [...itemBarcodes]);
+      .select('barcode, customer_signed_at, packed_bundle_barcode')
+      .in('barcode', chunk);
 
     if (itemErr) {
       warnings.push(`订单签收状态读取失败：${itemErr.message}`);
-    } else {
-      for (const item of itemRows || []) {
-        itemsByBarcode[String(item.barcode).toUpperCase()] = item;
-      }
+      break;
     }
+    for (const item of itemRows || []) {
+      itemsByBarcode[String(item.barcode).toUpperCase()] = item;
+    }
+  }
+
+  const packNotesByBarcode = {};
+  for (const row of packedResult.data || []) {
+    const code = String(row.bundle_barcode || '').trim().toUpperCase();
+    const note = String(row.note || '').trim();
+    if (code && note) packNotesByBarcode[code] = note;
   }
 
   return {
@@ -1128,6 +1378,7 @@ async function loadFinanceDataset(supabase) {
       itemsByBarcode,
       transportPaidBarcodes,
       manualEntries,
+      packNotesByBarcode,
     },
     warnings,
   };

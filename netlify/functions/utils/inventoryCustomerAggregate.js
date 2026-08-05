@@ -182,6 +182,101 @@ function mergeInvoiceParsed(movementNote, trackingNote) {
   };
 }
 
+function parsePackagingStockInLineBarcode(barcode) {
+  const trimmed = String(barcode || '').trim();
+  const match = trimmed.match(/^(.+)\((\d+)-(\d+)\)$/);
+  if (!match) return null;
+  const total = Number(match[2]);
+  const index = Number(match[3]);
+  if (!Number.isFinite(total) || !Number.isFinite(index) || total < 1 || index < 1 || index > total) {
+    return null;
+  }
+  return { base: match[1], total, index };
+}
+
+function isPackagingStockInPackNote(note) {
+  const text = String(note || '');
+  return (
+    text.includes('多个入库') ||
+    text.includes('Multiple stock in') ||
+    text.includes('အစုလိုက်စာရင်းသွင်း')
+  );
+}
+
+function extractPackedBundleFromNote(note) {
+  const match = String(note || '').match(/打包入\s+([A-Z0-9()_-]+)/i);
+  return match?.[1]?.trim().toUpperCase() || '';
+}
+
+/**
+ * 多个入库总费用：从包 note 补齐，并按包/基础入库号去重（整包只计一次）。
+ * 避免「总收入」= 行数 × 包费用。
+ */
+function applyPackFeeDedup(rows, packNotesByBarcode) {
+  const sorted = rows.slice().sort((a, b) =>
+    String(a.inboundBarcode || '')
+      .toUpperCase()
+      .localeCompare(String(b.inboundBarcode || '').toUpperCase()),
+  );
+  const packFeeAssigned = new Set();
+
+  for (const row of sorted) {
+    const bundle =
+      String(row.packedBundleBarcode || '').trim().toUpperCase() ||
+      extractPackedBundleFromNote(String(row.inboundNote || ''));
+    if (!bundle) continue;
+
+    const packNote = packNotesByBarcode[bundle] || '';
+    const packParsed = parseInboundMovementNote(packNote);
+    const packFee = parseAmount(packParsed.totalFee);
+    const isPackaging = isPackagingStockInPackNote(packNote) || Boolean(packFee);
+
+    if (row.fee <= 0 && packFee > 0 && !packFeeAssigned.has(bundle)) {
+      row.fee = packFee;
+      if (!row.paymentLabel && packParsed.paymentLabel) {
+        row.paymentLabel = packParsed.paymentLabel;
+        row.paymentStatus = derivePaymentStatus(packParsed.paymentLabel, row.customerSigned);
+      }
+      packFeeAssigned.add(bundle);
+      continue;
+    }
+
+    if (!isPackaging) continue;
+
+    // 同行已有费用：同包后续行清零，避免总收入翻倍
+    if (packFeeAssigned.has(bundle)) {
+      if (row.fee > 0 && (packFee <= 0 || row.fee === packFee)) {
+        row.fee = 0;
+      }
+    } else if (row.fee > 0) {
+      packFeeAssigned.add(bundle);
+    }
+  }
+
+  // (3-n) 新格式：同一基础入库号只保留最大费用一次
+  const byBase = new Map();
+  for (const row of sorted) {
+    const parsed = parsePackagingStockInLineBarcode(row.inboundBarcode);
+    if (!parsed) continue;
+    const list = byBase.get(parsed.base) || [];
+    list.push(row);
+    byBase.set(parsed.base, list);
+  }
+  for (const [, list] of byBase.entries()) {
+    const maxFee = Math.max(0, ...list.map((r) => Number(r.fee) || 0));
+    list.sort(
+      (a, b) =>
+        (parsePackagingStockInLineBarcode(a.inboundBarcode)?.index || 99) -
+        (parsePackagingStockInLineBarcode(b.inboundBarcode)?.index || 99),
+    );
+    list.forEach((row, idx) => {
+      row.fee = idx === 0 ? maxFee : 0;
+    });
+  }
+
+  return rows;
+}
+
 function buildExpressItemRow(item, inbound, trackingNote) {
   const merged = mergeInvoiceParsed(inbound?.note, trackingNote);
   const customerName =
@@ -200,6 +295,7 @@ function buildExpressItemRow(item, inbound, trackingNote) {
   const qty = inbound ? Number(inbound.qty) || 1 : Number(item.qty_on_hand) || 1;
   const fee = parseAmount(merged.totalFee);
   const customerSigned = isCustomerSignedItem(item);
+  const packedBundleBarcode = String(item.packed_bundle_barcode || '').trim().toUpperCase();
 
   return {
     id: item.id,
@@ -210,6 +306,8 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     productName: String(item.name || '').trim() || '—',
     expressBarcode: String(item.input_barcode || '').trim() || '—',
     inboundBarcode: String(item.barcode || '').trim(),
+    inboundNote: String(inbound?.note || '').trim(),
+    packedBundleBarcode,
     packaging: String(inbound?.packaging || '').trim() || '—',
     origin: originStoreCode,
     destination: destination || '—',
@@ -217,6 +315,7 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     weightKg: parseWeightKg(item.weight),
     qty,
     fee,
+    customerSigned,
     paymentStatus: derivePaymentStatus(merged.paymentLabel, customerSigned),
     packageStatus: derivePackageStatus(item),
     transportStatus: deriveTransportStatus(item, inbound, destination),
@@ -290,6 +389,33 @@ async function loadExpressItemsDataset(supabase) {
     }
   }
 
+  const packBarcodes = [
+    ...new Set(
+      itemList
+        .map((item) => String(item.packed_bundle_barcode || '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  const packNotesByBarcode = {};
+  if (packBarcodes.length > 0) {
+    for (let i = 0; i < packBarcodes.length; i += 100) {
+      const chunk = packBarcodes.slice(i, i + 100);
+      const { data: packRows, error: packErr } = await supabase
+        .from('inventory_packed_shipments')
+        .select('bundle_barcode, note')
+        .in('bundle_barcode', chunk);
+      if (packErr) {
+        warnings.push(`快递包备注读取失败：${packErr.message}`);
+        break;
+      }
+      for (const row of packRows || []) {
+        const code = String(row.bundle_barcode || '').trim().toUpperCase();
+        const note = String(row.note || '').trim();
+        if (code && note) packNotesByBarcode[code] = note;
+      }
+    }
+  }
+
   const rows = [];
   for (const item of itemList) {
     const inbound = pickInboundMovement(inboundByItem[item.id]);
@@ -297,6 +423,8 @@ async function loadExpressItemsDataset(supabase) {
     const barcode = String(item.barcode || '').trim();
     rows.push(buildExpressItemRow(item, inbound, trackingNoteByBarcode[barcode]));
   }
+
+  applyPackFeeDedup(rows, packNotesByBarcode);
 
   return { rows, warnings };
 }
@@ -404,4 +532,5 @@ module.exports = {
   fetchCustomerItems,
   customerKey,
   aggregateCustomerSummaries,
+  applyPackFeeDedup,
 };

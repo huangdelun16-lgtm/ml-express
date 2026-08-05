@@ -154,7 +154,9 @@ async function loadFinanceDataset(
       (from, to) =>
         supabase
           .from('inventory_store_items')
-          .select('id, barcode, final_destination, recipient_name, customer_signed_at')
+          .select(
+            'id, barcode, final_destination, recipient_name, customer_signed_at, packed_bundle_barcode',
+          )
           .or(itemScope)
           .order('updated_at', { ascending: false })
           .range(from, to),
@@ -191,6 +193,31 @@ async function loadFinanceDataset(
   const paidTransportBarcodes = new Set(
     paidRows.map((row) => safeCode(String(row.pack_barcode || ''))),
   );
+
+  const packBarcodes = [
+    ...new Set(
+      items
+        .map((item) => safeCode(String(item.packed_bundle_barcode || '')))
+        .filter(Boolean),
+    ),
+  ];
+  const packNotesByBarcode: Record<string, string> = {};
+  if (packBarcodes.length > 0) {
+    for (let index = 0; index < packBarcodes.length; index += 100) {
+      const chunk = packBarcodes.slice(index, index + 100);
+      const { data, error } = await supabase
+        .from('inventory_packed_shipments')
+        .select('bundle_barcode, note')
+        .in('bundle_barcode', chunk);
+      throwQueryError('快递包备注读取失败', error);
+      for (const row of data ?? []) {
+        const code = safeCode(String((row as { bundle_barcode?: string }).bundle_barcode || ''));
+        const note = String((row as { note?: string }).note || '').trim();
+        if (code && note) packNotesByBarcode[code] = note;
+      }
+    }
+  }
+
   return {
     items,
     movements,
@@ -198,6 +225,7 @@ async function loadFinanceDataset(
     orders,
     paidTransportBarcodes,
     manualEntries,
+    packNotesByBarcode,
   };
 }
 

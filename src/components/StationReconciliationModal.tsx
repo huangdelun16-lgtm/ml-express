@@ -190,7 +190,7 @@ const StationReconciliationModal: React.FC<Props> = ({ open, onClose, store }) =
                 {store.store_code} · {store.store_name}
               </h2>
               <p className="cbl-customer-modal__phone">
-                {isEn ? 'Station reconciliation statement' : '中转站对账单'}
+                {isEn ? 'Station reconciliation statement' : '站点对账单'}
               </p>
             </div>
           </div>

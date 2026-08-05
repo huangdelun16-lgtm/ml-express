@@ -1,5 +1,10 @@
 import type { FinanceLedgerEntry, FinanceLedgerSummary } from '../types/financeLedger';
 import { destinationCodesMatch, normalizeDestinationCode } from './destinationCode';
+import {
+  normalizePaymentLabel,
+  parseInboundMovementNote,
+} from './inboundMovementNote';
+import { parsePackagingStockInLineBarcode } from './inboundBarcode';
 import { ownershipKeyFromStoreCode } from './storeOwnership';
 import {
   buildCrossBorderFinanceSummary,
@@ -17,6 +22,7 @@ export type FinanceItemRow = {
   final_destination?: string | null;
   recipient_name?: string | null;
   customer_signed_at?: string | null;
+  packed_bundle_barcode?: string | null;
 };
 
 export type FinanceMovementRow = {
@@ -76,6 +82,8 @@ export type FinanceDataset = {
   orders: FinanceOrderRow[];
   paidTransportBarcodes: Set<string>;
   manualEntries: FinanceManualRow[];
+  /** 快递包 note（多个入库总费用写在包备注上） */
+  packNotesByBarcode?: Record<string, string>;
 };
 
 export function parseFinanceAmount(raw: unknown): number {
@@ -88,19 +96,53 @@ export function parseInboundFinanceNote(note: unknown): {
   totalFee?: string;
   paymentLabel?: '预付' | '到付';
 } {
-  const parts = String(note ?? '')
-    .trim()
-    .split(' · ')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  let totalFee: string | undefined;
-  let paymentLabel: '预付' | '到付' | undefined;
-  for (const part of parts) {
-    const fee = part.match(/^总费用\s+([\d.]+)\s*MMK$/i);
-    if (fee) totalFee = fee[1];
-    if (part === '预付' || part === '到付') paymentLabel = part;
+  const parsed = parseInboundMovementNote(String(note ?? ''));
+  const payment = normalizePaymentLabel(parsed.paymentLabel);
+  return {
+    totalFee: parsed.totalFee,
+    paymentLabel: payment === '预付' || payment === '到付' ? payment : undefined,
+  };
+}
+
+function extractPackedBundleFromNote(note: string): string {
+  const match = String(note || '').match(/打包入\s+([A-Z0-9()_-]+)/i);
+  return match?.[1]?.trim().toUpperCase() || '';
+}
+
+/** 行 note 缺总费用时，从多个入库快递包 note 补齐（同一包仅允许补一次，避免重复计入） */
+export function enrichInboundNoteWithPackFee(
+  note: string,
+  packedBundleBarcode: string | undefined,
+  packNotesByBarcode: Record<string, string> | undefined,
+  packFeeAssigned?: Set<string>,
+): string {
+  const trimmed = String(note || '').trim();
+  const parsed = parseInboundFinanceNote(trimmed);
+  if (parsed.totalFee) return trimmed;
+
+  const bundle =
+    String(packedBundleBarcode || '').trim().toUpperCase() ||
+    extractPackedBundleFromNote(trimmed) ||
+    '';
+  if (!bundle || !packNotesByBarcode) return trimmed;
+
+  const packNote = packNotesByBarcode[bundle];
+  if (!packNote) return trimmed;
+  const packParsed = parseInboundFinanceNote(packNote);
+  if (!packParsed.totalFee) return trimmed;
+
+  if (packFeeAssigned?.has(bundle)) {
+    // 同包其它行只补付款方式，不重复补金额
+    if (parsed.paymentLabel || !packParsed.paymentLabel) return trimmed;
+    return trimmed ? `${packParsed.paymentLabel} · ${trimmed}` : packParsed.paymentLabel;
   }
-  return { totalFee, paymentLabel };
+  packFeeAssigned?.add(bundle);
+
+  const feePart = `总费用 ${packParsed.totalFee} MMK`;
+  if (!trimmed) {
+    return packParsed.paymentLabel ? `${feePart} · ${packParsed.paymentLabel}` : feePart;
+  }
+  return `${feePart} · ${trimmed}`;
 }
 
 function formatMmk(amount: number): string {
@@ -115,8 +157,16 @@ function orderEntry(
   movement: FinanceMovementRow,
   item: FinanceItemRow | undefined,
   currentKey: string,
+  packNotesByBarcode?: Record<string, string>,
+  packFeeAssigned?: Set<string>,
 ): FinanceLedgerEntry | null {
-  const parsed = parseInboundFinanceNote(movement.note);
+  const enrichedNote = enrichInboundNoteWithPackFee(
+    String(movement.note || ''),
+    item?.packed_bundle_barcode || undefined,
+    packNotesByBarcode,
+    packFeeAssigned,
+  );
+  const parsed = parseInboundFinanceNote(enrichedNote);
   const amount = parseFinanceAmount(parsed.totalFee);
   const destination = String(item?.final_destination || movement.destination || '').trim();
   const originKey = ownershipKeyFromStoreCode(movement.origin_store_code || '') || currentKey;
@@ -208,6 +258,68 @@ function manualEntry(row: FinanceManualRow): FinanceLedgerEntry {
   };
 }
 
+/** 多个入库共享总费用：同一基础入库号只计一次（取最大金额；任一行签收即已收） */
+export function collapsePackagingStockInOrderEntries(
+  entries: FinanceLedgerEntry[],
+): FinanceLedgerEntry[] {
+  const groups = new Map<string, FinanceLedgerEntry[]>();
+  const rest: FinanceLedgerEntry[] = [];
+
+  for (const entry of entries) {
+    const isOrder =
+      entry.category === 'order_prepaid' ||
+      entry.category === 'order_collected' ||
+      entry.category === 'order_income_cod';
+    const parsed = isOrder ? parsePackagingStockInLineBarcode(entry.barcode) : null;
+    if (!parsed) {
+      rest.push(entry);
+      continue;
+    }
+    const list = groups.get(parsed.base) ?? [];
+    list.push(entry);
+    groups.set(parsed.base, list);
+  }
+
+  for (const [base, list] of groups) {
+    const amount = Math.max(0, ...list.map((row) => Number(row.amount) || 0));
+    const anyCollected = list.some((row) => row.category === 'order_collected');
+    const anyPrepaid = list.some((row) => row.category === 'order_prepaid');
+    const category = anyCollected
+      ? 'order_collected'
+      : anyPrepaid
+        ? 'order_prepaid'
+        : 'order_income_cod';
+    const primary =
+      list.find((row) => parsePackagingStockInLineBarcode(row.barcode)?.index === 1) ?? list[0];
+    const title =
+      category === 'order_prepaid'
+        ? '订单 · 已付款'
+        : category === 'order_collected'
+          ? '订单收入 · 已签收收款'
+          : '订单收入 · 到付待收';
+    rest.push({
+      ...primary,
+      id: `order:pack:${base}`,
+      category,
+      title,
+      amount,
+      amountDisplay:
+        amount > 0
+          ? category === 'order_prepaid'
+            ? `+${formatMmk(amount)}`
+            : `+${formatMmk(amount)}`
+          : category === 'order_collected'
+            ? '已收款'
+            : category === 'order_prepaid'
+              ? '已付款'
+              : '到付待收',
+      barcode: primary.barcode || `${base}(1-1)`,
+    });
+  }
+
+  return rest;
+}
+
 export function buildFinanceLedgerEntries(
   storeCode: string,
   hubCode: string,
@@ -220,12 +332,27 @@ export function buildFinanceLedgerEntries(
   );
   const entries: FinanceLedgerEntry[] = [];
   const orderSeen = new Set<string>();
+  const packNotes = dataset.packNotesByBarcode ?? {};
+  const packFeeAssigned = new Set<string>();
 
-  for (const movement of dataset.movements) {
+  // 先按条码排序，保证同包「补费用」落在稳定的第一行
+  const inboundMovements = dataset.movements
+    .filter((movement) => {
+      const barcode = String(movement.barcode || '').trim().toUpperCase();
+      return movement.type === 'in' && !barcode.startsWith('PKG');
+    })
+    .slice()
+    .sort((a, b) =>
+      String(a.barcode || '')
+        .trim()
+        .toUpperCase()
+        .localeCompare(String(b.barcode || '').trim().toUpperCase()),
+    );
+
+  for (const movement of inboundMovements) {
     const barcode = String(movement.barcode || '').trim().toUpperCase();
-    if (movement.type !== 'in' || barcode.startsWith('PKG')) continue;
     const item = (movement.item_id && itemById.get(movement.item_id)) || itemByBarcode.get(barcode);
-    const entry = orderEntry(movement, item, currentKey);
+    const entry = orderEntry(movement, item, currentKey, packNotes, packFeeAssigned);
     if (entry && !orderSeen.has(barcode)) {
       orderSeen.add(barcode);
       entries.push(entry);
@@ -242,6 +369,7 @@ export function buildFinanceLedgerEntries(
     if (!pkg) continue;
     const destination = String(order.destination_code || '').trim();
     if (destination && !destinationCodesMatch(destination, hubCode)) continue;
+    const item = itemByBarcode.get(barcode);
     const pseudoMovement: FinanceMovementRow = {
       id: `cloud:${barcode}`,
       barcode: order.order_barcode,
@@ -254,12 +382,29 @@ export function buildFinanceLedgerEntries(
       recipient_name: order.recipient_name,
       created_at: order.inbound_at,
     };
-    const entry = orderEntry(pseudoMovement, itemByBarcode.get(barcode), currentKey);
+    const entry = orderEntry(pseudoMovement, item, currentKey, packNotes, packFeeAssigned);
     if (entry) {
       orderSeen.add(barcode);
       entries.push({ ...entry, id: `cloud:${entry.id}` });
     }
   }
+
+  const collapsedOrders = collapsePackagingStockInOrderEntries(
+    entries.filter(
+      (entry) =>
+        entry.category === 'order_prepaid' ||
+        entry.category === 'order_collected' ||
+        entry.category === 'order_income_cod',
+    ),
+  );
+  const nonOrderEntries = entries.filter(
+    (entry) =>
+      entry.category !== 'order_prepaid' &&
+      entry.category !== 'order_collected' &&
+      entry.category !== 'order_income_cod',
+  );
+  entries.length = 0;
+  entries.push(...collapsedOrders, ...nonOrderEntries);
 
   const transportSeen = new Set<string>();
   const transportTripSeen = new Set<string>();

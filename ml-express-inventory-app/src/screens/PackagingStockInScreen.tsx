@@ -319,10 +319,12 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     }
   };
 
+  /** 财务/Admin 只认中文业务标签；多语言 UI 文案勿写入 note */
   const buildLineNote = () => {
     const parts: string[] = [];
-    if (payCod) parts.push(t.stockIn.cod);
-    if (payPrepaid) parts.push(t.stockIn.prepaid);
+    if (grandTotalFee > 0) parts.push(`总费用 ${grandTotalFee} MMK`);
+    if (payCod) parts.push('到付');
+    if (payPrepaid) parts.push('预付');
     if (batchNote.trim()) parts.push(batchNote.trim());
     parts.push(`${t.packagingStockIn.packDateLabel} ${packDate}`);
     return parts.join(' · ');

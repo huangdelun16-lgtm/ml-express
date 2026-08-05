@@ -151,6 +151,126 @@ describe('buildFinanceLedgerEntries', () => {
   });
 });
 
+describe('packaging stock-in finance', () => {
+  it('解析英文 Total fee / COD，并从包 note 补总费用（同包只计一次）', () => {
+    const entries = buildFinanceLedgerEntries(
+      'MUSE001',
+      'MSE',
+      dataset({
+        items: [
+          {
+            id: 'i1',
+            barcode: 'MDY131412040826(3-1)',
+            final_destination: 'MDY',
+            packed_bundle_barcode: 'RUI26MDY30006',
+          },
+          {
+            id: 'i2',
+            barcode: 'MDY131412040826(3-2)',
+            final_destination: 'MDY',
+            packed_bundle_barcode: 'RUI26MDY30006',
+          },
+          {
+            id: 'i3',
+            barcode: 'MDY131412040826(3-3)',
+            final_destination: 'MDY',
+            packed_bundle_barcode: 'RUI26MDY30006',
+          },
+        ],
+        movements: [
+          {
+            id: 'm1',
+            item_id: 'i1',
+            barcode: 'MDY131412040826(3-1)',
+            type: 'in',
+            note: 'Prepaid · 打包入 RUI26MDY30006',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+          {
+            id: 'm2',
+            item_id: 'i2',
+            barcode: 'MDY131412040826(3-2)',
+            type: 'in',
+            note: 'Prepaid · 打包入 RUI26MDY30006',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+          {
+            id: 'm3',
+            item_id: 'i3',
+            barcode: 'MDY131412040826(3-3)',
+            type: 'in',
+            note: 'Prepaid · 打包入 RUI26MDY30006',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+        ],
+        packNotesByBarcode: {
+          RUI26MDY30006: '多个入库 · 总费用 50000 MMK · 09',
+        },
+      }),
+    );
+    const finance = filterCrossBorderFinanceEntries(entries);
+    const prepaid = finance.filter((entry) => entry.category === 'order_prepaid');
+    expect(prepaid).toHaveLength(1);
+    expect(prepaid[0].amount).toBe(50000);
+
+    const summary = buildFinanceLedgerSummary(finance, 'MUSE001', 'MSE', true);
+    expect(summary.collectedTotal).toBe(50000);
+  });
+
+  it('新多个入库行 note 含总费用时按 (3-n) 去重', () => {
+    const entries = buildFinanceLedgerEntries(
+      'MUSE001',
+      'MSE',
+      dataset({
+        items: [
+          { id: 'i1', barcode: 'MDY1(3-1)', final_destination: 'MDY' },
+          { id: 'i2', barcode: 'MDY1(3-2)', final_destination: 'MDY' },
+          { id: 'i3', barcode: 'MDY1(3-3)', final_destination: 'MDY' },
+        ],
+        movements: [
+          {
+            id: 'm1',
+            item_id: 'i1',
+            barcode: 'MDY1(3-1)',
+            type: 'in',
+            note: '总费用 90000 MMK · 预付',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+          {
+            id: 'm2',
+            item_id: 'i2',
+            barcode: 'MDY1(3-2)',
+            type: 'in',
+            note: '总费用 90000 MMK · 预付',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+          {
+            id: 'm3',
+            item_id: 'i3',
+            barcode: 'MDY1(3-3)',
+            type: 'in',
+            note: '总费用 90000 MMK · 预付',
+            destination: 'MDY',
+            origin_store_code: 'MUSE001',
+          },
+        ],
+      }),
+    );
+    const summary = buildFinanceLedgerSummary(
+      filterCrossBorderFinanceEntries(entries),
+      'MUSE001',
+      'MSE',
+      true,
+    );
+    expect(summary.collectedTotal).toBe(90000);
+  });
+});
+
 describe('filterCrossBorderFinanceEntries', () => {
   it('排除库存操作和发站 outbound 车费', () => {
     const base: Omit<FinanceLedgerEntry, 'id' | 'category'> = {
