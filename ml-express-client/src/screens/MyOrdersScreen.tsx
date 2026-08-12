@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Alert, ActivityIndicator, DeviceEventEmitter, Image, Vibration, Animated, Modal, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, RefreshControl, Dimensions, Alert, ActivityIndicator, DeviceEventEmitter, Image, Vibration, Animated, Modal, TextInput, Platform, ListRenderItem } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,12 +8,10 @@ import { packageService, supabase, reviewService } from '../services/supabase';
 import { chatService } from '../services/chatService';
 import LoggerService from '../services/LoggerService';
 import { useApp } from '../contexts/AppContext';
-import { useLoading } from '../contexts/LoadingContext';
-import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
+import { feedbackService } from '../services/FeedbackService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
-import PackingModal from '../components/PackingModal';
 import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -55,7 +53,6 @@ interface Order {
 
 export default function MyOrdersScreen({ navigation, route }: any) {
   const { language } = useApp();
-  const { showLoading, hideLoading } = useLoading();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   // 从路由参数中获取筛选状态，默认为'all'
@@ -63,21 +60,11 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
-  const [userType, setUserType] = useState<'customer' | 'merchant'>('customer');
   
   // 筛选卡片的位置记录
   const filterCardPositions = useRef<{[key: string]: number}>({});
   // ScrollView引用
   const scrollViewRef = useRef<ScrollView>(null);
-  
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
-
-  // 打包模态框状态
-  const [showPackingModal, setShowPackingModal] = useState(false);
-  const [packingOrderData, setPackingOrderData] = useState<Order | null>(null);
 
   // 🚀 评价：已读 store_reviews 的订单；自动弹窗关闭时写入 reviewPromptStorage
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
@@ -235,11 +222,11 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   const t = translations[language] || translations.zh;
 
-  // 显示Toast
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    if (type === 'success') feedbackService.success(message);
+    else if (type === 'error') feedbackService.error(message);
+    else if (type === 'warning') feedbackService.warning(message);
+    else feedbackService.info(message);
   };
 
   // 状态过滤器
@@ -299,7 +286,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   /** 有未评价的已送达/已完成单时，进入页面后自动弹评价（关闭=不再自动打扰，仍可从列表手动点「评价」） */
   useFocusEffect(
     useCallback(() => {
-      if (userType !== 'customer' || loading || !customerId) {
+      if (loading || !customerId) {
         return () => {};
       }
       const t = setTimeout(() => {
@@ -321,7 +308,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         })();
       }, 500);
       return () => clearTimeout(t);
-    }, [userType, customerId, loading])
+    }, [customerId, loading])
   );
 
   // 打开评价弹窗时解析店铺名（delivery_stores）
@@ -406,16 +393,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     try {
       const userData = await AsyncStorage.getItem('currentUser');
       const isGuest = await AsyncStorage.getItem('isGuest');
-      const storedUserType = await AsyncStorage.getItem('userType');
       
       if (userData) {
         const user = JSON.parse(userData);
         setCustomerId(user.id);
-        
-        // 检测用户类型：优先使用 AsyncStorage 中的 userType，否则从 user 对象中读取
-        const detectedUserType = storedUserType || user.user_type || 'customer';
-        const finalUserType = detectedUserType === 'merchant' ? 'merchant' : 'customer';
-        setUserType(finalUserType);
         
         // 如果是访客，不加载订单
         if (isGuest === 'true' || user.id === 'guest') {
@@ -423,7 +404,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           setOrders([]);
           setFilteredOrders([]);
         } else {
-          loadOrders(user.id, finalUserType);
+          loadOrders(user.id);
         }
       } else {
         // 没有用户信息，跳转登录
@@ -440,7 +421,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 加载订单
-  const loadOrders = async (userId: string, type: 'customer' | 'merchant' = 'customer') => {
+  const loadOrders = async (userId: string) => {
     try {
       setLoading(true);
       
@@ -450,19 +431,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       const userEmail = await AsyncStorage.getItem('userEmail');
       const userPhone = await AsyncStorage.getItem('userPhone');
       
-      // 如果是商家，获取店铺名称用于匹配 sender_name（兼容旧数据）
-      let storeName: string | undefined;
-      if (type === 'merchant') {
-        const userName = await AsyncStorage.getItem('userName');
-        if (userName) {
-          storeName = userName;
-        }
-      }
-      
-      // 传递 userType、storeName、email 和 phone 参数，让 getAllOrders 知道如何查询订单
       const { orders: data } = await packageService.getAllOrders(userId, {
-        userType: type,
-        storeName: storeName,
+        userType: 'customer',
         email: userEmail || user?.email,
         phone: userPhone || user?.phone
       });
@@ -512,9 +482,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const onRefresh = useCallback(async () => {
     if (!customerId) return;
     setRefreshing(true);
-    await loadOrders(customerId, userType);
+    await loadOrders(customerId);
     setRefreshing(false);
-  }, [customerId, userType]);
+  }, [customerId]);
 
   // 过滤订单
   const filterOrders = (orderList: Order[], status: string) => {
@@ -706,65 +676,139 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         throw new Error('Submit failed');
       }
     } catch (error) {
-      Alert.alert('错误', '提交评价失败');
+      feedbackService.error(language === 'zh' ? '提交评价失败' : 'Failed to submit review');
     } finally {
       setIsSubmittingReview(false);
     }
   };
 
-  // 🚀 新增：商家接单
-  const handleMerchantAccept = async (orderId: string, paymentMethod: string) => {
-    try {
-      showLoading(language === 'zh' ? '正在接单...' : 'Accepting...', 'package');
-      const newStatus = '打包中'; // 🚀 改为打包中
-      
-      const { error } = await supabase
-        .from('packages')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', orderId);
+  const renderOrderItem: ListRenderItem<Order> = ({ item: order }) => (
+            <TouchableOpacity
+              style={[
+                styles.orderCard,
+                unreadCounts[order.id] > 0 && styles.unreadOrderCard
+              ]}
+              onPress={() => handleViewDetail(order.id)}
+              activeOpacity={0.7}
+            >
+              {/* 🚀 新增：卡片右上角消息提醒 */}
+              {unreadCounts[order.id] > 0 && (
+                <View style={styles.cardUnreadBadge}>
+                  <Text style={styles.cardUnreadBadgeText}>💬 {unreadCounts[order.id]}</Text>
+                </View>
+              )}
+              {/* 订单头部 */}
+              <View style={styles.orderHeader}>
+                <View style={styles.orderHeaderLeft}>
+                  <Text style={styles.orderIdBadge}>#{order.id.slice(-6).toUpperCase()}</Text>
+                  <Text style={styles.orderPackageType}>{getPackageTypeTranslation(order.package_type)}</Text>
+                  <Text style={styles.orderWeight}>{order.weight}</Text>
+                </View>
+                <View style={[styles.orderStatus, { backgroundColor: getStatusColor(order.status) }]}>
+                  <Text style={styles.orderStatusText}>{getStatusTranslation(order.status)}</Text>
+                </View>
+              </View>
+              {(() => {
+                const appLang: AppLang =
+                  language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
+                return (
+                  <Text style={styles.orderJourneyHint} numberOfLines={2}>
+                    {getOrderListJourneyHint(order.status, appLang)}
+                  </Text>
+                );
+              })()}
 
-      if (error) throw error;
-      
-      showToast(language === 'zh' ? '接单成功，请打包' : 'Accepted, please pack', 'success');
-      onRefresh();
-    } catch (error) {
-      Alert.alert('错误', '接单失败');
-    } finally {
-      hideLoading();
-    }
-  };
+              {/* 寄件人信息 */}
+              <View style={styles.orderInfo}>
+                <View style={styles.orderInfoRow}>
+                  <Text style={styles.orderInfoIcon}>📤</Text>
+                  <Text style={styles.orderInfoLabel}>{t.sender}:</Text>
+                  <Text style={styles.orderInfoValue}>{order.sender_name}</Text>
+                  <Text style={styles.orderInfoPhone}>{order.sender_phone}</Text>
+                </View>
+                <View style={styles.orderInfoRow}>
+                  <Text style={styles.orderInfoIcon}>📍</Text>
+                  <Text style={styles.orderInfoAddress} numberOfLines={1}>
+                    {order.sender_address}
+                  </Text>
+                  {order.sender_latitude && order.sender_longitude && (
+                    <Text style={styles.orderInfoCoords}>
+                      ({order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)})
+                    </Text>
+                  )}
+                </View>
+              </View>
 
-  // 🚀 新增：商家拒绝
-  const handleMerchantDecline = async (orderId: string) => {
-    Alert.alert(
-      language === 'zh' ? '拒绝订单' : 'Decline Order',
-      language === 'zh' ? '确定要拒绝并取消此订单吗？' : 'Decline and cancel this order?',
-      [
-        { text: t.cancel, style: 'cancel' },
-        { 
-          text: t.confirm, 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              showLoading(language === 'zh' ? '正在取消...' : 'Cancelling...', 'package');
-              const { error } = await supabase
-                .from('packages')
-                .update({ status: '已取消', updated_at: new Date().toISOString() })
-                .eq('id', orderId);
+              {/* 收件人信息 */}
+              <View style={styles.orderInfo}>
+                <View style={styles.orderInfoRow}>
+                  <Text style={styles.orderInfoIcon}>👤</Text>
+                  <Text style={styles.orderInfoLabel}>{t.receiver}:</Text>
+                  <Text style={styles.orderInfoValue}>{order.receiver_name}</Text>
+                  <Text style={styles.orderInfoPhone}>{order.receiver_phone}</Text>
+                </View>
+                <View style={styles.orderInfoRow}>
+                  <Text style={styles.orderInfoIcon}>📍</Text>
+                  <Text style={styles.orderInfoAddress} numberOfLines={1}>
+                    {order.receiver_address}
+                  </Text>
+                  {order.receiver_latitude && order.receiver_longitude && (
+                    <Text style={styles.orderInfoCoords}>
+                      ({order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)})
+                    </Text>
+                  )}
+                </View>
+              </View>
 
-              if (error) throw error;
-              showToast(language === 'zh' ? '订单已拒绝' : 'Declined', 'info');
-              onRefresh();
-            } catch (error) {
-              Alert.alert('错误', '操作失败');
-            } finally {
-              hideLoading();
-            }
-          }
-        }
-      ]
-    );
-  };
+              {/* 配送员信息（如有） */}
+              {order.courier && (
+                <View style={styles.orderCourier}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <Text style={styles.orderCourierIcon}>🏍️</Text>
+                    <Text style={styles.orderCourierText}>
+                      {t.courier}: {order.courier}
+                    </Text>
+                  </View>
+                  {/* 🚀 新增：配送员小框里的消息提示 */}
+                  {unreadCounts[order.id] > 0 && (
+                    <View style={styles.courierUnreadContainer}>
+                      <Ionicons name="chatbubble-ellipses" size={14} color="#3b82f6" />
+                      <Text style={styles.courierUnreadText}>{language === 'zh' ? '新消息' : 'New Msg'}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* 订单底部 */}
+              <View style={styles.orderFooter}>
+                <View style={styles.orderFooterLeft}>
+                  <Text style={styles.orderPrice}>{order.price} MMK</Text>
+                  <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <TouchableOpacity
+                    style={styles.detailButton}
+                    onPress={() => handleViewDetail(order.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.detailButtonText}>{t.detail}</Text>
+                    <Text style={styles.detailButtonIcon}>→</Text>
+                  </TouchableOpacity>
+                  
+                  {/* 🚀 新增：评价按钮 */}
+                  {(order.status === '已送达' || order.status === '已完成') && !reviewedOrderIds.has(order.id) && (
+                    <TouchableOpacity
+                      style={[styles.detailButton, { backgroundColor: '#fbbf24', marginLeft: 8 }]}
+                      onPress={() => handleOpenReviewModal(order)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.detailButtonText, { color: '#ffffff' }]}>⭐ {t.rate}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </TouchableOpacity>
+  );
 
   if (loading && !refreshing) {
     return (
@@ -820,15 +864,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           backgroundColor: 'rgba(255, 255, 255, 0.05)',
           zIndex: 0
         }} />
-
-        {/* Toast通知 */}
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        duration={3000}
-        onHide={() => setToastVisible(false)}
-      />
 
       <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
         <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
@@ -939,14 +974,20 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       </View>
 
       {/* 订单列表 */}
-      <ScrollView
+      <FlatList
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, filteredOrders.length === 0 && { flexGrow: 1 }]}
+        data={filteredOrders}
+        keyExtractor={(item) => item.id}
+        renderItem={renderOrderItem}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
         }
-      >
-        {filteredOrders.length === 0 ? (
+        ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📦</Text>
             <Text style={styles.emptyText}>{t.noOrders}</Text>
@@ -968,225 +1009,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        ) : (
-          filteredOrders.map((order) => (
-            <TouchableOpacity
-              key={order.id}
-              style={[
-                styles.orderCard,
-                unreadCounts[order.id] > 0 && styles.unreadOrderCard
-              ]}
-              onPress={() => handleViewDetail(order.id)}
-              activeOpacity={0.7}
-            >
-              {/* 🚀 新增：卡片右上角消息提醒 */}
-              {unreadCounts[order.id] > 0 && (
-                <View style={styles.cardUnreadBadge}>
-                  <Text style={styles.cardUnreadBadgeText}>💬 {unreadCounts[order.id]}</Text>
-                </View>
-              )}
-              {/* 订单头部 */}
-              <View style={styles.orderHeader}>
-                <View style={styles.orderHeaderLeft}>
-                  <Text style={styles.orderIdBadge}>#{order.id.slice(-6).toUpperCase()}</Text>
-                  <Text style={styles.orderPackageType}>{getPackageTypeTranslation(order.package_type)}</Text>
-                  <Text style={styles.orderWeight}>{order.weight}</Text>
-                </View>
-                <View style={[styles.orderStatus, { backgroundColor: getStatusColor(order.status) }]}>
-                  <Text style={styles.orderStatusText}>{getStatusTranslation(order.status)}</Text>
-                </View>
-              </View>
-              {(() => {
-                const appLang: AppLang =
-                  language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
-                return (
-                  <Text style={styles.orderJourneyHint} numberOfLines={2}>
-                    {getOrderListJourneyHint(order.status, appLang)}
-                  </Text>
-                );
-              })()}
-
-              {/* 寄件人信息 */}
-              <View style={styles.orderInfo}>
-                <View style={styles.orderInfoRow}>
-                  <Text style={styles.orderInfoIcon}>📤</Text>
-                  <Text style={styles.orderInfoLabel}>{t.sender}:</Text>
-                  <Text style={styles.orderInfoValue}>{order.sender_name}</Text>
-                  <Text style={styles.orderInfoPhone}>{order.sender_phone}</Text>
-                </View>
-                <View style={styles.orderInfoRow}>
-                  <Text style={styles.orderInfoIcon}>📍</Text>
-                  <Text style={styles.orderInfoAddress} numberOfLines={1}>
-                    {order.sender_address}
-                  </Text>
-                  {order.sender_latitude && order.sender_longitude && (
-                    <Text style={styles.orderInfoCoords}>
-                      ({order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)})
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* 收件人信息 */}
-              <View style={styles.orderInfo}>
-                <View style={styles.orderInfoRow}>
-                  <Text style={styles.orderInfoIcon}>👤</Text>
-                  <Text style={styles.orderInfoLabel}>{t.receiver}:</Text>
-                  <Text style={styles.orderInfoValue}>{order.receiver_name}</Text>
-                  <Text style={styles.orderInfoPhone}>{order.receiver_phone}</Text>
-                </View>
-                <View style={styles.orderInfoRow}>
-                  <Text style={styles.orderInfoIcon}>📍</Text>
-                  <Text style={styles.orderInfoAddress} numberOfLines={1}>
-                    {order.receiver_address}
-                  </Text>
-                  {order.receiver_latitude && order.receiver_longitude && (
-                    <Text style={styles.orderInfoCoords}>
-                      ({order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)})
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* 配送员信息（如有） */}
-              {order.courier && (
-                <View style={styles.orderCourier}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <Text style={styles.orderCourierIcon}>🏍️</Text>
-                    <Text style={styles.orderCourierText}>
-                      {t.courier}: {order.courier}
-                    </Text>
-                  </View>
-                  {/* 🚀 新增：配送员小框里的消息提示 */}
-                  {unreadCounts[order.id] > 0 && (
-                    <View style={styles.courierUnreadContainer}>
-                      <Ionicons name="chatbubble-ellipses" size={14} color="#3b82f6" />
-                      <Text style={styles.courierUnreadText}>{language === 'zh' ? '新消息' : 'New Msg'}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* 订单底部 */}
-              <View style={styles.orderFooter}>
-                <View style={styles.orderFooterLeft}>
-                  {userType === 'merchant' ? (
-                    <View>
-                      <Text style={[styles.orderInfoLabel, {marginBottom: 4}]}>
-                        {t.deliveryFee}: <Text style={{color: '#1e293b', fontWeight: '600'}}>{order.price} MMK</Text>
-                      </Text>
-                      <Text style={[styles.orderInfoLabel, {marginBottom: 4}]}>
-                        {t.cod}: <Text style={{color: '#1e293b', fontWeight: '600'}}>{Number(order.cod_amount || 0) > 0 ? `${order.cod_amount} MMK` : t.none}</Text>
-                      </Text>
-                      <Text style={styles.orderPrice}>
-                        {t.totalAmount}: {(parseFloat(order.price?.replace(/[^\d.]/g, '') || '0') + Number(order.cod_amount || 0)).toLocaleString()} MMK
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.orderPrice}>{order.price} MMK</Text>
-                  )}
-                  <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <TouchableOpacity
-                    style={styles.detailButton}
-                    onPress={() => handleViewDetail(order.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.detailButtonText}>{t.detail}</Text>
-                    <Text style={styles.detailButtonIcon}>→</Text>
-                  </TouchableOpacity>
-                  
-                  {/* 🚀 新增：评价按钮 */}
-                  {userType !== 'merchant' && (order.status === '已送达' || order.status === '已完成') && !reviewedOrderIds.has(order.id) && (
-                    <TouchableOpacity
-                      style={[styles.detailButton, { backgroundColor: '#fbbf24', marginLeft: 8 }]}
-                      onPress={() => handleOpenReviewModal(order)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.detailButtonText, { color: '#ffffff' }]}>⭐ {t.rate}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* 🚀 新增：商家快捷接单/取消按钮 */}
-              {userType === 'merchant' && order.status === '待确认' && (
-                <View style={styles.merchantsActionRow}>
-                  <TouchableOpacity 
-                    style={[styles.merchantsButton, styles.merchantsDeclineButton]}
-                    onPress={() => handleMerchantDecline(order.id)}
-                  >
-                    <Ionicons name="close-circle-outline" size={18} color="#ef4444" />
-                    <Text style={styles.merchantsDeclineText}>{language === 'zh' ? '拒绝' : 'Decline'}</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={[styles.merchantsButton, styles.merchantsAcceptButton]}
-                    onPress={() => handleMerchantAccept(order.id, order.payment_method || 'cash')}
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={18} color="white" />
-                    <Text style={styles.merchantsAcceptText}>{language === 'zh' ? '接单' : 'Accept'}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* 🚀 新增：商家打包完成按钮 */}
-              {userType === 'merchant' && order.status === '打包中' && (
-                <View style={styles.merchantsActionRow}>
-                  <TouchableOpacity 
-                    style={[styles.merchantsButton, styles.merchantsAcceptButton, { backgroundColor: '#10b981' }]}
-                    onPress={() => {
-                      setPackingOrderData(order);
-                      setShowPackingModal(true);
-                    }}
-                  >
-                    <Ionicons name="cube-outline" size={18} color="white" />
-                    <Text style={styles.merchantsAcceptText}>{language === 'zh' ? '开始打包' : 'Start Packing'}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))
-        )}
-
-        <View style={{ height: 20 }} />
-      </ScrollView>
-
-      {/* 🚀 打包核对单 Modal */}
-      <PackingModal
-        visible={showPackingModal}
-        orderData={packingOrderData}
-        language={language}
-        onClose={() => {
-          setShowPackingModal(false);
-          setPackingOrderData(null);
-        }}
-        onComplete={async () => {
-          if (!packingOrderData) return;
-          try {
-            showLoading(language === 'zh' ? '提交中...' : 'Processing...', 'package');
-            const newStatus = packingOrderData.payment_method === 'cash' ? '待收款' : '待取件';
-            const { error } = await supabase
-              .from('packages')
-              .update({ status: newStatus, updated_at: new Date().toISOString() })
-              .eq('id', packingOrderData.id);
-
-            if (error) throw error;
-            
-            showToast(language === 'zh' ? '打包完成' : 'Packing Done', 'success');
-            setShowPackingModal(false);
-            setPackingOrderData(null);
-            
-            // 发送全局通知，刷新其他页面的状态
-            DeviceEventEmitter.emit('order_status_updated');
-            onRefresh();
-          } catch (error) {
-            Alert.alert('错误', '提交失败，请重试');
-          } finally {
-            hideLoading();
-          }
-        }}
+        }
+        ListFooterComponent={<View style={{ height: 20 }} />}
       />
 
       {/* 🚀 新增：评价弹窗 */}
@@ -1746,42 +1570,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2563eb',
     fontWeight: 'bold',
-  },
-  // 🚀 新增：商家动作行
-  merchantsActionRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  merchantsButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 6,
-  },
-  merchantsAcceptButton: {
-    backgroundColor: '#10b981',
-  },
-  merchantsDeclineButton: {
-    backgroundColor: '#fff1f2',
-    borderWidth: 1,
-    borderColor: '#fecdd3',
-  },
-  merchantsAcceptText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  merchantsDeclineText: {
-    color: '#ef4444',
-    fontWeight: 'bold',
-    fontSize: 14,
   },
   // 🚀 新增评价 Modal 样式
   modalOverlay: {

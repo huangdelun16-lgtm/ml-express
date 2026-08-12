@@ -41,6 +41,7 @@ export default function LoginScreen({ navigation }: any) {
       languageBurmese: 'မြန်မာ',
       browseGuest: '暂不登录，先逛逛',
       browseGuestHint: '可浏览商城与追踪订单，下单需登录',
+      merchantAppHint: '商家请使用「MARKET LINK MERCHANT」App 登录店铺',
     },
     en: {
       welcome: 'Welcome Back',
@@ -63,6 +64,7 @@ export default function LoginScreen({ navigation }: any) {
       languageBurmese: 'မြန်မာ',
       browseGuest: 'Browse without signing in',
       browseGuestHint: 'Browse the mall and track orders; sign in to place orders',
+      merchantAppHint: 'Store owners: please use the MARKET LINK MERCHANT app',
     },
     my: {
       welcome: 'ပြန်လည်ကြိုဆိုပါတယ်',
@@ -85,6 +87,7 @@ export default function LoginScreen({ navigation }: any) {
       languageBurmese: 'မြန်မာ',
       browseGuest: 'မဝင်ဘဲ အရင်လှည့်ကြည့်မည်',
       browseGuestHint: 'ဈေးဝယ်စင်တာနှင့် အော်ဒါခြေရာခံနိုင်သည်၊ အော်ဒါတင်ရန် ဝင်ရောက်ရမည်',
+      merchantAppHint: 'ဆိုင်ပိုင်ရှင်များ MARKET LINK MERCHANT App ကို သုံးပါ',
     },
   };
 
@@ -262,6 +265,8 @@ export default function LoginScreen({ navigation }: any) {
                 {currentT.noAccount} <Text style={styles.registerHighlight}>{currentT.register}</Text>
               </Text>
             </TouchableOpacity>
+
+            <Text style={styles.merchantHint}>{currentT.merchantAppHint}</Text>
           </View>
         </ScrollView>
       </LinearGradient>
@@ -457,5 +462,13 @@ const styles = StyleSheet.create({
   registerHighlight: {
     color: '#2563EB',
     fontWeight: 'bold',
+  },
+  merchantHint: {
+    marginTop: 16,
+    color: '#94a3b8',
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 8,
   },
 });

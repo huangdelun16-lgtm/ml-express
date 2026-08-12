@@ -7,8 +7,6 @@ import {
   Text, 
   TouchableOpacity, 
   Platform,
-  DeviceEventEmitter,
-  Vibration,
   Image
 } from 'react-native';
 
@@ -25,13 +23,12 @@ import {
 } from '@expo-google-fonts/noto-sans-myanmar';
 import Constants from 'expo-constants';
 import NotificationService from './src/services/notificationService';
-import { AppProvider, useApp } from './src/contexts/AppContext';
+import { AppProvider } from './src/contexts/AppContext';
 import { LoadingProvider } from './src/contexts/LoadingContext';
 import { CartProvider } from './src/contexts/CartContext';
 import { ErrorBoundary } from './src/components/ErrorHandler';
 import NetworkStatus from './src/components/NetworkStatus';
 import { GlobalToast } from './src/components/GlobalToast';
-import { OrderAlertModal } from './src/components/OrderAlertModal';
 
 // 引入所有页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -79,15 +76,6 @@ import { analytics, EventType } from './src/services/AnalyticsService';
 import { supabase } from './src/services/supabase';
 
 function AppContent({ onLayoutRootView }: any) {
-  const { language, showOrderAlert, setShowOrderAlert, pendingOrders, removePendingOrder } = useApp();
-
-  const handleCloseAlert = () => {
-    setShowOrderAlert(false);
-    Vibration.cancel(); 
-    const Speech = require('expo-speech');
-    Speech.stop(); // 🚀 停止语音
-  };
-
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <NetworkStatus />
@@ -223,29 +211,6 @@ function AppContent({ onLayoutRootView }: any) {
           />
         </Stack.Navigator>
       </NavigationContainer>
-
-      {/* 🚀 全局订单提醒模态框 */}
-      <OrderAlertModal 
-        visible={showOrderAlert}
-        orders={pendingOrders}
-        language={language}
-        onClose={handleCloseAlert}
-        onAccepted={(acceptedOrder: any) => {
-          if (acceptedOrder) {
-            removePendingOrder(acceptedOrder.id);
-            // 🚀 移除自动弹出打包窗口，商家需前往“我的订单”手动点击打包
-            // setPackingOrderData(acceptedOrder);
-            // setShowPackingModal(true);
-          }
-        }}
-        onDeclineSuccess={(orderId: string) => {
-          removePendingOrder(orderId);
-        }}
-        onStatusUpdate={() => {
-          console.log('✅ 订单状态已更新，发送全局通知');
-          DeviceEventEmitter.emit('order_status_updated');
-        }}
-      />
     </View>
   );
 }

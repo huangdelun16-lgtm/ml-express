@@ -13,10 +13,11 @@ import {
 } from '../services/crossBorderTrackingService';
 import { chatService } from '../services/chatService';
 import { useApp } from '../contexts/AppContext';
-import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { useFocusEffect } from '@react-navigation/native';
+import { feedbackService } from '../services/FeedbackService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -78,6 +79,9 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 
   const [isOnline, setIsOnline] = useState(true);
   const [mapError, setMapError] = useState(false);
+  const [mapMounted, setMapMounted] = useState(false);
+  const lastFitAtRef = useRef(0);
+  const hasFittedOnceRef = useRef(false);
   const [inTransitOrders, setInTransitOrders] = useState<Package[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -153,23 +157,28 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     if (!result.success) {
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
       setInputText(messageText);
-      Alert.alert(language === 'zh' ? '错误' : 'Error', language === 'zh' ? '消息发送失败' : 'Failed to send message');
+      feedbackService.error(language === 'zh' ? '消息发送失败' : 'Failed to send message');
     }
   };
 
-  // 🚀 自动检查未读消息
+  // 未读消息：屏内 focus 时低频轮询；聊天弹窗打开时提高频率
   useEffect(() => {
-    if (!packageData?.id || !currentUserId) return;
-    
+    if (!packageData?.id || !currentUserId || !mapMounted) return;
+
+    let cancelled = false;
     const checkUnread = async () => {
       const count = await chatService.getUnreadCount(currentUserId);
-      setUnreadCount(count);
+      if (!cancelled) setUnreadCount(count);
     };
-    
+
     checkUnread();
-    const timer = setInterval(checkUnread, 10000);
-    return () => clearInterval(timer);
-  }, [packageData?.id, currentUserId]);
+    const intervalMs = showChatModal ? 8000 : 30000;
+    const timer = setInterval(checkUnread, intervalMs);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [packageData?.id, currentUserId, showChatModal, mapMounted]);
 
   // 🚀 当页面切换订单时重新加载聊天
   useEffect(() => {
@@ -245,21 +254,9 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 
       const userEmail = await AsyncStorage.getItem('userEmail');
       const userPhone = await AsyncStorage.getItem('userPhone');
-      const storedUserType = await AsyncStorage.getItem('userType');
-      const finalUserType = storedUserType === 'merchant' ? 'merchant' : 'customer';
-
-      // 🚀 新增：如果是商家，获取店铺名称用于匹配（与 MyOrdersScreen 同步）
-      let storeName: string | undefined;
-      if (finalUserType === 'merchant') {
-        const userName = await AsyncStorage.getItem('userName');
-        if (userName) {
-          storeName = userName;
-        }
-      }
 
       const { orders } = await packageService.getAllOrders(user.id, {
-        userType: finalUserType,
-        storeName: storeName, // 传入店铺名称
+        userType: 'customer',
         email: userEmail || user?.email,
         phone: userPhone || user?.phone
       });
@@ -412,6 +409,18 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     return Math.max(2, timeInMinutes); // 最少显示2分钟
   };
 
+
+  // 地图仅在屏获得焦点时挂载，离屏卸载以降低原生资源占用
+  useFocusEffect(
+    useCallback(() => {
+      setMapMounted(true);
+      return () => {
+        setMapMounted(false);
+        hasFittedOnceRef.current = false;
+      };
+    }, [])
+  );
+
   // 监听骑手实时位置
   useEffect(() => {
     let channel: any = null;
@@ -420,7 +429,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     const activeTrackingStatuses = ['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'];
     const isTrackingActive = packageData && activeTrackingStatuses.includes(packageData.status);
 
-    if (isOnline && isTrackingActive && courierId) {
+    if (mapMounted && isOnline && isTrackingActive && courierId) {
       console.log('📡 启动骑手实时追踪:', courierId);
       
       // 1. 获取初始位置
@@ -486,41 +495,44 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         supabase.removeChannel(channel);
       }
     };
-  }, [packageData?.status, courierId, isOnline]);
+  }, [packageData?.status, courierId, isOnline, mapMounted]);
 
-  // 当数据加载或骑手位置更新时，尝试调整地图视野
+  // 地图视野：首次立即适配，之后最多每 4 秒跟随一次，避免每次 Realtime 都重绘视野
   useEffect(() => {
-    if (mapRef.current && packageData) {
-      const coordinates = [];
-      if (packageData.sender_latitude && packageData.sender_longitude) {
-        coordinates.push({ latitude: Number(packageData.sender_latitude), longitude: Number(packageData.sender_longitude) });
-      }
-      if (packageData.receiver_latitude && packageData.receiver_longitude) {
-        coordinates.push({ latitude: Number(packageData.receiver_latitude), longitude: Number(packageData.receiver_longitude) });
-      }
-      if (riderLocation) {
-        coordinates.push({ latitude: Number(riderLocation.latitude), longitude: Number(riderLocation.longitude) });
-      }
+    if (!mapMounted || !mapRef.current || !packageData) return;
 
-      if (coordinates.length >= 2) {
-        mapRef.current.fitToCoordinates(coordinates, {
-          edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-          animated: true,
-        });
-      } else if (coordinates.length === 1) {
-        mapRef.current.animateToRegion({
-          ...coordinates[0],
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }, 1000);
-      }
+    const now = Date.now();
+    const shouldFit = !hasFittedOnceRef.current || now - lastFitAtRef.current >= 4000;
+    if (!shouldFit) return;
+
+    const coordinates = [];
+    if (packageData.sender_latitude && packageData.sender_longitude) {
+      coordinates.push({ latitude: Number(packageData.sender_latitude), longitude: Number(packageData.sender_longitude) });
     }
-  }, [packageData, riderLocation]);
+    if (packageData.receiver_latitude && packageData.receiver_longitude) {
+      coordinates.push({ latitude: Number(packageData.receiver_latitude), longitude: Number(packageData.receiver_longitude) });
+    }
+    if (riderLocation) {
+      coordinates.push({ latitude: Number(riderLocation.latitude), longitude: Number(riderLocation.longitude) });
+    }
+    if (coordinates.length === 0) return;
 
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
+    lastFitAtRef.current = now;
+    hasFittedOnceRef.current = true;
+
+    if (coordinates.length >= 2) {
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+        animated: true,
+      });
+    } else {
+      mapRef.current.animateToRegion({
+        ...coordinates[0],
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 1000);
+    }
+  }, [packageData, riderLocation, mapMounted]);
 
   // 翻译
   const translations: any = {
@@ -678,11 +690,11 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 
   const t = translations[language] || translations.zh;
 
-  // 显示Toast
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    if (type === 'success') feedbackService.success(message);
+    else if (type === 'error') feedbackService.error(message);
+    else if (type === 'warning') feedbackService.warning(message);
+    else feedbackService.info(message);
   };
 
   // 查询订单
@@ -757,15 +769,6 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         zIndex: 0
       }} />
-
-      {/* Toast通知 */}
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        duration={3000}
-        onHide={() => setToastVisible(false)}
-      />
 
       <ScrollView 
         style={styles.scrollView} 
@@ -1008,14 +1011,22 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             {/* 实时地图追踪 */}
             {(['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(packageData.status)) && (
               <View style={[styles.mapContainer, isDarkMode && { borderColor: '#1e293b', borderWidth: 1 }]}>
-                {!isOnline || mapError ? (
+                {!mapMounted || !isOnline || mapError ? (
                   <View style={styles.mapFallback}>
                     <Text style={styles.mapFallbackIcon}>🛰️</Text>
                     <Text style={styles.mapFallbackTitle}>
-                      {!isOnline ? t.mapOfflineTitle : t.mapErrorTitle}
+                      {!mapMounted
+                        ? (language === 'zh' ? '地图准备中' : language === 'en' ? 'Preparing map' : 'မြေပုံပြင်ဆင်နေသည်')
+                        : !isOnline
+                          ? t.mapOfflineTitle
+                          : t.mapErrorTitle}
                     </Text>
                     <Text style={styles.mapFallbackDesc}>
-                      {!isOnline ? t.mapOfflineDesc : t.mapErrorDesc}
+                      {!mapMounted
+                        ? (language === 'zh' ? '进入页面后加载实时地图' : language === 'en' ? 'Live map loads when this screen is active' : 'ဤစာမျက်နှာတွင် မြေပုံဖွင့်မည်')
+                        : !isOnline
+                          ? t.mapOfflineDesc
+                          : t.mapErrorDesc}
                     </Text>
                   </View>
                 ) : (

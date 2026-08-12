@@ -2,7 +2,6 @@ import React, { memo, useCallback, useMemo } from 'react';
 import LoggerService from './../../services/LoggerService';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert, Platform } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { errorService } from '../../services/ErrorService';
 import AutocompleteSuggestionItem from './AutocompleteSuggestionItem';
 
 interface MapModalProps {
@@ -193,38 +192,42 @@ const MapModal = memo<MapModalProps>(({
           )}
         </View>
 
-        <MapView
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          style={styles.map}
-          initialRegion={mapRegion}
-          region={mapRegion}
-          showsUserLocation={true}
-          showsMyLocationButton={false}
-          showsCompass={true}
-          showsScale={true}
-          loadingEnabled={true}
-          mapType="standard"
-          onPress={handleMapPress}
-          onPoiClick={handlePoiClick}
-          onMapReady={() => {
-            if (__DEV__) {
-              LoggerService.debug('地图已准备就绪');
-            }
-          }}
-        >
-          {selectedLocation && (
-            <Marker
-              coordinate={{
-                latitude: selectedLocation.latitude || 21.9588,
-                longitude: selectedLocation.longitude || 96.0891
-              }}
-              draggable
-              onDragEnd={handleMarkerDragEnd}
-              title={markerTitle || "选择的位置"}
-              description={markerTitle ? "店铺注册位置" : "拖动或点击地图调整位置"}
-            />
-          )}
-        </MapView>
+        {visible ? (
+          <MapView
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            style={styles.map}
+            initialRegion={mapRegion}
+            region={mapRegion}
+            showsUserLocation={true}
+            showsMyLocationButton={false}
+            showsCompass={true}
+            showsScale={true}
+            loadingEnabled={true}
+            mapType="standard"
+            onPress={handleMapPress}
+            onPoiClick={handlePoiClick}
+            onMapReady={() => {
+              if (__DEV__) {
+                LoggerService.debug('地图已准备就绪');
+              }
+            }}
+          >
+            {selectedLocation && (
+              <Marker
+                coordinate={{
+                  latitude: selectedLocation.latitude || 21.9588,
+                  longitude: selectedLocation.longitude || 96.0891
+                }}
+                draggable
+                onDragEnd={handleMarkerDragEnd}
+                title={markerTitle || "选择的位置"}
+                description={markerTitle ? "店铺注册位置" : "拖动或点击地图调整位置"}
+              />
+            )}
+          </MapView>
+        ) : (
+          <View style={styles.map} />
+        )}
 
         {selectedPlace && (
           <View style={styles.selectedPlaceInfo}>

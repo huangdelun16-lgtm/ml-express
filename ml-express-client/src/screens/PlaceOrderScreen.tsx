@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { baseStyles, wizardStyles } from '../components/placeOrder/placeOrderStyles';
 import {
   View,
   Text,
@@ -26,7 +27,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { useCart, summarizeCustomerRemarks, getCartItemLineKey, CartItem } from '../contexts/CartContext';
-import { packageService, systemSettingsService, supabase, merchantService, Product } from '../services/supabase';
+import { packageService, systemSettingsService, supabase, Product } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView, ScaleInView } from '../components/Animations';
@@ -86,7 +87,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         const incomingProducts = route.params.selectedProducts;
         const productMap: Record<string, number> = {};
         
-        // 1. 先把这些商品加入到 merchantProducts 列表中，这样后续逻辑能找到它们
+        // 1. 先把购物车商品加入到列表中，这样后续逻辑能找到它们
         // 过滤掉已经在列表中的商品，避免重复
         setMerchantProducts(prev => {
           const existingIds = new Set(prev.map(p => p.id));
@@ -206,11 +207,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           setUserId(user.id);
           setUserName(user.name);
           setUserPhone(user.phone);
-          setIsMerchantStore(user.user_type === 'merchant');
           setIsGuest(false);
-          if (user.user_type === 'merchant') {
-            setPaymentMethod('cash');
-          }
           
           // 从数据库获取最新余额
           const { data, error } = await supabase
@@ -396,20 +393,11 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   // 支付方式（默认现金，二维码开发中）
   const [paymentMethod, setPaymentMethod] = useState<'balance' | 'cash'>('cash');
   const [accountBalance, setAccountBalance] = useState<number>(0);
-  const [isMerchantStore, setIsMerchantStore] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  const [merchantStore, setMerchantStore] = useState<any>(null); // 商家店铺信息
-
-  useEffect(() => {
-    if (currentUser?.user_type === 'merchant' && paymentMethod !== 'cash') {
-      setPaymentMethod('cash');
-    }
-  }, [currentUser, paymentMethod]);
   
-  // 商品选择相关状态
+  // 购物车商品相关状态
   const [merchantProducts, setMerchantProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({}); // id -> quantity
-  const [showProductSelector, setShowProductSelector] = useState(false);
   const [hasCOD, setHasCOD] = useState(true); // 新增：是否代收状态
   
   // 计费规则
@@ -965,56 +953,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     loadPricingSettings();
   }, []);
 
-  // 加载合伙店铺信息（当currentUser变化时）
-  useEffect(() => {
-    // 检查 currentUser 是否包含 user_type
-    // 注意：App端 currentUser 是从 localStorage 加载的，可能需要检查结构
-    if (currentUser?.user_type === 'merchant') {
-      const loadMerchantStore = async () => {
-        try {
-          // 在App端使用 supabase
-          const { data: store } = await supabase
-            .from('delivery_stores')
-            .select('*')
-            .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
-            .limit(1)
-            .maybeSingle();
-          
-          if (store) {
-            LoggerService.debug('✅ App端已加载合伙店铺信息:', store.store_name);
-            setMerchantStore(store);
-            
-            // 自动填充寄件人信息
-            setSenderName(store.store_name);
-            setSenderPhone(store.phone || store.manager_phone);
-            setSenderAddress(store.address);
-            
-            // 自动设置坐标
-            setSenderCoordinates({
-              lat: store.latitude,
-              lng: store.longitude
-            });
-            LoggerService.debug('✅ 已自动填充店铺信息和坐标');
-
-            // 加载店铺商品
-            try {
-              const products = await merchantService.getPublicStoreProducts(store.id);
-              setMerchantProducts(products);
-              LoggerService.debug('✅ 已加载店铺商品:', products.length);
-            } catch (err) {
-              LoggerService.error('加载店铺商品失败:', err);
-            }
-          }
-        } catch (error) {
-          LoggerService.error('加载合伙店铺失败:', error);
-        }
-      };
-      loadMerchantStore();
-    } else {
-      setMerchantStore(null);
-    }
-  }, [currentUser]);
-
   const loadUserInfo = async () => {
     try {
       const id = await AsyncStorage.getItem('userId');
@@ -1137,26 +1075,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   // 切换使用我的信息
   useEffect(() => {
     if (useMyInfo) {
-      if (currentUser?.user_type === 'merchant' && merchantStore) {
-        setSenderName(merchantStore.store_name);
-        setSenderPhone(merchantStore.phone || merchantStore.manager_phone);
-        // 如果没有地址，则使用店铺地址
-        if (!senderAddress) {
-            setSenderAddress(merchantStore.address);
-            setSenderCoordinates({
-                lat: merchantStore.latitude,
-                lng: merchantStore.longitude
-            });
-        }
-      } else {
-        setSenderName(userName);
-        setSenderPhone(userPhone);
-      }
+      setSenderName(userName);
+      setSenderPhone(userPhone);
     } else {
       setSenderName('');
       setSenderPhone('');
     }
-  }, [useMyInfo, userName, userPhone, currentUser, merchantStore]);
+  }, [useMyInfo, userName, userPhone]);
 
   // 计算价格
   // 使用当前位置（在地图Modal中）- 优化：使用缓存和超时
@@ -1238,21 +1163,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   const openMapSelector = useCallback(async (type: 'sender' | 'receiver') => {
     try {
       setMapType(type);
-
-      // 如果是 MERCHANTS 账号且选择寄件地址，且已加载店铺信息，直接锁定到店铺位置
-      if (currentUser?.user_type === 'merchant' && type === 'sender' && merchantStore) {
-          LoggerService.debug('📍 MERCHANTS账号(App)，自动锁定店铺位置:', merchantStore.store_name);
-          setSelectedLocation({
-            latitude: merchantStore.latitude,
-            longitude: merchantStore.longitude,
-          });
-          // 可以在这里设置地址输入框的值，但App端MapModal可能处理方式不同
-          // mapAddressInput 是 MapModal 的 prop，可以在这里设置
-          setMapAddressInput(merchantStore.address);
-          
-          setShowMapModal(true);
-          return; // 跳过后续的自动定位逻辑
-      }
       
       // 如果已有地址，填充到输入框
       if (type === 'sender' && senderAddress) {
@@ -1871,17 +1781,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         deducted: false,
       });
       
-      // 🚀 优化：记录下单人身份 (识别 商家/VIP/普通会员)
+      // 🚀 优化：记录下单人身份 (识别 VIP/普通会员)
       let ordererType = '会员';
-      if (currentUser?.user_type === 'merchant') {
-        ordererType = '商家';
-      } else if (currentUser?.user_type === 'vip' || accountBalance > 0) {
+      if (currentUser?.user_type === 'vip' || accountBalance > 0) {
         ordererType = 'VIP';
       }
 
       const typeTag = language === 'zh' ? `[下单身份: ${ordererType}]` : 
-                     language === 'en' ? `[Orderer: ${ordererType === '商家' ? 'MERCHANTS' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]` : 
-                     `[အော်ဒါတင်သူ: ${ordererType === '商家' ? 'MERCHANTS' : (ordererType === 'VIP' ? 'VIP' : 'Member')}]`;
+                     language === 'en' ? `[Orderer: ${ordererType === 'VIP' ? 'VIP' : 'Member'}]` : 
+                     `[အော်ဒါတင်သူ: ${ordererType === 'VIP' ? 'VIP' : 'Member'}]`;
 
       const createTime = createdAt.toLocaleString('zh-CN', {
         year: 'numeric',
@@ -1902,28 +1810,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       // 如果是商城选货订单，获取店铺ID
       if (route.params?.selectedProducts && route.params.selectedProducts.length > 0) {
         deliveryStoreId = route.params.selectedProducts[0].store_id;
-      }
-
-      // 如果是 MERCHANTS 账号，强制使用店铺信息
-      if (currentUser?.user_type === 'merchant') {
-        try {
-          LoggerService.debug('正在查找商家店铺信息...', currentUser);
-          const { data: store } = await supabase
-            .from('delivery_stores')
-            .select('*')
-            .or(`store_code.eq.${currentUser.name},manager_phone.eq.${currentUser.phone},phone.eq.${currentUser.phone},store_name.eq.${currentUser.name}`)
-            .limit(1)
-            .maybeSingle();
-
-          if (store) {
-            LoggerService.debug('找到商家店铺，强制使用店铺坐标:', store.store_name);
-            finalSenderLat = store.latitude;
-            finalSenderLng = store.longitude;
-            // finalSenderAddr = store.address; // 可选：是否强制覆盖地址文本
-          }
-        } catch (err) {
-          LoggerService.error('查找商家店铺异常:', err);
-        }
       }
 
       // 🚀 优化：生成支付状态标签
@@ -1951,16 +1837,15 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         receiver_longitude: receiverCoordinates?.lng || null,
         package_type: packageType,
         weight: weight,
-        cod_amount: (currentUser?.user_type === 'merchant' && hasCOD) ? codAmountNumber : (deliveryStoreId ? codAmountNumber : 0),
+        cod_amount: deliveryStoreId ? codAmountNumber : 0,
         description: `${typeTag} ${paymentTag} ${description || ''}`.trim(),
         delivery_speed: deliverySpeed,
         scheduled_delivery_time: deliverySpeed === '定时达' ? scheduledTime : '',
         delivery_distance: isCalculated ? calculatedDistance : distance,
-        // 🚀 优化：商城订单初始状态为“待确认”，商家订单直接为“待取件/待收款”
-        status: (deliveryStoreId && currentUser?.user_type !== 'merchant') 
-          ? '待确认' 
+        status: deliveryStoreId
+          ? '待确认'
           : (paymentMethod === 'cash' ? '待收款' : '待取件'),
-        delivery_store_id: deliveryStoreId || (currentUser?.user_type === 'merchant' ? userId : null),
+        delivery_store_id: deliveryStoreId || null,
         create_time: createTime,
         pickup_time: '',
         delivery_time: '',
@@ -1988,8 +1873,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       const draftSnapshot = orderDraftRef.current;
 
       // 1. 如果是商城订单，强制检查余额是否充足支付商品
-      // 🚀 修复：仅针对“买家”（Member/VIP），商家（MERCHANTS）录单不扣除自身余额
-      if (cartTotal > 0 && !isGuest && currentUser?.user_type !== 'merchant') {
+      if (cartTotal > 0 && !isGuest) {
         if (accountBalance < cartTotal) {
           if (draftSnapshot?.deducted) {
             // 已扣款情况下跳过余额不足校验
@@ -2008,8 +1892,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       }
 
       // 2. 如果运费也选择余额支付
-      // 🚀 修复：仅针对非商家账号
-      if (paymentMethod === 'balance' && !isGuest && currentUser?.user_type !== 'merchant') {
+      if (paymentMethod === 'balance' && !isGuest) {
         totalDeduction += shippingFee;
         
         if (accountBalance < totalDeduction && !draftSnapshot?.deducted) {
@@ -2152,36 +2035,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     setToastVisible(true);
   };
 
-  const handleProductQuantityChange = (productId: string, delta: number) => {
-    setSelectedProducts(prev => {
-      const product = merchantProducts.find(p => p.id === productId);
-      if (!product) return prev;
-
-      const currentQty = prev[productId] || 0;
-      let newQty = currentQty + delta;
-
-      // 🚀 核心优化：增加库存校验逻辑
-      if (delta > 0) {
-        // 如果库存不是无限(-1)且当前数量已达到库存上限
-        if (product.stock !== -1 && currentQty >= product.stock) {
-          showToast(language === 'zh' ? `库存不足 (剩余: ${product.stock})` : `Out of stock (Left: ${product.stock})`, 'warning');
-          return prev;
-        }
-      }
-
-      newQty = Math.max(0, newQty);
-      
-      const newSelected = { ...prev };
-      if (newQty === 0) {
-        delete newSelected[productId];
-      } else {
-        newSelected[productId] = newQty;
-      }
-      
-      return newSelected;
-    });
-  };
-
   // 🚀 新增：统一监听选中商品或代收状态的变化，实时更新金额和描述
   useEffect(() => {
     updateCODAndDescription(selectedProducts);
@@ -2214,12 +2067,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       // 自动把选中的商品添加到物品描述中
       const productsText = `[${currentT.selectedProducts}: ${productDetails.join(', ')}]`;
       
-      // 🚀 优化：仅当非 MERCHANTS 账号时，才添加“余额支付”金额到描述中
-      let payToMerchantTag = '';
-      if (currentUser?.user_type !== 'merchant') {
-        const payToMerchantText = currentT.itemBalancePayment;
-        payToMerchantTag = ` [${payToMerchantText}: ${totalCOD.toLocaleString()} MMK]`;
-      }
+      const payToMerchantText = currentT.itemBalancePayment;
+      const payToMerchantTag = ` [${payToMerchantText}: ${totalCOD.toLocaleString()} MMK]`;
 
       // 如果原先有描述，保留它（避免重复添加）
       const cleanDesc = description.replace(/\[已选商品:.*?\]|\[Selected:.*?\]|\[ကုန်ပစ္စည်းများ:.*?\]|\[付给商家:.*?\]|\[Pay to Merchant:.*?\]|\[ဆိုင်သို့ ပေးချေရန်:.*?\]|\[骑手代付:.*?\]|\[Courier Advance Pay:.*?\]|\[ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း:.*?\]|\[平台支付:.*?\]|\[Platform Payment:.*?\]|\[ပလက်ဖောင်းမှ ပေးချေခြင်း:.*?\]|\[余额支付:.*?\]|\[Balance Payment:.*?\]|\[လက်ကျန်ငွေဖြင့် ပေးချေခြင်း:.*?\]|\[买家商品备注:.*?\]|\[Buyer item notes:.*?\]|\[ဝယ်ယူသူမှတ်ချက်:.*?\]/g, '').trim();
@@ -2560,7 +2409,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             onOpenMap={() => openMapSelector('sender')}
             onOpenAddressBook={() => openAddressBook('sender')}
             onBlur={handleFieldBlur}
-            disabled={cartTotal > 0 && currentUser?.user_type !== 'merchant'} // 🚀 商城订单锁定寄件信息
+            disabled={cartTotal > 0} // 🚀 商城订单锁定寄件信息
           />
 
           {/* 收件人表单 */}
@@ -2586,108 +2435,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
           {wizardStep === 1 && (
           <>
-          {/* 🚀 新增：商家商品选择卡片 (仅限 MERCHANTS 账号，放在收件人后) */}
-          {currentUser?.user_type === 'merchant' && (
-            <FadeInView delay={250}>
-              <View style={styles.section}>
-                <View style={styles.sectionTitleContainer}>
-                  <Ionicons name="basket-outline" size={18} color="#1e293b" />
-                  <Text style={styles.sectionTitle}> {currentT.selectedProducts}</Text>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.label}>{language === 'zh' ? '从我的店铺选货' : 'Select from my store'}</Text>
-                      <TouchableOpacity 
-                        style={styles.selectProductBtn}
-                        onPress={() => setShowProductSelector(true)}
-                      >
-                        <Ionicons name="add-circle-outline" size={16} color="#3b82f6" />
-                        <Text style={styles.selectProductBtnText}>{language === 'zh' ? '选择商品' : language === 'en' ? 'Select Product' : 'ကုန်ပစ္စည်းရွေးချယ်ပါ'}</Text>
-                      </TouchableOpacity>
-                  </View>
-
-                  {/* 已选商品列表 */}
-                  {Object.keys(selectedProducts).length > 0 ? (
-                    <View style={styles.selectedProductsList}>
-                      {Object.entries(selectedProducts).map(([id, qty]) => {
-                        const product = merchantProducts.find(p => p.id === id);
-                        if (!product) return null;
-                        return (
-                          <View key={id} style={styles.selectedProductItem}>
-                            <Text style={styles.selectedProductName} numberOfLines={1}>{product.name}</Text>
-                            <View style={styles.qtyControl}>
-                              <TouchableOpacity onPress={() => handleProductQuantityChange(id, -1)}>
-                                <Ionicons name="remove-circle-outline" size={20} color="#64748b" />
-                              </TouchableOpacity>
-                              <Text style={styles.qtyText}>{qty}</Text>
-                              <TouchableOpacity onPress={() => handleProductQuantityChange(id, 1)}>
-                                <Ionicons name="add-circle-outline" size={20} color="#3b82f6" />
-                              </TouchableOpacity>
-                            </View>
-                            <Text style={styles.selectedProductPrice}>{(product.price * qty).toLocaleString()} MMK</Text>
-                          </View>
-                        );
-                      })}
-                      <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>{currentT.totalPrice}</Text>
-                        <Text style={{ fontWeight: '900', color: '#10b981', fontSize: 16 }}>{cartTotal.toLocaleString()} MMK</Text>
-                      </View>
-
-                      {/* 🚀 优化：代收款控制现在放在“总计”下面 */}
-                      <View style={{ marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
-                        <View style={[styles.sectionHeader, { borderBottomWidth: 0, paddingBottom: 0 }]}>
-                          <View style={styles.sectionTitleContainer}>
-                            <MoneyIcon size={16} color="#475569" />
-                            <Text style={[styles.sectionTitle, { fontSize: 14, color: '#475569' }]}> {currentT.codAmount}</Text>
-                          </View>
-                        </View>
-
-                        <View style={{ marginTop: 10 }}>
-                          <TextInput
-                            style={[styles.input, { height: 40, paddingVertical: 8, backgroundColor: '#fff' }]}
-                            value={codAmount}
-                            onChangeText={setCodAmount}
-                            placeholder={currentT.placeholders.codAmount}
-                            placeholderTextColor="#9ca3af"
-                            keyboardType="decimal-pad"
-                            editable={hasCOD} // 🚀 仅开启代收时可编辑
-                          />
-                          
-                          {/* 🚀 移动位置：无代收/有代收开关移动到金额输入框下方 */}
-                          <View style={[styles.codToggleContainer, { alignSelf: 'flex-start', marginTop: 12, paddingHorizontal: 0 }]}>
-                            <Text style={[styles.codToggleLabel, { fontSize: 11 }, !hasCOD && styles.codToggleLabelActive]}>{currentT.noCollect}</Text>
-                            <Switch
-                              value={hasCOD}
-                              onValueChange={handleToggleCOD}
-                              trackColor={{ false: '#e2e8f0', true: '#3b82f6' }}
-                              thumbColor="#ffffff"
-                              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                            />
-                            <Text style={[styles.codToggleLabel, { fontSize: 11 }, hasCOD && styles.codToggleLabelActive]}>{currentT.collect}</Text>
-                          </View>
-
-                          {hasCOD && (
-                            <Text style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
-                              💡 {language === 'zh' ? '该金额将由骑手代收' : language === 'en' ? 'Courier will collect this' : 'ကူရီယာမှ ကောက်ခံမည်'}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                    </View>
-                  ) : (
-                    <TouchableOpacity 
-                      onPress={() => setShowProductSelector(true)}
-                      style={{ padding: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }}
-                    >
-                      <Text style={{ color: '#94a3b8' }}>{language === 'zh' ? '暂未选择商品，点击添加' : 'No items selected, tap to add'}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </FadeInView>
-          )}
-
           {/* 包裹信息 */}
           <PackageInfo
             language={language as any}
@@ -2708,11 +2455,11 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
               setSelectedPackageTypeInfo(type);
               setShowPackageTypeInfo(true);
             }}
-            cartTotal={currentUser?.user_type === 'merchant' ? 0 : cartTotal}
-            accountBalance={currentUser?.user_type === 'merchant' ? undefined : accountBalance}
+            cartTotal={cartTotal}
+            accountBalance={accountBalance}
           />
 
-          {/* 代收款 (仅限 VIP 账号，MERCHANTS 已移入商品卡片) */}
+          {/* 代收款 (仅限 VIP 账号) */}
           {currentUser?.user_type === 'vip' && (
             <FadeInView delay={320}>
               <View style={styles.section}>
@@ -2781,9 +2528,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             pricingSettings={pricingSettings as any}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={setPaymentMethod}
-            accountBalance={currentUser?.user_type === 'merchant' ? undefined : (accountBalance - cartTotal)}
-            cartTotal={currentUser?.user_type === 'merchant' ? 0 : cartTotal}
-            isMerchant={currentUser?.user_type === 'merchant'}
+            accountBalance={accountBalance - cartTotal}
+            cartTotal={cartTotal}
           />
           )}
         </ScrollView>
@@ -2998,96 +2744,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         </View>
       </Modal>
 
-      {/* 商品选择模态框 */}
-      <Modal
-        visible={showProductSelector}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowProductSelector(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
-            <View style={styles.qrModalHeader}>
-              <Text style={styles.modalTitle}>{language === 'zh' ? '选择商品' : language === 'en' ? 'Select Product' : 'ကုန်ပစ္စည်းရွေးချယ်ပါ'}</Text>
-              <TouchableOpacity onPress={() => setShowProductSelector(false)} style={styles.timePickerCloseButton}>
-                <Ionicons name="close" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ marginVertical: 10 }}>
-              {merchantProducts.length === 0 ? (
-                <View style={{ padding: 40, alignItems: 'center' }}>
-                  <Ionicons name="basket-outline" size={48} color="#cbd5e1" />
-                  <Text style={{ marginTop: 12, color: '#94a3b8' }}>暂无上架商品</Text>
-                </View>
-              ) : (
-                merchantProducts.map((item) => (
-                  <View key={item.id} style={styles.selectorItem}>
-                    <View style={styles.selectorImageContainer}>
-                      {item.image_url ? (
-                        <Image source={{ uri: item.image_url }} style={styles.selectorImage} />
-                      ) : (
-                        <Ionicons name="image-outline" size={24} color="#cbd5e1" />
-                      )}
-                    </View>
-                    
-                    <View style={styles.selectorRightContent}>
-                      <Text style={styles.selectorName} numberOfLines={1}>{item.name}</Text>
-                      <Text style={styles.selectorPrice} numberOfLines={1}>{item.price.toLocaleString()} MMK</Text>
-                      
-                      <View style={styles.selectorBottomRow}>
-                        <View style={styles.selectorStockRow}>
-                          <Ionicons name="cube-outline" size={12} color="#94a3b8" />
-                          <Text style={[
-                            styles.selectorStockText,
-                            item.stock === 0 && { color: '#ef4444' }
-                          ]}>
-                            {language === 'zh' ? '库存' : language === 'en' ? 'Stock' : 'လက်ကျန်'}: {item.stock === -1 ? (language === 'zh' ? '无限' : language === 'en' ? 'Infinite' : 'အကန့်အသတ်မရှိ') : item.stock}
-                          </Text>
-                        </View>
-                        
-                        <View style={styles.selectorQtyControl}>
-                          <TouchableOpacity 
-                            onPress={() => handleProductQuantityChange(item.id, -1)}
-                            disabled={!selectedProducts[item.id]}
-                          >
-                            <Ionicons 
-                              name="remove-circle-outline" 
-                              size={28} 
-                              color={selectedProducts[item.id] ? "#64748b" : "#e2e8f0"} 
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.qtyText}>{selectedProducts[item.id] || 0}</Text>
-                          <TouchableOpacity 
-                            onPress={() => handleProductQuantityChange(item.id, 1)}
-                            disabled={item.stock !== -1 && (selectedProducts[item.id] || 0) >= item.stock}
-                          >
-                            <Ionicons 
-                              name="add-circle-outline" 
-                              size={28} 
-                              color={item.stock !== -1 && (selectedProducts[item.id] || 0) >= item.stock ? "#e2e8f0" : "#3b82f6"} 
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-
-            <TouchableOpacity 
-              style={styles.modalConfirmBtn}
-              onPress={() => setShowProductSelector(false)}
-            >
-              <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.modalConfirmGradient}>
-                <Text style={styles.modalConfirmText}>{language === 'zh' ? '确定' : language === 'en' ? 'Confirm' : 'အတည်ပြုသည်'}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* QR码模态框 */}
       <Modal
         visible={showQRCodeModal}
@@ -3198,1237 +2854,3 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   );
 }
 
-const baseStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    paddingTop: 40,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  section: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 8,
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.9)',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  calculateButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  calculateButtonGradient: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  calculateButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  pricePlaceholder: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  pricePlaceholderText: {
-    fontSize: 16,
-    color: '#64748b',
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  pricePlaceholderSubtext: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
-  sectionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#1e293b',
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 2,
-  },
-  switchLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  inputGroup: {
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 5,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  linkButton: {
-    fontSize: 13,
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-  input: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#1e293b',
-  },
-  textArea: {
-    minHeight: 68,
-    textAlignVertical: 'top',
-  },
-  coordsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    backgroundColor: '#f0fdf4',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#059669',
-  },
-  coordsLabel: {
-    fontSize: 12,
-    color: '#059669',
-    fontWeight: '600',
-    marginRight: 4,
-  },
-  coordsText: {
-    fontSize: 12,
-    color: '#059669',
-    fontWeight: '500',
-  },
-  coordinateInfo: {
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f0f9ff',
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#3b82f6',
-  },
-  coordinateText: {
-    fontSize: 12,
-    color: '#1e40af',
-    fontWeight: '500',
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-  },
-  chipActive: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#3b82f6',
-  },
-  chipText: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  chipTextActive: {
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-    marginBottom: 10,
-  },
-  radioOptionActive: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#3b82f6',
-  },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#cbd5e1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#3b82f6',
-  },
-  radioContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  radioText: {
-    fontSize: 15,
-    color: '#475569',
-  },
-  radioTextActive: {
-    color: '#1e40af',
-    fontWeight: '600',
-  },
-  extraPrice: {
-    fontSize: 13,
-    color: '#f59e0b',
-    fontWeight: '600',
-  },
-  priceCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 16,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  priceLabel: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  priceValue: {
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '500',
-  },
-  priceDivider: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 8,
-  },
-  priceLabelTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  priceTotal: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-  },
-  submitButton: {
-    marginTop: 32,
-    marginBottom: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
-  },
-  submitGradient: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    gap: 12,
-  },
-  submitText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: 1,
-  },
-  qrModalClose: {
-    position: 'absolute',
-    right: 16,
-    top: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  qrModalCloseText: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
-  submitPrice: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  // 地图模态框样式
-  mapModalContainer: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  mapHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: 15,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  mapCloseButton: {
-    fontSize: 28,
-    color: '#64748b',
-    fontWeight: 'bold',
-    width: 40,
-  },
-  mapTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    flex: 1,
-    textAlign: 'center',
-  },
-  mapHeaderButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  mapCurrentLocationButton: {
-    backgroundColor: '#f0f9ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3b82f6',
-  },
-  mapCurrentLocationText: {
-    fontSize: 14,
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-  mapConfirmButton: {
-    fontSize: 28,
-    color: '#3b82f6',
-    fontWeight: 'bold',
-    width: 40,
-    textAlign: 'right',
-  },
-  map: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  mapFooter: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
-  mapInstructions: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  mapAddressInputContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    position: 'relative',
-    zIndex: 1000,
-  },
-  mapAddressInput: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1e293b',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  suggestionsContainer: {
-    position: 'absolute',
-    top: 70, // 输入框下方 (padding 15 + input height ~50 + margin 5)
-    left: 20,
-    right: 20,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    maxHeight: 300,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 1001,
-  },
-  suggestionsList: {
-    maxHeight: 400,
-  },
-  suggestionItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#ffffff',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  suggestionItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  suggestionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  suggestionMainText: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#1f2937',
-    flex: 1,
-  },
-  suggestionSecondaryText: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  loadingIndicator: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  loadingText: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noResultsContainer: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noResultsText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-  },
-  // 包裹类型说明模态框样式
-  infoModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoModalContent: {
-    width: '90%',
-    maxWidth: 400,
-  },
-  infoModalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  infoModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  infoModalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  infoModalClose: {
-    fontSize: 24,
-    color: '#94a3b8',
-    fontWeight: 'bold',
-  },
-  infoModalBody: {
-    marginBottom: 24,
-  },
-  infoItem: {
-    marginBottom: 16,
-  },
-  infoLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 6,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-    marginBottom: 4,
-  },
-  infoDescription: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
-  },
-  infoModalButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  infoModalButtonGradient: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  infoModalButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  // QR码模态框样式
-  qrModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  qrModalContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    width: '100%',
-    maxWidth: 400,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 16,
-  },
-  qrModalHeader: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  qrModalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  qrModalBody: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  qrInfoText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748b',
-    marginTop: 16,
-    marginBottom: 6,
-  },
-  qrOrderId: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E86AB',
-    marginBottom: 8,
-  },
-  qrOrderPrice: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#10b981',
-    marginBottom: 16,
-  },
-  qrCodeContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  qrCodeWrapper: {
-    padding: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    shadowColor: '#2E86AB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  qrHint: {
-    marginTop: 16,
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  // 支付方式选择样式
-  paymentMethodContainer: {
-    marginTop: 12,
-  },
-  paymentMethodOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginBottom: 12,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-  },
-  paymentMethodOptionActive: {
-    backgroundColor: '#f0f9ff',
-    borderColor: '#3b82f6',
-  },
-  paymentMethodRadio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#94a3b8',
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  paymentMethodRadioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#3b82f6',
-  },
-  paymentMethodContent: {
-    flex: 1,
-  },
-  paymentMethodLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 4,
-  },
-  paymentMethodLabelActive: {
-    color: '#3b82f6',
-  },
-  paymentMethodDesc: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  qrModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 20,
-    paddingTop: 0,
-  },
-  qrButton: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  qrButtonGradient: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  qrButtonText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  // 时间选择器样式
-  timePickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  timePickerContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    width: '92%',
-    maxWidth: 400,
-    maxHeight: '85%',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 16,
-  },
-  timePickerHeader: {
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  timePickerHeaderContent: {
-    flex: 1,
-  },
-  timePickerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  timePickerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  timePickerCloseButton: {
-    width: 30,
-    height: 32,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  timePickerBody: {
-    padding: 20,
-  },
-  quickSelectSection: {
-    marginBottom: 20,
-  },
-  quickSelectTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  quickSelectGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
-  },
-  quickSelectButton: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickSelectButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  timeSlotsSection: {
-    height: 220, // 固定高度防止重叠
-  },
-  timeSlotsTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  timeSlotsContainer: {
-    marginTop: 8,
-    flex: 1,
-  },
-  timeSlotsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'flex-start',
-    paddingBottom: 10,
-  },
-  timeSlotButton: {
-    width: '31.3%', // 精确计算宽度
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  timeSlotButtonActive: {
-    borderColor: '#3b82f6',
-    backgroundColor: '#eff6ff',
-  },
-  timeSlotText: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '700',
-  },
-  timeSlotTextActive: {
-    color: '#3b82f6',
-  },
-  timePickerButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    backgroundColor: '#fff',
-  },
-  timePickerCancelButton: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timePickerCancelText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  timePickerConfirmButton: {
-    flex: 2,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  timePickerConfirmGradient: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  timePickerConfirmText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  // 选中POI信息样式
-  selectedPlaceInfo: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#0ea5e9',
-  },
-  selectedPlaceName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#0c4a6e',
-    marginBottom: 4,
-  },
-  selectedPlaceAddress: {
-    fontSize: 12,
-    color: '#0369a1',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '90%',
-    maxWidth: 400,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  modalText: {
-    fontSize: 15,
-    color: '#475569',
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  modalCloseButton: {
-    backgroundColor: '#3b82f6',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  modalCloseButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  // 商家商品选择样式
-  selectProductBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-  },
-  selectProductBtnText: {
-    fontSize: 12,
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-  selectedProductsList: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  selectedProductItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  selectedProductName: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '500',
-  },
-  qtyControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 12,
-  },
-  qtyText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    minWidth: 20,
-    textAlign: 'center',
-  },
-  selectedProductPrice: {
-    fontSize: 13,
-    color: '#10b981',
-    fontWeight: '700',
-    minWidth: 80,
-    textAlign: 'right',
-  },
-  productTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-    paddingTop: 8,
-  },
-  productTotalLabel: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  productTotalValue: {
-    fontSize: 16,
-    color: '#3b82f6',
-    fontWeight: 'bold',
-  },
-  selectorItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  selectorImageContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  selectorImage: {
-    width: '100%',
-    height: '100%',
-  },
-  selectorRightContent: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: 'space-between',
-    paddingVertical: 2,
-  },
-  selectorName: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  selectorPrice: {
-    fontSize: 14,
-    color: '#10b981',
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  selectorBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  selectorStockRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  selectorStockText: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '500',
-  },
-  selectorQtyControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  modalConfirmBtn: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginTop: 10,
-  },
-  modalConfirmGradient: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalCloseBtn: {
-    padding: 4,
-  },
-  // 代收切换样式
-  codToggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  codToggleLabel: {
-    fontSize: 13,
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  codToggleLabelActive: {
-    color: '#3b82f6',
-  },
-});
-
-const wizardStyles = StyleSheet.create({
-  mainColumn: {
-    flex: 1,
-  },
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  guestBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(251, 191, 36, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.45)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  guestBannerText: {
-    flex: 1,
-    color: '#fde68a',
-    fontSize: 13,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  guestBannerLink: {
-    color: '#fbbf24',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  topChrome: {
-    paddingHorizontal: 16,
-    zIndex: 2,
-    backgroundColor: 'transparent',
-  },
-  topChromeCompact: {
-    paddingBottom: 0,
-  },
-  actionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  actionBarSide: {
-    flex: 1,
-    minHeight: 40,
-    justifyContent: 'center',
-  },
-  actionBarSideEnd: {
-    alignItems: 'flex-end',
-  },
-  actionSidePlaceholder: {
-    width: 72,
-    height: 44,
-  },
-  stepIndicator: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-    minWidth: 44,
-  },
-  actionBack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 9,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
-    gap: 2,
-  },
-  backBtnText: {
-    color: '#e2e8f0',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  actionPrimaryBtn: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    minWidth: 108,
-    maxWidth: '100%',
-    elevation: 4,
-  },
-  actionPrimaryGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-  },
-  nextBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-    flexShrink: 1,
-  },
-});

@@ -430,17 +430,15 @@ export default function HomeScreen({ navigation }: any) {
       setUserId(storedUserId);
       setUserName(storedUserName || '');
       
-      // 🚀 规范化用户类型，确保识别 merchant
-      let finalUserType = storedUserType?.toLowerCase();
-      if (finalUserType === 'merchants' || finalUserType === 'partner') finalUserType = 'merchant';
-      console.log('🏠 [HomeScreen] 用户身份识别:', { 原始: storedUserType, 规范化: finalUserType, 是否显示商城: (isGuest || finalUserType === 'customer' || finalUserType === 'vip') });
-      setUserType(finalUserType || null);
+      // 会员 App 仅 customer / vip / guest；商家会话由 AppContext 清掉
+      const finalUserType = storedUserType?.toLowerCase() || null;
+      setUserType(finalUserType);
       
       setIsGuest(guestMode === 'true');
 
-      // 如果是已登录用户（非访客），加载订单数据
+      // 如果是已登录用户（非访客），按客户身份加载订单数据
       if (storedUserId && guestMode !== 'true') {
-        await loadOrderData(storedUserId, storedUserEmail || undefined, storedUserPhone || undefined, finalUserType || undefined);
+        await loadOrderData(storedUserId, storedUserEmail || undefined, storedUserPhone || undefined, 'customer');
       }
     } catch (error) {
       errorService.handleError(error, { context: 'HomeScreen.loadUserData', silent: true });

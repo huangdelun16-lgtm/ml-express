@@ -41,6 +41,7 @@ ml-express-client-web/build/
 *.p12
 *.keystore
 *.jks
+**/android/keystore.properties
 vercel.json
 !vercel.json.example
 

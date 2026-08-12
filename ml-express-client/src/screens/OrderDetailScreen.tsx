@@ -73,7 +73,6 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerId, setCustomerId] = useState('');
-  const [userType, setUserType] = useState<'customer' | 'merchant'>('customer');
   const [deliveryPhotos, setDeliveryPhotos] = useState<any[]>([]); // 🚀 新增：配送照片状态
 
   // 聊天相关
@@ -471,7 +470,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       id: 'temp-' + Date.now(),
       order_id: id,
       sender_id: customerId,
-      sender_type: userType === 'merchant' ? 'merchant' : 'customer',
+      sender_type: 'customer',
       message: messageText,
       created_at: new Date().toISOString(),
       is_read: false
@@ -482,7 +481,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     const result = await chatService.sendMessage({
       order_id: id,
       sender_id: customerId,
-      sender_type: userType === 'merchant' ? 'merchant' : 'customer',
+      sender_type: 'customer',
       message: messageText
     });
     
@@ -497,15 +496,11 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     try {
       setLoading(true);
       
-      // 加载用户ID
+      // 加载用户ID（会员 App 仅 customer）
       const userData = await AsyncStorage.getItem('currentUser');
-      const storedUserType = await AsyncStorage.getItem('userType');
       if (userData) {
         const user = JSON.parse(userData);
         setCustomerId(user.id);
-        // 检测用户类型
-        const detectedUserType = storedUserType || user.user_type || 'customer';
-        setUserType(detectedUserType === 'merchant' ? 'merchant' : 'customer');
       }
 
       // 同时加载订单详情和聊天记录
@@ -1002,33 +997,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
             const deliveryFee = parseFloat(order.price?.replace(/[^0-9.]/g, '') || '0');
             const total = itemCost + deliveryFee;
 
-            if (userType === 'merchant') {
-              return (
-                <View style={styles.merchantsPriceContainer}>
-                  <View style={styles.priceRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="bicycle-outline" size={16} color="#3b82f6" style={{ marginRight: 8 }} />
-                      <Text style={styles.priceLabel}>{t.deliveryFee}</Text>
-                    </View>
-                    <Text style={styles.priceValue}>{deliveryFee.toLocaleString()} MMK</Text>
-                  </View>
-                  <View style={styles.priceRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="cash-outline" size={16} color="#f59e0b" style={{ marginRight: 8 }} />
-                      <Text style={styles.priceLabel}>{t.cod}</Text>
-                    </View>
-                    <Text style={styles.priceValue}>{Number(order.cod_amount || 0) > 0 ? `${Number(order.cod_amount).toLocaleString()} MMK` : t.none}</Text>
-                  </View>
-                  
-                  <View style={{ height: 1, backgroundColor: '#e2e8f0', marginVertical: 12, borderStyle: 'dashed', borderRadius: 1 }} />
-                  
-                  <View style={[styles.priceRow, styles.totalPriceRow, { backgroundColor: '#eff6ff', borderTopWidth: 0 }]}>
-                    <Text style={[styles.totalPriceLabel, { fontSize: 18 }]}>{t.totalAmount}</Text>
-                    <Text style={[styles.totalPriceValue, { fontSize: 24 }]}>{(deliveryFee + Number(order.cod_amount || 0)).toLocaleString()} MMK</Text>
-                  </View>
-                </View>
-              );
-            } else if (isVIP && itemCost > 0) {
+            if (isVIP && itemCost > 0) {
               return (
                 <View style={styles.merchantsPriceContainer}>
                   {/* 商品费项目 */}

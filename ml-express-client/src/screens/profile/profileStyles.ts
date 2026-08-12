@@ -1,0 +1,994 @@
+import { Dimensions, StyleSheet } from 'react-native';
+import { theme } from '../../config/theme';
+
+const { width } = Dimensions.get('window');
+
+export const profileStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background.default,
+  },
+  darkContainer: {
+    backgroundColor: '#0f172a',
+  },
+  darkText: {
+    color: '#f8fafc',
+  },
+  darkSettingsList: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
+  darkSettingItem: {
+    borderBottomColor: '#334155',
+  },
+  header: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text.light,
+    letterSpacing: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  userCard: {
+    borderRadius: 24,
+    padding: theme.spacing.l,
+    marginBottom: theme.spacing.xl,
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  userHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    marginRight: theme.spacing.l,
+  },
+  avatar: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.white,
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: theme.colors.white,
+  },
+  userInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.s,
+  },
+  userName: {
+    fontSize: theme.typography.sizes.xl,
+    fontWeight: 'bold',
+    color: theme.colors.white,
+    marginRight: theme.spacing.s,
+    maxWidth: 150,
+  },
+  userBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.s,
+  },
+  userBadgeText: {
+    color: theme.colors.white,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  merchantsBadge: {
+    backgroundColor: '#3b82f6', // 蓝色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  merchantsBadgeText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  vipBadge: {
+    backgroundColor: '#fbbf24', // 金色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  vipBadgeText: {
+    color: '#92400e', // 深褐色文字
+    fontWeight: '800',
+  },
+  adminBadge: {
+    backgroundColor: '#f97316', // 橙色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  adminBadgeText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  courierBadge: {
+    backgroundColor: '#a855f7', // 紫色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  courierBadgeText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  memberBadge: {
+    backgroundColor: '#3b82f6', // 蓝色背景
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  memberBadgeText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  contactInfoContainer: {
+    gap: 4,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userContact: {
+    fontSize: theme.typography.sizes.s,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginLeft: 6,
+  },
+  loginButton: {
+    marginTop: theme.spacing.s,
+    backgroundColor: theme.colors.white,
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.l,
+    alignSelf: 'flex-start',
+  },
+  loginButtonText: {
+    color: theme.colors.primary.DEFAULT,
+    fontSize: theme.typography.sizes.s,
+    fontWeight: 'bold',
+  },
+  editButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: theme.spacing.s,
+  },
+  section: {
+    marginBottom: theme.spacing.xxl,
+  },
+  sectionTitle: {
+    fontSize: theme.typography.sizes.l,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.l,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  statCard: {
+    width: (width - 56) / 2,
+    marginBottom: 16,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    ...theme.shadows.medium,
+    overflow: 'hidden',
+  },
+  statGradient: {
+    flex: 1,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+  },
+  statContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  statIconSmall: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: theme.colors.white,
+    marginBottom: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  statLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  actionCard: {
+    width: (width - 60) / 4,
+    alignItems: 'center',
+    marginBottom: theme.spacing.l,
+  },
+  actionIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.s,
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  actionIconText: {
+    fontSize: 24,
+  },
+  actionLabel: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+  },
+  settingsList: {
+    backgroundColor: theme.colors.background.paper,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: theme.spacing.l,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border.light,
+  },
+  settingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  settingIcon: {
+    fontSize: 20,
+    marginRight: theme.spacing.m,
+  },
+  settingLabel: {
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.text.primary,
+  },
+  settingArrow: {
+    fontSize: 20,
+    color: theme.colors.text.tertiary,
+  },
+  settingRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  notificationToggle: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  notificationToggleText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: theme.colors.white,
+  },
+  languageButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  languageButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: theme.colors.background.subtle,
+  },
+  languageButtonActive: {
+    backgroundColor: theme.colors.primary.DEFAULT,
+  },
+  languageButtonText: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    fontWeight: '600',
+  },
+  languageButtonTextActive: {
+    color: theme.colors.white,
+  },
+  logoutButton: {
+    backgroundColor: theme.colors.error.DEFAULT,
+    borderRadius: theme.borderRadius.l,
+    padding: theme.spacing.l,
+    alignItems: 'center',
+    marginTop: theme.spacing.s,
+    marginBottom: theme.spacing.xxl,
+    ...theme.shadows.medium,
+  },
+  logoutButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.typography.sizes.m,
+    fontWeight: '600',
+  },
+  footer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  footerText: {
+    fontSize: theme.typography.sizes.s,
+    color: theme.colors.text.secondary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  footerVersion: {
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.text.tertiary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: theme.colors.background.paper,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+    ...theme.shadows.large,
+  },
+  modalTitle: {
+    fontSize: theme.typography.sizes.xl,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xl,
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: theme.colors.background.input,
+    borderWidth: 1,
+    borderColor: theme.colors.border.DEFAULT,
+    borderRadius: theme.borderRadius.m,
+    padding: theme.spacing.m,
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.m,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  modalButtonCancel: {
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  modalButtonConfirm: {
+    backgroundColor: theme.colors.primary.DEFAULT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#64748b',
+  },
+  modalButtonTextConfirm: {
+    color: '#ffffff',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    backgroundColor: 'transparent',
+  },
+  aboutScrollView: {
+    maxHeight: 400,
+    marginBottom: 16,
+  },
+  aboutDescription: {
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.text.secondary,
+    lineHeight: 22,
+    marginBottom: 20,
+    textAlign: 'left',
+  },
+  aboutSection: {
+    marginBottom: 20,
+  },
+  aboutSectionTitle: {
+    fontSize: theme.typography.sizes.m,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    marginBottom: 8,
+  },
+  aboutSectionValue: {
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.text.secondary,
+    flex: 1,
+  },
+  aboutVersionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.borderRadius.s,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  aboutUpdateBtn: {
+    minWidth: 96,
+    minHeight: 36,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: theme.borderRadius.m,
+    backgroundColor: theme.colors.primary.DEFAULT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aboutUpdateBtnDisabled: {
+    opacity: 0.75,
+  },
+  aboutUpdateBtnText: {
+    color: '#fff',
+    fontSize: theme.typography.sizes.s,
+    fontWeight: '700',
+  },
+  aboutLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.borderRadius.s,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  aboutLinkText: {
+    fontSize: theme.typography.sizes.m,
+    color: theme.colors.primary.DEFAULT,
+    fontWeight: '500',
+    flex: 1,
+  },
+  aboutLinkArrow: {
+    fontSize: 20,
+    color: theme.colors.text.tertiary,
+    marginLeft: 8,
+  },
+  codCard: {
+    backgroundColor: theme.colors.background.paper,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.l,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    ...theme.shadows.medium,
+  },
+  codStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  codStatBox: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  codStatLabel: {
+    fontSize: theme.typography.sizes.xs,
+    fontWeight: '600',
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  codStatValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  codInfoContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  codInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  codInfoLabel: {
+    fontSize: theme.typography.sizes.s,
+    color: theme.colors.text.secondary,
+    fontWeight: '500',
+  },
+  codInfoValue: {
+    fontSize: theme.typography.sizes.s,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+  },
+  codInfoBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  codInfoBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  merchantCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.background.paper,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    ...theme.shadows.small,
+  },
+  merchantGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  merchantIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  merchantIcon: {
+    fontSize: 24,
+  },
+  merchantInfo: {
+    flex: 1,
+  },
+  merchantTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    marginBottom: 4,
+  },
+  merchantDesc: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+  },
+  // 🚀 营业管理样式
+  businessCard: {
+    backgroundColor: theme.colors.background.paper,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.l,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    ...theme.shadows.medium,
+  },
+  businessHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 15,
+  },
+  businessIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  businessIcon: {
+    fontSize: 24,
+  },
+  businessHeaderText: {
+    flex: 1,
+  },
+  businessTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    marginBottom: 4,
+  },
+  // 🚀 打印机设置样式
+  printerSettingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  printerSettingLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  printerSettingDesc: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  printerSettingSection: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  printerSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#64748b',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  printerTypeGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  printerTypeCard: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  printerTypeCardActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#3b82f6',
+  },
+  printerTypeLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  printerTypeLabelActive: {
+    color: '#3b82f6',
+    fontWeight: 'bold',
+  },
+  printerInput: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  printerHint: {
+    fontSize: 11,
+    color: '#f59e0b',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    padding: 4,
+  },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.small,
+  },
+  qtyBtnText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  qtyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginHorizontal: 15,
+    minWidth: 20,
+    textAlign: 'center',
+  },
+  // 🚀 新增：评价相关样式
+
+  businessDesc: {
+    fontSize: 12,
+    color: theme.colors.text.tertiary,
+  },
+  businessActions: {
+    gap: 16,
+  },
+  businessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 16,
+  },
+  businessRowLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.colors.text.primary,
+    marginBottom: 2,
+  },
+  businessRowDesc: {
+    fontSize: 11,
+    color: theme.colors.text.tertiary,
+  },
+  toggleContainer: {
+    width: 50,
+    height: 26,
+    borderRadius: 13,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'white',
+    ...theme.shadows.small,
+  },
+  timeSettingsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timeInputGroup: {
+    flex: 1,
+  },
+  timeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.text.secondary,
+    marginBottom: 6,
+    marginLeft: 4,
+  },
+  timeDisplayBox: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  timeDisplayText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: theme.colors.text.primary,
+  },
+  businessSaveButton: {
+    marginTop: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...theme.shadows.small,
+  },
+  businessSaveGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  businessSaveText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // 🚀 打印机设置样式
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reviewSummaryCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.3)',
+  },
+  reviewSummaryGradient: {
+    padding: 20,
+  },
+  ratingMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ratingAverageContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  starLarge: {
+    fontSize: 32,
+    marginBottom: 4,
+  },
+  ratingBigValue: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#b45309',
+  },
+  reviewCountSub: {
+    fontSize: 12,
+    color: '#92400e',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  ratingBarsContainer: {
+    flex: 1.5,
+    paddingLeft: 20,
+  },
+  ratingBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  starSmall: {
+    fontSize: 10,
+    width: 25,
+    color: '#92400e',
+    fontWeight: 'bold',
+  },
+  barBackground: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    backgroundColor: '#fbbf24',
+    borderRadius: 3,
+  },
+  // 评价详情列表样式
+  reviewItem: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    ...theme.shadows.small,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  reviewUser: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#1e293b',
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  reviewRating: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  reviewComment: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  reviewImages: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reviewImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+  },
+
+  darkSearchInput: {
+    backgroundColor: '#0f172a',
+    color: '#f8fafc',
+    borderColor: '#334155',
+  },
+
+  modalCloseButton: {
+    padding: 8,
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  darkCard: {
+    backgroundColor: '#1e293b',
+  },
+
+});
+

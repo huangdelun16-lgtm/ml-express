@@ -84,7 +84,7 @@ flowchart TB
 
 | 端 | 登录方式 | 会话存储 |
 |----|----------|----------|
-| 会员 Web/App | `users` 表（customer）邮箱/手机 + 密码 | `localStorage` / `AsyncStorage` |
+| 会员 Web/App | `users` 表（customer）邮箱/手机 + 密码 | `localStorage` / `AsyncStorage`（**不含商家登录**） |
 | 商家 Web/App | `delivery_stores` 店铺码 + 密码 | `localStorage` / `AsyncStorage` |
 | 骑手 App | `admin_accounts` + `ensure-courier-auth` Edge Function | `AsyncStorage` |
 | 管理后台 | `verify-admin` Netlify Function + HMAC JWT Cookie | session/localStorage |
@@ -194,18 +194,18 @@ flowchart TB
 
 | 维度 | 说明 |
 |------|------|
-| **定位** | C 端原生：下单、追踪、商城、充值、通知 |
+| **定位** | C 端原生：下单、追踪、商城、充值、通知（**仅 customer**；商家运营请用 `ml-express-merchant-app`） |
 | **入口** | `index.js` → `App.tsx`（React Navigation 6 Native Stack） |
 | **UI** | `src/screens/`（16 Screen）、`src/components/` |
 | **状态** | `AppContext`、`CartContext`、`LoadingContext` |
 | **业务层** | `supabase.ts`、`DatabaseService.ts`（SQLite 缓存）、`notificationService.ts`、`appUpdateService.ts` |
 | **工具** | `mediaAccess.ts`（Android Photo Picker，无 READ_MEDIA 权限）、`appUpdate.ts` |
-| **认证** | `users` customer → `AsyncStorage`；支持游客；商家分支走 `delivery_stores` |
+| **认证** | `users` `user_type='customer'` → `AsyncStorage`；支持游客；旧 merchant session 由 `AppContext` 清掉并提示用商家 App |
 | **Deep link** | `ml-express-client://`；关联域 `mlexpress.com` |
 | **Google Play** | `blockedPermissions` 屏蔽 READ_MEDIA_*；选图走系统 Photo Picker |
 | **部署** | EAS projectId `80b0873d-…`；profiles：`apk` / `production`（AAB） |
 
-**屏幕导航**：Welcome → Login/Register → Main(Home) → PlaceOrder、MyOrders、TrackOrder、CityMall、Cart、MerchantProducts、Profile、OrderDetail、AddressBook、NotificationCenter…
+**屏幕导航**：Welcome → Login/Register → Main(Home) → PlaceOrder、MyOrders、TrackOrder、CityMall、Cart、**MerchantProducts（客户逛店只读）**、Profile、OrderDetail、AddressBook、NotificationCenter…
 
 ### 3.1.5 商家 App（`ml-express-merchant-app/`）
 
@@ -520,13 +520,16 @@ cd ml-express-merchant-web && npm install && npm start
 ```
 ml-express-client/
 ├── index.js → App.tsx
-├── app.json / eas.json
+├── app.json / app.config.js / eas.json   # Maps Key 由 app.config.js 从环境变量注入
+├── .env.example                          # 本地/EAS 所需 EXPO_PUBLIC_* 模板
 ├── src/
-│   ├── screens/            # 16 Screen（见 7.4）
+│   ├── screens/            # 16 Screen（见 7.4）；Profile 文案/样式见 screens/profile/
 │   ├── components/
+│   │   └── placeOrder/     # 下单向导子组件 + placeOrderStyles
 │   ├── contexts/           # AppContext, CartContext, LoadingContext
 │   ├── services/
-│   │   ├── supabase.ts     # 主业务 API
+│   │   ├── supabase.ts     # 业务 API 入口（re-export）
+│   │   ├── clientApi/      # 拆分后的服务实现（customer/package/merchant…）
 │   │   ├── DatabaseService.ts   # expo-sqlite 本地缓存
 │   │   ├── notificationService.ts
 │   │   ├── appUpdateService.ts  # 应用内 APK 更新检查
@@ -534,9 +537,14 @@ ml-express-client/
 │   └── utils/
 │       ├── mediaAccess.ts       # Android Photo Picker（Google Play 合规）
 │       └── appUpdate.ts
-├── android/ ios/           # 原生工程
+├── android/
+│   ├── keystore.properties.example  # 签名模板
+│   ├── keystore.properties          # 本地签名密码（gitignore，勿提交）
+│   └── app/*.keystore               # 仅 debug.keystore 可入库；release/upload 勿提交
 └── docs/sql/               # client_android_latest_release.sql
 ```
+
+**密钥约定**：`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` / `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` 放 `.env`（本地）或 EAS Secrets；`android/keystore.properties` 放上传密钥密码。勿把 Maps Key、keystore 密码写入 `app.json` / `gradle.properties`。
 
 ### 7.3 数据层
 
@@ -551,12 +559,13 @@ ml-express-client/
 
 **Native Stack**（`initialRouteName="Welcome"`）：
 
-Welcome → Login/Register → **Main(HomeScreen)** → PlaceOrder、MyOrders、TrackOrder、Profile、OrderDetail、AddressBook、CityMall、Cart、MerchantProducts、NotificationCenter、NotificationSettings…
+Welcome → Login/Register → **Main(HomeScreen)** → PlaceOrder、MyOrders、TrackOrder、Profile、OrderDetail、AddressBook、CityMall、Cart、MerchantProducts（客户逛店只读）、NotificationCenter、NotificationSettings…
 
 ### 7.5 认证
 
 - `users` 表 `user_type='customer'`，自定义密码校验（**非 Supabase Auth JWT**）。
-- 支持游客模式；商家登录走 `delivery_stores` 分支（同一 `supabase.ts`）。
+- 支持游客模式；**会员 App 仅维护 customer 会话**（`AppContext` 守卫：检测到 merchant/partner 会清 session 并提示使用 `ml-express-merchant-app`）。
+- CityMall / MerchantProducts 为客户逛店只读浏览 + 购物车下单，不含商家接单/商品 CRUD/打印机等运营能力。
 
 ### 7.6 Google Play 媒体权限策略
 
