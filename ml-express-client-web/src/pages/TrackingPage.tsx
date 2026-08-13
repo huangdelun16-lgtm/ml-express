@@ -12,6 +12,7 @@ import {
   TERMINAL_EXCLUDED_STATUSES,
   TRACKING_LIVE_MAP_STATUSES
 } from '../constants/packageStatus';
+import { feedbackService } from '../services/FeedbackService';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
@@ -356,7 +357,7 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
 
   const handleTrackingInternal = async (number: string) => {
     if (!number.trim()) {
-      alert(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');
+      feedbackService.notify(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');
       return;
     }
     setLoading(true);
@@ -374,7 +375,7 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
         // 🚀 核心优化：如果该订单是“顺路递”，则不显示在包裹跟踪中
         const isWaySide = pkg.package_type === '顺路递' || pkg.package_type === 'Eco Way' || pkg.package_type === 'တန်တန်လေးပို့';
         if (isWaySide) {
-          alert(language === 'zh' ? '该订单类型暂不支持实时跟踪' : 'Live tracking is not available for this package type');
+          feedbackService.notify(language === 'zh' ? '该订单类型暂不支持实时跟踪' : 'Live tracking is not available for this package type');
           setTrackingResult(null);
           setCourierLocation(null);
           setAnimatedCourierLocation(null);
@@ -385,14 +386,14 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
         setTrackingResult(pkg);
         // 收货地坐标由上方 useEffect 根据 receiver_latitude/receiver_longitude 或地理编码写入 receiverMapPosition（与客户端 App 一致）
       } else {
-        alert(t.tracking.notFound);
+        feedbackService.notify(t.tracking.notFound);
         setTrackingResult(null);
         setCourierLocation(null);
         setAnimatedCourierLocation(null);
       }
     } catch (error) {
       LoggerService.error('查询失败:', error);
-      alert(language === 'zh' ? '查询失败，请稍后重试' : language === 'en' ? 'Query failed, please try again later' : 'ရှာဖွေမှု မအောင်မြင်ပါ');
+      feedbackService.notify(language === 'zh' ? '查询失败，请稍后重试' : language === 'en' ? 'Query failed, please try again later' : 'ရှာဖွေမှု မအောင်မြင်ပါ');
     } finally {
       setLoading(false);
     }

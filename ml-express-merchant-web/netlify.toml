@@ -19,6 +19,10 @@
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
   NETLIFY_SKIP_PLUGINS = "true"
+  # CLI `netlify deploy --build` 默认 context=dev，必须写在 build.environment 才会生效。
+  # 前端包会打入 anon / Maps 公钥，属预期；勿把 service role / Twilio / Gmail 加进 OMIT。
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+  SECRETS_SCAN_OMIT_KEYS = "REACT_APP_SUPABASE_ANON_KEY,REACT_APP_SUPABASE_URL,REACT_APP_GOOGLE_MAPS_API_KEY"
 
 # 勿用 releases/latest：若最新 Release 未附带 ml-express-merchants.apk 会 404。
 # 发布新版商家 APK 后请上传到 GitHub 并改为对应 tag，或恢复为 latest（且保证附件存在）。
@@ -39,3 +43,12 @@
     Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
     Pragma = "no-cache"
     Expires = "0"
+
+[context.production.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+[context.deploy-preview.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+[context.branch-deploy.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"

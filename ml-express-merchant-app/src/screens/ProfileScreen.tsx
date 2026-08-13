@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import LoggerService from "./../services/LoggerService";
+import { feedbackService } from "../services/FeedbackService";
 import {
   View,
   Text,
@@ -27,9 +28,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as Speech from "expo-speech";
 import { Vibration } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import { pickImageFromLibrary, ensureSaveToLibraryPermission } from "../utils/mediaAccess";
 import * as MediaLibrary from "expo-media-library";
-import * as FileSystem from "expo-file-system";
 import { useApp } from "../contexts/AppContext";
 import { useLoading } from "../contexts/LoadingContext";
 import {
@@ -40,7 +40,6 @@ import {
   reviewService,
   supabase,
 } from "../services/supabase";
-import Toast from "../components/Toast";
 import BackToHomeButton from "../components/BackToHomeButton";
 import { theme } from "../config/theme";
 import Skeleton, { StatsCardSkeleton } from "../components/Skeleton";
@@ -309,13 +308,6 @@ export default function ProfileScreen({ navigation }: any) {
   const [tempSelectedMonth, setTempSelectedMonth] = useState(
     new Date().getMonth() + 1,
   );
-
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastType, setToastType] = useState<
-    "success" | "error" | "info" | "warning"
-  >("info");
 
   // 编辑资料模态框
   const [showEditModal, setShowEditModal] = useState(false);
@@ -618,9 +610,7 @@ export default function ProfileScreen({ navigation }: any) {
     message: string,
     type: "success" | "error" | "info" | "warning" = "info",
   ) => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(message, type);
   };
 
   // 多语言翻译
@@ -1807,7 +1797,7 @@ export default function ProfileScreen({ navigation }: any) {
   // 🚀 新增：中转站重新发货逻辑
   const handleReshipOrder = async (pkg: any) => {
     if (!isMerchantStore || storeInfo?.store_type !== "transit_station") {
-      Alert.alert("错误", "仅限中转站账号操作");
+      feedbackService.notify("错误", "仅限中转站账号操作");
       return;
     }
 
@@ -1843,12 +1833,12 @@ export default function ProfileScreen({ navigation }: any) {
             if (error) throw error;
 
             hideLoading();
-            Alert.alert("成功", t.reshipSuccess);
+            feedbackService.notify("成功", t.reshipSuccess);
             await loadUserPackages();
           } catch (error) {
             hideLoading();
             LoggerService.error("重新发货失败:", error);
-            Alert.alert("错误", "操作失败，请重试");
+            feedbackService.notify("错误", "操作失败，请重试");
           }
         },
       },
@@ -1872,41 +1862,6 @@ export default function ProfileScreen({ navigation }: any) {
     ]);
   };
 
-  const handleDeleteAccount = async () => {
-    if (isGuest || !userId) {
-      showToast(t.pleaseLogin, "warning");
-      return;
-    }
-
-    Alert.alert(t.confirmDeleteTitle, t.deleteWarning, [
-      { text: t.cancel, style: "cancel" },
-      {
-        text: t.deleteAccount,
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setRefreshing(true);
-            const result = await customerService.deleteAccount(userId);
-
-            if (result.success) {
-              showToast(t.deleteSuccess, "success");
-              await AsyncStorage.clear();
-              setTimeout(() => {
-                navigation.replace("Login");
-              }, 1500);
-            } else {
-              Alert.alert(t.deleteFailed, result.error?.message || "");
-            }
-          } catch (error) {
-            LoggerService.error("注销账号操作失败:", error);
-            showToast(t.deleteFailed, "error");
-          } finally {
-            setRefreshing(false);
-          }
-        },
-      },
-    ]);
-  };
 
   const handleEditProfile = () => {
     if (isGuest) {
@@ -1997,10 +1952,10 @@ export default function ProfileScreen({ navigation }: any) {
       console.log("🚀 开始保存二维码...", amount);
       showLoading(language === "zh" ? "正在保存..." : "Saving...", "package");
 
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted") {
+      const granted = await ensureSaveToLibraryPermission();
+      if (!granted) {
         hideLoading();
-        Alert.alert("提示", "需要相册权限才能保存图片");
+        feedbackService.notify("提示", "需要相册权限才能保存图片");
         return;
       }
 
@@ -2020,7 +1975,7 @@ export default function ProfileScreen({ navigation }: any) {
         await MediaLibrary.saveToLibraryAsync(localUri);
 
         hideLoading();
-        Alert.alert(
+        feedbackService.notify(
           language === "zh" ? "保存成功" : "Saved!",
           language === "zh"
             ? "收款码已保存到您的相册，请打开 KBZPay 支付"
@@ -2033,21 +1988,14 @@ export default function ProfileScreen({ navigation }: any) {
       hideLoading();
       console.error("保存二维码失败详情:", error);
       LoggerService.error("保存二维码失败:", error);
-      Alert.alert("保存失败", `原因: ${error?.message || "未知错误"}`);
+      feedbackService.notify("保存失败", `原因: ${error?.message || "未知错误"}`);
     }
   };
 
   // 🚀 新增：上传支付凭证
   const handleUploadPaymentProof = async () => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("提示", "需要相册权限才能选择图片");
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result = await pickImageFromLibrary({
         mediaTypes: ["images"],
         allowsEditing: true,
         quality: 0.7,
@@ -2055,7 +2003,7 @@ export default function ProfileScreen({ navigation }: any) {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setRechargeProofUri(result.assets[0].uri);
-        Alert.alert("提示", "凭证已选择，请确认提交充值申请");
+        feedbackService.notify("提示", "凭证已选择，请确认提交充值申请");
       }
     } catch (error) {
       LoggerService.error("Pick proof error:", error);
@@ -2069,13 +2017,13 @@ export default function ProfileScreen({ navigation }: any) {
 
     if (!selectedRechargeAmount || !userId) {
       console.warn("缺少必要信息:", { selectedRechargeAmount, userId });
-      Alert.alert("提示", "用户信息已丢失，请重新登录");
+      feedbackService.notify("提示", "用户信息已丢失，请重新登录");
       return;
     }
 
     if (!rechargeProofUri) {
       console.warn("未选择汇款凭证");
-      Alert.alert("提示", t.pleaseUploadRecord);
+      feedbackService.notify("提示", t.pleaseUploadRecord);
       return;
     }
 
@@ -2084,8 +2032,6 @@ export default function ProfileScreen({ navigation }: any) {
         language === "zh" ? "正在提交申请..." : "Submitting...",
         "package",
       );
-      console.log("正在准备上传凭证:", rechargeProofUri);
-      Alert.alert("提示", "正在上传凭证，请稍候...");
 
       // 1. 上传图片到 Supabase Storage
       const proofUrl = await rechargeService.uploadProof(
@@ -2140,7 +2086,7 @@ export default function ProfileScreen({ navigation }: any) {
         errorMsg = "网络连接失败，请检查您的网络设置";
       }
 
-      Alert.alert(
+      feedbackService.notify(
         language === "zh" ? "提交失败" : "Failed",
         language === "zh"
           ? `充值申请提交失败，请联系客服。\n错误详情: ${errorMsg}`
@@ -3446,35 +3392,6 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
 
-        {/* 注销账号 */}
-        {!isGuest && (
-          <TouchableOpacity
-            style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
-            onPress={handleDeleteAccount}
-          >
-            <View style={styles.settingLeft}>
-              <Text
-                style={[
-                  styles.settingIcon,
-                  { color: theme.colors.error.DEFAULT },
-                ]}
-              >
-                🗑️
-              </Text>
-              <Text
-                style={[
-                  styles.settingLabel,
-                  { color: theme.colors.error.DEFAULT },
-                ]}
-              >
-                {t.deleteAccount}
-              </Text>
-            </View>
-            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>
-              ›
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );
@@ -4306,7 +4223,7 @@ export default function ProfileScreen({ navigation }: any) {
                     const privacyUrl =
                       "https://market-link-express.com/privacy-policy";
                     Linking.openURL(privacyUrl).catch(() => {
-                      Alert.alert(
+                      feedbackService.notify(
                         language === "zh"
                           ? "无法打开链接"
                           : language === "en"
@@ -4334,7 +4251,7 @@ export default function ProfileScreen({ navigation }: any) {
                     const termsUrl =
                       "https://market-link-express.com/terms-of-service";
                     Linking.openURL(termsUrl).catch(() => {
-                      Alert.alert(
+                      feedbackService.notify(
                         language === "zh"
                           ? "无法打开链接"
                           : language === "en"
@@ -5531,14 +5448,6 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
-
-      <Toast
-        message={toastMessage}
-        type={toastType}
-        visible={toastVisible}
-        duration={3000}
-        onHide={() => setToastVisible(false)}
-      />
     </View>
   );
 }

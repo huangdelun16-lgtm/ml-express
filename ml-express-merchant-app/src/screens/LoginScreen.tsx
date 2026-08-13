@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
+import { merchantAuthService, MerchantAuthError } from '../services/merchantAuthService';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import LanguageSelector from '../components/LanguageSelector';
@@ -40,6 +41,7 @@ export default function LoginScreen({ navigation }: any) {
       storeNotFound: '店铺代码不存在',
       storePasswordError: '密码错误',
       queryStoreFailed: '查询店铺失败，请稍后重试',
+      networkError: '无法连接登录服务器，请检查移动网络或 Wi-Fi 后重试。',
       welcomeMERCHANTS: '欢迎回来，',
     },
     en: {
@@ -59,6 +61,7 @@ export default function LoginScreen({ navigation }: any) {
       storeNotFound: 'Store code not found',
       storePasswordError: 'Incorrect password',
       queryStoreFailed: 'Failed to query store',
+      networkError: 'Cannot reach login server. Check your network and try again.',
       welcomeMERCHANTS: 'Welcome back, ',
     },
     my: {
@@ -78,6 +81,7 @@ export default function LoginScreen({ navigation }: any) {
       storeNotFound: 'ဆိုင်ကုဒ် မရှိပါ',
       storePasswordError: 'စကားဝှက်မှားနေပါသည်',
       queryStoreFailed: 'ဆိုင်ကို ရှာဖွေရန် မအောင်မြင်ပါ',
+      networkError: 'လော့ဂ်အင်ဆာဗာသို့ ချိတ်ဆက်မရပါ။ ကွန်ရက်ကို စစ်ဆေးပါ။',
       welcomeMERCHANTS: 'ပြန်လည်ကြိုဆိုပါတယ် ',
     },
   };
@@ -109,68 +113,61 @@ export default function LoginScreen({ navigation }: any) {
         return;
       }
 
-      const storeCodeInput = email.trim().toUpperCase(); // 🚀 强制转大写，处理大小写输入问题
-      const { data: store, error: storeError } = await supabase
-        .from("delivery_stores")
-        .select("*")
-        .eq("store_code", storeCodeInput)
-        .maybeSingle();
+      const storeCodeInput = email.trim().toUpperCase();
+      let store;
+      try {
+        store = await merchantAuthService.login(storeCodeInput, password);
+      } catch (authError: any) {
+        hideLoading();
+        const kind =
+          authError instanceof MerchantAuthError
+            ? authError.kind
+            : /网络|超时|timeout|Abort|Failed to fetch|Network|无法连接/i.test(String(authError?.message || ''))
+              ? 'network'
+              : 'credentials';
+        const raw = String(authError?.message || '');
+
+        if (kind === 'network') {
+          feedbackService.error(raw || currentT.networkError);
+          return;
+        }
+
+        if (/店铺代码不存在|Store code not found/i.test(raw)) {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("id, user_type")
+            .or(`email.eq.${storeCodeInput},phone.eq.${storeCodeInput}`)
+            .maybeSingle();
+
+          if (userData) {
+            let errorMsg =
+              language === "zh"
+                ? "检测到非商家账号。请使用商家专属代码登录。"
+                : "Non-merchant account detected. Please use your Merchant Store Code.";
+
+            if (userData.user_type === "admin") {
+              errorMsg =
+                language === "zh"
+                  ? "检测到管理员账号。本 App 仅供商家使用，请前往管理后台。"
+                  : "Admin account detected. This app is for Merchants only.";
+            }
+
+            feedbackService.error(errorMsg);
+          } else {
+            feedbackService.error(currentT.storeNotFound);
+          }
+          return;
+        }
+
+        feedbackService.error(raw || currentT.storePasswordError);
+        return;
+      }
 
       hideLoading();
-
-      if (storeError) {
-        LoggerService.error("查询合伙店铺失败:", storeError);
-        feedbackService.error(`${currentT.queryStoreFailed} (${storeError.message})`); // 🚀 增加具体错误信息
-        return;
-      }
-
-      if (!store) {
-        // 🚀 额外检查：是否误用了其他类型的账号尝试登录商家端
-        const { data: userData } = await supabase
-          .from("users")
-          .select("id, user_type")
-          .or(`email.eq.${storeCodeInput},phone.eq.${storeCodeInput}`)
-          .maybeSingle();
-
-        if (userData) {
-          let errorMsg =
-            language === "zh"
-              ? "检测到非商家账号。请使用商家专属代码登录。"
-              : "Non-merchant account detected. Please use your Merchant Store Code.";
-
-          if (userData.user_type === "admin") {
-            errorMsg =
-              language === "zh"
-                ? "检测到管理员账号。本 App 仅供商家使用，请前往管理后台。"
-                : "Admin account detected. This app is for Merchants only.";
-          }
-
-          feedbackService.error(errorMsg);
-        } else {
-          feedbackService.error(currentT.storeNotFound);
-        }
-        return;
-      }
 
       const blockReason = getMerchantLoginBlockReason(store, loginLang);
       if (blockReason) {
         feedbackService.error(blockReason);
-        return;
-      }
-
-      // 🚀 逻辑修正：密码对比也应进行 trim
-      if (store.password?.trim() !== password.trim()) {
-        feedbackService.error(currentT.storePasswordError);
-        return;
-      }
-
-      // 🚀 核心优化：检查商家账号状态
-      if (store.status && store.status !== "active") {
-        feedbackService.error(
-          language === "zh"
-            ? `账号状态异常 (${store.status})，请联系管理员。`
-            : `Account status issue (${store.status}). Please contact admin.`,
-        );
         return;
       }
 

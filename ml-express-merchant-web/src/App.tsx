@@ -6,6 +6,7 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { supabase } from './services/supabase';
 import { isTransitStationStore } from './services/_shared/merchantLoginGuard';
 import './App.css';
+import { GlobalToast } from './components/GlobalToast';
 
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const StoreProductsPage = lazy(() => import('./pages/StoreProductsPage'));
@@ -110,8 +111,10 @@ function App() {
     setCurrentUser(user);
   };
 
-  if (loading) {
-    return (
+  return (
+    <LanguageProvider>
+      <GlobalToast />
+      {loading ? (
       <div
         style={{
           minHeight: '100vh',
@@ -124,11 +127,7 @@ function App() {
       >
         Loading…
       </div>
-    );
-  }
-
-  return (
-    <LanguageProvider>
+      ) : (
       <Router>
         <div className="App" style={{ minHeight: '100vh', background: '#0a0f1e' }}>
           <Routes>
@@ -165,6 +164,7 @@ function App() {
           </Routes>
         </div>
       </Router>
+      )}
     </LanguageProvider>
   );
 }

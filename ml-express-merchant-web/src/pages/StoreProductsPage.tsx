@@ -14,6 +14,7 @@ import {
 } from '../utils/merchantProductForm';
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 import '../styles/merchantProductsPage.css';
+import { feedbackService } from '../services/FeedbackService';
 
 const StoreProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -100,7 +101,7 @@ const StoreProductsPage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error('图片上传失败:', error);
-      alert(language === 'zh' ? '图片上传失败，请重试' : 'Image upload failed');
+      feedbackService.notify(language === 'zh' ? '图片上传失败，请重试' : 'Image upload failed');
     } finally {
       setIsUploading(false);
       if (productFileInputRef.current) productFileInputRef.current.value = '';
@@ -129,7 +130,7 @@ const StoreProductsPage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error('详细介绍图上传失败:', error);
-      alert(language === 'zh' ? '图片上传失败，请重试' : 'Image upload failed');
+      feedbackService.notify(language === 'zh' ? '图片上传失败，请重试' : 'Image upload failed');
     } finally {
       setIsUploadingDetailImages(false);
       if (detailImagesFileInputRef.current) detailImagesFileInputRef.current.value = '';
@@ -148,7 +149,7 @@ const StoreProductsPage: React.FC = () => {
     const { draft, error: formError } = buildMerchantProductDraft(productForm);
     if (!storeId) return;
     if (formError) {
-      alert(language === 'zh' ? formError : formError);
+      feedbackService.notify(language === 'zh' ? formError : formError);
       return;
     }
 
@@ -166,7 +167,7 @@ const StoreProductsPage: React.FC = () => {
         setShowAddEditProductModal(false);
         await loadStoreData(storeId);
         if (!editingProduct || ('pendingReview' in result && result.pendingReview)) {
-          alert(
+          feedbackService.notify(
             language === 'zh'
               ? editingProduct
                 ? '修改已提交，待后台审核通过后客户才能看到新内容。'
@@ -177,7 +178,7 @@ const StoreProductsPage: React.FC = () => {
           );
         }
       } else {
-        alert(language === 'zh' ? '保存失败，请重试' : 'Save failed');
+        feedbackService.notify(language === 'zh' ? '保存失败，请重试' : 'Save failed');
       }
     } catch (error) {
       LoggerService.error('保存商品失败:', error);
@@ -197,7 +198,7 @@ const StoreProductsPage: React.FC = () => {
         const storeId = currentUser?.store_id || currentUser?.id;
         if (storeId) await loadStoreData(storeId);
       } else {
-        alert(language === 'zh' ? '删除失败' : 'Delete failed');
+        feedbackService.notify(language === 'zh' ? '删除失败' : 'Delete failed');
       }
     } catch (error) {
       LoggerService.error('删除商品失败:', error);
@@ -213,7 +214,7 @@ const StoreProductsPage: React.FC = () => {
         const storeId = currentUser?.store_id || currentUser?.id;
         if (storeId) await loadStoreData(storeId);
         if ('pendingReview' in result && result.pendingReview) {
-          alert(
+          feedbackService.notify(
             language === 'zh'
               ? '上下架变更已提交，待后台审核通过后生效。'
               : 'Availability change submitted for admin approval.',

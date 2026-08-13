@@ -9,6 +9,7 @@ import LoggerService from '../services/LoggerService';
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 import { CITY_MALL_CATEGORIES, getMerchantStoreTypeLabel } from '../services/_shared/merchantStoreTypes';
 import type { StoreTypeLang } from '../services/_shared/merchantStoreTypes';
+import { feedbackService } from '../services/FeedbackService';
 
 const CityMallPage: React.FC = () => {
   const navigate = useNavigate();
@@ -859,7 +860,7 @@ const CityMallPage: React.FC = () => {
                       key={store.id}
                       onClick={() => {
                         if (!status.isOpen) {
-                          alert(t.mall.closedToday);
+                          feedbackService.notify(t.mall.closedToday);
                           return;
                         }
                         navigate(`/mall/${store.id}`);

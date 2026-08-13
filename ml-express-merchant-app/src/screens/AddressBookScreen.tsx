@@ -17,8 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
 import { addressService, AddressItem } from '../services/supabase';
 import { theme } from '../config/theme';
-import Toast from '../components/Toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { feedbackService } from '../services/FeedbackService';
 import MapModal from '../components/placeOrder/MapModal';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
@@ -197,15 +197,8 @@ export default function AddressBookScreen({ navigation, route }: any) {
     is_default: false
   });
 
-  // Toast
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
-
   const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
-    setToastMessage(msg);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(msg, type);
   };
 
   const t = {
@@ -306,7 +299,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
 
   const handleSave = async () => {
     if (!formData.contact_name || !formData.contact_phone || !formData.address_text) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      feedbackService.notify('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -589,13 +582,6 @@ export default function AddressBookScreen({ navigation, route }: any) {
           </View>
         </View>
       </Modal>
-
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        onHide={() => setToastVisible(false)}
-      />
     </View>
   );
 }

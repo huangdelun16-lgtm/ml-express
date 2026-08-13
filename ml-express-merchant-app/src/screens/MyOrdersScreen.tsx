@@ -3,15 +3,15 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, D
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as ImagePicker from 'expo-image-picker';
+import { pickImageFromLibrary } from '../utils/mediaAccess';
 import { packageService, supabase, reviewService, merchantService } from '../services/supabase';
 import { chatService } from '../services/chatService';
 import LoggerService from '../services/LoggerService';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
 import { errorService } from '../services/ErrorService';
+import { feedbackService } from '../services/FeedbackService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import PackingModal from '../components/PackingModal';
 import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
@@ -66,11 +66,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // ScrollView引用
   const scrollViewRef = useRef<ScrollView>(null);
   
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
-
   // 打包模态框状态
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [packingOrderData, setPackingOrderData] = useState<Order | null>(null);
@@ -224,9 +219,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   // 显示Toast
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(message, type);
   };
 
   // 状态过滤器
@@ -585,15 +578,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       return;
     }
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(language === 'zh' ? '权限错误' : 'Permission Error', language === 'zh' ? '需要相册访问权限来上传评价图片' : 'Need photo library access');
-      return;
-    }
-
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const result = await pickImageFromLibrary({
+        mediaTypes: ['images'],
         allowsMultipleSelection: true,
         selectionLimit: 6 - reviewImages.length,
         quality: 0.7,
@@ -629,7 +616,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const handleSubmitReview = async () => {
     if (!reviewOrder || !customerId) return;
     if (!reviewComment.trim()) {
-      Alert.alert(language === 'zh' ? '提示' : 'Alert', language === 'zh' ? '请输入评价内容' : 'Please enter review');
+      feedbackService.notify(language === 'zh' ? '提示' : 'Alert', language === 'zh' ? '请输入评价内容' : 'Please enter review');
       return;
     }
 
@@ -666,7 +653,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         throw new Error('Submit failed');
       }
     } catch (error) {
-      Alert.alert('错误', '提交评价失败');
+      feedbackService.notify('错误', '提交评价失败');
     } finally {
       setIsSubmittingReview(false);
     }
@@ -688,7 +675,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       showToast(language === 'zh' ? '接单成功，请打包' : 'Accepted, please pack', 'success');
       onRefresh();
     } catch (error) {
-      Alert.alert('错误', '接单失败');
+      feedbackService.notify('错误', '接单失败');
     } finally {
       hideLoading();
     }
@@ -716,7 +703,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               showToast(language === 'zh' ? '订单已拒绝' : 'Declined', 'info');
               onRefresh();
             } catch (error) {
-              Alert.alert('错误', '操作失败');
+              feedbackService.notify('错误', '操作失败');
             } finally {
               hideLoading();
             }
@@ -780,15 +767,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           backgroundColor: 'rgba(255, 255, 255, 0.05)',
           zIndex: 0
         }} />
-
-        {/* Toast通知 */}
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        duration={3000}
-        onHide={() => setToastVisible(false)}
-      />
 
       <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
         <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
@@ -1146,7 +1124,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
             DeviceEventEmitter.emit('order_status_updated');
             onRefresh();
           } catch (error) {
-            Alert.alert('错误', '提交失败，请重试');
+            feedbackService.notify('错误', '提交失败，请重试');
           } finally {
             hideLoading();
           }

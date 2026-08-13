@@ -16,6 +16,7 @@ import {
   addDismissedReviewOrderIdWeb,
   pickUnratedDeliveredPackage,
 } from '../utils/reviewPromptStorage';
+import { feedbackService } from '../services/FeedbackService';
 
 // 注入样式
 if (typeof document !== 'undefined') {
@@ -365,7 +366,7 @@ const ProfilePage: React.FC = () => {
   const handleAddVacationDate = () => {
     if (!tempVacationDate) return;
     if (businessStatus.vacation_dates.includes(tempVacationDate)) {
-      alert(language === 'zh' ? '该日期已在休假列表中' : 'Date already in list');
+      feedbackService.notify(language === 'zh' ? '该日期已在休假列表中' : 'Date already in list');
       return;
     }
     setBusinessStatus(prev => ({
@@ -416,10 +417,10 @@ const ProfilePage: React.FC = () => {
         });
         if (result.success) {
           setStoreInfo(result.data);
-          alert(language === 'zh' ? '商家资料更新成功' : 'Merchant profile updated');
+          feedbackService.notify(language === 'zh' ? '商家资料更新成功' : 'Merchant profile updated');
           setShowEditProfileModal(false);
         } else {
-          alert(language === 'zh' ? '更新失败，请重试' : 'Update failed');
+          feedbackService.notify(language === 'zh' ? '更新失败，请重试' : 'Update failed');
         }
       } else {
         // 客户资料更新
@@ -433,15 +434,15 @@ const ProfilePage: React.FC = () => {
           const updatedUser = { ...currentUser, ...result.data };
           setCurrentUser(updatedUser);
           localStorage.setItem('ml-express-customer', JSON.stringify(updatedUser));
-          alert(language === 'zh' ? '个人资料更新成功' : 'Profile updated');
+          feedbackService.notify(language === 'zh' ? '个人资料更新成功' : 'Profile updated');
           setShowEditProfileModal(false);
         } else {
-          alert(language === 'zh' ? '更新失败，请重试' : 'Update failed');
+          feedbackService.notify(language === 'zh' ? '更新失败，请重试' : 'Update failed');
         }
       }
     } catch (error) {
       LoggerService.error('保存资料失败:', error);
-      alert(language === 'zh' ? '发生错误，请稍后重试' : 'An error occurred');
+      feedbackService.notify(language === 'zh' ? '发生错误，请稍后重试' : 'An error occurred');
     } finally {
       setIsSavingProfile(false);
     }
@@ -515,7 +516,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error('图片上传失败:', error);
-      alert('图片上传失败，请重试');
+      feedbackService.notify('图片上传失败，请重试');
     } finally {
       setIsUploading(false);
     }
@@ -523,7 +524,7 @@ const ProfilePage: React.FC = () => {
 
   const handleSaveProduct = async () => {
     if (!productForm.name || !productForm.price || !currentUser?.id) {
-      alert('请填写必要信息');
+      feedbackService.notify('请填写必要信息');
       return;
     }
 
@@ -563,10 +564,10 @@ const ProfilePage: React.FC = () => {
         setShowAddEditProductModal(false);
         await loadProducts();
         if (!editingProduct) {
-          alert(language === 'zh' ? '商品已提交，待后台审核通过后将展示给顾客。' : 'Submitted. Visible to customers after admin approval.');
+          feedbackService.notify(language === 'zh' ? '商品已提交，待后台审核通过后将展示给顾客。' : 'Submitted. Visible to customers after admin approval.');
         }
       } else {
-        alert('保存失败，请重试');
+        feedbackService.notify('保存失败，请重试');
       }
     } catch (error) {
       LoggerService.error('保存商品失败:', error);
@@ -584,7 +585,7 @@ const ProfilePage: React.FC = () => {
       if (result.success) {
         await loadProducts();
       } else {
-        alert('删除失败，请重试');
+        feedbackService.notify('删除失败，请重试');
       }
     } catch (error) {
       LoggerService.error('删除商品失败:', error);
@@ -616,21 +617,21 @@ const ProfilePage: React.FC = () => {
         setStoreInfo((prev: any) => ({ ...prev, ...result.data }));
         // 🚀 优化：根据状态显示不同的通知
         if (updates.vacation_dates !== undefined) {
-          alert(language === 'zh' ? '✅ 休假计划已更新' : '✅ Vacation schedule updated');
+          feedbackService.notify(language === 'zh' ? '✅ 休假计划已更新' : '✅ Vacation schedule updated');
         } else if (updates.is_closed_today !== undefined) {
-          alert(updates.is_closed_today 
+          feedbackService.notify(updates.is_closed_today 
             ? (language === 'zh' ? '🛑 今日暂停服务已开启' : language === 'en' ? '🛑 Service suspended today' : 'ယနေ့ ဝန်ဆောင်မှု ရပ်နားထားပါသည်')
             : (language === 'zh' ? '✅ 营业状态已恢复' : language === 'en' ? '✅ Business resumed' : 'လုပ်ငန်း ပြန်လည်စတင်ပါပြီ')
           );
         } else {
-          alert(language === 'zh' ? '💾 营业时间设置成功' : language === 'en' ? '💾 Operating hours set successfully' : 'ဖွင့်လှစ်ချိန် သတ်မှတ်မှု အောင်မြင်ပါသည်');
+          feedbackService.notify(language === 'zh' ? '💾 营业时间设置成功' : language === 'en' ? '💾 Operating hours set successfully' : 'ဖွင့်လှစ်ချိန် သတ်မှတ်မှု အောင်မြင်ပါသည်');
         }
       } else {
-        alert(language === 'zh' ? '❌ 保存失败' : '❌ Save failed');
+        feedbackService.notify(language === 'zh' ? '❌ 保存失败' : '❌ Save failed');
       }
     } catch (error) {
       LoggerService.error('更新营业状态失败:', error);
-      alert(language === 'zh' ? '❌ 保存发生错误' : '❌ An error occurred');
+      feedbackService.notify(language === 'zh' ? '❌ 保存发生错误' : '❌ An error occurred');
     } finally {
       setIsSavingStatus(false);
     }
@@ -639,7 +640,7 @@ const ProfilePage: React.FC = () => {
   // 🚀 新增：中转站重新发货逻辑
   const handleReshipOrder = async (pkg: any) => {
     if (!storeInfo || storeInfo.store_type !== 'transit_station') {
-      alert(language === 'zh' ? '仅限中转站账号操作' : 'Transit stations only');
+      feedbackService.notify(language === 'zh' ? '仅限中转站账号操作' : 'Transit stations only');
       return;
     }
 
@@ -668,11 +669,11 @@ const ProfilePage: React.FC = () => {
 
       if (error) throw error;
 
-      alert(language === 'zh' ? '重新发货成功！包裹已回到待分配队列。' : 'Re-shipped successfully!');
+      feedbackService.notify(language === 'zh' ? '重新发货成功！包裹已回到待分配队列。' : 'Re-shipped successfully!');
       await loadUserPackages();
     } catch (error) {
       LoggerService.error('重新发货失败:', error);
-      alert(language === 'zh' ? '操作失败，请重试' : 'Action failed');
+      feedbackService.notify(language === 'zh' ? '操作失败，请重试' : 'Action failed');
     } finally {
       setLoading(false);
     }
@@ -741,7 +742,7 @@ const ProfilePage: React.FC = () => {
         const user = JSON.parse(savedUser);
         if (user.user_type === 'merchant') {
           localStorage.removeItem('ml-express-customer');
-          alert(
+          feedbackService.notify(
             language === 'zh'
               ? '商家账号请使用商家端网站登录。已退出本地会话。'
               : language === 'en'
@@ -950,7 +951,7 @@ const ProfilePage: React.FC = () => {
     try {
       const result = await reviewService.replyToReview(reviewId, replyText);
       if (result.success) {
-        alert(language === 'zh' ? '回复成功' : language === 'en' ? 'Reply sent' : 'ပြန်လည်ဖြေကြားပြီးပါပြီ');
+        feedbackService.notify(language === 'zh' ? '回复成功' : language === 'en' ? 'Reply sent' : 'ပြန်လည်ဖြေကြားပြီးပါပြီ');
         setReplyText('');
         setReplyingToId(null);
         await loadStoreReviews(); // 重新加载
@@ -1084,7 +1085,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error('加载代收款订单失败:', error);
-      alert('加载订单列表失败');
+      feedbackService.notify('加载订单列表失败');
     }
   };
 
@@ -1103,7 +1104,7 @@ const ProfilePage: React.FC = () => {
   // 处理密码修改
   const handlePasswordChange = async () => {
     if (!isPartnerStore || !storeInfo) {
-      alert(language === 'zh' ? '只有合伙店铺账户可以修改密码' : 
+      feedbackService.notify(language === 'zh' ? '只有合伙店铺账户可以修改密码' : 
             language === 'en' ? 'Only merchants store accounts can change password' : 
             'လုပ်ဖော်ကိုင်ဖက်ဆိုင်အကောင့်သာ စကားဝှက်ကို ပြောင်းလဲနိုင်သည်');
       return;
@@ -1111,28 +1112,28 @@ const ProfilePage: React.FC = () => {
 
     // 验证输入
     if (!passwordForm.currentPassword) {
-      alert(language === 'zh' ? '请输入当前密码' : 
+      feedbackService.notify(language === 'zh' ? '请输入当前密码' : 
             language === 'en' ? 'Please enter current password' : 
             'လက်ရှိစကားဝှက်ထည့်ပါ');
       return;
     }
 
     if (!passwordForm.newPassword) {
-      alert(language === 'zh' ? '请输入新密码' : 
+      feedbackService.notify(language === 'zh' ? '请输入新密码' : 
             language === 'en' ? 'Please enter new password' : 
             'စကားဝှက်အသစ်ထည့်ပါ');
       return;
     }
 
     if (passwordForm.newPassword.length < 6) {
-      alert(language === 'zh' ? '新密码至少需要6位' : 
+      feedbackService.notify(language === 'zh' ? '新密码至少需要6位' : 
             language === 'en' ? 'New password must be at least 6 characters' : 
             'စကားဝှက်အသစ်သည် အနည်းဆုံး ၆ လုံးရှိရမည်');
       return;
     }
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert(language === 'zh' ? '两次输入的密码不一致' : 
+      feedbackService.notify(language === 'zh' ? '两次输入的密码不一致' : 
             language === 'en' ? 'Passwords do not match' : 
             'စကားဝှက်များ မတူညီပါ');
       return;
@@ -1140,7 +1141,7 @@ const ProfilePage: React.FC = () => {
 
     // 验证当前密码
     if (storeInfo.password !== passwordForm.currentPassword) {
-      alert(language === 'zh' ? '当前密码错误' : 
+      feedbackService.notify(language === 'zh' ? '当前密码错误' : 
             language === 'en' ? 'Current password is incorrect' : 
             'လက်ရှိစကားဝှက် မှားနေပါသည်');
       return;
@@ -1155,7 +1156,7 @@ const ProfilePage: React.FC = () => {
 
       if (error) {
         LoggerService.error('更新密码失败:', error);
-        alert(language === 'zh' ? '更新密码失败，请稍后重试' : 
+        feedbackService.notify(language === 'zh' ? '更新密码失败，请稍后重试' : 
               language === 'en' ? 'Failed to update password, please try again later' : 
               'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
         return;
@@ -1168,12 +1169,12 @@ const ProfilePage: React.FC = () => {
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPasswordModal(false);
       
-      alert(language === 'zh' ? '密码修改成功！' : 
+      feedbackService.notify(language === 'zh' ? '密码修改成功！' : 
             language === 'en' ? 'Password changed successfully!' : 
             'စကားဝှက် ပြောင်းလဲခြင်း အောင်မြင်ပါသည်!');
     } catch (error) {
       LoggerService.error('更新密码异常:', error);
-      alert(language === 'zh' ? '更新密码失败，请稍后重试' : 
+      feedbackService.notify(language === 'zh' ? '更新密码失败，请稍后重试' : 
             language === 'en' ? 'Failed to update password, please try again later' : 
             'စကားဝှက် ပြောင်းလဲရန် မအောင်မြင်ပါ');
     }
@@ -1209,7 +1210,7 @@ const ProfilePage: React.FC = () => {
       console.log(`✅ 获取到 ${orders?.length || 0} 条订单`);
 
       if (!orders || orders.length === 0) {
-        alert(language === 'zh' ? '所选日期范围内没有订单数据' : 'No orders found in the selected date range');
+        feedbackService.notify(language === 'zh' ? '所选日期范围内没有订单数据' : 'No orders found in the selected date range');
         setIsExporting(false);
         return;
       }
@@ -1297,13 +1298,13 @@ const ProfilePage: React.FC = () => {
           }
         } catch (pdfErr) {
           console.error('❌ PDF 生成过程崩溃:', pdfErr);
-          alert(language === 'zh' ? 'PDF 格式暂不支持中文/缅文，请选择 Excel (XLSX) 格式导出。' : 'PDF format currently does not support Unicode. Please use Excel (XLSX) instead.');
+          feedbackService.notify(language === 'zh' ? 'PDF 格式暂不支持中文/缅文，请选择 Excel (XLSX) 格式导出。' : 'PDF format currently does not support Unicode. Please use Excel (XLSX) instead.');
           setIsExporting(false);
         }
       }
     } catch (error) {
       LoggerService.error('导出对账单失败:', error);
-      alert('导出失败，请检查网络重试');
+      feedbackService.notify('导出失败，请检查网络重试');
       setIsExporting(false);
     }
   };
@@ -1327,13 +1328,13 @@ const ProfilePage: React.FC = () => {
 
       const result = await response.json();
       if (result.success) {
-        alert(language === 'zh' ? '✅ 对账单已成功发送到您的邮箱' : '✅ Statement has been sent to your email');
+        feedbackService.notify(language === 'zh' ? '✅ 对账单已成功发送到您的邮箱' : '✅ Statement has been sent to your email');
         setShowExportModal(false);
       } else {
         throw new Error(result.error);
       }
     } catch (error: any) {
-      alert(`发送失败: ${error.message}`);
+      feedbackService.notify(`发送失败: ${error.message}`);
     } finally {
       setIsExporting(false);
     }
@@ -1401,7 +1402,7 @@ const ProfilePage: React.FC = () => {
 
       const result = await reviewService.createReview(reviewData);
       if (result.success) {
-        alert(language === 'zh' ? '评价提交成功！感谢您的反馈。' : 'Review submitted! Thank you.');
+        feedbackService.notify(language === 'zh' ? '评价提交成功！感谢您的反馈。' : 'Review submitted! Thank you.');
         
         // 🚀 更新已评价ID列表，让按钮立即消失
         setReviewedOrderIds(prev => {
@@ -1418,7 +1419,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error('提交评价失败:', error);
-      alert(language === 'zh' ? '提交失败，请重试' : 'Submission failed, please try again');
+      feedbackService.notify(language === 'zh' ? '提交失败，请重试' : 'Submission failed, please try again');
     } finally {
       setIsSubmittingReview(false);
     }
@@ -1601,7 +1602,7 @@ const ProfilePage: React.FC = () => {
       
       // 检查当前状态是否是待确认
       if (pkgToAccept.status !== '待确认') {
-        alert(language === 'zh' ? '该订单状态已变更，无法接单' : 'Order status has changed, cannot accept');
+        feedbackService.notify(language === 'zh' ? '该订单状态已变更，无法接单' : 'Order status has changed, cannot accept');
         return;
       }
 
@@ -1612,7 +1613,7 @@ const ProfilePage: React.FC = () => {
         // 🚀 核心优化：接单成功后自动打印小票
         handlePrintReceipt(pkgToAccept);
         
-        alert(language === 'zh' ? '接单成功！小票已自动打印，请开始打包商品。' : 'Order accepted! Receipt printed, please start packing.');
+        feedbackService.notify(language === 'zh' ? '接单成功！小票已自动打印，请开始打包商品。' : 'Order accepted! Receipt printed, please start packing.');
         // 刷新本地数据
         const updatedPackage = { ...pkgToAccept, status: '打包中' };
         if (!targetPkg) setSelectedPackage(updatedPackage);
@@ -1622,7 +1623,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error('接单失败:', error);
-      alert(language === 'zh' ? '接单失败，请重试' : 'Accept failed, please try again');
+      feedbackService.notify(language === 'zh' ? '接单失败，请重试' : 'Accept failed, please try again');
     } finally {
       setLoading(false);
     }
@@ -1647,7 +1648,7 @@ const ProfilePage: React.FC = () => {
       const success = await packageService.updatePackageStatus(pkg.id, '已取消');
       
       if (success) {
-        alert(language === 'zh' ? '订单已成功取消' : language === 'en' ? 'Order cancelled successfully' : 'အော်ဒါကို ပယ်ဖျက်ပြီးပါပြီ');
+        feedbackService.notify(language === 'zh' ? '订单已成功取消' : language === 'en' ? 'Order cancelled successfully' : 'အော်ဒါကို ပယ်ဖျက်ပြီးပါပြီ');
         // 刷新本地数据
         const updatedPackage = { ...pkg, status: '已取消' };
         setUserPackages(prev => prev.map(p => p.id === pkg.id ? updatedPackage : p));
@@ -1656,7 +1657,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error('取消订单失败:', error);
-      alert(language === 'zh' ? '操作失败，请重试' : 'Operation failed, please try again');
+      feedbackService.notify(language === 'zh' ? '操作失败，请重试' : 'Operation failed, please try again');
     } finally {
       setLoading(false);
     }
@@ -1693,7 +1694,7 @@ const ProfilePage: React.FC = () => {
       const success = await packageService.updatePackageStatus(packingOrderData.id, nextStatus);
       
       if (success) {
-        alert(language === 'zh' ? '打包完成！快递员将很快上门取件。' : 'Packing complete! Courier will arrive soon.');
+        feedbackService.notify(language === 'zh' ? '打包完成！快递员将很快上门取件。' : 'Packing complete! Courier will arrive soon.');
         setShowPackingModal(false);
         setPackingOrderData(null);
         // 刷新本地列表
@@ -1703,7 +1704,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error('打包完成更新失败:', error);
-      alert(language === 'zh' ? '提交失败，请重试' : 'Submission failed, please try again');
+      feedbackService.notify(language === 'zh' ? '提交失败，请重试' : 'Submission failed, please try again');
     } finally {
       setLoading(false);
     }
@@ -1874,12 +1875,12 @@ const ProfilePage: React.FC = () => {
   const handleOpenPaymentQR = async () => {
     const parsed = parseFloat(rechargeAmount);
     if (isNaN(parsed) || parsed <= 0) {
-      alert(language === 'zh' ? '请输入有效的充值金额' : 'Please enter a valid amount');
+      feedbackService.notify(language === 'zh' ? '请输入有效的充值金额' : 'Please enter a valid amount');
       return;
     }
     const amount = Math.round(parsed);
     if (!RECHARGE_QR_AMOUNT_TIERS.includes(amount as (typeof RECHARGE_QR_AMOUNT_TIERS)[number])) {
-      alert(language === 'zh' ? '请选择列表中的充值档位' : 'Please pick a valid recharge amount');
+      feedbackService.notify(language === 'zh' ? '请选择列表中的充值档位' : 'Please pick a valid recharge amount');
       return;
     }
     try {
@@ -1909,7 +1910,7 @@ const ProfilePage: React.FC = () => {
   const handleConfirmRecharge = async () => {
     if (!selectedRechargeAmount || !currentUser?.id) return;
     if (!rechargeProof) {
-      alert(language === 'zh' ? '请上传汇款凭证截图' : 'Please upload payment proof');
+      feedbackService.notify(language === 'zh' ? '请上传汇款凭证截图' : 'Please upload payment proof');
       return;
     }
 
@@ -1931,7 +1932,7 @@ const ProfilePage: React.FC = () => {
       });
 
       if (result.success) {
-        alert(language === 'zh' ? '提交成功！管理员审核通过后余额将自动到账。' : 'Submitted! Balance will be updated after admin review.');
+        feedbackService.notify(language === 'zh' ? '提交成功！管理员审核通过后余额将自动到账。' : 'Submitted! Balance will be updated after admin review.');
         setShowPaymentQRModal(false);
         setRechargeAmount('');
         setRechargeProof(null);
@@ -1941,7 +1942,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       console.error('Recharge failed:', error);
-      alert(language === 'zh' ? '提交失败，请稍后重试' : 'Submission failed, please try again');
+      feedbackService.notify(language === 'zh' ? '提交失败，请稍后重试' : 'Submission failed, please try again');
     } finally {
       setLoading(false);
     }
@@ -2760,7 +2761,7 @@ const ProfilePage: React.FC = () => {
                                     ? 'Voice alerts enabled'
                                     : 'အသံ သတိပေးမှု ဖွင့်ထားသည်'
                               );
-                              alert(
+                              feedbackService.notify(
                                 language === 'zh'
                                   ? '✅ 语音提醒已开启！待确认新订单会语音提醒；订单列表约每 8 秒自动刷新。'
                                   : 'Voice on. Pending orders are announced. The list auto-refreshes about every 8 seconds.'

@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { CartProvider } from './contexts/CartContext';
 import './App.css';
+import { GlobalToast } from './components/GlobalToast';
 
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
@@ -116,6 +117,7 @@ function App() {
         <CartProvider>
           <Router>
             <div className="App" style={{ minHeight: '100vh' }}>
+              <GlobalToast />
               <ClientWebMerchantSessionGuard />
               <Suspense fallback={<RouteFallback />}>
                 <Routes>

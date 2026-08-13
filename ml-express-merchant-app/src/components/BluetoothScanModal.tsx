@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -34,6 +33,7 @@ import {
 import type { ReceiptPaperWidthMm } from '../constants/receiptPaper';
 import ReceiptPaperSizePicker from './ReceiptPaperSizePicker';
 import ReceiptPrintPreviewModal from './ReceiptPrintPreviewModal';
+import { feedbackService } from '../services/FeedbackService';
 
 type Props = {
   visible: boolean;
@@ -112,14 +112,14 @@ export default function BluetoothScanModal({
           (error) => {
             if (cancelled) return;
             setScanning(false);
-            Alert.alert(strings.title, resolveScanError(strings, error));
+            feedbackService.notify(strings.title, resolveScanError(strings, error));
           },
         );
         stopScanRef.current = stop;
       } catch (error) {
         if (cancelled) return;
         setScanning(false);
-        Alert.alert(strings.title, resolveScanError(strings, error));
+        feedbackService.notify(strings.title, resolveScanError(strings, error));
       }
     })();
 
@@ -139,7 +139,7 @@ export default function BluetoothScanModal({
 
   const handleRescan = () => {
     if (!isNativeBleAvailable()) {
-      Alert.alert(strings.title, strings.unavailable);
+      feedbackService.notify(strings.title, strings.unavailable);
       return;
     }
     if (connectingId) return;
@@ -159,7 +159,7 @@ export default function BluetoothScanModal({
           },
           (error) => {
             setScanning(false);
-            Alert.alert(strings.title, resolveScanError(strings, error));
+            feedbackService.notify(strings.title, resolveScanError(strings, error));
           },
         );
         stopScanRef.current = stop;
@@ -170,7 +170,7 @@ export default function BluetoothScanModal({
         }, SCAN_DURATION_MS);
       } catch (error) {
         setScanning(false);
-        Alert.alert(strings.title, resolveScanError(strings, error));
+        feedbackService.notify(strings.title, resolveScanError(strings, error));
       }
     })();
   };
@@ -194,12 +194,12 @@ export default function BluetoothScanModal({
         const connected = await connectBluetoothDevice(device.id);
         setConnectedDevice(connected);
         onConnectionChange?.();
-        Alert.alert(
+        feedbackService.notify(
           strings.title,
           fmtScanPrinter(strings.connectedTo, { name: labelFor(connected) }),
         );
       } catch (error) {
-        Alert.alert(strings.connectFailed, resolveScanError(strings, error));
+        feedbackService.notify(strings.connectFailed, resolveScanError(strings, error));
       } finally {
         setConnectingId(null);
       }
@@ -216,7 +216,7 @@ export default function BluetoothScanModal({
         setConnectedDevice(null);
         onConnectionChange?.();
       } catch (error) {
-        Alert.alert(strings.connectFailed, resolveScanError(strings, error));
+        feedbackService.notify(strings.connectFailed, resolveScanError(strings, error));
       } finally {
         setDisconnecting(false);
       }

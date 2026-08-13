@@ -11,8 +11,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../contexts/AppContext';
 import NotificationService from '../services/notificationService';
-import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
+import { feedbackService } from '../services/FeedbackService';
 
 const { width } = Dimensions.get('window');
 
@@ -20,15 +20,8 @@ export default function NotificationWorkflowScreen({ navigation }: any) {
   const { language } = useApp();
   const [notificationService] = useState(() => NotificationService.getInstance());
   
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
-
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(message, type);
   };
 
   // 多语言翻译
@@ -255,13 +248,6 @@ export default function NotificationWorkflowScreen({ navigation }: any) {
           {renderFunctionButton(t.cancelAllNotifications, handleCancelAllNotifications, '❌', '#ef4444')}
         </View>
       </ScrollView>
-
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        onHide={() => setToastVisible(false)}
-      />
     </View>
   );
 }

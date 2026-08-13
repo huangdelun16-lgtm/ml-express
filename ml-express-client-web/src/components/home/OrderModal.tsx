@@ -9,6 +9,7 @@ import {
   validatePackageStep,
   type OrderWizardStepIndex,
 } from './orderModalWizard';
+import { feedbackService } from '../../services/FeedbackService';
 
 /** 创建订单弹窗：与商家端 Web 统一视觉 */
 const MODAL_OVERLAY: CSSProperties = {
@@ -381,18 +382,18 @@ const OrderModal: React.FC<OrderModalProps> = ({
         wizardCopy
       );
       if (err) {
-        window.alert(err);
+        feedbackService.notify(err);
         return;
       }
     }
     if (wizardStep === 1) {
       if (selectedDeliverySpeed !== 'Eco Way' && !selectedPackageType?.trim()) {
-        window.alert(wizardCopy.fillRequired);
+        feedbackService.notify(wizardCopy.fillRequired);
         return;
       }
       const err = validatePackageStep(showWeightInput, orderWeight, wizardCopy);
       if (err) {
-        window.alert(err);
+        feedbackService.notify(err);
         return;
       }
     }
@@ -404,7 +405,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
         wizardCopy
       );
       if (err) {
-        window.alert(err);
+        feedbackService.notify(err);
         return;
       }
     }
@@ -421,7 +422,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
       return;
     }
     if (!isCalculated) {
-      window.alert(
+      feedbackService.notify(
         language === 'zh'
           ? '请稍候，正在计算跑腿费…'
           : language === 'en'

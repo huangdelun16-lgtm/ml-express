@@ -20,6 +20,7 @@ import {
   productHasVariants,
 } from '../utils/productVariants';
 import { myanmarTextCss } from '../utils/myanmarText';
+import { feedbackService } from '../services/FeedbackService';
 
 const PIECE_REMARK_LABELS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
@@ -56,16 +57,9 @@ const StoreProductsPage: React.FC = () => {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [detailCartLineKey, setDetailCartLineKey] = useState<string | null>(null);
 
-  const [toast, setToast] = useState<{ message: string; type: 'ok' | 'warn' } | null>(null);
-
   const productRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const detailScrollRef = useRef<HTMLDivElement>(null);
   const detailIntroAnchorRef = useRef<HTMLDivElement>(null);
-
-  const showToast = (message: string, type: 'ok' | 'warn' = 'ok') => {
-    setToast({ message, type });
-    window.setTimeout(() => setToast(null), 2000);
-  };
 
   const scrollToDetailIntro = () => {
     detailIntroAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -246,9 +240,8 @@ const StoreProductsPage: React.FC = () => {
       return;
     }
     if (!product.is_available) {
-      showToast(
+      feedbackService.warning(
         language === 'zh' ? '商品已下架' : language === 'en' ? 'This item is unavailable' : t.store.unavailable,
-        'warn'
       );
       params.delete('openDetail');
       params.delete('variant');
@@ -285,14 +278,13 @@ const StoreProductsPage: React.FC = () => {
     if (!selectedProductDetail) return;
     const pid = selectedProductDetail.id;
     if (productHasVariants(selectedProductDetail) && !selectedVariantId) {
-      showToast(
+      feedbackService.warning(
         language === 'zh' ? '请先选择规格' : language === 'en' ? 'Please select a variant' : t.store.unavailable,
-        'warn',
       );
       return;
     }
     if (detailStockCap === 0) {
-      showToast(t.store.outOfStock, 'warn');
+      feedbackService.warning(t.store.outOfStock);
       return;
     }
     const qty = detailStockCap === 99999 ? detailQty : Math.min(detailQty, detailStockCap);
@@ -313,17 +305,17 @@ const StoreProductsPage: React.FC = () => {
         } else {
           updateCartItemDetails(oldKey, qty, padded);
         }
-        showToast(t.store.cartUpdated);
+        feedbackService.success(t.store.cartUpdated);
       } else {
         addToCart(selectedProductDetail, qty, remarks, variantId);
-        showToast(t.store.addedToCart);
+        feedbackService.success(t.store.addedToCart);
       }
       closeDetailModal();
     };
 
     if (!fromCart) {
       if (!currentUser) {
-        alert(
+        feedbackService.notify(
           language === 'zh'
             ? '请先登录后再加入购物车'
             : language === 'en'
@@ -334,7 +326,7 @@ const StoreProductsPage: React.FC = () => {
       }
       const status = checkStoreOpenStatus();
       if (!status.isOpen) {
-        alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
+        feedbackService.notify(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
         return;
       }
       if (!confirmReplaceOtherStore()) return;
@@ -349,7 +341,7 @@ const StoreProductsPage: React.FC = () => {
       return;
     }
     if (!currentUser) {
-      alert(
+      feedbackService.notify(
         language === 'zh'
           ? '请先登录后再加入购物车'
           : language === 'en'
@@ -361,7 +353,7 @@ const StoreProductsPage: React.FC = () => {
 
     const status = checkStoreOpenStatus();
     if (!status.isOpen) {
-      alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
+      feedbackService.notify(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
       return;
     }
     const qty = itemQuantities[product.id] || 0;
@@ -381,12 +373,12 @@ const StoreProductsPage: React.FC = () => {
       delete next[product.id];
       return next;
     });
-    showToast(t.store.addedToCart);
+    feedbackService.success(t.store.addedToCart);
   };
 
   const handleBulkAddToCart = () => {
     if (!currentUser) {
-      alert(
+      feedbackService.notify(
         language === 'zh'
           ? '请先登录后再加入购物车'
           : language === 'en'
@@ -398,13 +390,13 @@ const StoreProductsPage: React.FC = () => {
 
     const status = checkStoreOpenStatus();
     if (!status.isOpen) {
-      alert(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
+      feedbackService.notify(language === 'zh' ? '该商户目前已打烊，无法下单' : 'Merchant is currently closed');
       return;
     }
 
     const selectedItems = products.filter((p) => (itemQuantities[p.id] || 0) > 0);
     if (selectedItems.length === 0) {
-      alert(
+      feedbackService.notify(
         language === 'zh'
           ? '请先选择商品数量'
           : language === 'en'
@@ -418,7 +410,7 @@ const StoreProductsPage: React.FC = () => {
       (p) => productHasVariants(p) && !selectedVariantByProduct[p.id],
     );
     if (missingVariant) {
-      alert(
+      feedbackService.notify(
         language === 'zh'
           ? `请为「${missingVariant.name}」选择规格（点击商品卡片）`
           : `Please select a variant for "${missingVariant.name}"`,
@@ -441,7 +433,7 @@ const StoreProductsPage: React.FC = () => {
     setItemQuantities({});
     setLineRemarks({});
     setSelectedVariantByProduct({});
-    showToast(t.store.addedToCart);
+    feedbackService.success(t.store.addedToCart);
   };
 
   const checkStoreOpenStatus = () => {
@@ -1396,28 +1388,6 @@ const StoreProductsPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {toast && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 4000,
-            background: toast.type === 'warn' ? '#b45309' : '#0f172a',
-            color: 'white',
-            padding: '12px 20px',
-            borderRadius: 14,
-            fontWeight: 700,
-            boxShadow: '0 12px 28px rgba(0,0,0,0.2)',
-            maxWidth: '90vw',
-            textAlign: 'center',
-          }}
-        >
-          {toast.message}
         </div>
       )}
 

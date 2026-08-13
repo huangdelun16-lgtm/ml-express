@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -22,6 +21,7 @@ import {
   saveReceiptPaperWidth,
 } from '../services/receiptPaperSettings';
 import ReceiptPaperSizePicker from './ReceiptPaperSizePicker';
+import { feedbackService } from '../services/FeedbackService';
 import {
   computeReceiptTotals,
   createSampleReceiptData,
@@ -139,20 +139,20 @@ export default function ReceiptPrintPreviewModal({
       try {
         const settings = await printerService.getSettings();
         if (!settings.enabled || settings.type !== 'bluetooth') {
-          Alert.alert(strings.printPreviewTitle, strings.printPreviewNotEnabled);
+          feedbackService.notify(strings.printPreviewTitle, strings.printPreviewNotEnabled);
           return;
         }
 
         await saveReceiptPaperWidth(paperWidth);
         const ok = await printerService.printMerchantReceipt(receipt);
         if (!ok) {
-          Alert.alert(strings.printPreviewTitle, strings.printPreviewNotEnabled);
+          feedbackService.notify(strings.printPreviewTitle, strings.printPreviewNotEnabled);
           return;
         }
-        Alert.alert(strings.printPreviewTitle, strings.printPreviewSent);
+        feedbackService.notify(strings.printPreviewTitle, strings.printPreviewSent);
         if (isOrderMode) onClose();
       } catch (error) {
-        Alert.alert(strings.printPreviewTitle, resolvePrintError(strings, error));
+        feedbackService.notify(strings.printPreviewTitle, resolvePrintError(strings, error));
       } finally {
         setPrinting(false);
       }

@@ -24,13 +24,14 @@ import LoggerService from "../services/LoggerService";
 import QRCode from "react-native-qrcode-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
+import { ensureSaveToLibraryPermission } from "../utils/mediaAccess";
 import * as MediaLibrary from "expo-media-library";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import { packageService, merchantService } from "../services/supabase";
 import { useApp } from "../contexts/AppContext";
 import { useLoading } from "../contexts/LoadingContext";
-import Toast from "../components/Toast";
 import BackToHomeButton from "../components/BackToHomeButton";
+import { feedbackService } from "../services/FeedbackService";
 import ReceiptPrintPreviewModal from "../components/ReceiptPrintPreviewModal";
 import { type AppLang, getJourneyCopy, getJourneyLabels } from "../utils/orderJourney";
 
@@ -194,10 +195,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const handleSaveQRCode = async () => {
     try {
       showLoading(language === "zh" ? "正在保存..." : "Saving...", "package");
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted") {
+      const granted = await ensureSaveToLibraryPermission();
+      if (!granted) {
         hideLoading();
-        Alert.alert(
+        feedbackService.notify(
           language === "zh" ? "权限提示" : "Permission Required",
           language === "zh"
             ? "需要相册权限才能保存二维码"
@@ -213,7 +214,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
       await MediaLibrary.saveToLibraryAsync(uri);
       hideLoading();
-      Alert.alert(
+      feedbackService.notify(
         language === "zh" ? "保存成功" : "Saved!",
         language === "zh"
           ? "二维码已保存到您的相册"
@@ -222,19 +223,12 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     } catch (error) {
       hideLoading();
       LoggerService.error("保存二维码失败:", error);
-      Alert.alert(
+      feedbackService.notify(
         language === "zh" ? "保存失败" : "Save Failed",
         language === "zh" ? "无法保存图片" : "Unable to save image",
       );
     }
   };
-
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastType, setToastType] = useState<
-    "success" | "error" | "info" | "warning"
-  >("info");
 
   // 翻译
   const translations: any = {
@@ -448,9 +442,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     message: string,
     type: "success" | "error" | "info" | "warning" = "info",
   ) => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(message, type);
   };
 
   // 复制订单号
@@ -532,7 +524,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     if (!result.success) {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
       setInputText(messageText);
-      Alert.alert("错误", "消息发送失败");
+      feedbackService.notify("错误", "消息发送失败");
     }
   };
 
@@ -594,10 +586,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
           hideLoading();
 
           if (result.success) {
-            Alert.alert(t.cancelSuccess, result.message);
+            feedbackService.notify(t.cancelSuccess, result.message);
             loadData(); // 重新加载数据
           } else {
-            Alert.alert(t.cancelFailed, result.message);
+            feedbackService.notify(t.cancelFailed, result.message);
           }
         },
       },
@@ -612,7 +604,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   // 提交评价
   const handleSubmitRating = async () => {
     if (rating === 0) {
-      Alert.alert("提示", "请选择评分");
+      feedbackService.notify("提示", "请选择评分");
       return;
     }
 
@@ -626,28 +618,28 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     hideLoading();
 
     if (result.success) {
-      Alert.alert(t.rateSuccess, result.message);
+      feedbackService.notify(t.rateSuccess, result.message);
       setShowRateModal(false);
       loadData(); // 重新加载数据
     } else {
-      Alert.alert(t.rateFailed, result.message);
+      feedbackService.notify(t.rateFailed, result.message);
     }
   };
 
   // 联系配送员
   const handleContactCourier = () => {
     if (!order?.courier) {
-      Alert.alert("提示", "暂无配送员信息");
+      feedbackService.notify("提示", "暂无配送员信息");
       return;
     }
     // 这里可以实现拨打电话或发送消息
-    Alert.alert("提示", `联系配送员: ${order.courier}`);
+    feedbackService.notify("提示", `联系配送员: ${order.courier}`);
   };
 
   // 拨打电话
   const handleCallPhone = (phone: string) => {
     if (!phone || !phone.trim()) {
-      Alert.alert("提示", "暂无联系电话");
+      feedbackService.notify("提示", "暂无联系电话");
       return;
     }
     Linking.openURL(`tel:${phone}`);
@@ -866,14 +858,6 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       {renderRatingModal()}
-      {/* Toast通知 */}
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        duration={3000}
-        onHide={() => setToastVisible(false)}
-      />
 
       {/* 顶部状态栏 */}
       <LinearGradient
@@ -1627,7 +1611,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
                 <TouchableOpacity
                   key={index}
                   onPress={() => {
-                    Alert.alert(language === "zh" ? "查看照片" : "View Photo");
+                    feedbackService.notify(language === "zh" ? "查看照片" : "View Photo");
                   }}
                 >
                   <Image
@@ -2173,14 +2157,6 @@ export default function OrderDetailScreen({ route, navigation }: any) {
           </View>
         </View>
       </Modal>
-
-      <Toast
-        message={toastMessage}
-        type={toastType}
-        visible={toastVisible}
-        duration={3000}
-        onHide={() => setToastVisible(false)}
-      />
 
       <ReceiptPrintPreviewModal
         visible={receiptPreviewVisible}

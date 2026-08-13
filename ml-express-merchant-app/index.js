@@ -12,6 +12,9 @@ if (Platform.OS !== 'web') {
   } catch (e) {}
 }
 
+import { installProductionConsoleGate } from './src/services/LoggerService';
+installProductionConsoleGate();
+
 import { registerRootComponent } from 'expo';
 import App from './App';
 

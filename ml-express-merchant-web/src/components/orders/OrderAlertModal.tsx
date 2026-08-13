@@ -13,6 +13,7 @@ import {
   buildProductNamePriceMap,
 } from '../../utils/parseOrderPackingItems';
 import './OrderAlertModal.css';
+import { feedbackService } from '../../services/FeedbackService';
 
 type Lang = 'zh' | 'en' | 'my';
 
@@ -194,7 +195,7 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
       onAccepted(String(orderData.id));
     } catch (err) {
       LoggerService.error('接单失败', err);
-      window.alert(language === 'zh' ? '接单失败，请重试' : 'Accept failed');
+      feedbackService.notify(language === 'zh' ? '接单失败，请重试' : 'Accept failed');
     } finally {
       setIsProcessing(false);
     }
@@ -245,7 +246,7 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
       onDeclined(String(orderData.id));
     } catch (err) {
       LoggerService.error('拒单失败', err);
-      window.alert(language === 'zh' ? '操作失败' : 'Failed');
+      feedbackService.notify(language === 'zh' ? '操作失败' : 'Failed');
     } finally {
       setIsProcessing(false);
     }

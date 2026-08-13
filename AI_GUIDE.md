@@ -86,7 +86,7 @@ flowchart TB
 | 端 | 登录方式 | 会话存储 |
 |----|----------|----------|
 | 会员 Web/App | `users` 表（customer）邮箱/手机 + 密码 | `localStorage` / `AsyncStorage`（**不含商家登录**） |
-| 商家 Web/App | `delivery_stores` 店铺码 + 密码 | `localStorage` / `AsyncStorage` |
+| 商家 Web/App | Web：`delivery_stores` 客户端比对（待对齐）；**App**：Netlify `merchant-password`（**无客户端明文密码兜底**） | `localStorage` / `AsyncStorage` |
 | 骑手 App | `admin_accounts` + Netlify `admin-password` + `ensure-courier-auth`（**无客户端明文密码兜底**） | `AsyncStorage`（`persistSession: false`） |
 | 管理后台 | `verify-admin` Netlify Function + HMAC JWT Cookie | session/localStorage |
 | Inventory App | `inventory-store-login` Edge Function → Supabase Auth JWT | SecureStore + Supabase Auth |
@@ -116,7 +116,7 @@ flowchart TB
 | **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户、Support | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.6.2 (69)** | EAS |
-| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.0 (11)** | EAS |
+| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.8 (19)** | EAS |
 | **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.8 (77)** | EAS |
 | **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + Supabase Auth + 蓝牙打印 | **1.7.0 (13)** | EAS |
 | **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
@@ -171,11 +171,12 @@ flowchart TB
 | 维度 | 说明 |
 |------|------|
 | **定位** | C 端官网：着陆、商城、购物车、账户、合规/Support |
-| **入口** | `src/index.tsx` → `src/App.tsx`（React Router **v7**） |
-| **UI** | `src/pages/`（14 页）；`LanguageProvider`、`CartProvider` |
+| **入口** | `src/index.tsx`（生产 console 门禁 + Sentry）→ `src/App.tsx`（React Router **v7**） |
+| **UI** | `src/pages/`（14 页）；`LanguageProvider`、`CartProvider`；`GlobalToast` |
 | **业务层** | `src/services/supabase.ts` + `_shared/` |
 | **服务端** | `netlify/functions/`：`merchant-apply`、`send-sms`、`send-statement` 等 |
 | **认证** | `users`（customer）→ `localStorage`（`ml-express-customer`）；**非 Supabase Auth** |
+| **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`window.confirm` 仅确认/破坏性操作；生产 `installProductionConsoleGate`；**已有** `@sentry/react`（`sentryInit`），可保留 |
 | **路由** | `/`、`/mall`、`/cart`、`/profile`、`/support`、`/ml-inventory/privacy`、合规页 |
 | **部署** | Netlify site `52f5f573-…`；Base directory = 本子目录 |
 
@@ -184,10 +185,11 @@ flowchart TB
 | 维度 | 说明 |
 |------|------|
 | **定位** | B 端轻量后台：门店资料、商品、订单跟踪 |
-| **入口** | `src/index.tsx` → `src/App.tsx`（Router **v7**） |
-| **UI** | `LoginPage`、`ProfilePage`、`StoreProductsPage`、`TrackingPage`；`OrderModal` 4 步下单向导 |
+| **入口** | `src/index.tsx`（生产 console 门禁）→ `src/App.tsx`（Router **v7**） |
+| **UI** | `LoginPage`、`ProfilePage`、`StoreProductsPage`、`TrackingPage`；`OrderModal` 4 步下单向导；`GlobalToast` |
 | **业务层** | `src/services/supabase.ts` + `_shared/`（含 `merchantLoginGuard`） |
 | **认证** | `delivery_stores` 店铺码 + 密码 → `localStorage`；**拒绝** `transit_station` |
+| **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`window.confirm` 仅确认/破坏性操作；生产 `installProductionConsoleGate`（**无 Sentry**，勿擅自加） |
 | **路由** | `/login` → `/`（Profile）、`/products`、订单经 Profile/Tracking |
 | **部署** | Netlify site `126af2b9-…` |
 
@@ -199,7 +201,7 @@ flowchart TB
 | **入口** | `index.js` → `App.tsx`（React Navigation 6 Native Stack） |
 | **UI** | `src/screens/`（16 Screen）、`src/components/` |
 | **状态** | `AppContext`、`CartContext`、`LoadingContext` |
-| **业务层** | `supabase.ts`、`DatabaseService.ts`（SQLite 缓存）、`notificationService.ts`、`appUpdateService.ts` |
+| **业务层** | `supabase.ts` + `clientApi/`、`DatabaseService.ts`（SQLite 缓存）、`notificationService.ts`、`appUpdateService.ts` |
 | **工具** | `mediaAccess.ts`（Android Photo Picker，无 READ_MEDIA 权限）、`appUpdate.ts` |
 | **认证** | `users` `user_type='customer'` → `AsyncStorage`；支持游客；旧 merchant session 由 `AppContext` 清掉并提示用商家 App |
 | **Deep link** | `ml-express-client://`；关联域 `mlexpress.com` |
@@ -212,13 +214,15 @@ flowchart TB
 
 | 维度 | 说明 |
 |------|------|
-| **定位** | B 端原生：与会员 App 架构镜像，侧重门店订单/商品管理 |
-| **入口** | `index.js` → `App.tsx` |
+| **定位** | B 端原生：**仅店铺运营**（接单、打包、商品 CRUD、打印、**代客下单**）；不含会员注册/商城逛店/购物车 |
+| **入口** | `index.js`（`installProductionConsoleGate`）→ `App.tsx` |
 | **包名** | `com.mlexpress.merchants`；scheme `ml-express-merchants://` |
-| **差异** | 额外 `expo-image-manipulator`；Screen 命名与 client 基本一致 |
-| **认证** | `delivery_stores` + `merchantLoginGuard`（拦截中转站账号） |
+| **核心屏** | Home、MyOrders、MerchantProducts（管理）、PlaceOrder（电话订餐代客下单）、Profile、打印 |
+| **认证** | `delivery_stores` + Netlify `merchant-password`（**无客户端明文密码兜底**）+ `merchantLoginGuard` |
+| **业务层** | `supabase.ts`（barrel）+ `merchantApi/`；登录 `merchantAuthService` |
+| **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`Alert.alert` 仅确认/破坏性操作；生产 `installProductionConsoleGate`（**无 Sentry**，勿擅自加） |
 | **共享** | `src/services/_shared/`（含 `productReview.ts`） |
-| **部署** | EAS projectId `0c1336bd-…` |
+| **部署** | EAS projectId `0c1336bd-…`；版本见 §20（app.json **2.4.8 (19)**） |
 
 ### 3.1.6 骑手/员工 App（`ml-express-mobile-app/`）
 
@@ -360,7 +364,8 @@ flowchart TB
 | 函数 | 用途 |
 |------|------|
 | `verify-admin` | 校验 Admin JWT |
-| `admin-password` | 改密 |
+| `admin-password` | Admin / 骑手改密与登录 |
+| `merchant-password` | 商家 App 店铺登录 / 改密（不回传 password） |
 | `send-email-code` / `verify-email-code` | 邮箱验证码 |
 | `send-sms` / `verify-sms` | 短信验证码 |
 | `send-order-confirmation` | 下单确认邮件 |
@@ -412,11 +417,11 @@ CRA + TypeScript + React Router **v7** + `@supabase/supabase-js` + `@sentry/reac
 ```
 ml-express-client-web/
 ├── src/
-│   ├── index.tsx → App.tsx
+│   ├── index.tsx → App.tsx   # 启动前 installProductionConsoleGate；Sentry 见 sentryInit
 │   ├── pages/              # 14 个页面（Home、Mall、Cart、Profile、Support…）
-│   ├── components/
+│   ├── components/         # GlobalToast、home/OrderModal…
 │   ├── contexts/           # LanguageProvider, CartProvider
-│   ├── services/           # supabase.ts + _shared/
+│   ├── services/           # supabase.ts、FeedbackService、ToastService、LoggerService + _shared/
 │   ├── constants/ styles/ utils/
 ├── netlify/functions/      # merchant-apply, send-sms, send-statement…
 └── netlify.toml            # Base directory = 本子目录
@@ -451,6 +456,18 @@ ml-express-client-web/
 cd ml-express-client-web && npm install && npm start
 ```
 
+### 5.6 反馈、日志与监控（对标商家 App §8.8）
+
+| 模块 | 职责 |
+|------|------|
+| `ToastService` + `GlobalToast` | 全局轻提示（顶部固定） |
+| `FeedbackService` | Toast 统一入口（`notify` 承接旧 `alert(title, message)`；无震动） |
+| `window.confirm` | **仅**确认/破坏性操作（清空购物车、删除商品、取消订单等） |
+| `LoggerService` + `installProductionConsoleGate`（`index.tsx`） | 生产压制 `console.log/info`；错误脱敏 |
+| `@sentry/react` + `sentryInit` | **已有**，可保留；勿擅自改 DSN |
+
+非确认提示（登录校验、保存结果、打烊、加入购物车）一律 `feedbackService.notify/success/error/warning`，不要各页再挂本地 Toast。
+
 ---
 
 ## 6. 商家端网站 `ml-express-merchant-web/`
@@ -459,17 +476,18 @@ cd ml-express-client-web && npm install && npm start
 
 ### 6.1 技术栈
 
-与 client-web 类似：CRA + TS + React Router v7 + Supabase。
+与 client-web 类似：CRA + TS + React Router v7 + Supabase。**无 Sentry**，勿擅自加。
 
 ### 6.2 目录结构
 
 ```
 ml-express-merchant-web/
 ├── src/
+│   ├── index.tsx           # 启动前 installProductionConsoleGate
 │   ├── pages/              # Login, Profile, StoreProducts, Tracking
-│   ├── components/home/    # OrderModal.tsx（4 步下单向导）
+│   ├── components/         # GlobalToast；home/OrderModal.tsx（4 步下单向导）
 │   ├── contexts/ hooks/
-│   ├── services/           # supabase.ts + _shared/
+│   ├── services/           # supabase.ts、FeedbackService、ToastService、LoggerService + _shared/
 ├── netlify/functions/      # send-sms, send-statement, verify-email…
 └── netlify.toml
 ```
@@ -500,6 +518,17 @@ ml-express-merchant-web/
 ```bash
 cd ml-express-merchant-web && npm install && npm start
 ```
+
+### 6.7 反馈、日志与监控（对标商家 App §8.8）
+
+| 模块 | 职责 |
+|------|------|
+| `ToastService` + `GlobalToast` | 全局轻提示（顶部固定） |
+| `FeedbackService` | Toast 统一入口（`notify` 承接旧 `alert`；无震动） |
+| `window.confirm` | **仅**确认/破坏性操作（删除商品、拒单、取消订单等） |
+| `LoggerService` + `installProductionConsoleGate`（`index.tsx`） | 生产压制 `console.log/info`；错误脱敏。**无 Sentry**，勿擅自加 |
+
+非确认提示（保存/上传结果、接单失败、余额不足）一律 `feedbackService.notify/success/error/warning`，不要各页再挂本地 Toast。
 
 ---
 
@@ -601,31 +630,80 @@ npm run build:apk:gradle                            # 本地 Gradle APK
 | 项 | 值 |
 |----|-----|
 | 包名 | `com.mlexpress.merchants` |
-| 版本 | **2.4.0**（build **11**） |
+| 显示名 | MARKET LINK MERCHANT |
+| 版本 | **2.4.8**（iOS build **19** / Android versionCode **19**） |
 | Scheme | `ml-express-merchants://` |
 | EAS | projectId `0c1336bd-…` |
 
-### 8.2 架构
+### 8.2 产品边界（对标会员端「只留 customer」）
 
-与会员 App（§7）**同构**：Expo 54 + Navigation 6 + `supabase.ts` + SQLite 缓存 + `_shared/`。
+商家 App **只做店铺运营**，不提供会员能力：
 
-**额外依赖**：`expo-image-manipulator`（商品图处理）。
+| 保留（B 端） | 已去掉（会员残留） |
+|--------------|-------------------|
+| 接单提醒 `OrderAlertModal`、订单列表/详情 | 会员注册 `Register` |
+| 商品管理（增删改、上下架、批量改价） | 城市商城逛店 `CityMall` |
+| **立即下单**（电话订餐 / 代客下单） | 购物车 `Cart` / `CartContext` |
+| 地址簿（代客下单用） | 商品页「加入购物车」只读逛店 |
+| 蓝牙小票打印、打包 | 注销会员账号（`customerService.deleteAccount`） |
+| 订单追踪、店铺资料、充值申请 | 客户端明文比对 `delivery_stores.password` |
 
-### 8.3 认证
+会员购物请用 `ml-express-client`。中转站账号请用 Inventory App。
 
-- `delivery_stores` 店铺码 + 密码 → `AsyncStorage`。
+### 8.3 架构
+
+Expo 54 + Navigation 6 + `supabase.ts`（barrel）+ `merchantApi/` + SQLite 缓存 + `_shared/`。
+
+```
+src/services/
+├── supabase.ts              # 业务 API 入口（re-export）
+├── merchantApi/             # 拆分后的服务实现（customer/package/merchant…）
+├── merchantAuthService.ts   # 店铺登录 / 改密（Netlify merchant-password）
+├── FeedbackService.ts / ToastService.ts / LoggerService.ts
+├── DatabaseService.ts
+└── _shared/
+```
+
+**额外依赖**：`expo-image-manipulator`（商品图处理）、蓝牙打印。
+
+### 8.4 认证与密钥
+
+- 登录：店铺码 + 密码 → Netlify **`merchant-password`**（`merchantAuthService`）；**不在客户端** `select("*")` 比对 `delivery_stores.password`。
+- 弱网 vs 凭据错误在 `LoginScreen` 区分提示。
 - **`merchantLoginGuard`**：拦截 `transit_station`（中转站账号只能登 Inventory App）。
+- 改密：商家走 `merchant-password` `updatePassword`（仍写入 `password` 列以兼容商家 Web）。
+- **Maps Key**：`app.config.js` 从 `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` / `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` 注入；勿写回 `app.json`。
 
-### 8.4 屏幕
+### 8.5 屏幕
 
-Welcome → Login → Main → MyOrders、MerchantProducts、PlaceOrder、Cart、Profile、OrderDetail…（与 client 命名基本一致，面向 B 端操作）。
+Welcome → Login → Main(Home) → MyOrders、OrderDetail、MerchantProducts、**PlaceOrder（代客下单）**、AddressBook、Profile、TrackOrder、NotificationCenter、NotificationSettings。
 
-### 8.5 构建
+### 8.6 构建
 
 ```bash
 cd ml-express-merchant-app && npm install && npx expo start
 eas build --platform android --profile production
 ```
+
+### 8.7 Google Play 媒体权限策略
+
+对标会员 §7.6：
+
+- `app.json` / `app.config.js` → `android.blockedPermissions` 屏蔽 `READ_MEDIA_IMAGES/VIDEO/AUDIO`、`READ_MEDIA_VISUAL_USER_SELECTED`、`READ_EXTERNAL_STORAGE`、`RECORD_AUDIO`。
+- `expo-media-library` 配置 `granularPermissions: []`；保存收款码用 `writeOnly` 或 Android 13+ MediaStore。
+- 选图统一经 `utils/mediaAccess.ts` → 系统 Photo Picker，**不**在 Android 上 `requestMediaLibraryPermissionsAsync`。
+- 现有 `android/` 清单用 `tools:node="remove"` 剔除读相册权限；`WRITE_EXTERNAL_STORAGE` 仅 `maxSdkVersion=32`。下次 EAS/`prebuild` 后生效于新包。
+
+### 8.8 反馈、日志与监控（对标骑手 §9.8）
+
+| 模块 | 职责 |
+|------|------|
+| `ToastService` + `GlobalToast` + `Toast` | 全局轻提示 |
+| `FeedbackService` | Toast + Vibration 统一入口（`notify` 承接旧 `Alert.alert(title, message)`） |
+| `Alert.alert` | **仅**确认/破坏性操作（退出、拒绝订单、删除商品、取消订单、热线选择、强制下线、OTA 重启） |
+| `LoggerService` + `installProductionConsoleGate`（`index.js`） | 生产压制 `console.log/info`；错误脱敏。**无 Sentry**，勿擅自加 |
+
+非确认提示（权限、保存/打印结果、余额不足、接单失败）一律 `feedbackService.notify/success/error/warning`，不要各屏再挂本地 `<Toast>`。
 
 ---
 
@@ -1293,7 +1371,7 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | 环境 | 前缀 | 示例 |
 |------|------|------|
 | CRA（admin/client-web/merchant-web） | `REACT_APP_*` | `REACT_APP_SUPABASE_URL`、`REACT_APP_SUPABASE_ANON_KEY` |
-| Expo（含 Inventory） | `EXPO_PUBLIC_*` + `app.config.js` `extra` | Inventory 生产默认值在 `app.config.js` |
+| Expo（含 Inventory） | `EXPO_PUBLIC_*` + `app.config.js` `extra` | 会员/商家 Maps Key；Inventory 生产默认值在 `app.config.js` |
 | Netlify Functions | Dashboard | `SUPABASE_SERVICE_ROLE_KEY`、`JWT_SECRET` 等 |
 
 **注意**：CRA 的 `REACT_APP_*` 与 Expo 的 `EXPO_PUBLIC_*` **不互通**，各 app 独立配置。
@@ -1350,10 +1428,15 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 12. **Inventory EAS 发布**：改 `app.json` version/buildNumber + `eas build`；Support URL 保持可访问。
 13. **改打印**：`tsplLabelBuilder.ts` + `bluetoothThermalPrinter.ts` + `printerService.ts`。
 14. **勿提交** `.env`、keystore、`.temp/`、`upload-release.keystore`；仅用户要求时 commit。
-15. **改 Google Play 媒体权限**：client `app.json blockedPermissions` + `mediaAccess.ts` + `AndroidManifest.xml tools:node="remove"`。
+15. **改 Google Play 媒体权限**：client / **商家 App** 的 `app.json blockedPermissions` + `utils/mediaAccess.ts` + `AndroidManifest.xml tools:node="remove"`。
 16. **改 Inventory B 签收**：`CustomerSignFlowModal` + migration `20260720140000` + `markCustomerSigned`。
 17. **改 STAFF 骑手端**：保留双工作区与 `admin_accounts` 登录；登录改 `staffApi/adminAccountService`；工作区改 `staffWorkspace.ts`；扫码改 `scanCodeHelpers` + `findPackageByScanCode`；提示走 `feedbackService`；日志走 `LoggerService`（见 §9、§22）。
 18. **会员 App 勿恢复商家运营入口**；密钥勿写进客户端明文。
+19. **改商家 App 提示/日志**：非确认走 `feedbackService`；生产门禁 `installProductionConsoleGate`；勿擅自加 Sentry。
+20. **商家 App 勿恢复会员注册/商城/购物车**；**保留**首页「立即下单」（电话订餐代客下单）与地址簿。
+21. **商家 App 登录**走 `merchant-password`，勿恢复客户端明文密码比对；Maps Key 只放 `.env` / EAS Secrets。
+22. **改商家 App 业务 API**：改 `merchantApi/*`；`supabase.ts` 只做 barrel（与会员 `clientApi`、骑手 `staffApi` 同一手法）。
+23. **改会员/商家 Web 提示/日志**：非确认走 `feedbackService`；生产门禁 `installProductionConsoleGate`；确认/破坏性继续 `window.confirm`。会员 Web 已有 Sentry 可保留；**勿给商家 Web 加 Sentry**。
 
 ---
 
@@ -1362,11 +1445,17 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | 我想… | 先看 |
 |--------|------|
 | **全仓架构一页恢复记忆** | **§22** |
+| **商家 App 产品边界** | **§8.2**（保留代客下单；无注册/商城/购物车） |
+| 商家 App 登录 / Maps Key | `merchantAuthService.ts`、`netlify/functions/merchant-password.js`、`app.config.js` |
+| 商家 App 业务 API | `services/supabase.ts`（barrel）+ `services/merchantApi/` |
 | **STAFF 工作区 / 双角色** | `utils/staffWorkspace.ts`、`App.tsx` MainTabs、`ProfileScreen` |
 | STAFF 登录 / 密码校验 | `services/staffApi/adminAccountService.ts`、`LoginScreen.tsx` |
 | STAFF 扫码取件送达 | `utils/scanCodeHelpers.ts`、`PackageDetailScreen`、`supabase.ts` `findPackageByScanCode` |
 | STAFF 我的任务列表 | `MyTasksScreen.tsx`、`MyTaskPackageCard.tsx` |
 | STAFF Toast / 生产日志 | `feedbackService.ts`、`GlobalToast.tsx`、`LoggerService.ts`、`index.ts` |
+| 商家 App Toast / 生产日志 | `FeedbackService.ts`、`GlobalToast.tsx`、`LoggerService.ts`、`index.js` |
+| 会员 Web Toast / 生产日志 | `FeedbackService.ts`、`GlobalToast.tsx`、`LoggerService.ts`、`index.tsx`（Sentry：`sentryInit`） |
+| 商家 Web Toast / 生产日志 | `FeedbackService.ts`、`GlobalToast.tsx`、`LoggerService.ts`、`index.tsx`（**无 Sentry**） |
 | STAFF 定位省电 | `locationService.ts`、`MapScreen.tsx`、`InAppNavigationModal.tsx` |
 | **Inventory A/B 职责划分** | **§10.2**（发站 vs 到站，改需求前必读） |
 | Inventory A：订单列表过滤 | `expressDetailsVisibility.ts` → `inventoryService.listItems` |
@@ -1392,6 +1481,7 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | 合伙店铺（不含中转站） | `DeliveryStoreManagement.tsx` |
 | 会员 App 应用内更新 | `appUpdateService.ts`、`docs/sql/client_android_latest_release.sql` |
 | 会员 App 媒体权限 / 选图 | `ml-express-client/src/utils/mediaAccess.ts`、`app.json blockedPermissions` |
+| 商家 App 媒体权限 / 选图 | `ml-express-merchant-app/src/utils/mediaAccess.ts`、`app.json blockedPermissions` |
 | 代购报价表 | `ProxyQuotePage.tsx`、`utils/proxyQuoteExcel.ts` |
 | 商家下单弹窗 | `merchant-web/.../OrderModal.tsx` |
 | 会员/商家计费 | `/shared/src/pricing.ts` |
@@ -1407,7 +1497,7 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 |------|------|--------------|------|
 | 管理后台（根） | **2.2.4** | — | `package.json` |
 | ml-express-client | **2.6.2** | **69** | 体验与稳定性优化 |
-| ml-express-merchant-app | **2.4.0** | **11** | |
+| ml-express-merchant-app | **2.4.8** | **19** | 仅店铺运营；保留代客下单 |
 | ml-express-mobile-app | **2.3.8** | **77** | STAFF 骑手端 |
 | ml-express-inventory-app | **1.7.0** | **13** | 快递单/入库单复制；客户签收留痕 |
 | ml-express-client-web | **0.1.0** | — | |
@@ -1475,7 +1565,7 @@ cd ml-express-inventory-app && npm run typecheck
 
 ```
 会员     → users（customer）自定义会话
-商家     → delivery_stores 店铺码
+商家     → delivery_stores + merchant-password（App；无客户端明文兜底）
 STAFF    → admin_accounts + admin-password + ensure-courier-auth（非纯 Supabase Auth）
 Admin Web→ verify-admin HMAC Cookie
 Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT 主路径）
@@ -1504,6 +1594,9 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 | Admin 菜单/权限 | 根 `src/App.tsx`、`AccountManagement` |
 | Admin 跨境 | `CrossBorderLogisticsPage` + `inventory-admin-*` Functions |
 | 会员 App | `ml-express-client/src/`（clientApi / screens） |
+| 会员 Web | §5 + FeedbackService / LoggerService（保留既有 Sentry） |
+| 商家 App | §8 + `merchantApi/` + `merchantAuthService` + FeedbackService / LoggerService |
+| 商家 Web | §6 + FeedbackService / LoggerService（无 Sentry） |
 | STAFF | §9 + `staffApi/` + `staffWorkspace` + `scanCodeHelpers` |
 | Inventory A/B | §10.2 + `inventoryService` / `trackingService` |
 | Schema | `supabase/migrations/` + 更新 §14 |
@@ -1517,7 +1610,13 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 - 勿提交 `.env`、keystore、`.cursor/` 计划垃圾。
 - STAFF：勿删管理端；勿改回明文密码登录。
 - 会员 App：勿恢复商家运营能力入口。
+- 商家 App：非确认提示走 `feedbackService`；勿擅自加 `@sentry/react-native`。
+- 会员/商家 Web：非确认提示走 `feedbackService`；勿各页再挂本地 Toast。
+- 商家 Web：勿擅自加 `@sentry/react`。
+- 商家 App：勿恢复会员注册/商城/购物车；**保留**电话订餐「立即下单」。
+- 商家 App：勿改回客户端明文密码登录；勿把 Maps Key 写回 `app.json`。
+- 商家 App：勿在 Android 选图时申请 `READ_MEDIA_*` / `READ_EXTERNAL_STORAGE`（走 Photo Picker，见 §8.7）。
 
 ---
 
-*最后更新：2026-08-13 — 补全 §9 STAFF 架构（工作区/扫码/省电/日志）与 §22 全仓记忆恢复卡；骑手端 P0/P1 落地。*
+*最后更新：2026-08-13 — 会员/商家 Web：Toast 统一非确认提示 + 生产 console 门禁（对标商家 App §8.8；会员 Web 保留既有 Sentry，商家 Web 无 Sentry）。*

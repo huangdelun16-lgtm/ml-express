@@ -3,6 +3,7 @@ import LoggerService from '../services/LoggerService';
 import { TouchableOpacity, Text, StyleSheet, Alert, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
+import { feedbackService } from '../services/FeedbackService';
 
 interface LogoutButtonProps {
   navigation: any;
@@ -49,7 +50,7 @@ export default function LogoutButton({ navigation, position = 'topRight', style 
               });
             } catch (error) {
               LoggerService.error('退出登录失败:', error);
-              Alert.alert('', currentT.logout + '失败，请重试');
+              feedbackService.error(currentT.logout + '失败，请重试');
             }
           },
         },

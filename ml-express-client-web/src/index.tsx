@@ -1,9 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { installProductionConsoleGate } from './services/LoggerService';
 import './index.css';
 import './styles/global.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+
+installProductionConsoleGate();
 
 void import('./sentryInit').then((m) => m.initSentry());
 

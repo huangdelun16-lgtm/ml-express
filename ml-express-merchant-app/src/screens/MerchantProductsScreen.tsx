@@ -11,21 +11,18 @@ import {
   Modal,
   TextInput,
   Switch,
-  Dimensions,
   RefreshControl,
   ScrollView,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../contexts/AppContext';
-import { useCart } from '../contexts/CartContext';
 import { merchantService, Product, ProductCategory, productFormSource, hasPendingProductUpdate } from '../services/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../config/theme';
-import Toast from '../components/Toast';
+import { feedbackService } from '../services/FeedbackService';
 import { autoPrepareProductImageUri, autoPrepareProductImageUris } from '../utils/productImageNative';
+import { pickImageFromLibrary } from '../utils/mediaAccess';
 import ProductVariantsEditor from '../components/ProductVariantsEditor';
 import {
   defaultMerchantProductForm,
@@ -34,17 +31,41 @@ import {
   type MerchantProductFormState,
 } from '../utils/merchantProductForm';
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width } = Dimensions.get('window');
+const STORE_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isStoreUuid(value: unknown): value is string {
+  const id = String(value || '').trim();
+  return Boolean(id) && id !== 'undefined' && id !== 'null' && STORE_UUID_RE.test(id);
+}
+
+async function resolveMerchantStoreId(routeStoreId?: string | null): Promise<string | null> {
+  const candidates: unknown[] = [routeStoreId];
+  try {
+    candidates.push(await AsyncStorage.getItem('userId'));
+    const raw = await AsyncStorage.getItem('currentUser');
+    if (raw) {
+      const user = JSON.parse(raw);
+      candidates.push(user?.store_id, user?.id);
+    }
+  } catch {
+    // ignore storage parse errors; route/session fallbacks still apply
+  }
+  for (const candidate of candidates) {
+    if (isStoreUuid(candidate)) return String(candidate).trim();
+  }
+  return null;
+}
 
 export default function MerchantProductsScreen({ route, navigation }: any) {
-  const { storeId, storeName, highlightProductId, autoAddProductId } = route.params || {}; // 🚀 增加解析新参数
+  const { storeId: routeStoreId, storeName } = route.params || {};
   const { language } = useApp();
-  const { addToCart, cartCount, cartItems } = useCart();
+  const [storeId, setStoreId] = useState<string>(isStoreUuid(routeStoreId) ? routeStoreId.trim() : '');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isReadOnly, setIsReadOnly] = useState(true);
   
   // 商品表单状态
   const [showProductModal, setShowProductModal] = useState(false);
@@ -59,19 +80,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const [bulkValue, setBulkValue] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  // 🚀 新增：产品详情模态框状态
-  const [showDetailModal, setShowEditDetailModal] = useState(false);
-  const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
-
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
-
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(message, type);
   };
 
   const t = {
@@ -90,10 +100,6 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       saveSuccess: '保存成功',
       noProducts: '暂无商品，点击右上角添加',
       infinite: '无限',
-      addToCart: '加入购物车',
-      buyNow: '立即下单',
-      quantity: '数量',
-      addedToCart: '已加入购物车',
       bulkManage: '批量管理',
       selectAll: '全选',
       unselectAll: '取消全选',
@@ -125,10 +131,6 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       saveSuccess: 'Saved successfully',
       noProducts: 'No products yet, tap + to add',
       infinite: 'Infinite',
-      addToCart: 'Add to Cart',
-      buyNow: 'Buy Now',
-      quantity: 'Quantity',
-      addedToCart: 'Added to cart',
       bulkManage: 'Bulk',
       selectAll: 'Select All',
       unselectAll: 'Unselect All',
@@ -160,10 +162,6 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       saveSuccess: 'သိမ်းဆည်းပြီးပါပြီ',
       noProducts: 'ကုန်ပစ္စည်းမရှိသေးပါ။ အသစ်ထည့်ရန် + ကိုနှိပ်ပါ',
       infinite: 'အကန့်အသတ်မရှိ',
-      addToCart: 'ခြင်းထဲသို့ထည့်ရန်',
-      buyNow: 'ယခုဝယ်မည်',
-      quantity: 'အရေအတွက်',
-      addedToCart: 'ခြင်းထဲသို့ထည့်ပြီးပါပြီ',
       bulkManage: 'အစုလိုက်',
       selectAll: 'အားလုံးရွေး',
       unselectAll: 'အားလုံးဖျက်',
@@ -185,38 +183,23 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const currentT = t[language as keyof typeof t] || t.zh;
 
   useEffect(() => {
-    checkViewMode();
     loadProducts();
   }, []);
-
-  // 🚀 响应来自商城的跳转指令（高亮或自动加车）
-  useEffect(() => {
-    if (!loading && products.length > 0) {
-      if (autoAddProductId) {
-        const product = products.find(p => p.id === autoAddProductId);
-        if (product && product.is_available) {
-          updateItemQuantity(autoAddProductId, 1);
-          showToast(language === 'zh' ? '已为您自动选中商品' : 'Product auto-selected', 'success');
-        }
-      }
-    }
-  }, [loading, products]);
-
-  const checkViewMode = async () => {
-    const currentUserId = await AsyncStorage.getItem('userId');
-    const userType = await AsyncStorage.getItem('userType');
-    // 如果是商家查看自己的店铺，则非只读模式
-    if (userType === 'merchant' && currentUserId === storeId) {
-      setIsReadOnly(false);
-    } else {
-      setIsReadOnly(true);
-    }
-  };
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await merchantService.getStoreProducts(storeId);
+      const id = await resolveMerchantStoreId(routeStoreId || storeId);
+      if (!id) {
+        setProducts([]);
+        showToast(
+          language === 'zh' ? '无法识别店铺，请重新登录后再试' : 'Store not found. Please sign in again.',
+          'error',
+        );
+        return;
+      }
+      setStoreId(id);
+      const data = await merchantService.getStoreProducts(id);
       setProducts(data);
     } catch (error) {
       showToast('加载失败', 'error');
@@ -233,29 +216,21 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
   const pickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('提示', '需要相册权限才能选择图片');
-        return;
-      }
-
-      const options: ImagePicker.ImagePickerOptions = {
+      const result = await pickImageFromLibrary({
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 1,
-      };
-
-      const result = await ImagePicker.launchImageLibraryAsync(options);
+      });
 
       if (!result.canceled && result.assets?.[0]?.uri) {
         const preparedUri = await autoPrepareProductImageUri(result.assets[0].uri);
         setProductForm((prev) => ({ ...prev, image_url: preparedUri }));
       }
     } catch (error) {
-      console.error('Pick image error:', error);
+      console.warn('Pick image error:', error);
       try {
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        const result = await pickImageFromLibrary({
+          mediaTypes: ['images'],
           allowsEditing: false,
           quality: 1,
         });
@@ -264,28 +239,20 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           setProductForm((prev) => ({ ...prev, image_url: preparedUri }));
         }
       } catch (retryError) {
-        Alert.alert('错误', '无法打开相册，请检查权限');
+        feedbackService.notify('错误', '无法打开相册，请检查权限');
       }
     }
   };
 
   const pickDetailImages = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('权限提示', '需要相册权限才能上传图片');
-        return;
-      }
-
-      const options: ImagePicker.ImagePickerOptions = {
+      const result = await pickImageFromLibrary({
         allowsMultipleSelection: true,
         selectionLimit: 12,
         allowsEditing: false,
         quality: 1,
         mediaTypes: ['images'],
-      };
-
-      const result = await ImagePicker.launchImageLibraryAsync(options);
+      });
       if (!result.canceled && result.assets?.length) {
         const uris = await autoPrepareProductImageUris(result.assets.map((asset) => asset.uri));
         setProductForm((prev) => ({
@@ -295,8 +262,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         setShowDetailImagesPanel(true);
       }
     } catch (error) {
-      console.error('Pick detail images error:', error);
-      Alert.alert('错误', '无法打开相册，请检查权限');
+      console.warn('Pick detail images error:', error);
+      feedbackService.notify('错误', '无法打开相册，请检查权限');
     }
   };
 
@@ -329,6 +296,16 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       return;
     }
 
+    const activeStoreId = storeId || (await resolveMerchantStoreId(routeStoreId));
+    if (!activeStoreId) {
+      showToast(
+        language === 'zh' ? '无法识别店铺，请重新登录后再试' : 'Store not found. Please sign in again.',
+        'error',
+      );
+      return;
+    }
+    setStoreId(activeStoreId);
+
     try {
       setFormLoading(true);
       let finalImageUrl = productForm.image_url;
@@ -336,12 +313,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       // 如果是本地图片路径，先上传
       if (productForm.image_url && (productForm.image_url.startsWith('file://') || productForm.image_url.startsWith('content://'))) {
         console.log('正在上传本地图片:', productForm.image_url);
-        const uploadedUrl = await merchantService.uploadProductImage(storeId, productForm.image_url);
+        const uploadedUrl = await merchantService.uploadProductImage(activeStoreId, productForm.image_url);
         if (uploadedUrl) {
           finalImageUrl = uploadedUrl;
           console.log('图片上传成功:', uploadedUrl);
         } else {
-          Alert.alert('错误', '图片上传失败，请检查网络或重试。请确保图片已成功上传后再保存商品。\n(提示: 请确保相册授权正常)');
+          feedbackService.notify('错误', '图片上传失败，请检查网络或重试。请确保图片已成功上传后再保存商品。\n(提示: 请确保相册授权正常)');
           setFormLoading(false);
           return;
         }
@@ -350,7 +327,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       const finalDetailUrls: string[] = [];
       for (const uri of productForm.detail_image_urls) {
         if (uri.startsWith('file://') || uri.startsWith('content://')) {
-          const uploadedUrl = await merchantService.uploadProductImage(storeId, uri);
+          const uploadedUrl = await merchantService.uploadProductImage(activeStoreId, uri);
           if (uploadedUrl) {
             finalDetailUrls.push(uploadedUrl);
           }
@@ -360,7 +337,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       }
 
       const productData: Record<string, unknown> = {
-        store_id: storeId,
+        store_id: activeStoreId,
         ...draft,
         image_url: finalImageUrl,
         detail_image_urls: finalDetailUrls,
@@ -369,7 +346,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       const result = await merchantService.saveMerchantProduct({
         mode: editingProduct ? 'edit' : 'create',
         product: editingProduct ?? null,
-        storeId,
+        storeId: activeStoreId,
         draft: productData,
       });
 
@@ -560,94 +537,30 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }
   };
 
-  const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
-
-  const updateItemQuantity = (id: string, delta: number) => {
-    setItemQuantities(prev => ({
-      ...prev,
-      [id]: Math.max(0, (prev[id] || 0) + delta)
-    }));
-  };
-
-  const getSelectedItems = () => {
-    return products.filter(p => (itemQuantities[p.id] || 0) > 0).map(p => ({
-      ...p,
-      quantity: itemQuantities[p.id]
-    }));
-  };
-
-  const handleOpenProductDetail = (product: Product) => {
-    setSelectedProductDetail(product);
-    setShowEditDetailModal(true);
-  };
-
-  const handleBulkAddToCart = () => {
-    const selectedItems = getSelectedItems();
-    if (selectedItems.length === 0) {
-      Alert.alert(language === 'zh' ? '提示' : 'Notice', language === 'zh' ? '请先选择商品数量' : 'Please select item quantity');
-      return;
-    }
-
-    // 🚀 核心逻辑优化：检查是否属于不同店铺
-    if (cartItems.length > 0 && cartItems[0].store_id !== storeId) {
-      Alert.alert(
-        language === 'zh' ? '清空购物车提示' : 'Clear Cart Notice',
-        language === 'zh' 
-          ? '购物车中已存在其他店铺的商品，继续添加将清空原有商品。确定继续吗？' 
-          : 'Cart already contains items from another store. Adding new items will clear existing ones. Continue?',
-        [
-          { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
-          { 
-            text: language === 'zh' ? '确定' : 'Continue', 
-            onPress: () => {
-              selectedItems.forEach(item => {
-                addToCart(item, item.quantity);
-              });
-              showToast(currentT.addedToCart, 'success');
-              setItemQuantities({});
-            } 
-          }
-        ]
-      );
-      return;
-    }
-
-    selectedItems.forEach(item => {
-      addToCart(item, item.quantity);
-    });
-    showToast(currentT.addedToCart, 'success');
-    // 可选：清空当前选择
-    setItemQuantities({});
-  };
-
   const renderProductItem = ({ item }: { item: Product }) => {
-    const quantity = itemQuantities[item.id] || 0;
     const isSelected = selectedProductIds.has(item.id);
     
     return (
       <TouchableOpacity 
         style={[
           styles.productCard, 
-          isReadOnly ? { width: (width - 48) / 2, flexDirection: 'column', alignItems: 'flex-start' } : { width: '100%', flexDirection: 'row', alignItems: 'center' },
-          item.id === highlightProductId && styles.highlightedCard // 🚀 高亮显示
+          { width: '100%', flexDirection: 'row', alignItems: 'center' },
         ]}
-        onPress={() => isReadOnly ? handleOpenProductDetail(item) : handleOpenEditProduct(item)}
+        onPress={() => handleOpenEditProduct(item)}
         activeOpacity={0.7}
       >
-        {!isReadOnly && (
-          <TouchableOpacity
-            style={[styles.selectCircle, isSelected && styles.selectCircleActive]}
-            onPress={() => toggleSelectProduct(item.id)}
-          >
-            {isSelected && <Ionicons name="checkmark" size={14} color="white" />}
-          </TouchableOpacity>
-        )}
-        <View style={isReadOnly ? styles.productImageContainerGrid : styles.productImageContainerList}>
+        <TouchableOpacity
+          style={[styles.selectCircle, isSelected && styles.selectCircleActive]}
+          onPress={() => toggleSelectProduct(item.id)}
+        >
+          {isSelected && <Ionicons name="checkmark" size={14} color="white" />}
+        </TouchableOpacity>
+        <View style={styles.productImageContainerList}>
           {item.image_url && !item.image_url.startsWith('file://') ? (
             <Image source={{ uri: item.image_url }} style={styles.productImage} />
           ) : (
             <View style={styles.productImagePlaceholder}>
-              <Ionicons name="image-outline" size={isReadOnly ? 24 : 32} color="#cbd5e1" />
+              <Ionicons name="image-outline" size={32} color="#cbd5e1" />
             </View>
           )}
           {!item.is_available && (
@@ -675,53 +588,27 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             </Text>
           </View>
 
-          {/* 管理模式下显示状态文字和开关 */}
-          {!isReadOnly && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              <View style={[styles.statusIndicator, { backgroundColor: item.is_available ? '#dcfce7' : '#fee2e2', marginTop: 0 }]}>
-                <Text style={[styles.statusText, { color: item.is_available ? '#15803d' : '#ef4444' }]}>
-                  {item.is_available ? currentT.available : currentT.unavailable}
-                </Text>
-              </View>
-              <View style={{ marginLeft: 10 }}>
-                <Switch
-                  value={item.is_available}
-                  onValueChange={() => toggleProductStatus(item)}
-                  trackColor={{ false: '#cbd5e1', true: '#10b981' }}
-                  thumbColor="#ffffff"
-                  style={Platform.OS === 'ios' ? { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] } : {}}
-                />
-              </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <View style={[styles.statusIndicator, { backgroundColor: item.is_available ? '#dcfce7' : '#fee2e2', marginTop: 0 }]}>
+              <Text style={[styles.statusText, { color: item.is_available ? '#15803d' : '#ef4444' }]}>
+                {item.is_available ? currentT.available : currentT.unavailable}
+              </Text>
             </View>
-          )}
-
-          {isReadOnly && item.is_available && (
-            <View style={styles.customerActionContainer}>
-              <View style={styles.smallQuantitySelector}>
-                <TouchableOpacity 
-                  onPress={() => updateItemQuantity(item.id, -1)}
-                  style={[styles.smallQtyBtn, quantity === 0 && styles.disabledQtyBtn]}
-                  disabled={quantity === 0}
-                >
-                  <Ionicons name="remove" size={14} color={quantity === 0 ? "#cbd5e1" : "#3b82f6"} />
-                </TouchableOpacity>
-                <Text style={[styles.smallQtyValue, quantity === 0 && { color: '#cbd5e1' }]}>{quantity}</Text>
-                <TouchableOpacity 
-                  onPress={() => updateItemQuantity(item.id, 1)}
-                  style={styles.smallQtyBtn}
-                >
-                  <Ionicons name="add" size={14} color="#3b82f6" />
-                </TouchableOpacity>
-              </View>
+            <View style={{ marginLeft: 10 }}>
+              <Switch
+                value={item.is_available}
+                onValueChange={() => toggleProductStatus(item)}
+                trackColor={{ false: '#cbd5e1', true: '#10b981' }}
+                thumbColor="#ffffff"
+                style={Platform.OS === 'ios' ? { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] } : {}}
+              />
             </View>
-          )}
+          </View>
         </View>
 
-        {!isReadOnly && (
-          <View style={styles.productActions}>
-            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
-          </View>
-        )}
+        <View style={styles.productActions}>
+          <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+        </View>
       </TouchableOpacity>
     );
   };
@@ -738,26 +625,12 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{storeName || currentT.title}</Text>
           <View style={styles.headerRight}>
-            {!isReadOnly ? (
-              <TouchableOpacity 
-                onPress={handleOpenAddProduct}
-                style={styles.addBtn}
-              >
-                <Ionicons name="add" size={28} color="white" />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity 
-                onPress={() => navigation.navigate('Cart')}
-                style={styles.cartBtn}
-              >
-                <Ionicons name="cart-outline" size={24} color="white" />
-                {cartCount > 0 && (
-                  <View style={styles.cartBadge}>
-                    <Text style={styles.cartBadgeText}>{cartCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity 
+              onPress={handleOpenAddProduct}
+              style={styles.addBtn}
+            >
+              <Ionicons name="add" size={28} color="white" />
+            </TouchableOpacity>
           </View>
         </View>
       </LinearGradient>
@@ -769,13 +642,10 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           </View>
         ) : (
           <FlatList
-            key={isReadOnly ? 'grid' : 'list'}
             data={products}
             keyExtractor={(item) => item.id}
             renderItem={renderProductItem}
-            numColumns={isReadOnly ? 2 : 1}
-            columnWrapperStyle={isReadOnly ? { justifyContent: 'space-between' } : null}
-            contentContainerStyle={[styles.listContent, isReadOnly ? { paddingBottom: 100 } : { paddingBottom: 180 }]}
+            contentContainerStyle={[styles.listContent, { paddingBottom: 180 }]}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
             }
@@ -788,8 +658,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           />
         )}
 
-        {!isReadOnly && (
-          <View style={styles.bulkBar}>
+        <View style={styles.bulkBar}>
             <View style={styles.bulkHeaderRow}>
               <TouchableOpacity style={styles.bulkSelectBtn} onPress={handleSelectAll}>
                 <Text style={styles.bulkSelectText}>
@@ -821,25 +690,6 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               </TouchableOpacity>
             </View>
           </View>
-        )}
-
-        {/* 客户模式下的底部操作栏 */}
-        {isReadOnly && products.length > 0 && (
-          <View style={styles.stickyFooter}>
-            <TouchableOpacity 
-              style={styles.bulkAddToCartBtn}
-              onPress={handleBulkAddToCart}
-            >
-              <LinearGradient
-                colors={['#fbbf24', '#f59e0b']}
-                style={styles.bulkBtnGradient}
-              >
-                <Ionicons name="cart-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.bulkBtnText}>{currentT.addToCart}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
 
       <Modal
@@ -1087,103 +937,6 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           </View>
         </View>
       </Modal>
-
-      {/* 商品详情模态框 */}
-      <Modal
-        visible={showDetailModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowEditDetailModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { padding: 0, overflow: 'hidden' }]}>
-            {selectedProductDetail?.image_url ? (
-              <Image source={{ uri: selectedProductDetail.image_url }} style={styles.detailImage} />
-            ) : (
-              <View style={styles.detailImagePlaceholder}>
-                <Ionicons name="image-outline" size={64} color="#cbd5e1" />
-              </View>
-            )}
-            
-            <TouchableOpacity 
-              style={styles.detailCloseBtn}
-              onPress={() => setShowEditDetailModal(false)}
-            >
-              <Ionicons name="close" size={24} color="white" />
-            </TouchableOpacity>
-
-            <View style={styles.detailInfoContainer}>
-              <View style={styles.detailHeader}>
-                <Text style={styles.detailName}>{selectedProductDetail?.name}</Text>
-                <View style={styles.detailPriceRow}>
-                  <Text style={styles.detailPrice}>{selectedProductDetail?.price.toLocaleString()} MMK</Text>
-                  {selectedProductDetail?.original_price && selectedProductDetail.original_price > selectedProductDetail.price && (
-                    <Text style={styles.detailOriginalPrice}>{selectedProductDetail.original_price.toLocaleString()} MMK</Text>
-                  )}
-                </View>
-              </View>
-
-              <ScrollView style={styles.detailScroll} showsVerticalScrollIndicator={false}>
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>✨ {currentT.description}</Text>
-                  <View style={styles.descriptionBox}>
-                    <Text style={styles.detailDescription}>
-                      {selectedProductDetail?.description || currentT.noDescription}
-                    </Text>
-                  </View>
-                </View>
-
-                {(selectedProductDetail?.detail_image_urls?.length ?? 0) > 0 ? (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>🖼️ {currentT.detailImages}</Text>
-                    {selectedProductDetail?.detail_image_urls?.map((url, idx) => (
-                      <Image
-                        key={`${url}-${idx}`}
-                        source={{ uri: url }}
-                        style={styles.detailScrollingImage}
-                        resizeMode="cover"
-                      />
-                    ))}
-                  </View>
-                ) : null}
-                
-                <View style={[styles.stockRow, { marginTop: 24, backgroundColor: '#f8fafc', padding: 12, borderRadius: 12 }]}>
-                  <Ionicons name="cube-outline" size={18} color="#3b82f6" />
-                  <Text style={[styles.productStock, { fontSize: 15, fontWeight: '700', color: '#1e293b' }]}>
-                    {currentT.stock}: {selectedProductDetail?.stock === -1 ? currentT.infinite : selectedProductDetail?.stock}
-                  </Text>
-                </View>
-              </ScrollView>
-
-              <View style={styles.detailFooter}>
-                <TouchableOpacity 
-                  style={styles.detailAddBtn}
-                  onPress={() => {
-                    if (selectedProductDetail) {
-                      updateItemQuantity(selectedProductDetail.id, 1);
-                      setShowEditDetailModal(false);
-                      showToast(currentT.addedToCart, 'success');
-                    }
-                  }}
-                >
-                  <LinearGradient colors={['#fbbf24', '#f59e0b']} style={styles.detailAddGradient}>
-                    <Ionicons name="cart-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                    <Text style={styles.detailAddText}>{currentT.addToCart}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Toast
-        message={toastMessage}
-        type={toastType}
-        visible={toastVisible}
-        duration={1500}
-        onHide={() => setToastVisible(false)}
-      />
     </View>
   );
 }
@@ -1502,6 +1255,13 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+    flex: 1,
+    marginRight: 12,
   },
   modalCloseBtn: {
     width: 32,

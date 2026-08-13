@@ -25,7 +25,6 @@ import QRCode from 'react-native-qrcode-svg';
 import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { useCart } from '../contexts/CartContext';
 import { packageService, systemSettingsService, supabase, merchantService, Product } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
@@ -60,17 +59,15 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const WIZARD_LAST_STEP: OrderWizardStepIndex = 3;
 
 import * as MediaLibrary from 'expo-media-library';
+import { ensureSaveToLibraryPermission } from '../utils/mediaAccess';
 import * as Sharing from 'expo-sharing'; // 即使没在package.json，有时expo自带
 import * as FileSystem from 'expo-file-system/legacy';
 import ViewShot, { captureRef } from 'react-native-view-shot';
-
-import Toast from '../components/Toast';
 
 export default function PlaceOrderScreen({ navigation, route }: any) {
   const { language } = useApp();
   const insets = useSafeAreaInsets();
   const { showLoading, hideLoading } = useLoading();
-  const { clearCart } = useCart();
   const styles = useLanguageStyles(baseStyles);
   
   // QR码保存引用
@@ -156,11 +153,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     try {
       showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
       
-      // 检查相册权限
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const granted = await ensureSaveToLibraryPermission();
+      if (!granted) {
         hideLoading();
-        Alert.alert(
+        feedbackService.notify(
           language === 'zh' ? '权限提示' : 'Permission Required',
           language === 'zh' ? '需要相册权限才能保存二维码' : 'Photo library permission is required to save QR code'
         );
@@ -178,14 +174,14 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       await MediaLibrary.saveToLibraryAsync(uri);
       
       hideLoading();
-      Alert.alert(
+      feedbackService.notify(
         language === 'zh' ? '保存成功' : 'Saved!',
         language === 'zh' ? '二维码已保存到您的相册' : 'QR code has been saved to your gallery'
       );
     } catch (error) {
       hideLoading();
       LoggerService.error('保存二维码失败:', error);
-      Alert.alert(
+      feedbackService.notify(
         language === 'zh' ? '保存失败' : 'Save Failed',
         language === 'zh' ? '无法保存图片，请稍后重试' : 'Unable to save image, please try again'
       );
@@ -1184,7 +1180,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         hideLoading();
-        Alert.alert('提示', '需要位置权限才能使用此功能');
+        feedbackService.notify('提示', '需要位置权限才能使用此功能');
         return;
       }
 
@@ -1218,7 +1214,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         hideLoading();
-        Alert.alert('提示', '需要位置权限才能使用此功能');
+        feedbackService.notify('提示', '需要位置权限才能使用此功能');
         return;
       }
 
@@ -1461,7 +1457,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         setIsCalculated(true);
         if (!silent) {
           hideLoading();
-          Alert.alert(currentT.calculateSuccess, `配送类型: 顺路递 (24小时内送达)\n总费用: ${Math.round(basePrice)} MMK`);
+          feedbackService.notify(currentT.calculateSuccess, `配送类型: 顺路递 (24小时内送达)\n总费用: ${Math.round(basePrice)} MMK`);
         }
         return;
       }
@@ -1497,7 +1493,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
       if (!silent) {
         hideLoading();
-        Alert.alert(currentT.calculateSuccess, `距离: ${roundedDistanceForPrice}km\n总费用: ${Math.round(totalPrice)} MMK`);
+        feedbackService.notify(currentT.calculateSuccess, `距离: ${roundedDistanceForPrice}km\n总费用: ${Math.round(totalPrice)} MMK`);
       }
     } catch (error) {
       if (!silent) {
@@ -2032,7 +2028,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             // 已扣款情况下跳过余额不足校验
           } else {
             hideLoading();
-            Alert.alert(
+            feedbackService.notify(
               currentT.insufficientBalance, 
               `${language === 'zh' ? '账户余额' : 'Balance'}: ${accountBalance.toLocaleString()} MMK\n` +
               `${language === 'zh' ? '商品总计' : 'Items Total'}: ${cartTotal.toLocaleString()} MMK\n\n` +
@@ -2051,7 +2047,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         
         if (accountBalance < totalDeduction && !draftSnapshot?.deducted) {
           hideLoading();
-          Alert.alert(
+          feedbackService.notify(
             currentT.insufficientBalance, 
             `${language === 'zh' ? '账户余额' : 'Balance'}: ${accountBalance.toLocaleString()} MMK\n` +
             `${language === 'zh' ? '总计费用' : 'Total Required'}: ${totalDeduction.toLocaleString()} MMK`
@@ -2077,7 +2073,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           if (deductError) {
             hideLoading();
             LoggerService.error('余额扣除失败:', deductError);
-            Alert.alert('扣款失败', '由于余额扣除异常，请稍后重试或联系客服。');
+            feedbackService.notify('扣款失败', '由于余额扣除异常，请稍后重试或联系客服。');
             return;
           }
 
@@ -2100,12 +2096,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       hideLoading();
 
       if (result?.success || result?.error?.code === '23505') {
-        // 🚀 核心优化：订单创建成功后清空购物车
-        if (route.params?.selectedProducts) {
-          clearCart();
-          LoggerService.debug('✅ 订单创建成功，购物车已清空');
-        }
-        
         await persistOrderLocally(offlinePayload, 'synced');
         await clearDraft();
         syncPendingOrders();
@@ -2146,7 +2136,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             .eq('id', userId);
           if (refundError) {
             LoggerService.error('余额回滚失败:', refundError);
-            Alert.alert('下单失败', '订单未创建成功，余额回滚失败，请联系客服处理。');
+            feedbackService.notify('下单失败', '订单未创建成功，余额回滚失败，请联系客服处理。');
           } else {
             setAccountBalance(originalBalance);
             await AsyncStorage.setItem('currentUser', JSON.stringify({ ...currentUser, balance: originalBalance }));
@@ -2178,14 +2168,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     }
   };
 
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
-
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(message, type);
   };
 
   const handleProductQuantityChange = (product: Product, delta: number, variantId?: string) => {
@@ -3013,7 +2997,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                     setScheduledTime(timeStr);
                     setShowTimePicker(false);
                   } else {
-                    Alert.alert('提示', '请选择日期并输入时间');
+                    feedbackService.notify('提示', '请选择日期并输入时间');
                   }
                 }}
               >
@@ -3264,13 +3248,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           </View>
         </View>
       </Modal>
-      {/* 🚀 移除多余的空 Modal */}
-      <Toast 
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        onHide={() => setToastVisible(false)}
-      />
     </View>
   );
 }

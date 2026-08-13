@@ -67,6 +67,11 @@ function isOriginAllowed(origin) {
   if (/^http:\/\/localhost:\d+$/.test(origin)) {
     return true;
   }
+
+  // Expo Web / 部分模拟器会用 127.0.0.1 而不是 localhost
+  if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
+    return true;
+  }
   
   return false;
 }
@@ -91,10 +96,18 @@ function getCorsHeaders(event, options = {}) {
   // 验证来源
   const isAllowed = isOriginAllowed(origin);
   
-  // 如果来源被允许，返回该来源；否则返回 null（不允许）
+  // 空 Origin（原生 App）不能把 '' 当成 ACAO，否则等于没开 CORS
+  if (!origin && isAllowed) {
+    return {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': allowedMethods.join(', '),
+      'Access-Control-Allow-Headers': allowedHeaders.join(', '),
+      'Content-Type': 'application/json'
+    };
+  }
+
   const allowOrigin = isAllowed ? origin : null;
-  
-  // 如果没有允许的来源，返回默认头（不允许跨域）
+
   if (!allowOrigin) {
     return {
       'Content-Type': 'application/json'

@@ -27,6 +27,7 @@ import {
   type OrderPrintSource,
 } from '../utils/orderToMerchantReceipt';
 import { buildReceiptItemDisplays } from '../utils/receiptItemFormat';
+import { feedbackService } from '../services/FeedbackService';
 
 const { width } = Dimensions.get('window');
 const FOOTER_SPACE = 120;
@@ -257,7 +258,7 @@ export const OrderAlertModal = ({
           try {
             const printed = await handlePrintOrder();
             if (!printed) {
-              Alert.alert(
+              feedbackService.notify(
                 language === 'zh' ? '小票未打印' : 'Receipt not printed',
                 language === 'zh'
                   ? '订单已接单，但打印机未连接或未就绪。请到「小票机」连接后在订单详情「重新打印小票」。'
@@ -266,7 +267,7 @@ export const OrderAlertModal = ({
             }
           } catch (printError) {
             console.error('打印失败:', printError);
-            Alert.alert(
+            feedbackService.notify(
               language === 'zh' ? '小票打印失败' : 'Print failed',
               language === 'zh'
                 ? '订单已接单，但自动打印失败。请到订单详情点击「重新打印小票」。'
@@ -278,7 +279,7 @@ export const OrderAlertModal = ({
     } catch (error) {
       console.error('接单失败:', error);
       endProcessing();
-      Alert.alert('错误', '接单失败，请检查网络');
+      feedbackService.notify('错误', '接单失败，请检查网络');
     }
   };
 
@@ -363,7 +364,7 @@ export const OrderAlertModal = ({
               onDeclineSuccess?.(orderData.id);
             } catch (err) {
               console.error('拒绝接单失败:', err);
-              Alert.alert('错误', '操作失败，请重试');
+              feedbackService.notify('错误', '操作失败，请重试');
             } finally {
               endProcessing();
             }

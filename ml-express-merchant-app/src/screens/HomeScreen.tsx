@@ -206,7 +206,7 @@ export default function HomeScreen({ navigation }: any) {
         yesterdayOrderCount: revenueData.yesterdayOrderCount ?? 0,
       });
     } catch (error) {
-      console.error("Failed to load merchant data:", error);
+      console.warn("Failed to load merchant data:", error);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -544,12 +544,18 @@ export default function HomeScreen({ navigation }: any) {
 
           <TouchableOpacity
             style={styles.actionItem}
-            onPress={() =>
+            onPress={async () => {
+              const fallbackId = await AsyncStorage.getItem("userId");
+              const fallbackName = await AsyncStorage.getItem("userName");
+              const storeId = merchantInfo?.id || fallbackId;
+              if (!storeId) {
+                return;
+              }
               navigation.navigate("MerchantProducts", {
-                storeId: merchantInfo?.id,
-                storeName: merchantInfo?.store_name,
-              })
-            }
+                storeId,
+                storeName: merchantInfo?.store_name || fallbackName || undefined,
+              });
+            }}
           >
             <View style={[styles.iconBg, { backgroundColor: "#f0fdf4" }]}>
               <Ionicons name="cube-outline" size={28} color="#10b981" />

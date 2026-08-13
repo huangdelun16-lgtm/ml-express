@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image, FlatList, RefreshControl, Animated, Alert, Modal, Vibration, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image, FlatList, RefreshControl, Animated, Modal, Vibration, Platform } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { packageService, supabase, deliveryPhotoService } from '../services/supabase';
 import { chatService } from '../services/chatService';
 import { useApp } from '../contexts/AppContext';
-import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
+import { feedbackService } from '../services/FeedbackService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
@@ -146,7 +146,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     if (!result.success) {
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
       setInputText(messageText);
-      Alert.alert(language === 'zh' ? '错误' : 'Error', language === 'zh' ? '消息发送失败' : 'Failed to send message');
+      feedbackService.notify(language === 'zh' ? '错误' : 'Error', language === 'zh' ? '消息发送失败' : 'Failed to send message');
     }
   };
 
@@ -188,7 +188,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               key={index}
               onPress={() => {
                 // 这里可以增加查看大图逻辑
-                Alert.alert(language === 'zh' ? '查看照片' : 'View Photo');
+                feedbackService.notify(language === 'zh' ? '查看照片' : 'View Photo');
               }}
             >
               <Image 
@@ -495,11 +495,6 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     }
   }, [packageData, riderLocation]);
 
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
-
   // 翻译
   const translations: any = {
     zh: {
@@ -643,9 +638,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 
   // 显示Toast
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(message, type);
   };
 
   // 查询订单
@@ -711,15 +704,6 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         zIndex: 0
       }} />
-
-      {/* Toast通知 */}
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        duration={3000}
-        onHide={() => setToastVisible(false)}
-      />
 
       <ScrollView 
         style={styles.scrollView} 

@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { toastService } from './ToastService';
+import { feedbackService } from './FeedbackService';
 import LoggerService from './LoggerService';
 
 export interface AppError {
@@ -168,7 +168,7 @@ class ErrorService {
     if (!silent) {
       if (useToast) {
         // 使用 Toast 显示错误
-        toastService.error(appError.message);
+        feedbackService.error(appError.message);
       } else {
         // 使用 Alert 显示错误（支持重试）
         this.showErrorAlert(appError, showRetry, onRetry);

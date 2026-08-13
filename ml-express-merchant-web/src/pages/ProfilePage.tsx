@@ -21,6 +21,7 @@ import {
   systemSettingsService,
 } from "../services/supabase";
 import LoggerService from "../services/LoggerService";
+import { feedbackService } from "../services/FeedbackService";
 import QRCode from "qrcode";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api"; // 🚀 新增
 import { getMerchantStoreTypeLabel } from "../services/_shared/merchantStoreTypes";
@@ -471,7 +472,7 @@ const ProfilePage: React.FC = () => {
   const handleAddVacationDate = () => {
     if (!tempVacationDate) return;
     if (businessStatus.vacation_dates.includes(tempVacationDate)) {
-      alert(
+      feedbackService.notify(
         language === "zh" ? "该日期已在休假列表中" : "Date already in list",
       );
       return;
@@ -527,12 +528,12 @@ const ProfilePage: React.FC = () => {
         );
         if (result.success) {
           setStoreInfo(result.data);
-          alert(
+          feedbackService.notify(
             language === "zh" ? "商家资料更新成功" : "Merchant profile updated",
           );
           setShowEditProfileModal(false);
         } else {
-          alert(language === "zh" ? "更新失败，请重试" : "Update failed");
+          feedbackService.notify(language === "zh" ? "更新失败，请重试" : "Update failed");
         }
       } else {
         // 客户资料更新
@@ -549,15 +550,15 @@ const ProfilePage: React.FC = () => {
             "ml-express-customer",
             JSON.stringify(updatedUser),
           );
-          alert(language === "zh" ? "个人资料更新成功" : "Profile updated");
+          feedbackService.notify(language === "zh" ? "个人资料更新成功" : "Profile updated");
           setShowEditProfileModal(false);
         } else {
-          alert(language === "zh" ? "更新失败，请重试" : "Update failed");
+          feedbackService.notify(language === "zh" ? "更新失败，请重试" : "Update failed");
         }
       }
     } catch (error) {
       LoggerService.error("保存资料失败:", error);
-      alert(language === "zh" ? "发生错误，请稍后重试" : "An error occurred");
+      feedbackService.notify(language === "zh" ? "发生错误，请稍后重试" : "An error occurred");
     } finally {
       setIsSavingProfile(false);
     }
@@ -610,7 +611,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error("图片上传失败:", error);
-      alert("图片上传失败，请重试");
+      feedbackService.notify("图片上传失败，请重试");
     } finally {
       setIsUploading(false);
       if (productFileInputRef.current) productFileInputRef.current.value = "";
@@ -638,7 +639,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error("详细介绍图上传失败:", error);
-      alert("图片上传失败，请重试");
+      feedbackService.notify("图片上传失败，请重试");
     } finally {
       setIsUploadingDetailImages(false);
       if (detailImagesFileInputRef.current) {
@@ -658,7 +659,7 @@ const ProfilePage: React.FC = () => {
     const { draft, error: formError } = buildMerchantProductDraft(productForm);
     if (!currentUser?.id) return;
     if (formError) {
-      alert(formError);
+      feedbackService.notify(formError);
       return;
     }
 
@@ -676,7 +677,7 @@ const ProfilePage: React.FC = () => {
         setShowAddEditProductModal(false);
         await loadProducts();
         if (!editingProduct || ("pendingReview" in result && result.pendingReview)) {
-          alert(
+          feedbackService.notify(
             language === "zh"
               ? editingProduct
                 ? "修改已提交，待后台审核通过后客户才能看到新内容。"
@@ -687,7 +688,7 @@ const ProfilePage: React.FC = () => {
           );
         }
       } else {
-        alert("保存失败，请重试");
+        feedbackService.notify("保存失败，请重试");
       }
     } catch (error) {
       LoggerService.error("保存商品失败:", error);
@@ -705,7 +706,7 @@ const ProfilePage: React.FC = () => {
       if (result.success) {
         await loadProducts();
       } else {
-        alert("删除失败，请重试");
+        feedbackService.notify("删除失败，请重试");
       }
     } catch (error) {
       LoggerService.error("删除商品失败:", error);
@@ -720,7 +721,7 @@ const ProfilePage: React.FC = () => {
       if (result.success) {
         await loadProducts();
         if ("pendingReview" in result && result.pendingReview) {
-          alert(
+          feedbackService.notify(
             language === "zh"
               ? "上下架变更已提交，待后台审核通过后生效。"
               : "Availability change submitted for admin approval.",
@@ -748,7 +749,7 @@ const ProfilePage: React.FC = () => {
   const handleUpdateStoreStatus = async (updates: Partial<DeliveryStore>) => {
     const storeId = resolveStoreId();
     if (!storeId) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "无法获取店铺信息，请重新登录后再试"
           : "Store not found. Please log in again.",
@@ -767,13 +768,13 @@ const ProfilePage: React.FC = () => {
         setStoreInfo((prev: any) => ({ ...prev, ...result.data }));
         applyStoreBusinessStatus(result.data);
         if (updates.vacation_dates !== undefined) {
-          alert(
+          feedbackService.notify(
             language === "zh"
               ? "✅ 休假计划已更新"
               : "✅ Vacation schedule updated",
           );
         } else if (updates.is_closed_today !== undefined) {
-          alert(
+          feedbackService.notify(
             updates.is_closed_today
               ? language === "zh"
                 ? "🛑 今日暂停服务已开启"
@@ -787,7 +788,7 @@ const ProfilePage: React.FC = () => {
                   : "လုပ်ငန်း ပြန်လည်စတင်ပါပြီ",
           );
         } else {
-          alert(
+          feedbackService.notify(
             language === "zh"
               ? "💾 营业时间设置成功"
               : language === "en"
@@ -800,7 +801,7 @@ const ProfilePage: React.FC = () => {
           (result.error as { message?: string })?.message ||
           (typeof result.error === "string" ? result.error : "");
         LoggerService.error("保存营业状态失败:", result.error);
-        alert(
+        feedbackService.notify(
           language === "zh"
             ? `❌ 保存失败${errMsg ? `：${errMsg}` : ""}`
             : `❌ Save failed${errMsg ? `: ${errMsg}` : ""}`,
@@ -808,7 +809,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error("更新营业状态失败:", error);
-      alert(language === "zh" ? "❌ 保存发生错误" : "❌ An error occurred");
+      feedbackService.notify(language === "zh" ? "❌ 保存发生错误" : "❌ An error occurred");
     } finally {
       setIsSavingStatus(false);
     }
@@ -817,7 +818,7 @@ const ProfilePage: React.FC = () => {
   // 🚀 新增：中转站重新发货逻辑
   const handleReshipOrder = async (pkg: any) => {
     if (!storeInfo || storeInfo.store_type !== "transit_station") {
-      alert(language === "zh" ? "仅限中转站账号操作" : "Transit stations only");
+      feedbackService.notify(language === "zh" ? "仅限中转站账号操作" : "Transit stations only");
       return;
     }
 
@@ -856,7 +857,7 @@ const ProfilePage: React.FC = () => {
 
       if (error) throw error;
 
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "重新发货成功！包裹已回到待分配队列。"
           : "Re-shipped successfully!",
@@ -864,7 +865,7 @@ const ProfilePage: React.FC = () => {
       await loadUserPackages();
     } catch (error) {
       LoggerService.error("重新发货失败:", error);
-      alert(language === "zh" ? "操作失败，请重试" : "Action failed");
+      feedbackService.notify(language === "zh" ? "操作失败，请重试" : "Action failed");
     } finally {
       setLoading(false);
     }
@@ -1171,7 +1172,7 @@ const ProfilePage: React.FC = () => {
     try {
       const result = await reviewService.replyToReview(reviewId, replyText);
       if (result.success) {
-        alert(
+        feedbackService.notify(
           language === "zh"
             ? "回复成功"
             : language === "en"
@@ -1332,7 +1333,7 @@ const ProfilePage: React.FC = () => {
     variantId?: string,
   ) => {
     if (productHasVariants(product) && !variantId) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "请先选择规格"
           : language === "en"
@@ -1349,7 +1350,7 @@ const ProfilePage: React.FC = () => {
       const currentQty = prev[lineKey] || 0;
 
       if (delta > 0 && stockCap !== 99999 && currentQty >= stockCap) {
-        alert(
+        feedbackService.notify(
           language === "zh"
             ? `库存不足 (剩余: ${stockCap})`
             : language === "en"
@@ -1554,7 +1555,7 @@ const ProfilePage: React.FC = () => {
 
       if (!senderCoords || !receiverCoords) {
         if (!silent) {
-          alert(
+          feedbackService.notify(
             language === "zh"
               ? "请先在地图上选择寄件和收件位置（或确保地址中含坐标）"
               : "Please select sender and receiver locations on the map (or ensure coordinates in address)",
@@ -1593,7 +1594,7 @@ const ProfilePage: React.FC = () => {
       setIsCalculated(true);
 
       if (!silent) {
-        alert(
+        feedbackService.notify(
           language === "zh"
             ? `计算完成！\n配送距离: ${isWaySide ? "—" : `${roundedDistanceForBilling}km`}\n总费用: ${priceValue} MMK`
             : `Done.\nDistance: ${isWaySide ? "—" : `${roundedDistanceForBilling} km`}\nTotal: ${priceValue} MMK`,
@@ -1602,7 +1603,7 @@ const ProfilePage: React.FC = () => {
     } catch (error) {
       console.error("价格估算失败:", error);
       if (!silent) {
-        alert(
+        feedbackService.notify(
           language === "zh" ? "计算失败，请重试" : "Calculation failed, try again",
         );
       }
@@ -1907,7 +1908,7 @@ const ProfilePage: React.FC = () => {
     e: React.MouseEvent<HTMLButtonElement>,
   ) => {
     if (!navigator.geolocation) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "您的浏览器不支持地理定位功能"
           : language === "en"
@@ -1917,7 +1918,7 @@ const ProfilePage: React.FC = () => {
       return;
     }
     if (!window.google?.maps?.Geocoder) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "地图尚未加载完成，请稍后再试"
           : "Map is still loading, please try again",
@@ -1960,7 +1961,7 @@ const ProfilePage: React.FC = () => {
         if (result?.[0]) {
           const address = result[0].formatted_address;
           setMapModalPreviewAddress(address);
-          alert(
+          feedbackService.notify(
             language === "zh"
               ? `✅ 定位成功！\n\n地址：${address}\n\n坐标：${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
               : language === "en"
@@ -1976,7 +1977,7 @@ const ProfilePage: React.FC = () => {
             ? `纬度: ${latitude.toFixed(6)}, 经度: ${longitude.toFixed(6)}`
             : `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`,
         );
-        alert(
+        feedbackService.notify(
           language === "zh"
             ? `📍 已获取坐标：\n纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n\n请手动输入详细地址`
             : `📍 Coordinates:\n${latitude.toFixed(6)}, ${longitude.toFixed(6)}\n\nEnter address manually if needed`,
@@ -2010,7 +2011,7 @@ const ProfilePage: React.FC = () => {
             errorMessage = geo.message || errorMessage;
         }
       }
-      alert(errorMessage);
+      feedbackService.notify(errorMessage);
     } finally {
       button.innerHTML = originalContent;
       button.style.opacity = "1";
@@ -2173,7 +2174,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error("加载代收款订单失败:", error);
-      alert("加载订单列表失败");
+      feedbackService.notify("加载订单列表失败");
     }
   };
 
@@ -2192,7 +2193,7 @@ const ProfilePage: React.FC = () => {
   // 处理密码修改
   const handlePasswordChange = async () => {
     if (!isPartnerStore || !storeInfo) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "只有合伙店铺账户可以修改密码"
           : language === "en"
@@ -2204,7 +2205,7 @@ const ProfilePage: React.FC = () => {
 
     // 验证输入
     if (!passwordForm.currentPassword) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "请输入当前密码"
           : language === "en"
@@ -2215,7 +2216,7 @@ const ProfilePage: React.FC = () => {
     }
 
     if (!passwordForm.newPassword) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "请输入新密码"
           : language === "en"
@@ -2226,7 +2227,7 @@ const ProfilePage: React.FC = () => {
     }
 
     if (passwordForm.newPassword.length < 6) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "新密码至少需要6位"
           : language === "en"
@@ -2237,7 +2238,7 @@ const ProfilePage: React.FC = () => {
     }
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "两次输入的密码不一致"
           : language === "en"
@@ -2249,7 +2250,7 @@ const ProfilePage: React.FC = () => {
 
     // 验证当前密码
     if (storeInfo.password !== passwordForm.currentPassword) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "当前密码错误"
           : language === "en"
@@ -2268,7 +2269,7 @@ const ProfilePage: React.FC = () => {
 
       if (error) {
         LoggerService.error("更新密码失败:", error);
-        alert(
+        feedbackService.notify(
           language === "zh"
             ? "更新密码失败，请稍后重试"
             : language === "en"
@@ -2289,7 +2290,7 @@ const ProfilePage: React.FC = () => {
       });
       setShowPasswordModal(false);
       
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "密码修改成功！"
           : language === "en"
@@ -2298,7 +2299,7 @@ const ProfilePage: React.FC = () => {
       );
     } catch (error) {
       LoggerService.error("更新密码异常:", error);
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "更新密码失败，请稍后重试"
           : language === "en"
@@ -2323,7 +2324,7 @@ const ProfilePage: React.FC = () => {
         language: language as MerchantLanguage,
       });
       if (result.noOrders) {
-        alert(
+        feedbackService.notify(
           language === 'zh'
             ? '所选日期范围内没有订单数据'
             : 'No orders found in the selected date range',
@@ -2332,18 +2333,18 @@ const ProfilePage: React.FC = () => {
       }
       if (!result.ok) {
         if (result.error === 'pdf_unicode') {
-          alert(
+          feedbackService.notify(
             language === 'zh'
               ? 'PDF 格式暂不支持中文/缅文，请选择 Excel (XLSX) 格式导出。'
               : 'PDF format does not support Unicode. Please use Excel.',
           );
         } else {
-          alert(language === 'zh' ? '导出失败，请检查网络重试' : 'Export failed');
+          feedbackService.notify(language === 'zh' ? '导出失败，请检查网络重试' : 'Export failed');
         }
         return;
       }
       if (exportMethod === 'email') {
-        alert(
+        feedbackService.notify(
           language === 'zh'
             ? '✅ 对账单已成功发送到您的邮箱'
             : '✅ Statement has been sent to your email',
@@ -2394,7 +2395,7 @@ const ProfilePage: React.FC = () => {
   const handleSubmitReview = async () => {
     if (!reviewOrder || !currentUser?.id) return;
     if (!reviewComment.trim()) {
-      alert(
+      feedbackService.notify(
         language === "zh" ? "请输入评价内容" : "Please enter review comment",
       );
       return;
@@ -2417,7 +2418,7 @@ const ProfilePage: React.FC = () => {
 
       const result = await reviewService.createReview(reviewData);
       if (result.success) {
-        alert(
+        feedbackService.notify(
           language === "zh"
             ? "评价提交成功！感谢您的反馈。"
             : "Review submitted! Thank you.",
@@ -2438,7 +2439,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       LoggerService.error("提交评价失败:", error);
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "提交失败，请重试"
           : "Submission failed, please try again",
@@ -2553,7 +2554,7 @@ const ProfilePage: React.FC = () => {
   const handleOpenPaymentQR = () => {
     const amount = parseFloat(rechargeAmount);
     if (isNaN(amount) || amount <= 0) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "请输入有效的充值金额"
           : "Please enter a valid amount",
@@ -2580,7 +2581,7 @@ const ProfilePage: React.FC = () => {
   const handleConfirmRecharge = async () => {
     if (!selectedRechargeAmount || !currentUser?.id) return;
     if (!rechargeProof) {
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "请上传汇款凭证截图"
           : "Please upload payment proof",
@@ -2609,7 +2610,7 @@ const ProfilePage: React.FC = () => {
       });
 
       if (result.success) {
-        alert(
+        feedbackService.notify(
           language === "zh"
             ? "提交成功！管理员审核通过后余额将自动到账。"
             : "Submitted! Balance will be updated after admin review.",
@@ -2623,7 +2624,7 @@ const ProfilePage: React.FC = () => {
       }
     } catch (error) {
       console.error("Recharge failed:", error);
-      alert(
+      feedbackService.notify(
         language === "zh"
           ? "提交失败，请稍后重试"
           : "Submission failed, please try again",
@@ -3955,7 +3956,7 @@ const ProfilePage: React.FC = () => {
                       if (!isVoiceEnabled) {
                         speakNotification("语音提醒功能已开启");
                         void ensureDesktopNotificationPermission().then((perm) => {
-                          alert(
+                          feedbackService.notify(
                             language === "zh"
                               ? perm === "granted"
                                 ? "✅ 语音与桌面通知已开启！有新订单时即使用其它软件也会弹出系统通知，点击通知可返回商家端。"

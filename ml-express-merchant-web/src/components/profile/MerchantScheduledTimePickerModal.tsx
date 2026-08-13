@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { feedbackService } from "../../services/FeedbackService";
 
 type UiCopy = {
   today: string;
@@ -262,7 +263,7 @@ const MerchantScheduledTimePickerModal: React.FC<
                 onConfirm(`${dateStr} ${tempScheduledTime}`);
                 onClose();
               } else {
-                alert(
+                feedbackService.notify(
                   language === "zh"
                     ? "请选择时间"
                     : language === "en"

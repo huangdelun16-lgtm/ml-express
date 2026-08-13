@@ -6,6 +6,7 @@ import type { MerchantLanguage } from '../constants/merchantOrderStatus';
 import { getPackingModalModel } from '../utils/parseOrderPackingItems';
 import { printMerchantReceipt } from '../utils/printMerchantReceipt';
 import { loadPrinterSettings } from '../services/printerSettings';
+import { feedbackService } from '../services/FeedbackService';
 
 interface UseMerchantPackageModalsOptions {
   language: MerchantLanguage;
@@ -78,7 +79,7 @@ export function useMerchantPackageModals({
       try {
         setActionLoading(true);
         if (pkgToAccept.status !== MERCHANT_ORDER_STATUS.PENDING_CONFIRM) {
-          alert(
+          feedbackService.notify(
             language === 'zh'
               ? '该订单状态已变更，无法接单'
               : 'Order status changed',
@@ -96,7 +97,7 @@ export function useMerchantPackageModals({
               await printMerchantReceipt(pkgToAccept, productPriceMap, language);
             } catch (printError) {
               LoggerService.warn('接单后自动打印失败', printError);
-              alert(
+              feedbackService.notify(
                 language === 'zh'
                   ? '接单成功，但小票打印失败。请到「我的账号 → 打印机」检查设置后重试。'
                   : 'Order accepted, but receipt print failed. Check Printer settings.',
@@ -104,7 +105,7 @@ export function useMerchantPackageModals({
             }
           }
           removePendingOrder?.(pkgToAccept.id);
-          alert(
+          feedbackService.notify(
             language === 'zh'
               ? printerSettings.autoPrint
                 ? '接单成功！小票已发送打印，请开始打包商品。'
@@ -168,7 +169,7 @@ export function useMerchantPackageModals({
       await printMerchantReceipt(packingOrderData, productPriceMap, language);
     } catch (error) {
       LoggerService.warn('打包窗口补打小票失败', error);
-      alert(
+      feedbackService.notify(
         language === 'zh'
           ? '打印失败，请检查浏览器是否允许打印，或稍后重试。'
           : language === 'en'
@@ -195,7 +196,7 @@ export function useMerchantPackageModals({
         nextStatus,
       );
       if (success) {
-        alert(
+        feedbackService.notify(
           language === 'zh'
             ? '打包完成！快递员将很快上门取件。'
             : 'Packing complete! Courier will arrive soon.',

@@ -22,6 +22,7 @@ import {
   type OrderWizardStepIndex,
 } from './orderModalWizard';
 import Logo from '../Logo';
+import { feedbackService } from '../../services/FeedbackService';
 
 /** 创建订单弹窗：统一视觉（与客户端 Web 对齐） */
 const MODAL_OVERLAY: CSSProperties = {
@@ -321,15 +322,15 @@ const OrderModal: React.FC<OrderModalProps> = ({
         receiverName, receiverPhone, receiverAddress: receiverAddressText,
         senderLocation: selectedSenderLocation, receiverLocation: selectedReceiverLocation,
       }, wizardCopy);
-      if (err) { window.alert(err); return; }
+      if (err) { feedbackService.notify(err); return; }
     }
     if (wizardStep === 1) {
       const err = validatePackageStep(showWeightInput, orderWeight, wizardCopy);
-      if (err) { window.alert(err); return; }
+      if (err) { feedbackService.notify(err); return; }
     }
     if (wizardStep === 2) {
       const err = validateDeliveryStep(selectedDeliverySpeed, scheduledDeliveryTime, t.ui.scheduledDelivery, wizardCopy);
-      if (err) { window.alert(err); return; }
+      if (err) { feedbackService.notify(err); return; }
       void onEnterConfirmStep?.();
     }
     if (wizardStep < WIZARD_LAST_STEP) goToStep((wizardStep + 1) as OrderWizardStepIndex);
@@ -342,7 +343,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
     }
     if (!confirmSubmitReadyRef.current) return;
     if (!isCalculated) {
-      window.alert(
+      feedbackService.notify(
         language === 'zh'
           ? '请稍候，跑腿费正在估算中…'
           : language === 'en'

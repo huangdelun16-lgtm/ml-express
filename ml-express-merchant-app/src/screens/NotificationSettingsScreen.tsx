@@ -16,8 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { useApp } from '../contexts/AppContext';
-import Toast from '../components/Toast';
 import BackToHomeButton from '../components/BackToHomeButton';
+import { feedbackService } from '../services/FeedbackService';
 import NotificationService from '../services/notificationService';
 
 const { width } = Dimensions.get('window');
@@ -43,10 +43,6 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
     emailNotifications: false,
     smsNotifications: false,
   });
-  // Toast状态
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
 
   const [notifPerm, setNotifPerm] = useState<
     'granted' | 'denied' | 'undetermined' | 'unavailable' | null
@@ -78,9 +74,7 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
   );
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
+    feedbackService.show(message, type);
   };
   // 多语言翻译
   const translations = {
@@ -357,12 +351,6 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type={toastType}
-        onHide={() => setToastVisible(false)}
-      />
     </View>
   );
 };

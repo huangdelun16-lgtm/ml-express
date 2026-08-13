@@ -14,6 +14,7 @@ import LoginRegisterModal from '../components/home/LoginRegisterModal';
 import { MYANMAR_CITIES, CityKey, DEFAULT_CITY_KEY, DEFAULT_CITY_CENTER } from '../constants/cities';
 import { deriveInitialOrderStatus } from '../utils/orderSubmitHelpers';
 import '../styles/homeLanding.css';
+import { feedbackService } from '../services/FeedbackService';
 // import { getNearestCityKey } from '../utils/locationUtils';
 
 const LandingServicesChunk = lazy(() => import('./ServicesPage'));
@@ -702,7 +703,7 @@ const HomePage: React.FC = () => {
       setShowOrderForm(true);
     } else {
       // 用户未登录，提示并打开注册窗口
-      alert(language === 'zh' ? '请先注册或登录后再下单' : 
+      feedbackService.notify(language === 'zh' ? '请先注册或登录后再下单' : 
             language === 'en' ? 'Please register or login before placing an order' : 
             'အော်ဒါမတင်မီ အကောင့်ဖွင့်ပါ သို့မဟုတ် ဝင်ပါ');
       setShowRegisterModal(true);
@@ -723,7 +724,7 @@ const HomePage: React.FC = () => {
     
     if (isPhoneLogin) {
       if (!registerForm.phone) {
-        alert(language === 'zh' ? '请填写电话号码' : language === 'en' ? 'Please fill in phone number' : 'ဖုန်းနံပါတ်ဖြည့်ပါ');
+        feedbackService.notify(language === 'zh' ? '请填写电话号码' : language === 'en' ? 'Please fill in phone number' : 'ဖုန်းနံပါတ်ဖြည့်ပါ');
         return;
       }
 
@@ -731,7 +732,7 @@ const HomePage: React.FC = () => {
       // 登录时稍微放宽一点，但基本格式还是要对
       const phoneRegex = /^[1-9]\d{7,10}$/;
       if (!isLoginMode && !phoneRegex.test(registerForm.phone)) {
-        alert(language === 'zh' ? '请输入有效的手机号' : 
+        feedbackService.notify(language === 'zh' ? '请输入有效的手机号' : 
               language === 'en' ? 'Please enter a valid phone number' : 
               'မှန်ကန်သော ဖုန်းနံပါတ်ထည့်ပါ');
         return;
@@ -743,12 +744,12 @@ const HomePage: React.FC = () => {
 
     // 验证密码
     if (!registerForm.password) {
-      alert(language === 'zh' ? '请输入密码' : language === 'en' ? 'Please enter password' : 'စကားဝှက်ထည့်ပါ');
+      feedbackService.notify(language === 'zh' ? '请输入密码' : language === 'en' ? 'Please enter password' : 'စကားဝှက်ထည့်ပါ');
       return;
     }
 
     if (!isLoginMode && registerForm.password.length < 6) {
-      alert(language === 'zh' ? '密码至少需要6位' : language === 'en' ? 'Password must be at least 6 characters' : 'စကားဝှက်သည် အနည်းဆုံး ၆ လုံးရှိရမည်');
+      feedbackService.notify(language === 'zh' ? '密码至少需要6位' : language === 'en' ? 'Password must be at least 6 characters' : 'စကားဝှက်သည် အနည်းဆုံး ၆ လုံးရှိရမည်');
       return;
     }
 
@@ -827,24 +828,24 @@ const HomePage: React.FC = () => {
         // ===== 登录模式（会员）—— 商家请使用独立商家端 =====
         // 普通登录：验证邮箱或手机号和密码
         if (!registerForm.email && !registerForm.phone) {
-          alert(language === 'zh' ? '请输入邮箱或手机号' : language === 'en' ? 'Please enter email or phone number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ');
+          feedbackService.notify(language === 'zh' ? '请输入邮箱或手机号' : language === 'en' ? 'Please enter email or phone number' : 'အီးမေးလ် သို့မဟုတ် ဖုန်းနံပါတ်ထည့်ပါ');
           return;
         }
 
         if (!registerForm.password) {
-          alert(language === 'zh' ? '请输入密码' : language === 'en' ? 'Please enter password' : 'စကားဝှက်ထည့်ပါ');
+          feedbackService.notify(language === 'zh' ? '请输入密码' : language === 'en' ? 'Please enter password' : 'စကားဝှက်ထည့်ပါ');
           return;
         }
 
         if (!existingUser) {
-          alert(language === 'zh' ? '该账号未注册，请先注册' : language === 'en' ? 'Account not registered, please register first' : 'အကောင့်မရှိပါ၊ မှတ်ပုံတင်ပါ');
+          feedbackService.notify(language === 'zh' ? '该账号未注册，请先注册' : language === 'en' ? 'Account not registered, please register first' : 'အကောင့်မရှိပါ၊ မှတ်ပုံတင်ပါ');
           setIsLoginMode(false);
           return;
         }
         
         // 商家账号请使用商家端 Web，不在客户端登录
         if (existingUser.user_type === 'merchant') {
-          alert(
+          feedbackService.notify(
             language === 'zh'
               ? '商家账号请使用商家端网站登录与管理。客户端仅支持会员账号。'
               : language === 'en'
@@ -856,7 +857,7 @@ const HomePage: React.FC = () => {
 
         // 验证密码
         if (existingUser.password !== registerForm.password) {
-          alert(language === 'zh' ? '密码错误' : language === 'en' ? 'Incorrect password' : 'စကားဝှက်မှားနေပါသည်');
+          feedbackService.notify(language === 'zh' ? '密码错误' : language === 'en' ? 'Incorrect password' : 'စကားဝှက်မှားနေပါသည်');
           return;
         }
 
@@ -864,7 +865,7 @@ const HomePage: React.FC = () => {
         setCurrentUser(existingUser);
         localStorage.setItem('ml-express-customer', JSON.stringify(existingUser));
         setShowRegisterModal(false);
-        alert(language === 'zh' ? `登录成功！欢迎回来，${existingUser.name}` : 
+        feedbackService.notify(language === 'zh' ? `登录成功！欢迎回来，${existingUser.name}` : 
               language === 'en' ? `Login successful! Welcome back, ${existingUser.name}` : 
               'ဝင်ရောက်ခြင်း အောင်မြင်ပါသည်! ' + existingUser.name);
         
@@ -878,24 +879,24 @@ const HomePage: React.FC = () => {
         
         // 验证姓名
         if (!registerForm.name) {
-          alert(language === 'zh' ? '请填写姓名' : language === 'en' ? 'Please fill in name' : 'နာမည်ဖြည့်ပါ');
+          feedbackService.notify(language === 'zh' ? '请填写姓名' : language === 'en' ? 'Please fill in name' : 'နာမည်ဖြည့်ပါ');
           return;
         }
 
         // 验证确认密码
         if (!registerForm.confirmPassword) {
-          alert(language === 'zh' ? '请确认密码' : language === 'en' ? 'Please confirm password' : 'စကားဝှက်အတည်ပြုပါ');
+          feedbackService.notify(language === 'zh' ? '请确认密码' : language === 'en' ? 'Please confirm password' : 'စကားဝှက်အတည်ပြုပါ');
           return;
         }
 
         if (registerForm.password !== registerForm.confirmPassword) {
-          alert(language === 'zh' ? '两次输入的密码不一致' : language === 'en' ? 'Passwords do not match' : 'စကားဝှက်များ မတူညီပါ');
+          feedbackService.notify(language === 'zh' ? '两次输入的密码不一致' : language === 'en' ? 'Passwords do not match' : 'စကားဝှက်များ မတူညီပါ');
           return;
         }
 
         // 验证验证码
         if (!registerForm.verificationCode) {
-          alert(language === 'zh' ? '请输入验证码' : language === 'en' ? 'Please enter verification code' : 'အတည်ပြုကုဒ်ထည့်ပါ');
+          feedbackService.notify(language === 'zh' ? '请输入验证码' : language === 'en' ? 'Please enter verification code' : 'အတည်ပြုကုဒ်ထည့်ပါ');
           return;
         }
 
@@ -917,7 +918,7 @@ const HomePage: React.FC = () => {
         
         if (!verifyResult.success) {
           console.error('验证码验证失败:', verifyResult.message);
-          alert(verifyResult.message);
+          feedbackService.notify(verifyResult.message);
           return;
         }
 
@@ -929,7 +930,7 @@ const HomePage: React.FC = () => {
           const identifierEn = registerMethod === 'email' ? 'Email' : 'Phone number';
           const identifierMm = registerMethod === 'email' ? 'အီးမေးလ်' : 'ဖုန်းနံပါတ်';
           
-          alert(language === 'zh' ? `该${identifier}已注册，请直接登录` : 
+          feedbackService.notify(language === 'zh' ? `该${identifier}已注册，请直接登录` : 
                 language === 'en' ? `${identifierEn} already registered, please login` : 
                 `${identifierMm} မှတ်ပုံတင်ပြီးပါပြီ၊ ဝင်ပါ`);
           setIsLoginMode(true);
@@ -955,7 +956,7 @@ const HomePage: React.FC = () => {
           setShowRegisterModal(false);
           setShowOrderForm(true);
           console.log('注册成功，已保存用户信息');
-          alert(language === 'zh' ? '注册成功！欢迎使用缅甸同城快递' : 
+          feedbackService.notify(language === 'zh' ? '注册成功！欢迎使用缅甸同城快递' : 
                 language === 'en' ? 'Registration successful! Welcome to Myanmar Express' : 
                 'မှတ်ပုံတင်ခြင်း အောင်မြင်ပါသည်!');
           
@@ -965,14 +966,14 @@ const HomePage: React.FC = () => {
           setCountdown(0);
         } else {
           console.error('注册失败：userService.createCustomer 返回 null');
-          alert(language === 'zh' ? '注册失败，请稍后重试' : 
+          feedbackService.notify(language === 'zh' ? '注册失败，请稍后重试' : 
                 language === 'en' ? 'Registration failed, please try again later' : 
                 'မှတ်ပုံတင်ခြင်း မအောင်မြင်ပါ');
         }
       }
     } catch (error) {
       console.error('注册/登录失败:', error);
-      alert(language === 'zh' ? '操作失败，请检查网络连接' : 
+      feedbackService.notify(language === 'zh' ? '操作失败，请检查网络连接' : 
             language === 'en' ? 'Operation failed, please check network connection' : 
             'လုပ်ဆောင်ချက် မအောင်မြင်ပါ');
     }
@@ -982,7 +983,7 @@ const HomePage: React.FC = () => {
   const handleSendVerificationCode = async () => {
     // 检查倒计时
     if (countdown > 0) {
-      alert(language === 'zh' ? `请等待 ${countdown} 秒后再试` : 
+      feedbackService.notify(language === 'zh' ? `请等待 ${countdown} 秒后再试` : 
             language === 'en' ? `Please wait ${countdown} seconds` : 
             countdown + ' စက္ကန့် စောင့်ပါ');
       return;
@@ -995,7 +996,7 @@ const HomePage: React.FC = () => {
         // ========== 邮箱验证 ==========
         // 验证邮箱
         if (!registerForm.email) {
-          alert(language === 'zh' ? '请先输入邮箱' : 
+          feedbackService.notify(language === 'zh' ? '请先输入邮箱' : 
                 language === 'en' ? 'Please enter email first' : 
                 'အီးမေးလ်ထည့်ပါ');
           return;
@@ -1003,7 +1004,7 @@ const HomePage: React.FC = () => {
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(registerForm.email)) {
-          alert(language === 'zh' ? '请输入有效的邮箱地址' : 
+          feedbackService.notify(language === 'zh' ? '请输入有效的邮箱地址' : 
                 language === 'en' ? 'Please enter a valid email address' : 
                 'မှန်ကန်သော အီးမေးလ်လိပ်စာထည့်ပါ');
           return;
@@ -1024,17 +1025,17 @@ const HomePage: React.FC = () => {
             setSentCode(result.code); // 开发模式可能会返回验证码
             console.log('🔑 验证码:', result.code);
           }
-          alert(result.message);
+          feedbackService.notify(result.message);
         } else {
           console.error('❌ 邮箱服务返回失败:', result);
-          alert(result.message);
+          feedbackService.notify(result.message);
         }
         
       } else {
         // ========== 短信验证 ==========
         // 验证手机号
         if (!registerForm.phone) {
-          alert(language === 'zh' ? '请先输入手机号' : 
+          feedbackService.notify(language === 'zh' ? '请先输入手机号' : 
                 language === 'en' ? 'Please enter phone number first' : 
                 'ဖုန်းနံပါတ်ထည့်ပါ');
           return;
@@ -1043,7 +1044,7 @@ const HomePage: React.FC = () => {
         // 支持 9xxxxxxxx 格式（UI 已带 +95 并自动去 0）
         const phoneRegex = /^[1-9]\d{7,10}$/;
         if (!phoneRegex.test(registerForm.phone)) {
-          alert(language === 'zh' ? '请输入有效的手机号' : 
+          feedbackService.notify(language === 'zh' ? '请输入有效的手机号' : 
                 language === 'en' ? 'Please enter a valid phone number' : 
                 'မှန်ကန်သော ဖုန်းနံပါတ်ထည့်ပါ');
           return;
@@ -1064,15 +1065,15 @@ const HomePage: React.FC = () => {
             setSentCode(result.code); // 开发模式可能会返回验证码
             console.log('🔑 验证码:', result.code);
           }
-          alert(result.message);
+          feedbackService.notify(result.message);
         } else {
-          alert(result.message);
+          feedbackService.notify(result.message);
         }
       }
     } catch (error) {
       console.error('发送验证码失败:', error);
       console.error('错误详情:', JSON.stringify(error, null, 2));
-      alert(language === 'zh' ? '发送失败，请重试' : 
+      feedbackService.notify(language === 'zh' ? '发送失败，请重试' : 
             language === 'en' ? 'Failed to send, please try again' : 
             'ပို့ဆောင်မှု မအောင်မြင်ပါ');
     }
@@ -1313,10 +1314,10 @@ const HomePage: React.FC = () => {
       document.body.removeChild(link);
       
       // 模拟发送给客户
-      alert(t.errors?.qrDownloaded);
+      feedbackService.notify(t.errors?.qrDownloaded);
     } catch (error) {
       console.error(t.errors?.downloadFailed, error);
-      alert(t.errors?.downloadFailed);
+      feedbackService.notify(t.errors?.downloadFailed);
     } finally {
       setDownloading(false);
     }
@@ -1462,7 +1463,7 @@ const HomePage: React.FC = () => {
       if (!window.google || !window.google.maps) {
         console.warn('⚠️ Google Maps API未加载，使用默认距离 5km');
         if (!silent) {
-          alert(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n使用默认距离: 5 km`);
+          feedbackService.notify(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n使用默认距离: 5 km`);
         }
         return 5;
       }
@@ -1504,7 +1505,7 @@ const HomePage: React.FC = () => {
               } else if (element?.status === 'ZERO_RESULTS') {
                 console.warn('⚠️ 无法找到路线，使用默认距离');
                 if (!silent) {
-                  alert((language === 'zh' ? '无法计算两地之间的距离，可能地址不够详细' : language === 'en' ? 'Unable to calculate distance between two locations, address may be insufficient' : 'နေရာနှစ်ခုကြားအကွာအဝေးကို တွက်ချက်နိုင်ခြင်းမရှိပါ၊ လိပ်စာမလုံလောက်နိုင်သည်') + '\n' + (language === 'zh' ? '使用默认距离: 5 km' : language === 'en' ? 'Using default distance: 5 km' : 'ပုံမှန်အကွာအဝေး: 5 km'));
+                  feedbackService.notify((language === 'zh' ? '无法计算两地之间的距离，可能地址不够详细' : language === 'en' ? 'Unable to calculate distance between two locations, address may be insufficient' : 'နေရာနှစ်ခုကြားအကွာအဝေးကို တွက်ချက်နိုင်ခြင်းမရှိပါ၊ လိပ်စာမလုံလောက်နိုင်သည်') + '\n' + (language === 'zh' ? '使用默认距离: 5 km' : language === 'en' ? 'Using default distance: 5 km' : 'ပုံမှန်အကွာအဝေး: 5 km'));
                 }
                 resolve(5);
               } else {
@@ -1514,13 +1515,13 @@ const HomePage: React.FC = () => {
             } else if (status === 'OVER_QUERY_LIMIT') {
               console.error('❌ Google Maps API 查询限额已达上限');
               if (!silent) {
-                alert(language === 'zh' ? '系统繁忙，使用默认距离: 5 km' : language === 'en' ? 'System busy, using default distance: 5 km' : 'စနစ်မှာ အလုပ်များနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
+                feedbackService.notify(language === 'zh' ? '系统繁忙，使用默认距离: 5 km' : language === 'en' ? 'System busy, using default distance: 5 km' : 'စနစ်မှာ အလုပ်များနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
               }
               resolve(5);
             } else if (status === 'REQUEST_DENIED') {
               console.error('❌ Google Maps API 请求被拒绝，可能是 API Key 问题');
               if (!silent) {
-                alert(language === 'zh' ? '地图服务配置错误，使用默认距离: 5 km' : language === 'en' ? 'Map service configuration error, using default distance: 5 km' : 'မြေပုံဝန်ဆောင်မှု ကွန်ဖီဂူရေးရှင်းမှားနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
+                feedbackService.notify(language === 'zh' ? '地图服务配置错误，使用默认距离: 5 km' : language === 'en' ? 'Map service configuration error, using default distance: 5 km' : 'မြေပုံဝန်ဆောင်မှု ကွန်ဖီဂူရေးရှင်းမှားနေသည်၊ ပုံမှန်အကွာအဝေး: 5 km');
               }
               resolve(5);
             } else {
@@ -1534,7 +1535,7 @@ const HomePage: React.FC = () => {
       console.error('❌ 距离计算异常:', error);
       const errorMsg = error instanceof Error ? error.message : '未知错误';
       if (!silent) {
-        alert(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n${errorMsg}\n使用默认距离: 5 km`);
+        feedbackService.notify(`${t.errors?.distanceCalculationFailed || '距离计算失败'}\n${errorMsg}\n使用默认距离: 5 km`);
       }
       return 5;
     }
@@ -1686,7 +1687,7 @@ const HomePage: React.FC = () => {
       } else {
         if (!senderAddressTextValue || !receiverAddressTextValue) {
           if (!silent) {
-            alert(language === 'zh' ? '请先选择寄件和收件地址（建议从地图选择以获得精准费用）' :
+            feedbackService.notify(language === 'zh' ? '请先选择寄件和收件地址（建议从地图选择以获得精准费用）' :
                   language === 'en' ? 'Please select sender and receiver addresses (Map selection recommended for accurate pricing)' :
                   'ပို့ဆောင်သူနှင့် လက်ခံသူ လိပ်စာများကို ရွေးချယ်ပါ (တိကျသောစျေးနှုန်းအတွက် မြေပုံမှရွေးချယ်ရန် အကြံပြုပါသည်)');
           }
@@ -1730,12 +1731,12 @@ const HomePage: React.FC = () => {
             `Calculation Complete!\nDelivery Distance: ${roundedDistanceForBilling}km\nTotal Cost: ${priceValue} MMK` :
             'တွက်ချက်မှု ပြီးမြောက်ပါပြီ!\nပို့ဆောင်အကွာအဝေး: ' + roundedDistanceForBilling + 'km\nစုစုပေါင်းကုန်ကျစရိတ်: ' + priceValue + ' MMK';
         }
-        alert(resultMsg);
+        feedbackService.notify(resultMsg);
       }
     } catch (error) {
       console.error('计算费用失败:', error);
       if (!silent) {
-        alert(language === 'zh' ? '计算失败，请重试' :
+        feedbackService.notify(language === 'zh' ? '计算失败，请重试' :
               language === 'en' ? 'Calculation failed, please try again' :
               'တွက်ချက်မှု မအောင်မြင်ပါ၊ ပြန်လည်ကြိုးစားပါ');
       }
@@ -1813,12 +1814,12 @@ const HomePage: React.FC = () => {
       !orderInfo.senderAddress ||
       !orderInfo.receiverAddress
     ) {
-      alert(t.errors?.addressRequired || '请填写完整的寄件和收件信息');
+      feedbackService.notify(t.errors?.addressRequired || '请填写完整的寄件和收件信息');
       return;
     }
 
     if (!selectedSenderLocation || !selectedReceiverLocation) {
-      alert(
+      feedbackService.notify(
         language === 'zh'
           ? '请在地图中选择寄件与收件精确位置'
           : language === 'en'
@@ -1839,7 +1840,7 @@ const HomePage: React.FC = () => {
       !orderInfo.deliverySpeed?.trim() ||
       (needWeight && !String(orderInfo.weight ?? '').trim())
     ) {
-      alert('请填写完整的包裹信息');
+      feedbackService.notify('请填写完整的包裹信息');
       return;
     }
     
@@ -3203,7 +3204,7 @@ const HomePage: React.FC = () => {
               <button
                 onClick={async (e) => {
                   if (!navigator.geolocation) {
-                    alert('您的浏览器不支持地理定位功能');
+                    feedbackService.notify('您的浏览器不支持地理定位功能');
                     return;
                   }
 
@@ -3263,7 +3264,7 @@ const HomePage: React.FC = () => {
                         // 更新选中位置
                         setSelectedLocation({ lat: latitude, lng: longitude, address });
                         
-                        alert(`✅ 定位成功！\n\n地址：${address}\n\n坐标：${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                        feedbackService.notify(`✅ 定位成功！\n\n地址：${address}\n\n坐标：${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
                       } else {
                         throw new Error('无法获取地址信息');
                       }
@@ -3276,7 +3277,7 @@ const HomePage: React.FC = () => {
                       }
                       setMapCenter({ lat: latitude, lng: longitude });
                       setMapClickPosition({ lat: latitude, lng: longitude });
-                      alert(`📍 已获取位置坐标：\n纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n\n请手动输入详细地址`);
+                      feedbackService.notify(`📍 已获取位置坐标：\n纬度: ${latitude.toFixed(6)}\n经度: ${longitude.toFixed(6)}\n\n请手动输入详细地址`);
                     }
                     
                   } catch (error: unknown) {
@@ -3302,7 +3303,7 @@ const HomePage: React.FC = () => {
                     if (process.env.NODE_ENV === 'development') {
                       console.warn('定位未成功:', geo);
                     }
-                    alert(errorMessage);
+                    feedbackService.notify(errorMessage);
                   } finally {
                     // 恢复按钮状态
                     button.innerHTML = originalContent;
@@ -3561,7 +3562,7 @@ const HomePage: React.FC = () => {
                       console.warn('⚠️ 未能获取坐标信息');
                     }
 
-                    alert(`✅ 地址已成功填入${mapSelectionType === 'sender' ? '寄件' : '收件'}地址字段！\n\n📍 ${completeAddress}`);
+                    feedbackService.notify(`✅ 地址已成功填入${mapSelectionType === 'sender' ? '寄件' : '收件'}地址字段！\n\n📍 ${completeAddress}`);
 
                     setMapClickPosition(null);
                     setSelectedLocation(null);
@@ -3569,7 +3570,7 @@ const HomePage: React.FC = () => {
                     setShowMapModal(false);
                     setMapSelectionType(null);
                   } else {
-                    alert('⚠️ 请先在地图上点击选择位置，或在地址框中输入地址信息');
+                    feedbackService.notify('⚠️ 请先在地图上点击选择位置，或在地址框中输入地址信息');
                   }
                 }}
                 style={{
@@ -3730,7 +3731,7 @@ const HomePage: React.FC = () => {
                     setScheduledDeliveryTime(`${dateStr} ${tempScheduledTime}`);
                     setShowTimePickerModal(false);
                   } else {
-                    alert('请选择时间');
+                    feedbackService.notify('请选择时间');
                   }
                 }}
                 style={{

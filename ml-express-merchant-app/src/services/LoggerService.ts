@@ -49,6 +49,7 @@ const SENSITIVE_KEYS = [
   'refresh_token',
   'session',
   'cookie',
+  'anon',
 ];
 
 /**
@@ -71,6 +72,9 @@ function sanitizeData(data: any): any {
 
   // 如果是对象，递归处理
   if (typeof data === 'object' && !Array.isArray(data)) {
+    if (data instanceof Error) {
+      return { name: data.name, message: sanitizeData(data.message), stack: data.stack };
+    }
     const sanitized: any = {};
     
     for (const [key, value] of Object.entries(data)) {
@@ -170,8 +174,9 @@ class LoggerService {
     const sanitizedError = sanitizeData(error);
     const sanitizedContext = sanitizeData(context);
     
-    if (currentLogLevel <= LogLevel.ERROR) {
-      console.error('[ERROR]', message, sanitizedError, sanitizedContext);
+    if (currentLogLevel <= LogLevel.ERROR && isDevelopment) {
+      // 开发态用 warn，避免 RN LogBox 把业务 error 打成红屏
+      console.warn('[ERROR]', message, sanitizedError, sanitizedContext);
     }
     
     // 生产环境发送错误到日志服务
@@ -191,8 +196,39 @@ class LoggerService {
 }
 
 /**
- * 导出默认实例（兼容旧代码）
+ * 生产环境压制 console.log/info/debug，避免泄露内部信息；warn/error 脱敏后保留。
+ * 商家端无 Sentry，勿在此擅自接入。
  */
+export function installProductionConsoleGate(): void {
+  if (isDevelopment) return;
+
+  const redactedWarn = (...args: any[]) => {
+    try {
+      console.warn.apply(console, args.map(sanitizeData) as any);
+    } catch {
+      /* ignore */
+    }
+  };
+  const redactedError = (...args: any[]) => {
+    try {
+      console.error.apply(console, args.map(sanitizeData) as any);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // eslint-disable-next-line no-console
+  console.log = () => {};
+  // eslint-disable-next-line no-console
+  console.info = () => {};
+  // eslint-disable-next-line no-console
+  console.debug = () => {};
+  // eslint-disable-next-line no-console
+  console.warn = redactedWarn as typeof console.warn;
+  // eslint-disable-next-line no-console
+  console.error = redactedError as typeof console.error;
+}
+
 export default LoggerService;
 
 /**

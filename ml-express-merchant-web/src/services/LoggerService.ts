@@ -9,6 +9,7 @@
  */
 
 const isDevelopment = process.env.NODE_ENV === 'development';
+let productionConsoleGateInstalled = false;
 
 /**
  * 日志级别
@@ -48,6 +49,7 @@ const SENSITIVE_KEYS = [
   'refresh_token',
   'session',
   'cookie',
+  'anon',
 ];
 
 /**
@@ -70,6 +72,9 @@ function sanitizeData(data: any): any {
 
   // 如果是对象，递归处理
   if (typeof data === 'object' && !Array.isArray(data)) {
+    if (data instanceof Error) {
+      return { name: data.name, message: sanitizeData(data.message), stack: data.stack };
+    }
     const sanitized: any = {};
     
     for (const [key, value] of Object.entries(data)) {
@@ -169,8 +174,8 @@ class LoggerService {
   static error(message: string, ...args: any[]): void {
     const sanitizedArgs = args.map(arg => sanitizeData(arg));
     
-    if (currentLogLevel <= LogLevel.ERROR) {
-      console.error('[ERROR]', message, ...sanitizedArgs);
+    if (currentLogLevel <= LogLevel.ERROR && isDevelopment) {
+      console.warn('[ERROR]', message, ...sanitizedArgs);
     }
     
     // 生产环境发送错误到日志服务
@@ -190,8 +195,40 @@ class LoggerService {
 }
 
 /**
- * 导出默认实例（兼容旧代码）
+ * 生产环境压制 console.log/info/debug；warn/error 脱敏后保留。
+ * 商家 Web 无 Sentry，勿在此擅自接入。
  */
+export function installProductionConsoleGate(): void {
+  if (isDevelopment || productionConsoleGateInstalled) return;
+  productionConsoleGateInstalled = true;
+
+  const redactedWarn = (...args: any[]) => {
+    try {
+      console.warn.apply(console, args.map(sanitizeData) as any);
+    } catch {
+      /* ignore */
+    }
+  };
+  const redactedError = (...args: any[]) => {
+    try {
+      console.error.apply(console, args.map(sanitizeData) as any);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // eslint-disable-next-line no-console
+  console.log = () => {};
+  // eslint-disable-next-line no-console
+  console.info = () => {};
+  // eslint-disable-next-line no-console
+  console.debug = () => {};
+  // eslint-disable-next-line no-console
+  console.warn = redactedWarn as typeof console.warn;
+  // eslint-disable-next-line no-console
+  console.error = redactedError as typeof console.error;
+}
+
 export default LoggerService;
 
 /**
