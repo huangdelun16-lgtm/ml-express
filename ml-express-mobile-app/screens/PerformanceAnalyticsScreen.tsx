@@ -12,6 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { supabase } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 import {
   normalizePackageStatusZh,
   isActiveCourierTaskStatus,
@@ -59,7 +60,7 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
       // 🚀 优化：使用骑手姓名进行查询
       const currentUserName = await AsyncStorage.getItem('currentUserName');
       if (!currentUserName) {
-        Alert.alert('错误', '未找到骑手信息');
+        feedbackService.notify('错误', '未找到骑手信息');
         return;
       }
       
@@ -100,7 +101,7 @@ export default function PerformanceAnalyticsScreen({ navigation }: any) {
 
     } catch (error) {
       console.error('加载业绩数据失败:', error);
-      Alert.alert('错误', '加载数据失败，请重试');
+      feedbackService.notify('错误', '加载数据失败，请重试');
     } finally {
       setLoading(false);
     }

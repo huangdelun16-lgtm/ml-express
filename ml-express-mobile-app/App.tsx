@@ -18,6 +18,10 @@ import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Vibration, DeviceEventEmitter } from 'react-native';
+import {
+  readStaffWorkspaceContext,
+  STAFF_WORKSPACE_CHANGED_EVENT,
+} from './utils/staffWorkspace';
 import { shouldAlertCourierOnNewAssignment } from './utils/packageStatusNormalize';
 import type { LanguageTexts } from './utils/i18n';
 import LoginScreen from './screens/LoginScreen';
@@ -43,6 +47,7 @@ import LocationDisclosureScreen from './screens/LocationDisclosureScreen';
 import * as Linking from 'expo-linking';
 import { navigationRef } from './navigation/navigationRef';
 import LocationPrecheckModalHost from './components/LocationPrecheckModalHost';
+import { GlobalToast } from './components/GlobalToast';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -249,14 +254,26 @@ function CourierTabs() {
 }
 
 function MainTabs() {
-  const [userRole, setUserRole] = React.useState<string>('');
+  const [workspace, setWorkspace] = React.useState<'admin' | 'courier' | null>(null);
 
   React.useEffect(() => {
-    const loadRole = async () => {
-      const role = (await AsyncStorage.getItem('currentUserRole')) || 'operator';
-      setUserRole(role);
+    let cancelled = false;
+    (async () => {
+      const { mode } = await readStaffWorkspaceContext();
+      if (!cancelled) setWorkspace(mode);
+    })();
+    const sub = DeviceEventEmitter.addListener(
+      STAFF_WORKSPACE_CHANGED_EVENT,
+      (payload?: { mode?: 'admin' | 'courier' }) => {
+        if (payload?.mode === 'admin' || payload?.mode === 'courier') {
+          setWorkspace(payload.mode);
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+      sub.remove();
     };
-    loadRole();
   }, []);
 
   /** 登录并进主界面后再恢复后台追踪（避免启动屏阶段未挂载 Permission 宿主即请求权限，违反 Play 披露顺序） */
@@ -278,7 +295,15 @@ function MainTabs() {
     };
   }, []);
 
-  if (userRole === 'admin' || userRole === 'manager') {
+  if (!workspace) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    );
+  }
+
+  if (workspace === 'admin') {
     return <AdminTabs />;
   }
 
@@ -618,6 +643,7 @@ export default function App() {
     <SafeAreaProvider>
       <AppProvider>
         <AppContent />
+        <GlobalToast />
       </AppProvider>
     </SafeAreaProvider>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { chatService } from '../services/chatService';
+import { feedbackService } from '../services/feedbackService';
 import { packageService, deliveryStoreService, supabase } from '../services/supabase';
 import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
@@ -33,7 +34,13 @@ import {
   normalizePackageStatusZh,
   isPickupFlowStatus,
   isNavigateMerchantFirstPhase,
+  isDeliveryActionStatus,
 } from '../utils/packageStatusNormalize';
+import {
+  isDeliveryStoreScan,
+  parseStoreReceiveCode,
+  scanMatchesPackage,
+} from '../utils/scanCodeHelpers';
 import { getPackingModalModel } from '../utils/parseOrderPackingItems';
 import { openMapsToAddress } from '../utils/openMapsNavigation';
 import { getOrdererIdentityDisplay } from '../utils/ordererIdentity';
@@ -50,12 +57,16 @@ const { width } = Dimensions.get('window');
 export default function PackageDetailScreen({ route, navigation }: any) {
   const isFocused = useIsFocused();
   const { language, t } = useApp();
-  const { packageId, package: initialPackage } = route.params || {};
+  const { packageId, package: initialPackage, openScan, openDeliveryActions } =
+    route.params || {};
   const [pkg, setPkg] = useState<any>(initialPackage || null);
   const [loading, setLoading] = useState(!initialPackage);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
+  const scanLockRef = useRef(false);
+  const lastScanAtRef = useRef(0);
+  const autoOpenHandledRef = useRef(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -114,6 +125,19 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     };
   }, [packageId, route.params?.id, initialPackage]);
 
+  // 地图等入口：自动打开送达/取件操作或扫码
+  useEffect(() => {
+    if (!pkg || autoOpenHandledRef.current) return;
+    if (openScan) {
+      autoOpenHandledRef.current = true;
+      setShowScanModal(true);
+      return;
+    }
+    if (openDeliveryActions) {
+      autoOpenHandledRef.current = true;
+      setShowCameraModal(true);
+    }
+  }, [pkg, openScan, openDeliveryActions]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -199,7 +223,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       // 如果发送失败，移除乐观消息并还原输入框（可选，或者显示失败红点）
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
       setInputText(messageText);
-      Alert.alert('错误', '消息发送失败: ' + (result.error?.message || '未知错误'));
+      feedbackService.notify('错误', '消息发送失败: ' + (result.error?.message || '未知错误'));
     }
   };
 
@@ -234,7 +258,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
     if (!result.success) {
       console.error('❌ 快捷回复发送失败:', result.error);
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
-      Alert.alert('错误', '消息发送失败: ' + (result.error?.message || '未知错误'));
+      feedbackService.notify('错误', '消息发送失败: ' + (result.error?.message || '未知错误'));
     }
   };
 
@@ -258,10 +282,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       }
     } catch (error) {
       console.error('加载包裹详情失败:', error);
-      Alert.alert(
-        language === 'zh' ? '加载失败' : 'Load Failed',
-        language === 'zh' ? '无法加载包裹详情，请检查网络' : 'Unable to load package details, please check network'
-      );
+      feedbackService.notify(language === 'zh' ? '加载失败' : 'Load Failed', language === 'zh' ? '无法加载包裹详情，请检查网络' : 'Unable to load package details, please check network');
     } finally {
       setLoading(false);
     }
@@ -300,7 +321,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
   const handleOpenCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('权限不足', '需要相机权限');
+      feedbackService.notify('权限不足', '需要相机权限');
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -344,7 +365,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
                 loadPackageDetails(pkg.id);
               }
     } catch (error) {
-              Alert.alert('错误', '操作失败');
+              feedbackService.notify('错误', '操作失败');
             }
           }
         }
@@ -363,10 +384,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       const health = await deviceHealthService.performFullCheck();
       
       if (health.location.isMocked) {
-        Alert.alert(
-          language === 'zh' ? '检测到异常' : 'Anomaly Detected',
-          language === 'zh' ? '系统检测到您正在使用“模拟定位”，该操作已被禁止并已上报系统。' : 'Mock location detected. This action is prohibited and reported.'
-        );
+        feedbackService.notify(language === 'zh' ? '检测到异常' : 'Anomaly Detected', language === 'zh' ? '系统检测到您正在使用“模拟定位”，该操作已被禁止并已上报系统。' : 'Mock location detected. This action is prohibited and reported.');
         const courierId = await AsyncStorage.getItem('currentCourierId') || pkg.courier || '未知';
         const courierName = await AsyncStorage.getItem('currentUserName') || '骑手';
         await packageService.reportAnomaly({
@@ -395,12 +413,9 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         const dist = R * c;
 
         if (dist > 200) {
-          Alert.alert(
-            language === 'zh' ? '距离过远' : 'Too Far',
-            language === 'zh' 
+          feedbackService.notify(language === 'zh' ? '距离过远' : 'Too Far', language === 'zh' 
               ? `您距离送达点还剩 ${Math.round(dist)} 米，请到达目的地后再拍照。` 
-              : `You are ${Math.round(dist)}m away from destination. Please arrive before taking photo.`
-          );
+              : `You are ${Math.round(dist)}m away from destination. Please arrive before taking photo.`);
           return;
         }
       }
@@ -409,13 +424,23 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         pkg.id, '已送达', undefined, new Date().toISOString(), pkg.courier
       );
       if (success) {
-        Alert.alert('成功', '包裹已送达', [{ text: '确定', onPress: () => {
-          setShowPhotoModal(false);
-          loadPackageDetails(pkg.id);
-        }}]);
+        feedbackService.success(language === 'zh' ? '包裹已送达' : 'Package delivered');
+        Alert.alert(
+          language === 'zh' ? '送达成功' : 'Delivered',
+          language === 'zh' ? '配送证明已提交' : 'Delivery proof submitted',
+          [
+            {
+              text: language === 'zh' ? '完成' : 'Done',
+              onPress: () => {
+                setShowPhotoModal(false);
+                navigation.goBack();
+              },
+            },
+          ],
+        );
       }
       } catch (error) {
-      Alert.alert('失败', '上传配送证明失败');
+      feedbackService.notify('失败', '上传配送证明失败');
     } finally {
       setUploading(false);
     }
@@ -423,7 +448,7 @@ export default function PackageDetailScreen({ route, navigation }: any) {
 
   const handleReportAnomaly = async () => {
     if (!anomalyType || !anomalyDescription) {
-      Alert.alert('提示', '请选择异常类型并填写详细说明');
+      feedbackService.notify('提示', '请选择异常类型并填写详细说明');
       return;
     }
 
@@ -463,82 +488,171 @@ export default function PackageDetailScreen({ route, navigation }: any) {
         throw new Error('Submit failed');
       }
     } catch (error) {
-      Alert.alert('失败', '提交报备失败，请重试');
+      feedbackService.notify('失败', '提交报备失败，请重试');
     } finally {
       setReporting(false);
     }
   };
 
   const handleScanCode = async (data: string) => {
+    const now = Date.now();
+    if (scanLockRef.current || now - lastScanAtRef.current < 1800) return;
+    scanLockRef.current = true;
+    lastScanAtRef.current = now;
     setShowScanModal(false);
-    
+
     try {
       setLoading(true);
-      
-      // 1. 🚀 防作弊检查
+      if (!pkg) return;
+
+      const statusNormLocal = normalizePackageStatusZh(pkg.status);
       const { deviceHealthService } = require('../services/deviceHealthService');
       const health = await deviceHealthService.performFullCheck();
       if (health.location.isMocked) {
-        Alert.alert('检测到异常', '禁止使用模拟定位进行扫码送达');
+        feedbackService.warning(
+          language === 'zh' ? '禁止使用模拟定位进行扫码' : 'Mock location is not allowed for scan',
+        );
         return;
       }
 
-      // 2. 🚀 距离检查 (如果是送达操作且不是扫码送达中转站)
-      const isStoreCode = data.startsWith('STORE_');
-      if (
-        pkg &&
-        !isPickupFlowStatus(normalizePackageStatusZh(pkg.status)) &&
-        !isStoreCode
-      ) {
-        const scanCoords = await locationService.getCurrentLocation(language);
-        if (scanCoords && pkg.receiver_latitude && pkg.receiver_longitude) {
-          const R = 6371e3;
-          const p1 = scanCoords.latitude * Math.PI/180;
-          const p2 = pkg.receiver_latitude * Math.PI/180;
-          const dp = (pkg.receiver_latitude - scanCoords.latitude) * Math.PI/180;
-          const dl = (pkg.receiver_longitude - scanCoords.longitude) * Math.PI/180;
-          const a = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          const dist = R * c;
+      // —— 取件：扫包裹号 / 寄件码 ——
+      if (isPickupFlowStatus(statusNormLocal)) {
+        if (scanMatchesPackage(data, pkg)) {
+          const success = await packageService.updatePackageStatus(
+            pkg.id,
+            '已取件',
+            new Date().toLocaleString('zh-CN'),
+            undefined,
+            pkg.courier,
+          );
+          if (success) {
+            feedbackService.success(
+              language === 'zh' ? '取件成功，可开始配送' : 'Picked up. Ready to deliver.',
+            );
+            await loadPackageDetails(pkg.id);
+          } else {
+            feedbackService.error(language === 'zh' ? '取件失败' : 'Pickup failed');
+          }
+        } else if (isDeliveryStoreScan(data)) {
+          feedbackService.warning(
+            language === 'zh'
+              ? '当前为取件阶段，请扫描包裹码；店长收件码用于送达'
+              : 'Pickup stage: scan package code. Store code is for delivery.',
+          );
+        } else {
+          feedbackService.warning(
+            language === 'zh'
+              ? '扫码与当前包裹不匹配，请对准本单二维码'
+              : 'Code does not match this package',
+          );
+        }
+        return;
+      }
 
-          if (dist > 200) {
-            Alert.alert('距离过远', `您距离送达点还剩 ${Math.round(dist)} 米，请到达目的地后再扫码。`);
+      // —— 送达：店长收件码 / 中转站 ——
+      if (isDeliveryActionStatus(statusNormLocal) || statusNormLocal === '异常上报') {
+        if (isDeliveryStoreScan(data)) {
+          const parsed = parseStoreReceiveCode(data);
+          if (!parsed) {
+            feedbackService.warning(language === 'zh' ? '收件码无效' : 'Invalid store code');
             return;
           }
-        }
-      }
 
-      if (data.startsWith('STORE_')) {
-        const storeId = data.replace('STORE_', '').split('_')[0];
-        
-        // 🚀 核心逻辑：如果是异常上报状态送达中转站，增加备注说明
-        const isAnomalyResolution =
-          normalizePackageStatusZh(pkg?.status) === '异常上报';
-        const statusMsg = isAnomalyResolution ? '已送达 (异常转中转站)' : '已送达';
-        const alertMsg = isAnomalyResolution ? '包裹已作为异常件送达至中转站' : '包裹已送达至代收点';
+          const scanCoords = await locationService.getCurrentLocation(language);
+          if (scanCoords && pkg.receiver_latitude && pkg.receiver_longitude) {
+            const R = 6371e3;
+            const p1 = (scanCoords.latitude * Math.PI) / 180;
+            const p2 = (pkg.receiver_latitude * Math.PI) / 180;
+            const dp = ((pkg.receiver_latitude - scanCoords.latitude) * Math.PI) / 180;
+            const dl = ((pkg.receiver_longitude - scanCoords.longitude) * Math.PI) / 180;
+            const a =
+              Math.sin(dp / 2) * Math.sin(dp / 2) +
+              Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const dist = R * c;
+            if (dist > 200) {
+              feedbackService.warning(
+                language === 'zh'
+                  ? `距离送达点约 ${Math.round(dist)} 米，请靠近后再扫码`
+                  : `About ${Math.round(dist)}m away. Move closer before scanning.`,
+              );
+              return;
+            }
+          }
 
-        const success = await packageService.updatePackageStatus(
-            pkg.id, '已送达', undefined, new Date().toISOString(), pkg.courier, undefined, { storeId, storeName: '中转站', receiveCode: data }
-        );
-        if (success) {
-            // 如果是异常上报，额外更新一条描述
+          const isAnomalyResolution = statusNormLocal === '异常上报';
+          let storeName = '中转站';
+          try {
+            const storeDetails = await deliveryStoreService.getStoreById(parsed.storeId);
+            if (storeDetails?.store_name) storeName = storeDetails.store_name;
+          } catch {}
+
+          const success = await packageService.updatePackageStatus(
+            pkg.id,
+            '已送达',
+            undefined,
+            new Date().toISOString(),
+            pkg.courier,
+            undefined,
+            { storeId: parsed.storeId, storeName, receiveCode: data },
+          );
+          if (success) {
             if (isAnomalyResolution) {
               try {
-                await supabase.from('packages').update({ 
-                  description: (pkg.description || '') + ' [异常转送中转站]'
-                }).eq('id', pkg.id);
-              } catch (e) {}
+                await supabase
+                  .from('packages')
+                  .update({ description: (pkg.description || '') + ' [异常转送中转站]' })
+                  .eq('id', pkg.id);
+              } catch {}
             }
-            
-            Alert.alert('✅ ' + statusMsg, alertMsg, [{ text: '确定', onPress: () => loadPackageDetails(pkg.id) }]);
+            feedbackService.success(
+              language === 'zh' ? `已送达：${storeName}` : `Delivered: ${storeName}`,
+            );
+            Alert.alert(
+              language === 'zh' ? '送达成功' : 'Delivered',
+              language === 'zh'
+                ? `包裹已送达至 ${storeName}`
+                : `Package delivered to ${storeName}`,
+              [
+                {
+                  text: language === 'zh' ? '完成' : 'Done',
+                  onPress: () => navigation.goBack(),
+                },
+              ],
+            );
+          } else {
+            feedbackService.error(language === 'zh' ? '送达更新失败' : 'Delivery update failed');
+          }
+          return;
         }
-      } else {
-        Alert.alert('扫码成功', `扫描结果: ${data}`);
+
+        if (scanMatchesPackage(data, pkg)) {
+          feedbackService.info(
+            language === 'zh'
+              ? '请扫描店长收件码完成送达，或改用拍照送达'
+              : 'Scan store receive code, or use photo delivery',
+          );
+          return;
+        }
+
+        feedbackService.warning(
+          language === 'zh'
+            ? '请扫描店长收件码（STORE_…）完成送达'
+            : 'Scan store receive code (STORE_…) to deliver',
+        );
+        return;
       }
+
+      feedbackService.warning(
+        language === 'zh'
+          ? `当前状态「${pkg.status}」无法通过扫码操作`
+          : `Status ${pkg.status} cannot be updated via scan`,
+      );
     } catch (error) {
-      Alert.alert('错误', '更新失败');
+      feedbackService.error(language === 'zh' ? '扫码处理失败' : 'Scan handling failed');
     } finally {
       setLoading(false);
+      scanLockRef.current = false;
     }
   };
 
@@ -1211,7 +1325,14 @@ export default function PackageDetailScreen({ route, navigation }: any) {
       <Modal visible={showScanModal} transparent animationType="slide">
         <View style={styles.scanOverlay}>
           {isFocused ? (
-            <CameraView style={StyleSheet.absoluteFill} facing="back" onBarcodeScanned={({ data }) => handleScanCode(data)} />
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{
+                barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8'],
+              }}
+              onBarcodeScanned={({ data }) => handleScanCode(data)}
+            />
           ) : (
             <View style={[StyleSheet.absoluteFill, styles.cameraPaused]}>
               <Text style={styles.cameraPausedText}>

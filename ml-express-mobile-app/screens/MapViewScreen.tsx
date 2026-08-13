@@ -14,6 +14,7 @@ import {
 import * as Location from 'expo-location';
 import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import { packageService, Package, Courier, courierService } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 
 interface MapViewScreenProps {
   visible: boolean;
@@ -54,7 +55,7 @@ export default function MapViewScreen({ visible, onClose }: MapViewScreenProps) 
       await loadCourierLocations();
     } catch (error) {
       console.error('加载地图数据失败:', error);
-      Alert.alert('错误', '加载地图数据失败');
+      feedbackService.notify('错误', '加载地图数据失败');
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ export default function MapViewScreen({ visible, onClose }: MapViewScreenProps) 
     try {
       const { status } = await requestForegroundPermissionsIfDisclosed();
       if (status !== 'granted') {
-        Alert.alert('权限不足', '需要位置权限才能显示地图');
+        feedbackService.notify('权限不足', '需要位置权限才能显示地图');
         return;
       }
 
@@ -149,7 +150,7 @@ export default function MapViewScreen({ visible, onClose }: MapViewScreenProps) 
       if (supported) {
         Linking.openURL(url);
       } else {
-        Alert.alert('错误', '无法打开地图应用');
+        feedbackService.notify('错误', '无法打开地图应用');
       }
     });
   };

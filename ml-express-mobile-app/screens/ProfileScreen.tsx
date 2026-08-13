@@ -29,9 +29,22 @@ import {
 } from '../utils/packageStatusNormalize';
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 import { locationService, syncCourierLocationToSupabase } from '../services/locationService';
+import { feedbackService } from '../services/feedbackService';
 import * as Location from 'expo-location';
 import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
 import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
+import {
+  canAccessCourierManagement,
+  canAccessFinanceManagement,
+  canAccessPackageManagement,
+  canAccessPerformanceAnalytics,
+  canUseAdminWorkspace,
+  canUseCourierWorkspace,
+  isDualCapabilityStaff,
+  readStaffWorkspaceContext,
+  setStaffWorkspaceMode,
+  type StaffWorkspaceMode,
+} from '../utils/staffWorkspace';
 
 const { width } = Dimensions.get('window');
 
@@ -69,6 +82,9 @@ export default function ProfileScreen({ navigation }: any) {
   const [currentUser, setCurrentUser] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState('');
   const [currentUserPosition, setCurrentUserPosition] = useState('');
+  const [workspaceMode, setWorkspaceMode] = useState<StaffWorkspaceMode>('courier');
+  const [courierId, setCourierId] = useState<string | null>(null);
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [courierOnline, setCourierOnline] = useState(true);
   const [togglingOnline, setTogglingOnline] = useState(false);
   const [stats, setStats] = useState({
@@ -91,30 +107,54 @@ export default function ProfileScreen({ navigation }: any) {
   );
 
   const loadUserInfo = async () => {
-    const userName = await AsyncStorage.getItem('currentUserName') || '用户';
-    const user = await AsyncStorage.getItem('currentUser') || '';
-    const userRole = await AsyncStorage.getItem('currentUserRole') || 'operator';
-    const position = await AsyncStorage.getItem('currentUserPosition') || '';
+    const userName = (await AsyncStorage.getItem('currentUserName')) || '用户';
+    const user = (await AsyncStorage.getItem('currentUser')) || '';
     const onlinePref = await AsyncStorage.getItem(COURIER_ONLINE_MODE_KEY);
+    const ctx = await readStaffWorkspaceContext();
     setCurrentUserName(userName);
     setCurrentUser(user);
-    setCurrentUserRole(userRole);
-    setCurrentUserPosition(position);
+    setCurrentUserRole(ctx.role);
+    setCurrentUserPosition(ctx.position);
+    setWorkspaceMode(ctx.mode);
+    setCourierId(ctx.courierId);
     setCourierOnline(onlinePref !== 'false');
   };
 
-  const isRider =
-    currentUserPosition === '骑手' || currentUserPosition === '骑手队长';
+  const isRider = canUseCourierWorkspace(currentUserPosition, courierId);
+  const dualCapable = isDualCapabilityStaff({
+    role: currentUserRole,
+    position: currentUserPosition,
+    courierId,
+  });
+  const showAdminMenu = canUseAdminWorkspace(currentUserRole) && workspaceMode === 'admin';
 
+  const switchWorkspace = async (mode: StaffWorkspaceMode) => {
+    if (switchingWorkspace) return;
+    if (mode === 'admin' && !canUseAdminWorkspace(currentUserRole)) {
+      feedbackService.warning(t.workspaceCannotSwitch);
+      return;
+    }
+    if (mode === 'courier' && !canUseCourierWorkspace(currentUserPosition, courierId)) {
+      feedbackService.warning(t.workspaceCannotSwitch);
+      return;
+    }
+    setSwitchingWorkspace(true);
+    try {
+      const next = await setStaffWorkspaceMode(mode);
+      setWorkspaceMode(next);
+      feedbackService.success(
+        next === 'admin' ? t.workspaceSwitchedAdmin : t.workspaceSwitchedCourier,
+      );
+    } finally {
+      setSwitchingWorkspace(false);
+    }
+  };
   const setCourierOnlineState = async (next: boolean) => {
     const courierId = await AsyncStorage.getItem('currentCourierId');
     if (!courierId) {
-      Alert.alert(
-        language === 'zh' ? '提示' : 'Notice',
-        language === 'zh'
+      feedbackService.notify(language === 'zh' ? '提示' : 'Notice', language === 'zh'
           ? '未找到骑手档案，请重新登录'
-          : 'Courier profile not found. Please login again.',
-      );
+          : 'Courier profile not found. Please login again.');
       return;
     }
     setTogglingOnline(true);
@@ -147,7 +187,7 @@ export default function ProfileScreen({ navigation }: any) {
               { text: t.openSystemSettings, onPress: () => Linking.openSettings() },
             ]);
           } else {
-            Alert.alert(t.tipTitle, t.locationPermissionMessage);
+            feedbackService.notify(t.tipTitle, t.locationPermissionMessage);
           }
           setTogglingOnline(false);
           return;
@@ -190,10 +230,7 @@ export default function ProfileScreen({ navigation }: any) {
       }
     } catch (e) {
       console.error(e);
-      Alert.alert(
-        language === 'zh' ? '失败' : 'Failed',
-        language === 'zh' ? '状态更新失败，请重试' : 'Could not update status',
-      );
+      feedbackService.notify(language === 'zh' ? '失败' : 'Failed', language === 'zh' ? '状态更新失败，请重试' : 'Could not update status');
     } finally {
       setTogglingOnline(false);
     }
@@ -382,6 +419,53 @@ export default function ProfileScreen({ navigation }: any) {
     },
   ];
 
+  const adminMenuItems = [
+    canAccessPackageManagement(currentUserRole)
+      ? {
+          icon: '📦',
+          title: language === 'zh' ? '包裹管理' : 'Package Management',
+          subtitle: language === 'zh' ? '查看与分配包裹' : 'View and assign packages',
+          screen: 'PackageManagement',
+        }
+      : null,
+    canAccessCourierManagement(currentUserRole)
+      ? {
+          icon: '🚚',
+          title: language === 'zh' ? '骑手管理' : 'Courier Management',
+          subtitle: language === 'zh' ? '骑手状态与派单' : 'Courier status & dispatch',
+          screen: 'CourierManagement',
+        }
+      : null,
+    canAccessFinanceManagement(currentUserRole)
+      ? {
+          icon: '💰',
+          title: language === 'zh' ? '财务管理' : 'Finance',
+          subtitle: language === 'zh' ? '收支与对账' : 'Finance records',
+          screen: 'FinanceManagement',
+        }
+      : null,
+    canAccessPerformanceAnalytics(currentUserRole)
+      ? {
+          icon: '📈',
+          title: language === 'zh' ? '绩效分析' : 'Performance',
+          subtitle: language === 'zh' ? '骑手绩效看板' : 'Courier performance',
+          screen: 'PerformanceAnalytics',
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    icon: string;
+    title: string;
+    subtitle: string;
+    screen: string;
+  }>;
+
+  const courierQuickItems = menuItems.filter((item) => {
+    if (workspaceMode === 'admin' && !isRider) {
+      // 纯管理账号：隐藏配送历史/统计，保留设置与帮助
+      return item.screen === 'Settings' || !item.screen;
+    }
+    return true;
+  });
   return (
     <View style={styles.container}>
       {/* 渐变背景 */}
@@ -416,13 +500,19 @@ export default function ProfileScreen({ navigation }: any) {
                 <View style={styles.roleBadge}>
                   <Text style={styles.roleBadgeText}>{getRoleName(currentUserRole)}</Text>
                 </View>
+                <View style={[styles.roleBadge, { backgroundColor: workspaceMode === 'admin' ? 'rgba(59,130,246,0.35)' : 'rgba(16,185,129,0.35)', marginTop: 6 }]}>
+                  <Text style={styles.roleBadgeText}>
+                    {workspaceMode === 'admin' ? t.workspaceAdminLabel : t.workspaceCourierLabel}
+                  </Text>
+                </View>
                 <Text style={styles.userId}>{language === 'zh' ? '账号' : language === 'my' ? 'အကောင့်' : 'ID'}: {currentUser}</Text>
               </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* 统计卡片 */}
+        {/* 统计卡片 — 配送工作区或双岗配送视角 */}
+        {(workspaceMode === 'courier' || isRider) && (
         <View style={styles.statsContainer}>
           <LinearGradient
             colors={['rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.03)']}
@@ -447,8 +537,10 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
           </LinearGradient>
         </View>
+        )}
 
         {/* 🚀 优化：今日核心金额统计 (一行一个，防止金额过长) */}
+        {workspaceMode === 'courier' && isRider && (
         <View style={[styles.statsContainer, { marginTop: -10 }]}>
           <LinearGradient
             colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.03)']}
@@ -475,9 +567,56 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
           </LinearGradient>
         </View>
+        )}
+
+        {/* 工作区：管理督导 / 骑手配送（双岗可切换，不删管理员） */}
+        {(canUseAdminWorkspace(currentUserRole) || isRider) && (
+          <View style={[styles.statsContainer, { marginTop: 4 }]}>
+            <LinearGradient
+              colors={
+                workspaceMode === 'admin'
+                  ? ['rgba(59, 130, 246, 0.28)', 'rgba(15, 23, 42, 0.6)']
+                  : ['rgba(16, 185, 129, 0.25)', 'rgba(15, 23, 42, 0.6)']
+              }
+              style={styles.onlineCard}
+            >
+              <Text style={styles.onlineTitle}>
+                {workspaceMode === 'admin' ? t.workspaceAdminLabel : t.workspaceCourierLabel}
+              </Text>
+              <Text style={[styles.onlineHint, { marginBottom: dualCapable ? 12 : 0 }]}>
+                {workspaceMode === 'admin' ? t.workspaceAdminHint : t.workspaceCourierHint}
+              </Text>
+              {dualCapable ? (
+                <TouchableOpacity
+                  style={styles.workspaceSwitchBtn}
+                  disabled={switchingWorkspace}
+                  onPress={() =>
+                    switchWorkspace(workspaceMode === 'admin' ? 'courier' : 'admin')
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    workspaceMode === 'admin'
+                      ? t.workspaceSwitchToCourier
+                      : t.workspaceSwitchToAdmin
+                  }
+                >
+                  {switchingWorkspace ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.workspaceSwitchText}>
+                      {workspaceMode === 'admin'
+                        ? t.workspaceSwitchToCourier
+                        : t.workspaceSwitchToAdmin}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ) : null}
+            </LinearGradient>
+          </View>
+        )}
 
         {/* 骑手：在线接单（与 Admin 实时跟踪 / 待分配派单联动） */}
-        {isRider && (
+        {isRider && workspaceMode === 'courier' && (
           <View style={[styles.statsContainer, { marginTop: 4 }]}>
             <LinearGradient
               colors={['rgba(16, 185, 129, 0.25)', 'rgba(15, 23, 42, 0.6)']}
@@ -518,16 +657,46 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         )}
 
+        {/* 管理中心（仅管理督导工作区） */}
+        {showAdminMenu && adminMenuItems.length > 0 ? (
+          <View style={styles.menuContainer}>
+            <Text style={styles.sectionTitle}>{t.workspaceAdminMenuTitle}</Text>
+            <View style={styles.menuList}>
+              {adminMenuItems.map((item, index) => (
+                <TouchableOpacity
+                  key={item.screen}
+                  style={[
+                    styles.menuItem,
+                    index === adminMenuItems.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.title}
+                  onPress={() => navigation.navigate(item.screen)}
+                >
+                  <View style={styles.menuIconContainer}>
+                    <Text style={styles.menuIconText}>{item.icon}</Text>
+                  </View>
+                  <View style={styles.menuContent}>
+                    <Text style={styles.menuTitle}>{item.title}</Text>
+                    <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.3)" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {/* 功能菜单 */}
         <View style={styles.menuContainer}>
           <Text style={styles.sectionTitle}>{language === 'zh' ? '快捷功能' : language === 'my' ? 'အမြန်လုပ်ဆောင်ချက်များ' : 'Quick Actions'}</Text>
           <View style={styles.menuList}>
-            {menuItems.map((item, index) => (
+            {courierQuickItems.map((item, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
                   styles.menuItem,
-                  index === menuItems.length - 1 && { borderBottomWidth: 0 }
+                  index === courierQuickItems.length - 1 && { borderBottomWidth: 0 }
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={item.title}
@@ -538,10 +707,7 @@ export default function ProfileScreen({ navigation }: any) {
                   } else if (item.screen) {
                     navigation.navigate(item.screen);
                   } else {
-                    Alert.alert(
-                      language === 'zh' ? '提示' : language === 'my' ? 'အကြောင်းကြားချက်' : 'Notice', 
-                      language === 'zh' ? '功能开发中，敬请期待！' : language === 'my' ? 'လုပ်ဆောင်ချက်များဖွံ့ဖြိုးတိုးတက်နေဆဲ၊ စောင့်ဆိုင်းပါ!' : 'Feature coming soon!'
-                    );
+                    feedbackService.notify(language === 'zh' ? '提示' : language === 'my' ? 'အကြောင်းကြားချက်' : 'Notice', language === 'zh' ? '功能开发中，敬请期待！' : language === 'my' ? 'လုပ်ဆောင်ချက်များဖွံ့ဖြိုးတိုးတက်နေဆဲ၊ စောင့်ဆိုင်းပါ!' : 'Feature coming soon!');
                   }
                 }}
               >
@@ -688,6 +854,20 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.65)',
     fontSize: 12,
     lineHeight: 18,
+  },
+  workspaceSwitchBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  workspaceSwitchText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   statsContainer: {
     paddingHorizontal: 20,

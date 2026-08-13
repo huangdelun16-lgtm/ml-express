@@ -12,6 +12,8 @@ import {
 import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
 import { packageService } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
+import { logger } from '../services/LoggerService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import NetInfo from '@react-native-community/netinfo';
@@ -20,7 +22,12 @@ import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import {
   normalizePackageStatusZh,
   isPickupFlowStatus,
+  isDeliveryActionStatus,
 } from '../utils/packageStatusNormalize';
+import {
+  classifyScanCode,
+  parseStoreReceiveCode,
+} from '../utils/scanCodeHelpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -212,13 +219,13 @@ export default function ScanScreen({ navigation }: any) {
       setCurrentCourierName(userName);
       setCurrentCourierId(userId);
     } catch (error) {
-      console.error('加载骑手信息失败:', error);
+      logger.error('加载骑手信息失败', error);
     }
   };
 
   // 重置扫描状态
   const resetScanState = () => {
-    console.log('重置扫描状态');
+    logger.debug('重置扫描状态');
     setScanned(false);
     setIsProcessing(false);
     scannedDataRef.current = null;
@@ -228,13 +235,13 @@ export default function ScanScreen({ navigation }: any) {
   // 检查相机权限状态
   useEffect(() => {
     if (permission) {
-      console.log('相机权限状态:', permission.granted);
+      logger.debug('相机权限状态', { granted: permission.granted });
       if (!permission.granted) {
         setCameraError('相机权限未授予');
       } else {
         // 权限已授予，清除之前的错误
         setCameraError(null);
-        console.log('相机权限已授予，准备初始化相机');
+        logger.debug('相机权限已授予');
       }
     }
   }, [permission]);
@@ -278,23 +285,23 @@ export default function ScanScreen({ navigation }: any) {
     
     // 多重检查防止重复扫描
     if (scanned || isProcessing) {
-      console.log('扫描被阻止：已扫描或正在处理中');
+      logger.debug('扫描被阻止：已扫描或正在处理中');
       return;
     }
     
     // 检查是否扫描了相同的数据
     if (scannedDataRef.current === data) {
-      console.log('扫描被阻止：相同数据已处理');
+      logger.debug('扫描被阻止：相同数据已处理');
       return;
     }
     
     // 防抖：如果距离上次扫描时间少于2秒，忽略
     if (currentTime - lastScanTimeRef.current < 2000) {
-      console.log('扫描被阻止：防抖保护');
+      logger.debug('扫描被阻止：防抖保护');
       return;
     }
     
-    console.log('开始处理扫描数据:', data);
+    logger.debug('开始处理扫描数据');
     
     // 设置处理状态和时间戳
     setScanned(true);
@@ -305,363 +312,271 @@ export default function ScanScreen({ navigation }: any) {
     try {
       await searchPackage(data);
     } catch (error) {
-      console.error('扫描处理错误:', error);
+      logger.error('扫描处理错误', error);
       // 发生错误时重置状态
       resetScanState();
     }
   };
 
+  const openPackageDetail = (pkgId: string) => {
+    resetScanState();
+    navigation.navigate('PackageDetail', { packageId: pkgId });
+  };
+
   const searchPackage = async (packageId: string) => {
     try {
-      // 检查网络状态
       if (!isOnline) {
-        Alert.alert(
-          '网络未连接',
-          '请检查网络连接后重试',
-          [
-            { text: '确定', onPress: resetScanState }
-          ]
-        );
+        Alert.alert('网络未连接', '请检查网络连接后重试', [
+          { text: '确定', onPress: resetScanState },
+        ]);
         return;
       }
 
-      // 检查是否是店长收件码
-      if (packageId.startsWith('STORE_')) {
+      const kind = classifyScanCode(packageId);
+
+      if (kind === 'store') {
         await handleStoreReceiveCode(packageId);
         return;
       }
 
-      // 检查是否是中转码
-      if (packageId.startsWith('TC')) {
-        await handleTransferCode(packageId);
+      const foundPackage = await packageService.findPackageByScanCode(packageId);
+      if (!foundPackage) {
+        feedbackService.warning(
+          language === 'zh'
+            ? '未找到该包裹，请确认编号或中转码'
+            : 'Package not found. Check ID or transfer code.',
+        );
+        resetScanState();
         return;
       }
 
-      let packages: any[] = [];
-      try {
-        packages = await packageService.getAllPackages();
-      } catch (error: any) {
-        console.error('获取包裹列表失败:', error);
-        const errorMessage = error?.message || '未知错误';
-        
-        // 检查是否是网络错误
-        if (
-          errorMessage.includes('Network') || 
-          errorMessage.includes('connection') ||
-          errorMessage.includes('gateway') ||
-          errorMessage.includes('Network connection lost')
-        ) {
-          setNetworkError('网络连接失败，请检查网络后重试');
+      const ns = normalizePackageStatusZh(foundPackage.status);
+
+      // 中转码：待派送 / 中转站已送达 → 分配给当前骑手
+      if (kind === 'transfer') {
+        const raw = String(foundPackage.status || '');
+        const canAssign =
+          raw === '待派送' ||
+          ns === '已送达' ||
+          (ns === '配送中' && !foundPackage.courier);
+        if (canAssign || ns === '已送达' || raw === '待派送') {
+          const statusText = ns === '已送达' ? (language === 'zh' ? '已到达中转站' : 'At station') : foundPackage.status;
           Alert.alert(
-            '网络错误',
-            '无法连接到服务器，请检查网络连接后重试',
+            language === 'zh' ? '确认领取中转包裹' : 'Claim transfer package',
+            language === 'zh'
+              ? `包裹：${foundPackage.id}\n状态：${statusText}\n中转码：${packageId}\n\n是否分配给：${currentCourierName}？`
+              : `Package: ${foundPackage.id}\nStatus: ${statusText}\nAssign to ${currentCourierName}?`,
             [
-              { text: '确定', onPress: resetScanState }
-            ]
+              { text: language === 'zh' ? '取消' : 'Cancel', onPress: resetScanState },
+              {
+                text: language === 'zh' ? '确认分配' : 'Assign',
+                onPress: async () => {
+                  await assignPackageToCourier(foundPackage);
+                },
+              },
+            ],
           );
           return;
         }
-        
-        // 其他错误
+      }
+
+      if (isPickupFlowStatus(ns)) {
         Alert.alert(
-          '查询失败',
-          '无法获取包裹列表，请稍后重试',
+          language === 'zh' ? '确认取件' : 'Confirm pickup',
+          language === 'zh'
+            ? `包裹：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n\n确认后状态将更新为「已取件」`
+            : `Package: ${foundPackage.id}\nReceiver: ${foundPackage.receiver_name}\n\nConfirm to mark as picked up.`,
           [
-            { text: '确定', onPress: resetScanState }
-          ]
+            { text: language === 'zh' ? '取消' : 'Cancel', onPress: resetScanState },
+            {
+              text: language === 'zh' ? '确认取件' : 'Confirm',
+              onPress: async () => {
+                await confirmPickup(foundPackage);
+              },
+            },
+          ],
         );
         return;
       }
 
-      const foundPackage = packages.find(p => p.id === packageId);
-
-      if (foundPackage) {
-        const ns = normalizePackageStatusZh(foundPackage.status);
-        // 待取件 / 待收款：可扫码取件
-        if (isPickupFlowStatus(ns)) {
-          Alert.alert(
-            '确认取件',
-            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n\n扫码确认取件，状态将更新为"已取件"`,
-            [
-              { text: '取消', onPress: resetScanState },
-              {
-                text: '确认取件',
-                onPress: async () => {
-                  await confirmPickup(foundPackage);
-                }
-              }
-            ]
-          );
-        } else if (ns === '打包中' || ns === '待确认') {
-          Alert.alert(
-            '暂不可取件',
-            `包裹编号：${foundPackage.id}\n状态：${foundPackage.status}\n\n请等待商家确认/完成备货后再取件。`,
-            [{ text: '确定', onPress: resetScanState }]
-          );
-        } else if (ns === '已取件') {
-          Alert.alert(
-            '包裹已取件',
-            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}\n\n请点击"开始配送"按钮开始配送`,
-            [
-              { text: '确定', onPress: resetScanState }
-            ]
-          );
-        } else if (ns === '配送中') {
-          Alert.alert(
-            '包裹配送中',
-            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}\n\n包裹正在配送中，请继续配送流程`,
-            [
-              { text: '确定', onPress: resetScanState }
-            ]
-          );
-        } else if (ns === '已送达' || ns === '已完成') {
-          Alert.alert(
-            '包裹已送达',
-            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}\n\n包裹已完成配送`,
-            [
-              { text: '确定', onPress: resetScanState }
-            ]
-          );
-        } else {
-          Alert.alert(
-            '包裹状态异常',
-            `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n状态：${foundPackage.status}\n\n当前状态无法通过此处扫码取件，请在任务详情中操作。`,
-            [
-              { text: '确定', onPress: resetScanState }
-            ]
-          );
-        }
-      } else {
-        Alert.alert('未找到', '该包裹不存在或未分配给你', [
-          { text: '确定', onPress: resetScanState }
-        ]);
-      }
-    } catch (error: any) {
-      console.error('查询包裹失败:', error);
-      const errorMessage = error?.message || '未知错误';
-      
-      // 检查是否是网络错误
-      if (
-        errorMessage.includes('Network') || 
-        errorMessage.includes('connection') ||
-        errorMessage.includes('gateway') ||
-        errorMessage.includes('Network connection lost')
-      ) {
-        setNetworkError('网络连接失败，请检查网络后重试');
+      if (ns === '打包中' || ns === '待确认') {
         Alert.alert(
-          '网络错误',
-          '无法连接到服务器，请检查网络连接后重试',
+          language === 'zh' ? '暂不可取件' : 'Not ready',
+          language === 'zh'
+            ? `包裹 ${foundPackage.id} 状态为「${foundPackage.status}」，请等待商家备货完成。`
+            : `Package ${foundPackage.id} is still packing. Wait for merchant.`,
           [
-            { text: '确定', onPress: resetScanState }
-          ]
+            { text: language === 'zh' ? '查看详情' : 'Open', onPress: () => openPackageDetail(foundPackage.id) },
+            { text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState },
+          ],
+        );
+        return;
+      }
+
+      if (isDeliveryActionStatus(ns)) {
+        Alert.alert(
+          language === 'zh' ? '继续配送' : 'Continue delivery',
+          language === 'zh'
+            ? `包裹 ${foundPackage.id} 状态：${foundPackage.status}\n请打开详情完成拍照或扫码送达。`
+            : `Package ${foundPackage.id} (${foundPackage.status}). Open detail to deliver.`,
+          [
+            {
+              text: language === 'zh' ? '去送达' : 'Deliver',
+              onPress: () => openPackageDetail(foundPackage.id),
+            },
+            { text: language === 'zh' ? '继续扫码' : 'Rescan', style: 'cancel', onPress: resetScanState },
+          ],
+        );
+        return;
+      }
+
+      if (ns === '已送达' || ns === '已完成') {
+        feedbackService.info(
+          language === 'zh'
+            ? `包裹 ${foundPackage.id} 已送达`
+            : `Package ${foundPackage.id} already delivered`,
+        );
+        resetScanState();
+        return;
+      }
+
+      Alert.alert(
+        language === 'zh' ? '无法在此扫码操作' : 'Cannot action here',
+        language === 'zh'
+          ? `包裹 ${foundPackage.id} 状态：${foundPackage.status}\n请打开任务详情处理。`
+          : `Package ${foundPackage.id}: ${foundPackage.status}`,
+        [
+          { text: language === 'zh' ? '查看详情' : 'Open', onPress: () => openPackageDetail(foundPackage.id) },
+          { text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState },
+        ],
+      );
+    } catch (error: any) {
+      logger.error('查询包裹失败', error);
+      const errorMessage = error?.message || '';
+      if (/Network|connection|gateway|timeout/i.test(errorMessage)) {
+        setNetworkError('网络连接失败，请检查网络后重试');
+        feedbackService.warning(
+          language === 'zh' ? '无法连接服务器，请检查网络' : 'Cannot reach server. Check network.',
         );
       } else {
-        Alert.alert('错误', '查询包裹失败，请稍后重试', [
-          { text: '确定', onPress: resetScanState }
-        ]);
+        feedbackService.error(
+          language === 'zh' ? '查询包裹失败，请稍后重试' : 'Failed to look up package',
+        );
       }
+      resetScanState();
     }
   };
 
   const handleTransferCode = async (transferCode: string) => {
-    try {
-      console.log('处理中转码:', transferCode);
-      
-      // 检查网络状态
-      if (!isOnline) {
-        Alert.alert(
-          '网络未连接',
-          '请检查网络连接后重试',
-          [
-            { text: '确定', onPress: resetScanState }
-          ]
-        );
-        return;
-      }
-
-      // 查找具有此中转码的包裹
-      let packages: any[] = [];
-      try {
-        packages = await packageService.getAllPackages();
-      } catch (error: any) {
-        console.error('获取包裹列表失败:', error);
-        const errorMessage = error?.message || '未知错误';
-        
-        if (
-          errorMessage.includes('Network') || 
-          errorMessage.includes('connection') ||
-          errorMessage.includes('gateway') ||
-          errorMessage.includes('Network connection lost')
-        ) {
-          setNetworkError('网络连接失败，请检查网络后重试');
-          Alert.alert(
-            '网络错误',
-            '无法连接到服务器，请检查网络连接后重试',
-            [
-              { text: '确定', onPress: resetScanState }
-            ]
-          );
-          return;
-        }
-        
-        Alert.alert(
-          '查询失败',
-          '无法获取包裹列表，请稍后重试',
-          [
-            { text: '确定', onPress: resetScanState }
-          ]
-        );
-        return;
-      }
-      
-      const foundPackage = packages.find(p => p.transfer_code === transferCode);
-      
-      if (!foundPackage) {
-        Alert.alert('中转码无效', '未找到与此中转码对应的包裹', [
-          { text: '确定', onPress: resetScanState }
-        ]);
-        return;
-      }
-      
-      // 检查包裹状态 - 允许"已送达"（中转站）和"待派送"状态的包裹
-      if (foundPackage.status !== '待派送' && foundPackage.status !== '已送达') {
-        Alert.alert(
-          '包裹状态错误',
-          `包裹编号：${foundPackage.id}\n当前状态：${foundPackage.status}\n\n只有"待派送"或"已送达"（中转站）状态的包裹才能被分配`,
-          [
-            { text: '确定', onPress: resetScanState }
-          ]
-        );
-        return;
-      }
-      
-      // 确认分配包裹给当前骑手
-      const statusText = foundPackage.status === '已送达' ? '已到达中转站' : foundPackage.status;
-      Alert.alert(
-        '确认分配包裹',
-        `包裹编号：${foundPackage.id}\n收件人：${foundPackage.receiver_name}\n寄件人：${foundPackage.sender_name}\n当前状态：${statusText}\n中转码：${transferCode}\n\n是否将此包裹分配给骑手：${currentCourierName}？`,
-        [
-          { text: '取消', onPress: resetScanState },
-          {
-            text: '确认分配',
-            onPress: async () => {
-              await assignPackageToCourier(foundPackage);
-            }
-          }
-        ]
-      );
-      
-    } catch (error) {
-      console.error('处理中转码失败:', error);
-      Alert.alert('错误', '处理中转码失败，请重试', [
-        { text: '确定', onPress: resetScanState }
-      ]);
-    }
+    // 兼容旧入口：统一走精确查找
+    await searchPackage(transferCode);
   };
 
   const assignPackageToCourier = async (pkg: any) => {
     try {
-      console.log('开始分配包裹给骑手:', pkg.id, currentCourierId);
-      
-      // 更新包裹状态为"派送中"，并分配骑手
       const success = await packageService.updatePackageStatus(
         pkg.id,
         '派送中',
         pkg.pickup_time,
-        undefined, // 保持delivery_time为空，因为还在派送中
-        currentCourierId, // 分配当前骑手
-        pkg.transfer_code // 保持中转码
+        undefined,
+        currentCourierId,
+        pkg.transfer_code,
       );
-      
+
       if (success) {
         Alert.alert(
-          '分配成功',
-          `包裹 ${pkg.id} 已成功分配给骑手：${currentCourierName}\n\n包裹状态已更新为"派送中"`,
+          language === 'zh' ? '分配成功' : 'Assigned',
+          language === 'zh'
+            ? `包裹 ${pkg.id} 已分配给 ${currentCourierName}`
+            : `Package ${pkg.id} assigned to ${currentCourierName}`,
           [
-            { text: '确定', onPress: resetScanState }
-          ]
+            {
+              text: language === 'zh' ? '去配送' : 'Open',
+              onPress: () => openPackageDetail(pkg.id),
+            },
+            { text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState },
+          ],
         );
       } else {
-        Alert.alert('分配失败', '更新包裹状态失败，请重试', [
-          { text: '确定', onPress: resetScanState }
-        ]);
+        feedbackService.error(language === 'zh' ? '分配失败，请重试' : 'Assign failed');
+        resetScanState();
       }
-      
     } catch (error) {
-      console.error('分配包裹失败:', error);
-      Alert.alert('错误', '分配包裹失败，请重试', [
-        { text: '确定', onPress: resetScanState }
-      ]);
+      logger.error('分配包裹失败', error);
+      feedbackService.error(language === 'zh' ? '分配包裹失败' : 'Assign failed');
+      resetScanState();
     }
   };
 
   const handleStoreReceiveCode = async (receiveCode: string) => {
     try {
-      // 解析收件码: STORE_{store_id}_{store_code}
-      const parts = receiveCode.split('_');
-      if (parts.length !== 3) {
-        Alert.alert('收件码格式错误', '无法识别此收件码', [
-          { text: '确定', onPress: resetScanState }
-        ]);
+      const parsed = parseStoreReceiveCode(receiveCode);
+      if (!parsed) {
+        feedbackService.warning(
+          language === 'zh' ? '收件码格式无法识别' : 'Invalid store receive code',
+        );
+        resetScanState();
         return;
       }
 
-      const storeId = parts[1];
-      const storeCode = parts[2];
-
       Alert.alert(
-        '店长收件码',
-        `店铺代码：${storeCode}\n收件码：${receiveCode}\n\n骑手送件时必须扫描此码确认送达`,
-        [
-          { text: '确定', onPress: resetScanState }
-        ]
+        language === 'zh' ? '店长收件码' : 'Store receive code',
+        language === 'zh'
+          ? `店铺代码：${parsed.storeCode || parsed.storeId}\n\n请打开对应包裹详情，使用「扫码送达」扫描此码完成送达。`
+          : `Store: ${parsed.storeCode || parsed.storeId}\n\nOpen package detail → Scan to deliver with this code.`,
+        [{ text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState }],
       );
     } catch (error) {
-      Alert.alert('错误', '处理收件码失败', [
-        { text: '确定', onPress: resetScanState }
-      ]);
+      feedbackService.error(language === 'zh' ? '处理收件码失败' : 'Failed to handle store code');
+      resetScanState();
     }
   };
 
   const confirmPickup = async (packageData: any) => {
     try {
       const pickupTime = new Date().toLocaleString('zh-CN');
-      
-      // 使用实际的骑手账号信息
       const courierName = currentCourierName || '未知骑手';
-      const courierId = currentCourierId || 'unknown';
-      
+
       const success = await packageService.updatePackageStatus(
         packageData.id,
         '已取件',
         pickupTime,
-        undefined, // deliveryTime
-        courierName
+        undefined,
+        courierName,
       );
 
       if (success) {
+        feedbackService.success(
+          language === 'zh'
+            ? `取件成功：${packageData.id}`
+            : `Picked up: ${packageData.id}`,
+        );
         Alert.alert(
-          '取件成功！',
-          `包裹编号：${packageData.id}\n收件人：${packageData.receiver_name}\n取件时间：${pickupTime}\n负责骑手：${courierName}`,
+          language === 'zh' ? '取件成功' : 'Pickup done',
+          language === 'zh'
+            ? `包裹 ${packageData.id} 已取件。下一步可去详情导航并送达。`
+            : `Package ${packageData.id} picked up. Open detail to navigate & deliver.`,
           [
-            { text: '确定', onPress: resetScanState }
-          ]
+            {
+              text: language === 'zh' ? '去配送' : 'Deliver',
+              onPress: () => openPackageDetail(packageData.id),
+            },
+            { text: language === 'zh' ? '继续扫码' : 'Rescan', onPress: resetScanState },
+          ],
         );
       } else {
-        Alert.alert('取件失败', '更新包裹状态失败，请重试', [
-          { text: '确定', onPress: resetScanState }
-        ]);
+        feedbackService.error(language === 'zh' ? '取件失败，请重试' : 'Pickup failed');
+        resetScanState();
       }
     } catch (error) {
-      Alert.alert('取件失败', '网络错误，请重试', [
-        { text: '确定', onPress: resetScanState }
-      ]);
+      feedbackService.error(language === 'zh' ? '取件失败，请检查网络' : 'Pickup failed. Check network.');
+      resetScanState();
     }
   };
 
   const handleManualSearch = async () => {
     if (!manualInput.trim()) {
-      Alert.alert('提示', '请输入包裹编号');
+      feedbackService.notify('提示', '请输入包裹编号');
       return;
     }
     await searchPackage(manualInput.trim());
@@ -723,11 +638,11 @@ export default function ScanScreen({ navigation }: any) {
                       barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'pdf417'],
                     }}
                     onCameraReady={() => {
-                      console.log('相机已准备就绪');
+                      logger.debug('相机已准备就绪');
                       setCameraError(null);
                     }}
                     onMountError={(error) => {
-                      console.error('相机挂载错误:', error);
+                      logger.error('相机挂载错误', error);
                       setCameraError('相机无法启动，请检查设备权限或重启应用');
                     }}
                   />

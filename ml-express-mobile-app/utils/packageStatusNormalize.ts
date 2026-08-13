@@ -56,6 +56,15 @@ export function isPickupFlowStatus(normalized: string): boolean {
   );
 }
 
+/** 允许「送达」扫码 / 拍照流程的状态 */
+export function isDeliveryActionStatus(normalized: string): boolean {
+  return (
+    normalized === PACKAGE_STATUS.PICKED_UP ||
+    normalized === PACKAGE_STATUS.IN_TRANSIT ||
+    normalized === PACKAGE_STATUS.EXCEPTION
+  );
+}
+
 /** 到达商家地理围栏提示（可在店外等待打包完成） */
 export function isMerchantGeofenceStatus(normalized: string): boolean {
   return (

@@ -14,6 +14,7 @@ import {
   type DimensionValue,
 } from 'react-native';
 import { courierService, packageService, Courier, Package } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 import { useApp } from '../contexts/AppContext';
 
 interface CourierStats {
@@ -124,13 +125,13 @@ export default function CourierManagementScreen({ navigation }: any) {
   // 添加新骑手
   const handleAddCourier = async () => {
     if (!newCourierForm.name.trim() || !newCourierForm.phone.trim()) {
-      Alert.alert('提示', '请填写姓名和电话');
+      feedbackService.notify('提示', '请填写姓名和电话');
       return;
     }
 
     try {
       // 这里应该调用API添加新骑手
-      Alert.alert('成功', '新骑手添加成功！');
+      feedbackService.notify('成功', '新骑手添加成功！');
       setShowAddCourier(false);
       setNewCourierForm({
         name: '',
@@ -142,7 +143,7 @@ export default function CourierManagementScreen({ navigation }: any) {
       });
       await loadData();
     } catch (error) {
-      Alert.alert('错误', '添加骑手失败');
+      feedbackService.notify('错误', '添加骑手失败');
     }
   };
 
@@ -151,10 +152,10 @@ export default function CourierManagementScreen({ navigation }: any) {
     try {
       await courierService.updateCourierStatus(courierId, newStatus);
       await loadCouriers();
-      Alert.alert('成功', `骑手状态已更新为${getStatusText(newStatus)}`);
+      feedbackService.notify('成功', `骑手状态已更新为${getStatusText(newStatus)}`);
     } catch (error) {
       console.error('更新骑手状态失败:', error);
-      Alert.alert('错误', '状态更新失败，请重试');
+      feedbackService.notify('错误', '状态更新失败，请重试');
     }
   };
 
@@ -164,7 +165,7 @@ export default function CourierManagementScreen({ navigation }: any) {
       // 这里应该调用API分配任务
       Alert.alert('任务分配', '正在为骑手分配新任务...');
     } catch (error) {
-      Alert.alert('错误', '任务分配失败');
+      feedbackService.notify('错误', '任务分配失败');
     }
   };
 

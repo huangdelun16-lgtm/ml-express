@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -14,6 +13,8 @@ import {
   StatusBar
 } from 'react-native';
 import { adminAccountService, supabase, resolveRiderPricingRegionId } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
+import { logger } from '../services/LoggerService';
 import { notificationService } from '../services/notificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
@@ -22,6 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
+import { ensureStaffWorkspaceModeInitialized } from '../utils/staffWorkspace';
 
 const { width, height } = Dimensions.get('window');
 
@@ -34,10 +36,7 @@ export default function LoginScreen({ navigation }: any) {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert(
-        language === 'zh' ? '提示' : 'Tip', 
-        language === 'zh' ? '请输入账号和密码' : 'Please enter account and password'
-      );
+      feedbackService.notify(language === 'zh' ? '提示' : 'Tip', language === 'zh' ? '请输入账号和密码' : 'Please enter account and password');
       return;
     }
 
@@ -45,11 +44,11 @@ export default function LoginScreen({ navigation }: any) {
 
     try {
       // ===== 员工登录 =====
-      console.log('🚀 开始执行登录请求:', username);
+      logger.log('🚀 开始执行登录请求:', username);
       const account = await adminAccountService.login(username, password);
       
       if (account) {
-        console.log('✅ 登录验证通过, 开始存储用户信息:', account.username);
+        logger.log('✅ 登录验证通过, 开始存储用户信息:', account.username);
         const userId = account.id || '';
         const userUsername = account.username || '';
         const userEmployeeName = account.employee_name || '';
@@ -94,22 +93,22 @@ export default function LoginScreen({ navigation }: any) {
           }
           await Promise.all(storageOps);
         } catch (storageError) {
-          console.error('❌ AsyncStorage 保存失败:', storageError);
+          logger.error('❌ AsyncStorage 保存失败:', storageError);
         }
         
         // 🚀 核心：安全地尝试清除 Supabase Auth 状态
         try {
           if (supabase.auth) {
-            await supabase.auth.signOut().catch(e => console.warn('Supabase signOut ignored:', e));
+            await supabase.auth.signOut().catch(e => logger.warn('Supabase signOut ignored:', e));
           }
         } catch (authError) {
-          console.warn('Supabase auth check failed:', authError);
+          logger.warn('Supabase auth check failed:', authError);
         }
         
         let courierId = '';
         
         if (userPosition === '骑手' || userPosition === '骑手队长') {
-          console.log('🛵 检测到骑手身份，同步骑手数据...');
+          logger.log('🛵 检测到骑手身份，同步骑手数据...');
           try {
             // 1. 尝试查找现有骑手记录（优先 employee_id，避免同名重复建号导致位置对不上）
             let { data: courierData, error: fetchError } = await supabase
@@ -136,7 +135,7 @@ export default function LoginScreen({ navigation }: any) {
             
             // 2. 如果不存在，则创建一个新的骑手记录
             if (!courierData && !fetchError) {
-              console.log('📝 正在为新账号创建骑手记录...');
+              logger.log('📝 正在为新账号创建骑手记录...');
               const { data: newData, error: insertError } = await supabase
                 .from('couriers')
                 .insert([{
@@ -154,9 +153,9 @@ export default function LoginScreen({ navigation }: any) {
               
               if (!insertError) {
                 courierData = newData;
-                console.log('✅ 骑手记录创建成功');
+                logger.log('✅ 骑手记录创建成功');
               } else {
-                console.error('❌ 创建骑手记录失败:', insertError);
+                logger.error('❌ 创建骑手记录失败:', insertError);
               }
             }
             
@@ -176,37 +175,49 @@ export default function LoginScreen({ navigation }: any) {
               await AsyncStorage.setItem('currentUserName', courierData.name);
             }
           } catch (error) {
-            console.error('Courier data sync error:', error);
+            logger.error('Courier data sync error:', error);
           }
         }
 
+        await ensureStaffWorkspaceModeInitialized({
+          role: userRole,
+          position: userPosition,
+          courierId: courierId || null,
+        });
         // 🚀 核心改进：强制刷新并绑定推送令牌
         // 放在最后，确保 userId 和 courierId 都已经确定
         try {
           const token = await notificationService.registerForPushNotificationsAsync();
           if (token) {
-            console.log('🔄 正在强制重新绑定推送令牌...');
+            logger.log('🔄 正在强制重新绑定推送令牌...');
             await notificationService.savePushTokenToSupabase(token, userId, courierId);
           }
         } catch (nsError) {
-          console.warn('推送注册失败，但不影响登录:', nsError);
+          logger.warn('推送注册失败，但不影响登录:', nsError);
         }
         
-        console.log('🏁 登录流程全部完成，跳转主页');
+        logger.log('🏁 登录流程全部完成，跳转主页');
         const disclosed = await hasAcceptedLocationDisclosure();
         navigation.replace(disclosed ? 'Main' : 'LocationDisclosure');
       } else {
-        Alert.alert(
-          language === 'zh' ? '登录失败' : 'Login Failed',
-          language === 'zh' ? '用户名或密码错误' : 'Invalid username or password'
-        );
+        feedbackService.notify(language === 'zh' ? '登录失败' : 'Login Failed', language === 'zh' ? '用户名或密码错误' : 'Invalid username or password');
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      Alert.alert(
-        language === 'zh' ? '登录错误' : 'Login Error',
-        error.message || 'Unknown error'
-      );
+      logger.error('Login error:', error);
+      const raw = String(error?.message || '');
+      const isNetwork =
+        /网络|超时|timeout|Abort|Failed to fetch|Network|无法连接|unstable/i.test(raw);
+      const title = language === 'zh'
+        ? (isNetwork ? '网络异常' : '登录失败')
+        : (isNetwork ? 'Network Error' : 'Login Failed');
+      const fallback = language === 'zh'
+        ? (isNetwork
+            ? '无法连接登录服务器，请检查移动网络或 Wi-Fi 后重试。'
+            : '用户名或密码错误，或账号已停用。')
+        : (isNetwork
+            ? 'Cannot reach login server. Check your network and try again.'
+            : 'Invalid credentials or account disabled.');
+      feedbackService.notify(title, raw || fallback);
     } finally {
       setLoading(false);
     }
@@ -313,12 +324,9 @@ export default function LoginScreen({ navigation }: any) {
             <TouchableOpacity 
               style={styles.registerLink}
               onPress={() => {
-                Alert.alert(
-                  language === 'zh' ? '申请入驻' : 'Apply to Join',
-                  language === 'zh' 
+                feedbackService.notify(language === 'zh' ? '申请入驻' : 'Apply to Join', language === 'zh' 
                     ? '想要成为 ML Express 的骑手吗？请联系我们的地推人员或拨打客服热线进行申请。' 
-                    : 'Want to become an ML Express rider? Please contact our local staff or call customer service to apply.'
-                );
+                    : 'Want to become an ML Express rider? Please contact our local staff or call customer service to apply.');
               }}
             >
               <Text style={styles.registerLinkText}>

@@ -1,3 +1,4 @@
+import { logger } from './LoggerService';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -55,7 +56,7 @@ export async function syncCourierLocationToSupabase(
       : await supabase.from('courier_locations').insert([row]);
 
     if (writeError) {
-      console.warn('⚠️ 更新实时位置失败:', writeError.message);
+      logger.warn('⚠️ 更新实时位置失败:', writeError.message);
     } else {
       locOk = true;
     }
@@ -74,7 +75,7 @@ export async function syncCourierLocationToSupabase(
     .eq('id', courierId);
 
   if (courierError) {
-    console.warn('⚠️ 更新 couriers 地理字段失败:', courierError.message);
+    logger.warn('⚠️ 更新 couriers 地理字段失败:', courierError.message);
   }
 
   return locOk;
@@ -90,7 +91,7 @@ const SMOOTHING_FACTOR = 0.35; // 卡尔曼滤波简易版系数：越小越平�
  */
 TaskManager.defineTask(LOCATION_TRACKING_TASK, async ({ data, error }: any) => {
   if (error) {
-    console.error('后台位置任务错误:', error);
+    logger.error('后台位置任务错误:', error);
     return;
   }
   if (data) {
@@ -133,8 +134,8 @@ async function saveLocationToSupabase(latitude: number, longitude: number, isMov
     const now = Date.now();
     const lastUpdate = lastUpdateStr ? parseInt(lastUpdateStr) : 0;
 
-    // 动态间隔：移动时 12s，静止 90s（上报仍节流，减轻服务器与射频唤醒）
-    const minInterval = isMoving ? 12 * 1000 : 90 * 1000;
+    // 动态间隔：移动时 20s，静止 120s（上报仍节流，减轻服务器与射频唤醒）
+    const minInterval = isMoving ? 20 * 1000 : 120 * 1000;
     if (now - lastUpdate < minInterval) return;
 
     await syncCourierLocationToSupabase(courierId, {
@@ -146,9 +147,9 @@ async function saveLocationToSupabase(latitude: number, longitude: number, isMov
     void checkRouteArrivalAtLocation(latitude, longitude);
 
     await AsyncStorage.setItem('last_location_update_time', now.toString());
-    // console.log(`📍 位置同步成功 (${isMoving ? '移动' : '静止'}):`, { latitude, longitude });
+    // logger.log(`📍 位置同步成功 (${isMoving ? '移动' : '静止'}):`, { latitude, longitude });
   } catch (err) {
-    // console.error('位置同步异常:', err);
+    // logger.error('位置同步异常:', err);
   }
 }
 
@@ -181,7 +182,7 @@ export const locationService = {
       if (existingFg.status !== 'granted') {
         const { status: foregroundStatus } = await requestForegroundPermissionsIfDisclosed();
         if (foregroundStatus !== 'granted') {
-          console.warn('未获得前台位置权限');
+          logger.warn('未获得前台位置权限');
           return false;
         }
         // 增加小延迟，避免连续弹窗
@@ -194,7 +195,7 @@ export const locationService = {
       if (backgroundStatus !== 'granted') {
         const { status: newStatus } = await requestBackgroundPermissionsIfDisclosed();
         if (newStatus !== 'granted') {
-          console.warn('后台位置权限被拒绝，将无法在后台持续追踪配送进度');
+          logger.warn('后台位置权限被拒绝，将无法在后台持续追踪配送进度');
           return false;
         }
       }
@@ -202,7 +203,7 @@ export const locationService = {
       await this.enableUpdates();
       return true;
     } catch (err) {
-      console.error('启动后台追踪失败:', err);
+      logger.error('启动后台追踪失败:', err);
       return false;
     }
   },
@@ -217,11 +218,11 @@ export const locationService = {
       try { await Location.stopLocationUpdatesAsync(LOCATION_TRACKING_TASK); } catch (e) {}
     }
 
-    // High：相较 BestForNavigation 明显省电，仍足够用于配送轨迹与电子围栏
+    // Balanced + 较长间隔：登录后默认省电轨迹；地图页有在途单时会按模式覆盖
     await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
-      accuracy: Location.Accuracy.High,
-      timeInterval: 8000,
-      distanceInterval: 22,
+      accuracy: Location.Accuracy.Balanced,
+      timeInterval: 35000,
+      distanceInterval: 80,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: "ML Express 配送员助手正在运行",
@@ -229,10 +230,10 @@ export const locationService = {
         notificationColor: "#3b82f6",
       },
       pausesUpdatesAutomatically: true,
-      deferredUpdatesInterval: 12000,
-      deferredUpdatesDistance: 25,
+      deferredUpdatesInterval: 35000,
+      deferredUpdatesDistance: 80,
     });
-    console.log('🚀 后台位置追踪已启动 (High 精度 · 省电优化)');
+    logger.log('🚀 后台位置追踪已启动 (Balanced · 省电默认)');
   },
 
   /**
@@ -243,10 +244,10 @@ export const locationService = {
       const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TRACKING_TASK);
       if (isTaskRegistered) {
         await Location.stopLocationUpdatesAsync(LOCATION_TRACKING_TASK);
-        console.log('🛑 后台位置追踪已停止');
+        logger.log('🛑 后台位置追踪已停止');
       }
     } catch (err) {
-      console.error('停止后台追踪失败:', err);
+      logger.error('停止后台追踪失败:', err);
     }
   }
 };

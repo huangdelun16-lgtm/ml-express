@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  SectionList,
   TouchableOpacity,
   RefreshControl,
   Alert,
@@ -22,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import { packageService, deliveryStoreService, supabase, Package } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 import { cacheService } from '../services/cacheService';
 import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
@@ -40,9 +41,17 @@ import {
   isMerchantGeofenceStatus,
   isPickupFlowStatus,
   isNavigateMerchantFirstPhase,
+  isDeliveryActionStatus,
 } from '../utils/packageStatusNormalize';
+import {
+  isDeliveryStoreScan,
+  parseStoreReceiveCode,
+  scanMatchesPackage,
+} from '../utils/scanCodeHelpers';
 import { openMapsToAddress } from '../utils/openMapsNavigation';
 import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
+import { MyTaskPackageCard } from '../components/MyTaskPackageCard';
+import { myTasksScreenStyles as styles } from './myTasks/myTasksScreenStyles';
 
 const { width, height } = Dimensions.get('window');
 
@@ -91,7 +100,14 @@ const MyTasksScreen: React.FC = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
 
-  // 🚀 地理围栏与实时距离状态
+  const taskSections = useMemo(() => {
+    const dates = selectedDate ? [selectedDate] : Object.keys(groupedPackages);
+    return dates
+      .filter((date) => (groupedPackages[date] || []).length > 0)
+      .map((date) => ({ title: date, data: groupedPackages[date] }));
+  }, [groupedPackages, selectedDate]);
+
+    // 🚀 地理围栏与实时距离状态
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [arrivedMerchantId, setArrivedMerchantId] = useState<string | null>(null);
 
@@ -173,35 +189,43 @@ const MyTasksScreen: React.FC = () => {
   useEffect(() => {
     loadMyPackages();
     loadCurrentCourierInfo();
+  }, []);
 
-    // 🚀 启动前台高精度定位监听，用于自动签到和送达判定
-    let locationSubscription: any = null;
+  // 仅「我的任务」在前台时开围栏定位；离屏停掉，避免与地图页/后台任务叠加重精度 GPS
+  useEffect(() => {
+    if (!isFocused) return;
+
+    let locationSubscription: Location.LocationSubscription | null = null;
+    let cancelled = false;
+
     const startLocationWatch = async () => {
       const { status } = await requestForegroundPermissionsIfDisclosed(language);
-      if (status !== 'granted') return;
+      if (status !== 'granted' || cancelled) return;
 
       locationSubscription = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 5000,
-          distanceInterval: 10,
+          accuracy: Location.Accuracy.High,
+          timeInterval: 12000,
+          distanceInterval: 25,
+          mayShowUserSettingsDialog: false,
         },
         (location) => {
           setCurrentLocation(location);
-        }
+        },
       );
     };
 
     startLocationWatch();
 
     return () => {
-      if (locationSubscription) locationSubscription.remove();
+      cancelled = true;
+      locationSubscription?.remove();
     };
-  }, [language]);
+  }, [isFocused, language]);
 
-  // 🚀 自动地理围栏触发逻辑
+  // 🚀 自动地理围栏触发逻辑（仅本页聚焦时）
   useEffect(() => {
-    if (!currentLocation || packages.length === 0) return;
+    if (!isFocused || !currentLocation || packages.length === 0) return;
 
     packages.forEach(pkg => {
       // 1. 到达商家自动签到 (100米内)；含「打包中」（可在店外等待备货）
@@ -235,7 +259,7 @@ const MyTasksScreen: React.FC = () => {
         }
       }
     });
-  }, [currentLocation, packages]);
+  }, [currentLocation, packages, isFocused, arrivedMerchantId, language]);
 
   // 距离计算辅助函数
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -288,10 +312,7 @@ const MyTasksScreen: React.FC = () => {
         if (cached) {
           allPackages = cached;
         } else {
-          Alert.alert(
-            language === 'zh' ? '离线状态' : 'Offline Mode',
-            language === 'zh' ? '当前无网络连接且无本地缓存数据' : 'No network connection and no cached data'
-          );
+          feedbackService.notify(language === 'zh' ? '离线状态' : 'Offline Mode', language === 'zh' ? '当前无网络连接且无本地缓存数据' : 'No network connection and no cached data');
         }
       }
       
@@ -324,10 +345,7 @@ const MyTasksScreen: React.FC = () => {
       setAvailableDates(dates);
     } catch (error) {
       console.error('加载我的任务失败:', error);
-      Alert.alert(
-        language === 'zh' ? '加载失败' : 'Load Failed',
-        language === 'zh' ? '无法加载任务列表，请重试' : 'Unable to load task list, please try again'
-      );
+      feedbackService.notify(language === 'zh' ? '加载失败' : 'Load Failed', language === 'zh' ? '无法加载任务列表，请重试' : 'Unable to load task list, please try again');
     } finally {
       setLoading(false);
     }
@@ -435,7 +453,7 @@ const MyTasksScreen: React.FC = () => {
                 );
               }
             } catch (error) {
-              Alert.alert('错误', '操作失败');
+              feedbackService.notify('错误', '操作失败');
             }
           }
         }
@@ -447,7 +465,7 @@ const MyTasksScreen: React.FC = () => {
     try {
       const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
       if (cameraPermission.status !== 'granted') {
-        Alert.alert('权限不足', '需要相机权限才能拍照');
+        feedbackService.notify('权限不足', '需要相机权限才能拍照');
         return;
       }
 
@@ -464,7 +482,7 @@ const MyTasksScreen: React.FC = () => {
         setShowCameraModal(false);
       }
     } catch (error) {
-      Alert.alert('错误', '无法打开相机');
+      feedbackService.notify('错误', '无法打开相机');
     }
   };
 
@@ -484,10 +502,7 @@ const MyTasksScreen: React.FC = () => {
         const score = courierData?.credit_score ?? 100;
         
         if (score < 60) {
-          Alert.alert(
-            language === 'zh' ? '接单受限' : 'Account Restricted',
-            language === 'zh' ? `您的信用分过低 (${score})，已被限制接单。` : `Credit score too low (${score}). Account restricted.`
-          );
+          feedbackService.notify(language === 'zh' ? '接单受限' : 'Account Restricted', language === 'zh' ? `您的信用分过低 (${score})，已被限制接单。` : `Credit score too low (${score}). Account restricted.`);
           return;
         }
       }
@@ -520,7 +535,7 @@ const MyTasksScreen: React.FC = () => {
                 loadMyPackages();
               }
             } catch (error) {
-              Alert.alert('错误', '操作失败');
+              feedbackService.notify('错误', '操作失败');
             }
           }
         }
@@ -538,7 +553,7 @@ const MyTasksScreen: React.FC = () => {
       const health = await deviceHealthService.performFullCheck();
       
       if (health.location.isMocked) {
-        Alert.alert('检测到异常', '禁止使用模拟定位进行送达操作');
+        feedbackService.notify('检测到异常', '禁止使用模拟定位进行送达操作');
         return;
       }
 
@@ -555,7 +570,7 @@ const MyTasksScreen: React.FC = () => {
         );
 
         if (dist > 200) {
-          Alert.alert('距离过远', `您距离送达点还剩 ${Math.round(dist)} 米，请到达目的地后再拍照。`);
+          feedbackService.notify('距离过远', `您距离送达点还剩 ${Math.round(dist)} 米，请到达目的地后再拍照。`);
           return;
         }
       }
@@ -579,7 +594,7 @@ const MyTasksScreen: React.FC = () => {
         }]);
       }
     } catch (error) {
-      Alert.alert('上传失败', '请检查网络连接');
+      feedbackService.notify('上传失败', '请检查网络连接');
     } finally {
       setUploadingPhoto(false);
     }
@@ -588,7 +603,7 @@ const MyTasksScreen: React.FC = () => {
   const handleReportAnomaly = async () => {
     if (!selectedPackage) return;
     if (!anomalyType || !anomalyDescription) {
-      Alert.alert('提示', '请选择异常类型并填写详细说明');
+      feedbackService.notify('提示', '请选择异常类型并填写详细说明');
       return;
     }
 
@@ -633,7 +648,7 @@ const MyTasksScreen: React.FC = () => {
         throw new Error('Submit failed');
       }
     } catch (error) {
-      Alert.alert('失败', '提交报备失败，请重试');
+      feedbackService.notify('失败', '提交报备失败，请重试');
     } finally {
       setReporting(false);
     }
@@ -642,95 +657,163 @@ const MyTasksScreen: React.FC = () => {
   const handleScanCode = async (data: string) => {
     if (scannedOnce.current) return;
     scannedOnce.current = true;
-    
+
     try {
       setLoading(true);
-      
-      // 1. 🚀 防作弊检查
+      if (!selectedPackage) return;
+
+      const statusNormLocal = normalizePackageStatusZh(selectedPackage.status);
       const { deviceHealthService } = require('../services/deviceHealthService');
       const health = await deviceHealthService.performFullCheck();
       if (health.location.isMocked) {
-        Alert.alert('检测到异常', '禁止使用模拟定位进行扫码操作');
+        feedbackService.warning(
+          language === 'zh' ? '禁止使用模拟定位进行扫码' : 'Mock location is not allowed',
+        );
         return;
       }
 
-      // 2. 🚀 距离检查 (如果是送达操作且不是扫码送达中转站) (经 locationService，确保有披露)
-      const isStoreCode = data.startsWith('STORE_');
+      // 取件：匹配本单码
+      if (isPickupFlowStatus(statusNormLocal)) {
+        setShowScanModal(false);
+        setScanning(false);
+        if (scanMatchesPackage(data, selectedPackage)) {
+          const success = await packageService.updatePackageStatus(
+            selectedPackage.id,
+            '已取件',
+            new Date().toLocaleString('zh-CN'),
+            undefined,
+            currentCourierName,
+          );
+          if (success) {
+            feedbackService.success(
+              language === 'zh' ? '取件成功' : 'Picked up',
+            );
+            setShowDetailModal(false);
+            await loadMyPackages();
+          } else {
+            feedbackService.error(language === 'zh' ? '取件失败' : 'Pickup failed');
+          }
+        } else if (isDeliveryStoreScan(data)) {
+          feedbackService.warning(
+            language === 'zh'
+              ? '取件请扫包裹码；店长码用于送达'
+              : 'Scan package code for pickup; store code is for delivery',
+          );
+        } else {
+          feedbackService.warning(
+            language === 'zh' ? '扫码与当前任务不匹配' : 'Code does not match this task',
+          );
+        }
+        return;
+      }
+
+      // 送达：店长码
       if (
-        selectedPackage &&
-        !isPickupFlowStatus(normalizePackageStatusZh(selectedPackage.status)) &&
-        !isStoreCode
+        isDeliveryActionStatus(statusNormLocal) ||
+        statusNormLocal === '异常上报'
       ) {
+        if (!isDeliveryStoreScan(data)) {
+          setShowScanModal(false);
+          setScanning(false);
+          if (scanMatchesPackage(data, selectedPackage)) {
+            feedbackService.info(
+              language === 'zh'
+                ? '请扫描店长收件码，或改用拍照送达'
+                : 'Scan store receive code, or use photo delivery',
+            );
+          } else {
+            feedbackService.warning(
+              language === 'zh'
+                ? '请扫描店长收件码（STORE_…）'
+                : 'Scan store receive code (STORE_…)',
+            );
+          }
+          return;
+        }
+
         const coords = await locationService.getCurrentLocation(language);
-        const { data: pkgData } = await supabase.from('packages').select('receiver_latitude, receiver_longitude').eq('id', selectedPackage.id).single();
-        
+        const { data: pkgData } = await supabase
+          .from('packages')
+          .select('receiver_latitude, receiver_longitude')
+          .eq('id', selectedPackage.id)
+          .single();
+
         if (coords && pkgData?.receiver_latitude) {
           const dist = calculateDistance(
             coords.latitude,
             coords.longitude,
             pkgData.receiver_latitude,
-            pkgData.receiver_longitude
+            pkgData.receiver_longitude,
           );
-
           if (dist > 200) {
-            Alert.alert('距离过远', `您距离送达点还剩 ${Math.round(dist)} 米，请到达目的地后再扫码。`);
+            feedbackService.warning(
+              language === 'zh'
+                ? `距离送达点约 ${Math.round(dist)} 米，请靠近后再扫码`
+                : `About ${Math.round(dist)}m away. Move closer.`,
+            );
             return;
           }
         }
-      }
 
-      setScannedData(data);
-      setScanning(false);
-      setShowScanModal(false);
-      
-      if (data.startsWith('STORE_')) {
-        const parts = data.split('_');
-        const storeId = parts.length > 1 ? parts[1] : '';
+        setScannedData(data);
+        setScanning(false);
+        setShowScanModal(false);
+
+        const parsed = parseStoreReceiveCode(data);
+        const storeId = parsed?.storeId || '';
         if (!storeId) {
-          Alert.alert('错误', '无效的店铺收件码');
+          feedbackService.warning(language === 'zh' ? '收件码无效' : 'Invalid store code');
           resetScanState();
           return;
         }
-        
-        const storeDetails = await deliveryStoreService.getStoreById(storeId);
-        const storeName = storeDetails ? storeDetails.store_name : `中转站`;
-        
-        // 🚀 核心逻辑：支持异常上报状态送达中转站
-        const isAnomalyResolution =
-          normalizePackageStatusZh(selectedPackage?.status) === "异常上报";
-        const statusMsg = isAnomalyResolution ? '已送达 (异常转中转站)' : '已送达';
-        const alertMsg = isAnomalyResolution ? `包裹已作为异常件送达至：${storeName}` : `包裹已送达至：${storeName}`;
 
-        Alert.alert('✅ ' + statusMsg, alertMsg, [{
-          text: '确定',
-          onPress: async () => {
-            if (selectedPackage) {
-              const success = await packageService.updatePackageStatus(
-                selectedPackage.id, '已送达', undefined, new Date().toISOString(), currentCourierName,
-                undefined, { storeId, storeName, receiveCode: data }
-              );
-              
-              if (success) {
-                // 如果是异常上报，额外更新一条描述
-                if (isAnomalyResolution) {
-                  try {
-                    await supabase.from('packages').update({ 
-                      description: (selectedPackage.description || '') + ' [异常转送中转站]'
-                    }).eq('id', selectedPackage.id);
-                  } catch (e) {}
-                }
-                await loadMyPackages();
-              }
-            }
+        const storeDetails = await deliveryStoreService.getStoreById(storeId);
+        const storeName = storeDetails ? storeDetails.store_name : '中转站';
+        const isAnomalyResolution = statusNormLocal === '异常上报';
+
+        const success = await packageService.updatePackageStatus(
+          selectedPackage.id,
+          '已送达',
+          undefined,
+          new Date().toISOString(),
+          currentCourierName,
+          undefined,
+          { storeId, storeName, receiveCode: data },
+        );
+
+        if (success) {
+          if (isAnomalyResolution) {
+            try {
+              await supabase
+                .from('packages')
+                .update({
+                  description: (selectedPackage.description || '') + ' [异常转送中转站]',
+                })
+                .eq('id', selectedPackage.id);
+            } catch {}
           }
-        }]);
-      } else {
-        Alert.alert('扫码成功', `扫描结果: ${data}`);
+          feedbackService.success(
+            language === 'zh' ? `已送达：${storeName}` : `Delivered: ${storeName}`,
+          );
+          setShowDetailModal(false);
+          await loadMyPackages();
+        } else {
+          feedbackService.error(language === 'zh' ? '送达更新失败' : 'Delivery failed');
+        }
+        return;
       }
+
+      setShowScanModal(false);
+      feedbackService.warning(
+        language === 'zh'
+          ? `当前状态「${selectedPackage.status}」无法扫码操作`
+          : `Cannot scan-action status ${selectedPackage.status}`,
+      );
     } catch (error) {
-      Alert.alert('错误', '更新失败');
+      feedbackService.error(language === 'zh' ? '扫码处理失败' : 'Scan failed');
     } finally {
       setLoading(false);
+      scannedOnce.current = false;
     }
   };
 
@@ -857,94 +940,63 @@ const MyTasksScreen: React.FC = () => {
             <Ionicons name="calendar-outline" size={22} color="white" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerBtn} onPress={onRefresh}>
-            <Ionicons name={refreshing ? "sync" : "refresh-outline"} size={22} color="white" />
+            <Ionicons name={refreshing ? 'sync' : 'refresh-outline'} size={22} color="white" />
           </TouchableOpacity>
         </View>
       </View>
 
       <DeviceHealthShield />
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}>
-        {selectedDate && (
-          <View style={styles.activeFilter}>
-            <Text style={styles.filterText}>📅 {selectedDate}</Text>
-            <TouchableOpacity onPress={() => setSelectedDate(null)}><Ionicons name="close-circle" size={20} color="#fff" /></TouchableOpacity>
-          </View>
-        )}
-        
-        {packages.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyTitle}>{language === 'zh' ? '暂无任务' : 'No Tasks'}</Text>
-          </View>
-        ) : (
-          (selectedDate ? [selectedDate] : Object.keys(groupedPackages)).map(date => (
-            <View key={date} style={styles.dateGroup}>
-              <Text style={styles.dateGroupTitle}>{date}</Text>
-              {groupedPackages[date]?.map(item => (
-                <TouchableOpacity key={item.id} style={styles.packageCard} onPress={() => handlePackagePress(item)} activeOpacity={0.8}>
-                  <View style={styles.cardHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={styles.cardId}>{item.id}</Text>
-                      
-                      {/* 🚀 新增：在顶部显示下单身份 */}
-                      {(() => {
-                        const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
-                        if (identityMatch && identityMatch[1]) {
-                          const identity = identityMatch[1];
-                          const isMERCHANTS = identity === '商家' || identity === 'MERCHANTS';
-                          return (
-                            <View style={[styles.identityBadge, { backgroundColor: isMERCHANTS ? '#3b82f6' : '#f59e0b' }]}>
-                              <Text style={styles.identityText}>{identity}</Text>
-                            </View>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </View>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                      <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-                    </View>
-                  </View>
-                  <DeliveryCountdownBadge
-                    pkg={item}
-                    language={language === 'zh' ? 'zh' : language === 'en' ? 'en' : 'my'}
-                    variant="compact"
-                    theme="dark"
-                  />
-                  <View style={styles.cardBody}>
-                    <View style={styles.cardRow}><Ionicons name="person" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue}>{item.receiver_name}</Text></View>
-                    <View style={styles.cardRow}><Ionicons name="location" size={14} color="rgba(255,255,255,0.4)" /><Text style={styles.cardValue} numberOfLines={1}>{item.receiver_address}</Text></View>
-                  </View>
-                  
-                  {/* 🚀 新增：列表展示余额支付金额 */}
-                  {(() => {
-                    const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
-                    if (payMatch && payMatch[1]) {
-                      return (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
-                          <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
-                            💰 {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}: {payMatch[1]} MMK
-                          </Text>
-                        </View>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  <View style={styles.cardFooter}>
-                    <View style={styles.tag}><Text style={styles.tagText}>{item.package_type}</Text></View>
-                    <View style={styles.tag}><Text style={styles.tagText}>{item.weight}kg</Text></View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+      <SectionList
+        style={styles.scroll}
+        sections={taskSections}
+        keyExtractor={(item) => item.id}
+        stickySectionHeadersEnabled={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
+        }
+        ListHeaderComponent={
+          selectedDate ? (
+            <View style={styles.activeFilter}>
+              <Text style={styles.filterText}>📅 {selectedDate}</Text>
+              <TouchableOpacity onPress={() => setSelectedDate(null)}>
+                <Ionicons name="close-circle" size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
-          ))
+          ) : null
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyIcon}>📦</Text>
+              <Text style={styles.emptyTitle}>{language === 'zh' ? '暂无任务' : 'No Tasks'}</Text>
+            </View>
+          ) : null
+        }
+        renderSectionHeader={({ section }) => (
+          <View style={styles.dateGroup}>
+            <Text style={styles.dateGroupTitle}>{section.title}</Text>
+          </View>
         )}
-      </ScrollView>
+        renderItem={({ item }) => (
+          <MyTaskPackageCard
+            item={item}
+            language={language}
+            onPress={handlePackagePress}
+            getStatusColor={getStatusColor}
+            getStatusText={getStatusText}
+          />
+        )}
+        contentContainerStyle={
+          taskSections.length === 0 ? { flexGrow: 1 } : { paddingBottom: 24 }
+        }
+      />
 
       {renderDetailModal()}
-
       {/* 地址模态框：取件/待收款优先商家导航 */}
       <Modal visible={showAddressModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -1208,7 +1260,14 @@ const MyTasksScreen: React.FC = () => {
       <Modal visible={showScanModal} transparent animationType="slide">
         <View style={styles.scanOverlay}>
           {isFocused ? (
-            <CameraView style={StyleSheet.absoluteFill} facing="back" onBarcodeScanned={({ data }) => handleScanCode(data)} />
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{
+                barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8'],
+              }}
+              onBarcodeScanned={({ data }) => handleScanCode(data)}
+            />
           ) : (
             <View style={[StyleSheet.absoluteFill, styles.cameraPaused]}>
               <Text style={styles.cameraPausedText}>
@@ -1426,160 +1485,6 @@ const MyTasksScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  header: { paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingHorizontal: 20, paddingBottom: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { color: '#fff', fontSize: 24, fontWeight: '800' },
-  headerSubtitle: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: '700' },
-  headerRight: { flexDirection: 'row', gap: 12 },
-  headerBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  scroll: { flex: 1, paddingHorizontal: 20 },
-  activeFilter: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(59, 130, 246, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, alignSelf: 'flex-start', marginBottom: 16 },
-  filterText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 100 },
-  emptyIcon: { fontSize: 60, marginBottom: 16 },
-  emptyTitle: { color: 'rgba(255,255,255,0.3)', fontSize: 18, fontWeight: '700' },
-  dateGroup: { marginBottom: 24 },
-  dateGroupTitle: { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '800', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 },
-  packageCard: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  cardId: { color: '#fff', fontSize: 14, fontWeight: '800', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  statusText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  cardBody: { gap: 6, marginBottom: 12 },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardValue: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600', flex: 1 },
-  cardFooter: { flexDirection: 'row', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-  tag: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  tagText: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  glassModal: { width: '100%', backgroundColor: 'rgba(30, 41, 59, 0.98)', borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
-  modalHeader: { padding: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  modalSubtitle: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
-  modalBody: { padding: 24 },
-  glassInfoCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  infoSectionTitle: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '800', marginBottom: 16, textTransform: 'uppercase' },
-  infoLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  infoLineLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' },
-  infoLineValue: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  glassDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 16 },
-  contactCard: { gap: 4 },
-  contactRole: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '800' },
-  contactName: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  contactPhone: { color: '#3b82f6', fontSize: 14, fontWeight: '700' },
-  modalActionsGrid: { flexDirection: 'row', gap: 12 },
-  gridActionBtn: { flex: 1, height: 90, borderRadius: 20, overflow: 'hidden' },
-  gridBtnGradient: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 12 },
-  gridBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', marginTop: 8 },
-  dateItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 8, backgroundColor: 'rgba(255,255,255,0.02)' },
-  dateItemSelected: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' },
-  dateItemText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  scanOverlay: { flex: 1, backgroundColor: '#000' },
-  cameraPaused: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0f172a',
-  },
-  cameraPausedText: {
-    color: '#e2e8f0',
-    fontSize: 13,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  scanFrameContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scanFrame: { width: 250, height: 250, position: 'relative' },
-  corner: { position: 'absolute', width: 40, height: 40, borderColor: '#3b82f6' },
-  scanHint: { color: '#fff', marginTop: 40, fontSize: 14, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
-  scanCloseBtn: { position: 'absolute', top: 60, right: 30 },
-  photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
-  photoPreviewWrapper: {
-    width: '100%',
-    aspectRatio: 4/3,
-    borderRadius: 24,
-    marginBottom: 24,
-    backgroundColor: '#f1f5f9',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    position: 'relative',
-  },
-  photoBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  photoBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  photoActionRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  retakeButtonFixed: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  retakeButtonTextFixed: {
-    color: '#64748b',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  uploadButtonFixed: {
-    flex: 2,
-    height: 56,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  uploadButtonGradientFixed: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  uploadButtonTextFixed: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  infoSection: {
-    marginBottom: 20,
-  },
-  disabledBtn: {
-    opacity: 0.5,
-  },
-  identityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  identityText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-});
+;
 
 export default MyTasksScreen;

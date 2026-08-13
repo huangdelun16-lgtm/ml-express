@@ -29,6 +29,7 @@
 19. [常用文件速查](#19-常用文件速查)
 20. [版本与分支](#20-版本与分支)
 21. [CI 与质量门禁](#21-ci-与质量门禁)
+22. [架构记忆恢复卡（全仓速记）](#22-架构记忆恢复卡全仓速记)
 
 ---
 
@@ -86,7 +87,7 @@ flowchart TB
 |----|----------|----------|
 | 会员 Web/App | `users` 表（customer）邮箱/手机 + 密码 | `localStorage` / `AsyncStorage`（**不含商家登录**） |
 | 商家 Web/App | `delivery_stores` 店铺码 + 密码 | `localStorage` / `AsyncStorage` |
-| 骑手 App | `admin_accounts` + `ensure-courier-auth` Edge Function | `AsyncStorage` |
+| 骑手 App | `admin_accounts` + Netlify `admin-password` + `ensure-courier-auth`（**无客户端明文密码兜底**） | `AsyncStorage`（`persistSession: false`） |
 | 管理后台 | `verify-admin` Netlify Function + HMAC JWT Cookie | session/localStorage |
 | Inventory App | `inventory-store-login` Edge Function → Supabase Auth JWT | SecureStore + Supabase Auth |
 
@@ -116,7 +117,7 @@ flowchart TB
 | **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.6.2 (69)** | EAS |
 | **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.0 (11)** | EAS |
-| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.7 (76)** | EAS |
+| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.8 (77)** | EAS |
 | **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + Supabase Auth + 蓝牙打印 | **1.7.0 (13)** | EAS |
 | **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
 | **`netlify/`** | 服务端 | 管理后台 Netlify Functions | Node | — | — |
@@ -223,14 +224,15 @@ flowchart TB
 
 | 维度 | 说明 |
 |------|------|
-| **定位** | STAFF：骑手配送 + 管理员督导（双角色 Tab） |
-| **入口** | `index.ts` → `App.tsx`；显示名 **MARKET LINK STAFF** |
-| **目录** | 无 `src/` 前缀：`screens/`、`services/`、`navigation/`（lazyScreens）、`contexts/` |
-| **业务层** | `supabase.ts`、`locationService`、`notificationService` |
-| **特性** | `@sentry/react-native`；后台定位（`expo-task-manager`）；`RoleGuardScreen` |
-| **认证** | `admin_accounts` + Edge/Netlify `ensure-courier-auth`；`persistSession: false` |
-| **导航** | Stack + 双 Tab 组：Admin（Dashboard/Map/Scan/Profile）vs Courier（MyTasks/Map/Scan/Profile） |
-| **部署** | EAS projectId `9831d961-…`；`build:aab` |
+| **定位** | STAFF：骑手配送 + 管理员督导（**工作区切换**，不删管理员） |
+| **入口** | `index.ts`（Sentry + 生产 console 门禁）→ `App.tsx`；显示名 **MARKET LINK STAFF** |
+| **目录** | 无 `src/` 前缀：`screens/`、`services/`、`navigation/`、`utils/`、`contexts/` |
+| **业务层** | `supabase.ts`（barrel）+ `staffApi/`；`locationService`；`feedbackService` / `LoggerService` |
+| **工作区** | `utils/staffWorkspace.ts`：`admin` / `courier`；双岗可切换；财务进管理督导 |
+| **扫码主路径** | `scanCodeHelpers` + `findPackageByScanCode`；取件扫包裹码、送达扫 `STORE_`；地图进详情 `openScan` |
+| **认证** | `admin_accounts` + Netlify `admin-password`（**无客户端明文密码兜底**）+ `ensure-courier-auth` |
+| **导航** | Stack + 双 Tab：Admin（Dashboard/Map/Scan/Profile）vs Courier（MyTasks/Map/Scan/Profile） |
+| **部署** | EAS projectId `9831d961-…`；`build:aab`；版本 **2.3.8 (77)** |
 
 ### 3.1.7 Inventory 中转站 App（`ml-express-inventory-app/`）
 
@@ -637,7 +639,7 @@ eas build --platform android --profile production
 |----|-----|
 | 包名 | `com.mlexpress.courier` |
 | 显示名 | MARKET LINK STAFF |
-| 版本 | **2.3.7**（Android versionCode **76**） |
+| 版本 | **2.3.8**（iOS build **77** / Android versionCode **77**） |
 | Scheme | `ml-express-staff://` |
 | EAS | projectId `9831d961-…` |
 
@@ -645,34 +647,102 @@ eas build --platform android --profile production
 
 ```
 ml-express-mobile-app/
-├── index.ts → App.tsx
-├── screens/           # 20 Screen（lazy load）
-├── navigation/        # lazyScreens.tsx, navigationRef.ts
-├── services/          # supabase.ts, locationService, notificationService, _shared/
-├── components/ contexts/
-├── constants/         # courierOnline.ts
-└── app.config.js      # blockedPermissions 屏蔽 READ_MEDIA_*
+├── index.ts                 # Sentry instrument + installProductionConsoleGate → App
+├── instrument.ts            # Sentry 初始化
+├── App.tsx                  # 导航根；MainTabs 按工作区切换 Admin/Courier
+├── screens/
+│   ├── LoginScreen.tsx
+│   ├── MapScreen.tsx + map/mapScreenStyles.ts
+│   ├── MyTasksScreen.tsx + myTasks/myTasksScreenStyles.ts  # SectionList 虚拟化
+│   ├── PackageDetailScreen.tsx / ScanScreen / ScannerScreen
+│   ├── Dashboard / Profile / Settings / Finance* / Courier* / PackageManagement…
+│   └── …
+├── navigation/              # lazyScreens.tsx, navigationRef.ts
+├── services/
+│   ├── supabase.ts          # barrel：业务 API + re-export staffApi
+│   ├── staffApi/
+│   │   ├── supabaseClient.ts
+│   │   ├── types.ts
+│   │   └── adminAccountService.ts   # 登录 / admin-password
+│   ├── locationService.ts / routingService.ts / notificationService.ts
+│   ├── feedbackService.ts / toastService.ts / LoggerService.ts / errorService.ts
+│   └── _shared/             # sync 自 /shared（勿手改）
+├── components/              # GlobalToast、MyTaskPackageCard、RoleGuardScreen、InAppNavigationModal…
+├── utils/
+│   ├── staffWorkspace.ts    # 工作区 admin|courier + 角色能力
+│   ├── scanCodeHelpers.ts   # 扫码分类 / STORE_ / 匹配包裹
+│   └── packageStatusNormalize.ts、i18n.ts…
+├── contexts/ AppContext.tsx
+├── constants/               # courierOnline.ts、packageStatus.ts
+└── app.config.js            # blockedPermissions 等
 ```
 
-### 9.3 认证与角色
+### 9.3 认证与角色（红线）
 
-- 登录：`admin_accounts` 用户名 + 密码。
-- Provisioning：`ensure-courier-auth` Edge Function / Netlify Function。
-- Supabase client **`persistSession: false`**。
-- **双角色 UI**：管理员 Tab（Dashboard/财务/骑手管理）vs 骑手 Tab（MyTasks/配送）。
+- 登录：`admin_accounts` 用户名 + 密码 → Netlify **`admin-password`**（`adminAccountService`）；弱网与凭据错误在 `LoginScreen` 区分提示。
+- **禁止**：客户端明文密码比对 / 本地密码兜底；**不要**改成纯 Supabase Auth 替代 `admin_accounts`。
+- Provisioning：`ensure-courier-auth`（Edge / Netlify）为骑手绑定 Auth 能力。
+- Supabase JS client：**`persistSession: false`**；业务态存在 `AsyncStorage`（role / position / courierId / workspace）。
+- **保留双角色 STAFF**：管理督导 + 骑手配送；**不删管理员**能力。
 
-### 9.4 导航
+### 9.4 工作区与权限（`utils/staffWorkspace.ts`）
 
-Stack：Login → LocationDisclosure → Main(Tabs) → PackageDetail、DeliveryHistory、PackageManagement、CourierManagement、FinanceManagement、Settings…
+| 概念 | 说明 |
+|------|------|
+| 工作区 `admin` | Tab：Dashboard / Map / Scan / Profile；财务默认进此区 |
+| 工作区 `courier` | Tab：MyTasks / Map / Scan / Profile |
+| 角色能力 | `admin`/`manager`/`finance` → 管理区；职位骑手或有 `courierId` → 配送区 |
+| 双岗 | `isDualCapabilityStaff`：账号页可切换；默认督导 |
+| 守卫 | `RoleGuardScreen`：无权限 Toast 后退；菜单按 `canAccess*` 裁剪 |
 
-### 9.5 特性
+事件：`STAFF_WORKSPACE_CHANGED_EVENT`；存储键 `staff_workspace_mode`。
 
-- `@sentry/react-native` 错误监控。
-- 后台定位：`expo-location` + `expo-task-manager` → `courier_locations` 实时上报。
-- `RoleGuardScreen` 权限守卫。
+### 9.5 导航
+
+Stack：Login → LocationDisclosure → Main(Tabs) → PackageDetail、DeliveryHistory、PackageManagement、CourierManagement、FinanceManagement、PerformanceAnalytics、Settings、MapView…
+
+### 9.6 扫码 / 取件 / 送达主路径
+
+| 步骤 | 实现要点 |
+|------|----------|
+| 分类 | `classifyScanCode`：`package` / `transfer` / `store`（`STORE_`）/ `unknown` |
+| 查单 | `packageService.findPackageByScanCode`（精确，防抖） |
+| 取件 | 详情内扫包裹码 / 寄件码；成功后「去配送」 |
+| 送达 | 扫门店 `STORE_{storeId}_…`；`parseStoreReceiveCode` |
+| 地图入口 | 进 `PackageDetail` 并带 `openScan` 自动开扫 |
+| 匹配 | `scanMatchesPackage`（id / sender_code / transfer_code / store_receive_code） |
+
+### 9.7 定位、地图与省电
+
+- 前台：`locationService` 默认 **Balanced**；地图/任务 **离屏停** `watchPosition`。
+- 后台：`expo-task-manager` 上报 `courier_locations`；idle / 在途降频。
+- MapView：仅 `mapFocused && showMapPreview`（或导航弹层可见）时挂载；导航 Map **关 `showsTraffic`**。
+- 应用内导航：`InAppNavigationModal` + `routingService` / `routeNavigationSession`。
+
+### 9.8 反馈、日志与监控
+
+| 模块 | 职责 |
+|------|------|
+| `toastService` + `GlobalToast` + `Toast` | 全局轻提示 |
+| `feedbackService` | Toast + 触觉统一入口 |
+| `Alert.alert` | **仅**确认/破坏性操作 |
+| `LoggerService` + `installProductionConsoleGate`（`index.ts`） | 生产压制 `console.log/info`；错误脱敏 → Sentry |
+| `@sentry/react-native`（`instrument.ts`） | 崩溃/异常 |
+
+### 9.9 我的任务性能
+
+- `MyTasksScreen`：`SectionList` 虚拟化（非全量 `ScrollView`）。
+- 卡片：`components/MyTaskPackageCard.tsx` 独立渲染，减列表重绘。
+- 样式：`screens/myTasks/myTasksScreenStyles.ts`（与 Map 样式拆分同类手法）。
+
+### 9.10 特性速记 & 构建
+
+- City 配送主数据：`packages`、`couriers`、`courier_locations`、`delivery_stores`（与 Inventory `inventory_*` 隔离）。
+- 缓存：`cacheService` + 列表缓存键（见 `supabase.ts`）。
 
 ```bash
 cd ml-express-mobile-app && npm install && npx expo start
+npx tsc --noEmit
 npm run build:aab   # Android AAB 生产包
 ```
 
@@ -1282,6 +1352,8 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 14. **勿提交** `.env`、keystore、`.temp/`、`upload-release.keystore`；仅用户要求时 commit。
 15. **改 Google Play 媒体权限**：client `app.json blockedPermissions` + `mediaAccess.ts` + `AndroidManifest.xml tools:node="remove"`。
 16. **改 Inventory B 签收**：`CustomerSignFlowModal` + migration `20260720140000` + `markCustomerSigned`。
+17. **改 STAFF 骑手端**：保留双工作区与 `admin_accounts` 登录；登录改 `staffApi/adminAccountService`；工作区改 `staffWorkspace.ts`；扫码改 `scanCodeHelpers` + `findPackageByScanCode`；提示走 `feedbackService`；日志走 `LoggerService`（见 §9、§22）。
+18. **会员 App 勿恢复商家运营入口**；密钥勿写进客户端明文。
 
 ---
 
@@ -1289,6 +1361,13 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 | 我想… | 先看 |
 |--------|------|
+| **全仓架构一页恢复记忆** | **§22** |
+| **STAFF 工作区 / 双角色** | `utils/staffWorkspace.ts`、`App.tsx` MainTabs、`ProfileScreen` |
+| STAFF 登录 / 密码校验 | `services/staffApi/adminAccountService.ts`、`LoginScreen.tsx` |
+| STAFF 扫码取件送达 | `utils/scanCodeHelpers.ts`、`PackageDetailScreen`、`supabase.ts` `findPackageByScanCode` |
+| STAFF 我的任务列表 | `MyTasksScreen.tsx`、`MyTaskPackageCard.tsx` |
+| STAFF Toast / 生产日志 | `feedbackService.ts`、`GlobalToast.tsx`、`LoggerService.ts`、`index.ts` |
+| STAFF 定位省电 | `locationService.ts`、`MapScreen.tsx`、`InAppNavigationModal.tsx` |
 | **Inventory A/B 职责划分** | **§10.2**（发站 vs 到站，改需求前必读） |
 | Inventory A：订单列表过滤 | `expressDetailsVisibility.ts` → `inventoryService.listItems` |
 | Inventory A：PKG 列表 / 装车候选 | `packDisplayStatus.ts` → `listOutboundPackages` |
@@ -1329,7 +1408,7 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | 管理后台（根） | **2.2.4** | — | `package.json` |
 | ml-express-client | **2.6.2** | **69** | 体验与稳定性优化 |
 | ml-express-merchant-app | **2.4.0** | **11** | |
-| ml-express-mobile-app | **2.3.7** | **76** | STAFF 骑手端 |
+| ml-express-mobile-app | **2.3.8** | **77** | STAFF 骑手端 |
 | ml-express-inventory-app | **1.7.0** | **13** | 快递单/入库单复制；客户签收留痕 |
 | ml-express-client-web | **0.1.0** | — | |
 | ml-express-merchant-web | **0.1.0** | — | |
@@ -1373,4 +1452,72 @@ cd ml-express-inventory-app && npm run typecheck
 
 ---
 
-*最后更新：2026-08-02 — Inventory §10.2 明确 **A（发站：入库→客户/货物→装车）** 与 **B（到站：签收→车费→中转→客户签收）** 双线；A 基本完成、B 待系统测试。*
+## 22. 架构记忆恢复卡（全仓速记）
+
+> 忘记项目时先读本节，再按业务跳到对应章节。细节以代码为准。
+
+### 22.1 一句话地图
+
+| 包 | 给谁用 | 数据边界 | 部署 |
+|----|--------|----------|------|
+| 根 `src/` | 运营 Admin | City + 跨境控制台 | Netlify |
+| `ml-express-client-web` | 会员浏览器 | City `users`/`packages`/`orders` | Netlify |
+| `ml-express-merchant-web` | 商家浏览器 | `delivery_stores` | Netlify |
+| `ml-express-client` | 会员手机 | City；**仅 customer** | EAS |
+| `ml-express-merchant-app` | 商家手机 | `delivery_stores` | EAS |
+| `ml-express-mobile-app` | 骑手/员工 STAFF | City + `admin_accounts` | EAS |
+| `ml-express-inventory-app` | 中转站 | **仅** `inventory_*` + JWT | EAS |
+| `/shared` | 跨端纯逻辑 | 同步到各端 `_shared`（Inventory 除外） | sync 脚本 |
+
+**两条业务线永不混表**：City（`packages`…）≠ Inventory（`inventory_*`）。
+
+### 22.2 认证红线（勿改错）
+
+```
+会员     → users（customer）自定义会话
+商家     → delivery_stores 店铺码
+STAFF    → admin_accounts + admin-password + ensure-courier-auth（非纯 Supabase Auth）
+Admin Web→ verify-admin HMAC Cookie
+Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT 主路径）
+```
+
+### 22.3 STAFF 决策快照（2026-08）
+
+1. **双工作区** `admin` | `courier`，双岗可切换；**不删管理员**。
+2. **登录**只信服务端密码校验；无客户端明文兜底。
+3. **扫码主路径**：取件扫包裹码，送达扫 `STORE_`；地图 → 详情 `openScan`。
+4. **体验**：Toast 统一非确认提示；`MyTasks` SectionList；地图离屏停定位。
+5. **生产**：console 门禁 + `LoggerService` + Sentry。
+6. 版本锚点：**2.3.8 (77)**；详述见 **§9**。
+
+### 22.4 Inventory 决策快照
+
+- **A 发站**：入库 → 客户/货物 → 打包 → 装车（基本完成）。
+- **B 到站**：签收 → 车费 → 中转 → 客户签收（待系统测试）。
+- 在线专用、不写 `/shared`；详述见 **§10.2**。
+
+### 22.5 改代码入口（最短路径）
+
+| 目标 | 入口 |
+|------|------|
+| 计费/审核/充值 QR | `/shared/src` → `npm run sync:shared` |
+| Admin 菜单/权限 | 根 `src/App.tsx`、`AccountManagement` |
+| Admin 跨境 | `CrossBorderLogisticsPage` + `inventory-admin-*` Functions |
+| 会员 App | `ml-express-client/src/`（clientApi / screens） |
+| STAFF | §9 + `staffApi/` + `staffWorkspace` + `scanCodeHelpers` |
+| Inventory A/B | §10.2 + `inventoryService` / `trackingService` |
+| Schema | `supabase/migrations/` + 更新 §14 |
+| 类型门禁 | `.github/workflows/typecheck.yml` + `scripts/ci-typecheck.mjs` |
+
+### 22.6 勿做清单
+
+- 勿把 Inventory 表当 City 包裹用（或反向）。
+- 勿在合伙店铺流创建 `transit_station`（走跨境账号）。
+- 勿手改各端 `_shared/` 副本。
+- 勿提交 `.env`、keystore、`.cursor/` 计划垃圾。
+- STAFF：勿删管理端；勿改回明文密码登录。
+- 会员 App：勿恢复商家运营能力入口。
+
+---
+
+*最后更新：2026-08-13 — 补全 §9 STAFF 架构（工作区/扫码/省电/日志）与 §22 全仓记忆恢复卡；骑手端 P0/P1 落地。*

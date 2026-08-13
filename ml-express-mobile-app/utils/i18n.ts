@@ -235,6 +235,16 @@ export interface LanguageTexts {
   locationOpenSettingsHint: string;
   adminAccessDeniedTitle: string;
   adminAccessDeniedBody: string;
+  workspaceAdminLabel: string;
+  workspaceCourierLabel: string;
+  workspaceAdminHint: string;
+  workspaceCourierHint: string;
+  workspaceSwitchToAdmin: string;
+  workspaceSwitchToCourier: string;
+  workspaceSwitchedAdmin: string;
+  workspaceSwitchedCourier: string;
+  workspaceAdminMenuTitle: string;
+  workspaceCannotSwitch: string;
   /** 无障碍 */
   a11yBack: string;
   a11yLogout: string;
@@ -495,6 +505,16 @@ export const translations: { [key: string]: LanguageTexts } = {
     locationOpenSettingsHint: '位置权限被拒绝且无法再次弹窗。请在系统设置中开启本应用的位置权限。',
     adminAccessDeniedTitle: '无权限',
     adminAccessDeniedBody: '当前账号无法访问此管理功能。',
+    workspaceAdminLabel: '管理督导',
+    workspaceCourierLabel: '骑手配送',
+    workspaceAdminHint: '包裹 / 骑手 / 财务等管理功能',
+    workspaceCourierHint: '我的任务、在线接单与配送地图',
+    workspaceSwitchToAdmin: '切换到管理督导',
+    workspaceSwitchToCourier: '切换到骑手配送',
+    workspaceSwitchedAdmin: '已切换到管理督导工作区',
+    workspaceSwitchedCourier: '已切换到骑手配送工作区',
+    workspaceAdminMenuTitle: '管理中心',
+    workspaceCannotSwitch: '当前账号不具备该工作区权限',
     a11yBack: '返回上一页',
     a11yLogout: '退出登录',
     a11yOnlineToggle: '切换在线接单状态',
@@ -753,6 +773,16 @@ export const translations: { [key: string]: LanguageTexts } = {
     locationOpenSettingsHint: 'Location was denied and cannot be asked again. Enable location for this app in system settings.',
     adminAccessDeniedTitle: 'Access denied',
     adminAccessDeniedBody: 'Your role cannot open this management screen.',
+    workspaceAdminLabel: 'Ops console',
+    workspaceCourierLabel: 'Courier delivery',
+    workspaceAdminHint: 'Packages, couriers, finance tools',
+    workspaceCourierHint: 'My tasks, online status, delivery map',
+    workspaceSwitchToAdmin: 'Switch to ops console',
+    workspaceSwitchToCourier: 'Switch to courier delivery',
+    workspaceSwitchedAdmin: 'Switched to ops console',
+    workspaceSwitchedCourier: 'Switched to courier delivery',
+    workspaceAdminMenuTitle: 'Management',
+    workspaceCannotSwitch: 'This account cannot use that workspace',
     a11yBack: 'Go back',
     a11yLogout: 'Log out',
     a11yOnlineToggle: 'Toggle online for orders',
@@ -1011,6 +1041,16 @@ export const translations: { [key: string]: LanguageTexts } = {
     locationOpenSettingsHint: 'တည်နေရာခွင့်ပြုချက်ငြင်းပြီး ထပ်မမေးနိုင်ပါ။ စနစ်ဆက်တင်တွင် ဖွင့်ပေးပါ။',
     adminAccessDeniedTitle: 'ခွင့်ပြုချက်မရှိ',
     adminAccessDeniedBody: 'ဤစီမံခန့်ခွဲမှုစာမျက်နှာကို သင့်အခန်းကဏ္ဍမှ မဖွင့်နိုင်ပါ။',
+    workspaceAdminLabel: 'စီမံခန့်ခွဲမှု',
+    workspaceCourierLabel: 'ပို့ဆောင်ရေး',
+    workspaceAdminHint: 'ပစ္စည်း / စာပို့သမား / ငွေစာရင်း',
+    workspaceCourierHint: 'လုပ်ငန်းတာဝန်၊ အွန်လိုင်းနှင့် မြေပုံ',
+    workspaceSwitchToAdmin: 'စီမံခန့်ခွဲမှုသို့ပြောင်းရန်',
+    workspaceSwitchToCourier: 'ပို့ဆောင်ရေးသို့ပြောင်းရန်',
+    workspaceSwitchedAdmin: 'စီမံခန့်ခွဲမှုသို့ ပြောင်းပြီး',
+    workspaceSwitchedCourier: 'ပို့ဆောင်ရေးသို့ ပြောင်းပြီး',
+    workspaceAdminMenuTitle: 'စီမံခန့်ခွဲမှုစင်တာ',
+    workspaceCannotSwitch: 'ဤအကောင့်သည် ထိုနေရာသို့ မပြောင်းနိုင်ပါ',
     a11yBack: 'နောက်သို့',
     a11yLogout: 'အကောင့်မှထွက်ရန်',
     a11yOnlineToggle: 'အွန်လိုင်းမှာယူမှု ဖွင့်/ပိတ်',

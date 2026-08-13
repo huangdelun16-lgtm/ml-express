@@ -274,7 +274,7 @@ export default function InAppNavigationModal({
               style={StyleSheet.absoluteFillObject}
               customMapStyle={Platform.OS === 'android' ? undefined : MAP_STYLE_LOGISTICS_PRO}
               mapType="standard"
-              showsTraffic
+              showsTraffic={false}
               showsUserLocation
               showsMyLocationButton={Platform.OS === 'android'}
               pitchEnabled={false}

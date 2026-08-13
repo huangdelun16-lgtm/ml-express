@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { supabase, adminAccountService } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 import { useApp } from '../contexts/AppContext';
 import { getPushRuntimeSummary } from '../services/notificationService';
 
@@ -144,7 +145,7 @@ export default function SettingsScreen({ navigation }: any) {
       await AsyncStorage.setItem('appSettings', JSON.stringify(newSettings));
       setSettings(newSettings);
     } catch (error) {
-      Alert.alert('错误', '保存设置失败');
+      feedbackService.notify('错误', '保存设置失败');
     }
   };
 
@@ -169,11 +170,11 @@ export default function SettingsScreen({ navigation }: any) {
 
   const handleChangePassword = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      Alert.alert('提示', language === 'zh' ? '请填写当前密码和新密码' : 'Please fill current, new and confirm password');
+      feedbackService.notify('提示', language === 'zh' ? '请填写当前密码和新密码' : 'Please fill current, new and confirm password');
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      Alert.alert('错误', language === 'zh' ? '新密码和确认密码不匹配' : 'Passwords do not match');
+      feedbackService.notify('错误', language === 'zh' ? '新密码和确认密码不匹配' : 'Passwords do not match');
       return;
     }
     try {
@@ -184,36 +185,36 @@ export default function SettingsScreen({ navigation }: any) {
         passwordForm.newPassword
       );
       if (success) {
-        Alert.alert('成功', language === 'zh' ? '密码修改成功' : 'Password updated');
+        feedbackService.notify('成功', language === 'zh' ? '密码修改成功' : 'Password updated');
         setShowPasswordModal(false);
         setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
-        Alert.alert('错误', language === 'zh' ? '修改失败，请重试' : 'Update failed');
+        feedbackService.notify('错误', language === 'zh' ? '修改失败，请重试' : 'Update failed');
       }
     } catch (error) {
-      Alert.alert('错误', language === 'zh' ? '网络错误' : 'Network error');
+      feedbackService.notify('错误', language === 'zh' ? '网络错误' : 'Network error');
     }
   };
 
   const handleChangeUsername = async () => {
     if (!usernameForm.newUsername || usernameForm.newUsername.length < 3) {
-      Alert.alert('错误', language === 'zh' ? '用户名至少3位' : 'Username must be at least 3 chars');
+      feedbackService.notify('错误', language === 'zh' ? '用户名至少3位' : 'Username must be at least 3 chars');
       return;
     }
     try {
       // currentUser 是旧用户名，usernameForm.newUsername 是新用户名
       const success = await adminAccountService.updateUsername(currentUser, usernameForm.newUsername);
       if (success) {
-        Alert.alert('成功', language === 'zh' ? '用户名已修改' : 'Username updated');
+        feedbackService.notify('成功', language === 'zh' ? '用户名已修改' : 'Username updated');
         await AsyncStorage.setItem('currentUser', usernameForm.newUsername);
         setShowUsernameModal(false);
         setUsernameForm({ currentUsername: '', newUsername: '' });
         loadUserInfo();
       } else {
-        Alert.alert('错误', language === 'zh' ? '修改失败，可能用户名已存在' : 'Update failed');
+        feedbackService.notify('错误', language === 'zh' ? '修改失败，可能用户名已存在' : 'Update failed');
       }
     } catch (error) {
-      Alert.alert('错误', language === 'zh' ? '网络错误' : 'Network error');
+      feedbackService.notify('错误', language === 'zh' ? '网络错误' : 'Network error');
     }
   };
 

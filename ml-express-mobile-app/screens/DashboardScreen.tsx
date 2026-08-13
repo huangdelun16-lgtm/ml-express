@@ -19,13 +19,24 @@ import * as Location from 'expo-location';
 import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
 import { syncCourierLocationToSupabase } from '../services/locationService';
 import { Alert } from 'react-native';
+import { feedbackService } from '../services/feedbackService';
+import {
+  canAccessCourierManagement,
+  canAccessFinanceManagement,
+  canAccessPackageManagement,
+  isDualCapabilityStaff,
+  readStaffWorkspaceContext,
+  setStaffWorkspaceMode,
+} from '../utils/staffWorkspace';
 
 const { width } = Dimensions.get('window');
 
 export default function DashboardScreen({ navigation }: any) {
-  const { language, setLanguage } = useApp();
+  const { language, setLanguage, t: appT } = useApp();
   const [currentUserName, setCurrentUserName] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState('');
+  const [dualCapable, setDualCapable] = useState(false);
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -141,12 +152,30 @@ export default function DashboardScreen({ navigation }: any) {
 
   const loadUserInfo = async () => {
     try {
-      const userName = await AsyncStorage.getItem('currentUserName') || '管理员';
-      const userRole = await AsyncStorage.getItem('currentUserRole') || 'admin';
+      const userName = (await AsyncStorage.getItem('currentUserName')) || '管理员';
+      const ctx = await readStaffWorkspaceContext();
       setCurrentUserName(userName);
-      setCurrentUserRole(userRole);
+      setCurrentUserRole(ctx.role);
+      setDualCapable(
+        isDualCapabilityStaff({
+          role: ctx.role,
+          position: ctx.position,
+          courierId: ctx.courierId,
+        }),
+      );
     } catch (error) {
       console.error('加载用户信息失败:', error);
+    }
+  };
+
+  const switchToCourierWorkspace = async () => {
+    if (switchingWorkspace) return;
+    setSwitchingWorkspace(true);
+    try {
+      await setStaffWorkspaceMode('courier');
+      feedbackService.success(appT.workspaceSwitchedCourier);
+    } finally {
+      setSwitchingWorkspace(false);
     }
   };
 
@@ -350,38 +379,44 @@ export default function DashboardScreen({ navigation }: any) {
 
   const currentT = t[language as keyof typeof t] || t.zh;
 
-  // 管理模块卡片数据
+  // 管理模块卡片数据（按角色裁剪，财务仅见财务）
   const moduleCards = [
-    {
-      id: 'packages',
-      title: currentT.packageManagement,
-      subtitle: currentT.packageManagementDesc,
-      icon: '📦',
-      color: '#3182ce',
-      gradient: ['#3182ce', '#2c5282'],
-      screen: 'PackageManagement',
-      count: stats.totalPackages,
-    },
-    {
-      id: 'couriers',
-      title: currentT.courierManagement,
-      subtitle: currentT.courierManagementDesc,
-      icon: '🚚',
-      color: '#9b59b6',
-      gradient: ['#9b59b6', '#8e44ad'],
-      screen: 'CourierManagement',
-      count: null,
-    },
-    {
-      id: 'finance',
-      title: currentT.financeManagement,
-      subtitle: currentT.financeManagementDesc,
-      icon: '💰',
-      color: '#27ae60',
-      gradient: ['#27ae60', '#229954'],
-      screen: 'FinanceManagement',
-      count: null,
-    },
+    canAccessPackageManagement(currentUserRole)
+      ? {
+          id: 'packages',
+          title: currentT.packageManagement,
+          subtitle: currentT.packageManagementDesc,
+          icon: '📦',
+          color: '#3182ce',
+          gradient: ['#3182ce', '#2c5282'],
+          screen: 'PackageManagement',
+          count: stats.totalPackages,
+        }
+      : null,
+    canAccessCourierManagement(currentUserRole)
+      ? {
+          id: 'couriers',
+          title: currentT.courierManagement,
+          subtitle: currentT.courierManagementDesc,
+          icon: '🚚',
+          color: '#9b59b6',
+          gradient: ['#9b59b6', '#8e44ad'],
+          screen: 'CourierManagement',
+          count: null,
+        }
+      : null,
+    canAccessFinanceManagement(currentUserRole)
+      ? {
+          id: 'finance',
+          title: currentT.financeManagement,
+          subtitle: currentT.financeManagementDesc,
+          icon: '💰',
+          color: '#27ae60',
+          gradient: ['#27ae60', '#229954'],
+          screen: 'FinanceManagement',
+          count: null,
+        }
+      : null,
     {
       id: 'settings',
       title: currentT.systemSettings,
@@ -392,7 +427,16 @@ export default function DashboardScreen({ navigation }: any) {
       screen: 'Settings',
       count: null,
     },
-  ];
+  ].filter(Boolean) as Array<{
+    id: string;
+    title: string;
+    subtitle: string;
+    icon: string;
+    color: string;
+    gradient: string[];
+    screen: string;
+    count: number | null;
+  }>;
 
   return (
     <View style={styles.container}>
@@ -414,6 +458,8 @@ export default function DashboardScreen({ navigation }: any) {
               {currentUserRole === 'admin' ? currentT.systemAdmin : 
                currentUserRole === 'manager' ? currentT.manager : 
                currentUserRole === 'finance' ? currentT.finance : currentT.operator}
+              {' · '}
+              {appT.workspaceAdminLabel}
             </Text>
           </View>
           <View style={styles.headerButtons}>
@@ -428,6 +474,22 @@ export default function DashboardScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
         </View>
+
+        {dualCapable ? (
+          <TouchableOpacity
+            style={styles.workspaceSwitchBanner}
+            onPress={switchToCourierWorkspace}
+            disabled={switchingWorkspace}
+            accessibilityRole="button"
+            accessibilityLabel={appT.workspaceSwitchToCourier}
+          >
+            {switchingWorkspace ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.workspaceSwitchBannerText}>{appT.workspaceSwitchToCourier}</Text>
+            )}
+          </TouchableOpacity>
+        ) : null}
 
         {/* 装饰圆圈 */}
         <View style={styles.decorCircle1} />
@@ -525,15 +587,17 @@ export default function DashboardScreen({ navigation }: any) {
           ⚡ {currentT.quickActions}
         </Text>
         <View style={styles.quickActions}>
-          <TouchableOpacity 
-            style={styles.quickActionButton}
-            onPress={() => navigation.navigate('PackageManagement')}
-          >
-            <Text style={styles.quickActionIcon}>➕</Text>
-            <Text style={styles.quickActionText}>
-              {language === 'zh' ? '新建包裹' : language === 'en' ? 'New Package' : 'ထုပ်ပိုးအသစ်'}
-            </Text>
-          </TouchableOpacity>
+          {canAccessPackageManagement(currentUserRole) ? (
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => navigation.navigate('PackageManagement')}
+            >
+              <Text style={styles.quickActionIcon}>➕</Text>
+              <Text style={styles.quickActionText}>
+                {language === 'zh' ? '新建包裹' : language === 'en' ? 'New Package' : 'ထုပ်ပိုးအသစ်'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity 
             style={styles.quickActionButton}
@@ -688,6 +752,22 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     alignSelf: 'flex-start',
+  },
+  workspaceSwitchBanner: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(16, 185, 129, 0.35)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    zIndex: 2,
+  },
+  workspaceSwitchBannerText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   logoutButton: {
     width: 44,

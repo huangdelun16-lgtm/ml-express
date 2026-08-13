@@ -16,6 +16,7 @@ import {
   type DimensionValue,
 } from 'react-native';
 import { supabase, auditLogService } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { formatI18n } from '../utils/i18n';
@@ -145,7 +146,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
   // 记录管理函数
   const handleAddRecord = async () => {
     if (!recordForm.category || !recordForm.amount) {
-      Alert.alert(t.tipTitle, t.financeFillCategoryAndAmount);
+      feedbackService.notify(t.tipTitle, t.financeFillCategoryAndAmount);
       return;
     }
 
@@ -161,7 +162,7 @@ export default function FinanceManagementScreen({ navigation }: any) {
         .insert([newRecord]);
 
       if (error) {
-        Alert.alert(t.error, t.financeAddFailed);
+        feedbackService.notify(t.error, t.financeAddFailed);
         return;
       }
 
@@ -179,12 +180,12 @@ export default function FinanceManagementScreen({ navigation }: any) {
         action_description: `移动端创建财务记录，类型：${newRecord.record_type === 'income' ? '收入' : '支出'}，分类：${newRecord.category}，金额：${newRecord.amount} ${newRecord.currency}`,
       });
 
-      Alert.alert(t.success, t.financeAddSuccess);
+      feedbackService.notify(t.success, t.financeAddSuccess);
       setShowAddRecord(false);
       resetForm();
       await loadRecords();
     } catch (error) {
-      Alert.alert(t.error, t.financeAddFailed);
+      feedbackService.notify(t.error, t.financeAddFailed);
     }
   };
 

@@ -2,6 +2,7 @@ import { Alert, LogBox, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 import { translations } from '../utils/i18n';
+import { logger } from './LoggerService';
 
 // 忽略某些已知的非严重警告
 LogBox.ignoreLogs([
@@ -46,7 +47,7 @@ export const errorService = {
     const defaultHandler = ErrorUtils.getGlobalHandler();
 
     ErrorUtils.setGlobalHandler(async (error: any, isFatal?: boolean) => {
-      console.error('🚨 全局捕获异常:', error);
+      logger.error('全局捕获异常', error, { isFatal });
       await this.saveErrorLog(error);
       captureToSentry(error);
 
@@ -77,7 +78,7 @@ export const errorService = {
     // 2. 捕获未处理的 Promise Rejection
     const originalHandler = (global as any).Promise.onUnhandledRejection;
     (global as any).Promise.onUnhandledRejection = (id: string, error: any) => {
-      console.warn('⚠️ 未处理的 Promise 拒绝:', error);
+      logger.warn('未处理的 Promise 拒绝', error);
       this.saveErrorLog({
         message: error?.message || 'Unhandled Promise Rejection',
         stack: error?.stack || '',
@@ -108,7 +109,7 @@ export const errorService = {
       const newLogs = [logEntry, ...existingLogs].slice(0, 20);
       await AsyncStorage.setItem('app_error_logs', JSON.stringify(newLogs));
     } catch (e) {
-      console.error('Failed to save error log:', e);
+      logger.error('Failed to save error log', e);
     }
   },
 

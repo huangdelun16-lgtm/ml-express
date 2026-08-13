@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { mapScreenStyles as styles } from './map/mapScreenStyles';
 import { useIsFocused } from '@react-navigation/native';
 import {
   View,
@@ -27,6 +28,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { packageService, Package, supabase, deliveryPhotoService } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 import { cacheService } from '../services/cacheService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppState, AppStateStatus, DeviceEventEmitter } from 'react-native';
@@ -339,8 +341,17 @@ export default function MapScreen({ navigation }: any) {
   }, [currentDeliveringPackageId, packages]);
 
   const buildLocationConfig = useCallback(() => {
-    // 省电策略：避免 BestForNavigation；配送中用 High + 适中间隔，仍可满足围栏与轨迹
-    if (isBackground) {
+    // 省电：离屏/后台不跑前台高精度；后台任务按模式降频。避免 BestForNavigation。
+    const offScreen = isBackground || !isFocused;
+    if (offScreen) {
+      if (hasInTransitOrders) {
+        return {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 45000,
+          distanceInterval: 80,
+          mode: 'background_active' as const,
+        };
+      }
       return {
         accuracy: Location.Accuracy.Balanced,
         timeInterval: 120000,
@@ -362,7 +373,7 @@ export default function MapScreen({ navigation }: any) {
       distanceInterval: 100,
       mode: 'idle' as const,
     };
-  }, [hasInTransitOrders, isBackground]);
+  }, [hasInTransitOrders, isBackground, isFocused]);
 
   const cleanupMemory = useCallback(() => {
     coordinatesCache.current = {};
@@ -665,24 +676,18 @@ export default function MapScreen({ navigation }: any) {
         
         // 限制规则：信用分低于 60 分禁止开始配送
         if (score < 60) {
-          Alert.alert(
-            language === 'zh' ? '接单受限' : 'Account Restricted',
-            language === 'zh' 
+          feedbackService.notify(language === 'zh' ? '接单受限' : 'Account Restricted', language === 'zh' 
               ? `您的信用分过低 (${score})，已被限制接单。请联系管理员处理。` 
-              : `Your credit score is too low (${score}). Account restricted. Please contact admin.`
-          );
+              : `Your credit score is too low (${score}). Account restricted. Please contact admin.`);
           return;
         }
 
         // 限制规则：信用分低于 80 分不能接高价单 (配送费 > 5000)
         const deliveryFee = parseFloat(pkg.price?.toString().replace(/[^\d.]/g, '') || '0');
         if (score < 80 && deliveryFee > 5000) {
-          Alert.alert(
-            language === 'zh' ? '权限不足' : 'Restricted',
-            language === 'zh' 
+          feedbackService.notify(language === 'zh' ? '权限不足' : 'Restricted', language === 'zh' 
               ? `您的信用分 (${score}) 不足以配送此高价订单（限 80 分以上）。` 
-              : `Credit score (${score}) too low for this high-value order (min 80).`
-          );
+              : `Credit score (${score}) too low for this high-value order (min 80).`);
           return;
         }
       }
@@ -695,10 +700,7 @@ export default function MapScreen({ navigation }: any) {
       setCurrentDeliveringPackageId(packageId);
       loadPackages();
     } catch (e) { 
-      Alert.alert(
-        language === 'zh' ? '错误' : language === 'en' ? 'Error' : 'အမှား', 
-        language === 'zh' ? '操作失败' : language === 'en' ? 'Operation failed' : 'လုပ်ဆောင်မှု မအောင်မြင်ပါ'
-      ); 
+      feedbackService.notify(language === 'zh' ? '错误' : language === 'en' ? 'Error' : 'အမှား', language === 'zh' ? '操作失败' : language === 'en' ? 'Operation failed' : 'လုပ်ဆောင်မှု မအောင်မြင်ပါ'); 
     } finally {
       setLoading(false);
     }
@@ -716,10 +718,7 @@ export default function MapScreen({ navigation }: any) {
       const health = await deviceHealthService.performFullCheck();
       
       if (health.location.isMocked) {
-        Alert.alert(
-          language === 'zh' ? '检测到异常' : 'Anomaly Detected',
-          language === 'zh' ? '系统检测到您正在使用“模拟定位”，该操作已被禁止并已上报系统。' : 'Mock location detected. This action is prohibited and reported.'
-        );
+        feedbackService.notify(language === 'zh' ? '检测到异常' : 'Anomaly Detected', language === 'zh' ? '系统检测到您正在使用“模拟定位”，该操作已被禁止并已上报系统。' : 'Mock location detected. This action is prohibited and reported.');
         // 上报给系统 (这里可以通过 reportAnomaly 实现)
         await packageService.reportAnomaly({
           packageId: pkg.id,
@@ -734,7 +733,7 @@ export default function MapScreen({ navigation }: any) {
 
       // 2. 🚀 电子围栏检查：检查距离
       if (!location) {
-        Alert.alert('提示', '无法获取您的当前位置，请确保 GPS 已开启');
+        feedbackService.notify('提示', '无法获取您的当前位置，请确保 GPS 已开启');
         return;
       }
 
@@ -749,12 +748,9 @@ export default function MapScreen({ navigation }: any) {
       console.log(`📍 距离目标点: ${distanceMeters.toFixed(2)} 米`);
 
       if (distanceMeters > 200) {
-        Alert.alert(
-          language === 'zh' ? '距离过远' : 'Too Far',
-          language === 'zh' 
+        feedbackService.notify(language === 'zh' ? '距离过远' : 'Too Far', language === 'zh' 
             ? `您距离送达点还剩 ${Math.round(distanceMeters)} 米，请到达目的地后再点击（需在 200 米范围内）。` 
-            : `You are ${Math.round(distanceMeters)}m away from destination. Please arrive before clicking (within 200m).`
-        );
+            : `You are ${Math.round(distanceMeters)}m away from destination. Please arrive before clicking (within 200m).`);
         return;
       }
 
@@ -778,9 +774,8 @@ export default function MapScreen({ navigation }: any) {
           const name = await AsyncStorage.getItem('currentUserName') || '';
           const ok = await packageService.updatePackageStatus(packageId, '已取件', new Date().toLocaleString('zh-CN'), undefined, name);
           if (ok) {
-            Alert.alert(
-              language === 'zh' ? '成功' : language === 'en' ? 'Success' : 'အောင်မြင်ပါသည်',
-              language === 'zh' ? '已确认取件' : language === 'en' ? 'Pickup confirmed' : 'ကောက်ယူမှုကိုအတည်ပြုပြီးပါပြီ'
+            feedbackService.success(
+              language === 'zh' ? '已确认取件' : language === 'en' ? 'Pickup confirmed' : 'ကောက်ယူမှုကိုအတည်ပြုပြီးပါပြီ',
             );
             setStatusOverrides(prev => ({ ...prev, [packageId]: '已取件' }));
             setPackages(prev => {
@@ -794,9 +789,8 @@ export default function MapScreen({ navigation }: any) {
             }
       if (selectedPackageForMap?.id === packageId) setSelectedPackageForMap(prev => prev ? { ...prev, status: '已取件' } : null);
           } else {
-            Alert.alert(
-              language === 'zh' ? '错误' : language === 'en' ? 'Error' : 'အမှား',
-              language === 'zh' ? '操作失败' : language === 'en' ? 'Operation failed' : 'လုပ်ဆောင်မှု မအောင်မြင်ပါ'
+            feedbackService.error(
+              language === 'zh' ? '操作失败' : language === 'en' ? 'Operation failed' : 'လုပ်ဆောင်မှု မအောင်မြင်ပါ',
             );
           }
         }}
@@ -813,12 +807,13 @@ export default function MapScreen({ navigation }: any) {
 
   const startAutoRefresh = useCallback(() => {
     stopAutoRefresh();
-    if (isBackground || !autoRefreshEnabled || !hasInTransitOrders) return;
+    // 离屏不轮询列表，减轻射频与主线程占用
+    if (isBackground || !isFocused || !autoRefreshEnabled || !hasInTransitOrders) return;
     const intervalSeconds = hasInTransitOrders ? autoRefreshInterval : Math.max(autoRefreshInterval, 120);
     autoRefreshTimerRef.current = setInterval(() => {
-      if (!isBackground && isOnline) loadPackages(true);
+      if (!isBackground && isFocused && isOnline) loadPackages(true);
     }, intervalSeconds * 1000);
-  }, [isBackground, autoRefreshEnabled, autoRefreshInterval, hasInTransitOrders, isOnline, stopAutoRefresh, loadPackages]);
+  }, [isBackground, isFocused, autoRefreshEnabled, autoRefreshInterval, hasInTransitOrders, isOnline, stopAutoRefresh, loadPackages]);
 
   const initNetworkListener = useCallback(() => {
     NetInfo.fetch().then(state => setIsOnline(state.isConnected ?? false));
@@ -860,8 +855,7 @@ export default function MapScreen({ navigation }: any) {
     }
   }, []);
 
-  const stopLocationTracking = useCallback(async () => {
-    // 1. 停止前台监听
+  const stopForegroundWatch = useCallback(() => {
     if (locationIntervalRef.current) {
       if ((locationIntervalRef.current as any).remove) {
         (locationIntervalRef.current as any).remove();
@@ -870,8 +864,11 @@ export default function MapScreen({ navigation }: any) {
       }
       locationIntervalRef.current = null;
     }
+  }, []);
 
-    // 2. 🚀 停止后台持续定位任务
+  const stopLocationTracking = useCallback(async () => {
+    stopForegroundWatch();
+
     try {
       const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
       const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -888,7 +885,11 @@ export default function MapScreen({ navigation }: any) {
 
     setIsLocationTracking(false);
     lastLocationConfigRef.current = null;
-  }, []);
+  }, [stopForegroundWatch]);
+
+  const lastUiLocationUpdateRef = useRef(0);
+  const optimizedPackagesRef = useRef<PackageWithExtras[]>([]);
+  optimizedPackagesRef.current = optimizedPackagesWithCoords;
 
   const startLocationTracking = useCallback(async () => {
     try {
@@ -904,33 +905,33 @@ export default function MapScreen({ navigation }: any) {
       }
 
       const locationConfig = buildLocationConfig();
+      const wantForegroundWatch =
+        isFocused && !isBackground && (locationConfig.mode === 'active' || locationConfig.mode === 'idle');
       const lastConfig = lastLocationConfigRef.current;
-      if (
+      const configUnchanged =
         isLocationTracking &&
         lastConfig &&
         lastConfig.mode === locationConfig.mode &&
         lastConfig.timeInterval === locationConfig.timeInterval &&
         lastConfig.distanceInterval === locationConfig.distanceInterval &&
-        lastConfig.accuracy === locationConfig.accuracy
-      ) {
+        lastConfig.accuracy === locationConfig.accuracy;
+      const watchAlreadyMatches = wantForegroundWatch
+        ? Boolean(locationIntervalRef.current)
+        : !locationIntervalRef.current;
+
+      if (configUnchanged && watchAlreadyMatches) {
         return;
       }
-      
-      // 清除旧的追踪
-      if (locationIntervalRef.current) {
-        if ((locationIntervalRef.current as any).remove) {
-          (locationIntervalRef.current as any).remove();
-        } else {
-          clearInterval(locationIntervalRef.current);
-        }
-      }
-      
+
+      // 先停前台 watch，再按需重建（避免离屏双开 GPS）
+      stopForegroundWatch();
+
       setIsLocationTracking(true);
 
       // 🚀 核心优化 1：启动后台持续定位任务 (通过苹果审核的关键)
       const LOCATION_TRACKING_TASK = 'LOCATION_TRACKING_TASK';
       const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-      
+
       if (!isExpoGo) {
         try {
           const isStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TRACKING_TASK);
@@ -939,7 +940,9 @@ export default function MapScreen({ navigation }: any) {
           }
           // 与登录页 locationService 使用同一任务名；此处按配送状态覆盖为省电参数
           const pauseWhenStatic =
-            locationConfig.mode === 'idle' || locationConfig.mode === 'background';
+            locationConfig.mode === 'idle' ||
+            locationConfig.mode === 'background' ||
+            locationConfig.mode === 'background_active';
           await Location.startLocationUpdatesAsync(LOCATION_TRACKING_TASK, {
             accuracy: locationConfig.accuracy,
             timeInterval: Math.min(locationConfig.timeInterval, 600000),
@@ -961,13 +964,19 @@ export default function MapScreen({ navigation }: any) {
           console.log('✅ [后台任务] 已同步启动/刷新 (模式:', locationConfig.mode, ')');
         } catch (err) {
           console.error('❌ [后台任务] 启动失败:', err);
-          // 仅在非开发模式下且不是由于权限问题导致时抛出严重错误
         }
       } else {
         console.log('💡 [开发提示] Expo Go 环境，跳过官方后台任务启动以避免崩溃');
       }
 
-      // 🚀 核心优化 2：使用 watchPositionAsync 保持前台精准追踪
+      lastLocationConfigRef.current = locationConfig;
+
+      // 离屏/后台：只保留后台任务，不挂前台 watch（省电 + 减少 setState）
+      if (!wantForegroundWatch) {
+        return;
+      }
+
+      // 🚀 核心优化 2：仅地图 Tab 在前台时用 watchPositionAsync 做 UI / 围栏
       const subscription = await Location.watchPositionAsync(
         {
           accuracy: locationConfig.accuracy,
@@ -981,7 +990,6 @@ export default function MapScreen({ navigation }: any) {
           const heading = currentLocation.coords.heading;
           const speed = currentLocation.coords.speed || 0;
 
-          // 🚀 坐标平滑处理 (Simple Low-pass Filter)
           if (!lastSmoothCoords.current) {
             lastSmoothCoords.current = { lat: latitude, lng: longitude };
           } else {
@@ -989,32 +997,44 @@ export default function MapScreen({ navigation }: any) {
             longitude = lastSmoothCoords.current.lng + SMOOTHING_FACTOR * (longitude - lastSmoothCoords.current.lng);
             lastSmoothCoords.current = { lat: latitude, lng: longitude };
           }
-          
-          setSmoothCoords({ lat: latitude, lng: longitude });
-          setLocation({ latitude, longitude });
 
-          // 🚀 核心：地理围栏自动检测 (到达商家或目的地)
-          if (optimizedPackagesWithCoords.length > 0) {
-            optimizedPackagesWithCoords.forEach(pkg => {
+          // UI 状态节流：约 2.5s 一次，避免每点刷新列表/导航弹层
+          if (now - lastUiLocationUpdateRef.current > 2500) {
+            lastUiLocationUpdateRef.current = now;
+            setSmoothCoords({ lat: latitude, lng: longitude });
+            setLocation({ latitude, longitude });
+          }
+
+          const pkgs = optimizedPackagesRef.current;
+          if (pkgs.length > 0) {
+            pkgs.forEach((pkg) => {
               if (isMerchantGeofenceStatus(normalizePackageStatusZh(pkg.status))) {
-                const dist = calculateDistanceKm(latitude, longitude, pkg.coords?.lat || 0, pkg.coords?.lng || 0);
-                if (dist <= 0.1) { // 100米内
+                const dist = calculateDistanceKm(
+                  latitude,
+                  longitude,
+                  pkg.coords?.lat || 0,
+                  pkg.coords?.lng || 0,
+                );
+                if (dist <= 0.1) {
                   Vibration.vibrate(400);
-                  // 可以在这里弹出提示或更新 UI
                 }
               }
             });
           }
 
-          // 🚀 动态上报逻辑：移动速度快时位移超过10米即上报，静止时保持心跳
           let shouldUpdate = false;
           if (!lastUpdateLocation.current) shouldUpdate = true;
           else {
-            const distance = calculateDistanceKm(lastUpdateLocation.current.lat, lastUpdateLocation.current.lng, latitude, longitude);
+            const distance = calculateDistanceKm(
+              lastUpdateLocation.current.lat,
+              lastUpdateLocation.current.lng,
+              latitude,
+              longitude,
+            );
             const isMoving = speed > 0.5;
-            if ((isMoving && distance * 1000 > 15) || (now - lastUpdateLocation.current.time) > 2 * 60 * 1000) {
+            if ((isMoving && distance * 1000 > 15) || now - lastUpdateLocation.current.time > 2 * 60 * 1000) {
               shouldUpdate = true;
-          }
+            }
           }
 
           if (shouldUpdate) {
@@ -1027,16 +1047,24 @@ export default function MapScreen({ navigation }: any) {
             void checkRouteArrivalAtLocation(latitude, longitude);
             lastUpdateLocation.current = { lat: latitude, lng: longitude, time: now };
           }
-        }
+        },
       );
 
       locationIntervalRef.current = subscription as any;
-      lastLocationConfigRef.current = locationConfig;
-    } catch (e) { 
-      setIsLocationTracking(false); 
+    } catch (e) {
+      setIsLocationTracking(false);
       console.error('追踪启动异常:', e);
     }
-  }, [buildLocationConfig, hasInTransitOrders, isBackground, isLocationTracking, stopLocationTracking, language]);
+  }, [
+    buildLocationConfig,
+    hasInTransitOrders,
+    isBackground,
+    isFocused,
+    isLocationTracking,
+    stopForegroundWatch,
+    stopLocationTracking,
+    language,
+  ]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(
@@ -1069,10 +1097,7 @@ export default function MapScreen({ navigation }: any) {
           }
         }
       } else {
-        Alert.alert(
-          language === 'zh' ? '需要位置权限' : 'Location Required',
-          language === 'zh' ? '请在设置中开启位置权限，以便我们为您提供导航和配送追踪。' : 'Please enable location permissions in settings for navigation and tracking.'
-        );
+        feedbackService.notify(language === 'zh' ? '需要位置权限' : 'Location Required', language === 'zh' ? '请在设置中开启位置权限，以便我们为您提供导航和配送追踪。' : 'Please enable location permissions in settings for navigation and tracking.');
       }
     } catch (e) {
       console.error('请求权限异常:', e);
@@ -1120,7 +1145,7 @@ export default function MapScreen({ navigation }: any) {
       const health = await deviceHealthService.performFullCheck();
       
       if (health.location.isMocked) {
-        Alert.alert('检测到异常', '系统检测到模拟定位，无法确认送达。');
+        feedbackService.notify('检测到异常', '系统检测到模拟定位，无法确认送达。');
         return;
       }
 
@@ -1135,7 +1160,7 @@ export default function MapScreen({ navigation }: any) {
         );
 
         if (dist * 1000 > 200) {
-          Alert.alert('距离过远', `您当前距离目标点约 ${Math.round(dist * 1000)} 米，请到达目的地 200 米范围内再确认。`);
+          feedbackService.notify('距离过远', `您当前距离目标点约 ${Math.round(dist * 1000)} 米，请到达目的地 200 米范围内再确认。`);
           return;
         }
       }
@@ -1190,7 +1215,7 @@ export default function MapScreen({ navigation }: any) {
   const handleReportAnomaly = useCallback(async () => {
     if (!currentPackageForDelivery) return;
     if (!anomalyType || !anomalyDescription) {
-      Alert.alert('提示', '请选择异常类型并填写详细说明');
+      feedbackService.notify('提示', '请选择异常类型并填写详细说明');
       return;
     }
 
@@ -1226,7 +1251,7 @@ export default function MapScreen({ navigation }: any) {
         throw new Error('Submit failed');
       }
     } catch (error) {
-      Alert.alert('失败', '提交报备失败，请重试');
+      feedbackService.notify('失败', '提交报备失败，请重试');
     } finally {
       setReporting(false);
     }
@@ -1239,14 +1264,11 @@ export default function MapScreen({ navigation }: any) {
       options?: { manualPlanning?: boolean; availableStops?: NavStop[] },
     ) => {
       if (!location) {
-        Alert.alert(
-          language === 'zh' ? '需要定位' : language === 'en' ? 'Location required' : 'တည်နေရာလိုအပ်ပါ',
-          language === 'zh'
+        feedbackService.notify(language === 'zh' ? '需要定位' : language === 'en' ? 'Location required' : 'တည်နေရာလိုအပ်ပါ', language === 'zh'
             ? '请先开启位置权限后再导航。'
             : language === 'en'
               ? 'Enable location to navigate.'
-              : 'လမ်းညွှန်ရန် တည်နေရာခွင့်ပြုချက် လိုအပ်ပါသည်။',
-        );
+              : 'လမ်းညွှန်ရန် တည်နေရာခွင့်ပြုချက် လိုအပ်ပါသည်။');
         return;
       }
       const manual = options?.manualPlanning ?? false;
@@ -1652,7 +1674,14 @@ export default function MapScreen({ navigation }: any) {
                 <View style={styles.dualButtons}>
                   <TouchableOpacity 
                     style={[styles.placeholderButton, { backgroundColor: '#3b82f6' }]} 
-                    onPress={(e) => { e?.stopPropagation?.(); navigation.navigate('Scan'); }}
+                    onPress={(e) => {
+                      e?.stopPropagation?.();
+                      navigation.navigate('PackageDetail', {
+                        packageId: item.id,
+                        package: item,
+                        openScan: true,
+                      });
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel={t.a11yMapScanPickup}
                   >
@@ -1728,21 +1757,21 @@ export default function MapScreen({ navigation }: any) {
 
   useEffect(() => {
     startLocationTracking();
-  }, [hasInTransitOrders, isBackground, startLocationTracking]);
+  }, [hasInTransitOrders, isBackground, isFocused, startLocationTracking]);
 
   useEffect(() => {
-    if (autoRefreshEnabled) {
+    if (autoRefreshEnabled && isFocused && !isBackground) {
       startAutoRefresh();
     } else {
       stopAutoRefresh();
     }
-  }, [autoRefreshEnabled, hasInTransitOrders, startAutoRefresh, stopAutoRefresh]);
+  }, [autoRefreshEnabled, hasInTransitOrders, isFocused, isBackground, startAutoRefresh, stopAutoRefresh]);
 
   useEffect(() => {
-    if (!hasInTransitOrders) {
+    if (!hasInTransitOrders || !isFocused) {
       stopAutoRefresh();
     }
-  }, [hasInTransitOrders, stopAutoRefresh]);
+  }, [hasInTransitOrders, isFocused, stopAutoRefresh]);
 
   const filteredPackages = useMemo(() => {
     let filtered = packages.filter(pkg => !completedPackageIds[pkg.id]);
@@ -1913,7 +1942,7 @@ export default function MapScreen({ navigation }: any) {
         stops={navStops}
         availableStops={navAvailableStops}
         manualPlanning={navManualPlanning}
-        mapFocused={isFocused}
+        mapFocused={isFocused && showMapPreview}
         t={t}
       />
 
@@ -1958,7 +1987,15 @@ export default function MapScreen({ navigation }: any) {
                 <>
                   <TouchableOpacity
                     style={styles.gridActionBtn}
-                    onPress={() => { setShowCameraModal(false); navigation.navigate('Scan'); }}
+                    onPress={() => {
+                      setShowCameraModal(false);
+                      if (!currentPackageForDelivery) return;
+                      navigation.navigate('PackageDetail', {
+                        packageId: currentPackageForDelivery.id,
+                        package: currentPackageForDelivery,
+                        openScan: true,
+                      });
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel={t.a11yMapScanPickup}
                   >
@@ -2005,7 +2042,15 @@ export default function MapScreen({ navigation }: any) {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.gridActionBtn}
-                    onPress={() => { setShowCameraModal(false); navigation.navigate('Scan'); }}
+                    onPress={() => {
+                      setShowCameraModal(false);
+                      if (!currentPackageForDelivery) return;
+                      navigation.navigate('PackageDetail', {
+                        packageId: currentPackageForDelivery.id,
+                        package: currentPackageForDelivery,
+                        openScan: true,
+                      });
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel={t.a11yMapScanPickup}
                   >
@@ -2179,555 +2224,3 @@ export default function MapScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: {
-    backgroundColor: '#1e293b', 
-    paddingTop: Platform.OS === 'ios' ? 60 : 40, 
-    paddingBottom: 15, 
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
-  newOrderBannerWrap: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    overflow: 'hidden',
-    elevation: 6,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-  },
-  newOrderBannerInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  newOrderBannerTextCol: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  newOrderBannerTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  newOrderBannerId: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 2,
-    letterSpacing: 0.5,
-  },
-  newOrderBannerBtn: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    marginRight: 8,
-  },
-  newOrderBannerBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  statusBanner: { backgroundColor: '#fef3c7', padding: 12, margin: 16, borderRadius: 12, flexDirection: 'row', alignItems: 'center', borderLeftWidth: 4, borderLeftColor: '#f59e0b' },
-  statusBannerOffline: { backgroundColor: '#fee2e2', borderLeftColor: '#ef4444' },
-  statusBannerText: { fontSize: 13, color: '#92400e', flex: 1, fontWeight: '500' },
-  retryButton: { backgroundColor: '#3b82f6', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8, marginLeft: 10 },
-  retryButtonText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  lastUpdateContainer: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  lastUpdateText: { fontSize: 12, color: '#64748b', fontWeight: '500' },
-  listContainer: { flex: 1, paddingTop: 10 },
-  searchFilterContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
-  searchContainer: { 
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff', 
-    borderRadius: 12, 
-    paddingHorizontal: 12, 
-    height: 46,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  searchIcon: { fontSize: 16, marginRight: 8, opacity: 0.6 },
-  searchInput: { flex: 1, fontSize: 14, color: '#1e293b', fontWeight: '500' },
-  filterButton: { 
-    backgroundColor: '#fff', 
-    paddingHorizontal: 15, 
-    height: 46, 
-    justifyContent: 'center', 
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  filterButtonText: { color: '#3b82f6', fontSize: 13, fontWeight: '700' },
-  
-  // 包裹卡片
-  packageCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16, 
-    marginBottom: 12, 
-    borderRadius: 16, 
-    padding: 16, 
-    shadowColor: '#000',
-    shadowOpacity: 0.08, 
-    shadowRadius: 12, 
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#f1f5f9'
-  },
-  currentDeliveringCard: { 
-    borderColor: '#10b981',
-    borderWidth: 2,
-    backgroundColor: '#f0fdf4'
-  },
-  packageInfo: { gap: 12 },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9'
-  },
-  idGroup: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  speedBadgeColumn: {
-    flexShrink: 1,
-    maxWidth: '56%',
-  },
-  scheduledTimeUnderBadge: {
-    marginTop: 5,
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#b45309',
-    lineHeight: 15,
-  },
-  packageId: { fontSize: 15, fontWeight: '800', color: '#1e293b' },
-  speedBadge: { 
-    flexDirection: 'row', 
-    backgroundColor: '#f1f5f9', 
-    paddingHorizontal: 8,
-    paddingVertical: 3, 
-    borderRadius: 8, 
-    alignItems: 'center', 
-    gap: 4 
-  },
-  speedIcon: { fontSize: 12 },
-  speedText: { fontSize: 11, fontWeight: '700', color: '#475569' },
-  deliveringBadge: { 
-    flexDirection: 'row',
-    backgroundColor: '#d1fae5', 
-    paddingHorizontal: 10, 
-    paddingVertical: 4, 
-    borderRadius: 20, 
-    alignItems: 'center',
-    gap: 4
-  },
-  deliveringText: { fontSize: 11, fontWeight: '800', color: '#059669' },
-  
-  cardBody: {
-    gap: 4
-  },
-  pickupSection: { flexDirection: 'row', gap: 12 },
-  deliverySection: { flexDirection: 'row', gap: 12 },
-  pointIndicator: {
-    alignItems: 'center',
-    width: 12,
-    paddingTop: 6
-  },
-  pointDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  pointLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 4,
-    minHeight: 20
-  },
-  pointContent: {
-    flex: 1,
-    paddingBottom: 10
-  },
-  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#94a3b8', marginBottom: 2, textTransform: 'uppercase' },
-  senderName: { fontSize: 14, fontWeight: '700', color: '#1e293b', marginBottom: 2 },
-  receiverName: { fontSize: 14, fontWeight: '700', color: '#1e293b', marginBottom: 2 },
-  address: { fontSize: 12, color: '#64748b', lineHeight: 18 },
-  
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12, 
-    marginTop: 4,
-    alignItems: 'center'
-  },
-  numberBadge: { 
-    width: 28, 
-    height: 28, 
-    borderRadius: 14, 
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  numberText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  buttonGroup: {
-    flex: 1,
-  },
-  dualButtons: {
-    flexDirection: 'row',
-    gap: 10
-  },
-  startDeliveryButton: {
-    backgroundColor: '#10b981',
-    height: 44,
-    borderRadius: 12, 
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#10b981',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3
-  },
-  startDeliveryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  finishDeliveryButton: {
-    backgroundColor: '#ef4444',
-    height: 44,
-    borderRadius: 12, 
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#ef4444',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3
-  },
-  finishDeliveryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  placeholderButton: { 
-    flex: 1,
-    height: 44,
-    borderRadius: 12, 
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  placeholderText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  completedButton: { 
-    height: 44,
-    borderRadius: 12, 
-    backgroundColor: '#f1f5f9', 
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  completedText: { color: '#94a3b8', fontWeight: '800', fontSize: 14 },
-
-  // 地图Modal
-  mapModalContainer: { flex: 1, backgroundColor: '#fff' },
-  mapModalHeader: {
-    flexDirection: 'row',
-    paddingHorizontal: 20, 
-    paddingTop: Platform.OS === 'ios' ? 60 : 40, 
-    paddingBottom: 20,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#1e293b'
-  },
-  mapModalTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)', 
-    alignItems: 'center',
-    justifyContent: 'center' 
-  },
-  mapPausedContainer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  mapPausedText: {
-    color: '#e2e8f0',
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  courierMarker: {
-    backgroundColor: '#10b981', 
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5
-  },
-  courierMarkerText: { fontSize: 20 },
-  pickupMarker: { 
-    backgroundColor: '#f59e0b', 
-    width: 34, 
-    height: 34, 
-    borderRadius: 17, 
-    alignItems: 'center',
-    justifyContent: 'center', 
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4
-  },
-  packageMarker: { 
-    backgroundColor: '#3b82f6', 
-    width: 34, 
-    height: 34, 
-    borderRadius: 17, 
-    alignItems: 'center',
-    justifyContent: 'center', 
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4
-  },
-  pickupMarkerText: { color: '#fff', fontWeight: '900', fontSize: 13 },
-  routePreviewMarkerAnchor: {
-    alignItems: 'center',
-  },
-  routePreviewPickupPill: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#fff',
-    maxWidth: width * 0.42,
-    marginBottom: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  routePreviewDeliveryPill: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#fff',
-    maxWidth: width * 0.42,
-    marginBottom: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  routePreviewPillText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 11,
-  },
-  routePreviewPickupDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#f59e0b',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  routePreviewDeliveryDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#2563eb',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  routeListContainer: { 
-    position: 'absolute', 
-    bottom: 0, 
-    left: 0, 
-    right: 0, 
-    height: 320, 
-    backgroundColor: 'rgba(255,255,255,0.98)', 
-    borderTopLeftRadius: 30, 
-    borderTopRightRadius: 30, 
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10
-  },
-  routeListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  routeListTitle: { fontSize: 17, fontWeight: '800', color: '#1e293b' },
-  startNavigationButtonCompact: { borderRadius: 14, overflow: 'hidden' },
-  navBtnGradientSmall: { paddingHorizontal: 20, paddingVertical: 10 },
-  navBtnTextSmall: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  routeListScroll: { flex: 1 },
-  routeListItem: { 
-    backgroundColor: '#f8fafc', 
-    borderRadius: 16,
-    borderWidth: 1, 
-    borderColor: '#f1f5f9',
-    padding: 12,
-    marginBottom: 10
-  },
-  routeNumberBadgeCompact: { 
-    width: 26, 
-    height: 26, 
-    borderRadius: 13, 
-    backgroundColor: '#1e293b', 
-    alignItems: 'center',
-    justifyContent: 'center' 
-  },
-  routeNumberBadgeTextCompact: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  statusDot: { width: 10, height: 10, borderRadius: 5 },
-  
-  cameraModalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
-  cameraModalContent: { backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 15, elevation: 10 },
-  cameraModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  cameraModalTitle: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
-  cameraModalBody: { alignItems: 'center' },
-  cameraButton: { backgroundColor: '#10b981', width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', shadowColor: '#10b981', shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
-  cameraButtonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  glassModal: { width: '100%', backgroundColor: 'rgba(30, 41, 59, 0.98)', borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
-  modalHeader: { padding: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  modalBody: { padding: 24 },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
-  disabledBtn: { opacity: 0.5 },
-  gridActionBtn: { flex: 1, height: 100, borderRadius: 20, overflow: 'hidden' },
-  gridBtnGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  gridBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', marginTop: 10 },
-  
-  photoModalContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
-  photoModalContent: { flex: 1, backgroundColor: '#fff', marginTop: 60, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24 },
-  photoModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  photoModalTitle: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
-  photoModalBody: { flex: 1 },
-  photoPreviewWrapper: { width: '100%', flex: 1, borderRadius: 20, marginBottom: 24, backgroundColor: '#f1f5f9', overflow: 'hidden' },
-  uploadButton: { borderRadius: 16, overflow: 'hidden', marginBottom: 20 },
-  uploadButtonGradient: { padding: 18, alignItems: 'center', justifyContent: 'center' },
-  uploadButtonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  
-  pointNavAction: { 
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6, 
-    backgroundColor: '#eff6ff', 
-    paddingHorizontal: 10, 
-    paddingVertical: 6, 
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginTop: 4
-  },
-  pointNavActionText: { color: '#3b82f6', fontSize: 12, fontWeight: '800' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyEmoji: { fontSize: 70, marginBottom: 24 },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#475569', marginBottom: 12 },
-  refreshButton: { backgroundColor: '#3b82f6', paddingHorizontal: 30, paddingVertical: 14, borderRadius: 16, shadowColor: '#3b82f6', shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
-  refreshButtonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  identityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  identityText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  scheduledDeliveryModalStrip: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#fffbeb',
-    borderBottomWidth: 1,
-    borderBottomColor: '#fde68a',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  scheduledDeliveryModalStripLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#92400e',
-    marginBottom: 2,
-  },
-  scheduledDeliveryModalStripValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#78350f',
-  },
-  merchantCodBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    borderWidth: 1.5,
-    borderColor: '#fecaca',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginTop: 8,
-  },
-  merchantCodBannerTitle: {
-    color: '#991b1b',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  merchantCodBannerAmount: {
-    color: '#b91c1c',
-    fontSize: 17,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  merchantCodInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  merchantCodInlineTextMuted: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-});

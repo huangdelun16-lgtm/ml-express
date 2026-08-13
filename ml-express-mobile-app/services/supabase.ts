@@ -1,9 +1,28 @@
-import { createClient } from '@supabase/supabase-js';
-import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { cacheService } from './cacheService';
 import { detectViolationsAsync } from './detectViolations';
+import { supabase } from './staffApi/supabaseClient';
+import type {
+  Package,
+  AuditLog,
+  Courier,
+  RouteOptimization,
+  DeliveryStore,
+  Notification,
+} from './staffApi/types';
+
+export { supabase, netlifyUrl } from './staffApi/supabaseClient';
+export type {
+  Package,
+  AdminAccount,
+  AuditLog,
+  Courier,
+  RouteOptimization,
+  DeliveryStore,
+  Notification,
+} from './staffApi/types';
+export { adminAccountService } from './staffApi/adminAccountService';
 
 // 缓存键名
 const CACHE_KEYS = {
@@ -25,371 +44,6 @@ const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 };
 
-// 使用环境变量配置 Supabase
-// 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
-// 注意：确保 URL 和 ANON_KEY 匹配同一个 Supabase 项目
-const supabaseUrl =
-  (Constants.expoConfig?.extra?.supabaseUrl as string | undefined) ||
-  process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  '';
-const supabaseKey =
-  (Constants.expoConfig?.extra?.supabaseAnonKey as string | undefined) ||
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  '';
-// Netlify URL 用于调用 admin-password function
-// 优先使用自定义域名，回退到默认 Netlify 域名
-const netlifyUrl =
-  (Constants.expoConfig?.extra?.netlifyUrl as string | undefined) ||
-  process.env.EXPO_PUBLIC_NETLIFY_URL ||
-  'https://admin-market-link-express.netlify.app';
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Supabase 配置缺失:');
-  console.error('   EXPO_PUBLIC_SUPABASE_URL:', supabaseUrl ? '已配置' : '未配置');
-  console.error('   EXPO_PUBLIC_SUPABASE_ANON_KEY:', supabaseKey ? '已配置' : '未配置');
-  console.error('   请检查 .env 文件或 EAS Secrets 配置');
-}
-
-// 调试信息：打印配置（不打印完整的 key）
-console.log('✅ Supabase 配置已加载:');
-console.log('   URL:', supabaseUrl);
-console.log('   Key:', supabaseKey ? `${supabaseKey.substring(0, 20)}...` : '未配置');
-
-// 创建 Supabase 客户端
-export const supabase = createClient(
-  supabaseUrl || 'https://invalid.supabase.co',
-  supabaseKey || 'invalid-anon-key', 
-  {
-  auth: {
-    persistSession: false, // 移动 app 不使用持久化 session
-    autoRefreshToken: false,
-    detectSessionInUrl: false
-  },
-  db: {
-    schema: 'public'
-  }
-});
-
-// 包裹数据类型
-export interface Package {
-  id: string;
-  sender_name: string;
-  sender_phone: string;
-  sender_address: string;
-  receiver_name: string;
-  receiver_phone: string;
-  receiver_address: string;
-  package_type: string;
-  weight: string;
-  description?: string;
-  status: string;
-  create_time: string;
-  pickup_time: string;
-  delivery_time: string;
-  courier: string;
-  price: string;
-  created_at?: string;
-  updated_at?: string;
-  // 新增店铺相关字段
-  delivery_store_id?: string;
-  delivery_store_name?: string;
-  store_receive_code?: string;
-  sender_code?: string; // 寄件码（客户提交订单后自动生成的二维码）
-  transfer_code?: string; // 中转码（包裹在中转站的唯一标识码）
-  // 新增坐标字段
-  receiver_latitude?: number; // 收件人纬度
-  receiver_longitude?: number; // 收件人经度
-  sender_latitude?: number; // 发件人纬度
-  sender_longitude?: number; // 发件人经度
-  // 新增配送相关字段
-  delivery_speed?: string; // 配送速度
-  scheduled_delivery_time?: string; // 定时配送时间
-  // 新增支付方式字段
-  payment_method?: 'qr' | 'cash'; // 支付方式：qr=二维码支付，cash=现金支付
-  cod_amount?: number; // 代收款金额 (COD)
-  rider_settled?: boolean; // 骑手是否已结清
-  rider_settled_at?: string; // 骑手结清时间
-  pricing_base_fee_mmk?: number | null;
-  // 费用明细字段
-  store_fee?: string | number; // 待付款（店铺填写）
-  delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
-  delivery_distance?: number; // 配送距离 (KM)
-}
-
-export interface AdminAccount {
-  id?: string;
-  username: string;
-  password?: string;
-  employee_name: string;
-  employee_id: string;
-  phone: string;
-  email: string;
-  department: string;
-  position: string;
-  role: 'admin' | 'manager' | 'operator' | 'finance';
-  status: 'active' | 'inactive' | 'suspended';
-  last_login?: string;
-  /** 员工所属领区，用于骑手端拉取对应计费规则 */
-  region?: string;
-}
-
-export interface AuditLog {
-  user_id: string;
-  user_name: string;
-  action_type: 'create' | 'update' | 'delete' | 'login' | 'logout';
-  module: 'packages' | 'users' | 'couriers' | 'finance' | 'settings' | 'system';
-  target_id?: string;
-  target_name?: string;
-  action_description: string;
-  old_value?: string;
-  new_value?: string;
-}
-
-// 快递员数据类型
-export interface Courier {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  address?: string;
-  vehicle_type: string;
-  license_number?: string;
-  status: 'active' | 'inactive' | 'busy';
-  join_date?: string;
-  last_active?: string;
-  total_deliveries?: number;
-  rating?: number;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-  current_location?: {
-    latitude: number;
-    longitude: number;
-  };
-}
-
-// 路线优化结果
-export interface RouteOptimization {
-  courier_id: string;
-  courier_name: string;
-  packages: Package[];
-  total_distance: number;
-  estimated_time: number;
-  priority_score: number;
-}
-
-// 快递店数据类型
-export interface DeliveryStore {
-  id: string;
-  store_name: string;
-  manager_name: string;
-  manager_phone: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  status: 'active' | 'inactive' | 'maintenance';
-  created_at: string;
-  updated_at: string;
-  vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
-  cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
-}
-
-// 管理员账号服务
-export const adminAccountService = {
-  async login(username: string, password: string): Promise<AdminAccount | null> {
-    try {
-      // 方法1: 尝试使用 Netlify Function 验证密码（推荐，支持加密密码）
-      let lastLoginError = null;
-
-      // 准备尝试的 URL 列表
-      const urlsToTry = [
-        'https://admin-market-link-express.netlify.app', // 🚀 调整：优先使用 Netlify 默认域名，通常更稳定
-        'https://admin-market-link-express.com',         // 顶级自定义域名
-        netlifyUrl                                       // 配置的域名
-      ].filter((v, i, a) => v && a.indexOf(v) === i); // 去重且过滤空值
-
-      console.log('开始登录流程，尝试节点数量:', urlsToTry.length);
-
-      for (const baseUrl of urlsToTry) {
-        // 每个节点尝试最多 2 次
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // 移除末尾斜杠
-            console.log(`🌐 正在尝试节点 (第 ${attempt} 次): ${cleanBaseUrl}...`);
-            
-            const controller = new AbortController();
-            // 🚀 大幅增加超时时间：第一次 15秒，第二次 30秒，适配缅甸极慢网络
-            const timeoutValue = attempt === 1 ? 15000 : 30000; 
-            const timeoutId = setTimeout(() => controller.abort(), timeoutValue);
-          
-            const response = await fetch(`${cleanBaseUrl}/.netlify/functions/admin-password`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache',
-                'User-Agent': 'ML-Express-Rider-App'
-              },
-              body: JSON.stringify({ action: 'login', username, password }),
-              signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            // 🚀 核心修复：即使状态码不是 2xx (如 401)，也要尝试解析 JSON 获取具体错误原因
-            const result = await response.json().catch(() => null);
-
-            if (response.ok && result?.success && result?.account) {
-              console.log(`✅ 节点 ${cleanBaseUrl} 验证成功`);
-              const accountFromNetlify = result.account;
-              
-              // 异步更新数据库中的最后登录时间（非阻塞）
-              try {
-                supabase
-                  .from('admin_accounts')
-                  .update({ last_login: new Date().toISOString() })
-                  .eq('id', accountFromNetlify.id)
-                  .then(({error}) => {
-                    if (error) console.warn('最后登录时间更新失败:', error.message);
-                  });
-              } catch (e) {}
-
-              // 获取数据库中的最新完整信息（尝试一次，失败则使用缓存或 function 返回值）
-              try {
-                const { data, error } = await supabase
-                  .from('admin_accounts')
-                  .select('*')
-                  .eq('username', username)
-                  .single();
-
-                if (!error && data) return data;
-              } catch (dbError) {
-                console.warn('获取数据库详细信息失败，使用基础信息');
-              }
-              
-              return {
-                ...accountFromNetlify,
-                password: '',
-                id: accountFromNetlify.id || '',
-                status: accountFromNetlify.status || 'active'
-              } as AdminAccount;
-            } else if (response.status === 401 || (result && !result.success)) {
-              // 处理业务逻辑错误 (如密码错误、账号停用等)
-              lastLoginError = result?.error || '用户名或密码错误';
-              console.warn(`❌ 验证失败 (${cleanBaseUrl}):`, lastLoginError);
-              
-              // 如果是明确的凭据错误，不要继续尝试其他节点，直接抛出异常
-              if (lastLoginError.includes('密码') || lastLoginError.includes('用户名') || lastLoginError.includes('停用') || lastLoginError.includes('不存在') || lastLoginError.includes('过期')) {
-                throw new Error(lastLoginError);
-              }
-            } else {
-              console.warn(`⚠️ 节点 ${cleanBaseUrl} 返回异常状态: ${response.status}`);
-              if (response.status === 404) break; // 路径不对，跳过此节点
-            }
-          } catch (err: any) {
-            if (err.name === 'AbortError') {
-              console.warn(`⏰ 节点 ${baseUrl} 请求超时 (尝试 ${attempt})`);
-            } else if (err.message && (err.message.includes('密码') || err.message.includes('用户名') || err.message.includes('不存在') || err.message.includes('停用'))) {
-              throw err; // 业务逻辑错误直接抛出
-            } else {
-              console.warn(`❌ 访问节点异常 (尝试 ${attempt}):`, err.message);
-            }
-            
-            // 如果是最后一次尝试且失败，则继续下一个 URL
-            if (attempt === 2) continue;
-            // 否则稍等一会（1.5秒）后重试
-            await new Promise(r => setTimeout(r, 1500));
-          }
-        }
-      }
-
-      // 如果所有云函数节点都失败，尝试直接数据库验证（仅支持旧的非加密账户）
-      console.log('🔄 所有云节点失败，尝试最后兜底验证...');
-      const { data: accountData, error: fetchError } = await supabase
-        .from('admin_accounts')
-        .select('*')
-        .eq('username', username)
-        .eq('status', 'active')
-        .single();
-
-      if (fetchError || !accountData) {
-        if (fetchError?.message?.includes('Network')) {
-          throw new Error('网络极度不稳定，请检查您的移动网络或 Wi-Fi 连接');
-        }
-        throw new Error(lastLoginError || '账号不存在或已停用');
-      }
-
-      // 检查密码是否加密
-      const isPasswordHashed = accountData.password && accountData.password.startsWith('$2');
-
-      if (isPasswordHashed) {
-        console.error('🚫 无法验证加密密码：云服务超时且网络不稳定');
-        throw new Error('服务器响应超时，请检查网络后重新尝试。');
-      }
-
-      // 密码是明文，直接比较（向后兼容）
-      if (accountData.password !== password) {
-        throw new Error('用户名或密码错误');
-      }
-
-      return accountData;
-    } catch (err: any) {
-      console.error('登录流程最终异常:', err);
-      throw err;
-    }
-  },
-
-  async updatePassword(username: string, currentPassword: string, newPassword: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'updatePassword',
-          username: username,
-          currentPassword: currentPassword,
-          newPassword: newPassword
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        return result.success;
-      }
-      return false;
-    } catch (error) {
-      console.error('更新密码失败:', error);
-      return false;
-    }
-  },
-
-  async updateUsername(currentUsername: string, newUsername: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${netlifyUrl}/.netlify/functions/admin-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'updateUsername',
-          currentUsername: currentUsername,
-          newUsername: newUsername
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        return result.success;
-      }
-      return false;
-    } catch (error) {
-      console.error('更新用户名失败:', error);
-      return false;
-    }
-  }
-};
 
 // 计费合并算法 + 领区解析已抽到 /shared/src/pricing.ts，此处导入并对外再导出
 import {
@@ -814,6 +468,40 @@ export const packageService = {
   },
 
   /**
+   * 扫码主路径：按包裹号 / 寄件码 / 中转码精确查找（避免全表拉取）
+   */
+  async findPackageByScanCode(raw: string): Promise<Package | null> {
+    const code = String(raw || '').trim();
+    if (!code || code.startsWith('STORE_')) return null;
+
+    try {
+      const byId = await this.getPackageById(code);
+      if (byId) return byId;
+
+      const { data: bySender, error: senderErr } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('sender_code', code)
+        .maybeSingle();
+      if (!senderErr && bySender) return bySender;
+
+      if (code.startsWith('TC') || /^TC/i.test(code)) {
+        const { data: byTransfer, error: transferErr } = await supabase
+          .from('packages')
+          .select('*')
+          .eq('transfer_code', code)
+          .maybeSingle();
+        if (!transferErr && byTransfer) return byTransfer;
+      }
+
+      return null;
+    } catch (err) {
+      console.error('扫码查找包裹失败:', err);
+      return null;
+    }
+  },
+
+  /**
    * 🚀 新增：骑手异常上报
    */
   async reportAnomaly(reportData: {
@@ -1188,21 +876,6 @@ export const deliveryStoreService = {
     }
   },
 };
-
-// 通知接口
-export interface Notification {
-  id: string;
-  recipient_id: string;
-  recipient_type: 'courier' | 'customer' | 'admin';
-  notification_type: 'package_assigned' | 'status_update' | 'urgent' | 'system';
-  title: string;
-  message: string;
-  package_id?: string;
-  is_read: boolean;
-  created_at: string;
-  read_at?: string;
-  metadata?: any;
-}
 
 // 通知服务
 export const notificationService = {

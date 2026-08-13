@@ -14,6 +14,7 @@ import {
   Vibration,
 } from 'react-native';
 import { packageService, Package, routeService, courierService, Courier, RouteOptimization } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 import ScannerScreen from './ScannerScreen';
 import MapViewScreen from './MapViewScreen';
 import { useApp } from '../contexts/AppContext';
@@ -156,13 +157,13 @@ export default function PackageManagementScreen({ navigation }: any) {
         setPackages(updatedPackages);
         calculateStatistics(updatedPackages);
         
-        Alert.alert('成功', `包裹状态已更新为 "${newStatus}"`);
+        feedbackService.notify('成功', `包裹状态已更新为 "${newStatus}"`);
       } else {
-        Alert.alert('错误', '状态更新失败，请重试');
+        feedbackService.notify('错误', '状态更新失败，请重试');
       }
     } catch (error) {
       console.error('更新状态失败:', error);
-      Alert.alert('错误', '网络错误，请检查连接');
+      feedbackService.notify('错误', '网络错误，请检查连接');
     } finally {
       setUpdating(false);
       setShowStatusModal(false);
@@ -272,17 +273,17 @@ export default function PackageManagementScreen({ navigation }: any) {
         setPackages(updatedPackages);
         calculateStatistics(updatedPackages);
         
-        Alert.alert('成功', `成功更新 ${successCount} 个包裹状态为 "${newStatus}"`);
+        feedbackService.notify('成功', `成功更新 ${successCount} 个包裹状态为 "${newStatus}"`);
         setSelectedPackages(new Set());
       }
       
       if (successCount < selectedPackages.size) {
-        Alert.alert('部分成功', `${successCount}/${selectedPackages.size} 个包裹更新成功`);
+        feedbackService.notify('部分成功', `${successCount}/${selectedPackages.size} 个包裹更新成功`);
       }
       
     } catch (error) {
       console.error('批量更新失败:', error);
-      Alert.alert('错误', '批量更新失败，请重试');
+      feedbackService.notify('错误', '批量更新失败，请重试');
     } finally {
       setUpdating(false);
       setShowBatchModal(false);
@@ -292,7 +293,7 @@ export default function PackageManagementScreen({ navigation }: any) {
   // 智能分配相关函数
   const handleSmartAssignment = async () => {
     if (selectedPackages.size === 0) {
-      Alert.alert('提示', '请先选择要分配的包裹');
+      feedbackService.notify('提示', '请先选择要分配的包裹');
       return;
     }
 
@@ -307,7 +308,7 @@ export default function PackageManagementScreen({ navigation }: any) {
       );
 
       if (unassignedPackages.length === 0) {
-        Alert.alert('提示', '选中的包裹都已经分配了快递员');
+        feedbackService.notify('提示', '选中的包裹都已经分配了快递员');
         setAssignmentLoading(false);
         return;
       }
@@ -318,7 +319,7 @@ export default function PackageManagementScreen({ navigation }: any) {
       const optimizations = await routeService.assignOptimalCourier(unassignedPackages);
       
       if (optimizations.length === 0) {
-        Alert.alert('分配失败', '没有可用的快递员或智能分配失败');
+        feedbackService.notify('分配失败', '没有可用的快递员或智能分配失败');
         setAssignmentLoading(false);
         return;
       }
@@ -328,7 +329,7 @@ export default function PackageManagementScreen({ navigation }: any) {
       setShowAssignModal(true);
     } catch (error) {
       console.error('智能分配失败:', error);
-      Alert.alert('错误', '智能分配失败，请重试');
+      feedbackService.notify('错误', '智能分配失败，请重试');
     } finally {
       setAssignmentLoading(false);
     }
@@ -354,16 +355,16 @@ export default function PackageManagementScreen({ navigation }: any) {
         setPackages(updatedPackages);
         calculateStatistics(updatedPackages);
         
-        Alert.alert('成功', `已将 ${packageIds.length} 个包裹分配给 ${optimization.courier_name}`);
+        feedbackService.notify('成功', `已将 ${packageIds.length} 个包裹分配给 ${optimization.courier_name}`);
         setSelectedPackages(new Set());
         setShowAssignModal(false);
         setBatchMode(false);
       } else {
-        Alert.alert('失败', '包裹分配失败，请重试');
+        feedbackService.notify('失败', '包裹分配失败，请重试');
       }
     } catch (error) {
       console.error('确认分配失败:', error);
-      Alert.alert('错误', '分配确认失败，请重试');
+      feedbackService.notify('错误', '分配确认失败，请重试');
     } finally {
       setUpdating(false);
     }
@@ -499,14 +500,14 @@ export default function PackageManagementScreen({ navigation }: any) {
       // 请求相机权限
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('需要相机权限', '需要相机权限才能拍照');
+        feedbackService.notify('需要相机权限', '需要相机权限才能拍照');
         return;
       }
 
       // 获取当前位置
       const { status: locationStatus } = await requestForegroundPermissionsIfDisclosed(language);
       if (locationStatus !== 'granted') {
-        Alert.alert('需要位置权限', '需要位置权限才能记录送达位置');
+        feedbackService.notify('需要位置权限', '需要位置权限才能记录送达位置');
         return;
       }
 
@@ -543,7 +544,7 @@ export default function PackageManagementScreen({ navigation }: any) {
       }
     } catch (error) {
       console.error('上传照片失败:', error);
-      Alert.alert('上传失败', '请重试');
+      feedbackService.notify('上传失败', '请重试');
     } finally {
       setUploadingPhoto(false);
     }

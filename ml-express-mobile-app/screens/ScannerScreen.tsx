@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { packageService, Package } from '../services/supabase';
+import { feedbackService } from '../services/feedbackService';
 
 interface ScannerScreenProps {
   visible: boolean;
@@ -36,7 +37,7 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
       await searchPackage(result.data);
     } catch (error) {
       console.error('扫码处理失败:', error);
-      Alert.alert('错误', '扫码处理失败，请重试');
+      feedbackService.notify('错误', '扫码处理失败，请重试');
       setScanned(false);
     } finally {
       setLoading(false);
@@ -88,14 +89,14 @@ export default function ScannerScreen({ visible, onClose, onPackageFound }: Scan
       }
     } catch (error) {
       console.error('搜索包裹失败:', error);
-      Alert.alert('搜索失败', '网络错误，请检查连接后重试');
+      feedbackService.notify('搜索失败', '网络错误，请检查连接后重试');
       setScanned(false);
     }
   };
 
   const handleManualSearch = async () => {
     if (!manualInput.trim()) {
-      Alert.alert('提示', '请输入包裹ID');
+      feedbackService.notify('提示', '请输入包裹ID');
       return;
     }
 
