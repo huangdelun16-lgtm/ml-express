@@ -1,11 +1,10 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AdminLogin from './pages/AdminLogin';
 import DeliveryAlerts from './pages/DeliveryAlerts';
 import AdminDashboardHome from './pages/AdminDashboardHome';
 import CityPackages from './pages/CityPackages';
 import UserManagement from './pages/UserManagement';
-import FinanceManagement from './pages/FinanceManagement';
 import SystemSettings from './pages/SystemSettings';
 import AccountManagement from './pages/AccountManagement';
 import BannerManagement from './pages/BannerManagement';
@@ -28,6 +27,9 @@ import { AdminTodoProvider } from './contexts/AdminTodoContext';
 import AdminTodoBar, { AdminBottomSpacer } from './components/AdminTodoBar';
 import AdminGlobalSearch from './components/AdminGlobalSearch';
 import AdminShellLayout, { STANDALONE_IMPORT_ADMIN_PATHS } from './layouts/AdminShellLayout';
+import { GlobalToast } from './components/GlobalToast';
+
+const FinanceManagement = lazy(() => import('./pages/FinanceManagement'));
 
 const standaloneImportPaths = STANDALONE_IMPORT_ADMIN_PATHS as readonly string[];
 
@@ -47,6 +49,7 @@ const AdminFloatingChrome: React.FC = () => {
 function App() {
   return (
     <LanguageProvider>
+      <GlobalToast />
       <AbnormalAlertManager />
       <Router>
         <AdminTodoProvider>
@@ -85,7 +88,9 @@ function App() {
                   path="finance"
                   element={
                     <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="finance">
-                      <FinanceManagement />
+                      <Suspense fallback={<div style={{ color: 'white', padding: 40, textAlign: 'center' }}>加载中...</div>}>
+                        <FinanceManagement />
+                      </Suspense>
                     </ProtectedRoute>
                   }
                 />

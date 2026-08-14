@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { packageService, Package, supabase, auditLogService, deliveryPhotoService } from '../services/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -8,6 +8,14 @@ import { useResponsive } from '../hooks/useResponsive';
 import SecurityVerificationModal from '../components/SecurityVerificationModal';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 import '../styles/adminCityPackages.css';
+import { feedbackService } from '../services/FeedbackService';
+
+const toLocalYMD = (d: Date = new Date()): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 const CityPackages: React.FC = () => {
   const navigate = useNavigate();
@@ -32,12 +40,28 @@ const CityPackages: React.FC = () => {
   const currentRegionPrefix = getDetectedRegion();
   // 系统管理员角色不开启领区过滤，其他角色如果有领区前缀则强制开启
   const isRegionalUser = currentUserRole !== 'admin' && currentRegionPrefix !== '';
+  const todayYmd = toLocalYMD();
+  const yesterdayYmd = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return toLocalYMD(d);
+  })();
 
   const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [packages, setPackages] = useState<Package[]>([]);
+  const [filteredTotal, setFilteredTotal] = useState(0);
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    pickedUp: 0,
+    delivering: 0,
+    delivered: 0,
+    cancelled: 0,
+  });
+  const loadRequestIdRef = useRef(0);
   const [deliveryStores, setDeliveryStores] = useState<any[]>([]);
   const [couriers, setCouriers] = useState<any[]>([]); // 🚀 新增：存储骑手列表
   const [courierDetail, setCourierDetail] = useState<any>(null);
@@ -49,12 +73,14 @@ const CityPackages: React.FC = () => {
   
   // 新增功能状态
   const [showDatePicker, setShowDatePicker] = useState(false);
+  /** 本地日历日 YYYY-MM-DD；空表示不按日筛 */
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [packagePhotos, setPackagePhotos] = useState<any[]>([]);
   const [photoLoading, setPhotoLoading] = useState(false);
   
   const [listSearchQuery, setListSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   
   // 审计日志状态
   const [packageLogs, setPackageLogs] = useState<any[]>([]);
@@ -94,18 +120,10 @@ const CityPackages: React.FC = () => {
     }
   };
 
-  // 加载包裹数据
+  // 店铺/骑手一次加载；包裹列表按筛选服务端分页
   useEffect(() => {
-    loadPackages();
     loadDeliveryStores();
-    loadCouriers(); // 🚀 新增：加载骑手数据
-    
-    // 设置定时刷新，每30秒刷新一次包裹状态
-    const refreshInterval = setInterval(() => {
-      loadPackages();
-    }, 30000);
-    
-    return () => clearInterval(refreshInterval);
+    loadCouriers();
   }, []);
 
   const loadDeliveryStores = async () => {
@@ -133,40 +151,86 @@ const CityPackages: React.FC = () => {
     }
   };
 
-  const loadPackages = async () => {
+  const loadPackages = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    const requestId = ++loadRequestIdRef.current;
     try {
-      setLoading(true);
-      const data = await packageService.getAllPackages();
-      setPackages(data);
+      if (!silent) setLoading(true);
+      const regionPrefix = isRegionalUser ? currentRegionPrefix : undefined;
+      const [list, counts] = await Promise.all([
+        packageService.listCityPackagesPage({
+          page: currentPage,
+          pageSize: itemsPerPage,
+          status: selectedStatus,
+          search: debouncedSearch,
+          dateYmd: selectedDate,
+          regionPrefix,
+        }),
+        packageService.getCityPackageStatusCounts(regionPrefix),
+      ]);
+      if (requestId !== loadRequestIdRef.current) return;
+      setPackages(list.data);
+      setFilteredTotal(list.total);
+      setStats(counts);
+      const pages = Math.ceil(list.total / itemsPerPage);
+      if (pages > 0 && currentPage > pages) {
+        setCurrentPage(pages);
+      }
     } catch (error) {
       console.error('加载包裹数据失败:', error);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [
+    currentPage,
+    itemsPerPage,
+    selectedStatus,
+    selectedDate,
+    debouncedSearch,
+    isRegionalUser,
+    currentRegionPrefix,
+  ]);
 
-  /** 全局搜索带 ?q= 时打开匹配运单详情 */
+  useEffect(() => {
+    const delay = listSearchQuery.trim() ? 350 : 0;
+    const timer = window.setTimeout(() => setDebouncedSearch(listSearchQuery), delay);
+    return () => window.clearTimeout(timer);
+  }, [listSearchQuery]);
+
+  useEffect(() => {
+    void loadPackages();
+  }, [loadPackages]);
+
+  useEffect(() => {
+    const refreshInterval = window.setInterval(() => {
+      void loadPackages({ silent: true });
+    }, 30000);
+    return () => window.clearInterval(refreshInterval);
+  }, [loadPackages]);
+
+  /** 全局搜索带 ?q= 时按单号/电话查一条并打开详情（不扫全表） */
   useEffect(() => {
     const q = searchParams.get('q')?.trim();
-    if (!q || !packages.length) return;
-    const pool = isRegionalUser ? packages.filter((pkg) => pkg.id.startsWith(currentRegionPrefix)) : packages;
-    const lower = q.toLowerCase();
-    const match = pool.find(
-      (p) =>
-        p.id === q ||
-        p.id.toLowerCase() === lower ||
-        (p.receiver_phone && p.receiver_phone.includes(q)) ||
-        (p.sender_phone && p.sender_phone.includes(q)) ||
-        (p.transfer_code && p.transfer_code.toLowerCase() === lower)
-    );
-    if (match) {
+    if (!q) return;
+    let cancelled = false;
+    void (async () => {
+      const match = await packageService.findCityPackageByQuery(
+        q,
+        isRegionalUser ? currentRegionPrefix : undefined,
+      );
+      if (cancelled || !match) return;
       setSelectedPackage(match);
       setShowDetailModal(true);
       const next = new URLSearchParams(searchParams);
       next.delete('q');
       setSearchParams(next, { replace: true });
-    }
-  }, [packages, searchParams, setSearchParams, isRegionalUser, currentRegionPrefix]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, setSearchParams, isRegionalUser, currentRegionPrefix]);
 
   /** URL ?status= 或从其它页面带入 search */
   useEffect(() => {
@@ -182,140 +246,15 @@ const CityPackages: React.FC = () => {
     const state = location.state as { search?: string } | null;
     if (state?.search) {
       setListSearchQuery(state.search);
+      setCurrentPage(1);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.pathname, location.state, navigate]);
 
-  // 计算包裹统计信息
-  const getPackageStatistics = () => {
-    let displayPackages = [...packages];
-    
-    // 统计也需要根据领区过滤
-    if (isRegionalUser) {
-      displayPackages = displayPackages.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
-    }
+  const getTotalPages = () => Math.ceil(filteredTotal / itemsPerPage) || 0;
 
-    const total = displayPackages.length;
-    const pending = displayPackages.filter((p) => p.status === '待取件' || p.status === '待收款').length;
-    const pickedUp = displayPackages.filter(p => p.status === '已取件').length;
-    const delivering = displayPackages.filter(p => p.status === '配送中' || p.status === '配送进行中').length;
-    const delivered = displayPackages.filter(p => p.status === '已送达').length;
-    const cancelled = displayPackages.filter(p => p.status === '已取消').length;
-
-    return {
-      total,
-      pending,
-      pickedUp,
-      delivering,
-      delivered,
-      cancelled
-    };
-  };
-
-  // 获取当前账号可见的基础包裹列表（已应用领区过滤）
-  const getBaseRegionalPackages = () => {
-    if (!isRegionalUser) return packages;
-    return packages.filter(pkg => pkg.id.startsWith(currentRegionPrefix));
-  };
-
-  // 按日期和状态过滤包裹（返回最终显示用的过滤列表）
-  const getFilteredPackages = () => {
-    let filteredPackages = getBaseRegionalPackages();
-    
-    // 按状态过滤
-    if (selectedStatus && selectedStatus !== 'all') {
-      filteredPackages = filteredPackages.filter((pkg) => {
-        if (selectedStatus === '待取件') {
-          return pkg.status === '待取件' || pkg.status === '待收款';
-        }
-        if (selectedStatus === '配送中') {
-          return pkg.status === '配送中' || pkg.status === '配送进行中';
-        }
-        return pkg.status === selectedStatus;
-      });
-    }
-
-    const q = listSearchQuery.trim().toLowerCase();
-    if (q) {
-      filteredPackages = filteredPackages.filter(
-        (pkg) =>
-          pkg.id.toLowerCase().includes(q) ||
-          (pkg.sender_name && pkg.sender_name.toLowerCase().includes(q)) ||
-          (pkg.receiver_name && pkg.receiver_name.toLowerCase().includes(q)) ||
-          (pkg.sender_phone && pkg.sender_phone.includes(listSearchQuery.trim())) ||
-          (pkg.receiver_phone && pkg.receiver_phone.includes(listSearchQuery.trim())) ||
-          (pkg.transfer_code && pkg.transfer_code.toLowerCase().includes(q)),
-      );
-    }
-    
-    // 按日期过滤
-    if (selectedDate) {
-      filteredPackages = filteredPackages.filter(pkg => {
-        const dateStr = pkg.created_at || pkg.create_time;
-        if (!dateStr) return false;
-        const pkgDate = new Date(dateStr).toLocaleDateString('zh-CN');
-        return pkgDate === selectedDate;
-      });
-    }
-    
-    // 按创建时间倒序排列
-    return filteredPackages.sort((a, b) => {
-      const dateStrA = a.created_at || a.create_time;
-      const dateStrB = b.created_at || b.create_time;
-      const dateA = dateStrA ? new Date(dateStrA).getTime() : 0;
-      const dateB = dateStrB ? new Date(dateStrB).getTime() : 0;
-      return dateB - dateA;
-    });
-  };
-
-  // 获取分页后的包裹列表
-  const getPaginatedPackages = () => {
-    const filteredPackages = getFilteredPackages();
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredPackages.slice(startIndex, endIndex);
-  };
-
-  // 计算总页数
-  const getTotalPages = () => {
-    const filteredPackages = getFilteredPackages();
-    return Math.ceil(filteredPackages.length / itemsPerPage);
-  };
-
-  // 处理页码变化
-  useEffect(() => {
-    const totalPages = getTotalPages();
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-  }, [packages, selectedStatus, selectedDate, itemsPerPage]);
-
-  // 处理过滤变化时重置到第一页
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedStatus, selectedDate, listSearchQuery]);
-
-  // 获取可用日期列表
-  const getAvailableDates = () => {
-    const dates = new Set<string>();
-    const visiblePackages = getBaseRegionalPackages();
-    visiblePackages.forEach(pkg => {
-      const dateStr = pkg.created_at || pkg.create_time;
-      if (dateStr) {
-        const date = new Date(dateStr).toLocaleDateString('zh-CN');
-        dates.add(date);
-      }
-    });
-    return Array.from(dates).sort((a, b) => {
-      // 按日期倒序排列（最新的在前）
-      return new Date(b).getTime() - new Date(a).getTime();
-    });
-  };
-
-  // 格式化日期显示
-  // 触发重新部署
   const formatDateDisplay = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? `${dateStr}T00:00:00` : dateStr);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -331,23 +270,20 @@ const CityPackages: React.FC = () => {
 
   // 处理状态卡片点击
   const handleStatusClick = (status: string) => {
+    setCurrentPage(1);
     if (selectedStatus === status) {
-      // 如果点击的是当前选中的状态，则取消选择
       setSelectedStatus(null);
     } else {
-      // 否则选择新状态
       setSelectedStatus(status);
     }
   };
 
-  // 清除所有过滤
   const clearAllFilters = () => {
     setSelectedStatus(null);
     setSelectedDate(null);
     setListSearchQuery('');
+    setCurrentPage(1);
   };
-
-  const stats = useMemo(() => getPackageStatistics(), [packages, isRegionalUser, currentRegionPrefix]);
 
   const chipClass = (key: string, tone: string) => {
     const active =
@@ -374,18 +310,17 @@ const CityPackages: React.FC = () => {
 
   // 全选/取消全选
   const toggleSelectAll = () => {
-    const filtered = getFilteredPackages();
-    if (selectedPackages.size === filtered.length) {
+    if (packages.length > 0 && selectedPackages.size === packages.length) {
       setSelectedPackages(new Set());
     } else {
-      setSelectedPackages(new Set(filtered.map(pkg => pkg.id)));
+      setSelectedPackages(new Set(packages.map((pkg) => pkg.id)));
     }
   };
 
   // 批量删除包裹
   const handleBatchDelete = async () => {
     if (selectedPackages.size === 0) {
-      alert(language === 'zh' ? '请先选择要删除的包裹' : language === 'en' ? 'Please select packages to delete' : 'ဖျက်ရန်ပက်ကေ့ဂျ်များကို ရွေးချယ်ပါ');
+      feedbackService.notify(language === 'zh' ? '请先选择要删除的包裹' : language === 'en' ? 'Please select packages to delete' : 'ဖျက်ရန်ပက်ကေ့ဂျ်များကို ရွေးချယ်ပါ');
       return;
     }
 
@@ -426,13 +361,13 @@ const CityPackages: React.FC = () => {
       });
 
       if (result.failed === 0) {
-        alert(language === 'zh' 
+        feedbackService.notify(language === 'zh' 
           ? `成功删除 ${result.success} 个包裹` 
           : language === 'en' 
           ? `Successfully deleted ${result.success} packages`
           : 'ပက်ကေ့ဂျ် ' + result.success + ' ခု ဖျက်ပြီးပါပြီ');
       } else {
-        alert(language === 'zh' 
+        feedbackService.notify(language === 'zh' 
           ? `删除完成：成功 ${result.success} 个，失败 ${result.failed} 个` 
           : language === 'en' 
           ? `Delete completed: ${result.success} succeeded, ${result.failed} failed`
@@ -448,7 +383,7 @@ const CityPackages: React.FC = () => {
       setShowDeleteConfirm(false);
     } catch (error) {
       console.error('批量删除失败:', error);
-      alert(language === 'zh' ? '批量删除失败，请重试' : language === 'en' ? 'Batch delete failed, please try again' : 'ဖျက်ရန် မအောင်မြင်၊ ထပ်စမ်းကြည့်ပါ');
+      feedbackService.notify(language === 'zh' ? '批量删除失败，请重试' : language === 'en' ? 'Batch delete failed, please try again' : 'ဖျက်ရန် မအောင်မြင်၊ ထပ်စမ်းကြည့်ပါ');
     } finally {
       setDeleting(false);
     }
@@ -607,8 +542,8 @@ const CityPackages: React.FC = () => {
           </h1>
           <span className="cpkg-subtitle">
             {language === 'zh'
-              ? `共 ${stats.total} 单 · 当前显示 ${getFilteredPackages().length} 单`
-              : `${stats.total} orders · showing ${getFilteredPackages().length}`}
+              ? `共 ${stats.total} 单 · 当前显示 ${filteredTotal} 单`
+              : `${stats.total} orders · showing ${filteredTotal}`}
           </span>
         </div>
 
@@ -636,7 +571,10 @@ const CityPackages: React.FC = () => {
             <input
               type="search"
               value={listSearchQuery}
-              onChange={(e) => setListSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setListSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder={language === 'zh' ? '单号 / 姓名 / 电话' : 'ID / name / phone'}
             />
           </label>
@@ -647,14 +585,14 @@ const CityPackages: React.FC = () => {
           <button type="button" className="cpkg-btn cpkg-btn--primary" onClick={() => navigate('/admin/tracking')}>
             📍 {language === 'zh' ? '实时跟踪' : 'Tracking'}
           </button>
-          <button type="button" className="cpkg-btn cpkg-btn--success" onClick={loadPackages}>
+          <button type="button" className="cpkg-btn cpkg-btn--success" onClick={() => void loadPackages()}>
             🔄 {language === 'zh' ? '刷新' : 'Refresh'}
           </button>
 
           {batchMode ? (
             <>
               <button type="button" className="cpkg-btn" onClick={toggleSelectAll}>
-                {selectedPackages.size === getFilteredPackages().length ? '取消全选' : '全选'}
+                {selectedPackages.size === packages.length && packages.length > 0 ? '取消全选' : '全选本页'}
               </button>
               <button
                 type="button"
@@ -696,7 +634,7 @@ const CityPackages: React.FC = () => {
                     {listSearchQuery.trim() && (
                       <strong style={{ marginRight: 8 }}>「{listSearchQuery.trim()}」</strong>
                     )}
-                    <span>({getFilteredPackages().length} 单)</span>
+                    <span>({filteredTotal} 单)</span>
                   </div>
                   <button type="button" className="cpkg-btn" onClick={clearAllFilters}>
                     清除筛选
@@ -704,7 +642,7 @@ const CityPackages: React.FC = () => {
             </div>
             )}
             
-            {getFilteredPackages().length === 0 ? (
+            {filteredTotal === 0 ? (
                 <div className="cpkg-empty">
                 <p>{
                   selectedStatus || selectedDate || listSearchQuery.trim()
@@ -719,7 +657,7 @@ const CityPackages: React.FC = () => {
                 </div>
               ) : (
               <>
-              {getPaginatedPackages().map((pkg) => (
+              {packages.map((pkg) => (
               <article key={pkg.id} className={`cpkg-card${batchMode && selectedPackages.has(pkg.id) ? ' cpkg-card--selected' : ''}`}>
                 <div className="cpkg-card__head">
                   <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
@@ -892,7 +830,7 @@ const CityPackages: React.FC = () => {
                 ))}
               
               {/* 分页控件 */}
-              {getFilteredPackages().length > itemsPerPage && (
+              {filteredTotal > itemsPerPage && (
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -947,10 +885,10 @@ const CityPackages: React.FC = () => {
                   }}>
                     <span>
                       {language === 'zh' 
-                        ? `第 ${currentPage} / ${getTotalPages()} 页，共 ${getFilteredPackages().length} 条`
+                        ? `第 ${currentPage} / ${getTotalPages()} 页，共 ${filteredTotal} 条`
                         : language === 'en'
-                        ? `Page ${currentPage} / ${getTotalPages()}, Total ${getFilteredPackages().length} items`
-                        : 'စာမျက်နှာ ' + currentPage + ' / ' + getTotalPages() + '၊ စုစုပေါင်း ' + getFilteredPackages().length + ' ခု'
+                        ? `Page ${currentPage} / ${getTotalPages()}, Total ${filteredTotal} items`
+                        : 'စာမျက်နှာ ' + currentPage + ' / ' + getTotalPages() + '၊ စုစုပေါင်း ' + filteredTotal + ' ခု'
                       }
                     </span>
                   </div>
@@ -1506,6 +1444,7 @@ const CityPackages: React.FC = () => {
                       onClick={() => {
                         setSelectedDate(null);
                         setSelectedStatus(null);
+                        setCurrentPage(1);
                       }}
                       style={{
                         background: selectedDate === null ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(255, 255, 255, 0.08)',
@@ -1524,69 +1463,57 @@ const CityPackages: React.FC = () => {
                       }}
                     >
                       <span>📦 {language === 'zh' ? '全部订单' : language === 'en' ? 'All Orders' : 'အမှာစာအားလုံး'}</span>
-                      <span style={{ opacity: 0.7 }}>{getBaseRegionalPackages().length}</span>
+                      <span style={{ opacity: 0.7 }}>{stats.total}</span>
                     </button>
 
                     {/* 今天 */}
                     <button
                       onClick={() => {
-                        const today = new Date().toLocaleDateString('zh-CN');
-                        setSelectedDate(today);
+                        setSelectedDate(todayYmd);
+                        setCurrentPage(1);
                       }}
                       style={{
-                        background: selectedDate === new Date().toLocaleDateString('zh-CN') ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'rgba(255, 255, 255, 0.08)',
+                        background: selectedDate === todayYmd ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'rgba(255, 255, 255, 0.08)',
                         color: 'white',
-                        border: selectedDate === new Date().toLocaleDateString('zh-CN') ? '2px solid #3b82f6' : '2px solid rgba(255, 255, 255, 0.15)',
+                        border: selectedDate === todayYmd ? '2px solid #3b82f6' : '2px solid rgba(255, 255, 255, 0.15)',
                         padding: '16px 24px',
                         borderRadius: '14px',
                         cursor: 'pointer',
                         fontSize: '1rem',
-                        fontWeight: selectedDate === new Date().toLocaleDateString('zh-CN') ? '600' : '500',
+                        fontWeight: selectedDate === todayYmd ? '600' : '500',
                         transition: 'all 0.3s ease',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        boxShadow: selectedDate === new Date().toLocaleDateString('zh-CN') ? '0 8px 20px rgba(59, 130, 246, 0.3)' : 'none'
+                        boxShadow: selectedDate === todayYmd ? '0 8px 20px rgba(59, 130, 246, 0.3)' : 'none'
                       }}
                     >
                       <span>☀️ {language === 'zh' ? '今天' : language === 'en' ? 'Today' : 'ယနေ့'}</span>
-                      <span style={{ opacity: 0.7 }}>
-                        {getBaseRegionalPackages().filter(pkg => {
-                          const dateStr = pkg.created_at || pkg.create_time;
-                          return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === new Date().toLocaleDateString('zh-CN');
-                        }).length}
-                      </span>
                     </button>
 
                     {/* 昨天 */}
                     <button
                       onClick={() => {
-                        const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('zh-CN');
-                        setSelectedDate(yesterday);
+                        setSelectedDate(yesterdayYmd);
+                        setCurrentPage(1);
                       }}
                       style={{
-                        background: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : 'rgba(255, 255, 255, 0.08)',
+                        background: selectedDate === yesterdayYmd ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : 'rgba(255, 255, 255, 0.08)',
                         color: 'white',
-                        border: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '2px solid #8b5cf6' : '2px solid rgba(255, 255, 255, 0.15)',
+                        border: selectedDate === yesterdayYmd ? '2px solid #8b5cf6' : '2px solid rgba(255, 255, 255, 0.15)',
                         padding: '16px 24px',
                         borderRadius: '14px',
                         cursor: 'pointer',
                         fontSize: '1rem',
-                        fontWeight: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '600' : '500',
+                        fontWeight: selectedDate === yesterdayYmd ? '600' : '500',
                         transition: 'all 0.3s ease',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        boxShadow: selectedDate === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN') ? '0 8px 20px rgba(139, 92, 246, 0.3)' : 'none'
+                        boxShadow: selectedDate === yesterdayYmd ? '0 8px 20px rgba(139, 92, 246, 0.3)' : 'none'
                       }}
                     >
                       <span>🌙 {language === 'zh' ? '昨天' : language === 'en' ? 'Yesterday' : 'မနေ့က'}</span>
-                      <span style={{ opacity: 0.7 }}>
-                        {getBaseRegionalPackages().filter(pkg => {
-                          const dateStr = pkg.created_at || pkg.create_time;
-                          return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === new Date(Date.now() - 86400000).toLocaleDateString('zh-CN');
-                        }).length}
-                      </span>
                     </button>
                   </div>
 
@@ -1603,113 +1530,52 @@ const CityPackages: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 右侧：历史日期列表 */}
+                {/* 右侧：任选一天（不再枚举历史日期，避免为筛日期全量拉单） */}
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <h3 style={{
-                      color: 'white',
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      margin: 0,
+                  <h3 style={{
+                    color: 'white',
+                    fontSize: '1.1rem',
+                    fontWeight: 600,
+                    margin: '0 0 20px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{
+                      background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
-                    }}>
-                      <span style={{
-                        background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '16px'
-                      }}>📅</span>
-                      {language === 'zh' ? '历史日期查询' : language === 'en' ? 'Historical Dates' : 'မှတ်တမ်းရက်စွဲများ'}
-                    </h3>
-                    
-                    {/* 日期搜索微调 */}
-                    <div style={{ position: 'relative' }}>
-                      <input 
-                        type="text"
-                        placeholder={language === 'zh' ? '搜索日期...' : 'Search...'}
-                        onChange={(e) => {
-                          const term = e.target.value;
-                          const elements = document.querySelectorAll('[data-date-btn]');
-                          elements.forEach((el: any) => {
-                            if (el.getAttribute('data-date-btn').includes(term)) {
-                              el.style.display = 'flex';
-                            } else {
-                              el.style.display = 'none';
-                            }
-                          });
-                        }}
-                        style={{
-                          background: 'rgba(0,0,0,0.2)',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '8px',
-                          padding: '6px 12px',
-                          color: 'white',
-                          fontSize: '0.85rem',
-                          outline: 'none',
-                          width: '120px'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{
-                    maxHeight: '400px',
-                    overflowY: 'auto',
-                    paddingRight: '12px',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                    gap: '12px'
-                  }}>
-                    {getAvailableDates().map((date) => {
-                      const datePackages = getBaseRegionalPackages().filter(pkg => {
-                        const dateStr = pkg.created_at || pkg.create_time;
-                        return dateStr && new Date(dateStr).toLocaleDateString('zh-CN') === date;
-                      });
-                      
-                      const isSelected = selectedDate === date;
-                      
-                      return (
-                        <button
-                          key={date}
-                          data-date-btn={date}
-                          onClick={() => setSelectedDate(date)}
-                          style={{
-                            background: isSelected ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' : 'rgba(255, 255, 255, 0.06)',
-                            color: 'white',
-                            border: isSelected ? '2px solid #06b6d4' : '2px solid rgba(255, 255, 255, 0.1)',
-                            padding: '12px 16px',
-                            borderRadius: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            textAlign: 'left',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            boxShadow: isSelected ? '0 4px 12px rgba(6, 182, 212, 0.3)' : 'none'
-                          }}
-                        >
-                          <div style={{ fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '4px' }}>
-                            {formatDateDisplay(date)}
-                          </div>
-                          <div style={{ 
-                            fontSize: '0.75rem', 
-                            color: isSelected ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            width: '100%'
-                          }}>
-                            <span>📦 {datePackages.length} {language === 'zh' ? '单' : 'Orders'}</span>
-                            {isSelected && <span>✓</span>}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                      justifyContent: 'center',
+                      fontSize: '16px'
+                    }}>📅</span>
+                    {language === 'zh' ? '指定日期' : language === 'en' ? 'Pick a date' : 'ရက်ရွေးရန်'}
+                  </h3>
+                  <input
+                    type="date"
+                    value={selectedDate || ''}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value || null);
+                      setCurrentPage(1);
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0,0,0,0.25)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '12px',
+                      padding: '14px 16px',
+                      color: 'white',
+                      fontSize: '1rem',
+                      outline: 'none',
+                    }}
+                  />
+                  {selectedDate && (
+                    <p style={{ color: 'rgba(255,255,255,0.75)', marginTop: 12, fontSize: '0.9rem' }}>
+                      {formatDateDisplay(selectedDate)}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1726,6 +1592,7 @@ const CityPackages: React.FC = () => {
                   onClick={() => {
                     setSelectedDate(null);
                     setSelectedStatus(null);
+                    setCurrentPage(1);
                   }}
                   style={{
                     background: 'rgba(255, 255, 255, 0.1)',

@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { errorHandler } from '../services/errorHandler';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
+import { feedbackService } from '../services/FeedbackService';
 
 // 🚀 新增：地区定义
 const REGIONS = [
@@ -70,7 +71,7 @@ const RechargeManagement: React.FC = () => {
           new_value: JSON.stringify({ status: 'completed' })
         });
         notifyAdminTodosRefresh();
-        alert('审核通过成功');
+        feedbackService.notify('审核通过成功');
         loadRequests();
       }
     } catch (error) {
@@ -99,7 +100,7 @@ const RechargeManagement: React.FC = () => {
           new_value: JSON.stringify({ status: 'rejected', reason })
         });
         notifyAdminTodosRefresh();
-        alert('已拒绝申请');
+        feedbackService.notify('已拒绝申请');
         loadRequests();
       }
     } catch (error) {

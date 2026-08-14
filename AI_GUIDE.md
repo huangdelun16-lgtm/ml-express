@@ -88,7 +88,7 @@ flowchart TB
 | 会员 Web/App | `users` 表（customer）邮箱/手机 + 密码 | `localStorage` / `AsyncStorage`（**不含商家登录**） |
 | 商家 Web/App | Web：`delivery_stores` 客户端比对（待对齐）；**App**：Netlify `merchant-password`（**无客户端明文密码兜底**） | `localStorage` / `AsyncStorage` |
 | 骑手 App | `admin_accounts` + Netlify `admin-password` + `ensure-courier-auth`（**无客户端明文密码兜底**） | `AsyncStorage`（`persistSession: false`） |
-| 管理后台 | `verify-admin` Netlify Function + HMAC JWT Cookie | session/localStorage |
+| 管理后台 | `admin-password` 登录 + `verify-admin` HMAC Cookie（**无**客户端明文/`admin`/`admin` 回退；令牌仅服务端签发） | httpOnly Cookie + 本地令牌副本（Cookie 丢失时 Bearer） |
 | Inventory App | `inventory-store-login` Edge Function → Supabase Auth JWT | SecureStore + Supabase Auth |
 
 ---
@@ -157,13 +157,14 @@ flowchart TB
 | 维度 | 说明 |
 |------|------|
 | **定位** | 内部运营：City 包裹/财务/跟踪/告警 + 跨境物流控制台 + 指标/代购 |
-| **入口** | `src/index.tsx` → `src/App.tsx`（React Router **v6**） |
+| **入口** | `src/index.tsx`（生产 console 门禁）→ `src/App.tsx`（React Router **v6**） |
 | **UI** | `src/pages/`（32+ 页）、`AdminShellLayout`；全屏独立模块见 §4.3 |
 | **业务层** | `src/services/supabase.ts`（City 主业务）、`inventoryConsoleService.ts`（跨境）、`authService.ts` |
 | **服务端** | `netlify/functions/`（Admin JWT 校验、跨境 CRUD、短信/邮件） |
-| **认证** | `verify-admin` + HMAC JWT Cookie；角色 `admin\|manager\|operator\|finance` + `permissionId` |
+| **认证** | `admin-password` + `verify-admin` HMAC；角色 `admin\|manager\|operator\|finance` + `permissionId`。**不要**把 Admin 会话接到会员/商家/骑手或 Inventory JWT。 |
 | **数据** | Supabase 直连（anon key）；跨境写操作经 Netlify Function + service role |
 | **共享** | `prebuild` → `sync:shared` → `src/services/_shared/` |
+| **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`window.confirm` 仅确认/破坏性操作；生产 `installProductionConsoleGate`（**无 Sentry**，勿擅自加） |
 | **部署** | Netlify site `ed9c2173-…`；`npm run deploy:netlify` |
 
 ### 3.1.2 会员 Web（`ml-express-client-web/`）
@@ -294,9 +295,10 @@ flowchart TB
 
 | 路径 | 职责 |
 |------|------|
-| `src/index.tsx` → `src/App.tsx` | 入口与路由表 |
-| `src/pages/` | 页面（见 §4.3） |
-| `src/components/` | 通用与跨境组件（`CrossBorder*`、`CblTablePagination`） |
+| `src/index.tsx` → `src/App.tsx` | 入口与路由表（生产 console 门禁 + `GlobalToast`） |
+| `src/pages/` | 页面（见 §4.3）；City 包裹列表走 `listCityPackagesPage` 分页，**勿**在该页调用 `getAllPackages` |
+| `src/components/` | 通用与跨境组件（`GlobalToast`、`CrossBorder*`、`CblTablePagination`） |
+| `src/services/FeedbackService.ts` / `ToastService.ts` / `LoggerService.ts` | Toast 入口与生产日志门禁 |
 | `src/layouts/AdminShellLayout.tsx` | 侧栏+顶栏；`STANDALONE_ADMIN_MODULE_PATHS` |
 | `src/contexts/` | 含 `AdminTodoContext` |
 | `src/services/supabase.ts` | Supabase 客户端 + 各业务 service |
@@ -314,7 +316,7 @@ flowchart TB
 |------|------|------|
 | `/admin/login` | `AdminLogin` | — |
 | `/admin/dashboard` | 仪表盘 | 默认 |
-| `/admin/city-packages` | City 包裹 | `city_packages` |
+| `/admin/city-packages` | City 包裹（服务端分页；状态 count 单独查；财务仍用 `getAllPackages`） | `city_packages` |
 | `/admin/users` | 用户 | `users` |
 | `/admin/finance` | 财务 | `finance` |
 | `/admin/tracking` / `realtime-tracking` | 跟踪 | `tracking` |
@@ -393,7 +395,7 @@ flowchart TB
 
 ### 4.8 指标管理 Hub（`ImportMetricDraftsPage.tsx`）
 
-全屏独立模块，内含 4 个 Tab（换电脑需 Supabase 云端数据，勿只依赖 localStorage）：
+全屏独立模块，**不与会员 Web/App、商家 Web/App、骑手 App、Inventory App 做登录或业务链接**。数据只服务 Admin 内部运营（换电脑需 Supabase 云端，勿只依赖 localStorage）：
 
 | Tab | 页面/组件 | 数据存储 |
 |-----|-----------|----------|
@@ -1167,6 +1169,8 @@ eas build --platform android --profile apk
 
 页面：`CrossBorderLogisticsPage.tsx`（独立全屏深色 UI）。
 
+**只对接 Inventory 中转站 App**（`inventory_*` 表 + `inventory-admin-*` Functions）。不要接到会员/商家/骑手会话或 City `packages` 主链路。Admin 控制台认证仍是 **Admin HMAC**（`verify-admin`），用 Service Role 读 Inventory 表；中转站员工登录仍走 Inventory App 自己的 `inventory-store-login` JWT，两套会话不要合并。
+
 ### 11.1 功能区块
 
 | 区块 | 数据来源 | 说明 |
@@ -1437,6 +1441,7 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 21. **商家 App 登录**走 `merchant-password`，勿恢复客户端明文密码比对；Maps Key 只放 `.env` / EAS Secrets。
 22. **改商家 App 业务 API**：改 `merchantApi/*`；`supabase.ts` 只做 barrel（与会员 `clientApi`、骑手 `staffApi` 同一手法）。
 23. **改会员/商家 Web 提示/日志**：非确认走 `feedbackService`；生产门禁 `installProductionConsoleGate`；确认/破坏性继续 `window.confirm`。会员 Web 已有 Sentry 可保留；**勿给商家 Web 加 Sentry**。
+24. **改 Admin Web 提示/日志**：非确认走 `feedbackService`；生产门禁 `installProductionConsoleGate`；确认/破坏性继续 `window.confirm`；**勿给 Admin 加 Sentry / 粒子背景 / 改 Router v6**。
 
 ---
 
@@ -1456,6 +1461,7 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | 商家 App Toast / 生产日志 | `FeedbackService.ts`、`GlobalToast.tsx`、`LoggerService.ts`、`index.js` |
 | 会员 Web Toast / 生产日志 | `FeedbackService.ts`、`GlobalToast.tsx`、`LoggerService.ts`、`index.tsx`（Sentry：`sentryInit`） |
 | 商家 Web Toast / 生产日志 | `FeedbackService.ts`、`GlobalToast.tsx`、`LoggerService.ts`、`index.tsx`（**无 Sentry**） |
+| Admin Web Toast / 生产日志 | `src/services/FeedbackService.ts`、`src/components/GlobalToast.tsx`、`src/services/LoggerService.ts`、`src/index.tsx`（**无 Sentry**） |
 | STAFF 定位省电 | `locationService.ts`、`MapScreen.tsx`、`InAppNavigationModal.tsx` |
 | **Inventory A/B 职责划分** | **§10.2**（发站 vs 到站，改需求前必读） |
 | Inventory A：订单列表过滤 | `expressDetailsVisibility.ts` → `inventoryService.listItems` |
@@ -1567,9 +1573,12 @@ cd ml-express-inventory-app && npm run typecheck
 会员     → users（customer）自定义会话
 商家     → delivery_stores + merchant-password（App；无客户端明文兜底）
 STAFF    → admin_accounts + admin-password + ensure-courier-auth（非纯 Supabase Auth）
-Admin Web→ verify-admin HMAC Cookie
+Admin Web→ admin-password 登录 + verify-admin HMAC Cookie（无客户端自签 / 无 admin/admin / 无明文密码回退）
 Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT 主路径）
 ```
+
+- **指标管理**：Admin 内部独立模块，不链会员/商家/骑手/Inventory。
+- **跨境物流**：只链 Inventory App 的数据与中转站账号；Admin 控制台用 HMAC，Inventory App 用自己的 JWT。
 
 ### 22.3 STAFF 决策快照（2026-08）
 
@@ -1592,7 +1601,10 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 |------|------|
 | 计费/审核/充值 QR | `/shared/src` → `npm run sync:shared` |
 | Admin 菜单/权限 | 根 `src/App.tsx`、`AccountManagement` |
-| Admin 跨境 | `CrossBorderLogisticsPage` + `inventory-admin-*` Functions |
+| Admin City 包裹列表 | `CityPackages.tsx` + `packageService.listCityPackagesPage`（勿改财务 `getAllPackages`） |
+| Admin Toast / 生产日志 | `FeedbackService`、`GlobalToast`、`LoggerService`、`src/index.tsx`（无 Sentry） |
+| Admin 认证 | `src/services/authService.ts`、`netlify/functions/admin-password.js`、`verify-admin.js` |
+| Admin 跨境 | `CrossBorderLogisticsPage` + `inventory-admin-*` Functions（只链 Inventory，Admin HMAC ≠ Inventory JWT） |
 | 会员 App | `ml-express-client/src/`（clientApi / screens） |
 | 会员 Web | §5 + FeedbackService / LoggerService（保留既有 Sentry） |
 | 商家 App | §8 + `merchantApi/` + `merchantAuthService` + FeedbackService / LoggerService |
@@ -1605,6 +1617,9 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 ### 22.6 勿做清单
 
 - 勿把 Inventory 表当 City 包裹用（或反向）。
+- 勿把 **指标管理** 接到会员/商家/骑手/Inventory 登录或业务流。
+- 勿把 **跨境物流** 接到 City 会员/商家/骑手会话；只链 Inventory App。
+- 勿在 Admin Web 客户端自签 HMAC，勿恢复 `admin`/`admin` 或明文密码登录回退。
 - 勿在合伙店铺流创建 `transit_station`（走跨境账号）。
 - 勿手改各端 `_shared/` 副本。
 - 勿提交 `.env`、keystore、`.cursor/` 计划垃圾。
@@ -1613,10 +1628,11 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 - 商家 App：非确认提示走 `feedbackService`；勿擅自加 `@sentry/react-native`。
 - 会员/商家 Web：非确认提示走 `feedbackService`；勿各页再挂本地 Toast。
 - 商家 Web：勿擅自加 `@sentry/react`。
+- Admin Web：非确认提示走 `feedbackService`；勿各页再挂本地 Toast；勿擅自加 Sentry / 粒子背景 / 改 Router v6。
 - 商家 App：勿恢复会员注册/商城/购物车；**保留**电话订餐「立即下单」。
 - 商家 App：勿改回客户端明文密码登录；勿把 Maps Key 写回 `app.json`。
 - 商家 App：勿在 Android 选图时申请 `READ_MEDIA_*` / `READ_EXTERNAL_STORAGE`（走 Photo Picker，见 §8.7）。
 
 ---
 
-*最后更新：2026-08-13 — 会员/商家 Web：Toast 统一非确认提示 + 生产 console 门禁（对标商家 App §8.8；会员 Web 保留既有 Sentry，商家 Web 无 Sentry）。*
+*最后更新：2026-08-14 — Admin City 包裹改为服务端分页，不再全表拉取（财务 `getAllPackages` 未改）。*

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAccountService, auditLogService } from '../services/supabase';
 import { saveToken } from '../services/authService';
+import { feedbackService } from '../services/FeedbackService';
 
 const AdminLogin: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -30,35 +31,12 @@ const AdminLogin: React.FC = () => {
         
         navigate('/admin/dashboard');
       } else {
-        // 如果数据库登录失败，回退到硬编码验证（兼容模式，仅用于紧急情况）
-        if (username === 'admin' && password === 'admin') {
-          await saveToken('admin', 'admin', '管理员', undefined, undefined, undefined);
-          
-          // 记录登录日志
-          await auditLogService.log({
-            user_id: 'admin',
-            user_name: '管理员',
-            action_type: 'login',
-            module: 'system',
-            action_description: '管理员登录系统（默认账号）'
-          });
-          
-          navigate('/admin/dashboard');
-        } else {
-          alert('用户名或密码错误，或账号已被停用');
-        }
+        feedbackService.notify('用户名或密码错误，或账号已被停用');
       }
     } catch (error) {
       console.error('登录异常:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('错误详情:', errorMessage);
-      
-      // 如果是 Token 签名生成失败，提供更详细的错误信息
-      if (errorMessage.includes('Token 签名生成失败')) {
-        alert('登录失败：Token 生成错误。请检查浏览器控制台获取详细信息，或联系管理员。');
-      } else {
-        alert('登录失败，请检查网络连接。错误：' + errorMessage);
-      }
+      feedbackService.notify('登录失败，请检查网络连接。错误：' + errorMessage);
     } finally {
       setLoading(false);
     }

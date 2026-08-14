@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { adminAccountService } from '../services/supabase';
+import { clearToken } from '../services/authService';
 import { useResponsive } from '../hooks/useResponsive';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
+import { feedbackService } from '../services/FeedbackService';
 
 /** 全屏独立模块：不使用通用后台侧栏/顶栏，由页面自带布局 */
 export const STANDALONE_ADMIN_MODULE_PATHS = [
@@ -211,7 +213,8 @@ const AdminShellLayout: React.FC = () => {
     employee_name: '',
   });
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await clearToken();
     navigate('/admin/login');
   };
 
@@ -230,7 +233,7 @@ const AdminShellLayout: React.FC = () => {
 
     try {
       if (userEditFormData.password && userEditFormData.password !== userEditFormData.confirmPassword) {
-        alert('两次输入的密码不一致');
+        feedbackService.notify('两次输入的密码不一致');
         return;
       }
 
@@ -238,7 +241,7 @@ const AdminShellLayout: React.FC = () => {
       const currentAccount = accounts.find((account) => account.username === currentUser);
 
       if (!currentAccount) {
-        alert('未找到当前用户信息');
+        feedbackService.notify('未找到当前用户信息');
         return;
       }
 
@@ -262,16 +265,16 @@ const AdminShellLayout: React.FC = () => {
         localStorage.setItem('currentUser', userEditFormData.username);
         localStorage.setItem('currentUserName', userEditFormData.employee_name);
 
-        alert('个人信息更新成功！');
+        feedbackService.notify('个人信息更新成功！');
         setShowUserEditModal(false);
 
         window.location.reload();
       } else {
-        alert('更新失败，请重试');
+        feedbackService.notify('更新失败，请重试');
       }
     } catch (error) {
       console.error('更新用户信息失败:', error);
-      alert('更新失败，请重试');
+      feedbackService.notify('更新失败，请重试');
     }
   };
 
@@ -929,7 +932,7 @@ const AdminShellLayout: React.FC = () => {
               type="button"
               onClick={() => {
                 speakNotification('语音提醒功能已开启');
-                alert(
+                feedbackService.notify(
                   '✅ 语音播报已激活！\n\n系统现在将自动在后台为您监控新充值申请、待分配订单（实时跟踪）与配送警报。',
                 );
               }}

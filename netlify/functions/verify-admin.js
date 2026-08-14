@@ -311,29 +311,6 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify({ success: true, message: '已登出' })
       };
-    } else if (action === 'generate') {
-      // 生成 Token（仅用于登录时，现在由 admin-password 函数处理）
-      const { username, role } = JSON.parse(event.body);
-      const newToken = generateAdminToken(username, role);
-      
-      // 设置 httpOnly Cookie
-      const cookieMaxAge = 2 * 60 * 60; // 2小时
-      const cookieOptions = [
-        `admin_auth_token=${newToken}`,
-        `Max-Age=${cookieMaxAge}`,
-        'Path=/',
-        'HttpOnly',
-        'SameSite=Strict',
-        process.env.NODE_ENV === 'production' ? 'Secure' : ''
-      ].filter(Boolean).join('; ');
-      
-      headers['Set-Cookie'] = cookieOptions;
-      
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({ token: newToken, valid: true })
-      };
     } else {
       return {
         statusCode: 400,

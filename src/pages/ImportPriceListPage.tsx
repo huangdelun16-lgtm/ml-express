@@ -10,6 +10,7 @@ import {
   type SavedLineItem,
 } from './ImportMetricDraftsPage';
 import { parseLicenceFile, type ParsedLicenceLine } from '../utils/importLicenceParse';
+import { feedbackService } from '../services/FeedbackService';
 
 type FlatRow = {
   rowKey: string;
@@ -234,7 +235,7 @@ const ImportPriceListPage: React.FC<ImportPriceListPageProps> = ({
     try {
       const parsed = await parseLicenceFile(file);
       if (!parsed.length) {
-        window.alert(t.parseEmpty);
+        feedbackService.notify(t.parseEmpty);
         return;
       }
       const regKeys = new Set(
@@ -244,15 +245,15 @@ const ImportPriceListPage: React.FC<ImportPriceListPageProps> = ({
       );
       for (const key of Array.from(regKeys)) {
         if (blockedRegisterKeys.has(key)) {
-          window.alert(t.parseDup);
+          feedbackService.notify(t.parseDup);
           return;
         }
       }
       const next = parsedToFlatRows(parsed);
       setLicenceRows((prev) => [...prev, ...next]);
-      window.alert(t.parseOk(next.length));
+      feedbackService.notify(t.parseOk(next.length));
     } catch {
-      window.alert(t.parseFail);
+      feedbackService.notify(t.parseFail);
     } finally {
       setParseBusy(false);
     }

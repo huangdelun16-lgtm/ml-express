@@ -6,26 +6,12 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { verifyAdminToken } = require('./verify-admin');
+const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { verifyLogin } = require('./admin-password');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 
 const CONFIRM_PHRASE = '清空测试数据';
 
-function getAdminTokenFromEvent(event) {
-  const cookieHeader = event.headers?.cookie || event.headers?.Cookie || '';
-  const tokenCookiePair = cookieHeader
-    .split(';')
-    .map((c) => c.trim())
-    .find((c) => c.startsWith('admin_auth_token='));
-  if (!tokenCookiePair) return null;
-  let token = tokenCookiePair.slice('admin_auth_token='.length).trim();
-  try {
-    token = decodeURIComponent(token);
-  } catch (_) {
-    /* 未编码的旧 Cookie */
-  }
-  return token || null;
-}
 
 function parseBody(event) {
   if (!event.body) return {};

@@ -411,6 +411,66 @@ export const testConnection = async () => {
   }
 };
 
+/** City 包裹列表分页参数。勿改 getAllPackages：财务总览仍依赖全量。 */
+export type CityPackageListParams = {
+  page: number;
+  pageSize: number;
+  status?: string | null;
+  search?: string;
+  dateYmd?: string | null;
+  regionPrefix?: string;
+};
+
+export type CityPackageStatusCounts = {
+  total: number;
+  pending: number;
+  pickedUp: number;
+  delivering: number;
+  delivered: number;
+  cancelled: number;
+};
+
+const sanitizePostgrestOrValue = (raw: string): string =>
+  raw.replace(/[%_*,()]/g, ' ').replace(/\s+/g, ' ').trim();
+
+const applyCityPackageListFilters = (
+  query: any,
+  opts: {
+    regionPrefix?: string;
+    status?: string | null;
+    search?: string;
+    dateYmd?: string | null;
+  },
+) => {
+  let next = query;
+  if (opts.regionPrefix) {
+    next = next.like('id', `${opts.regionPrefix}%`);
+  }
+  const status = opts.status;
+  if (status && status !== 'all') {
+    if (status === '待取件') {
+      next = next.in('status', ['待取件', '待收款']);
+    } else if (status === '配送中') {
+      next = next.in('status', ['配送中', '配送进行中']);
+    } else {
+      next = next.eq('status', status);
+    }
+  }
+  const q = sanitizePostgrestOrValue(opts.search || '');
+  if (q) {
+    next = next.or(
+      `id.ilike.%${q}%,sender_name.ilike.%${q}%,receiver_name.ilike.%${q}%,sender_phone.ilike.%${q}%,receiver_phone.ilike.%${q}%,transfer_code.ilike.%${q}%`,
+    );
+  }
+  if (opts.dateYmd && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateYmd)) {
+    const start = new Date(`${opts.dateYmd}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    next = next.gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+  }
+  return next;
+};
+
 // 包裹数据库操作
 export const packageService = {
   // 结清合伙店铺代收款
@@ -498,6 +558,106 @@ export const packageService = {
     } catch (err) {
       console.error('获取包裹列表异常:', err);
       return [];
+    }
+  },
+
+  /** City 包裹页：服务端分页。查询条件与原先客户端筛选对齐，不改 getAllPackages。 */
+  async listCityPackagesPage(
+    params: CityPackageListParams,
+  ): Promise<{ data: Package[]; total: number }> {
+    try {
+      const page = Math.max(1, params.page || 1);
+      const pageSize = Math.min(50, Math.max(1, params.pageSize || 10));
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = supabase
+        .from('packages')
+        .select('*', { count: 'exact' });
+      query = applyCityPackageListFilters(query, params);
+
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        console.warn('分页获取包裹失败:', error.message || error);
+        return { data: [], total: 0 };
+      }
+      return { data: data || [], total: count ?? 0 };
+    } catch (err) {
+      console.error('分页获取包裹异常:', err);
+      return { data: [], total: 0 };
+    }
+  },
+
+  /** City 包裹页状态卡片：只 count，不拉行。仅领区前缀，与旧版统计口径一致。 */
+  async getCityPackageStatusCounts(
+    regionPrefix?: string,
+  ): Promise<CityPackageStatusCounts> {
+    const empty: CityPackageStatusCounts = {
+      total: 0,
+      pending: 0,
+      pickedUp: 0,
+      delivering: 0,
+      delivered: 0,
+      cancelled: 0,
+    };
+    try {
+      const scoped = () => {
+        let q = supabase.from('packages').select('id', { count: 'exact', head: true });
+        if (regionPrefix) q = q.like('id', `${regionPrefix}%`);
+        return q;
+      };
+      const [totalRes, pendingRes, pickedRes, deliveringRes, deliveredRes, cancelledRes] =
+        await Promise.all([
+          scoped(),
+          scoped().in('status', ['待取件', '待收款']),
+          scoped().eq('status', '已取件'),
+          scoped().in('status', ['配送中', '配送进行中']),
+          scoped().eq('status', '已送达'),
+          scoped().eq('status', '已取消'),
+        ]);
+      return {
+        total: totalRes.count ?? 0,
+        pending: pendingRes.count ?? 0,
+        pickedUp: pickedRes.count ?? 0,
+        delivering: deliveringRes.count ?? 0,
+        delivered: deliveredRes.count ?? 0,
+        cancelled: cancelledRes.count ?? 0,
+      };
+    } catch (err) {
+      console.error('获取包裹状态统计失败:', err);
+      return empty;
+    }
+  },
+
+  /** 全局搜索 ?q=：按单号/电话/中转码查一条，避免为打开详情而全表扫描。 */
+  async findCityPackageByQuery(
+    raw: string,
+    regionPrefix?: string,
+  ): Promise<Package | null> {
+    const q = sanitizePostgrestOrValue(raw);
+    if (!q) return null;
+    try {
+      let query = supabase.from('packages').select('*');
+      if (regionPrefix) query = query.like('id', `${regionPrefix}%`);
+      const { data, error } = await query
+        .or(
+          `id.eq.${q},id.ilike.%${q}%,receiver_phone.ilike.%${q}%,sender_phone.ilike.%${q}%,transfer_code.eq.${q},transfer_code.ilike.%${q}%`,
+        )
+        .order('created_at', { ascending: false })
+        .limit(8);
+      if (error || !data?.length) return null;
+      const lower = q.toLowerCase();
+      return (
+        data.find((p) => p.id === q || p.id.toLowerCase() === lower) ||
+        data.find((p) => p.transfer_code && p.transfer_code.toLowerCase() === lower) ||
+        data[0]
+      );
+    } catch (err) {
+      console.error('搜索包裹失败:', err);
+      return null;
     }
   },
 
@@ -1822,33 +1982,7 @@ export const adminAccountService = {
       };
     } catch (err) {
       console.error('登录异常:', err);
-      // 如果 Function 调用失败，回退到旧的验证方式（向后兼容）
-      try {
-        const { data, error } = await supabase
-          .from('admin_accounts')
-          .select('*')
-          .eq('username', username)
-          .eq('password', password)
-          .eq('status', 'active')
-          .single();
-
-        if (error || !data) {
-          return { account: null };
-        }
-
-        // 更新最后登录时间
-        if (data?.id) {
-          await supabase
-            .from('admin_accounts')
-            .update({ last_login: new Date().toISOString() })
-            .eq('id', data.id);
-        }
-
-        return { account: data };
-      } catch (fallbackErr) {
-        console.error('回退登录验证失败:', fallbackErr);
-        return { account: null };
-      }
+      return { account: null };
     }
   },
 

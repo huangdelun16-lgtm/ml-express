@@ -7,6 +7,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { verifyAdminToken } = require('./verify-admin');
+const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const {
   createMerchantStoreFromApplication,
@@ -14,21 +15,6 @@ const {
   resolveNextMerchantStoreCode,
 } = require('./utils/merchantApplication');
 
-function getAdminTokenFromEvent(event) {
-  const cookieHeader = event.headers?.cookie || event.headers?.Cookie || '';
-  const tokenCookiePair = cookieHeader
-    .split(';')
-    .map((c) => c.trim())
-    .find((c) => c.startsWith('admin_auth_token='));
-  if (!tokenCookiePair) return null;
-  let token = tokenCookiePair.slice('admin_auth_token='.length).trim();
-  try {
-    token = decodeURIComponent(token);
-  } catch (_) {
-    /* legacy cookie */
-  }
-  return token || null;
-}
 
 const APPLICATION_COLUMNS =
   'id, store_name, store_type, region, address, latitude, longitude, phone, email, manager_name, manager_phone, operating_hours, cod_settlement_day, facilities, notes, applicant_name, salesperson_name, application_date, license_document_urls, status, review_notes, reviewed_by, reviewed_at, created_store_id, provisioned_store_code, created_at, updated_at';

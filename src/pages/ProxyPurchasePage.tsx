@@ -32,6 +32,7 @@ import {
   describeProxyPurchaseCloudError,
   isProxyPurchaseTableMissingError,
 } from '../utils/proxyPurchaseCloudError';
+import { feedbackService } from '../services/FeedbackService';
 
 const STORAGE_KEY = 'ml_admin_proxy_purchase_draft_v1';
 const SUMMARY_ALL_CUSTOMERS = '__all__';
@@ -1456,7 +1457,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     if (!isSpecificSummaryCustomer(summaryCustomerKey)) return;
     const amount = parseNum(depositDraftAmount);
     if (amount <= 0) {
-      window.alert(t.depositAmountInvalid);
+      feedbackService.notify(t.depositAmountInvalid);
       return;
     }
     const entry = newDepositEntry({
@@ -1487,7 +1488,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
     if (!isSpecificSummaryCustomer(summaryCustomerKey) || !editDepositDraft) return;
     const amount = parseNum(editDepositDraft.amount);
     if (amount <= 0) {
-      window.alert(t.depositAmountInvalid);
+      feedbackService.notify(t.depositAmountInvalid);
       return;
     }
     const entries = (customerDeposits[summaryCustomerKey]?.entries ?? []).map((entry) =>
@@ -1528,15 +1529,15 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
 
   const handleSummaryCustomerExport = useCallback(async () => {
     if (!isSpecificSummaryCustomer(summaryCustomerKey)) {
-      window.alert(t.exportNoneCustomer);
+      feedbackService.notify(t.exportNoneCustomer);
       return;
     }
     if (summaryExportScope === 'date' && !summaryExportDate.trim()) {
-      window.alert(t.exportNoneDate);
+      feedbackService.notify(t.exportNoneDate);
       return;
     }
     if (summaryExportRows.length === 0) {
-      window.alert(
+      feedbackService.notify(
         summaryExportScope === 'settled'
           ? t.exportNoneSettled
           : summaryExportScope === 'open'
@@ -1559,7 +1560,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       });
     } catch (err) {
       console.error(err);
-      window.alert(t.exportFail);
+      feedbackService.notify(t.exportFail);
     } finally {
       setExportBusy(false);
     }
@@ -1677,7 +1678,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       (r) => exportSelected[r.id] && !isProxyPurchaseRowSettled(r),
     );
     if (targets.length === 0) {
-      window.alert(t.noRowsToSettle);
+      feedbackService.notify(t.noRowsToSettle);
       return;
     }
     if (!window.confirm(`${t.confirmBatchSettle}${scopeHint}`)) return;
@@ -1708,7 +1709,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       (r) => exportSelected[r.id] && isProxyPurchaseRowSettled(r),
     );
     if (targets.length === 0) {
-      window.alert(t.noRowsToUnsettle);
+      feedbackService.notify(t.noRowsToUnsettle);
       return;
     }
     if (!window.confirm(`${t.confirmBatchUnsettle}${scopeHint}`)) return;
@@ -1952,7 +1953,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
 
   const handleExport = useCallback(async () => {
     if (exportableRows.length === 0) {
-      window.alert(t.exportNone);
+      feedbackService.notify(t.exportNone);
       return;
     }
     setExportModalOpen(true);
@@ -1960,7 +1961,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
 
   const confirmExport = useCallback(async () => {
     if (selectedExportRows.length === 0) {
-      window.alert(t.exportNone);
+      feedbackService.notify(t.exportNone);
       return;
     }
     setExportBusy(true);
@@ -1983,7 +1984,7 @@ const ProxyPurchasePage: React.FC<ProxyPurchasePageProps> = ({
       setExportModalOpen(false);
     } catch (err) {
       console.error(err);
-      window.alert(t.exportFail);
+      feedbackService.notify(t.exportFail);
     } finally {
       setExportBusy(false);
     }

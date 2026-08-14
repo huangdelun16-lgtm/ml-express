@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { personalLedgerService, type PersonalLedgerRow } from '../services/supabase';
+import { feedbackService } from '../services/FeedbackService';
 
 function todayIso(): string {
   const d = new Date();
@@ -354,7 +355,7 @@ const PersonalExpensePage: React.FC<PersonalExpensePageProps> = ({
   const handleSave = async () => {
     const amt = parseAmountInput(amountStr);
     if (amt <= 0) {
-      window.alert(language === 'zh' ? '请输入大于 0 的金额' : 'Enter an amount greater than 0');
+      feedbackService.notify(language === 'zh' ? '请输入大于 0 的金额' : 'Enter an amount greater than 0');
       amountInputRef.current?.focus();
       return;
     }
@@ -370,7 +371,7 @@ const PersonalExpensePage: React.FC<PersonalExpensePageProps> = ({
           note: note.trim(),
         });
         if (!ok) {
-          window.alert(t.saveFail);
+          feedbackService.notify(t.saveFail);
           return;
         }
       } else {
@@ -384,7 +385,7 @@ const PersonalExpensePage: React.FC<PersonalExpensePageProps> = ({
           note: note.trim(),
         });
         if (!ok) {
-          window.alert(t.saveFail);
+          feedbackService.notify(t.saveFail);
           return;
         }
       }

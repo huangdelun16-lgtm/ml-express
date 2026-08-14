@@ -15,6 +15,7 @@ import {
   resolvePackageCodAmount,
 } from '../utils/packageCodAmount';
 import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
+import { feedbackService } from '../services/FeedbackService';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
@@ -925,7 +926,7 @@ const RealTimeTracking: React.FC = () => {
       .sort((a, b) => (a.currentPackages || 0) - (b.currentPackages || 0));
 
     if (availableCouriers.length === 0) {
-      alert('当前没有在线的快递员，请稍后再试');
+      feedbackService.notify('当前没有在线的快递员，请稍后再试');
       return;
     }
 
@@ -962,7 +963,7 @@ const RealTimeTracking: React.FC = () => {
 
         // 显示明确的成功消息
         const successMessage = `✅ 分配成功！\n\n📦 包裹：${packageData.id}\n🚚 骑手：${courier.name}\n📲 通知：${notificationSuccess ? '已发送' : '发送失败'}\n\n包裹已从待分配列表移除`;
-        alert(successMessage);
+        feedbackService.notify(successMessage);
         
         setShowAssignModal(false);
         setSelectedPackage(null);
@@ -988,12 +989,12 @@ const RealTimeTracking: React.FC = () => {
             : c
         ));
       } else {
-        alert('❌ 分配失败！\n\n包裹状态更新失败，请重试');
+        feedbackService.notify('❌ 分配失败！\n\n包裹状态更新失败，请重试');
       }
     } catch (error) {
       console.error('分配包裹失败:', error);
       const errorMessage = error instanceof Error ? error.message : '未知错误';
-      alert('❌ 分配失败！\n\n发生错误：' + errorMessage);
+      feedbackService.notify('❌ 分配失败！\n\n发生错误：' + errorMessage);
     } finally {
       setIsAssigning(false);
     }

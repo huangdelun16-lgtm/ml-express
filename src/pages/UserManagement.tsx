@@ -5,6 +5,7 @@ import { supabase, auditLogService, deliveryStoreService, adminAccountService } 
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import '../styles/adminUserManagement.css';
+import { feedbackService } from '../services/FeedbackService';
 
 // 用户数据类型定义
 interface User {
@@ -791,15 +792,15 @@ const UserManagement: React.FC = () => {
       setSelectedUsers(new Set());
 
       if (failures > 0) {
-        window.alert(
+        feedbackService.notify(
           `完成部分删除。失败 ${failures} 条（可能受数据库外键或其它关联限制）。\n\n` + errors.slice(0, 5).join('\n'),
         );
       } else {
-        window.alert('批量删除成功');
+        feedbackService.notify('批量删除成功');
       }
     } catch (error) {
       console.error('批量删除异常:', error);
-      window.alert('操作出错');
+      feedbackService.notify('操作出错');
     } finally {
       setIsBatchDeleting(false);
     }
@@ -955,15 +956,15 @@ const UserManagement: React.FC = () => {
       const { error } = await supabase.from('users').insert([newUser]);
       if (error) {
         console.error('❌ 创建用户详细错误:', error.message, error.details, error.hint);
-        window.alert(`创建用户失败: ${error.message}`);
+        feedbackService.notify(`创建用户失败: ${error.message}`);
       } else {
         await loadUsers();
-        window.alert('用户创建成功！');
+        feedbackService.notify('用户创建成功！');
         setShowAddUserForm(false);
       }
     } catch (error: any) {
       console.error('❌ 创建用户异常:', error);
-      window.alert(`创建用户异常: ${error.message || '未知错误'}`);
+      feedbackService.notify(`创建用户异常: ${error.message || '未知错误'}`);
     }
   };
 
@@ -1014,7 +1015,7 @@ const UserManagement: React.FC = () => {
 
       if (error) {
         console.error('充值失败:', error);
-        window.alert('充值失败，请重试');
+        feedbackService.notify('充值失败，请重试');
       } else {
         // 记录审计日志
         await auditLogService.log({
@@ -1030,11 +1031,11 @@ const UserManagement: React.FC = () => {
         await loadUsers();
         setShowRechargeModal(false);
         setRechargeUser(null);
-        window.alert('充值成功！');
+        feedbackService.notify('充值成功！');
       }
     } catch (error) {
       console.error('充值异常:', error);
-      window.alert('操作出错');
+      feedbackService.notify('操作出错');
     } finally {
       setIsRecharging(false);
     }
@@ -1045,7 +1046,7 @@ const UserManagement: React.FC = () => {
     if (!editingUser) return;
 
     if (editingUser.user_type === 'admin') {
-      window.alert(
+      feedbackService.notify(
         '当前条目为后台「员工/管理员」账号，数据保存在「账户管理」中。\n\n请前往：控制台 → 系统设置 → 账户管理 进行修改。',
       );
       return;
@@ -1081,17 +1082,17 @@ const UserManagement: React.FC = () => {
 
       if (error) {
         console.error('❌ 更新用户详细错误:', error.message, error.details, error.hint);
-        window.alert(`更新用户失败: ${error.message}${error.hint ? '\n提示: ' + error.hint : ''}`);
+        feedbackService.notify(`更新用户失败: ${error.message}${error.hint ? '\n提示: ' + error.hint : ''}`);
       } else {
         console.log('✅ 用户更新成功:', data);
         await loadUsers();
-        window.alert('用户更新成功！');
+        feedbackService.notify('用户更新成功！');
         setShowAddUserForm(false);
         setEditingUser(null);
       }
     } catch (error: any) {
       console.error('❌ 更新用户异常:', error);
-      window.alert(`更新用户异常: ${error.message || '未知错误'}`);
+      feedbackService.notify(`更新用户异常: ${error.message || '未知错误'}`);
     }
   };
 
@@ -1104,32 +1105,32 @@ const UserManagement: React.FC = () => {
             ? await supabase.from('admin_accounts').delete().eq('employee_id', String(user.id).slice(4)).select('id')
             : await supabase.from('admin_accounts').delete().eq('id', user.id).select('id');
         if (del.error) {
-          window.alert(`删除管理员失败：${del.error.message}${del.error.hint ? '\n提示：' + del.error.hint : ''}`);
+          feedbackService.notify(`删除管理员失败：${del.error.message}${del.error.hint ? '\n提示：' + del.error.hint : ''}`);
           return;
         }
         if (!del.data?.length) {
-          window.alert('未删除任何记录：未在「账户管理」中找到对应后台账号。');
+          feedbackService.notify('未删除任何记录：未在「账户管理」中找到对应后台账号。');
           return;
         }
       } else {
         await supabase.from('recharge_requests').delete().eq('user_id', user.id);
         const { error, data } = await supabase.from('users').delete().eq('id', user.id).select('id');
         if (error) {
-          window.alert(
+          feedbackService.notify(
             `删除失败：${error.message}${error.details ? '\n' + error.details : ''}${error.hint ? '\n提示：' + error.hint : ''}`,
           );
           return;
         }
         if (!data?.length) {
-          window.alert('未删除任何记录：该用户可能已不存在，或数据在非 users 表中。');
+          feedbackService.notify('未删除任何记录：该用户可能已不存在，或数据在非 users 表中。');
           return;
         }
       }
       await loadUsers();
-      window.alert('删除成功');
+      feedbackService.notify('删除成功');
     } catch (error: unknown) {
       console.error('删除用户异常:', error);
-      window.alert(error instanceof Error ? error.message : '删除异常');
+      feedbackService.notify(error instanceof Error ? error.message : '删除异常');
     }
   };
 
@@ -1141,20 +1142,20 @@ const UserManagement: React.FC = () => {
             ? await supabase.from('admin_accounts').update({ status: newStatus }).eq('employee_id', String(user.id).slice(4))
             : await supabase.from('admin_accounts').update({ status: newStatus }).eq('id', user.id);
         if (up.error) {
-          window.alert('更新状态失败：' + up.error.message);
+          feedbackService.notify('更新状态失败：' + up.error.message);
           return;
         }
       } else {
         const { error } = await supabase.from('users').update({ status: newStatus }).eq('id', user.id);
         if (error) {
-          window.alert('更新状态失败：' + error.message);
+          feedbackService.notify('更新状态失败：' + error.message);
           return;
         }
       }
       await loadUsers();
     } catch (error) {
       console.error('更新状态异常', error);
-      window.alert('更新状态异常');
+      feedbackService.notify('更新状态异常');
     }
   };
 
@@ -1284,20 +1285,20 @@ const UserManagement: React.FC = () => {
         .update(courierUpdateData)
         .eq('employee_id', editingCourier.employee_id);
 
-      window.alert('资料更新成功！');
+      feedbackService.notify('资料更新成功！');
       setShowAddCourierForm(false);
       setEditingCourier(null);
       await loadCouriers();
     } catch (error: any) {
       console.error('更新快递员资料失败:', error);
-      window.alert(`更新失败: ${error.message}`);
+      feedbackService.notify(`更新失败: ${error.message}`);
     }
   };
 
   const handleCourierStatusChange = async (courierId: string, newStatus: any) => {
     console.log('🔄 更改快递员状态:', courierId, newStatus);
     if (!courierId) {
-      window.alert('错误：无效的快递员ID');
+      feedbackService.notify('错误：无效的快递员ID');
       return;
     }
     try {
@@ -1308,10 +1309,10 @@ const UserManagement: React.FC = () => {
       
       if (!error) {
         await loadCouriers();
-        window.alert('状态已更新');
+        feedbackService.notify('状态已更新');
       } else {
         console.error('更新状态失败:', error);
-        window.alert('状态更新失败: ' + error.message);
+        feedbackService.notify('状态更新失败: ' + error.message);
       }
     } catch (error) {
       console.error('更新状态异常');
@@ -1321,7 +1322,7 @@ const UserManagement: React.FC = () => {
   const handleDeleteCourier = async (courierId: string) => {
     console.log('🗑️ 删除快递员:', courierId);
     if (!courierId) {
-      window.alert('错误：无效的快递员ID');
+      feedbackService.notify('错误：无效的快递员ID');
       return;
     }
     if (!window.confirm('确定要永久删除这个快递员账号吗？此操作将移除该账号的所有访问权限！')) return;
@@ -1340,10 +1341,10 @@ const UserManagement: React.FC = () => {
 
       if (!adminError || !courierError) {
         await loadCouriers();
-        window.alert('账号已从权限系统和快递员库中删除');
+        feedbackService.notify('账号已从权限系统和快递员库中删除');
       } else {
         console.error('删除失败:', adminError || courierError);
-        window.alert('删除失败，请重试');
+        feedbackService.notify('删除失败，请重试');
       }
     } catch (error) {
       console.error('删除账号异常');

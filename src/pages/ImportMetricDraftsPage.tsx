@@ -12,6 +12,7 @@ import {
 import ImportPriceListPage from './ImportPriceListPage';
 import PersonalExpensePage from './PersonalExpensePage';
 import { isAbortLikeError } from '../utils/fetchError';
+import { feedbackService } from '../services/FeedbackService';
 
 const CURRENCIES = [
   { value: 'USD', label: '美金 USD' },
@@ -1571,7 +1572,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
     } catch (e) {
       console.error(e);
       const detail = e instanceof Error && e.message ? e.message : '';
-      window.alert(detail && detail !== 'import_metric_drafts update failed' ? `${saveErr}\n\n${detail}` : saveErr);
+      feedbackService.notify(detail && detail !== 'import_metric_drafts update failed' ? `${saveErr}\n\n${detail}` : saveErr);
     }
   };
 
@@ -1968,7 +1969,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                           const dataUrl = await hsAttachmentToPreviewDataUrl(f);
                           setLineField(row.id, { hsImageName: f.name, hsImageDataUrl: dataUrl });
                         } catch {
-                          window.alert('请上传 PDF、JPG 或 PNG，且文件需可被读取（PDF 将使用第一页生成预览）。');
+                          feedbackService.notify('请上传 PDF、JPG 或 PNG，且文件需可被读取（PDF 将使用第一页生成预览）。');
                           setLineField(row.id, { hsImageName: '', hsImageDataUrl: '' });
                         }
                         input.value = '';
@@ -2064,7 +2065,7 @@ const NewImportMetricDraftModal: React.FC<NewDraftModalProps> = ({
                           const dataUrl = await hsAttachmentToPreviewDataUrl(f);
                           setLineField(row.id, { packageImageName: f.name, packageImageDataUrl: dataUrl });
                         } catch {
-                          window.alert('请上传 PDF、JPG 或 PNG，且文件需可被读取（PDF 将使用第一页生成预览）。');
+                          feedbackService.notify('请上传 PDF、JPG 或 PNG，且文件需可被读取（PDF 将使用第一页生成预览）。');
                           setLineField(row.id, { packageImageName: '', packageImageDataUrl: '' });
                         }
                         input.value = '';
@@ -2736,7 +2737,7 @@ const ImportMetricDraftsPage: React.FC = () => {
           throw new Error(result.message);
         }
         if ('warningCode' in result && result.warningCode === 'missing_deposit_date_columns') {
-          window.alert(missingColsMsg);
+          feedbackService.notify(missingColsMsg);
         }
       } else {
         const result = await importMetricDraftService.insert({ ...write, created_by });
@@ -2744,7 +2745,7 @@ const ImportMetricDraftsPage: React.FC = () => {
           throw new Error(result.message);
         }
         if ('warningCode' in result && result.warningCode === 'missing_deposit_date_columns') {
-          window.alert(missingColsMsg);
+          feedbackService.notify(missingColsMsg);
         }
       }
       await reloadDrafts();
@@ -2758,7 +2759,7 @@ const ImportMetricDraftsPage: React.FC = () => {
       if (!isUuid(id)) return;
       const ok = await importMetricDraftService.remove(id);
       if (!ok) {
-        window.alert(
+        feedbackService.notify(
           language === 'en'
             ? 'Could not delete. Try again.'
             : language === 'my'
@@ -3536,7 +3537,7 @@ const ImportMetricDraftsPage: React.FC = () => {
                               onClick={() => {
                                 void exportDraftLineItemsExcel(d).catch((err) => {
                                   console.error(err);
-                                  window.alert(
+                                  feedbackService.notify(
                                     language === 'en'
                                       ? 'Excel export failed. Please try again.'
                                       : language === 'my'
@@ -3596,7 +3597,7 @@ const ImportMetricDraftsPage: React.FC = () => {
                                     await exportDraftPermitSummaryExcel(draftForExport, dateLocale);
                                   } catch (err) {
                                     console.error(err);
-                                    window.alert(
+                                    feedbackService.notify(
                                       language === 'en'
                                         ? 'Excel export failed. Please try again.'
                                         : language === 'my'

@@ -7,6 +7,7 @@ import {
   rowHasQuoteContent,
   type ProxyQuoteRow,
 } from '../utils/proxyQuoteExcel';
+import { feedbackService } from '../services/FeedbackService';
 
 const STORAGE_KEY = 'ml_admin_proxy_quote_v1';
 
@@ -842,7 +843,7 @@ const ProxyQuotePage: React.FC = () => {
         updateRow(rowId, { productImageDataUrl: dataUrl, productImageName: name });
       } catch (e: unknown) {
         const msg = e instanceof Error && e.message === 'too large' ? t.imageTooLarge : t.imageFail;
-        window.alert(msg);
+        feedbackService.notify(msg);
       }
     },
     [t.imageFail, t.imageTooLarge, updateRow],
@@ -856,7 +857,7 @@ const ProxyQuotePage: React.FC = () => {
     const mergedRows = getMergedRows();
     const rowsToExport = mergedRows.filter(rowHasQuoteContent);
     if (rowsToExport.length === 0) {
-      window.alert(t.exportNone);
+      feedbackService.notify(t.exportNone);
       return;
     }
     setExportBusy(true);
@@ -868,7 +869,7 @@ const ProxyQuotePage: React.FC = () => {
       });
     } catch (e) {
       console.error(e);
-      window.alert(t.exportFail);
+      feedbackService.notify(t.exportFail);
     } finally {
       setExportBusy(false);
     }

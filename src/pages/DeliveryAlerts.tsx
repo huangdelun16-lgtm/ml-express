@@ -5,6 +5,7 @@ import { deliveryAlertService } from '../services/deliveryAlertService';
 import { sanitizeHtml, escapeHtml } from '../utils/xssSanitizer';
 import { useLanguage } from '../contexts/LanguageContext';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
+import { feedbackService } from '../services/FeedbackService';
 
 interface DeliveryAlert {
   id: string;
@@ -389,14 +390,14 @@ export default function DeliveryAlerts() {
 
       if (error) {
         console.error('创建违规记录失败:', error);
-        window.alert('创建违规记录失败，请重试');
+        feedbackService.notify('创建违规记录失败，请重试');
         return false;
       }
 
       return true;
     } catch (error) {
       console.error('创建违规记录异常:', error);
-      window.alert('创建违规记录失败，请重试');
+      feedbackService.notify('创建违规记录失败，请重试');
       return false;
     }
   };
@@ -520,7 +521,7 @@ export default function DeliveryAlerts() {
         await handleUpdateStatus(selectedAlert.id, 'resolved');
         setShowViolationModal(false);
         loadViolationRecords();
-        window.alert(`违规记录创建成功！骑手信用分已降至 ${newScore}`);
+        feedbackService.notify(`违规记录创建成功！骑手信用分已降至 ${newScore}`);
       }
     } catch (error) {
       console.error('保存违规记录失败:', error);
@@ -674,17 +675,17 @@ export default function DeliveryAlerts() {
 
       if (error) {
         console.error('批量处理失败:', error);
-        window.alert('批量处理失败，请重试');
+        feedbackService.notify('批量处理失败，请重试');
         return;
       }
 
       loadAlerts();
       updateRealTimeStats();
       notifyAdminTodosRefresh();
-      window.alert(`成功${action === 'acknowledge' ? '确认' : action === 'resolve' ? '解决' : '忽略'} ${alertIds.length} 个警报`);
+      feedbackService.notify(`成功${action === 'acknowledge' ? '确认' : action === 'resolve' ? '解决' : '忽略'} ${alertIds.length} 个警报`);
     } catch (error) {
       console.error('批量处理异常:', error);
-      window.alert('批量处理失败，请重试');
+      feedbackService.notify('批量处理失败，请重试');
     } finally {
       setProcessing(false);
     }
@@ -709,7 +710,7 @@ export default function DeliveryAlerts() {
       );
 
       if (!success) {
-        window.alert('更新失败，请重试');
+        feedbackService.notify('更新失败，请重试');
         return;
       }
 
@@ -725,10 +726,10 @@ export default function DeliveryAlerts() {
       setResolutionNotes('');
       loadAlerts();
       notifyAdminTodosRefresh();
-      window.alert(`警报状态已更新为: ${newStatus}`);
+      feedbackService.notify(`警报状态已更新为: ${newStatus}`);
     } catch (error) {
       console.error('更新警报状态异常:', error);
-      window.alert('更新失败，请重试');
+      feedbackService.notify('更新失败，请重试');
     } finally {
       setProcessing(false);
     }
@@ -747,7 +748,7 @@ export default function DeliveryAlerts() {
 
       if (error) {
         console.error('删除失败:', error);
-        window.alert('删除失败，请重试');
+        feedbackService.notify('删除失败，请重试');
       } else {
         await logDeliveryAudit('delete', {
           target_id: 'all',
@@ -756,7 +757,7 @@ export default function DeliveryAlerts() {
         });
         loadAlerts();
         notifyAdminTodosRefresh();
-        window.alert('所有警报已成功清除');
+        feedbackService.notify('所有警报已成功清除');
       }
     } catch (err) {
       console.error('删除异常:', err);
@@ -1195,7 +1196,7 @@ export default function DeliveryAlerts() {
                     handleBatchAction('acknowledge', pendingIds);
                   }
                 } else {
-                  window.alert('没有待处理的警报');
+                  feedbackService.notify('没有待处理的警报');
                 }
               }}
               disabled={loading || alerts.filter(a => a.status === 'pending').length === 0}

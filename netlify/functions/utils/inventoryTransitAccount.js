@@ -2,24 +2,10 @@
  * Inventory 中转站账号：Auth JWT 同步（create / update 共用）
  */
 
+const { getAdminTokenFromEvent } = require('./adminToken');
+
 const TRANSIT_STATION_STORE_TYPE = 'transit_station';
 const PACK_HUB_CODES = ['MSE', 'LSO', 'POL', 'MDY', 'YGN', 'TGI'];
-
-function getAdminTokenFromEvent(event) {
-  const cookieHeader = event.headers?.cookie || event.headers?.Cookie || '';
-  const tokenCookiePair = cookieHeader
-    .split(';')
-    .map((c) => c.trim())
-    .find((c) => c.startsWith('admin_auth_token='));
-  if (!tokenCookiePair) return null;
-  let token = tokenCookiePair.slice('admin_auth_token='.length).trim();
-  try {
-    token = decodeURIComponent(token);
-  } catch (_) {
-    /* 未编码的旧 Cookie */
-  }
-  return token || null;
-}
 
 function inventoryAuthEmail(storeCode) {
   return `inventory+${storeCode.trim().toLowerCase()}@inventory.mlexpress.internal`;

@@ -1,3 +1,5 @@
+import { adminAuthenticatedFetch } from './authService';
+
 export type MerchantApplicationStatus = 'pending' | 'approved' | 'rejected';
 
 export type MerchantApplication = {
@@ -47,7 +49,7 @@ async function parseJsonResponse(response: Response) {
 export async function fetchMerchantApplications(
   status: MerchantApplicationStatus | 'all' = 'pending',
 ): Promise<{ applications: MerchantApplication[]; pendingCount: number }> {
-  const response = await fetch(
+  const response = await adminAuthenticatedFetch(
     `/.netlify/functions/merchant-admin-applications?status=${encodeURIComponent(status)}`,
     { credentials: 'include' },
   );
@@ -71,7 +73,7 @@ export async function fetchPendingMerchantApplicationCount(): Promise<number> {
 export async function fetchMerchantApplicationDetail(
   id: string,
 ): Promise<{ application: MerchantApplication; suggested_store_code: string | null }> {
-  const response = await fetch(
+  const response = await adminAuthenticatedFetch(
     `/.netlify/functions/merchant-admin-applications?id=${encodeURIComponent(id)}`,
     { credentials: 'include' },
   );
@@ -88,7 +90,7 @@ export async function approveMerchantApplication(input: {
   password?: string;
   store_code?: string;
 }): Promise<{ application: MerchantApplication; credentials: MerchantApplicationCredentials }> {
-  const response = await fetch('/.netlify/functions/merchant-admin-applications', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/merchant-admin-applications', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -105,7 +107,7 @@ export async function rejectMerchantApplication(input: {
   applicationId: string;
   review_notes?: string;
 }): Promise<MerchantApplication> {
-  const response = await fetch('/.netlify/functions/merchant-admin-applications', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/merchant-admin-applications', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },

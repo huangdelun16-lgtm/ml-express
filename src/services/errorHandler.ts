@@ -1,3 +1,5 @@
+import { feedbackService } from './FeedbackService';
+
 /**
  * 统一错误处理服务
  * 提供统一的错误处理、日志记录和用户提示
@@ -76,7 +78,7 @@ class ErrorHandler {
     // 使用更友好的提示方式
     if (typeof window !== 'undefined') {
       // 可以考虑使用toast库，这里暂时使用alert
-      alert(`✅ ${message}`);
+      feedbackService.notify(`✅ ${message}`);
     }
   }
 
@@ -85,7 +87,7 @@ class ErrorHandler {
    */
   showWarning(message: string): void {
     if (typeof window !== 'undefined') {
-      alert(`⚠️ ${message}`);
+      feedbackService.notify(`⚠️ ${message}`);
     }
   }
 
@@ -94,7 +96,7 @@ class ErrorHandler {
    */
   showInfo(message: string): void {
     if (typeof window !== 'undefined') {
-      alert(`ℹ️ ${message}`);
+      feedbackService.notify(`ℹ️ ${message}`);
     }
   }
 
@@ -173,7 +175,7 @@ class ErrorHandler {
         this.showDatabaseError(message);
         break;
       default:
-        alert(message);
+        feedbackService.notify(message);
     }
   }
 
@@ -181,14 +183,14 @@ class ErrorHandler {
    * 网络错误提示
    */
   private showNetworkError(message: string): void {
-    alert(`🌐 网络错误\n\n${message}\n\n请检查：\n• 网络连接\n• 服务器状态\n• 防火墙设置`);
+    feedbackService.notify(`🌐 网络错误\n\n${message}\n\n请检查：\n• 网络连接\n• 服务器状态\n• 防火墙设置`);
   }
 
   /**
    * 数据库错误提示
    */
   private showDatabaseError(message: string): void {
-    alert(`🗄️ 数据库错误\n\n${message}\n\n请稍后重试或联系管理员`);
+    feedbackService.notify(`🗄️ 数据库错误\n\n${message}\n\n请稍后重试或联系管理员`);
   }
 
   /**

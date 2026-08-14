@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { packageService, trackingService } from '../services/supabase';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
+import { feedbackService } from '../services/FeedbackService';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
@@ -244,7 +245,7 @@ const TrackingPage: React.FC = () => {
 
   const handleTracking = async () => {
     if (!trackingNumber.trim()) {
-      alert(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');
+      feedbackService.notify(language === 'zh' ? '请输入包裹单号' : language === 'en' ? 'Please enter tracking number' : 'ထုပ်ပိုးနံပါတ်ကို ထည့်ပါ');
       return;
     }
 
@@ -278,13 +279,13 @@ const TrackingPage: React.FC = () => {
           loadCourierLocation(foundPackage.courier);
         }
       } else {
-        alert(t.tracking.notFound);
+        feedbackService.notify(t.tracking.notFound);
         setTrackingResult(null);
         setCourierLocation(null);
       }
     } catch (error) {
       console.error('查询失败:', error);
-      alert(language === 'zh' ? '查询失败，请稍后重试' : language === 'en' ? 'Query failed, please try again later' : 'ရှာဖွေမှု မအောင်မြင်ပါ');
+      feedbackService.notify(language === 'zh' ? '查询失败，请稍后重试' : language === 'en' ? 'Query failed, please try again later' : 'ရှာဖွေမှု မအောင်မြင်ပါ');
     } finally {
       setLoading(false);
     }

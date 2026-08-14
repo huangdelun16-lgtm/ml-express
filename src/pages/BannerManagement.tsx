@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bannerService, tutorialService, welcomeScreenService, systemSettingsService, Banner, Tutorial, WelcomeScreen } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
+import { feedbackService } from '../services/FeedbackService';
 
 const CLIENT_RECHARGE_QR_SETTING_KEY = 'client.recharge_qr_urls';
 const RECHARGE_QR_TIERS = [10000, 50000, 100000, 300000, 500000, 1000000] as const;
@@ -172,9 +173,9 @@ const BannerManagement: React.FC = () => {
     });
     setRechargeQrSaving(false);
     if (ok) {
-      alert('已保存。用户端打开「余额充值 → 扫码支付」时会从服务器拉取最新图片。');
+      feedbackService.notify('已保存。用户端打开「余额充值 → 扫码支付」时会从服务器拉取最新图片。');
     } else {
-      alert('保存失败，请检查网络与权限后重试');
+      feedbackService.notify('保存失败，请检查网络与权限后重试');
     }
   };
 
@@ -204,7 +205,7 @@ const BannerManagement: React.FC = () => {
       setRechargeQrMap((prev) => ({ ...prev, [amount]: result.url as string }));
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : '上传失败');
+      feedbackService.notify(err instanceof Error ? err.message : '上传失败');
     } finally {
       setUploading(false);
       rechargeQrPickAmountRef.current = null;
@@ -231,7 +232,7 @@ const BannerManagement: React.FC = () => {
       setFormData(prev => ({ ...prev, image_url: result.url }));
     } catch (error) {
       console.error('上传图片异常:', error);
-      alert(error instanceof Error ? error.message : '上传失败');
+      feedbackService.notify(error instanceof Error ? error.message : '上传失败');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -254,7 +255,7 @@ const BannerManagement: React.FC = () => {
       setWelcomeFormData(prev => ({ ...prev, image_url: result.url }));
     } catch (error) {
       console.error('上传图片异常:', error);
-      alert('上传失败');
+      feedbackService.notify('上传失败');
     } finally {
       setUploading(false);
       if (tutorialFileInputRef.current) tutorialFileInputRef.current.value = '';
@@ -294,7 +295,7 @@ const BannerManagement: React.FC = () => {
       });
     } catch (error) {
       console.error('上传教学图片异常:', error);
-      alert('部分图片上传失败，请重试');
+      feedbackService.notify('部分图片上传失败，请重试');
     } finally {
       setUploading(false);
       if (tutorialFileInputRef.current) tutorialFileInputRef.current.value = '';
@@ -342,7 +343,7 @@ const BannerManagement: React.FC = () => {
       if (editingBanner) {
         const success = await bannerService.updateBanner(editingBanner.id!, formData);
         if (success) {
-          alert('广告更新成功！');
+          feedbackService.notify('广告更新成功！');
           setEditingBanner(null);
           setShowForm(false);
           loadBanners();
@@ -350,14 +351,14 @@ const BannerManagement: React.FC = () => {
       } else {
         const success = await bannerService.createBanner(formData);
         if (success) {
-          alert('广告创建成功！');
+          feedbackService.notify('广告创建成功！');
           setShowForm(false);
           loadBanners();
         }
       }
     } catch (error) {
       console.error('保存广告失败:', error);
-      alert('保存失败，请重试');
+      feedbackService.notify('保存失败，请重试');
     }
   };
 
@@ -394,7 +395,7 @@ const BannerManagement: React.FC = () => {
       if (editingTutorial) {
         const success = await tutorialService.updateTutorial(editingTutorial.id!, tutorialFormData);
         if (success) {
-          alert('教学步骤更新成功！');
+          feedbackService.notify('教学步骤更新成功！');
           setEditingTutorial(null);
           setShowTutorialEditModal(false);
           loadTutorials();
@@ -402,14 +403,14 @@ const BannerManagement: React.FC = () => {
       } else {
         const success = await tutorialService.createTutorial(tutorialFormData);
         if (success) {
-          alert('教学步骤创建成功！');
+          feedbackService.notify('教学步骤创建成功！');
           setShowTutorialEditModal(false);
           loadTutorials();
         }
       }
     } catch (error) {
       console.error('保存教学失败:', error);
-      alert('保存失败，请重试');
+      feedbackService.notify('保存失败，请重试');
     }
   };
 
@@ -446,7 +447,7 @@ const BannerManagement: React.FC = () => {
       if (editingWelcomeScreen) {
         const success = await welcomeScreenService.updateWelcomeScreen(editingWelcomeScreen.id!, welcomeFormData);
         if (success) {
-          alert('欢迎页面更新成功！');
+          feedbackService.notify('欢迎页面更新成功！');
           setEditingWelcomeScreen(null);
           setShowWelcomeEditModal(false);
           loadWelcomeScreens();
@@ -454,14 +455,14 @@ const BannerManagement: React.FC = () => {
       } else {
         const success = await welcomeScreenService.createWelcomeScreen(welcomeFormData);
         if (success) {
-          alert('欢迎页面创建成功！');
+          feedbackService.notify('欢迎页面创建成功！');
           setShowWelcomeEditModal(false);
           loadWelcomeScreens();
         }
       }
     } catch (error) {
       console.error('保存欢迎页面失败:', error);
-      alert('保存失败，请重试');
+      feedbackService.notify('保存失败，请重试');
     }
   };
 

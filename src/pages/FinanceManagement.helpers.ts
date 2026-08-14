@@ -1,7 +1,7 @@
 // FinanceManagement 页面的模块级纯逻辑、常量与类型。
 // 从 FinanceManagement.tsx 抽出以缩减巨型组件文件；无 React、无组件状态依赖。
 
-import { FinanceRecord, Package } from "../services/supabase";
+import { AdminAccount, FinanceRecord, Package } from "../services/supabase";
 
 export const REGIONS = [
   { id: "mandalay", name: "曼德勒", prefix: "MDY" },
@@ -208,4 +208,93 @@ export const statusColors: Record<FinanceRecord["status"], string> = {
 export const typeColors: Record<FinanceRecord["record_type"], string> = {
   income: "#2ecc71",
   expense: "#e74c3c",
+};
+
+export type FinanceTimePeriod = "7days" | "30days" | "90days" | "all";
+
+export const getDaysFromPeriod = (period: FinanceTimePeriod): number | null => {
+  switch (period) {
+    case "7days":
+      return 7;
+    case "30days":
+      return 30;
+    case "90days":
+      return 90;
+    case "all":
+      return null;
+    default:
+      return 30;
+  }
+};
+
+export const filterByTimePeriod = <
+  T extends {
+    record_date?: string;
+    created_at?: string;
+    create_time?: string;
+  },
+>(
+  data: T[],
+  period: FinanceTimePeriod,
+  dateField: "record_date" | "created_at" | "create_time" = "record_date",
+): T[] => {
+  const days = getDaysFromPeriod(period);
+  if (days === null) return data;
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+
+  return data.filter((item) => {
+    const dateStr = item[dateField];
+    if (!dateStr) {
+      if ("created_at" in item && item.created_at) {
+        const date = new Date(item.created_at);
+        return date >= cutoffDate;
+      }
+      if ("create_time" in item && item.create_time) {
+        const date = new Date(item.create_time);
+        return date >= cutoffDate;
+      }
+      return false;
+    }
+    const date = new Date(dateStr);
+    return date >= cutoffDate;
+  });
+};
+
+/** 财务「当日收款」骑手列表：账号系统（骑手/骑手队长）为准，再合并 couriers 表实时字段。勿改匹配字段。 */
+export const combineRidersFromAdminAccounts = (
+  accountsData: AdminAccount[],
+  realTimeData: Array<Record<string, any>>,
+) => {
+  const riderAccounts = accountsData.filter(
+    (acc) => acc.position === "骑手" || acc.position === "骑手队长",
+  );
+
+  return riderAccounts.map((acc) => {
+    const rtInfo = realTimeData.find(
+      (c) => c.phone === acc.phone || c.employee_id === acc.employee_id,
+    );
+
+    return {
+      ...rtInfo,
+      id: acc.id || rtInfo?.id || "",
+      name: acc.employee_name,
+      phone: acc.phone,
+      employee_id: acc.employee_id,
+      region: acc.region,
+      status: acc.status,
+      vehicle_type:
+        rtInfo?.vehicle_type ||
+        (acc.position === "骑手队长" ? "car" : "motorcycle"),
+      total_deliveries: rtInfo?.total_deliveries || 0,
+      rating: rtInfo?.rating || 5.0,
+      last_active: rtInfo?.last_active || "从未上线",
+      join_date:
+        acc.hire_date ||
+        (acc.created_at
+          ? new Date(acc.created_at).toLocaleDateString("zh-CN")
+          : "未知"),
+    };
+  });
 };

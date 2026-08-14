@@ -37,6 +37,7 @@ import {
 } from '../utils/packDisplayStatus';
 import { buildTripFeeGroupMap, isPrimaryTripFeePack, tripTransportGroupKey } from '../utils/tripTransportFee';
 import '../styles/crossBorderLogistics.css';
+import { feedbackService } from '../services/FeedbackService';
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -1323,7 +1324,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
         isEn={isEn}
         onCleared={() => {
           void load();
-          window.alert(
+          feedbackService.notify(
             isEn
               ? 'Inventory test data cleared from cloud. Devices will reconcile on next sync.'
               : '云端 Inventory 测试数据已清空。各中转站 App 下次同步后将自动清理本机对应订单与包裹。',

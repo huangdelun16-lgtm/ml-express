@@ -254,7 +254,7 @@ exports.handler = async (event, context) => {
 
         const cookieMaxAge = 2 * 60 * 60; // 2小时（秒）
         const cookieParts = [
-          `admin_auth_token=${token}`,
+          `admin_auth_token=${encodeURIComponent(token)}`,
           `Max-Age=${cookieMaxAge}`,
           'Path=/',
         ];

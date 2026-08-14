@@ -1,3 +1,5 @@
+import { adminAuthenticatedFetch } from './authService';
+
 export type FinanceOriginAttributionGroup = {
   originKey: string;
   label: string;
@@ -291,7 +293,7 @@ export async function fetchStoreFinanceDetail(storeCode: string): Promise<StoreF
   const url = new URL('/.netlify/functions/inventory-admin-finance', window.location.origin);
   url.searchParams.set('storeCode', storeCode);
 
-  const response = await fetch(url.toString(), {
+  const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
     credentials: 'include',
   });
@@ -314,7 +316,7 @@ export async function fetchInventoryConsoleData(
   url.searchParams.set('financePage', String(financePage));
   url.searchParams.set('financePageSize', String(financePageSize));
 
-  const response = await fetch(url.toString(), {
+  const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
     credentials: 'include',
   });
@@ -346,7 +348,7 @@ async function fetchInventoryConsoleSection(
     url.searchParams.set('financePageSize', String(financePagination.pageSize));
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
     credentials: 'include',
   });
@@ -410,7 +412,7 @@ export async function fetchInventoryCustomerSummaries(): Promise<{
   summaries: InventoryCustomerSummary[];
   warnings?: string[];
 }> {
-  const response = await fetch('/.netlify/functions/inventory-admin-customers', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-customers', {
     method: 'GET',
     credentials: 'include',
   });
@@ -443,7 +445,7 @@ export async function fetchInventoryCustomerItems(
     url.searchParams.set('customerPhone', customerPhone);
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
     credentials: 'include',
   });
@@ -537,7 +539,7 @@ export async function fetchCrossBorderAccountDetail(
   const url = new URL('/.netlify/functions/inventory-admin-update-account', window.location.origin);
   url.searchParams.set('storeCode', storeCode);
 
-  const response = await fetch(url.toString(), {
+  const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
     credentials: 'include',
   });
@@ -551,7 +553,7 @@ export async function fetchCrossBorderAccountDetail(
 export async function updateCrossBorderAccount(
   payload: UpdateCrossBorderAccountPayload,
 ): Promise<UpdateCrossBorderAccountResult> {
-  const response = await fetch('/.netlify/functions/inventory-admin-update-account', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-update-account', {
     method: 'PUT',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -571,7 +573,7 @@ export async function deleteCrossBorderAccount(
   const url = new URL('/.netlify/functions/inventory-admin-delete-account', window.location.origin);
   url.searchParams.set('storeCode', storeCode.trim());
 
-  const response = await fetch(url.toString(), {
+  const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'DELETE',
     credentials: 'include',
   });
@@ -585,7 +587,7 @@ export async function deleteCrossBorderAccount(
 export async function createCrossBorderAccount(
   draft: CrossBorderAccountDraft,
 ): Promise<CreateCrossBorderAccountResult> {
-  const response = await fetch('/.netlify/functions/inventory-admin-create-account', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-create-account', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -602,7 +604,7 @@ export async function createCrossBorderAccount(
 export async function createCrossBorderManualEntry(
   draft: CrossBorderManualEntryDraft,
 ): Promise<void> {
-  const response = await fetch('/.netlify/functions/inventory-admin-cross-border-entry', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-cross-border-entry', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -637,7 +639,7 @@ export async function clearInventoryTestData(
   password: string,
   confirmPhrase: string,
 ): Promise<InventoryTestDataClearResult> {
-  const response = await fetch('/.netlify/functions/inventory-admin-clear-test-data', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-clear-test-data', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -686,7 +688,7 @@ export type UpdateCrossBorderSalespersonPayload = {
 };
 
 export async function fetchCrossBorderSalespersons(): Promise<CrossBorderSalesperson[]> {
-  const response = await fetch('/.netlify/functions/inventory-admin-salespersons', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-salespersons', {
     method: 'GET',
     credentials: 'include',
   });
@@ -703,7 +705,7 @@ export async function fetchCrossBorderSalespersonDetail(
   const url = new URL('/.netlify/functions/inventory-admin-salespersons', window.location.origin);
   url.searchParams.set('id', id);
 
-  const response = await fetch(url.toString(), {
+  const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
     credentials: 'include',
   });
@@ -717,7 +719,7 @@ export async function fetchCrossBorderSalespersonDetail(
 export async function createCrossBorderSalesperson(
   draft: CrossBorderSalespersonDraft,
 ): Promise<CrossBorderSalesperson> {
-  const response = await fetch('/.netlify/functions/inventory-admin-salespersons', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-salespersons', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -733,7 +735,7 @@ export async function createCrossBorderSalesperson(
 export async function updateCrossBorderSalesperson(
   payload: UpdateCrossBorderSalespersonPayload,
 ): Promise<CrossBorderSalesperson> {
-  const response = await fetch('/.netlify/functions/inventory-admin-salespersons', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-salespersons', {
     method: 'PUT',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -755,7 +757,7 @@ export async function deleteCrossBorderSalesperson(id: string): Promise<{
   const url = new URL('/.netlify/functions/inventory-admin-salespersons', window.location.origin);
   url.searchParams.set('id', id);
 
-  const response = await fetch(url.toString(), {
+  const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'DELETE',
     credentials: 'include',
   });
@@ -795,7 +797,7 @@ export type CrossBorderRegisteredCustomerDraft = {
 export async function fetchCrossBorderRegisteredCustomers(): Promise<
   CrossBorderRegisteredCustomer[]
 > {
-  const response = await fetch('/.netlify/functions/inventory-admin-cross-border-customers', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-cross-border-customers', {
     method: 'GET',
     credentials: 'include',
   });
@@ -809,7 +811,7 @@ export async function fetchCrossBorderRegisteredCustomers(): Promise<
 export async function createCrossBorderRegisteredCustomer(
   draft: CrossBorderRegisteredCustomerDraft,
 ): Promise<CrossBorderRegisteredCustomer> {
-  const response = await fetch('/.netlify/functions/inventory-admin-cross-border-customers', {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-cross-border-customers', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },

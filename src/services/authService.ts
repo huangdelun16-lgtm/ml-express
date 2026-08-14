@@ -1,30 +1,12 @@
 /**
- * 认证服务
- * 处理管理员登录、Token 生成和验证
- * 使用 HMAC-SHA256 签名确保 Token 安全
- * 
- * ⚠️ 安全改进：
- * - Token 现在通过 httpOnly Cookie 存储（防止 XSS 攻击）
- * - 客户端无法直接读取 Token
- * - 所有认证请求自动包含 Cookie
+ * Admin Web 认证：令牌只由服务端 admin-password / verify-admin 签发（HMAC）。
+ * 浏览器不得自签 JWT，也不得回退 admin/admin 或明文密码查询。
+ * 不与会员/商家/骑手会话或 Inventory App JWT 共用。
  */
 
 import { logger } from '../utils/logger';
 
-interface AdminToken {
-  token: string;
-  expiresAt: number;
-  user: {
-    username: string;
-    role: string;
-    name: string;
-    region?: string;
-    permissions?: string[];
-  };
-}
-
 const TOKEN_STORAGE_KEY = 'admin_auth_token';
-const TOKEN_EXPIRY_TIME = 2 * 60 * 60 * 1000; // 2小时
 
 /** 短时间内复用 verify-admin 成功结果，减少首屏多次路由重复验证造成的延迟与 401 闪烁 */
 const VERIFY_CACHE_MS = 45_000;
@@ -46,128 +28,36 @@ function normalizePermissionKey(permissionId?: string | string[]): string | unde
   return arr.length ? arr.join(',') : undefined;
 }
 
-/**
- * 使用 HMAC-SHA256 生成安全的 Token 签名
- * @param data - 要签名的数据
- * @returns Promise<string> - Base64 编码的签名
- */
-async function generateHMACSignature(data: string): Promise<string> {
-  try {
-    // 使用 Web Crypto API（浏览器环境）
-    const encoder = new TextEncoder();
-    const dataBuffer = encoder.encode(data);
-    
-    // 从环境变量获取密钥，如果没有则使用默认值（仅用于开发）
-    // 生产环境必须设置 REACT_APP_JWT_SECRET（客户端）和 JWT_SECRET（服务端）
-    // 注意：客户端和服务端必须使用相同的密钥！
-    const secret = process.env.REACT_APP_JWT_SECRET || 'default-dev-secret-change-in-production';
-    
-    if (!secret || secret === 'default-dev-secret-change-in-production') {
-      logger.warn('⚠️ 警告：使用默认 JWT_SECRET，生产环境不安全！请在 Netlify 环境变量中配置 REACT_APP_JWT_SECRET');
+const USER_INFO_KEYS = [
+  'currentUser',
+  'currentUserName',
+  'currentUserRole',
+  'currentUserRegion',
+  'currentUserPermissions',
+] as const;
+
+function clearUserInfoStorage() {
+  USER_INFO_KEYS.forEach((key) => {
+    try {
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
+    } catch {
+      /* 隐私模式可能不可用 */
     }
-    
-    const keyBuffer = encoder.encode(secret);
-    
-    // 导入密钥
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw',
-      keyBuffer,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
-    
-    // 生成签名
-    const signature = await crypto.subtle.sign('HMAC', cryptoKey, dataBuffer);
-    
-    // 转换为 Base64（兼容 TypeScript 编译）
-    const uint8Array = new Uint8Array(signature);
-    const charCodes = Array.from(uint8Array);
-    return btoa(String.fromCharCode.apply(null, charCodes));
-  } catch (error) {
-    logger.error('生成签名失败:', error);
-    // 提供更详细的错误信息
-    if (error instanceof Error) {
-      logger.error('错误详情:', error.message);
-    }
-    throw new Error('Token 签名生成失败: ' + (error instanceof Error ? error.message : String(error)));
-  }
+  });
 }
 
-/**
- * 验证 HMAC-SHA256 签名
- * @param data - 原始数据
- * @param signature - 要验证的签名（Base64 编码）
- * @returns Promise<boolean> - 签名是否有效
- */
-async function verifyHMACSignature(data: string, signature: string): Promise<boolean> {
+function readStorage(key: string): string | null {
   try {
-    const expectedSignature = await generateHMACSignature(data);
-    // 使用时间安全的比较方法
-    return expectedSignature === signature;
-  } catch (error) {
-    logger.error('验证签名失败:', error);
-    return false;
-  }
-}
-
-/**
- * 生成安全的 Session Token
- * 格式：username:role:timestamp:signature
- * 签名使用 HMAC-SHA256 确保无法伪造
- */
-async function generateToken(username: string, role: string): Promise<string> {
-  const timestamp = Date.now().toString();
-  const payload = `${username}:${role}:${timestamp}`;
-  const signature = await generateHMACSignature(payload);
-  return `${payload}:${signature}`;
-}
-
-/**
- * 验证 Token 是否有效（包括签名验证）
- */
-async function isValidToken(token: string): Promise<boolean> {
-  try {
-    const parts = token.split(':');
-    if (parts.length < 4) return false; // 现在需要4部分：username:role:timestamp:signature
-
-    const [username, role, timestamp, signature] = parts;
-    const payload = `${username}:${role}:${timestamp}`;
-    
-    // 验证签名
-    const isValidSignature = await verifyHMACSignature(payload, signature);
-    if (!isValidSignature) {
-      return false;
-    }
-    
-    // 检查是否过期
-    const tokenAge = Date.now() - parseInt(timestamp);
-    return tokenAge < TOKEN_EXPIRY_TIME && tokenAge >= 0;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 从 Token 中提取用户信息
- */
-function parseToken(token: string): { username: string; role: string } | null {
-  try {
-    const parts = token.split(':');
-    if (parts.length < 4) return null; // 现在需要4部分
-    
-    return {
-      username: parts[0],
-      role: parts[1]
-    };
+    return sessionStorage.getItem(key) || localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
 /**
- * 保存 Token（通过服务器设置 httpOnly Cookie）
- * ⚠️ 注意：不再使用 localStorage，改为服务器设置 httpOnly Cookie
+ * 保存会话：httpOnly Cookie 由 admin-password 设置；此处只缓存服务端下发的令牌副本
+ *（Cookie 丢失时作为 Authorization Bearer / verify-admin body 回退）。
  */
 export async function saveToken(
   username: string,
@@ -175,67 +65,52 @@ export async function saveToken(
   name: string,
   region?: string,
   permissions?: string[],
-  /** 登录接口下发的与服务端 Cookie 一致的 token（优先）；缺省时客户端自签（兼容离线回退登录） */
   serverIssuedToken?: string | null
 ): Promise<string> {
-  const tokenToStore = serverIssuedToken
-    ? serverIssuedToken
-    : await generateToken(username, role);
-  try {
-    sessionStorage.setItem(TOKEN_STORAGE_KEY, tokenToStore);
-    localStorage.setItem(TOKEN_STORAGE_KEY, tokenToStore);
-  } catch (error) {
-    logger.warn('无法缓存会话令牌（verify-admin 请求体备用）:', error);
+  if (serverIssuedToken) {
+    try {
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, serverIssuedToken);
+      localStorage.setItem(TOKEN_STORAGE_KEY, serverIssuedToken);
+    } catch (error) {
+      logger.warn('无法缓存会话令牌（verify-admin / 跨境 Functions 请求备用）:', error);
+    }
   }
 
-  const userInfo = { username, role, name, region, permissions };
-  
-  // 只保存非敏感的用户信息到 sessionStorage 和 localStorage（页面关闭后清除 sessionStorage，但保留 localStorage 以兼容）
-  // 敏感数据（Token）由服务器通过 httpOnly Cookie 管理
   try {
     sessionStorage.setItem('currentUser', username);
     sessionStorage.setItem('currentUserName', name);
     sessionStorage.setItem('currentUserRole', role);
     if (region) sessionStorage.setItem('currentUserRegion', region);
     if (permissions) sessionStorage.setItem('currentUserPermissions', JSON.stringify(permissions));
-    
-    // 同时保存到 localStorage 以保持兼容性（特别是 Windows 浏览器）
+
     localStorage.setItem('currentUser', username);
     localStorage.setItem('currentUserName', name);
     localStorage.setItem('currentUserRole', role);
     if (region) localStorage.setItem('currentUserRegion', region);
     if (permissions) localStorage.setItem('currentUserPermissions', JSON.stringify(permissions));
   } catch (error) {
-    // sessionStorage 可能不可用（某些隐私模式）
     logger.warn('无法保存用户信息到存储:', error);
   }
-  
-  return tokenToStore;
+
+  return serverIssuedToken || '';
 }
 
-/**
- * 获取当前 Token
- * ⚠️ 注意：httpOnly Cookie 无法通过 JavaScript 读取
- * Token 现在由服务器通过 Cookie 自动发送，客户端不需要读取
- */
+/** 读取缓存的服务端令牌（Cookie 不可用时作为 Authorization Bearer） */
 export function getToken(): string | null {
-  // httpOnly Cookie 无法通过 JavaScript 读取
-  // Token 会在请求时自动通过 Cookie 发送
-  // 这里返回 null，让 verifyToken 通过 API 调用获取
-  return null;
+  return readStorage(TOKEN_STORAGE_KEY);
 }
 
-/**
- * 验证 Token 有效性（包括签名验证）
- */
-export async function validateToken(token: string): Promise<boolean> {
-  return await isValidToken(token);
+/** Admin Netlify Functions：带 Cookie + Bearer 回退 */
+export function adminAuthenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return fetch(input, { ...init, credentials: 'include', headers });
 }
 
-/**
- * 清除 Token
- * 调用服务器 API 清除 httpOnly Cookie
- */
+/** 清除本地会话并让服务端清 httpOnly Cookie */
 export async function clearToken(): Promise<void> {
   lastVerifySuccess = null;
   try {
@@ -244,26 +119,18 @@ export async function clearToken(): Promise<void> {
   } catch (error) {
     logger.warn('清除本地会话令牌失败:', error);
   }
-  // 清除 sessionStorage 中的用户信息
-  try {
-    sessionStorage.removeItem('currentUser');
-    sessionStorage.removeItem('currentUserName');
-    sessionStorage.removeItem('currentUserRole');
-  } catch (error) {
-    logger.warn('清除 sessionStorage 失败:', error);
-  }
-  
-  // 调用服务器 API 清除 httpOnly Cookie
+  clearUserInfoStorage();
+
   try {
     await fetch('/.netlify/functions/verify-admin', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        action: 'logout'
+        action: 'logout',
       }),
-      credentials: 'include' // 重要：包含 Cookie
+      credentials: 'include',
     });
   } catch (error) {
     logger.error('清除 Cookie 失败:', error);
@@ -271,8 +138,7 @@ export async function clearToken(): Promise<void> {
 }
 
 /**
- * 验证 Token（调用服务端验证）
- * Token 现在通过 httpOnly Cookie 自动发送
+ * 验证 Token（调用服务端 verify-admin）
  */
 export async function verifyToken(
   requiredRoles: string[] = [],
@@ -296,15 +162,7 @@ export async function verifyToken(
       return lastVerifySuccess.result;
     }
 
-    let bodyToken: string | undefined;
-    try {
-      bodyToken =
-        sessionStorage.getItem(TOKEN_STORAGE_KEY) ||
-        localStorage.getItem(TOKEN_STORAGE_KEY) ||
-        undefined;
-    } catch {
-      bodyToken = undefined;
-    }
+    const bodyToken = getToken() || undefined;
 
     const permissionIds =
       permissionId == null
@@ -337,7 +195,7 @@ export async function verifyToken(
         result: { valid: true, user: result.user },
       };
       try {
-        const existingRegion = sessionStorage.getItem('currentUserRegion') || localStorage.getItem('currentUserRegion') || undefined;
+        const existingRegion = readStorage('currentUserRegion') || undefined;
         const normalizedPermissions = Array.isArray(result.user.permissions)
           ? result.user.permissions.map((id: string) => (id === 'merchants_stores' ? 'merchant_stores' : id))
           : undefined;
@@ -381,47 +239,35 @@ export async function verifyToken(
   }
 }
 
-/**
- * 检查用户是否已登录
- * ⚠️ 注意：httpOnly Cookie 无法通过 JavaScript 检查
- * 需要通过 API 调用验证
- */
 export async function isAuthenticated(): Promise<boolean> {
   const result = await verifyToken([]);
   return result.valid;
 }
 
-/**
- * 获取当前用户信息
- * 从 sessionStorage 读取（非敏感信息）
- */
 export function getCurrentUser(): { username: string; role: string; name: string; region?: string; permissions?: string[] } | null {
   try {
-    const username = sessionStorage.getItem('currentUser');
-    const role = sessionStorage.getItem('currentUserRole');
-    const name = sessionStorage.getItem('currentUserName');
-    const region = sessionStorage.getItem('currentUserRegion') || undefined;
-    const permissionsStr = sessionStorage.getItem('currentUserPermissions');
+    const username = readStorage('currentUser');
+    const role = readStorage('currentUserRole');
+    const name = readStorage('currentUserName');
+    const region = readStorage('currentUserRegion') || undefined;
+    const permissionsStr = readStorage('currentUserPermissions');
     const permissions = permissionsStr ? JSON.parse(permissionsStr) : undefined;
-    
+
     if (!username || !role) return null;
-    
+
     return {
       username,
       role,
       name: name || '',
       region,
-      permissions
+      permissions,
     };
   } catch {
     return null;
   }
 }
 
-/**
- * 验证当前用户密码（用于高危操作二次验证）
- * @param password - 用户输入的明文密码
- */
+/** 高危操作二次验证：走 admin-password，不读客户端明文库 */
 export async function verifyCurrentUserPassword(password: string): Promise<{ success: boolean; error?: string }> {
   try {
     const user = getCurrentUser();
@@ -429,18 +275,17 @@ export async function verifyCurrentUserPassword(password: string): Promise<{ suc
       return { success: false, error: '未登录' };
     }
 
-    // 使用现有的 admin-password Function 的 login 动作进行验证
-    // 因为 login 动作包含了密码验证逻辑，且不会破坏现有会话
     const response = await fetch('/.netlify/functions/admin-password', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({
         action: 'login',
         username: user.username,
-        password
-      })
+        password,
+      }),
     });
 
     if (!response.ok) {
@@ -453,11 +298,10 @@ export async function verifyCurrentUserPassword(password: string): Promise<{ suc
     const result = await response.json();
     return {
       success: Boolean(result.success),
-      error: result.error
+      error: result.error,
     };
   } catch (error) {
     logger.error('密码二次验证失败:', error);
     return { success: false, error: '验证过程出错' };
   }
 }
-
