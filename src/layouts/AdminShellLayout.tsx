@@ -6,6 +6,7 @@ import { clearToken } from '../services/authService';
 import { useResponsive } from '../hooks/useResponsive';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
 import { feedbackService } from '../services/FeedbackService';
+import AdminFunctionMenu, { type AdminNavCard } from '../components/AdminFunctionMenu';
 
 /** 全屏独立模块：不使用通用后台侧栏/顶栏，由页面自带布局 */
 export const STANDALONE_ADMIN_MODULE_PATHS = [
@@ -17,49 +18,6 @@ export const STANDALONE_ADMIN_MODULE_PATHS = [
 
 /** @deprecated 使用 STANDALONE_ADMIN_MODULE_PATHS */
 export const STANDALONE_IMPORT_ADMIN_PATHS = STANDALONE_ADMIN_MODULE_PATHS;
-
-const MODULE_ICONS: Record<string, string> = {
-  city_packages: '📦',
-  users: '👥',
-  merchant_stores: '🏪',
-  finance: '💰',
-  tracking: '📍',
-  delivery_alerts: '🚨',
-  banners: '🖼️',
-  recharges: '💳',
-  supervision: '📋',
-  reports: '📊',
-  courier_performance: '🛵',
-  merchant_reconciliation: '🧾',
-  settings: '⚙️',
-  metric_management: '📑',
-  cross_border_logistics: '🚚',
-};
-
-const MODULE_ROUTES: Record<string, string> = {
-  city_packages: '/admin/city-packages',
-  users: '/admin/users',
-  merchant_stores: '/admin/delivery-stores',
-  finance: '/admin/finance',
-  tracking: '/admin/tracking',
-  settings: '/admin/settings',
-  delivery_alerts: '/admin/delivery-alerts',
-  banners: '/admin/banners',
-  recharges: '/admin/recharges',
-  supervision: '/admin/supervision',
-  reports: '/admin/reports',
-  courier_performance: '/admin/courier-performance',
-  merchant_reconciliation: '/admin/merchant-reconciliation',
-  metric_management: '/admin/metric-management',
-  cross_border_logistics: '/admin/cross-border-logistics',
-};
-
-function isModulePathActive(pathname: string, moduleId: string): boolean {
-  const base = MODULE_ROUTES[moduleId];
-  if (!base) return false;
-  if (moduleId === 'tracking' && pathname === '/admin/realtime-tracking') return true;
-  return pathname === base || pathname.startsWith(`${base}/`);
-}
 
 const AdminShellLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -204,7 +162,6 @@ const AdminShellLayout: React.FC = () => {
 
   const [showUserEditModal, setShowUserEditModal] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [hoveredNavId, setHoveredNavId] = useState<string | null>(null);
   const { isMobile } = useResponsive();
   const [userEditFormData, setUserEditFormData] = useState({
     username: '',
@@ -278,11 +235,7 @@ const AdminShellLayout: React.FC = () => {
     }
   };
 
-  type NavCard = {
-    id: string;
-    title: string;
-    roles: ('admin' | 'manager' | 'operator' | 'finance')[];
-  };
+  type NavCard = AdminNavCard;
 
   const allCardData: NavCard[] = useMemo(
     () => [
@@ -526,344 +479,22 @@ const AdminShellLayout: React.FC = () => {
         />
       )}
 
-      <aside
-        style={{
-          width: isMobile ? 'min(280px, 86vw)' : 118,
-          flexShrink: 0,
-          background:
-            'linear-gradient(180deg, rgba(8, 28, 52, 0.78) 0%, rgba(12, 38, 68, 0.62) 48%, rgba(10, 32, 58, 0.72) 100%)',
-          backdropFilter: 'blur(28px) saturate(1.15)',
-          WebkitBackdropFilter: 'blur(28px) saturate(1.15)',
-          borderRight: '1px solid rgba(255, 255, 255, 0.14)',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: isMobile ? '12px 10px' : '12px 9px',
-          paddingBottom: 14,
-          zIndex: isMobile ? 160 : 1,
-          position: isMobile ? 'fixed' : 'relative',
-          left: isMobile ? 0 : undefined,
-          top: isMobile ? 0 : undefined,
-          bottom: isMobile ? 0 : undefined,
-          height: isMobile ? '100vh' : '100%',
-          alignSelf: isMobile ? undefined : 'stretch',
-          transform: isMobile ? (mobileNavOpen ? 'translateX(0)' : 'translateX(-105%)') : undefined,
-          transition: isMobile ? 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
-          boxShadow: isMobile && mobileNavOpen
-            ? '8px 0 40px rgba(0, 0, 0, 0.28), inset -1px 0 0 rgba(255,255,255,0.08)'
-            : 'inset -1px 0 0 rgba(255, 255, 255, 0.06), 4px 0 24px rgba(0, 20, 40, 0.12)',
-          maxHeight: isMobile ? '100vh' : undefined,
+      <AdminFunctionMenu
+        cards={cardData}
+        pathname={pathname}
+        language={language}
+        isMobile={isMobile}
+        mobileNavOpen={mobileNavOpen}
+        badges={{
+          pendingRecharge: pendingRechargeCount,
+          pendingAssignment: pendingAssignmentCount,
+          pendingProductReview: pendingProductReviewCount,
+          pendingDeliveryAlerts: pendingDeliveryAlertsCount,
+          pendingMerchantApplications: pendingMerchantApplicationsCount,
         }}
-      >
-        <div
-          style={{
-            marginBottom: 10,
-            padding: isMobile ? '4px 6px 8px' : '2px 4px 8px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              marginBottom: 4,
-            }}
-          >
-            <span
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 7,
-                background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.35), rgba(59, 130, 246, 0.35))',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.72rem',
-                flexShrink: 0,
-              }}
-              aria-hidden
-            >
-              ☰
-            </span>
-            <span
-              style={{
-                fontSize: isMobile ? '0.72rem' : '0.62rem',
-                fontWeight: 800,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: 'rgba(255, 255, 255, 0.88)',
-              }}
-            >
-              {language === 'zh' ? '功能菜单' : language === 'en' ? 'Modules' : 'မီနူး'}
-            </span>
-          </div>
-          <div
-            style={{
-              fontSize: '0.58rem',
-              color: 'rgba(255, 255, 255, 0.45)',
-              paddingLeft: 2,
-              lineHeight: 1.35,
-            }}
-          >
-            {language === 'zh'
-              ? `${cardData.length} 个模块`
-              : language === 'en'
-                ? `${cardData.length} modules`
-                : `${cardData.length} ခု`}
-          </div>
-        </div>
-        <nav
-          className="admin-shell-nav"
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            marginRight: -2,
-            paddingRight: 2,
-            paddingBottom: 6,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 5,
-          }}
-        >
-          {cardData.map((card) => {
-            const pulseNav =
-              (card.id === 'tracking' && pendingAssignmentCount > 0) ||
-              (card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0);
-            const showProductBadge = card.id === 'merchant_stores' && pendingProductReviewCount > 0;
-            const showMerchantAppBadge =
-              card.id === 'merchant_stores' && pendingMerchantApplicationsCount > 0;
-            const showRechargeBadge = card.id === 'recharges' && pendingRechargeCount > 0;
-            const showAssignBadge = card.id === 'tracking' && pendingAssignmentCount > 0;
-            const showAlertBadge = card.id === 'delivery_alerts' && pendingDeliveryAlertsCount > 0;
-            const active = isModulePathActive(pathname, card.id);
-            const targetPath = MODULE_ROUTES[card.id];
-            const outlineMenuCard = card.id === 'metric_management';
-            const hovered = hoveredNavId === card.id;
-            const navBorder = active
-              ? outlineMenuCard
-                ? '1px solid rgba(125, 211, 252, 0.65)'
-                : '1px solid rgba(255, 255, 255, 0.38)'
-              : pulseNav
-                ? `1px solid ${card.id === 'delivery_alerts' ? 'rgba(248, 113, 113, 0.55)' : 'rgba(96, 165, 250, 0.5)'}`
-                : outlineMenuCard
-                  ? '1px solid rgba(56, 189, 248, 0.55)'
-                  : hovered
-                    ? '1px solid rgba(255, 255, 255, 0.22)'
-                    : '1px solid rgba(255, 255, 255, 0.09)';
-            const navBg = active
-              ? 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)'
-              : pulseNav
-                ? 'linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)'
-                : hovered
-                  ? 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)'
-                  : 'linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)';
-            const moduleIcon = MODULE_ICONS[card.id] ?? '•';
-            const hasBadge =
-              showProductBadge || showRechargeBadge || showAssignBadge || showAlertBadge;
-
-            return (
-              <button
-                key={card.id}
-                type="button"
-                aria-label={card.title}
-                aria-current={active ? 'page' : undefined}
-                onMouseEnter={() => setHoveredNavId(card.id)}
-                onMouseLeave={() => setHoveredNavId(null)}
-                onClick={() => {
-                  if (targetPath) navigate(targetPath);
-                  if (isMobile) setMobileNavOpen(false);
-                }}
-                style={{
-                  display: 'flex',
-                  flexDirection: isMobile ? 'row' : 'column',
-                  alignItems: isMobile ? 'center' : 'center',
-                  justifyContent: isMobile ? 'flex-start' : 'center',
-                  gap: isMobile ? 10 : 4,
-                  width: isMobile ? '100%' : '100%',
-                  minHeight: isMobile ? 52 : 54,
-                  textAlign: isMobile ? 'left' : 'center',
-                  padding: isMobile ? '10px 12px' : '8px 6px 7px',
-                  marginLeft: isMobile ? 0 : 0,
-                  marginRight: isMobile ? 0 : 0,
-                  borderRadius: 11,
-                  border: navBorder,
-                  background: navBg,
-                  color: 'white',
-                  cursor: 'pointer',
-                  transition:
-                    'background 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease',
-                  animation: pulseNav && !active ? 'pulse-alert 2.2s infinite' : undefined,
-                  boxSizing: 'border-box',
-                  boxShadow: active
-                    ? '0 4px 14px rgba(0, 30, 60, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)'
-                    : hovered
-                      ? '0 3px 10px rgba(0, 24, 48, 0.15)'
-                      : '0 1px 2px rgba(0, 20, 40, 0.08)',
-                  position: 'relative',
-                  transform: hovered && !active ? 'translateY(-1px)' : undefined,
-                  overflow: 'hidden',
-                }}
-              >
-                {active && (
-                  <span
-                    aria-hidden
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 6,
-                      bottom: 6,
-                      width: 3,
-                      borderRadius: '0 4px 4px 0',
-                      background: 'linear-gradient(180deg, #fbbf24, #3b82f6)',
-                      boxShadow: '0 0 8px rgba(251, 191, 36, 0.45)',
-                    }}
-                  />
-                )}
-                <span
-                  aria-hidden
-                  style={{
-                    fontSize: isMobile ? '1.15rem' : '1.05rem',
-                    lineHeight: 1,
-                    flexShrink: 0,
-                    filter: active ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.25))' : undefined,
-                  }}
-                >
-                  {moduleIcon}
-                </span>
-                <div
-                  style={
-                    isMobile
-                      ? { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }
-                      : { width: '100%', minWidth: 0 }
-                  }
-                >
-                  <div
-                    style={{
-                      fontWeight: active ? 800 : 700,
-                      fontSize: isMobile ? '0.9rem' : '0.7rem',
-                      lineHeight: isMobile ? 1.3 : 1.25,
-                      whiteSpace: isMobile ? 'nowrap' : 'normal',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: isMobile ? 'block' : '-webkit-box',
-                      WebkitLineClamp: isMobile ? 1 : 2,
-                      WebkitBoxOrient: 'vertical',
-                      textAlign: isMobile ? 'left' : 'center',
-                      color: active ? '#fff' : 'rgba(255, 255, 255, 0.92)',
-                    }}
-                  >
-                    {card.title}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    position: isMobile ? 'static' : 'absolute',
-                    top: isMobile ? undefined : 5,
-                    right: isMobile ? undefined : 5,
-                    flexShrink: 0,
-                    display: 'flex',
-                    flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    justifyContent: isMobile ? 'flex-end' : 'flex-end',
-                    gap: 3,
-                    maxWidth: isMobile ? undefined : 52,
-                    minHeight: hasBadge ? (isMobile ? 18 : 14) : 0,
-                  }}
-                >
-                  {showRechargeBadge && (
-                    <span
-                      style={{
-                        background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                        color: 'white',
-                        fontSize: '0.58rem',
-                        fontWeight: 800,
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        lineHeight: 1.2,
-                        boxShadow: '0 1px 4px rgba(220, 38, 38, 0.45)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                      }}
-                    >
-                      {pendingRechargeCount}
-                    </span>
-                  )}
-                  {showAssignBadge && (
-                    <span
-                      style={{
-                        background: 'linear-gradient(135deg, #38bdf8, #2563eb)',
-                        color: 'white',
-                        fontSize: '0.58rem',
-                        fontWeight: 800,
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        lineHeight: 1.2,
-                        boxShadow: '0 1px 4px rgba(37, 99, 235, 0.4)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                      }}
-                    >
-                      {pendingAssignmentCount}
-                    </span>
-                  )}
-                  {showAlertBadge && (
-                    <span
-                      style={{
-                        background: 'linear-gradient(135deg, #f87171, #b91c1c)',
-                        color: 'white',
-                        fontSize: '0.58rem',
-                        fontWeight: 800,
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        lineHeight: 1.2,
-                        boxShadow: '0 1px 4px rgba(185, 28, 28, 0.45)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                      }}
-                    >
-                      {pendingDeliveryAlertsCount}
-                    </span>
-                  )}
-                  {showProductBadge && (
-                    <span
-                      style={{
-                        background: 'linear-gradient(135deg, #fbbf24, #d97706)',
-                        color: 'white',
-                        fontSize: '0.58rem',
-                        fontWeight: 800,
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        lineHeight: 1.2,
-                        boxShadow: '0 1px 4px rgba(217, 119, 6, 0.4)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                      }}
-                    >
-                      {pendingProductReviewCount}
-                    </span>
-                  )}
-                  {showMerchantAppBadge && (
-                    <span
-                      title="待审核入驻申请"
-                      style={{
-                        background: 'linear-gradient(135deg, #60a5fa, #2563eb)',
-                        color: 'white',
-                        fontSize: '0.58rem',
-                        fontWeight: 800,
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        lineHeight: 1.2,
-                        boxShadow: '0 1px 4px rgba(37, 99, 235, 0.4)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                      }}
-                    >
-                      {pendingMerchantApplicationsCount}
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
+        onNavigate={(path) => navigate(path)}
+        onCloseMobile={() => setMobileNavOpen(false)}
+      />
 
       <div
         style={{

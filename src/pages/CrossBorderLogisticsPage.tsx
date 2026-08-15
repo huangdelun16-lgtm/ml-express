@@ -1,15 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
-import CrossBorderAccountManagementModal from '../components/CrossBorderAccountManagementModal';
-import CrossBorderPricingModal from '../components/CrossBorderPricingModal';
-import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
-import CrossBorderClearTestDataModal from '../components/CrossBorderClearTestDataModal';
-import CreateCrossBorderCustomerModal from '../components/CreateCrossBorderCustomerModal';
-import CustomerExpressItemsModal from '../components/CustomerExpressItemsModal';
-import StoreFinanceDetailModal from '../components/StoreFinanceDetailModal';
-import StationReconciliationModal from '../components/StationReconciliationModal';
 import CblTablePagination, { paginateSlice } from '../components/CblTablePagination';
 import {
   fetchInventoryConsoleFinance,
@@ -38,6 +38,26 @@ import {
 import { buildTripFeeGroupMap, isPrimaryTripFeePack, tripTransportGroupKey } from '../utils/tripTransportFee';
 import '../styles/crossBorderLogistics.css';
 import { feedbackService } from '../services/FeedbackService';
+
+const CrossBorderAccountManagementModal = lazy(
+  () => import('../components/CrossBorderAccountManagementModal'),
+);
+const CrossBorderPricingModal = lazy(() => import('../components/CrossBorderPricingModal'));
+const CrossBorderManualEntryModal = lazy(() => import('../components/CrossBorderManualEntryModal'));
+const CrossBorderClearTestDataModal = lazy(
+  () => import('../components/CrossBorderClearTestDataModal'),
+);
+const CreateCrossBorderCustomerModal = lazy(
+  () => import('../components/CreateCrossBorderCustomerModal'),
+);
+const CustomerExpressItemsModal = lazy(() => import('../components/CustomerExpressItemsModal'));
+const StoreFinanceDetailModal = lazy(() => import('../components/StoreFinanceDetailModal'));
+const StationReconciliationModal = lazy(() => import('../components/StationReconciliationModal'));
+
+function CblLazyModal({ open, children }: { open: boolean; children: React.ReactNode }) {
+  if (!open) return null;
+  return <Suspense fallback={null}>{children}</Suspense>;
+}
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -236,14 +256,17 @@ const CrossBorderLogisticsPage: React.FC = () => {
     return isEn ? hub.nameEn : hub.nameZh;
   };
 
-  const packsFilterLoadedRef = React.useRef<PackStatusFilter | null>(null);
-  const financePageRef = React.useRef(financePage);
-  const tablePageSizeRef = React.useRef(tablePageSize);
-  const financePaginationInitRef = React.useRef(true);
-  const customersSectionRef = React.useRef<HTMLElement | null>(null);
-  const incomeOverviewRef = React.useRef<HTMLDivElement | null>(null);
-  const customersFetchStartedRef = React.useRef(false);
+  const packsFilterLoadedRef = useRef<PackStatusFilter>('active');
+  const packFilterRef = useRef(packFilter);
+  const financePageRef = useRef(financePage);
+  const tablePageSizeRef = useRef(tablePageSize);
+  const customersSectionRef = useRef<HTMLElement | null>(null);
+  const customersFetchStartedRef = useRef(false);
+  const loadSeqRef = useRef(0);
+  const financeReqIdRef = useRef(0);
+  const packsReqIdRef = useRef(0);
 
+  packFilterRef.current = packFilter;
   financePageRef.current = financePage;
   tablePageSizeRef.current = tablePageSize;
 
@@ -281,9 +304,11 @@ const CrossBorderLogisticsPage: React.FC = () => {
   }, [loadCustomers]);
 
   const loadFinanceEntries = useCallback(async (page: number, pageSize: number) => {
+    const reqId = ++financeReqIdRef.current;
     setFinanceLoading(true);
     try {
       const result = await fetchInventoryConsoleFinance(page, pageSize);
+      if (reqId !== financeReqIdRef.current) return;
       setData((prev) =>
         prev
           ? {
@@ -296,12 +321,17 @@ const CrossBorderLogisticsPage: React.FC = () => {
     } catch {
       /* 保留当前财务数据 */
     } finally {
-      setFinanceLoading(false);
+      if (reqId === financeReqIdRef.current) {
+        setFinanceLoading(false);
+      }
     }
   }, []);
 
   const load = useCallback(async () => {
-    financePaginationInitRef.current = true;
+    const loadId = ++loadSeqRef.current;
+    const financeReqId = ++financeReqIdRef.current;
+    const packsReqId = ++packsReqIdRef.current;
+    const filter = packFilterRef.current;
     const shouldReloadCustomers = customersFetchStartedRef.current;
     setLoading(true);
     setFinanceLoading(true);
@@ -311,72 +341,76 @@ const CrossBorderLogisticsPage: React.FC = () => {
     const [overviewSettled, financeSettled, packsSettled] = await Promise.allSettled([
       fetchInventoryConsoleOverview(),
       fetchInventoryConsoleFinance(financePageRef.current, tablePageSizeRef.current),
-      fetchInventoryConsolePacks(packFilter),
+      fetchInventoryConsolePacks(filter),
     ]);
+
+    if (loadId !== loadSeqRef.current) return;
+
+    const financeResult = financeSettled.status === 'fulfilled' ? financeSettled.value : null;
+    const packsResult = packsSettled.status === 'fulfilled' ? packsSettled.value : null;
+    const financeFresh = financeReqId === financeReqIdRef.current && financeResult != null;
+    const packsFresh = packsReqId === packsReqIdRef.current && packsResult != null;
 
     if (overviewSettled.status === 'fulfilled') {
       const overview = overviewSettled.value;
       const warnings = [...(overview.warnings ?? [])];
-      if (financeSettled.status === 'fulfilled' && financeSettled.value.warnings?.length) {
-        warnings.push(...financeSettled.value.warnings);
+      if (financeResult?.warnings?.length) {
+        warnings.push(...financeResult.warnings);
       }
-      if (packsSettled.status === 'fulfilled' && packsSettled.value.warnings?.length) {
-        warnings.push(...packsSettled.value.warnings);
+      if (packsResult?.warnings?.length) {
+        warnings.push(...packsResult.warnings);
       }
 
-      setData({
+      setData((prev) => ({
         ok: true,
         at: new Date().toISOString(),
-        transitStores:
-          financeSettled.status === 'fulfilled'
-            ? financeSettled.value.transitStores
-            : overview.transitStores,
+        transitStores: financeResult && financeFresh
+          ? financeResult.transitStores
+          : (prev?.transitStores ?? overview.transitStores),
         stats: overview.stats,
         transportFeeTotal: overview.transportFeeTotal,
-        recentPacks:
-          packsSettled.status === 'fulfilled' ? packsSettled.value.recentPacks : [],
-        packStatusFilter:
-          packsSettled.status === 'fulfilled'
-            ? (packsSettled.value.packStatusFilter ?? packFilter)
-            : packFilter,
-        crossBorderFinance:
-          financeSettled.status === 'fulfilled'
-            ? financeSettled.value.crossBorderFinance
-            : undefined,
+        recentPacks: packsResult && packsFresh ? packsResult.recentPacks : (prev?.recentPacks ?? []),
+        packStatusFilter: packsResult && packsFresh
+          ? (packsResult.packStatusFilter ?? filter)
+          : (prev?.packStatusFilter ?? filter),
+        crossBorderFinance: financeResult && financeFresh
+          ? financeResult.crossBorderFinance
+          : prev?.crossBorderFinance,
         warnings,
-      });
+      }));
 
-      if (packsSettled.status === 'fulfilled') {
-        packsFilterLoadedRef.current = packFilter;
+      if (packsFresh) {
+        packsFilterLoadedRef.current = filter;
       }
     } else {
-      setData(null);
       const reason = overviewSettled.reason;
       setError(reason instanceof Error ? reason.message : '加载失败');
     }
 
     setLoading(false);
-    setFinanceLoading(false);
-    setPacksLoading(false);
+    if (financeReqId === financeReqIdRef.current) {
+      setFinanceLoading(false);
+    }
+    if (packsReqId === packsReqIdRef.current) {
+      setPacksLoading(false);
+    }
 
     if (shouldReloadCustomers) {
       void loadCustomers();
     }
-  }, [packFilter, loadCustomers]);
+  }, [loadCustomers]);
 
-  const initialLoadDoneRef = React.useRef(false);
+  const initialLoadDoneRef = useRef(false);
 
   useEffect(() => {
     void load().then(() => {
       initialLoadDoneRef.current = true;
-      packsFilterLoadedRef.current = packFilter;
-      scheduleCustomersLoad();
     });
-  }, [load, scheduleCustomersLoad]);
+  }, [load]);
 
   useEffect(() => {
-    const targets = [customersSectionRef.current, incomeOverviewRef.current].filter(Boolean);
-    if (!targets.length) return;
+    const target = customersSectionRef.current;
+    if (!target) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -387,29 +421,24 @@ const CrossBorderLogisticsPage: React.FC = () => {
       { rootMargin: '320px' },
     );
 
-    for (const el of targets) {
-      observer.observe(el as Element);
-    }
+    observer.observe(target);
     return () => observer.disconnect();
   }, [scheduleCustomersLoad]);
 
   useEffect(() => {
     if (!initialLoadDoneRef.current) return;
-    if (financePaginationInitRef.current) {
-      financePaginationInitRef.current = false;
-      return;
-    }
     void loadFinanceEntries(financePage, tablePageSize);
   }, [financePage, tablePageSize, loadFinanceEntries]);
 
   useEffect(() => {
-    if (!initialLoadDoneRef.current) return;
     if (packsFilterLoadedRef.current === packFilter) return;
-    packsFilterLoadedRef.current = packFilter;
+    const reqId = ++packsReqIdRef.current;
     setPacksPage(1);
     setPacksLoading(true);
     void fetchInventoryConsolePacks(packFilter)
       .then((result) => {
+        if (reqId !== packsReqIdRef.current) return;
+        packsFilterLoadedRef.current = packFilter;
         setData((prev) =>
           prev
             ? {
@@ -420,16 +449,20 @@ const CrossBorderLogisticsPage: React.FC = () => {
             : prev,
         );
       })
-      .finally(() => setPacksLoading(false));
+      .catch(() => {
+        /* 保留当前运输明细 */
+      })
+      .finally(() => {
+        if (reqId === packsReqIdRef.current) {
+          setPacksLoading(false);
+        }
+      });
   }, [packFilter]);
 
   useEffect(() => {
     setStoresPage(1);
     setCustomersPage(1);
     setPacksPage(1);
-  }, [tablePageSize]);
-
-  useEffect(() => {
     setFinancePage(1);
   }, [tablePageSize]);
 
@@ -548,8 +581,9 @@ const CrossBorderLogisticsPage: React.FC = () => {
       : `Inventory App 登录\n店铺代码：${lastCreated.login.storeCode}\n密码：${lastCreated.login.password}\n枢纽码：${lastCreated.login.hubCode}`;
     try {
       await navigator.clipboard.writeText(text);
+      feedbackService.success(isEn ? 'Login credentials copied' : '登录信息已复制');
     } catch {
-      /* ignore */
+      feedbackService.error(isEn ? 'Copy failed' : '复制失败');
     }
   };
 
@@ -692,16 +726,24 @@ const CrossBorderLogisticsPage: React.FC = () => {
         )}
 
         <div className="cbl-stats">
-          {statsCards.map((card) => (
-            <div key={card.label} className="cbl-stat">
-              <div className="cbl-stat__label">{card.label}</div>
-              <div className="cbl-stat__value">{card.value}</div>
-              <div className="cbl-stat__hint">{card.hint}</div>
-            </div>
-          ))}
+          {statsCards.length
+            ? statsCards.map((card) => (
+                <div key={card.label} className="cbl-stat">
+                  <div className="cbl-stat__label">{card.label}</div>
+                  <div className="cbl-stat__value">{card.value}</div>
+                  <div className="cbl-stat__hint">{card.hint}</div>
+                </div>
+              ))
+            : Array.from({ length: 6 }, (_, i) => (
+                <div key={`cbl-stat-skel-${i}`} className="cbl-stat is-skeleton" aria-hidden>
+                  <div className="cbl-stat__label">{'\u00a0'}</div>
+                  <div className="cbl-stat__value">{'\u00a0'}</div>
+                  <div className="cbl-stat__hint">{'\u00a0'}</div>
+                </div>
+              ))}
         </div>
 
-        <div className="cbl-io-overview" ref={incomeOverviewRef}>
+        <div className="cbl-io-overview">
           <section className="cbl-io-overview-card cbl-io-overview-card--in">
             <h2 className="cbl-io-overview-card__title">
               {isEn ? 'Total income' : '总收入'}
@@ -1213,7 +1255,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
               <div className="cbl-empty">{isEn ? 'Loading transport…' : '正在加载运输明细…'}</div>
             ) : recentPacks.length ? (
               <>
-              <div className="cbl-table-wrap">
+              <div className={`cbl-table-wrap${packsLoading ? ' is-loading' : ''}`}>
                 <table className="cbl-table">
                   <thead>
                     <tr>
@@ -1297,68 +1339,84 @@ const CrossBorderLogisticsPage: React.FC = () => {
         </section>
       </div>
 
-      <CrossBorderAccountManagementModal
-        open={showAccountMgmtModal}
-        onClose={() => setShowAccountMgmtModal(false)}
-        stores={data?.transitStores ?? []}
-        isEn={isEn}
-        onCreated={handleCreated}
-        onUpdated={handleAccountUpdated}
-        onDeleted={handleAccountDeleted}
-      />
+      <CblLazyModal open={showAccountMgmtModal}>
+        <CrossBorderAccountManagementModal
+          open={showAccountMgmtModal}
+          onClose={() => setShowAccountMgmtModal(false)}
+          stores={data?.transitStores ?? []}
+          isEn={isEn}
+          onCreated={handleCreated}
+          onUpdated={handleAccountUpdated}
+          onDeleted={handleAccountDeleted}
+        />
+      </CblLazyModal>
 
-      <CrossBorderPricingModal
-        open={showPricingModal}
-        onClose={() => setShowPricingModal(false)}
-      />
+      <CblLazyModal open={showPricingModal}>
+        <CrossBorderPricingModal
+          open={showPricingModal}
+          onClose={() => setShowPricingModal(false)}
+        />
+      </CblLazyModal>
 
-      <CrossBorderManualEntryModal
-        open={showManualEntryModal}
-        onClose={() => setShowManualEntryModal(false)}
-        onSaved={() => void load()}
-      />
+      <CblLazyModal open={showManualEntryModal}>
+        <CrossBorderManualEntryModal
+          open={showManualEntryModal}
+          onClose={() => setShowManualEntryModal(false)}
+          onSaved={() => void load()}
+        />
+      </CblLazyModal>
 
-      <CrossBorderClearTestDataModal
-        open={showClearTestModal}
-        onClose={() => setShowClearTestModal(false)}
-        isEn={isEn}
-        onCleared={() => {
-          void load();
-          feedbackService.notify(
-            isEn
-              ? 'Inventory test data cleared from cloud. Devices will reconcile on next sync.'
-              : '云端 Inventory 测试数据已清空。各中转站 App 下次同步后将自动清理本机对应订单与包裹。',
-          );
-        }}
-      />
+      <CblLazyModal open={showClearTestModal}>
+        <CrossBorderClearTestDataModal
+          open={showClearTestModal}
+          onClose={() => setShowClearTestModal(false)}
+          isEn={isEn}
+          onCleared={() => {
+            void load();
+            feedbackService.notify(
+              isEn
+                ? 'Inventory test data cleared from cloud. Devices will reconcile on next sync.'
+                : '云端 Inventory 测试数据已清空。各中转站 App 下次同步后将自动清理本机对应订单与包裹。',
+            );
+          }}
+        />
+      </CblLazyModal>
 
-      <CustomerExpressItemsModal
-        open={customerModalTarget != null}
-        onClose={() => setCustomerModalTarget(null)}
-        customer={customerModalTarget}
-      />
+      <CblLazyModal open={customerModalTarget != null}>
+        <CustomerExpressItemsModal
+          open={customerModalTarget != null}
+          onClose={() => setCustomerModalTarget(null)}
+          customer={customerModalTarget}
+        />
+      </CblLazyModal>
 
-      <CreateCrossBorderCustomerModal
-        open={showCreateCustomerModal}
-        onClose={() => setShowCreateCustomerModal(false)}
-        onCreated={(customer) => {
-          setRegisteredCustomers((prev) => [customer, ...prev]);
-          setRegisteredCustomersPage(1);
-        }}
-      />
+      <CblLazyModal open={showCreateCustomerModal}>
+        <CreateCrossBorderCustomerModal
+          open={showCreateCustomerModal}
+          onClose={() => setShowCreateCustomerModal(false)}
+          onCreated={(customer) => {
+            setRegisteredCustomers((prev) => [customer, ...prev]);
+            setRegisteredCustomersPage(1);
+          }}
+        />
+      </CblLazyModal>
 
-      <StoreFinanceDetailModal
-        open={financeModalStore != null}
-        onClose={closeFinanceDetail}
-        store={financeModalStore}
-        mode={financeModalMode}
-      />
+      <CblLazyModal open={financeModalStore != null}>
+        <StoreFinanceDetailModal
+          open={financeModalStore != null}
+          onClose={closeFinanceDetail}
+          store={financeModalStore}
+          mode={financeModalMode}
+        />
+      </CblLazyModal>
 
-      <StationReconciliationModal
-        open={reconcileModalStore != null}
-        onClose={() => setReconcileModalStore(null)}
-        store={reconcileModalStore}
-      />
+      <CblLazyModal open={reconcileModalStore != null}>
+        <StationReconciliationModal
+          open={reconcileModalStore != null}
+          onClose={() => setReconcileModalStore(null)}
+          store={reconcileModalStore}
+        />
+      </CblLazyModal>
     </div>
   );
 };

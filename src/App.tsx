@@ -19,7 +19,6 @@ import MerchantReconciliationExportPage from './pages/MerchantReconciliationExpo
 import ImportMetricDraftsPage from './pages/ImportMetricDraftsPage';
 import ProxyPurchasePage from './pages/ProxyPurchasePage';
 import ProxyQuotePage from './pages/ProxyQuotePage';
-import CrossBorderLogisticsPage from './pages/CrossBorderLogisticsPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AbnormalAlertManager from './components/AbnormalAlertManager';
@@ -30,6 +29,7 @@ import AdminShellLayout, { STANDALONE_IMPORT_ADMIN_PATHS } from './layouts/Admin
 import { GlobalToast } from './components/GlobalToast';
 
 const FinanceManagement = lazy(() => import('./pages/FinanceManagement'));
+const CrossBorderLogisticsPage = lazy(() => import('./pages/CrossBorderLogisticsPage'));
 
 const standaloneImportPaths = STANDALONE_IMPORT_ADMIN_PATHS as readonly string[];
 
@@ -287,7 +287,9 @@ function App() {
                       requiredRoles={['admin', 'manager', 'operator', 'finance']}
                       permissionId="cross_border_logistics"
                     >
-                      <CrossBorderLogisticsPage />
+                      <Suspense fallback={<div style={{ color: 'white', padding: 40, textAlign: 'center' }}>加载中...</div>}>
+                        <CrossBorderLogisticsPage />
+                      </Suspense>
                     </ProtectedRoute>
                   }
                 />

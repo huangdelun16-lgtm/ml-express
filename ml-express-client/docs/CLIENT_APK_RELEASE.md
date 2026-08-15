@@ -37,17 +37,17 @@ npm run build:apk
 npm run download:apk
 ```
 
-将下载的文件重命名为与 SQL 一致，例如：`ml-client-2.6.2-69.apk`
+将下载的文件重命名为与 SQL 一致，例如：`ml-client-2.7.0-70.apk`
 
 ### 2. 上传到 Supabase Storage
 
 Dashboard → **Storage → client-releases → Upload file**
 
-- 路径：桶根目录，文件名 **`ml-client-2.6.2-69.apk`**（与下面 SQL 完全一致）
+- 路径：桶根目录，文件名 **`ml-client-2.7.0-70.apk`**（与下面 SQL 完全一致）
 - 上传后点文件 → **Get URL**，应类似：
 
 ```
-https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/client-releases/ml-client-2.6.2-69.apk
+https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/client-releases/ml-client-2.7.0-70.apk
 ```
 
 在浏览器打开该 URL，应开始下载 APK（不是 JSON 报错）。
@@ -60,7 +60,7 @@ SQL Editor 执行（或修改后执行）：
 
 **务必满足：**
 
-- `versionCode` **大于** 用户已安装版本（当前 **69**）
+- `versionCode` **大于** 用户已安装版本（当前 **70**）
 - `apkUrl` 与 Storage 中实际上传的文件名一致
 
 ### 4. 在 App 内验证

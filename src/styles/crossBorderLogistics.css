@@ -1458,6 +1458,48 @@
   color: #fff;
 }
 
+.cbl-stat.is-skeleton .cbl-stat__label,
+.cbl-stat.is-skeleton .cbl-stat__value,
+.cbl-stat.is-skeleton .cbl-stat__hint {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e2e8f0 20%, #f8fafc 50%, #e2e8f0 80%);
+  background-size: 200% 100%;
+  animation: cbl-shimmer 1.2s ease infinite;
+  color: transparent;
+}
+
+.cbl-stat.is-skeleton .cbl-stat__label {
+  height: 0.72em;
+  width: 46%;
+}
+
+.cbl-stat.is-skeleton .cbl-stat__value {
+  height: 1.35em;
+  width: 3.2em;
+  margin-top: 8px;
+}
+
+.cbl-stat.is-skeleton .cbl-stat__hint {
+  height: 0.7em;
+  width: 68%;
+  margin-top: 8px;
+}
+
+@keyframes cbl-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.cbl-table-wrap.is-loading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .cbl-empty {
   padding: 28px 16px;
   text-align: center;

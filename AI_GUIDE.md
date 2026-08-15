@@ -115,9 +115,9 @@ flowchart TB
 | **`/`（仓库根）** | Web | **管理后台**：订单、用户、财务、跟踪、告警、合伙店铺、报表、跨境物流 | CRA + TS + React Router **v6** | **2.2.4** | Netlify（根目录） |
 | **`ml-express-client-web/`** | Web | **会员端网站**：首页、商城、购物车、账户、Support | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
 | **`ml-express-merchant-web/`** | Web | **商家端网站**：门店订单/商品/对账 | CRA + TS + React Router **v7** | **0.1.0** | Netlify |
-| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.6.2 (69)** | EAS |
-| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.4.8 (19)** | EAS |
-| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.3.8 (77)** | EAS |
+| **`ml-express-client/`** | Mobile | **会员 App** `com.mlexpress.client` | Expo SDK 54 / RN 0.81 | **2.7.0 (70)** | EAS |
+| **`ml-express-merchant-app/`** | Mobile | **商家 App** `com.mlexpress.merchants` | Expo SDK 54 / RN 0.81 | **2.5.0 (20)** | EAS |
+| **`ml-express-mobile-app/`** | Mobile | **骑手/员工端** `com.mlexpress.courier` | Expo SDK 54 / RN 0.81 | **2.4.0 (78)** | EAS |
 | **`ml-express-inventory-app/`** | Mobile | **中转站库存 App** `com.mlexpress.inventory` | Expo SDK 54 + Supabase Auth + 蓝牙打印 | **1.7.0 (13)** | EAS |
 | **`shared/`** | 共享源 | 跨端纯逻辑单一源 | TS | — | sync 进各 app |
 | **`netlify/`** | 服务端 | 管理后台 Netlify Functions | Node | — | — |
@@ -223,7 +223,7 @@ flowchart TB
 | **业务层** | `supabase.ts`（barrel）+ `merchantApi/`；登录 `merchantAuthService` |
 | **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`Alert.alert` 仅确认/破坏性操作；生产 `installProductionConsoleGate`（**无 Sentry**，勿擅自加） |
 | **共享** | `src/services/_shared/`（含 `productReview.ts`） |
-| **部署** | EAS projectId `0c1336bd-…`；版本见 §20（app.json **2.4.8 (19)**） |
+| **部署** | EAS projectId `0c1336bd-…`；版本见 §20（app.json **2.5.0 (20)**） |
 
 ### 3.1.6 骑手/员工 App（`ml-express-mobile-app/`）
 
@@ -237,7 +237,7 @@ flowchart TB
 | **扫码主路径** | `scanCodeHelpers` + `findPackageByScanCode`；取件扫包裹码、送达扫 `STORE_`；地图进详情 `openScan` |
 | **认证** | `admin_accounts` + Netlify `admin-password`（**无客户端明文密码兜底**）+ `ensure-courier-auth` |
 | **导航** | Stack + 双 Tab：Admin（Dashboard/Map/Scan/Profile）vs Courier（MyTasks/Map/Scan/Profile） |
-| **部署** | EAS projectId `9831d961-…`；`build:aab`；版本 **2.3.8 (77)** |
+| **部署** | EAS projectId `9831d961-…`；`build:aab`；版本 **2.4.0 (78)** |
 
 ### 3.1.7 Inventory 中转站 App（`ml-express-inventory-app/`）
 
@@ -543,7 +543,7 @@ cd ml-express-merchant-web && npm install && npm start
 | 项 | 值 |
 |----|-----|
 | 包名 | `com.mlexpress.client` |
-| 版本 | **2.6.2**（iOS build **69** / Android versionCode **69**） |
+| 版本 | **2.7.0**（iOS build **70** / Android versionCode **70**） |
 | 技术 | Expo SDK 54 + RN 0.81.4 + React Navigation 6 |
 | Deep link | `ml-express-client://`、`https://mlexpress.com` |
 | EAS | projectId `80b0873d-1d76-429e-8c79-738a817d8a15` |
@@ -633,7 +633,7 @@ npm run build:apk:gradle                            # 本地 Gradle APK
 |----|-----|
 | 包名 | `com.mlexpress.merchants` |
 | 显示名 | MARKET LINK MERCHANT |
-| 版本 | **2.4.8**（iOS build **19** / Android versionCode **19**） |
+| 版本 | **2.5.0**（iOS build **20** / Android versionCode **20**） |
 | Scheme | `ml-express-merchants://` |
 | EAS | projectId `0c1336bd-…` |
 
@@ -719,7 +719,7 @@ eas build --platform android --profile production
 |----|-----|
 | 包名 | `com.mlexpress.courier` |
 | 显示名 | MARKET LINK STAFF |
-| 版本 | **2.3.8**（iOS build **77** / Android versionCode **77**） |
+| 版本 | **2.4.0**（iOS build **78** / Android versionCode **78**） |
 | Scheme | `ml-express-staff://` |
 | EAS | projectId `9831d961-…` |
 
@@ -1502,9 +1502,9 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 | 项目 | 版本 | Build / Code | 备注 |
 |------|------|--------------|------|
 | 管理后台（根） | **2.2.4** | — | `package.json` |
-| ml-express-client | **2.6.2** | **69** | 体验与稳定性优化 |
-| ml-express-merchant-app | **2.4.8** | **19** | 仅店铺运营；保留代客下单 |
-| ml-express-mobile-app | **2.3.8** | **77** | STAFF 骑手端 |
+| ml-express-client | **2.7.0** | **70** | 体验与稳定性优化 |
+| ml-express-merchant-app | **2.5.0** | **20** | 仅店铺运营；保留代客下单 |
+| ml-express-mobile-app | **2.4.0** | **78** | STAFF 骑手端 |
 | ml-express-inventory-app | **1.7.0** | **13** | 快递单/入库单复制；客户签收留痕 |
 | ml-express-client-web | **0.1.0** | — | |
 | ml-express-merchant-web | **0.1.0** | — | |
@@ -1587,7 +1587,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 3. **扫码主路径**：取件扫包裹码，送达扫 `STORE_`；地图 → 详情 `openScan`。
 4. **体验**：Toast 统一非确认提示；`MyTasks` SectionList；地图离屏停定位。
 5. **生产**：console 门禁 + `LoggerService` + Sentry。
-6. 版本锚点：**2.3.8 (77)**；详述见 **§9**。
+6. 版本锚点：**2.4.0 (78)**；详述见 **§9**。
 
 ### 22.4 Inventory 决策快照
 

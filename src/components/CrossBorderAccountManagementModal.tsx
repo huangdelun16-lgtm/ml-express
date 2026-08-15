@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import CreateCrossBorderAccountModal from './CreateCrossBorderAccountModal';
 import CreateSalespersonModal from './CreateSalespersonModal';
 import {
   deleteCrossBorderAccount,
@@ -30,6 +29,8 @@ type Props = {
 };
 
 type TabId = 'accounts' | 'salespersons';
+
+const CreateCrossBorderAccountModal = lazy(() => import('./CreateCrossBorderAccountModal'));
 
 function hubLabel(regionId: string | undefined, isEn: boolean): string {
   const hub = CROSS_BORDER_HUBS.find((h) => h.regionId === regionId);
@@ -422,17 +423,21 @@ const CrossBorderAccountManagementModal: React.FC<Props> = ({
         </div>
       </div>
 
-      <CreateCrossBorderAccountModal
-        open={accountFormOpen}
-        onClose={() => {
-          setShowCreate(false);
-          setEditStoreCode(null);
-        }}
-        existingStores={stores}
-        onCreated={handleCreated}
-        editStoreCode={showCreate ? null : editStoreCode}
-        onUpdated={handleUpdated}
-      />
+      {accountFormOpen ? (
+        <Suspense fallback={null}>
+          <CreateCrossBorderAccountModal
+            open={accountFormOpen}
+            onClose={() => {
+              setShowCreate(false);
+              setEditStoreCode(null);
+            }}
+            existingStores={stores}
+            onCreated={handleCreated}
+            editStoreCode={showCreate ? null : editStoreCode}
+            onUpdated={handleUpdated}
+          />
+        </Suspense>
+      ) : null}
 
       <CreateSalespersonModal
         open={salespersonFormOpen}

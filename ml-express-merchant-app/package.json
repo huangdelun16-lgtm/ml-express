@@ -1,6 +1,6 @@
 {
   "name": "ml-express-merchant-app",
-  "version": "2.4.8",
+  "version": "2.5.0",
   "main": "index.js",
   "scripts": {
     "sync:shared": "node ../shared/sync.mjs --out src/services/_shared",

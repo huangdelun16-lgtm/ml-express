@@ -7,10 +7,10 @@ VALUES (
   'client',
   'client.android.latest_release',
   jsonb_build_object(
-    'version', '2.6.2',
-    'versionCode', 69,
-    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/client-releases/ml-client-2.6.2-69.apk',
-    'releaseNotes', '2.6.2：体验与稳定性优化'
+    'version', '2.7.0',
+    'versionCode', 70,
+    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/client-releases/ml-client-2.7.0-70.apk',
+    'releaseNotes', '2.7.0：体验与稳定性优化'
   ),
   'Client app Android latest APK for in-app update check',
   'admin'
