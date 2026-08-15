@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useTranslation } from '../i18n';
+import { feedbackService } from '../services/FeedbackService';
 import type { TranslationDict } from '../i18n/translations';
 import {
   mergeScannedDevices,
@@ -78,7 +78,7 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
       } catch (error) {
         if (cancelled) return;
         setScanning(false);
-        Alert.alert(t.settings.scanPrinterTitle, resolveScanError(t, error));
+        feedbackService.notify(t.settings.scanPrinterTitle, resolveScanError(t, error));
       }
     })();
 
@@ -98,7 +98,7 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
 
   const handleRescan = () => {
     if (!isNativeBleAvailable()) {
-      Alert.alert(t.settings.scanPrinterTitle, t.settings.scanPrinterUnavailable);
+      feedbackService.notify(t.settings.scanPrinterTitle, t.settings.scanPrinterUnavailable);
       return;
     }
     if (connectingId) return;
@@ -123,7 +123,7 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
         }, SCAN_DURATION_MS);
       } catch (error) {
         setScanning(false);
-        Alert.alert(t.settings.scanPrinterTitle, resolveScanError(t, error));
+        feedbackService.notify(t.settings.scanPrinterTitle, resolveScanError(t, error));
       }
     })();
   };
@@ -147,12 +147,12 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
         const connected = await connectBluetoothDevice(device.id);
         setConnectedDevice(connected);
         onConnectionChange?.();
-        Alert.alert(
+        feedbackService.notify(
           t.settings.scanPrinterTitle,
           fmt(t.settings.scanPrinterConnectedTo, { name: connected.name }),
         );
       } catch (error) {
-        Alert.alert(
+        feedbackService.notify(
           t.settings.scanPrinterConnectFailed,
           resolveScanError(t, error),
         );
@@ -172,7 +172,7 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
         setConnectedDevice(null);
         onConnectionChange?.();
       } catch (error) {
-        Alert.alert(t.settings.scanPrinterConnectFailed, resolveScanError(t, error));
+        feedbackService.notify(t.settings.scanPrinterConnectFailed, resolveScanError(t, error));
       } finally {
         setDisconnecting(false);
       }

@@ -252,7 +252,7 @@ async function ensureCache(
     await applyPlatformWipeIfPending();
     const hub = scope.hubCode;
     const snapshot = await fetchSnapshot(session, hub, includeMovements);
-    if (cache && scopeMatches(cacheScope, scope)) {
+    if (cache && scopeMatches(cacheScope, scope) && !force) {
       cache = mergeInventoryCaches(cache, snapshot);
     } else {
       cache = snapshot;

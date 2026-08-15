@@ -27,6 +27,7 @@ import {
   openAndroidApkDownload,
 } from '../services/appUpdateService';
 import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
+import { feedbackService } from '../services/FeedbackService';
 import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 
 function SectionCard({
@@ -138,11 +139,11 @@ export default function SettingsScreen() {
       try {
         const result = await checkAndroidAppUpdate();
         if (!result.latest) {
-          Alert.alert(t.common.tip, t.settings.updateNoReleaseConfig);
+          feedbackService.notify(t.common.tip, t.settings.updateNoReleaseConfig);
           return;
         }
         if (!result.hasUpdate) {
-          Alert.alert(
+          feedbackService.notify(
             t.settings.updateUpToDateTitle,
             fmt(t.settings.updateUpToDateBody, {
               current: result.currentVersion,
@@ -167,14 +168,14 @@ export default function SettingsScreen() {
               text: t.settings.updateDownload,
               onPress: () => {
                 void openAndroidApkDownload(latest.apkUrl).catch((e: unknown) => {
-                  Alert.alert(t.settings.updateCheckFailed, resolveAppError(t, e));
+                  feedbackService.notify(t.settings.updateCheckFailed, resolveAppError(t, e));
                 });
               },
             },
           ],
         );
       } catch (e: unknown) {
-        Alert.alert(t.settings.updateCheckFailed, resolveAppError(t, e));
+        feedbackService.notify(t.settings.updateCheckFailed, resolveAppError(t, e));
       } finally {
         setCheckingUpdate(false);
       }
@@ -320,7 +321,7 @@ export default function SettingsScreen() {
         storeCode={storeCode}
         onClose={() => setPasswordModalVisible(false)}
         onSuccess={() =>
-          Alert.alert(t.settings.passwordUpdated, t.settings.passwordUpdatedMsg)
+          feedbackService.notify(t.settings.passwordUpdated, t.settings.passwordUpdatedMsg)
         }
       />
 

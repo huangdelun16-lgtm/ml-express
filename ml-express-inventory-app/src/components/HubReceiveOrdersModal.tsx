@@ -19,6 +19,7 @@ import {
   areAllPackOrdersProcessed,
   countPendingPackInboundOrders,
   isDestinationHubPack,
+  resolveHubReceiveStep,
   resolvePackLegDestinationCode,
 } from '../utils/hubReceivePack';
 
@@ -50,6 +51,7 @@ type Props = {
   errorText?: string;
   successText?: string;
   onClose: () => void;
+  onConfirmPack: () => void;
   onConfirmOrder: (orderId: string) => void;
   onBatchInbound: () => void;
   onPayTransportFee: () => void;
@@ -73,6 +75,7 @@ export default function HubReceiveOrdersModal({
   errorText,
   successText,
   onClose,
+  onConfirmPack,
   onConfirmOrder,
   onBatchInbound,
   onPayTransportFee,
@@ -83,8 +86,8 @@ export default function HubReceiveOrdersModal({
 
   const layout = useMemo(() => {
     const cardMax = windowHeight * 0.92;
-    const headerEstimate = 108;
-    const footerEstimate = 196;
+    const headerEstimate = 148;
+    const footerEstimate = 220;
     const orderListMax = Math.max(180, cardMax - headerEstimate - footerEstimate);
     return { cardMax, orderListMax };
   }, [windowHeight, pack?.orders.length]);
@@ -92,28 +95,34 @@ export default function HubReceiveOrdersModal({
   if (!pack || !store) return null;
 
   const destinationPack = isDestinationHubPack(pack, hubCode);
+  const step = resolveHubReceiveStep(pack, hubCode);
+  const packConfirmed = pack.status !== 'in_transit';
   const ordersAllProcessed = areAllPackOrdersProcessed(pack);
   const pendingInboundCount = countPendingPackInboundOrders(pack, hubCode);
 
   const legDest = resolvePackLegDestinationCode(pack) || hubCode;
   const feeDisplay = getTransportFeeDisplay(t, pack.transport_fee);
   const feeAmount = parseTransportFeeAmount(pack.transport_fee);
-  const hasPendingInbound = destinationPack && pendingInboundCount > 0;
+  const hasPendingInbound = pendingInboundCount > 0;
   const allInboundDone = ordersAllProcessed && !hasPendingInbound;
-  const needsFeePayment = allInboundDone && feeAmount > 0 && !transportFeePaid;
-  const showPayFeeButton = destinationPack && needsFeePayment && tripFeeAnchorPack;
+  const needsFeePayment = step === 3 && allInboundDone && feeAmount > 0 && !transportFeePaid;
+  const showPayFeeButton = needsFeePayment && tripFeeAnchorPack;
   const showTripFeeWaitHint =
-    destinationPack && allInboundDone && feeAmount > 0 && !transportFeePaid && !tripFeeAnchorPack;
+    step === 3 && allInboundDone && feeAmount > 0 && !transportFeePaid && !tripFeeAnchorPack;
   const transitOrders = pack.orders.filter((line) => resolveOrderDestinationCode(line) !== hubCode);
-  const canReleaseTransit = canReleaseTransitManually({
-    packageStatus: pack.status,
-    hasTransitOrders: transitOrders.length > 0,
-    hasUnreleasedTransitOrders: transitOrders.some((line) => line.status !== 'released_at_hub'),
-  });
+  const canReleaseTransit =
+    step === 2 &&
+    canReleaseTransitManually({
+      packageStatus: pack.status,
+      hasTransitOrders: transitOrders.length > 0,
+      hasUnreleasedTransitOrders: transitOrders.some((line) => line.status !== 'released_at_hub'),
+    });
   const showCloseButton =
-    !hasPendingInbound && allInboundDone && !needsFeePayment && !canReleaseTransit;
+    step === 3 && !hasPendingInbound && allInboundDone && !needsFeePayment && !canReleaseTransit;
   const canDismiss = showCloseButton;
-  const canBatchInbound = destinationPack && pendingInboundCount > 0;
+  const canBatchInbound = step === 2 && pendingInboundCount > 0;
+  const showConfirmPack = step === 1;
+  const step2Label = destinationPack ? t.hubReceive.stepInbound : t.hubReceive.stepDispatch;
   const actionBusy =
     loading || confirmingHubReceive || batchInbounding || payingTransportFee || releasingTransit;
 
@@ -140,6 +149,13 @@ export default function HubReceiveOrdersModal({
             <Text style={styles.closeXText}>✕</Text>
           </Pressable>
           <View style={styles.headerBlock}>
+            <View style={styles.stepRow}>
+              <StepChip index={1} label={t.hubReceive.stepConfirm} active={step === 1} done={step > 1} />
+              <View style={styles.stepLine} />
+              <StepChip index={2} label={step2Label} active={step === 2} done={step > 2} />
+              <View style={styles.stepLine} />
+              <StepChip index={3} label={t.hubReceive.stepFee} active={step === 3} done={showCloseButton} />
+            </View>
             <View style={styles.titleRow}>
               <Text style={styles.title}>{t.hubReceive.modalTitle}</Text>
               <View style={styles.statusBadge}>
@@ -180,7 +196,7 @@ export default function HubReceiveOrdersModal({
               const isDone =
                 line.status === 'hub_received' || line.status === 'released_at_hub';
               const canInbound =
-                destinationPack &&
+                packConfirmed &&
                 line.status === 'in_transit' &&
                 isLocal;
               const isConfirming = confirmingOrderId === line.id;
@@ -268,6 +284,21 @@ export default function HubReceiveOrdersModal({
               </View>
             ) : null}
 
+            {showConfirmPack ? (
+              <>
+                <Text style={styles.confirmHint}>{t.hubReceive.confirmPackHint}</Text>
+                <Pressable
+                  style={[styles.confirmPackBtn, actionBusy && styles.btnBusy]}
+                  onPress={onConfirmPack}
+                  disabled={actionBusy}
+                >
+                  <Text style={styles.confirmPackBtnText}>
+                    {confirmingHubReceive ? t.common.processing : t.hubReceive.modalConfirmPack}
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
+
             {canReleaseTransit ? (
               <Pressable
                 style={[styles.transitBtn, actionBusy && styles.btnBusy]}
@@ -336,6 +367,26 @@ export default function HubReceiveOrdersModal({
   );
 }
 
+function StepChip({
+  index,
+  label,
+  active,
+  done,
+}: {
+  index: number;
+  label: string;
+  active: boolean;
+  done: boolean;
+}) {
+  return (
+    <View style={[styles.stepChip, active && styles.stepChipActive, done && styles.stepChipDone]}>
+      <Text style={[styles.stepChipText, active && styles.stepChipTextActive, done && styles.stepChipTextDone]}>
+        {done ? '✓' : index} {label}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -361,6 +412,50 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingRight: 36,
   },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  stepLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#334155',
+    marginHorizontal: 4,
+  },
+  stepChip: {
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(51,65,85,0.7)',
+    borderWidth: 1,
+    borderColor: '#475569',
+  },
+  stepChipActive: {
+    backgroundColor: 'rgba(14,165,233,0.18)',
+    borderColor: '#38bdf8',
+  },
+  stepChipDone: {
+    backgroundColor: 'rgba(34,197,94,0.16)',
+    borderColor: '#4ade80',
+  },
+  stepChipText: { color: '#94a3b8', fontSize: 10, fontWeight: '900' },
+  stepChipTextActive: { color: '#7dd3fc' },
+  stepChipTextDone: { color: '#86efac' },
+  confirmHint: {
+    color: '#94a3b8',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 8,
+  },
+  confirmPackBtn: {
+    backgroundColor: '#0284c7',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  confirmPackBtnText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   closeXBtn: {
     position: 'absolute',
     top: 8,

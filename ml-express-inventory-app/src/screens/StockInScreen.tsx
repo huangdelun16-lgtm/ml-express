@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFormFieldChain } from '../hooks/useFormFieldChain';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -23,6 +22,7 @@ import { DimensionSpecField, LockedSuffixField } from '../components/StructuredI
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { applyStockMovement, getItemByBarcode, getStockInPrefillByCode } from '../services/inventoryService';
+import { feedbackService } from '../services/FeedbackService';
 import type { InventoryItem } from '../types/inventory';
 import { generateUniqueInboundBarcode } from '../utils/inboundBarcode';
 import {
@@ -272,19 +272,19 @@ export default function StockInScreen({ route, navigation }: Props) {
     }
     if (step === 2) {
       if (!recipientName.trim()) {
-        Alert.alert(t.common.tip, t.stockIn.alertName);
+        feedbackService.notify(t.common.tip, t.stockIn.alertName);
         return;
       }
       if (!recipientPhone.trim()) {
-        Alert.alert(t.common.tip, t.stockIn.alertPhone);
+        feedbackService.notify(t.common.tip, t.stockIn.alertPhone);
         return;
       }
       if (!productName.trim()) {
-        Alert.alert(t.common.tip, t.stockIn.alertItemName);
+        feedbackService.notify(t.common.tip, t.stockIn.alertItemName);
         return;
       }
       if (!packaging) {
-        Alert.alert(t.common.tip, t.itemForm.alertPackaging);
+        feedbackService.notify(t.common.tip, t.itemForm.alertPackaging);
         return;
       }
       setStep(3);
@@ -318,20 +318,20 @@ export default function StockInScreen({ route, navigation }: Props) {
   const submit = async () => {
     if (loading) return;
     if (!destination.trim()) {
-      Alert.alert(t.common.tip, t.stockIn.alertDestination);
+      feedbackService.notify(t.common.tip, t.stockIn.alertDestination);
       return;
     }
     if (!weightFilled) {
-      Alert.alert(t.common.tip, t.stockIn.alertWeight);
+      feedbackService.notify(t.common.tip, t.stockIn.alertWeight);
       return;
     }
     const n = Number(qty);
     if (!Number.isFinite(n) || n <= 0) {
-      Alert.alert(t.common.tip, t.stockIn.alertQty);
+      feedbackService.notify(t.common.tip, t.stockIn.alertQty);
       return;
     }
     if (!paymentSelected) {
-      Alert.alert(t.common.tip, t.stockIn.paymentRequired);
+      feedbackService.notify(t.common.tip, t.stockIn.paymentRequired);
       return;
     }
 
@@ -390,7 +390,7 @@ export default function StockInScreen({ route, navigation }: Props) {
 
       resetWizard();
     } catch (e: unknown) {
-      Alert.alert(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -478,9 +478,9 @@ export default function StockInScreen({ route, navigation }: Props) {
                 autoCapitalize="characters"
                 inputRef={step2Chain.propsFor('code').inputRef}
                 returnKeyType={step2Chain.propsFor('code').returnKeyType}
-                onSubmitEditing={() => {
+                onSubmitEditing={(e) => {
                   void lookupCustomerCodeNow(customerCode);
-                  step2Chain.propsFor('code').onSubmitEditing?.();
+                  step2Chain.propsFor('code').onSubmitEditing?.(e);
                 }}
                 blurOnSubmit={step2Chain.propsFor('code').blurOnSubmit}
               />

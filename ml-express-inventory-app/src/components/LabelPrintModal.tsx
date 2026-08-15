@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -13,6 +12,7 @@ import type { OrderBarcodeData } from './OrderBarcodeModal';
 import { useTranslation } from '../i18n';
 import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 import { printOrderBarcodeLabel } from '../services/bleLabelPrinter';
+import { feedbackService } from '../services/FeedbackService';
 import { resolvePrintError } from '../services/labelPrintFlow';
 
 type Props = {
@@ -34,11 +34,10 @@ export default function LabelPrintModal({ visible, data, printer, onClose }: Pro
     void (async () => {
       try {
         await printOrderBarcodeLabel(data);
-        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody, [
-          { text: t.common.ok, onPress: onClose },
-        ]);
+        feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
+        onClose();
       } catch (error) {
-        Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
+        feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
       } finally {
         setPrinting(false);
       }

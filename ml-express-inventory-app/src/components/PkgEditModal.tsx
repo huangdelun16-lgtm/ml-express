@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { resolveAppError, useTranslation } from '../i18n';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { updatePackedShipment } from '../services/inventoryService';
+import { feedbackService } from '../services/FeedbackService';
 import type { PackedShipmentListRow } from '../types/inventory';
 import {
   isPackContentLockedForStore,
@@ -61,7 +61,7 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
   const save = async () => {
     if (!pack) return;
     if (!form.payload.name.trim()) {
-      Alert.alert(t.common.tip, t.itemForm.alertName);
+      feedbackService.notify(t.common.tip, t.itemForm.alertName);
       return;
     }
     setSaving(true);
@@ -81,7 +81,7 @@ export default function PkgEditModal({ visible, pack, onClose, onSaved }: Props)
       onSaved();
       onClose();
     } catch (e: unknown) {
-      Alert.alert(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(t.common.fail, resolveAppError(t, e));
     } finally {
       setSaving(false);
     }

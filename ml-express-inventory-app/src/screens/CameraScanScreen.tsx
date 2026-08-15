@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import BarcodeScannerView from '../components/BarcodeScannerView';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
@@ -11,6 +11,7 @@ import type { InventoryItem } from '../types/inventory';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
+import { feedbackService } from '../services/FeedbackService';
 
 type Nav = {
   navigate: (
@@ -162,7 +163,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
               : fmt(t.common.signMarked, { name: detail.name }),
           );
         }}
-        onError={(message) => Alert.alert(t.common.signFailed, message)}
+        onError={(message) => feedbackService.notify(t.common.signFailed, message)}
       />
     </View>
   );

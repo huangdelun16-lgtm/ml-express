@@ -19,6 +19,8 @@ import {
 import {
   assertCloudPacksExist,
   deleteCloudPackedShipment,
+  fetchCloudHomeOverview,
+  fetchCloudRecentPackedShipments,
   fetchCloudTodayMovementTotals,
   packagingStockInBatchAtomic,
 } from './inventoryCloudApi';
@@ -111,15 +113,23 @@ const listRowLight = (
   };
 };
 
-async function all(scope?: { store: InventoryStoreSession; hubCode: string }, includeMovements = false) {
-  return getInventorySnapshot(scope?.store, scope?.hubCode, { includeMovements });
+async function all(
+  scope?: { store: InventoryStoreSession; hubCode: string },
+  includeMovements = false,
+  options?: { force?: boolean },
+) {
+  return getInventorySnapshot(scope?.store, scope?.hubCode, {
+    includeMovements,
+    force: options?.force,
+  });
 }
 
 export async function listItems(
   search?: string,
   scope?: { store: InventoryStoreSession; hubCode: string },
+  options?: { force?: boolean },
 ): Promise<InventoryItemListRow[]> {
-  const { items, packs } = await all(scope, false);
+  const { items, packs } = await all(scope, false, options);
   const q = search?.trim().toLowerCase();
 
   const packByBarcode = new Map(packs.map((p) => [p.bundle_barcode.trim().toUpperCase(), p]));
@@ -268,8 +278,12 @@ export async function applyStockMovement(params: {
   return { item: saved, movement };
 }
 
-export async function listPackableItems(search?: string, scope?: { store: InventoryStoreSession; hubCode: string }): Promise<InventoryItemListRow[]> {
-  return (await listItems(search, scope)).filter((item) => item.qty_on_hand > 0 && !item.packed && !isPackageBarcode(item.barcode));
+export async function listPackableItems(
+  search?: string,
+  scope?: { store: InventoryStoreSession; hubCode: string },
+  options?: { force?: boolean },
+): Promise<InventoryItemListRow[]> {
+  return (await listItems(search, scope, options)).filter((item) => item.qty_on_hand > 0 && !item.packed && !isPackageBarcode(item.barcode));
 }
 
 export async function createPackedShipment(params: {
@@ -796,17 +810,53 @@ export async function cancelInventoryItem(
 }
 
 export async function getStats(scope?: { store: InventoryStoreSession; hubCode: string }) {
-  const [{ items, packs }, { todayIn, todayOut }] = await Promise.all([
-    all(scope, false),
+  const [overview, { todayIn, todayOut }] = await Promise.all([
+    fetchCloudHomeOverview(),
     fetchCloudTodayMovementTotals(),
   ]);
+  void scope;
   return {
-    itemCount: items.length,
-    totalQty: items.reduce((n, i) => n + i.qty_on_hand, 0),
-    lowStockCount: items.filter((i) => i.min_qty > 0 && i.qty_on_hand <= i.min_qty).length,
+    itemCount: overview.itemCount,
+    totalQty: overview.totalQty,
+    lowStockCount: overview.lowStockCount,
     todayIn,
     todayOut,
-    packCount: packs.length,
+    packCount: overview.packCount,
+  };
+}
+
+export async function getHomeOverview(scope?: { store: InventoryStoreSession; hubCode: string }): Promise<{
+  stats: Awaited<ReturnType<typeof getStats>>;
+  recentPacks: PackedShipmentListRow[];
+}> {
+  const [overview, { todayIn, todayOut }, recentRows] = await Promise.all([
+    fetchCloudHomeOverview(),
+    fetchCloudTodayMovementTotals(),
+    fetchCloudRecentPackedShipments(3),
+  ]);
+  const details = recentRows.map((row) => packDetailFromCloudPackRow(row, []));
+  const visible = details.filter(
+    (pack) => !scope || isVisibleInPackedList(pack, scope.store, scope.hubCode),
+  );
+  const statuses: Record<string, import('../types/tracking').PkgTrackingStatus | null> =
+    await listPkgTrackingStatusMap(visible.map((p) => p.bundle_barcode)).catch(() => ({}));
+  return {
+    stats: {
+      itemCount: overview.itemCount,
+      totalQty: overview.totalQty,
+      lowStockCount: overview.lowStockCount,
+      todayIn,
+      todayOut,
+      packCount: overview.packCount,
+    },
+    recentPacks: visible.map((pack) => ({
+      ...pack,
+      cloud_status: statuses[pack.bundle_barcode.toUpperCase()] ?? null,
+      display_status: resolvePackDisplayStatus(
+        pack,
+        statuses[pack.bundle_barcode.toUpperCase()] ?? null,
+      ),
+    })),
   };
 }
 

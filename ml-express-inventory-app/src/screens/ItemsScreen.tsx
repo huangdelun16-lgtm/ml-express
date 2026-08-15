@@ -13,14 +13,14 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import ItemActionModal from '../components/ItemActionModal';
 import ItemViewModal from '../components/ItemViewModal';
-import PackagingStockInBarcodeText from '../components/PackagingStockInBarcodeText';
+import ItemsListRow from '../components/ItemsListRow';
+import ItemsModeBar, { type ItemsListMode } from '../components/ItemsModeBar';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
-import PaidStampWatermark from '../components/PaidStampWatermark';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import PackExpressModal from '../components/PackExpressModal';
 import RegionFilterBar from '../components/RegionFilterBar';
 import { useAuth } from '../contexts/AuthContext';
-import { inboundOrderBarcodeData, packOrderBarcodeData, listItemOrderBarcodeData, type PackBarcodePayload } from '../utils/orderBarcodeData';
+import { packOrderBarcodeData, listItemOrderBarcodeData, type PackBarcodePayload } from '../utils/orderBarcodeData';
 import { runBarcodeLabelPrintWithAlert } from '../services/labelPrintFlow';
 import {
   createPackedShipment,
@@ -37,21 +37,17 @@ import {
 import {
   canEditItemCustomerProfile,
 } from '../utils/itemCustomerProfileEdit';
-import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
-import {
-  isCustomerSignedItem,
-  resolveItemCardQty,
-  stockUnitLabel,
-} from '../utils/itemFieldFormat';
+import type { InventoryItemListRow } from '../types/inventory';
+import { isCustomerSignedItem } from '../utils/itemFieldFormat';
 import {
   collectItemDestinationCodes,
   formatMixedRegionPackConfirmMessage,
   resolveItemDestinationCode,
 } from '../utils/itemDestination';
 import { isExpressPackItem } from '../utils/packItem';
-import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
+import { feedbackService } from '../services/FeedbackService';
 import { resolveAppError, useTranslation, getItemCustomerProfileEditDeniedMessage } from '../i18n';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -60,8 +56,6 @@ type Nav = {
 };
 
 type ItemsRoute = RouteProp<RootStackParamList, 'Items'>;
-
-type ListMode = 'normal' | 'pack' | 'sign';
 
 export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const route = useRoute<ItemsRoute>();
@@ -74,7 +68,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [listMode, setListMode] = useState<ListMode>('normal');
+  const [listMode, setListMode] = useState<ItemsListMode>('normal');
   const [filterRegion, setFilterRegion] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [packModalVisible, setPackModalVisible] = useState(false);
@@ -108,8 +102,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     try {
       const nextItems =
         listMode === 'pack'
-          ? await listPackableItems(debouncedSearch, scope)
-          : await listItems(debouncedSearch, scope);
+          ? await listPackableItems(debouncedSearch, scope, { force })
+          : await listItems(debouncedSearch, scope, { force });
       if (requestId === requestIdRef.current) setItems(nextItems);
     } catch (error: unknown) {
       if (requestId === requestIdRef.current) {
@@ -230,7 +224,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     if (!store) return;
     const validationError = validateBatchSignSelection(selectedItems);
     if (validationError) {
-      Alert.alert(t.common.tip, validationError);
+      feedbackService.notify(t.common.tip, validationError);
       return;
     }
     setSignRequest({
@@ -242,7 +236,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
   const openPackModal = () => {
     if (selectedIds.size === 0) {
-      Alert.alert(t.common.tip, t.items.alertSelectPack);
+      feedbackService.notify(t.common.tip, t.items.alertSelectPack);
       return;
     }
 
@@ -354,78 +348,21 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
 
       <RegionFilterBar value={filterRegion} onChange={setFilterRegion} />
 
-      <View style={styles.actionRow}>
-        {listMode === 'normal' ? (
-          <>
-            <Pressable
-              style={styles.packBtn}
-              onPress={() => {
-                setFilterRegion('');
-                setListMode('pack');
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t.items.packBtn}
-            >
-              <Text style={styles.packBtnText}>{t.items.packBtn}</Text>
-            </Pressable>
-            <Pressable
-              style={styles.signSelectBtn}
-              onPress={() => {
-                setFilterRegion('');
-                setListMode('sign');
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t.items.batchSignBtn}
-            >
-              <Text style={styles.signSelectBtnText}>{t.items.batchSignBtn}</Text>
-            </Pressable>
-          </>
-        ) : listMode === 'pack' ? (
-          <>
-            <Pressable
-              style={styles.ghostBtn}
-              onPress={exitSelectMode}
-              accessibilityRole="button"
-              accessibilityLabel={t.items.cancelSelect}
-            >
-              <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
-            </Pressable>
-            <Text style={styles.packHint}>{t.items.packHint}</Text>
-            <Pressable
-              style={[styles.packBtn, selectedIds.size === 0 && styles.packBtnDisabled]}
-              onPress={openPackModal}
-              disabled={selectedIds.size === 0}
-              accessibilityRole="button"
-              accessibilityLabel={fmt(t.items.nextStep, { count: selectedIds.size })}
-            >
-              <Text style={styles.packBtnText}>{fmt(t.items.nextStep, { count: selectedIds.size })}</Text>
-            </Pressable>
-          </>
-        ) : listMode === 'sign' ? (
-          <>
-            <Pressable
-              style={styles.ghostBtn}
-              onPress={exitSelectMode}
-              accessibilityRole="button"
-              accessibilityLabel={t.items.cancelSelect}
-            >
-              <Text style={styles.ghostBtnText}>{t.items.cancelSelect}</Text>
-            </Pressable>
-            <Text style={styles.packHint}>{t.items.signSelectHint}</Text>
-            <Pressable
-              style={[styles.signActionBtn, selectedIds.size === 0 && styles.packBtnDisabled]}
-              onPress={handleBatchSign}
-              disabled={selectedIds.size === 0}
-              accessibilityRole="button"
-              accessibilityLabel={fmt(t.items.batchSignConfirm, { count: selectedIds.size })}
-            >
-              <Text style={styles.signActionBtnText}>
-                {fmt(t.items.batchSignConfirm, { count: selectedIds.size })}
-              </Text>
-            </Pressable>
-          </>
-        ) : null}
-      </View>
+      <ItemsModeBar
+        listMode={listMode}
+        selectedCount={selectedIds.size}
+        onEnterPack={() => {
+          setFilterRegion('');
+          setListMode('pack');
+        }}
+        onEnterSign={() => {
+          setFilterRegion('');
+          setListMode('sign');
+        }}
+        onCancel={exitSelectMode}
+        onOpenPack={openPackModal}
+        onBatchSign={handleBatchSign}
+      />
 
       {loadError ? (
         <View style={styles.inlineError}>
@@ -475,179 +412,19 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
             </Text>
           )
         }
-        renderItem={({ item }) => {
-          const selected = selectedIds.has(item.id);
-          const cardQty = resolveItemCardQty(item);
-          const meta = [item.spec, item.unit, item.weight].filter(Boolean).join(' · ');
-          const regionCode = resolveItemDestinationCode(item);
-          const transitShipped = item.hub_transit_shipped;
-          const transitReleased = item.hub_transit_released && !transitShipped;
-          const transitPendingAtHub =
-            item.packed &&
-            !transitReleased &&
-            !transitShipped &&
-            !item.hub_arrived &&
-            regionCode &&
-            hubCode &&
-            regionCode.toUpperCase() !== hubCode.toUpperCase();
-          const packBarcode =
-            item.packed && !transitReleased ? item.parent_pack_barcode?.trim() : '';
-          const signedDone = isCustomerSignedItem(item);
-
-          return (
-            <Pressable
-              style={[
-                styles.row,
-                selectActive && selected && { borderColor: selectAccent, backgroundColor: '#1a2332' },
-              ]}
-              onPress={() => {
-                if (selectActive) toggleSelect(item.id);
-                else setActionItem(item);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.customer_name?.trim() || item.recipient_name?.trim() || t.items.noCustomer}，${item.name}，${item.barcode}`}
-            >
-              {selectActive ? (
-                <SelectCheck selected={selected} accent={selectAccent} />
-              ) : null}
-              <View style={styles.cardBody}>
-                {signedDone ? <PaidStampWatermark /> : null}
-                <View style={styles.cardTop}>
-                  <View style={styles.cardMain}>
-                    <Text style={styles.topLine} numberOfLines={1}>
-                      <Text style={styles.customer}>
-                        {item.customer_name?.trim() || item.recipient_name?.trim() || t.items.noCustomer}
-                      </Text>
-                      {regionCode ? (
-                        <Text style={styles.destination}> · {regionDisplayLabel(regionCode)}</Text>
-                      ) : item.destination ? (
-                        <Text style={styles.destination}> · {item.destination}</Text>
-                      ) : null}
-                    </Text>
-                    <Text style={styles.productName} numberOfLines={2}>
-                      {item.name}
-                    </Text>
-                    <View style={styles.statusRow}>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          isCustomerSignedItem(item)
-                            ? styles.statusSignedDone
-                            : transitShipped
-                              ? styles.statusTransitShipped
-                              : transitReleased
-                                ? styles.statusTransitReleased
-                                : transitPendingAtHub
-                                  ? styles.statusTransitReleased
-                                  : item.hub_arrived
-                                  ? styles.statusHubArrived
-                                  : item.stocked_in
-                                    ? styles.statusInDone
-                                    : styles.statusInPending,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusText,
-                            isCustomerSignedItem(item)
-                              ? styles.statusSignedDoneText
-                              : transitShipped
-                                ? styles.statusTransitShippedText
-                                : transitReleased
-                                  ? styles.statusTransitReleasedText
-                                  : transitPendingAtHub
-                                    ? styles.statusTransitReleasedText
-                                    : item.hub_arrived
-                                    ? styles.statusHubArrivedText
-                                    : item.stocked_in
-                                      ? styles.statusInDoneText
-                                      : styles.statusInPendingText,
-                          ]}
-                        >
-                          {isCustomerSignedItem(item)
-                            ? t.items.statusSigned
-                            : transitShipped
-                              ? t.items.statusTransferred
-                              : transitReleased
-                                ? t.items.statusPendingOut
-                                : transitPendingAtHub
-                                  ? t.items.statusPendingTransit
-                                  : item.hub_arrived
-                                  ? t.items.statusArrived
-                                  : item.stocked_in
-                                    ? t.items.statusInbound
-                                    : t.items.statusNotInbound}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          item.packed && !transitReleased
-                            ? styles.statusPackDone
-                            : styles.statusPackPending,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusText,
-                            item.packed && !transitReleased
-                              ? styles.statusPackDoneText
-                              : styles.statusPackPendingText,
-                          ]}
-                        >
-                          {item.packed && !transitReleased ? t.items.statusPacked : t.items.statusNotPacked}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View style={styles.qtyBox}>
-                    <Text style={styles.qty}>{cardQty}</Text>
-                    <Text style={styles.unit}>{stockUnitLabel()}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.tagRow}>
-                  {packBarcode ? (
-                    <View style={styles.tagPurple}>
-                      <Text style={styles.tagPurpleLabel}>{t.items.packNo}</Text>
-                      <Text style={styles.tagPurpleValue} numberOfLines={1}>
-                        {packBarcode}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {item.input_barcode ? (
-                    <View style={styles.tagBlue}>
-                      <Text style={styles.tagBlueLabel}>{t.items.expressNo}</Text>
-                      <Text style={styles.tagBlueValue} numberOfLines={1}>
-                        {item.input_barcode}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <View
-                    style={[
-                      styles.tagYellow,
-                      !item.input_barcode && !packBarcode && styles.tagYellowFull,
-                    ]}
-                  >
-                    <Text style={styles.tagYellowLabel}>{t.items.inbound}</Text>
-                    <PackagingStockInBarcodeText
-                      barcode={item.barcode}
-                      variant="list"
-                      numberOfLines={1}
-                      style={styles.tagYellowValue}
-                    />
-                  </View>
-                </View>
-
-                {meta ? (
-                  <Text style={styles.meta} numberOfLines={1}>
-                    {meta}
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
-          );
-        }}
+        renderItem={({ item }) => (
+          <ItemsListRow
+            item={item}
+            hubCode={hubCode ?? undefined}
+            selected={selectedIds.has(item.id)}
+            selectActive={selectActive}
+            selectAccent={selectAccent}
+            onPress={() => {
+              if (selectActive) toggleSelect(item.id);
+              else setActionItem(item);
+            }}
+          />
+        )}
       />
 
       <ItemActionModal
@@ -664,7 +441,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
         onEdit={() => {
           if (!actionItem || !store) return;
           if (!actionCanEdit) {
-            Alert.alert(
+            feedbackService.notify(
               t.items.cannotEdit,
               getItemCustomerProfileEditDeniedMessage(t, actionItem, store, hubCode ?? undefined),
             );
@@ -743,21 +520,8 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           );
           void load();
         }}
-        onError={(message) => Alert.alert(t.common.signFailed, message)}
+        onError={(message) => feedbackService.notify(t.common.signFailed, message)}
       />
-    </View>
-  );
-}
-
-function SelectCheck({ selected, accent }: { selected: boolean; accent: string }) {
-  return (
-    <View
-      style={[
-        styles.check,
-        selected && { backgroundColor: accent, borderColor: accent },
-      ]}
-    >
-      <Text style={styles.checkMark}>{selected ? '✓' : ''}</Text>
     </View>
   );
 }
@@ -791,47 +555,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addText: { color: '#fff', fontWeight: '800' },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  packBtn: {
-    backgroundColor: '#7c3aed',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  packBtnDisabled: { opacity: 0.5 },
-  packBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  signSelectBtn: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#059669',
-  },
-  signSelectBtnText: { color: '#6ee7b7', fontWeight: '800', fontSize: 14 },
-  signActionBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  signActionBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  ghostBtn: {
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#475569',
-  },
-  ghostBtnText: { color: '#94a3b8', fontWeight: '700' },
-  packHint: { flex: 1, color: '#64748b', fontSize: 12, minWidth: 120 },
   inlineLoading: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -862,141 +585,4 @@ const styles = StyleSheet.create({
   retryBtnText: { color: '#fecaca', fontWeight: '800', fontSize: 12 },
   list: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 24 },
   empty: { color: '#94a3b8', textAlign: 'center', marginTop: 40, lineHeight: 22 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#1e293b',
-    borderRadius: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    marginBottom: 7,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  check: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#475569',
-    marginRight: 8,
-    marginTop: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkMark: { color: '#fff', fontWeight: '900', fontSize: 12 },
-  cardBody: { flex: 1, minWidth: 0, position: 'relative' },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  cardMain: { flex: 1, minWidth: 0 },
-  topLine: { fontSize: 12, lineHeight: 16 },
-  customer: { color: '#7dd3fc', fontWeight: '800' },
-  destination: { color: '#a5b4fc', fontWeight: '700' },
-  productName: {
-    color: '#f8fafc',
-    fontSize: 15,
-    fontWeight: '800',
-    marginTop: 2,
-    lineHeight: 24,
-    paddingVertical: 2,
-  },
-  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 },
-  statusBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-  statusInDone: { backgroundColor: 'rgba(34,197,94,0.15)' },
-  statusInPending: { backgroundColor: 'rgba(100,116,139,0.2)' },
-  statusHubArrived: { backgroundColor: 'rgba(14,165,233,0.15)' },
-  statusTransitReleased: { backgroundColor: 'rgba(168,85,247,0.15)' },
-  statusTransitShipped: { backgroundColor: 'rgba(56,189,248,0.15)' },
-  statusSignedDone: { backgroundColor: 'rgba(34,197,94,0.2)' },
-  statusPackDone: { backgroundColor: 'rgba(168,85,247,0.15)' },
-  statusPackPending: { backgroundColor: 'rgba(100,116,139,0.2)' },
-  statusText: { fontSize: 10, fontWeight: '900' },
-  statusInDoneText: { color: '#4ade80' },
-  statusInPendingText: { color: '#94a3b8' },
-  statusHubArrivedText: { color: '#38bdf8' },
-  statusTransitReleasedText: { color: '#c4b5fd' },
-  statusTransitShippedText: { color: '#38bdf8' },
-  statusSignedDoneText: { color: '#4ade80' },
-  statusPackDoneText: { color: '#c4b5fd' },
-  statusPackPendingText: { color: '#94a3b8' },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
-    marginTop: 5,
-  },
-  tagBlue: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexShrink: 1,
-    maxWidth: '100%',
-    backgroundColor: 'rgba(56,189,248,0.1)',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(56,189,248,0.3)',
-  },
-  tagBlueLabel: { color: '#38bdf8', fontSize: 10, fontWeight: '800' },
-  tagBlueValue: {
-    color: '#7dd3fc',
-    fontSize: 11,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    flexShrink: 1,
-  },
-  tagYellow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexShrink: 1,
-    maxWidth: '100%',
-    backgroundColor: 'rgba(251,191,36,0.1)',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.3)',
-  },
-  tagYellowFull: { flex: 1 },
-  tagYellowLabel: { color: '#fbbf24', fontSize: 10, fontWeight: '800' },
-  tagYellowValue: {
-    color: '#fde68a',
-    fontSize: 11,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    flexShrink: 1,
-  },
-  tagPurple: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexShrink: 1,
-    maxWidth: '100%',
-    backgroundColor: 'rgba(168,85,247,0.1)',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(168,85,247,0.28)',
-  },
-  tagPurpleLabel: { color: '#c4b5fd', fontSize: 10, fontWeight: '800' },
-  tagPurpleValue: {
-    color: '#d8b4fe',
-    fontSize: 11,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    flexShrink: 1,
-  },
-  meta: { color: '#64748b', fontSize: 11, marginTop: 4, fontFamily: 'monospace' },
-  qtyBox: { alignItems: 'flex-end', minWidth: 34 },
-  packSeq: {
-    color: '#34d399',
-    fontSize: 13,
-    fontWeight: '900',
-    fontFamily: 'monospace',
-    marginBottom: 2,
-  },
-  qty: { color: '#fbbf24', fontSize: 17, fontWeight: '900', lineHeight: 19 },
-  unit: { color: '#94a3b8', fontSize: 10, marginTop: 0 },
 });

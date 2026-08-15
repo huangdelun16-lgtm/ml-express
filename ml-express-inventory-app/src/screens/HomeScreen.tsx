@@ -11,7 +11,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { getStats, listPackedShipmentRows } from '../services/inventoryService';
+import { getHomeOverview } from '../services/inventoryService';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { packStatusStyle } from '../utils/packDisplayStatus';
 import { LOGIN_LOGO } from '../constants/branding';
@@ -45,12 +45,9 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
 
-    const [s, packsAfter] = await Promise.all([
-      getStats(scope),
-      listPackedShipmentRows(undefined, scope),
-    ]);
-    setStats(s);
-    setRecentPacks(packsAfter.slice(0, 3));
+    const { stats: nextStats, recentPacks: nextPacks } = await getHomeOverview(scope);
+    setStats(nextStats);
+    setRecentPacks(nextPacks);
   }, [store, hubCode]);
 
   useFocusEffect(
@@ -78,6 +75,15 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     { title: t.home.tileScan, icon: '📷', screen: 'CameraScan', color: '#06b6d4', bg: 'rgba(6,182,212,0.12)' },
     { title: t.home.tileSettings, icon: '⚙️', screen: 'Settings', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
   ];
+  const outboundTiles = tiles.filter((tile) =>
+    ['StockIn', 'PackagingStockIn', 'Items', 'Pkg', 'StockOut'].includes(tile.screen),
+  );
+  const inboundTiles = tiles.filter((tile) =>
+    ['HubReceive', 'CrossBorderFinance'].includes(tile.screen),
+  );
+  const moreTiles = tiles.filter((tile) =>
+    ['ShipmentTrack', 'Movements', 'CameraScan', 'Settings'].includes(tile.screen),
+  );
 
   return (
     <ScrollView
@@ -223,26 +229,43 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
         </Pressable>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t.home.quickActions}</Text>
-          <View style={styles.grid}>
-            {tiles.map((t) => (
-              <Pressable
-                key={t.screen}
-                style={({ pressed }) => [
-                  styles.tile,
-                  pressed && styles.tilePressed,
-                ]}
-                onPress={() => navigation.navigate(t.screen)}
-              >
-                <View style={[styles.tileIconWrap, { backgroundColor: t.bg }]}>
-                  <Text style={styles.tileIcon}>{t.icon}</Text>
-                </View>
-                <Text style={styles.tileTitle}>{t.title}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <Text style={styles.sectionLabel}>{t.home.sectionOutbound}</Text>
+          <TileGrid tiles={outboundTiles} navigation={navigation} />
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t.home.sectionInboundHub}</Text>
+          <TileGrid tiles={inboundTiles} navigation={navigation} />
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t.home.sectionMore}</Text>
+          <TileGrid tiles={moreTiles} navigation={navigation} />
         </View>
     </ScrollView>
+  );
+}
+
+function TileGrid({
+  tiles,
+  navigation,
+}: {
+  tiles: { title: string; icon: string; screen: string; bg: string }[];
+  navigation: Nav;
+}) {
+  return (
+    <View style={styles.grid}>
+      {tiles.map((tile) => (
+        <Pressable
+          key={tile.screen}
+          style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+          onPress={() => navigation.navigate(tile.screen)}
+        >
+          <View style={[styles.tileIconWrap, { backgroundColor: tile.bg }]}>
+            <Text style={styles.tileIcon}>{tile.icon}</Text>
+          </View>
+          <Text style={styles.tileTitle}>{tile.title}</Text>
+        </Pressable>
+      ))}
+    </View>
   );
 }
 

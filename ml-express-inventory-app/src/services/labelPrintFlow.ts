@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { feedbackService } from './FeedbackService';
 import type { OrderBarcodeData } from '../components/OrderBarcodeModal';
 import type { TranslationDict } from '../i18n/translations';
 import { loadSavedBluetoothDevice } from './bluetoothScanner';
@@ -31,16 +31,15 @@ export function runBarcodeLabelPrintWithAlert(
   void (async () => {
     const saved = await loadSavedBluetoothDevice();
     if (!saved) {
-      Alert.alert(t.settings.printFailed, t.settings.scanPrinterNotConfigured);
+      feedbackService.notify(t.settings.printFailed, t.settings.scanPrinterNotConfigured);
       return;
     }
     try {
       await runBarcodeLabelPrint(data);
-      Alert.alert(t.settings.printSentTitle, t.settings.printSentBody, [
-        { text: t.common.ok, onPress: onSuccess },
-      ]);
+      feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
+      onSuccess?.();
     } catch (error) {
-      Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
+      feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
     }
   })();
 }

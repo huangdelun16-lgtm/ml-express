@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +26,7 @@ import {
   getStockInPrefillByCode,
   submitPackagingStockIn,
 } from '../services/inventoryService';
+import { feedbackService } from '../services/FeedbackService';
 import { generatePackagingStockInLineBarcodes } from '../utils/inboundBarcode';
 import { normalizeScanCode, vibrateScanSuccess } from '../utils/barcodeScan';
 import {
@@ -257,7 +257,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     if (!editLine) return;
     const nextCode = normalizeScanCode(editCodeDraft);
     if (!nextCode) {
-      Alert.alert(t.common.tip, t.packagingStockIn.alertScanCode);
+      feedbackService.notify(t.common.tip, t.packagingStockIn.alertScanCode);
       return;
     }
     setLines((prev) =>
@@ -300,11 +300,11 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   const goNext = () => {
     if (step === 1) {
       if (!recipientName.trim()) {
-        Alert.alert(t.common.tip, t.packagingStockIn.alertName);
+        feedbackService.notify(t.common.tip, t.packagingStockIn.alertName);
         return;
       }
       if (!recipientPhone.trim()) {
-        Alert.alert(t.common.tip, t.packagingStockIn.alertPhone);
+        feedbackService.notify(t.common.tip, t.packagingStockIn.alertPhone);
         return;
       }
       setStep(2);
@@ -312,7 +312,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     }
     if (step === 2) {
       if (lines.length === 0) {
-        Alert.alert(t.common.tip, t.packagingStockIn.alertScanList);
+        feedbackService.notify(t.common.tip, t.packagingStockIn.alertScanList);
         return;
       }
       setStep(3);
@@ -333,15 +333,15 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   const submit = async () => {
     if (loading) return;
     if (!batchDestination.trim()) {
-      Alert.alert(t.common.tip, t.stockIn.alertDestination);
+      feedbackService.notify(t.common.tip, t.stockIn.alertDestination);
       return;
     }
     if (!paymentSelected) {
-      Alert.alert(t.common.tip, t.stockIn.paymentRequired);
+      feedbackService.notify(t.common.tip, t.stockIn.paymentRequired);
       return;
     }
     if (!batchWeightFilled) {
-      Alert.alert(t.common.tip, t.packagingStockIn.alertBatchWeight);
+      feedbackService.notify(t.common.tip, t.packagingStockIn.alertBatchWeight);
       return;
     }
 
@@ -413,7 +413,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
       });
       resetWizard();
     } catch (e: unknown) {
-      Alert.alert(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }

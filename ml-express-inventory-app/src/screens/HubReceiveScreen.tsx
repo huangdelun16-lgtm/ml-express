@@ -215,9 +215,9 @@ export default function HubReceiveScreen({ route }: NativeStackScreenProps<RootS
   const openPackOrdersModal = useCallback(
     async (detail: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
       let pkg = detail;
-      if (store) {
+      if (store && detail.status !== 'in_transit') {
         try {
-          if (!(await preflightHubReceive({ forWrite: detail.status === 'in_transit' }))) {
+          if (!(await preflightHubReceive())) {
             setActivePack(detail);
             setOrdersModalVisible(true);
             return detail;
@@ -233,7 +233,7 @@ export default function HubReceiveScreen({ route }: NativeStackScreenProps<RootS
       void refreshTransportFeePaid(pkg.pack_barcode);
       return pkg;
     },
-    [store, ensurePackHubReceived, refreshTransportFeePaid, t],
+    [store, ensurePackHubReceived, refreshTransportFeePaid, preflightHubReceive, t],
   );
 
   useEffect(() => {
@@ -282,7 +282,7 @@ export default function HubReceiveScreen({ route }: NativeStackScreenProps<RootS
       if (!pack) return;
       const knownOrder = pack.orders.find((line) => line.id === orderId);
       const { order, pkg } = await confirmOrderInPackById(orderId, store, hubCode, {
-        pkg,
+        pkg: pack,
         order: knownOrder,
       });
       await deliverHubOrderInboundAtStation({
@@ -397,6 +397,29 @@ export default function HubReceiveScreen({ route }: NativeStackScreenProps<RootS
       setError(resolveAppError(t, e));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmPack = async () => {
+    if (!store || !activePack || confirmingHubReceive || loading || confirmingOrderId || batchInbounding) return;
+    if (activePack.status !== 'in_transit') return;
+    setError('');
+    setModalSuccess('');
+    if (!(await preflightHubReceive({ forWrite: true }))) return;
+    setConfirmingHubReceive(true);
+    try {
+      const updated = await ensurePackHubReceived(activePack.pack_barcode, activePack);
+      setActivePack(updated);
+      void refreshTransportFeePaid(updated.pack_barcode);
+      setModalSuccess(t.hubReceive.packConfirmSuccessMsg);
+      showTaskSuccess(
+        t.hubReceive.packConfirmSuccess,
+        fmt(t.hubReceive.packConfirmed, { barcode: updated.pack_barcode }),
+      );
+    } catch (e: unknown) {
+      setError(resolveAppError(t, e));
+    } finally {
+      setConfirmingHubReceive(false);
     }
   };
 
@@ -644,6 +667,7 @@ export default function HubReceiveScreen({ route }: NativeStackScreenProps<RootS
           setOrdersModalVisible(false);
           setModalSuccess('');
         }}
+        onConfirmPack={() => void handleConfirmPack()}
         onConfirmOrder={(orderId) => void handleConfirmOrder(orderId)}
         onBatchInbound={() => void handleBatchInbound()}
         onPayTransportFee={handlePayTransportFee}

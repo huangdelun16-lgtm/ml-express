@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
 import LabelBarcodeContent from './LabelBarcodeContent';
 import { useTranslation } from '../i18n';
 import { loadSavedBluetoothDevice } from '../services/bluetoothScanner';
+import { feedbackService } from '../services/FeedbackService';
 import { resolvePrintError, runBarcodeLabelPrint } from '../services/labelPrintFlow';
 
 export type OrderBarcodeData = {
@@ -59,15 +59,13 @@ export default function OrderBarcodeModal({
       try {
         const saved = await loadSavedBluetoothDevice();
         if (!saved) {
-          Alert.alert(t.settings.printFailed, t.settings.scanPrinterNotConfigured);
+          feedbackService.notify(t.settings.printFailed, t.settings.scanPrinterNotConfigured);
           return;
         }
         await runBarcodeLabelPrint(data);
-        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody, [
-          { text: t.common.ok },
-        ]);
+        feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
       } catch (error) {
-        Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
+        feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
       } finally {
         setPrinting(false);
       }

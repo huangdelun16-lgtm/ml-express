@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -20,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useTranslation, resolveAppError } from '../i18n';
 import { applyTruckLoadOutbound, listOutboundPackages } from '../services/inventoryService';
+import { feedbackService } from '../services/FeedbackService';
 import { refreshCache } from '../services/inventoryCloudStore';
 import type { PackedShipmentDetail } from '../types/inventory';
 import OutboundDateField from '../components/OutboundDateField';
@@ -171,23 +171,23 @@ export default function StockOutScreen({ navigation }: Props) {
   const submit = async () => {
     if (loading) return;
     if (!destination.trim()) {
-      Alert.alert(t.common.tip, t.stockOut.alertSelectDest);
+      feedbackService.notify(t.common.tip, t.stockOut.alertSelectDest);
       return;
     }
     if (store && isOwnStationOutboundDestination(destination, store)) {
-      Alert.alert(t.common.tip, t.stockOut.alertOwnStation);
+      feedbackService.notify(t.common.tip, t.stockOut.alertOwnStation);
       return;
     }
     if (selectedPacks.length === 0) {
-      Alert.alert(t.common.tip, t.stockOut.alertSelectPack);
+      feedbackService.notify(t.common.tip, t.stockOut.alertSelectPack);
       return;
     }
     if (!isValidIsoDate(outboundDate)) {
-      Alert.alert(t.common.tip, t.stockOut.alertInvalidDate);
+      feedbackService.notify(t.common.tip, t.stockOut.alertInvalidDate);
       return;
     }
     if (!transportFee.trim() || Number(transportFee) <= 0) {
-      Alert.alert(t.common.tip, t.stockOut.alertTransportFee);
+      feedbackService.notify(t.common.tip, t.stockOut.alertTransportFee);
       return;
     }
 
@@ -230,7 +230,7 @@ export default function StockOutScreen({ navigation }: Props) {
       await loadPacks();
       await refreshTripPreview();
     } catch (e: unknown) {
-      Alert.alert(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }

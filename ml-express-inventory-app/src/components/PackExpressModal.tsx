@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,6 +14,7 @@ import ItemFormFields from './ItemFormFields';
 import { PACK_DESTINATION_OPTIONS } from '../constants/destinationOptions';
 import { useItemFormState } from '../hooks/useItemFormState';
 import { generatePackageNumber } from '../services/inventoryService';
+import { feedbackService } from '../services/FeedbackService';
 import type { InventoryStoreSession } from '../services/authService';
 import type { InventoryItem } from '../types/inventory';
 import { extractDestinationCode } from '../utils/inboundBarcode';
@@ -126,7 +126,7 @@ export default function PackExpressModal({
         });
       } catch (e: unknown) {
         if (!cancelled) {
-          Alert.alert(t.common.tip, resolveAppError(t, e));
+          feedbackService.notify(t.common.tip, resolveAppError(t, e));
         }
       }
     })();
@@ -138,11 +138,11 @@ export default function PackExpressModal({
 
   const save = async () => {
     if (!destination) {
-      Alert.alert(t.common.tip, t.itemForm.alertDestination);
+      feedbackService.notify(t.common.tip, t.itemForm.alertDestination);
       return;
     }
     if (!form.payload.barcode || !form.payload.name) {
-      Alert.alert(t.common.tip, `${t.itemForm.alertBarcode} / ${t.itemForm.alertName}`);
+      feedbackService.notify(t.common.tip, `${t.itemForm.alertBarcode} / ${t.itemForm.alertName}`);
       return;
     }
     setLoading(true);
@@ -150,7 +150,7 @@ export default function PackExpressModal({
       await onSubmit(form.payload);
       onClose();
     } catch (e: unknown) {
-      Alert.alert(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }

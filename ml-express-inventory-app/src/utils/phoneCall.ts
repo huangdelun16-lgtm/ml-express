@@ -1,4 +1,5 @@
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
+import { feedbackService } from '../services/FeedbackService';
 
 /** 拨号：仅保留数字与 + 号 */
 export function normalizePhoneForDial(raw: string): string {
@@ -8,7 +9,7 @@ export function normalizePhoneForDial(raw: string): string {
 export async function callPhoneNumber(raw: string): Promise<void> {
   const phone = normalizePhoneForDial(raw);
   if (!phone) {
-    Alert.alert('提示', '暂无客户电话');
+    feedbackService.notify('提示', '暂无客户电话');
     return;
   }
 
@@ -16,11 +17,11 @@ export async function callPhoneNumber(raw: string): Promise<void> {
   try {
     const can = await Linking.canOpenURL(url);
     if (!can) {
-      Alert.alert('无法拨打', '当前设备不支持拨号');
+      feedbackService.notify('无法拨打', '当前设备不支持拨号');
       return;
     }
     await Linking.openURL(url);
   } catch (e: unknown) {
-    Alert.alert('拨打失败', e instanceof Error ? e.message : '请重试');
+    feedbackService.notify('拨打失败', e instanceof Error ? e.message : '请重试');
   }
 }

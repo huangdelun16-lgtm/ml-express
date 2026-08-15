@@ -27,6 +27,7 @@ import { resolvePackOrderCount, stockUnitLabel } from '../utils/itemFieldFormat'
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
+import { feedbackService } from '../services/FeedbackService';
 import { canEditOwnedRecord, resolveOwnerKeyForListItem } from '../utils/storeOwnership';
 
 function formatTime(iso: string): string {
@@ -233,7 +234,7 @@ export default function PkgScreen() {
                       setActionPack(null);
                       await load();
                     } catch (e: unknown) {
-                      Alert.alert(
+                      feedbackService.notify(
                         t.pkg.unpackFailed,
                         resolveAppError(t, e),
                       );

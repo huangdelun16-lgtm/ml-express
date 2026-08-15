@@ -87,6 +87,14 @@ export type CloudPackRow = {
   inventory_packed_shipment_items?: CloudPackLineRow[];
 };
 
+const STORE_ITEM_COLUMNS =
+  'id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, min_qty, note, owner_store_id, owner_store_code, recipient_name, final_destination, hub_arrived_at, customer_signed_at, customer_sign_phone, customer_sign_pickup_type, customer_sign_proxy_name, customer_signature_data, customer_signed_by_operator, packed_at, packed_bundle_barcode, hub_transit_released_at, hub_transit_shipped_at, created_at, updated_at';
+
+const PACK_COLUMNS =
+  'id, bundle_item_id, bundle_barcode, bundle_name, operator, note, owner_store_id, owner_store_code, transport_fee, truck_leg_destination, loaded_at, created_at, updated_at';
+
+const PACK_LINE_COLUMNS = 'id, pack_id, item_id, item_barcode, item_name, qty, created_at';
+
 type AtomicRpcResult = {
   idempotent?: boolean;
   item?: Record<string, unknown>;
@@ -438,7 +446,7 @@ export async function fetchCloudStoreItems(
   // 依赖 RLS（owner / hub 目的地 / 到站 custody），不用 eq(owner_store_code) 避免店码格式不一致漏行
   const { data, error } = await supabase
     .from('inventory_store_items')
-    .select('*')
+    .select(STORE_ITEM_COLUMNS)
     .order('updated_at', { ascending: false })
     .limit(800);
   if (error) throw new Error(error.message);
@@ -519,6 +527,75 @@ export async function fetchCloudTodayMovementTotals(): Promise<{ todayIn: number
   return { todayIn, todayOut };
 }
 
+/** 首页统计：只拉数量字段，不拉订单/包明细 */
+export async function fetchCloudHomeOverview(): Promise<{
+  itemCount: number;
+  totalQty: number;
+  lowStockCount: number;
+  packCount: number;
+}> {
+  if (!isSupabaseConfigured()) {
+    return { itemCount: 0, totalQty: 0, lowStockCount: 0, packCount: 0 };
+  }
+  await ensureInventoryCloudAuth();
+  const [itemsRes, packsRes] = await Promise.all([
+    supabase.from('inventory_store_items').select('qty_on_hand, min_qty').limit(800),
+    supabase.from('inventory_packed_shipments').select('id').limit(200),
+  ]);
+  if (itemsRes.error) throw new Error(itemsRes.error.message);
+  if (packsRes.error) throw new Error(packsRes.error.message);
+  let itemCount = 0;
+  let totalQty = 0;
+  let lowStockCount = 0;
+  for (const row of itemsRes.data ?? []) {
+    const qty = Number((row as { qty_on_hand?: number }).qty_on_hand) || 0;
+    const minQty = Number((row as { min_qty?: number }).min_qty) || 0;
+    itemCount += 1;
+    totalQty += qty;
+    if (minQty > 0 && qty <= minQty) lowStockCount += 1;
+  }
+  return {
+    itemCount,
+    totalQty,
+    lowStockCount,
+    packCount: (packsRes.data ?? []).length,
+  };
+}
+
+/** 首页最近包裹：只拉 N 条及对应明细行 */
+export async function fetchCloudRecentPackedShipments(limit = 3): Promise<CloudPackRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  await ensureInventoryCloudAuth();
+  const { data: packs, error: packErr } = await supabase
+    .from('inventory_packed_shipments')
+    .select(PACK_COLUMNS)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (packErr) throw new Error(packErr.message);
+  if (!packs?.length) return [];
+
+  const packIds = packs.map((p) => String((p as { id: string }).id));
+  const { data: lines, error: lineErr } = await supabase
+    .from('inventory_packed_shipment_items')
+    .select(PACK_LINE_COLUMNS)
+    .in('pack_id', packIds);
+  if (lineErr) throw new Error(lineErr.message);
+
+  const linesByPack = new Map<string, CloudPackLineRow[]>();
+  for (const row of lines ?? []) {
+    const line = row as CloudPackLineRow;
+    const packId = String(line.pack_id);
+    const bucket = linesByPack.get(packId) ?? [];
+    bucket.push(line);
+    linesByPack.set(packId, bucket);
+  }
+
+  return packs.map((row) => ({
+    ...(row as CloudPackRow),
+    inventory_packed_shipment_items: linesByPack.get(String((row as { id: string }).id)) ?? [],
+  }));
+}
+
 export async function fetchCloudPackedShipments(
   _store: InventoryStoreSession,
   _hubCode?: string,
@@ -527,7 +604,7 @@ export async function fetchCloudPackedShipments(
   await ensureInventoryCloudAuth();
   const { data: packs, error: packErr } = await supabase
     .from('inventory_packed_shipments')
-    .select('*')
+    .select(PACK_COLUMNS)
     .order('created_at', { ascending: false })
     .limit(200);
   if (packErr) throw new Error(packErr.message);
@@ -536,7 +613,7 @@ export async function fetchCloudPackedShipments(
   const packIds = packs.map((p) => String((p as { id: string }).id));
   const { data: lines, error: lineErr } = await supabase
     .from('inventory_packed_shipment_items')
-    .select('*')
+    .select(PACK_LINE_COLUMNS)
     .in('pack_id', packIds);
   if (lineErr) throw new Error(lineErr.message);
 

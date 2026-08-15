@@ -23,6 +23,7 @@ import {
   updateItemInboundProfile,
   upsertItem,
 } from '../services/inventoryService';
+import { feedbackService } from '../services/FeedbackService';
 import {
   formatSpec,
   formatUnit,
@@ -139,7 +140,7 @@ export default function ItemFormScreen({
 
   const saveNew = async () => {
     if (!form.payload.barcode || !form.payload.name) {
-      Alert.alert(t.common.tip, `${t.itemForm.alertBarcode} / ${t.itemForm.alertName}`);
+      feedbackService.notify(t.common.tip, `${t.itemForm.alertBarcode} / ${t.itemForm.alertName}`);
       return;
     }
     setLoading(true);
@@ -151,7 +152,7 @@ export default function ItemFormScreen({
       );
       showTaskSuccess(t.itemForm.saveSuccess, form.payload.name, () => navigation.goBack());
     } catch (e: unknown) {
-      Alert.alert(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -160,19 +161,19 @@ export default function ItemFormScreen({
   const saveEdit = async () => {
     if (!itemId || !store) return;
     if (!recipientName.trim()) {
-      Alert.alert(t.common.tip, t.itemForm.alertCustomer);
+      feedbackService.notify(t.common.tip, t.itemForm.alertCustomer);
       return;
     }
     if (!destination.trim()) {
-      Alert.alert(t.common.tip, t.itemForm.alertDestination);
+      feedbackService.notify(t.common.tip, t.itemForm.alertDestination);
       return;
     }
     if (!productName.trim()) {
-      Alert.alert(t.common.tip, t.itemForm.alertName);
+      feedbackService.notify(t.common.tip, t.itemForm.alertName);
       return;
     }
     if (!packaging) {
-      Alert.alert(t.common.tip, t.itemForm.alertPackaging);
+      feedbackService.notify(t.common.tip, t.itemForm.alertPackaging);
       return;
     }
 
@@ -197,7 +198,7 @@ export default function ItemFormScreen({
       );
       showTaskSuccess(t.itemForm.saveSuccess, productName.trim(), () => navigation.goBack());
     } catch (e: unknown) {
-      Alert.alert(t.common.fail, resolveAppError(t, e));
+      feedbackService.notify(t.common.fail, resolveAppError(t, e));
     } finally {
       setLoading(false);
     }
@@ -219,11 +220,9 @@ export default function ItemFormScreen({
               try {
                 if (!store) throw new Error(t.common.notLoggedIn);
                 await cancelInventoryItem(itemId, operatorName ?? t.common.operator, store);
-                Alert.alert(t.itemForm.cancelOrderDone, '', [
-                  { text: t.common.ok, onPress: () => navigation.goBack() },
-                ]);
+                showTaskSuccess(t.itemForm.cancelOrderDone, undefined, () => navigation.goBack());
               } catch (e: unknown) {
-                Alert.alert(t.common.fail, resolveAppError(t, e));
+                feedbackService.notify(t.common.fail, resolveAppError(t, e));
               } finally {
                 setLoading(false);
               }

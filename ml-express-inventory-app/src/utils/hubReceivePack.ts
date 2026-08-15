@@ -41,3 +41,20 @@ export function listPendingPackInboundOrders(
 export function areAllPackOrdersProcessed(pack: PkgTrackingDetail): boolean {
   return pack.orders.every((order) => order.status !== 'in_transit');
 }
+
+export function hasUnreleasedTransitOrders(pack: PkgTrackingDetail, hubCode: string): boolean {
+  const hub = hubCode.trim().toUpperCase();
+  return pack.orders.some(
+    (order) => resolveOrderDestinationCode(order) !== hub && order.status !== 'released_at_hub',
+  );
+}
+
+/** 到站现场 3 步：1 确认到站 → 2 入库/分拨 → 3 支付车费 */
+export type HubReceiveStep = 1 | 2 | 3;
+
+export function resolveHubReceiveStep(pack: PkgTrackingDetail, hubCode: string): HubReceiveStep {
+  if (pack.status === 'in_transit') return 1;
+  if (countPendingPackInboundOrders(pack, hubCode) > 0) return 2;
+  if (hasUnreleasedTransitOrders(pack, hubCode)) return 2;
+  return 3;
+}

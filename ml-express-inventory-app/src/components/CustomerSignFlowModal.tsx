@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import SignaturePad from './SignaturePad';
 import type { InventoryStoreSession } from '../services/authService';
+import { feedbackService } from '../services/FeedbackService';
 import { getItemDetail, markCustomerSigned } from '../services/inventoryService';
 import type { InventoryItemDetail } from '../types/inventory';
 import type {
@@ -132,7 +133,7 @@ export default function CustomerSignFlowModal({
     };
     const validationError = validateCustomerSignReceipt(payload);
     if (validationError) {
-      Alert.alert('请完善签收信息', validationError);
+      feedbackService.notify('请完善签收信息', validationError);
       return;
     }
 

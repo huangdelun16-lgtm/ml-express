@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import InventorySessionMonitor from './src/components/InventorySessionMonitor';
+import { GlobalToast } from './src/components/GlobalToast';
 import LoginScreen from './src/screens/LoginScreen';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -47,6 +48,7 @@ export default function App() {
         <AuthProvider>
           <StatusBar style="light" />
           <Root />
+          <GlobalToast />
         </AuthProvider>
       </LanguageProvider>
     </SafeAreaProvider>

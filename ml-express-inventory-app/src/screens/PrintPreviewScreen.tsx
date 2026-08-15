@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import BluetoothScanModal from '../components/BluetoothScanModal';
+import { feedbackService } from '../services/FeedbackService';
 import LabelPaperSpecEditor from '../components/LabelPaperSpecEditor';
 import LabelPreviewToolbar from '../components/LabelPreviewToolbar';
 import LabelLayoutSizeEditor from '../components/LabelLayoutSizeEditor';
@@ -260,9 +261,9 @@ export default function PrintPreviewScreen() {
         setSavedPaper(paper);
         setSavedExpressLayout(expressLayout);
         setSavedPackageLayout(packageLayout);
-        Alert.alert(t.common.tip, t.settings.printPreviewLayoutSaved);
+        feedbackService.notify(t.common.tip, t.settings.printPreviewLayoutSaved);
       } catch (error) {
-        Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
+        feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
       } finally {
         setSaving(false);
       }
@@ -292,7 +293,7 @@ export default function PrintPreviewScreen() {
           void (async () => {
             await clearLabelPrinterSettings(connectedPrinter.id);
             applyDefaults();
-            Alert.alert(t.common.tip, t.settings.printPreviewLayoutReset);
+            feedbackService.notify(t.common.tip, t.settings.printPreviewLayoutReset);
           })();
         },
       },
@@ -302,7 +303,7 @@ export default function PrintPreviewScreen() {
   const handlePrint = () => {
     if (printing) return;
     if (!connectedPrinter) {
-      Alert.alert(t.settings.printFailed, t.settings.scanPrinterNotConfigured);
+      feedbackService.notify(t.settings.printFailed, t.settings.scanPrinterNotConfigured);
       return;
     }
 
@@ -310,9 +311,9 @@ export default function PrintPreviewScreen() {
     void (async () => {
       try {
         await runBarcodeLabelPrint(previewSample, copies, layout, paper);
-        Alert.alert(t.settings.printSentTitle, t.settings.printSentBody);
+        feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
       } catch (error) {
-        Alert.alert(t.settings.printFailed, resolvePrintError(t, error));
+        feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
       } finally {
         setPrinting(false);
       }

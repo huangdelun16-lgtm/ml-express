@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,6 +28,7 @@ import { stockUnitLabel } from '../utils/itemFieldFormat';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { pickupTypeLabel } from '../types/customerSignReceipt';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
+import { feedbackService } from '../services/FeedbackService';
 
 type Route = { params?: { presetCode?: string } };
 
@@ -453,7 +453,7 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
               : fmt(t.common.signMarked, { name: detail.name }),
           );
         }}
-        onError={(message) => Alert.alert(t.common.signFailed, message)}
+        onError={(message) => feedbackService.notify(t.common.signFailed, message)}
       />
     </ScrollView>
   );
