@@ -20,8 +20,10 @@ import {
   assertCloudPacksExist,
   deleteCloudPackedShipment,
   fetchCloudHomeOverview,
+  fetchCloudPackByBarcode,
   fetchCloudRecentPackedShipments,
   fetchCloudTodayMovementTotals,
+  getCloudItemIdByBarcode,
   packagingStockInBatchAtomic,
 } from './inventoryCloudApi';
 import {
@@ -34,6 +36,12 @@ import {
   canSelectPackedShipmentForTruckLoad,
 } from '../utils/packDisplayStatus';
 import { isVisibleInExpressDetailsList, isVisibleInPackedList } from '../utils/expressDetailsVisibility';
+import { itemMatchesKeyword } from '../utils/itemKeywordMatch';
+import {
+  assertPackagingExpressMatch,
+  filterItemsByExpressCodes,
+  packagingExpressKey,
+} from '../utils/packagingExpressMatch';
 import { canEditItemCustomerProfileAsync } from '../utils/itemCustomerProfileEdit';
 import { todayIsoDate } from '../utils/dateFormat';
 import { resolveTripNumberPrefix } from '../utils/tripNumber';
@@ -130,7 +138,6 @@ export async function listItems(
   options?: { force?: boolean },
 ): Promise<InventoryItemListRow[]> {
   const { items, packs } = await all(scope, false, options);
-  const q = search?.trim().toLowerCase();
 
   const packByBarcode = new Map(packs.map((p) => [p.bundle_barcode.trim().toUpperCase(), p]));
   const hydratedPacks = [...packs];
@@ -156,7 +163,7 @@ export async function listItems(
   const rows = items
     .filter((item) => !isPackageBarcode(item.barcode))
     .map((i) => listRowLight(i, hydratedPacks, items))
-    .filter((i) => !q || [i.barcode, i.input_barcode, i.name, i.spec, i.recipient_name, i.final_destination].join(' ').toLowerCase().includes(q));
+    .filter((i) => itemMatchesKeyword(i, search));
   if (!scope) return rows;
   return rows.filter((item) => isVisibleInExpressDetailsList(item, scope.store, scope.hubCode));
 }
@@ -375,10 +382,12 @@ export async function submitPackagingStockIn(params: {
 
   const storeCode = params.store.storeCode.trim().toUpperCase();
   const hub = resolveStoreHubCode(params.store);
+  const submittedExpress = params.lines.map((line) => line.inputBarcode.trim()).filter(Boolean);
+  const operationKey = `${params.bundle.barcode}:${packagingExpressKey(submittedExpress)}`;
 
   const rpcResult = await packagingStockInBatchAtomic({
     store: params.store,
-    operationId: inventoryOperationId('packaging-stock-in', params.bundle.barcode),
+    operationId: inventoryOperationId('packaging-stock-in', operationKey),
     payload: {
       store_code: storeCode,
       store_name: params.store.storeName,
@@ -407,9 +416,28 @@ export async function submitPackagingStockIn(params: {
   });
 
   const bundleItem = inventoryItemFromCloudRow(rpcResult.bundleItem);
-  const lineItems = rpcResult.lineItems.map(inventoryItemFromCloudRow);
+  const lineItems = filterItemsByExpressCodes(
+    rpcResult.lineItems.map(inventoryItemFromCloudRow),
+    submittedExpress,
+  );
+  assertPackagingExpressMatch(
+    submittedExpress,
+    lineItems.map((item) => item.input_barcode),
+  );
   const allItems = [bundleItem, ...lineItems];
-  const pack = packDetailFromCloudPackRow(rpcResult.pack, allItems);
+  const pack = packDetailFromCloudPackRow(
+    {
+      ...rpcResult.pack,
+      inventory_packed_shipment_items: (rpcResult.pack.inventory_packed_shipment_items ?? []).filter((line) =>
+        lineItems.some(
+          (item) =>
+            item.id === line.item_id ||
+            item.barcode.trim().toUpperCase() === String(line.item_barcode ?? '').trim().toUpperCase(),
+        ),
+      ),
+    },
+    allItems,
+  );
 
   mergePackagingStockInIntoCache(params.store, hub, {
     bundleItem,
@@ -896,11 +924,17 @@ export async function generatePackageNumber(
     }
   }
   let seq = maxSeq + 1;
-  for (let i = 0; i < 50; i += 1) {
+  for (let i = 0; i < 80; i += 1) {
     const candidate = `${body}${formatPackageSequence(seq)}`;
     const taken = packs.some((p) => p.bundle_barcode.toUpperCase() === candidate.toUpperCase());
-    const itemTaken = await getItemByBarcode(candidate);
-    if (!taken && !itemTaken) return candidate;
+    if (!taken) {
+      const [itemTaken, cloudPack, cloudItemId] = await Promise.all([
+        getItemByBarcode(candidate),
+        fetchCloudPackByBarcode(candidate),
+        getCloudItemIdByBarcode(candidate),
+      ]);
+      if (!itemTaken && !cloudPack && !cloudItemId) return candidate;
+    }
     seq += 1;
   }
   throw svc('cannotGeneratePackNo');

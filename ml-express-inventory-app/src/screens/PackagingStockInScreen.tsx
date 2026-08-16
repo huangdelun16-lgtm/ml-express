@@ -71,12 +71,11 @@ function newLineId(): string {
 }
 
 function emptyLine(code: string): PackagingScanLine {
-  const trimmed = code.trim();
   return {
     id: newLineId(),
-    code: trimmed,
+    code: code.trim(),
     count: 1,
-    productName: trimmed,
+    productName: '',
   };
 }
 
@@ -263,7 +262,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     setLines((prev) =>
       prev.map((l) =>
         l.id === editLine.id
-          ? { ...l, code: nextCode, productName: l.productName || nextCode }
+          ? { ...l, code: nextCode }
           : l,
       ),
     );
@@ -366,52 +365,65 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         qty: line.count,
       }));
 
-      const packNo = await generatePackageNumber(
-        batchDestination.trim(),
-        totalPieceCount,
-        normalizePackageOriginPrefix(store.storeCode || hubCode || 'PKG'),
-      );
+      const originPrefix = normalizePackageOriginPrefix(store.storeCode || hubCode || 'PKG');
+      let packNo = '';
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        packNo = await generatePackageNumber(
+          batchDestination.trim(),
+          totalPieceCount,
+          originPrefix,
+        );
+        try {
+          const { bundleItem } = await submitPackagingStockIn({
+            operator: operatorName ?? t.common.operator,
+            store,
+            destination: dest,
+            recipientName: recipientName.trim(),
+            recipientPhone: recipientPhone.trim(),
+            customerCode: customerCode.trim(),
+            inboundAt,
+            lineNote,
+            bundle: {
+              barcode: packNo,
+              name: fmt(t.packagingStockIn.packName, { name: recipientName.trim() }),
+              spec: specStr,
+              unit: `${totalPieceCount} Pcs`,
+              weight: batchWeightStr,
+              note: fmt(t.packagingStockIn.packNote, {
+                fee: String(grandTotalFee),
+                phone: recipientPhone.trim(),
+              }),
+            },
+            lines: stockInLines,
+          });
 
-      const { bundleItem } = await submitPackagingStockIn({
-        operator: operatorName ?? t.common.operator,
-        store,
-        destination: dest,
-        recipientName: recipientName.trim(),
-        recipientPhone: recipientPhone.trim(),
-        customerCode: customerCode.trim(),
-        inboundAt,
-        lineNote,
-        bundle: {
-          barcode: packNo,
-          name: fmt(t.packagingStockIn.packName, { name: recipientName.trim() }),
-          spec: specStr,
-          unit: `${totalPieceCount} Pcs`,
-          weight: batchWeightStr,
-          note: fmt(t.packagingStockIn.packNote, {
-            fee: String(grandTotalFee),
-            phone: recipientPhone.trim(),
-          }),
-        },
-        lines: stockInLines,
-      });
+          await saveStockInContactDraft({
+            customerCode: customerCode.trim().toUpperCase(),
+            recipientName: recipientName.trim(),
+            recipientPhone: recipientPhone.trim(),
+            destination: batchDestination.trim(),
+            detailAddress: '',
+            packaging: '',
+          });
 
-      await saveStockInContactDraft({
-        customerCode: customerCode.trim().toUpperCase(),
-        recipientName: recipientName.trim(),
-        recipientPhone: recipientPhone.trim(),
-        destination: batchDestination.trim(),
-        detailAddress: '',
-        packaging: '',
-      });
-
-      setBarcodeModalData({
-        productName: bundleItem.name,
-        barcode: packNo,
-        destination: batchDestination.trim(),
-        customerName: recipientName.trim(),
-        kind: 'pack',
-      });
-      resetWizard();
+          setBarcodeModalData({
+            productName: bundleItem.name,
+            barcode: packNo,
+            destination: batchDestination.trim(),
+            customerName: recipientName.trim(),
+            kind: 'pack',
+          });
+          resetWizard();
+          lastError = null;
+          break;
+        } catch (error: unknown) {
+          lastError = error;
+          const message = error instanceof Error ? error.message : String(error ?? '');
+          if (!/package barcode taken/i.test(message)) throw error;
+        }
+      }
+      if (lastError) throw lastError;
     } catch (e: unknown) {
       feedbackService.notify(t.common.fail, resolveAppError(t, e));
     } finally {

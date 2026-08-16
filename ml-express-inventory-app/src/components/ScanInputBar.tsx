@@ -22,6 +22,8 @@ type Props = {
   cameraScan?: boolean | CameraScanOptions;
   /** 自定义扫码（与 cameraScan 二选一） */
   onScanPress?: () => void;
+  /** 手动输入时保留大小写（关键词搜索）；扫码仍会规范化为大写 */
+  preserveCase?: boolean;
 };
 
 export default function ScanInputBar({
@@ -35,6 +37,7 @@ export default function ScanInputBar({
   busy = false,
   cameraScan,
   onScanPress,
+  preserveCase = false,
 }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<TextInput>(null);
@@ -53,8 +56,10 @@ export default function ScanInputBar({
     }
   }, [autoFocus, busy]);
 
-  const submitCode = (raw: string) => {
-    const code = normalizeScanCode(raw);
+  const submitCode = (raw: string, fromScan = false) => {
+    const code = !fromScan && preserveCase
+      ? raw.replace(/[\x00-\x1F\x7F]/g, '').trim()
+      : normalizeScanCode(raw);
     if (!code || busy) return;
     vibrateScanSuccess();
     onChangeText(code);
@@ -126,7 +131,7 @@ export default function ScanInputBar({
         <PhoneBarcodeScanModal
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
-          onScanned={submitCode}
+          onScanned={(code) => submitCode(code, true)}
           title={cameraOpts.title ?? t.scanInput.phoneScan}
           subtitle={cameraOpts.subtitle}
         />

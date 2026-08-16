@@ -4,6 +4,7 @@ import CopyableCodeRow from './CopyableCodeRow';
 import { useTranslation } from '../i18n';
 import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
+import { resolveItemOrderNumber } from '../utils/itemOrderNumber';
 
 type ItemRow = InventoryItem | InventoryItemListRow;
 
@@ -53,7 +54,7 @@ export default function ItemActionModal({
             </View>
           ) : null}
           <Text style={styles.title} numberOfLines={2}>
-            {item.name}
+            {isPack ? item.name : resolveItemOrderNumber(item)}
           </Text>
           {!isPack ? (
             <Text style={styles.subtitle} numberOfLines={1}>

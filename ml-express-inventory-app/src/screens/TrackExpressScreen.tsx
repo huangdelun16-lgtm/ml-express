@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import ScanInputBar from '../components/ScanInputBar';
+import ItemsListRow from '../components/ItemsListRow';
 import CustomerSignFlowModal, { type CustomerSignFlowRequest } from '../components/CustomerSignFlowModal';
 import { SignaturePreview } from '../components/SignaturePad';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,9 +20,9 @@ import {
   useTranslation,
 } from '../i18n';
 import type { TranslationDict } from '../i18n/translations';
-import { trackOrderByCode } from '../services/inventoryService';
+import { listItems, listPackedShipments, trackOrderByCode } from '../services/inventoryService';
 import { findTrackingByAnyCode } from '../services/trackingService';
-import type { PackedShipmentDetail, TrackOrderResult } from '../types/inventory';
+import type { InventoryItemListRow, PackedShipmentDetail, TrackOrderResult } from '../types/inventory';
 import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import { canMarkCustomerSigned } from '../utils/customerSign';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
@@ -31,6 +32,8 @@ import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { feedbackService } from '../services/FeedbackService';
 
 type Route = { params?: { presetCode?: string } };
+
+const KEYWORD_RESULT_LIMIT = 40;
 
 function getMatchLabel(t: TranslationDict, matchType: TrackOrderResult['matchType']): string {
   if (matchType === 'express') return t.trackExpress.matchExpress;
@@ -332,13 +335,15 @@ function CloudOnlyPanel({
 
 export default function TrackExpressScreen({ route }: { route?: Route }) {
   const { t, fmt } = useTranslation();
-  const { store, operatorName } = useAuth();
+  const { store, hubCode, operatorName } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
   const [result, setResult] = useState<TrackOrderResult | null>(null);
   const [cloudPkg, setCloudPkg] = useState<PkgTrackingDetail | null>(null);
   const [cloudOrder, setCloudOrder] = useState<OrderTrackingRecord | null>(null);
+  const [keywordMatches, setKeywordMatches] = useState<InventoryItemListRow[]>([]);
+  const [keywordTotal, setKeywordTotal] = useState(0);
   const [notFound, setNotFound] = useState(false);
 
   const search = useCallback(async (raw: string) => {
@@ -350,7 +355,10 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
     setResult(null);
     setCloudPkg(null);
     setCloudOrder(null);
+    setKeywordMatches([]);
+    setKeywordTotal(0);
     try {
+      const scope = store && hubCode ? { store, hubCode } : undefined;
       const [tracked, cloud] = await Promise.all([
         trackOrderByCode(q),
         findTrackingByAnyCode(q),
@@ -359,17 +367,54 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
       setCloudOrder(cloud.order);
       if (tracked) {
         setResult(tracked);
-      } else if (cloud.pkg) {
-        setNotFound(false);
-      } else {
-        setNotFound(true);
+        return;
       }
+
+      const matches = await listItems(q, scope);
+      if (matches.length === 1) {
+        const barcode = matches[0].barcode;
+        const [only, cloudForItem] = await Promise.all([
+          trackOrderByCode(barcode),
+          findTrackingByAnyCode(barcode),
+        ]);
+        if (only) {
+          setCloudPkg(cloudForItem.pkg);
+          setCloudOrder(cloudForItem.order);
+          setResult(only);
+          return;
+        }
+      }
+      if (matches.length > 1) {
+        setKeywordTotal(matches.length);
+        setKeywordMatches(matches.slice(0, KEYWORD_RESULT_LIMIT));
+        return;
+      }
+
+      const packs = await listPackedShipments(q, scope);
+      if (packs.length === 1) {
+        const packCode = packs[0].bundle_barcode;
+        const [packTracked, cloudForPack] = await Promise.all([
+          trackOrderByCode(packCode),
+          findTrackingByAnyCode(packCode),
+        ]);
+        if (packTracked) {
+          setCloudPkg(cloudForPack.pkg);
+          setCloudOrder(cloudForPack.order);
+          setResult(packTracked);
+          return;
+        }
+      }
+
+      if (cloud.pkg) {
+        return;
+      }
+      setNotFound(true);
     } catch {
       setNotFound(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [store, hubCode]);
 
   useEffect(() => {
     const preset = route?.params?.presetCode;
@@ -398,6 +443,7 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
         onChangeText={setCode}
         onSubmit={search}
         busy={loading}
+        preserveCase
         cameraScan={{
           title: t.trackExpress.cameraTitle,
           subtitle: t.trackExpress.cameraSubtitle,
@@ -427,6 +473,31 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
         </View>
       ) : null}
 
+      {keywordMatches.length > 0 ? (
+        <View style={styles.keywordBox}>
+          <Text style={styles.keywordTitle}>
+            {fmt(t.trackExpress.keywordResults, { count: keywordTotal })}
+          </Text>
+          <Text style={styles.keywordHint}>{t.trackExpress.tapForDetail}</Text>
+          {keywordMatches.map((item) => (
+            <ItemsListRow
+              key={item.id}
+              item={item}
+              hubCode={hubCode ?? undefined}
+              selected={false}
+              selectActive={false}
+              selectAccent="#38bdf8"
+              onPress={() => void search(item.barcode)}
+            />
+          ))}
+          {keywordTotal > keywordMatches.length ? (
+            <Text style={styles.keywordHint}>
+              {fmt(t.trackExpress.resultsCapped, { shown: keywordMatches.length })}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {result ? (
         <TrackResultPanel
           result={result}
@@ -437,7 +508,9 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
           onSignDelivered={handleSign}
         />
       ) : null}
-      {!result && cloudPkg ? <CloudOnlyPanel pkg={cloudPkg} order={cloudOrder} /> : null}
+      {!result && keywordMatches.length === 0 && cloudPkg ? (
+        <CloudOnlyPanel pkg={cloudPkg} order={cloudOrder} />
+      ) : null}
 
       <CustomerSignFlowModal
         request={signRequest}
@@ -483,6 +556,9 @@ const styles = StyleSheet.create({
   },
   notFoundTitle: { color: '#fca5a5', fontSize: 16, fontWeight: '800' },
   notFoundHint: { color: '#94a3b8', fontSize: 13, marginTop: 6, lineHeight: 20 },
+  keywordBox: { gap: 8, marginBottom: 12 },
+  keywordTitle: { color: '#7dd3fc', fontSize: 14, fontWeight: '800' },
+  keywordHint: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 4 },
   result: { marginTop: 4 },
   matchBanner: {
     backgroundColor: 'rgba(14,165,233,0.12)',

@@ -181,7 +181,7 @@ export default function PackExpressModal({
               <Text key={item.id} style={styles.selectedLine}>
                 · {item.customer_name ? `${item.customer_name} · ` : ''}
                 {item.destination ? `[${extractDestinationCode(item.destination)}] ` : ''}
-                {item.name}
+                {item.input_barcode?.trim() || item.name}
               </Text>
             ))}
           </View>

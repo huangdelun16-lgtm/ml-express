@@ -68,6 +68,7 @@ export type CloudPackLineRow = {
   item_name: string;
   qty: number;
   created_at: string;
+  input_barcode?: string;
 };
 
 export type CloudPackRow = {
@@ -94,6 +95,25 @@ const PACK_COLUMNS =
   'id, bundle_item_id, bundle_barcode, bundle_name, operator, note, owner_store_id, owner_store_code, transport_fee, truck_leg_destination, loaded_at, created_at, updated_at';
 
 const PACK_LINE_COLUMNS = 'id, pack_id, item_id, item_barcode, item_name, qty, created_at';
+const PACK_LINE_COLUMNS_WITH_EXPRESS = `${PACK_LINE_COLUMNS}, input_barcode`;
+
+async function fetchCloudPackLines(packIds: string[]): Promise<CloudPackLineRow[]> {
+  if (packIds.length === 0) return [];
+  const withExpress = await supabase
+    .from('inventory_packed_shipment_items')
+    .select(PACK_LINE_COLUMNS_WITH_EXPRESS)
+    .in('pack_id', packIds);
+  if (!withExpress.error) return (withExpress.data ?? []) as CloudPackLineRow[];
+  if (!/input_barcode/i.test(withExpress.error.message)) {
+    throw new Error(withExpress.error.message);
+  }
+  const fallback = await supabase
+    .from('inventory_packed_shipment_items')
+    .select(PACK_LINE_COLUMNS)
+    .in('pack_id', packIds);
+  if (fallback.error) throw new Error(fallback.error.message);
+  return (fallback.data ?? []) as CloudPackLineRow[];
+}
 
 type AtomicRpcResult = {
   idempotent?: boolean;
@@ -351,6 +371,7 @@ export async function packagingStockInBatchAtomic(params: {
         item_name: String(line.name ?? ''),
         qty: parseLineQty(line),
         created_at: String(line.created_at ?? ''),
+        input_barcode: String(line.input_barcode ?? ''),
       })),
     },
     lineItems: lineRows.map((line) => rowToCloudItem(line)),
@@ -575,11 +596,7 @@ export async function fetchCloudRecentPackedShipments(limit = 3): Promise<CloudP
   if (!packs?.length) return [];
 
   const packIds = packs.map((p) => String((p as { id: string }).id));
-  const { data: lines, error: lineErr } = await supabase
-    .from('inventory_packed_shipment_items')
-    .select(PACK_LINE_COLUMNS)
-    .in('pack_id', packIds);
-  if (lineErr) throw new Error(lineErr.message);
+  const lines = await fetchCloudPackLines(packIds);
 
   const linesByPack = new Map<string, CloudPackLineRow[]>();
   for (const row of lines ?? []) {
@@ -611,11 +628,7 @@ export async function fetchCloudPackedShipments(
   if (!packs?.length) return [];
 
   const packIds = packs.map((p) => String((p as { id: string }).id));
-  const { data: lines, error: lineErr } = await supabase
-    .from('inventory_packed_shipment_items')
-    .select(PACK_LINE_COLUMNS)
-    .in('pack_id', packIds);
-  if (lineErr) throw new Error(lineErr.message);
+  const lines = await fetchCloudPackLines(packIds);
 
   const linesByPack = new Map<string, CloudPackLineRow[]>();
   for (const row of lines ?? []) {

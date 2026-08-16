@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,8 +18,9 @@ import { packStatusStyle } from '../utils/packDisplayStatus';
 import { LOGIN_LOGO } from '../constants/branding';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { getPackStatusLabel, useTranslation } from '../i18n';
+import { feedbackService } from '../services/FeedbackService';
 
-type Nav = { navigate: (name: string) => void };
+type Nav = { navigate: (name: string, params?: { presetCode?: string }) => void };
 
 const PRIMARY_STAT_KEYS = [
   { key: 'itemCount' as const, labelKey: 'statSku' as const },
@@ -41,6 +43,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
   });
   const [recentPacks, setRecentPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
@@ -85,6 +88,15 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     ['ShipmentTrack', 'Movements', 'CameraScan', 'Settings'].includes(tile.screen),
   );
 
+  const goQueryExpress = () => {
+    const q = query.trim();
+    if (!q) {
+      feedbackService.info(t.home.queryExpressEmpty);
+      return;
+    }
+    navigation.navigate('TrackExpress', { presetCode: q });
+  };
+
   return (
     <ScrollView
       style={styles.root}
@@ -104,6 +116,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
         />
       }
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
     >
       <View style={styles.headerCard}>
         <View style={styles.headerTopRow}>
@@ -144,6 +157,37 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
           <View style={styles.chipMuted}>
             <Text style={styles.chipMutedText}>{t.home.localCloud}</Text>
           </View>
+        </View>
+      </View>
+
+      <View style={styles.queryCard}>
+        <View style={styles.queryHeader}>
+          <View style={styles.queryIconWrap}>
+            <Text style={styles.queryIcon}>🔍</Text>
+          </View>
+          <View style={styles.queryHeaderText}>
+            <Text style={styles.queryTitle}>{t.home.queryExpressTitle}</Text>
+            <Text style={styles.queryHint}>{t.home.queryExpressHint}</Text>
+          </View>
+        </View>
+        <View style={styles.queryRow}>
+          <TextInput
+            style={styles.queryInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t.home.queryExpressPlaceholder}
+            placeholderTextColor="#64748b"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={goQueryExpress}
+          />
+          <Pressable
+            style={({ pressed }) => [styles.queryBtn, pressed && styles.queryBtnPressed]}
+            onPress={goQueryExpress}
+          >
+            <Text style={styles.queryBtnText}>{t.common.query}</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -579,4 +623,56 @@ const styles = StyleSheet.create({
   },
   tileIcon: { fontSize: 22 },
   tileTitle: { color: '#f8fafc', fontSize: 15, fontWeight: '800' },
+  queryCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.28)',
+    shadowColor: '#0ea5e9',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  queryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  queryIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(14, 165, 233, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  queryIcon: { fontSize: 18 },
+  queryHeaderText: { flex: 1 },
+  queryTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '900' },
+  queryHint: { color: '#64748b', fontSize: 12, marginTop: 2, lineHeight: 17 },
+  queryRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
+  queryInput: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#f8fafc',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+  },
+  queryBtn: {
+    backgroundColor: '#0ea5e9',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    minWidth: 72,
+  },
+  queryBtnPressed: { opacity: 0.85 },
+  queryBtnText: { color: '#f8fafc', fontSize: 15, fontWeight: '900', textAlign: 'center' },
 });

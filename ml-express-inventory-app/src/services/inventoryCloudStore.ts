@@ -159,7 +159,8 @@ function packFromRow(row: CloudPackRow, items: InventoryItem[]): PackedShipmentD
       itemByBarcode.get(line.item_barcode.trim().toUpperCase());
     return {
       id: line.id, pack_id: row.id, item_id: item?.id ?? line.item_id ?? '',
-      item_barcode: line.item_barcode, input_barcode: item?.input_barcode ?? '',
+      item_barcode: line.item_barcode,
+      input_barcode: line.input_barcode?.trim() || item?.input_barcode?.trim() || '',
       item_name: line.item_name, destination: item?.final_destination ?? '',
       customer_name: item?.recipient_name ?? '', owner_store_code: item?.owner_store_code,
       qty: line.qty,

@@ -4,6 +4,7 @@ import PackagingStockInBarcodeText from './PackagingStockInBarcodeText';
 import { useTranslation } from '../i18n';
 import type { PackedShipmentDetail } from '../types/inventory';
 import { resolvePackOrderCount } from '../utils/itemFieldFormat';
+import { resolveItemOrderNumber, resolveItemProductSubtitle } from '../utils/itemOrderNumber';
 
 type Props = {
   visible: boolean;
@@ -28,16 +29,26 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
           <Text style={styles.subtitle}>{format(t.forms.orderCount, { count: orderCount })}</Text>
 
           <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-            {pack.items.map((line, index) => (
+            {pack.items.map((line, index) => {
+              const orderNumber = resolveItemOrderNumber(line);
+              const productSubtitle = resolveItemProductSubtitle(line);
+              return (
               <View key={line.id} style={styles.orderRow}>
                 <Text style={styles.orderIndex}>{index + 1}</Text>
                 <View style={styles.orderBody}>
-                  <Text style={styles.customerName} numberOfLines={1}>
-                    {line.customer_name?.trim() || t.items.noCustomer}
-                  </Text>
                   <Text style={styles.orderName} numberOfLines={2}>
-                    {line.item_name}
+                    {orderNumber}
                   </Text>
+                  {line.customer_name?.trim() ? (
+                    <Text style={styles.customerName} numberOfLines={1}>
+                      {line.customer_name.trim()}
+                    </Text>
+                  ) : null}
+                  {productSubtitle ? (
+                    <Text style={styles.productSubtitle} numberOfLines={1}>
+                      {productSubtitle}
+                    </Text>
+                  ) : null}
                   <View style={styles.codeRow}>
                     <View style={styles.tagBlue}>
                       <Text style={styles.tagBlueLabel}>{t.items.expressNo}</Text>
@@ -57,7 +68,8 @@ export default function PkgOrdersModal({ visible, pack, onClose }: Props) {
                   </View>
                 </View>
               </View>
-            ))}
+              );
+            })}
           </ScrollView>
 
           <Pressable style={styles.btn} onPress={onClose}>
@@ -113,8 +125,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   orderBody: { flex: 1, minWidth: 0 },
-  customerName: { color: '#7dd3fc', fontSize: 13, fontWeight: '800', marginBottom: 2 },
-  orderName: { color: '#f8fafc', fontSize: 14, fontWeight: '800' },
+  orderName: { color: '#f8fafc', fontSize: 16, fontWeight: '900', fontFamily: 'monospace' },
+  customerName: { color: '#7dd3fc', fontSize: 13, fontWeight: '800', marginTop: 3 },
+  productSubtitle: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginTop: 2 },
   codeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

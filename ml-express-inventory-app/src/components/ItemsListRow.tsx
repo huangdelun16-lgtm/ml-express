@@ -11,6 +11,7 @@ import {
   stockUnitLabel,
 } from '../utils/itemFieldFormat';
 import { resolveItemDestinationCode } from '../utils/itemDestination';
+import { resolveItemOrderNumber, resolveItemProductSubtitle } from '../utils/itemOrderNumber';
 
 type Props = {
   item: InventoryItemListRow;
@@ -31,6 +32,8 @@ export default function ItemsListRow({
 }: Props) {
   const { t } = useTranslation();
   const cardQty = resolveItemCardQty(item);
+  const orderNumber = resolveItemOrderNumber(item);
+  const productSubtitle = resolveItemProductSubtitle(item);
   const meta = [item.spec, item.unit, item.weight].filter(Boolean).join(' · ');
   const regionCode = resolveItemDestinationCode(item);
   const transitShipped = item.hub_transit_shipped;
@@ -51,7 +54,7 @@ export default function ItemsListRow({
       style={[styles.row, selectActive && selected && { borderColor: selectAccent, backgroundColor: '#1a2332' }]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${item.customer_name?.trim() || item.recipient_name?.trim() || t.items.noCustomer}，${item.name}，${item.barcode}`}
+      accessibilityLabel={`${item.customer_name?.trim() || item.recipient_name?.trim() || t.items.noCustomer}，${orderNumber}，${item.barcode}`}
     >
       {selectActive ? <SelectCheck selected={selected} accent={selectAccent} /> : null}
       <View style={styles.cardBody}>
@@ -69,8 +72,13 @@ export default function ItemsListRow({
               ) : null}
             </Text>
             <Text style={styles.productName} numberOfLines={2}>
-              {item.name}
+              {orderNumber}
             </Text>
+            {productSubtitle ? (
+              <Text style={styles.productSubtitle} numberOfLines={1}>
+                {productSubtitle}
+              </Text>
+            ) : null}
             <View style={styles.statusRow}>
               <View
                 style={[
@@ -229,6 +237,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 24,
     paddingVertical: 2,
+  },
+  productSubtitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 1,
   },
   statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 },
   statusBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
