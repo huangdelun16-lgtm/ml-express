@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
 import { useNavigate } from 'react-router-dom';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline, OverlayView, OverlayViewF } from '@react-google-maps/api';
 import { packageService, supabase } from '../services/supabase';
 import NavigationBar from '../components/home/NavigationBar';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
@@ -12,7 +12,11 @@ import {
   TERMINAL_EXCLUDED_STATUSES,
   TRACKING_LIVE_MAP_STATUSES
 } from '../constants/packageStatus';
+import { TRACKING_COURIER_COLOR, TRACKING_DESTINATION_COLOR, TRACKING_MAP_OPTIONS, TRACKING_ROUTE_COLOR } from '../constants/trackingMapStyles';
+import { getCourierMarkerIcon, getDestinationMarkerIcon } from '../utils/trackingMapMarkers';
+import { formatTrackingAge } from '../utils/trackingRelativeTime';
 import { feedbackService } from '../services/FeedbackService';
+import '../styles/trackingLiveMap.css';
 
 // Google Maps API 配置
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
@@ -75,6 +79,15 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
   const [selectedMarker, setSelectedMarker] = useState<'package' | 'courier' | null>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]); // 🚀 新增：进行中的订单列表
   const [loadingActiveOrders, setLoadingActiveOrders] = useState(false); // 🚀 新增：加载状态
+
+  const destinationMarkerIcon = useMemo(
+    () => (isMapLoaded ? getDestinationMarkerIcon() : undefined),
+    [isMapLoaded],
+  );
+  const courierMarkerIcon = useMemo(
+    () => (isMapLoaded ? getCourierMarkerIcon(courierLocation?.vehicle) : undefined),
+    [isMapLoaded, courierLocation?.vehicle],
+  );
 
   const loadActiveOrders = useCallback(async () => {
     if (!currentUser) return;
@@ -710,54 +723,24 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
               
               {/* 右侧：实时地图 */}
               <div>
-                <div style={{
-                  background: 'rgba(255,255,255,0.95)',
-                  backdropFilter: 'blur(20px)',
-                  padding: '2rem',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-                }}>
-                  <h3 style={{ 
-                    color: '#2c5282', 
-                    marginBottom: '1rem', 
-                    fontSize: '1.2rem',
-                    fontWeight: '700'
-                  }}>
-                    🗺️ {t.tracking.realTimeTracking}
-                  </h3>
-                  
+                <div className="tracking-map-shell">
+                  <div className="tracking-map-frame">
                   {isMapLoaded ? (
-                    <div style={{ height: '500px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #e2e8f0' }}>
                       <GoogleMap
                         mapContainerStyle={{ width: '100%', height: '100%' }}
+                        mapContainerClassName="tracking-map-canvas"
                         center={mapCenter}
                         zoom={13}
                         onLoad={(map) => {
                           mapInstanceRef.current = map;
                         }}
-                        options={{
-                          zoomControl: true,
-                          streetViewControl: false,
-                          mapTypeControl: false,
-                          fullscreenControl: true
-                        }}
+                        options={TRACKING_MAP_OPTIONS}
                       >
-                        {/* 收货地/包裹目的地 — 与 App 一致使用 receiver_* 坐标，不用 mapCenter（避免与骑手位置混淆） */}
                         {receiverMapPosition && (
                         <Marker
                           position={receiverMapPosition}
-                          icon={{
-                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${getStatusColor(trackingResult.status)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                              </svg>
-                            `),
-                            scaledSize: new window.google.maps.Size(40, 40),
-                            anchor: new window.google.maps.Point(20, 20)
-                          }}
+                          icon={destinationMarkerIcon}
+                          zIndex={2}
                           onClick={() => setSelectedMarker('package')}
                         />
                         )}
@@ -769,42 +752,41 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
                               { lat: animatedCourierLocation.lat, lng: animatedCourierLocation.lng },
                             ]}
                             options={{
-                              strokeColor: '#667eea',
-                              strokeOpacity: 0.85,
-                              strokeWeight: 3,
+                              strokeColor: TRACKING_ROUTE_COLOR,
+                              strokeOpacity: 0.92,
+                              strokeWeight: 4,
+                              geodesic: true,
                             }}
                           />
                         )}
+
+                        {animatedCourierLocation && (
+                          <OverlayViewF
+                            position={{ lat: animatedCourierLocation.lat, lng: animatedCourierLocation.lng }}
+                            mapPaneName={OverlayView.OVERLAY_LAYER}
+                            getPixelPositionOffset={() => ({ x: -36, y: -36 })}
+                          >
+                            <div className="tracking-map-pulse" />
+                          </OverlayViewF>
+                        )}
                         
-                        {/* 快递员位置标记 (使用动画坐标实现平滑移动) */}
                         {animatedCourierLocation && (
                           <Marker
                             position={{ lat: animatedCourierLocation.lat, lng: animatedCourierLocation.lng }}
-                            icon={{
-                              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                                <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                  <circle cx="12" cy="12" r="10" fill="#fff"/>
-                                  <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                                  <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                                  <line x1="15" y1="9" x2="15.01" y2="9"></line>
-                                </svg>
-                              `),
-                              scaledSize: new window.google.maps.Size(50, 50),
-                              anchor: new window.google.maps.Point(25, 25)
-                            }}
+                            icon={courierMarkerIcon}
+                            zIndex={3}
                             onClick={() => setSelectedMarker('courier')}
                           />
                         )}
 
-                        {/* 包裹信息窗口 */}
                         {selectedMarker === 'package' && receiverMapPosition && (
                           <InfoWindow
                             position={receiverMapPosition}
                             onCloseClick={() => setSelectedMarker(null)}
                           >
                             <div style={{ padding: '0.5rem' }}>
-                              <h4 style={{ margin: '0 0 0.5rem 0', color: '#2c5282' }}>
-                                📦 {t.tracking.packageLocation}
+                              <h4 style={{ margin: '0 0 0.5rem 0', color: TRACKING_DESTINATION_COLOR }}>
+                                {t.tracking.packageLocation}
                               </h4>
                               <p style={{ margin: '0', fontSize: '0.9rem', color: '#4a5568' }}>
                                 {trackingResult.receiver_address}
@@ -816,112 +798,96 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
                           </InfoWindow>
                         )}
 
-                        {/* 快递员信息窗口 */}
-                        {selectedMarker === 'courier' && animatedCourierLocation && (
+                        {selectedMarker === 'courier' && animatedCourierLocation && courierLocation && (
                           <InfoWindow
                             position={{ lat: animatedCourierLocation.lat, lng: animatedCourierLocation.lng }}
                             onCloseClick={() => setSelectedMarker(null)}
                           >
                             <div style={{ padding: '0.5rem' }}>
-                              <h4 style={{ margin: '0 0 0.5rem 0', color: '#e53e3e' }}>
-                                🏍️ {t.tracking.courierInfo}
+                              <h4 style={{ margin: '0 0 0.5rem 0', color: TRACKING_COURIER_COLOR }}>
+                                {t.tracking.courierInfo}
                               </h4>
                               <p style={{ margin: '0.2rem 0', fontSize: '0.9rem', color: '#2d3748' }}>
                                 <strong>{courierLocation.name}</strong>
                               </p>
                               <p style={{ margin: '0.2rem 0', fontSize: '0.85rem', color: '#4a5568' }}>
-                                📱 {courierLocation.phone}
+                                {courierLocation.phone}
                                 <br />
-                                🚗 {courierLocation.vehicle}
+                                {courierLocation.vehicle}
                               </p>
                               <p style={{ margin: '0.2rem 0', fontSize: '0.85rem', color: '#38a169' }}>
-                                ● {language === 'zh' ? '实时在线' : language === 'en' ? 'Online Now' : 'အွန်လိုင်း'}
+                                {t.tracking.live}
                               </p>
                             </div>
                           </InfoWindow>
                         )}
                       </GoogleMap>
-                    </div>
                   ) : (
                     <div style={{ 
-                      height: '500px', 
+                      height: '100%', 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center',
-                      background: '#f7fafc',
-                      borderRadius: '12px',
                       color: '#718096'
                     }}>
                       {language === 'zh' ? '加载地图中...' : language === 'en' ? 'Loading Map...' : 'မြေပုံ တင်နေသည်...'}
                     </div>
                   )}
 
-                  {/* 图例 */}
-                  <div style={{ 
-                    marginTop: '1rem', 
-                    padding: '1rem', 
-                    background: 'rgba(102, 126, 234, 0.05)',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    gap: '2rem',
-                    flexWrap: 'wrap',
-                    justifyContent: 'center'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ 
-                        width: '20px', 
-                        height: '20px', 
-                        background: getStatusColor(trackingResult.status),
-                        borderRadius: '50%'
-                      }} />
-                      <span style={{ fontSize: '0.9rem', color: '#4a5568' }}>{t.tracking.packageLocation}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ 
-                        width: '20px', 
-                        height: '20px', 
-                        background: '#e53e3e',
-                        borderRadius: '50%',
-                        border: '2px solid #fff',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                      }} />
-                      <span style={{ fontSize: '0.9rem', color: '#4a5568' }}>{t.tracking.courierLocation}</span>
-                    </div>
-                  </div>
-
-                  {/* 骑手位置信息或隐私提示 */}
-                  {TRACKING_LIVE_MAP_STATUSES.includes(trackingResult.status) && (
-                    <>
+                    <div className="tracking-map-hud tracking-map-hud--top">
+                      <div className="tracking-map-chip">
+                        {t.tracking.realTimeTracking}
+                        <span style={{ color: getStatusColor(trackingResult.status), fontWeight: 800 }}>
+                          {trackingResult.status}
+                        </span>
+                      </div>
                       {courierLocation ? (
-                        <div style={{ 
-                          marginTop: '1rem', 
-                          padding: '0.8rem', 
-                          background: 'rgba(56, 161, 105, 0.1)',
-                          borderRadius: '8px',
-                          textAlign: 'center',
-                          color: '#38a169',
-                          fontSize: '0.9rem'
-                        }}>
-                          🔄 {t.tracking.lastUpdate}: {new Date(courierLocation.last_active).toLocaleString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM')}
+                        <div className="tracking-map-chip tracking-map-live">
+                          <span className="tracking-map-live-dot" />
+                          {t.tracking.live}
                         </div>
-                      ) : (
-                        <div style={{
-                          marginTop: '1rem',
-                          padding: '0.8rem',
-                          background: 'rgba(237, 137, 54, 0.1)',
-                          color: '#c05621',
-                          fontSize: '0.9rem',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(237, 137, 54, 0.3)',
-                          textAlign: 'center'
-                        }}>
-                          🔒 {language === 'zh' ? '骑手正在配送其他包裹，稍后开始配送您的包裹时即可查看位置' : 
-                               language === 'en' ? 'Courier is delivering other packages. Location will be visible when delivering yours' : 
-                               'ပို့ဆောင်သူသည် အခြားထုပ်ပိုးများကို ပို့ဆောင်နေသည်'}
+                      ) : TRACKING_LIVE_MAP_STATUSES.includes(trackingResult.status) ? (
+                        <div className="tracking-map-chip">{t.tracking.courierOnTheWay}</div>
+                      ) : null}
+                    </div>
+
+                    {courierLocation ? (
+                      <div className="tracking-map-hud tracking-map-hud--courier">
+                        <div className="tracking-map-avatar">
+                          {String(courierLocation.name || trackingResult.courier || t.tracking.courier).trim().slice(0, 1).toUpperCase()}
                         </div>
-                      )}
-                    </>
-                  )}
+                        <div className="tracking-map-courier-meta">
+                          <div className="tracking-map-courier-name">
+                            {courierLocation.name || trackingResult.courier}
+                          </div>
+                          <div className="tracking-map-courier-sub">
+                            {[courierLocation.vehicle, formatTrackingAge(courierLocation.last_active, {
+                              justNow: t.tracking.justNow,
+                              minutesAgo: t.tracking.minutesAgo,
+                              hoursAgo: t.tracking.hoursAgo,
+                            })].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                      </div>
+                    ) : TRACKING_LIVE_MAP_STATUSES.includes(trackingResult.status) ? (
+                      <div className="tracking-map-hud tracking-map-hud--hint">
+                        {t.tracking.courierBusyHint}
+                      </div>
+                    ) : null}
+
+                    {!(TRACKING_LIVE_MAP_STATUSES.includes(trackingResult.status) && !courierLocation) ? (
+                    <div className="tracking-map-hud tracking-map-hud--legend">
+                      <div className="tracking-map-legend-pill">
+                        <span className="tracking-map-legend-dot tracking-map-legend-dot--pkg" />
+                        {t.tracking.packageLocation}
+                      </div>
+                      <div className="tracking-map-legend-pill">
+                        <span className="tracking-map-legend-dot tracking-map-legend-dot--rider" />
+                        {t.tracking.courierLocation}
+                      </div>
+                    </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>

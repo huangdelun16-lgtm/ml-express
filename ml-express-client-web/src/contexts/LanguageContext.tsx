@@ -76,7 +76,13 @@ const translations: any = {
       lastUpdate: '最后更新',
       courierInfo: '快递员信息',
       vehicle: '车辆',
-      contactCourier: '联系快递员'
+      contactCourier: '联系快递员',
+      live: 'LIVE',
+      justNow: '刚刚',
+      minutesAgo: '{n} 分钟前',
+      hoursAgo: '{n} 小时前',
+      courierOnTheWay: '骑手已出发',
+      courierBusyHint: '骑手正在配送其他包裹，开始配送您的包裹后即可查看位置',
     },
     cart: {
       title: '我的购物车',
@@ -681,7 +687,13 @@ const translations: any = {
       lastUpdate: 'Last Update',
       courierInfo: 'Courier Info',
       vehicle: 'Vehicle',
-      contactCourier: 'Contact Courier'
+      contactCourier: 'Contact Courier',
+      live: 'LIVE',
+      justNow: 'Just now',
+      minutesAgo: '{n} min ago',
+      hoursAgo: '{n} hr ago',
+      courierOnTheWay: 'Courier is on the way',
+      courierBusyHint: 'Courier is delivering other packages. Location appears when yours is next.',
     },
     cart: {
       title: 'My Cart',
@@ -1286,7 +1298,13 @@ const translations: any = {
       lastUpdate: 'နောက်ဆုံးအပ်ဒိတ်',
       courierInfo: 'ပေးပို့သူအချက်အလက်',
       vehicle: 'ယာဉ်',
-      contactCourier: 'ပေးပို့သူကို ဆက်သွယ်ပါ'
+      contactCourier: 'ပေးပို့သူကို ဆက်သွယ်ပါ',
+      live: 'LIVE',
+      justNow: 'ယခုလေးတင်',
+      minutesAgo: '{n} မိနစ် အကြာက',
+      hoursAgo: '{n} နာရီ အကြာက',
+      courierOnTheWay: 'ပေးပို့သူ ထွက်လာပြီး',
+      courierBusyHint: 'ပေးပို့သူသည် အခြားထုပ်ပိုးများကို ပို့ဆောင်နေသည်',
     },
     cart: {
       title: 'စျေးဝယ်လှည်း',
