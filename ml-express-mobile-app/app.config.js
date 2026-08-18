@@ -39,6 +39,19 @@ function withForceIosLocationUsageDescriptions(config) {
 /**
  * 敏感配置仅从环境变量注入（本地复制 .env.example → .env；EAS：Project secrets + EXPO_PUBLIC_*）
  */
+
+/** Production native builds bake absolute /__sb (Myanmar-reachable). Local expo start keeps env. */
+const NATIVE_SB_PROXY_URL = 'https://admin-market-link-express.com/__sb';
+const SUPABASE_UPSTREAM_URL = 'https://uopkyuluxnrewvlmutam.supabase.co';
+function resolveExtraSupabaseUrl(envUrl) {
+  const easProfile = process.env.EAS_BUILD_PROFILE || "";
+  const isEasRelease = process.env.EAS_BUILD === "true" && easProfile !== "development";
+  if (isEasRelease) {
+    process.env.EXPO_PUBLIC_SUPABASE_URL = NATIVE_SB_PROXY_URL;
+    return NATIVE_SB_PROXY_URL;
+  }
+  return (envUrl || SUPABASE_UPSTREAM_URL).trim();
+}
 module.exports = ({ config }) => {
   const expoConfig = baseConfig.expo || {};
 
@@ -48,7 +61,7 @@ module.exports = ({ config }) => {
     (expoConfig.ios?.config?.googleMapsApiKey) ||
     '';
 
-  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+  const supabaseUrl = resolveExtraSupabaseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL || '');
   const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
   const netlifyUrl =
     process.env.EXPO_PUBLIC_NETLIFY_URL ||
@@ -112,6 +125,7 @@ module.exports = ({ config }) => {
       eas: expoConfig.extra?.eas,
       supabaseUrl,
       supabaseAnonKey,
+      supabaseProxyUrl: NATIVE_SB_PROXY_URL,
       netlifyUrl,
       googleMapsApiKey,
     },

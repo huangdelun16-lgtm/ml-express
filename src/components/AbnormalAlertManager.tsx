@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase, packageService } from '../services/supabase';
+import { packageService } from '../services/supabase';
+import { useAdminSessionReady } from '../hooks/useAdminSessionReady';
 
 const AbnormalAlertManager: React.FC = () => {
+  const sessionReady = useAdminSessionReady();
   const [abnormalCount, setAbnormalCount] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const checkTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    if (!sessionReady) {
+      setAbnormalCount(0);
+      return undefined;
+    }
+
     // 请求通知权限
     if (Notification.permission === 'default') {
       Notification.requestPermission();
@@ -58,7 +65,7 @@ const AbnormalAlertManager: React.FC = () => {
     return () => {
       if (checkTimerRef.current) clearInterval(checkTimerRef.current);
     };
-  }, [abnormalCount]);
+  }, [abnormalCount, sessionReady]);
 
   return (
     <audio 

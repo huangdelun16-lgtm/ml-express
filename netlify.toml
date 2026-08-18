@@ -17,6 +17,12 @@
 
 # SPA重定向配置 - 解决React Router路由问题
 [[redirects]]
+  from = "/__sb/*"
+  to = "https://uopkyuluxnrewvlmutam.supabase.co/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
@@ -25,7 +31,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss:; media-src 'self' https: data: blob: https://assets.mixkit.co; img-src 'self' data: https: blob:; font-src 'self' https: data:; frame-src 'self' https:; worker-src 'self' blob:;"
+    Content-Security-Policy = "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss: https://*.workers.dev wss://*.workers.dev https://ml-supabase-proxy.huangdelun16.workers.dev wss://ml-supabase-proxy.huangdelun16.workers.dev; media-src 'self' https: data: blob: https://assets.mixkit.co; img-src 'self' data: https: blob:; font-src 'self' https: data:; frame-src 'self' https:; worker-src 'self' blob:;"
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"

@@ -20,12 +20,18 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://market-link-express.com/__sb"
       }
     },
     "apk": {
       "channel": "production",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://market-link-express.com/__sb"
       }
     },
     "production": {
@@ -36,6 +42,9 @@
       },
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://market-link-express.com/__sb"
       }
     },
     "testflight": {
@@ -44,6 +53,9 @@
       "channel": "production",
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://market-link-express.com/__sb"
       }
     }
   },

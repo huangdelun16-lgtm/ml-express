@@ -33,6 +33,12 @@
   force = true
 
 [[redirects]]
+  from = "/__sb/*"
+  to = "https://uopkyuluxnrewvlmutam.supabase.co/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

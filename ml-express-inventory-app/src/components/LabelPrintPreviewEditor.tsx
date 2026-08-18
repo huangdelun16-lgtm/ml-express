@@ -205,6 +205,7 @@ export default function LabelPrintPreviewEditor({
                 height={barcodePreviewHeight}
                 maxWidth={Math.max(24, toPx(barcodeWidthDots))}
                 showCodeText={false}
+                centered
               />
             </View>
 

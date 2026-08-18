@@ -13,11 +13,12 @@ import {
   normalizeCustomerProxyFeeStore,
 } from '../utils/proxyPurchaseExcel';
 import { isAbortLikeError } from '../utils/fetchError';
+import { applyNetlifyRealtimeFallback, resolveBrowserSupabaseUrl } from '../utils/supabaseBrowserUrl';
 export type { Banner, Tutorial, WelcomeScreen };
 export type { ProxyPurchaseRow as ProxyPurchaseWorkspaceRow };
 
-// 使用环境变量配置 Supabase（不再使用硬编码密钥）
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+// 浏览器走 Cloudflare Worker 代理（缅甸直连 *.supabase.co 会被掐）。Anon Key 仍来自环境变量。
+const supabaseUrl = resolveBrowserSupabaseUrl(process.env.REACT_APP_SUPABASE_URL);
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseKey) {
@@ -32,6 +33,8 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
+// production browser uses /__sb; realtime WS falls back to Worker
+applyNetlifyRealtimeFallback(supabase);
 
 // 包裹数据类型定义 - 匹配数据库字段名
 export interface Package {
@@ -1968,12 +1971,15 @@ export const adminAccountService = {
         return { account: null };
       }
 
-      // 更新最后登录时间
+      // 最后登录时间走浏览器→Worker，不能挡住已经成功的 Netlify 登录
       if (result.account.id) {
-        await supabase
+        void supabase
           .from('admin_accounts')
           .update({ last_login: new Date().toISOString() })
-          .eq('id', result.account.id);
+          .eq('id', result.account.id)
+          .then(({ error }) => {
+            if (error) console.warn('更新 last_login 失败:', error.message);
+          });
       }
 
       return {

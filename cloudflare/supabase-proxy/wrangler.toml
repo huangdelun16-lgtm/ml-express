@@ -1,0 +1,16 @@
+name = "ml-supabase-proxy"
+main = "src/index.js"
+compatibility_date = "2026-08-17"
+workers_dev = true
+
+# 源站：生产 Supabase（Worker 在 Cloudflare 机房访问，不走缅甸运营商）
+[vars]
+SUPABASE_HOSTNAME = "uopkyuluxnrewvlmutam.supabase.co"
+
+# 正确部署（不要用 Pages 连接整个 Git 仓库）：
+#   cd cloudflare/supabase-proxy
+#   npx wrangler login
+#   npx wrangler deploy
+# 部署成功后会得到 https://ml-supabase-proxy.<账号>.workers.dev
+# 先用这个地址测（关 VPN）。Custom Domain 在该 Worker 页面顶部的 Domains 标签，
+# 不是左侧边栏「Domains → Overview」（那是整站 DNS，可以一直空着）。

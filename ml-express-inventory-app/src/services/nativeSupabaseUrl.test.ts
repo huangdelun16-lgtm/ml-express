@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import {
+  NATIVE_SB_PROXY_URL,
+  applyRealtimeWsFallback,
+  resolveNativeSupabaseUrl,
+} from './nativeSupabaseUrl';
+
+const UPSTREAM = 'https://' + 'uopkyuluxnrewvlmutam' + '.supabase.co';
+
+describe('resolveNativeSupabaseUrl', () => {
+  it('dev keeps env supabase.co and custom URLs', () => {
+    expect(resolveNativeSupabaseUrl(UPSTREAM, true)).toBe(UPSTREAM);
+    expect(resolveNativeSupabaseUrl('https://sb.example.com', true)).toBe('https://sb.example.com');
+  });
+
+  it('dev empty stays empty (caller uses placeholder)', () => {
+    expect(resolveNativeSupabaseUrl('', true)).toBe('');
+  });
+
+  it('release remaps any configured URL to absolute /__sb', () => {
+    expect(resolveNativeSupabaseUrl(UPSTREAM, false)).toBe(NATIVE_SB_PROXY_URL);
+    expect(resolveNativeSupabaseUrl('', false)).toBe(NATIVE_SB_PROXY_URL);
+    expect(resolveNativeSupabaseUrl(NATIVE_SB_PROXY_URL, false)).toBe(NATIVE_SB_PROXY_URL);
+  });
+
+  it('realtime fallback only when not dev', () => {
+    const client = {
+      realtime: {
+        endPoint: UPSTREAM + '/realtime/v1/websocket',
+        httpEndpoint: UPSTREAM + '/realtime/v1',
+        headers: {},
+      },
+    };
+    applyRealtimeWsFallback(client, true);
+    expect(client.realtime.endPoint).toContain('supabase.co');
+    applyRealtimeWsFallback(client, false);
+    expect(client.realtime.endPoint.startsWith('wss://')).toBe(true);
+    expect(client.realtime.httpEndpoint).toContain('/realtime/v1');
+    expect(client.realtime.headers['User-Agent']).toContain('Mozilla');
+  });
+});

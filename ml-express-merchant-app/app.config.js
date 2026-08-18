@@ -46,6 +46,19 @@ const BLOCK_MEDIA_READ = [
  * 本地：ml-express-merchant-app/.env
  * EAS：项目 Environment / Secrets 配置同名 EXPO_PUBLIC_* 变量
  */
+
+/** Production native builds bake absolute /__sb (Myanmar-reachable). Local expo start keeps env. */
+const NATIVE_SB_PROXY_URL = 'https://mlexpress-merchants.com/__sb';
+const SUPABASE_UPSTREAM_URL = 'https://uopkyuluxnrewvlmutam.supabase.co';
+function resolveExtraSupabaseUrl(envUrl) {
+  const easProfile = process.env.EAS_BUILD_PROFILE || "";
+  const isEasRelease = process.env.EAS_BUILD === "true" && easProfile !== "development";
+  if (isEasRelease) {
+    process.env.EXPO_PUBLIC_SUPABASE_URL = NATIVE_SB_PROXY_URL;
+    return NATIVE_SB_PROXY_URL;
+  }
+  return (envUrl || SUPABASE_UPSTREAM_URL).trim();
+}
 module.exports = ({ config }) => {
   const expoConfig = { ...(config ?? baseConfig.expo ?? baseConfig) };
 
@@ -63,7 +76,7 @@ module.exports = ({ config }) => {
     process.env.EXPO_PUBLIC_NETLIFY_URL ||
     'https://admin-market-link-express.netlify.app'
   ).trim();
-  const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim();
+  const supabaseUrl = resolveExtraSupabaseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL || '');
   const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').trim();
 
   return {
@@ -105,6 +118,7 @@ module.exports = ({ config }) => {
       netlifyUrl,
       supabaseUrl: supabaseUrl || undefined,
       supabaseAnonKey: supabaseAnonKey || undefined,
+      supabaseProxyUrl: NATIVE_SB_PROXY_URL,
     },
   };
 };

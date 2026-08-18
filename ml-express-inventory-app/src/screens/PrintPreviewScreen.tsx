@@ -29,6 +29,7 @@ import {
   formatGroupTextScale,
   getGroupTextScaleMul,
   mergeAndCenterLabelLayout,
+  fitAndCenterLabelLayout,
   moveLabelGroup,
   TSPL_TEXT_LINE_HEIGHT_DOTS,
   type LabelBarcodeLayoutConfig,
@@ -237,7 +238,7 @@ export default function PrintPreviewScreen() {
       current: LabelBarcodeLayoutConfig,
       content: ReturnType<typeof previewLayoutContent>,
     ) =>
-      mergeAndCenterLabelLayout(
+      fitAndCenterLabelLayout(
         clampLabelBarcodeLayout(current, nextPaper.widthMm, nextPaper.heightMm),
         content,
         nextPaper.widthMm,

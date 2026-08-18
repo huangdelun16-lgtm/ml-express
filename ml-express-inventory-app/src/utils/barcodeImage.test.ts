@@ -6,6 +6,7 @@ import {
   getBarcodeDataUriCacheSize,
   getBarcodeImageUrl,
   getCode128ModuleRuns,
+  getCode128PrintModules,
   getCode128TotalModules,
 } from './barcodeImage';
 
@@ -32,6 +33,8 @@ describe('local Code128 barcode', () => {
     expect(runs[0]).toEqual({ black: false, modules: 10 });
     expect(runs[runs.length - 1]).toEqual({ black: false, modules: 10 });
     expect(total).toBeGreaterThan(100);
+    expect(getCode128PrintModules(code)).toBe(total - 20);
+    expect(getCode128PrintModules(code)).toBeGreaterThan(80);
     expect(runs.some((run) => run.black)).toBe(true);
   });
 

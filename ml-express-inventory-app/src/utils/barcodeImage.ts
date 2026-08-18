@@ -64,6 +64,13 @@ export function getCode128TotalModules(code: string): number {
   return getCode128ModuleRuns(code).reduce((sum, run) => sum + run.modules, 0);
 }
 
+/** TSPL BARCODE "128" 实际模块数（不含屏幕预览用的 quiet zone） */
+export function getCode128PrintModules(code: string): number {
+  const total = getCode128TotalModules(code);
+  if (total <= 0) return 1;
+  return Math.max(1, total - QUIET_ZONE_MODULES * 2);
+}
+
 export function buildCode128Svg(
   code: string,
   opts?: { scale?: number; height?: number; includeText?: boolean },

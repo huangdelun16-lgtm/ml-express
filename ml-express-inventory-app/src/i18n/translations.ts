@@ -339,7 +339,7 @@ const zh = {
     printWindowAction: 'Print',
     printWindowSending: '发送中…',
     printWindowWriteCharMissing: '无法找到打印机写入通道，请重新连接设备后再试。',
-    footer: 'ML Inventory v1.9.9 (32) · Market Link Express',
+    footer: 'ML Inventory v1.9.10 (33) · Market Link Express',
     regionTag: '区域 {hub}',
   },
   tracking: {
@@ -1155,7 +1155,7 @@ const en: typeof zh = {
     printWindowAction: 'Print',
     printWindowSending: 'Sending…',
     printWindowWriteCharMissing: 'Could not find a printer write channel. Reconnect the device and try again.',
-    footer: 'ML Inventory v1.9.9 (32) · Market Link Express',
+    footer: 'ML Inventory v1.9.10 (33) · Market Link Express',
     regionTag: 'Region {hub}',
   },
   tracking: {
@@ -1979,7 +1979,7 @@ const my: typeof zh = {
     printWindowAction: 'Print',
     printWindowSending: 'ပို့နေသည်…',
     printWindowWriteCharMissing: 'Printer write channel မတွေ့ — device ပြန်ချိတ်ပြီး retry လုပ်ပါ။',
-    footer: 'ML Inventory v1.9.9 (32) · Market Link Express',
+    footer: 'ML Inventory v1.9.10 (33) · Market Link Express',
     regionTag: 'ဒေသ {hub}',
   },
   tracking: {

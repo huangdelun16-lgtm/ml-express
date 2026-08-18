@@ -19,16 +19,15 @@ const AdminLogin: React.FC = () => {
 
       if (account) {
         await saveToken(account.username, account.role, account.employee_name, account.region, account.permissions as string[] | undefined, authToken);
-        
-        // 记录登录日志
-        await auditLogService.log({
+
+        void auditLogService.log({
           user_id: account.username,
           user_name: account.employee_name,
           action_type: 'login',
           module: 'system',
           action_description: `用户登录系统，角色：${account.role === 'admin' ? '管理员' : account.role === 'manager' ? '经理' : account.role === 'finance' ? '财务' : '操作员'}`
         });
-        
+
         navigate('/admin/dashboard');
       } else {
         feedbackService.notify('用户名或密码错误，或账号已被停用');

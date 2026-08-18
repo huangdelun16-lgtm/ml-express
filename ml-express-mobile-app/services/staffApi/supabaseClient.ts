@@ -1,19 +1,34 @@
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import { logger } from '../LoggerService';
+import {
+  applyRealtimeWsFallback,
+  nativeClientHeaders,
+  resolveNativeSupabaseUrl,
+} from './nativeSupabaseUrl';
+
+type SupabaseExtra = {
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+  supabaseProxyUrl?: string;
+  netlifyUrl?: string;
+};
+const extra = Constants.expoConfig?.extra as SupabaseExtra | undefined;
 
 // 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
-const supabaseUrl =
-  (Constants.expoConfig?.extra?.supabaseUrl as string | undefined) ||
+const configuredUrl =
+  extra?.supabaseUrl ||
   process.env.EXPO_PUBLIC_SUPABASE_URL ||
   '';
 const supabaseKey =
-  (Constants.expoConfig?.extra?.supabaseAnonKey as string | undefined) ||
+  extra?.supabaseAnonKey ||
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   '';
+const supabaseUrl = resolveNativeSupabaseUrl(configuredUrl);
+const proxyHeaders = nativeClientHeaders();
 
 export const netlifyUrl =
-  (Constants.expoConfig?.extra?.netlifyUrl as string | undefined) ||
+  extra?.netlifyUrl ||
   process.env.EXPO_PUBLIC_NETLIFY_URL ||
   'https://admin-market-link-express.netlify.app';
 
@@ -38,5 +53,9 @@ export const supabase = createClient(
     db: {
       schema: 'public',
     },
+    ...(proxyHeaders
+      ? { global: { headers: proxyHeaders }, realtime: { headers: proxyHeaders } }
+      : {}),
   }
 );
+applyRealtimeWsFallback(supabase);

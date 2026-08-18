@@ -1,0 +1,9 @@
+# 仓库根目录执行 `npx wrangler deploy` 时使用这份配置。
+# 只发 Supabase 代理 Worker，不要用 `wrangler pages deploy` 或 Cloudflare Pages 连整个 Git 仓库。
+name = "ml-supabase-proxy"
+main = "cloudflare/supabase-proxy/src/index.js"
+compatibility_date = "2026-08-17"
+workers_dev = true
+
+[vars]
+SUPABASE_HOSTNAME = "uopkyuluxnrewvlmutam.supabase.co"

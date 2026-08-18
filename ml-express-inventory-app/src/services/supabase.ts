@@ -1,16 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
+import { applyRealtimeWsFallback, nativeClientHeaders, resolveNativeSupabaseUrl } from './nativeSupabaseUrl';
 
 type SupabaseExtra = {
   supabaseUrl?: string;
   supabaseAnonKey?: string;
+  supabaseProxyUrl?: string;
 };
 
 const extra = (Constants.expoConfig?.extra ??
   Constants.manifest2?.extra) as SupabaseExtra | undefined;
 
-const supabaseUrl = (
+const configuredUrl = (
   process.env.EXPO_PUBLIC_SUPABASE_URL ??
   extra?.supabaseUrl ??
   ''
@@ -20,9 +22,11 @@ const supabaseAnonKey = (
   extra?.supabaseAnonKey ??
   ''
 ).trim();
+const supabaseUrl = resolveNativeSupabaseUrl(configuredUrl);
 
 const PLACEHOLDER_HOSTS = ['YOUR_PROJECT_REF.supabase.co', 'placeholder.supabase.co'];
 const PLACEHOLDER_KEY_PREFIXES = ['your_supabase_anon', 'placeholder-key'];
+const ADMIN_SB_HOST = 'admin-market-link-express' + '.com';
 
 export function isSupabaseConfigured(): boolean {
   if (!supabaseUrl || !supabaseAnonKey) return false;
@@ -30,7 +34,11 @@ export function isSupabaseConfigured(): boolean {
   if (PLACEHOLDER_KEY_PREFIXES.some((p) => supabaseAnonKey.toLowerCase().startsWith(p))) {
     return false;
   }
-  if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
+  const allowedHost =
+    supabaseUrl.includes('.supabase.co') ||
+    supabaseUrl.includes('/__sb') ||
+    supabaseUrl.includes(ADMIN_SB_HOST);
+  if (!supabaseUrl.startsWith('https://') || !allowedHost) {
     return false;
   }
   if (!supabaseAnonKey.startsWith('eyJ')) return false;
@@ -49,7 +57,7 @@ export function getSupabaseAnonKey(): string {
 export function getSupabaseConfigHint(): string {
   if (!__DEV__) return '';
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!configuredUrl || !supabaseAnonKey) {
     return '请在 ml-express-inventory-app/.env 中配置 EXPO_PUBLIC_SUPABASE_URL 与 EXPO_PUBLIC_SUPABASE_ANON_KEY';
   }
   if (!isSupabaseConfigured()) {
@@ -68,5 +76,12 @@ export const supabase = createClient(
       persistSession: true,
       detectSessionInUrl: false,
     },
+    ...(nativeClientHeaders()
+      ? {
+          global: { headers: nativeClientHeaders() },
+          realtime: { headers: nativeClientHeaders() },
+        }
+      : {}),
   },
 );
+applyRealtimeWsFallback(supabase);

@@ -29,11 +29,11 @@ export default function BarcodeImage({
   const totalModules = getCode128TotalModules(trimmed);
   if (runs.length === 0 || totalModules <= 0) return null;
 
-  const modulePx = Math.max(1, Math.floor(maxWidth / totalModules));
+  const modulePx = maxWidth / totalModules;
   const canvasWidth = totalModules * modulePx;
 
   return (
-    <View style={[styles.wrap, centered && styles.wrapCentered, { maxWidth }]}>
+    <View style={[styles.wrap, centered && styles.wrapCentered, { maxWidth, width: maxWidth }]}>
       <View
         style={[
           styles.canvas,

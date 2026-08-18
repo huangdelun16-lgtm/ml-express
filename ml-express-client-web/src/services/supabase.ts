@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { applyNetlifyRealtimeFallback, resolveBrowserSupabaseUrl } from '../utils/supabaseBrowserUrl';
 import { PACKAGE_STATUS } from '../constants/packageStatus';
 import LoggerService from './LoggerService';
 import { buildPricingSettings, pricingFieldToCamel } from './_shared/pricing';
@@ -18,7 +19,7 @@ import { createBannerService, createTutorialService } from './_shared/services';
 export type { Banner, Tutorial, ProductCategory, StoreReview, RechargeRequest };
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+const supabaseUrl = resolveBrowserSupabaseUrl(process.env.REACT_APP_SUPABASE_URL);
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 // 验证 API key 是否有效
@@ -34,6 +35,8 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
+// production browser uses /__sb; realtime WS falls back to Worker
+applyNetlifyRealtimeFallback(supabase);
 
 // 包裹数据类型定义
 export interface Package {

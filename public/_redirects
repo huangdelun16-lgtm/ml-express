@@ -1,4 +1,3 @@
-# Netlify SPA重定向规则
-# 将所有路由重定向到index.html，让React Router处理
-
-/*    /index.html   200
+# SPA fallback stays in repo-root netlify.toml [[redirects]].
+# Do not add /* /index.html 200 here: Cloudflare Pages treats it as an infinite redirect.
+/__sb/*  https://uopkyuluxnrewvlmutam.supabase.co/:splat  200!

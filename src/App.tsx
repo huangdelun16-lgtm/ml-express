@@ -50,9 +50,9 @@ function App() {
   return (
     <LanguageProvider>
       <GlobalToast />
-      <AbnormalAlertManager />
       <Router>
         <AdminTodoProvider>
+          <AbnormalAlertManager />
           <div className="App">
             <Routes>
               <Route path="/" element={<Navigate to="/admin/login" replace />} />

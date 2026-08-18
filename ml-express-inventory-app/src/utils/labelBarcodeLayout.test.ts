@@ -11,6 +11,7 @@ import {
   getGroupTextScaleMul,
   getLabelGroupBounds,
   mergeAndCenterLabelLayout,
+  fitAndCenterLabelLayout,
   MERGE_CENTER_BARCODE_TEXT_GAP,
   MERGE_CENTER_EXPRESS_BARCODE_GAP,
   moveLabelGroup,
@@ -93,7 +94,7 @@ describe('labelBarcodeLayout', () => {
       y: 55,
       height: 90,
     });
-    expect(next.barcode).toEqual({ x: 20, y: 55, height: 90 });
+    expect(next.barcode).toMatchObject({ x: 20, y: 55, height: 90 });
   });
 
   it('centers default layout horizontally for sample label content', () => {
@@ -189,6 +190,37 @@ describe('labelBarcodeLayout', () => {
     expect(Math.round(expressCenter)).toBe(Math.round(barcodeCenter));
     expect(Math.round(inboundCenter)).toBe(Math.round(barcodeCenter));
     expect(merged.barcode.x).toBeGreaterThan(0);
+  });
+
+  it('fits and centers content when switching to 58x40 or 40x20 paper', () => {
+    const shifted = clampLabelBarcodeLayout({
+      ...DEFAULT_LABEL_BARCODE_LAYOUT,
+      expressNo: { x: 0, y: 0 },
+      barcode: { x: 0, y: 0, height: 96 },
+      inboundCode: { x: 0, y: 0 },
+    });
+
+    const wide = fitAndCenterLabelLayout(shifted, SAMPLE_CONTENT, 58, 40);
+    const compact = fitAndCenterLabelLayout(shifted, SAMPLE_CONTENT, 40, 20);
+    const labelW58 = mmToLayoutDots(58);
+    const labelW40 = mmToLayoutDots(40);
+    const labelH20 = mmToLayoutDots(20);
+
+    const wideBarcodeW = getEffectiveElementWidthDots(wide, 'barcode', SAMPLE_CONTENT, 58);
+    const wideCenter = wide.barcode.x + wideBarcodeW / 2;
+    expect(Math.abs(wideCenter - labelW58 / 2)).toBeLessThanOrEqual(1);
+    expect(wide.barcode.x).toBeGreaterThan(0);
+
+    const compactBounds = getLabelGroupBounds(compact, SAMPLE_CONTENT, 40);
+    expect(compactBounds.x).toBeGreaterThanOrEqual(0);
+    expect(compactBounds.x + compactBounds.widthDots).toBeLessThanOrEqual(labelW40);
+    expect(compactBounds.y + compactBounds.heightDots).toBeLessThanOrEqual(labelH20);
+    expect(compact.inboundCode.y + getElementDimensions(compact, 'inboundCode', SAMPLE_CONTENT, 40).heightDots)
+      .toBeLessThanOrEqual(labelH20);
+    expect(compact.barcode.height).toBeLessThan(wide.barcode.height);
+
+    const compactBarcodeW = getEffectiveElementWidthDots(compact, 'barcode', SAMPLE_CONTENT, 40);
+    expect(Math.abs(compact.barcode.x + compactBarcodeW / 2 - labelW40 / 2)).toBeLessThanOrEqual(1);
   });
 
   it('merge and center ignores stale text widthDots when aligning to barcode', () => {
@@ -327,7 +359,7 @@ describe('buildTsplInboundLabel with layout', () => {
     });
 
     expect(payload).toContain(`TEXT ${layout.expressNo.x},${layout.expressNo.y},"2"`);
-    expect(payload).toContain('BARCODE 24,60,"128",104,0,0,');
+    expect(payload).toContain('BARCODE 24,60,"128",88,0,0,');
     expect(payload).toContain('TEXT 24,170,"2"');
     expect(payload.match(/TEXT .*67499191994/g)?.length).toBe(1);
     expect(payload.match(/TEXT .*MDY060400290726/g)?.length).toBe(1);
@@ -346,7 +378,7 @@ describe('buildTsplInboundLabel with layout', () => {
       layout,
     });
     expect(payload).toContain(
-      `BARCODE 24,60,"128",104,0,0,${metrics.narrow},${metrics.wide}`,
+      `BARCODE 24,60,"128",80,0,0,${metrics.narrow},${metrics.wide}`,
     );
     expect(metrics.widthDots).toBeGreaterThan(200);
   });

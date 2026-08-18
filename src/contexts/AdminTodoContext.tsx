@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { fetchPendingMerchantApplicationCount } from '../services/merchantApplicationService';
+import { useAdminSessionReady } from '../hooks/useAdminSessionReady';
 import { ADMIN_TODOS_REFRESH_EVENT } from '../utils/adminTodoBridge';
 
 export type AdminTodoCounts = {
@@ -63,7 +64,8 @@ type AdminTodoContextValue = {
 const AdminTodoContext = createContext<AdminTodoContextValue | null>(null);
 
 export const AdminTodoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const location = useLocation();
+  const sessionReady = useAdminSessionReady();
+  const { pathname } = useLocation();
   const [counts, setCounts] = useState<AdminTodoCounts>(emptyCounts);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 
@@ -77,26 +79,29 @@ export const AdminTodoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  const isAdminWorkspace =
-    location.pathname.startsWith('/admin') && location.pathname !== '/admin/login';
-
-  /** 进入后台或路由切换时拉一次，避免跨页处理完后计数仍旧 */
   useEffect(() => {
-    if (!isAdminWorkspace) return;
+    if (sessionReady) return;
+    setCounts(emptyCounts);
+    setLastUpdatedAt(null);
+  }, [sessionReady]);
+
+  /** 会话就绪或路由切换时拉一次，避免跨页处理完后计数仍旧 */
+  useEffect(() => {
+    if (!sessionReady) return;
     void refresh();
-  }, [isAdminWorkspace, location.pathname, refresh]);
+  }, [sessionReady, pathname, refresh]);
 
   /** 其它 Tab 处理完业务后广播，或本页 mutation 后手动触发 */
   useEffect(() => {
-    if (!isAdminWorkspace) return;
+    if (!sessionReady) return;
     const onBroadcast = () => void refresh();
     window.addEventListener(ADMIN_TODOS_REFRESH_EVENT, onBroadcast);
     return () => window.removeEventListener(ADMIN_TODOS_REFRESH_EVENT, onBroadcast);
-  }, [isAdminWorkspace, refresh]);
+  }, [sessionReady, refresh]);
 
   /** 从后台切回浏览器页签时补拉（Realtime 偶发滞后） */
   useEffect(() => {
-    if (!isAdminWorkspace) return;
+    if (!sessionReady) return;
     let t: number;
     const onVis = () => {
       if (document.visibilityState !== 'visible') return;
@@ -108,10 +113,10 @@ export const AdminTodoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       document.removeEventListener('visibilitychange', onVis);
       window.clearTimeout(t);
     };
-  }, [isAdminWorkspace, refresh]);
+  }, [sessionReady, refresh]);
 
   useEffect(() => {
-    if (!isAdminWorkspace) return;
+    if (!sessionReady) return;
 
     const channel = supabase
       .channel('admin-dashboard-todos')
@@ -137,7 +142,7 @@ export const AdminTodoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       window.clearInterval(fallbackTimer);
       void supabase.removeChannel(channel);
     };
-  }, [isAdminWorkspace, refresh]);
+  }, [sessionReady, refresh]);
 
   return (
     <AdminTodoContext.Provider value={{ counts, refresh, lastUpdatedAt }}>
