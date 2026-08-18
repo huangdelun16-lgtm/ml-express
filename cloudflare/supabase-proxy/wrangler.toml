@@ -1,9 +1,10 @@
-name = "ml-express-supabase-proxy"
+name = "ml-supabase-proxy"
 main = "src/index.js"
 compatibility_date = "2025-10-01"
 
-# After deploy, attach custom domain db.market-link-express.com
-# (or test with the assigned *.workers.dev URL).
+# Live public URL: https://ml-supabase-proxy.huangdelun16.workers.dev
+# Optional later: db.market-link-express.com once the apex zone is on Cloudflare.
 
 [vars]
+SUPABASE_HOSTNAME = "uopkyuluxnrewvlmutam.supabase.co"
 SUPABASE_ORIGIN = "https://uopkyuluxnrewvlmutam.supabase.co"

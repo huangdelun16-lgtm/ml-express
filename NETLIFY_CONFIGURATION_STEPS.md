@@ -72,7 +72,7 @@ CNAME   @         client-ml-express.netlify.app
 1. 访问：https://app.netlify.com/projects/client-ml-express
 2. 进入 **Site settings** → **Environment variables**
 3. 添加以下变量：
-   - `REACT_APP_SUPABASE_URL` = `https://db.market-link-express.com`
+   - `REACT_APP_SUPABASE_URL` = `https://ml-supabase-proxy.huangdelun16.workers.dev`
    - `REACT_APP_SUPABASE_ANON_KEY` = (你的 Supabase Anon Key)
    - `REACT_APP_GOOGLE_MAPS_API_KEY` = (你的 Google Maps API Key)
 

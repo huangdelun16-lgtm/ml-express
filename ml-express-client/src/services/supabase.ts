@@ -10,7 +10,7 @@ type SupabaseExtra = { supabaseUrl?: string; supabaseAnonKey?: string };
 const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra) as SupabaseExtra | undefined;
 
 // 缅甸 ISP 拦截 *.supabase.co；App 走 Cloudflare 反代。
-const PUBLIC_SUPABASE_URL = 'https://db.market-link-express.com';
+const PUBLIC_SUPABASE_URL = 'https://ml-supabase-proxy.huangdelun16.workers.dev';
 const configuredUrl = (
   process.env.EXPO_PUBLIC_SUPABASE_URL ||
   extra?.supabaseUrl ||

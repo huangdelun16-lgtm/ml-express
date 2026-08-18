@@ -108,7 +108,7 @@ app/
 object SupabaseClient {
     val instance: SupabaseClient by lazy {
         createSupabaseClient(
-            supabaseUrl = "https://db.market-link-express.com",
+            supabaseUrl = "https://ml-supabase-proxy.huangdelun16.workers.dev",
             supabaseKey = "YOUR_ANON_KEY"
         ) {
             install(Auth)

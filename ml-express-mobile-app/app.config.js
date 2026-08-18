@@ -1,6 +1,6 @@
 const baseConfig = require('./app.json');
 
-const PUBLIC_SUPABASE_URL = 'https://db.market-link-express.com';
+const PUBLIC_SUPABASE_URL = 'https://ml-supabase-proxy.huangdelun16.workers.dev';
 
 function publicSupabaseUrl(raw) {
   const url = String(raw || '').replace(/\/$/, '');

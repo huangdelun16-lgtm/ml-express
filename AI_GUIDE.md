@@ -39,7 +39,7 @@ MARKET LINK EXPRESS 是一个基于 **React/React Native + Supabase + Netlify** 
 │                                                                 │
 │  🗄️ 共享后端 (Supabase)                                        │
 │     ├── 上游: uopkyuluxnrewvlmutam.supabase.co（服务端直连）     │
-│     └── 公网反代: https://db.market-link-express.com             │
+│     └── 公网反代 (现网): ml-supabase-proxy.huangdelun16.workers.dev │
 │         （缅甸 ISP 拦截 *.supabase.co，浏览器/App 必须走反代）    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -91,21 +91,20 @@ MARKET LINK EXPRESS 是一个基于 **React/React Native + Supabase + Netlify** 
 
 | 调用方 | URL | 环境变量 |
 |--------|-----|----------|
-| 浏览器 / 移动 App | `https://db.market-link-express.com` | `REACT_APP_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_URL`（以及 STAFF `app.json` extra.supabaseUrl） |
+| 浏览器 / 移动 App | `https://ml-supabase-proxy.huangdelun16.workers.dev` | `REACT_APP_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_URL`（以及 STAFF `app.json` extra.supabaseUrl） |
 | Netlify Functions、Supabase Edge、运维脚本 | `https://uopkyuluxnrewvlmutam.supabase.co` | `SUPABASE_URL`（不要改成反代域名） |
 
-反代源码：[`cloudflare/supabase-proxy/`](cloudflare/supabase-proxy/)。用 Cloudflare Worker `fetch()` 透明转发 REST / Auth / Storage / Functions / Realtime WebSocket。不要用 Netlify redirects 做这层，会弄坏 Realtime。
+现网公网入口是已部署的 Worker：`https://ml-supabase-proxy.huangdelun16.workers.dev`。`db.market-link-express.com` 只是以后可选自定义域名（须先把 `market-link-express.com` apex 区迁到 Cloudflare；目前 DNS 仍在 Netlify，免费套餐无法只接入子域）。本仓 [`cloudflare/supabase-proxy/`](cloudflare/supabase-proxy/) 是该 Worker 的版本库副本，不要再新建平行 Worker。用 Cloudflare `fetch()` 透明转发 REST / Auth / Storage / Functions / Realtime WebSocket。不要用 Netlify redirects 做这层，会弄坏 Realtime。
 
-#### 运维清单（一次性）
+#### 运维清单
 
-1. `cd cloudflare/supabase-proxy && npx wrangler deploy`
-2. DNS：为 `db.market-link-express.com` 增加 CNAME（或把该主机名绑到上述 Worker 的自定义域名）
-3. 三个 Web 的 Netlify：把 **客户端** `REACT_APP_SUPABASE_URL` 设为 `https://db.market-link-express.com`，然后重新部署
+1. 生产反代已可用：`https://ml-supabase-proxy.huangdelun16.workers.dev`（无需等待自定义域名）
+2. 三个 Web 的 Netlify：把 **客户端** `REACT_APP_SUPABASE_URL` 设为 `https://ml-supabase-proxy.huangdelun16.workers.dev`，然后重新部署
    - Admin（仓库根目录）
    - `ml-express-client-web`
    - `ml-express-merchant-web`
-   - Functions 继续用 `SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co`（未设置时代码会回退到该上游）
-4. 四个 Expo App 更新 `EXPO_PUBLIC_SUPABASE_URL` 后 **EAS 重新出包**（URL 会打进客户端）
+   - Functions 继续用 `SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co`（未设置时代码会回退到该上游；**不要**指向 `workers.dev`）
+3. 四个 Expo App 更新 `EXPO_PUBLIC_SUPABASE_URL` 后 **EAS 重新出包**（URL 会打进客户端）
    - `ml-express-client`
    - `ml-express-merchant-app`
    - `ml-express-mobile-app`（STAFF）

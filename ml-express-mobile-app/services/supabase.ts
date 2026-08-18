@@ -28,7 +28,7 @@ const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: num
 // 使用环境变量配置 Supabase
 // 优先从 expo-constants 读取（通过 app.config.js 的 extra 字段），回退到 process.env
 // 缅甸 ISP 拦截 *.supabase.co；App 走 Cloudflare 反代（勿再指向 *.supabase.co）。
-const PUBLIC_SUPABASE_URL = 'https://db.market-link-express.com';
+const PUBLIC_SUPABASE_URL = 'https://ml-supabase-proxy.huangdelun16.workers.dev';
 const configuredUrl = (
   Constants.expoConfig?.extra?.supabaseUrl ||
   process.env.EXPO_PUBLIC_SUPABASE_URL ||

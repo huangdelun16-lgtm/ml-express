@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import LoggerService from './LoggerService';
 
 // 缅甸 ISP 拦截 *.supabase.co；浏览器走 Cloudflare 反代。Netlify Functions 仍直连 supabase.co。
-const PUBLIC_SUPABASE_URL = 'https://db.market-link-express.com';
+const PUBLIC_SUPABASE_URL = 'https://ml-supabase-proxy.huangdelun16.workers.dev';
 const configuredUrl = (process.env.REACT_APP_SUPABASE_URL || '').replace(/\/$/, '');
 const supabaseUrl =
   !configuredUrl || configuredUrl.includes('uopkyuluxnrewvlmutam.supabase.co')
@@ -15,10 +15,10 @@ if (!supabaseKey) {
     LoggerService.error('❌ 错误：Supabase 环境变量未配置！');
     LoggerService.error('本地开发：在本项目目录执行 cp .env.example .env.local，填写 URL 与 ANON_KEY 后重新 npm start');
     LoggerService.error('线上部署：在 Netlify → Site settings → Environment variables 中配置：');
-    LoggerService.error('  - REACT_APP_SUPABASE_URL（生产默认 https://db.market-link-express.com）');
+    LoggerService.error('  - REACT_APP_SUPABASE_URL（生产默认 https://ml-supabase-proxy.huangdelun16.workers.dev）');
     LoggerService.error('  - REACT_APP_SUPABASE_ANON_KEY');
     throw new Error(
-      '请配置 REACT_APP_SUPABASE_ANON_KEY（本地用 .env.local，见 .env.example；URL 默认走 db.market-link-express.com 反代）',
+      '请配置 REACT_APP_SUPABASE_ANON_KEY（本地用 .env.local，见 .env.example；URL 默认走 ml-supabase-proxy.huangdelun16.workers.dev 反代）',
     );
 }
 

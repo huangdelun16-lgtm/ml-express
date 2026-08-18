@@ -1,8 +1,8 @@
 /**
  * Transparent reverse proxy in front of Supabase.
  *
- * Public hostname: https://db.market-link-express.com
- * Upstream:        https://uopkyuluxnrewvlmutam.supabase.co
+ * Live public URL: https://ml-supabase-proxy.huangdelun16.workers.dev
+ * Upstream:        uopkyuluxnrewvlmutam.supabase.co (SUPABASE_HOSTNAME)
  *
  * Myanmar ISPs block *.supabase.co (DNS, and possibly IPv6). Browser and
  * mobile clients must use this Worker. Netlify Functions and other servers
@@ -57,10 +57,13 @@ function buildUpstreamHeaders(source, originHost, isWebSocket) {
 export default {
   /**
    * @param {Request} request
-   * @param {{ SUPABASE_ORIGIN?: string }} env
+   * @param {{ SUPABASE_HOSTNAME?: string, SUPABASE_ORIGIN?: string }} env
    */
   async fetch(request, env) {
-    const origin = String(env.SUPABASE_ORIGIN || DEFAULT_ORIGIN).replace(/\/$/, "");
+    const hostname = String(env.SUPABASE_HOSTNAME || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const origin = hostname
+      ? `https://${hostname}`
+      : String(env.SUPABASE_ORIGIN || DEFAULT_ORIGIN).replace(/\/$/, "");
     const incoming = new URL(request.url);
     const { target, originHost } = rewriteToUpstream(origin, incoming);
 
