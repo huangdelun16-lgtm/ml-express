@@ -6,7 +6,8 @@
 const bcrypt = require('bcryptjs');
 
 // 从环境变量获取 Supabase 配置
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
+// Server-side: always the real Supabase origin (not the public Cloudflare proxy used by browsers/apps).
+const supabaseUrl = process.env.SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
 /**

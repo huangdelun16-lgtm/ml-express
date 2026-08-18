@@ -40,7 +40,7 @@
 
 | 变量名 | 说明 | 示例值 |
 |--------|------|--------|
-| `REACT_APP_SUPABASE_URL` | Supabase 项目 URL | `https://uopkyuluxnrewvlmutam.supabase.co` |
+| `REACT_APP_SUPABASE_URL` | 浏览器走 Cloudflare 反代 | `https://ml-supabase-proxy.huangdelun16.workers.dev` |
 | `REACT_APP_SUPABASE_ANON_KEY` | Supabase 匿名密钥 | `YOUR_SUPABASE_ANON_KEY_HERE` |
 | `REACT_APP_GOOGLE_MAPS_API_KEY` | Google Maps API 密钥 | `AIzaSy...` |
 

@@ -1,19 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
 import LoggerService from './LoggerService';
 
-// 使用环境变量配置 Supabase（不再使用硬编码密钥）
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+// 缅甸 ISP 拦截 *.supabase.co；浏览器走 Cloudflare 反代。Netlify Functions 仍直连 supabase.co。
+const PUBLIC_SUPABASE_URL = 'https://ml-supabase-proxy.huangdelun16.workers.dev';
+const configuredUrl = (process.env.REACT_APP_SUPABASE_URL || '').replace(/\/$/, '');
+const supabaseUrl =
+  !configuredUrl || configuredUrl.includes('uopkyuluxnrewvlmutam.supabase.co')
+    ? PUBLIC_SUPABASE_URL
+    : configuredUrl;
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 // 验证 API key 是否有效
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseKey) {
     LoggerService.error('❌ 错误：Supabase 环境变量未配置！');
     LoggerService.error('本地开发：在本项目目录执行 cp .env.example .env.local，填写 URL 与 ANON_KEY 后重新 npm start');
     LoggerService.error('线上部署：在 Netlify → Site settings → Environment variables 中配置：');
-    LoggerService.error('  - REACT_APP_SUPABASE_URL');
+    LoggerService.error('  - REACT_APP_SUPABASE_URL（生产默认 https://ml-supabase-proxy.huangdelun16.workers.dev）');
     LoggerService.error('  - REACT_APP_SUPABASE_ANON_KEY');
     throw new Error(
-      '请配置 REACT_APP_SUPABASE_URL 与 REACT_APP_SUPABASE_ANON_KEY（本地用 .env.local，见 .env.example）',
+      '请配置 REACT_APP_SUPABASE_ANON_KEY（本地用 .env.local，见 .env.example；URL 默认走 ml-supabase-proxy.huangdelun16.workers.dev 反代）',
     );
 }
 
