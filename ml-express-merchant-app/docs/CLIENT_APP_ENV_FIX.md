@@ -5,7 +5,7 @@
 客户端 App 的 `.env` 文件已更新，包含以下环境变量：
 
 ```
-EXPO_PUBLIC_SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co
+EXPO_PUBLIC_SUPABASE_URL=https://ml-supabase-proxy.huangdelun16.workers.dev
 EXPO_PUBLIC_SUPABASE_ANON_KEY=[请从 Supabase Dashboard → Settings → API → API Keys 获取]
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=[请从 Google Cloud Console 获取]
 ```
@@ -80,7 +80,7 @@ npx expo start --clear
 
 ### EXPO_PUBLIC_SUPABASE_URL
 - **用途**: Supabase 项目 URL
-- **值**: `https://uopkyuluxnrewvlmutam.supabase.co`
+- **值**: `https://ml-supabase-proxy.huangdelun16.workers.dev`
 - **必需**: ✅ 是
 
 ### EXPO_PUBLIC_SUPABASE_ANON_KEY

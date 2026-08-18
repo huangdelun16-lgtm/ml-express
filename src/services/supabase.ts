@@ -1,18 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyNetlifyRealtimeFallback,
+  resolveBrowserSupabaseUrl,
+} from '../utils/browserSupabaseConfig';
 
-// 使用环境变量配置 Supabase（不再使用硬编码密钥）
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+// 缅甸 ISP 拦截 *.supabase.co；生产浏览器走 Netlify 同源 /__sb BFF。Functions 仍直连 supabase.co。
+const supabaseUrl = resolveBrowserSupabaseUrl();
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseKey) {
   console.error('❌ 错误：Supabase 环境变量未配置！');
   console.error('请在 Netlify Dashboard 中配置：');
-  console.error('  - REACT_APP_SUPABASE_URL');
   console.error('  - REACT_APP_SUPABASE_ANON_KEY');
-  throw new Error('REACT_APP_SUPABASE_URL 和 REACT_APP_SUPABASE_ANON_KEY 环境变量必须配置！');
+  console.error('  - （可选）REACT_APP_SUPABASE_URL；生产浏览器默认使用 window.location.origin + /__sb');
+  throw new Error('REACT_APP_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
+applyNetlifyRealtimeFallback(supabase);
 
 // 包裹数据类型定义 - 匹配数据库字段名
 export interface Package {

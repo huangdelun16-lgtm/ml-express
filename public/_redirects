@@ -1,4 +1,5 @@
-# Netlify SPA重定向规则
-# 将所有路由重定向到index.html，让React Router处理
+# Supabase same-origin BFF (must precede SPA fallback; 200! = force proxy)
+/__sb/*  https://uopkyuluxnrewvlmutam.supabase.co/:splat  200!
 
-/*    /index.html   200
+# SPA — React Router
+/*  /index.html  200

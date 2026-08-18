@@ -23,6 +23,13 @@
   status = 302
   force = true
 
+# 同源 Supabase BFF（缅甸 WiFi）；Realtime WS 由客户端改连 Cloudflare Worker
+[[redirects]]
+  from = "/__sb/*"
+  to = "https://uopkyuluxnrewvlmutam.supabase.co/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

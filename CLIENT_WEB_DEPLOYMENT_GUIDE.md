@@ -39,7 +39,7 @@ git push origin main
 
 #### 1. REACT_APP_SUPABASE_URL
 ```
-https://uopkyuluxnrewvlmutam.supabase.co
+https://ml-supabase-proxy.huangdelun16.workers.dev
 ```
 
 #### 2. REACT_APP_SUPABASE_ANON_KEY
@@ -60,7 +60,7 @@ AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE
 2. 点击 **Add a variable**
 3. 添加第一个变量：
    - **Key**: `REACT_APP_SUPABASE_URL`
-   - **Value**: `https://uopkyuluxnrewvlmutam.supabase.co`
+   - **Value**: `https://ml-supabase-proxy.huangdelun16.workers.dev`
    - **Scopes**: 勾选 `Production`, `Deploy previews`, `Branch deploys`
    - 点击 **Save**
 

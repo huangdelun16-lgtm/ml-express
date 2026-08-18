@@ -90,7 +90,7 @@ git push origin main
 #### 变量 1: REACT_APP_SUPABASE_URL
 
 - **Key**: `REACT_APP_SUPABASE_URL`
-- **Value**: `https://uopkyuluxnrewvlmutam.supabase.co`
+- **Value**: `https://ml-supabase-proxy.huangdelun16.workers.dev`
 - **Scopes**: 
   - ✅ Production
   - ✅ Deploy previews

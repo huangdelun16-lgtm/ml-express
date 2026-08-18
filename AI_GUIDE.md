@@ -1,6 +1,6 @@
 # MARKET LINK EXPRESS - AI 开发指南
 
-## 🚀 完整系统架构记录 (最后更新：2026年3月31日)
+## 🚀 完整系统架构记录 (最后更新：2026年8月18日)
 
 ### 📐 核心系统架构图 (5端联动)
 
@@ -38,7 +38,9 @@ MARKET LINK EXPRESS 是一个基于 **React/React Native + Supabase + Netlify** 
 │     └── 功能: 会员下单、VIP 充值等级系统、实时地图追踪             │
 │                                                                 │
 │  🗄️ 共享后端 (Supabase)                                        │
-│     └── 实时数据库、存储 (S3)、边缘函数 (Netlify Functions JWT)    │
+│     ├── 上游: uopkyuluxnrewvlmutam.supabase.co（服务端直连）     │
+│     └── 公网反代 (现网): ml-supabase-proxy.huangdelun16.workers.dev │
+│         （缅甸 ISP 拦截 *.supabase.co，浏览器/App 必须走反代）    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -83,6 +85,35 @@ MARKET LINK EXPRESS 是一个基于 **React/React Native + Supabase + Netlify** 
 
 ---
 
+### 🌐 环境变量与数据库入口（缅甸 ISP）
+
+缅甸多家 ISP 会拦截 `*.supabase.co`（DNS，以及可能的 IPv6）。Netlify 上的公开网站一般能打开，但客户端请求 `uopkyuluxnrewvlmutam.supabase.co` 会失败（WiFi / 多数蜂窝）；VPN 或少数 iPhone 蜂窝可能仍能直连。这不是应用逻辑 bug。
+
+| 调用方 | URL | 环境变量 |
+|--------|-----|----------|
+| 浏览器 / 移动 App | `https://ml-supabase-proxy.huangdelun16.workers.dev` | `REACT_APP_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_URL`（以及 STAFF `app.json` extra.supabaseUrl） |
+| Netlify Functions、Supabase Edge、运维脚本 | `https://uopkyuluxnrewvlmutam.supabase.co` | `SUPABASE_URL`（不要改成反代域名） |
+
+现网公网入口是已部署的 Worker：`https://ml-supabase-proxy.huangdelun16.workers.dev`。`db.market-link-express.com` 只是以后可选自定义域名（须先把 `market-link-express.com` apex 区迁到 Cloudflare；目前 DNS 仍在 Netlify，免费套餐无法只接入子域）。本仓 [`cloudflare/supabase-proxy/`](cloudflare/supabase-proxy/) 是该 Worker 的版本库副本，不要再新建平行 Worker。用 Cloudflare `fetch()` 透明转发 REST / Auth / Storage / Functions / Realtime WebSocket。不要用 Netlify redirects 做这层，会弄坏 Realtime。
+
+#### 运维清单
+
+1. 生产反代已可用：`https://ml-supabase-proxy.huangdelun16.workers.dev`（无需等待自定义域名）
+2. 三个 Web 的 Netlify：把 **客户端** `REACT_APP_SUPABASE_URL` 设为 `https://ml-supabase-proxy.huangdelun16.workers.dev`，然后重新部署
+   - Admin（仓库根目录）
+   - `ml-express-client-web`
+   - `ml-express-merchant-web`
+   - Functions 继续用 `SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co`（未设置时代码会回退到该上游；**不要**指向 `workers.dev`）
+3. 四个 Expo App 更新 `EXPO_PUBLIC_SUPABASE_URL` 后 **EAS 重新出包**（URL 会打进客户端）
+   - `ml-express-client`
+   - `ml-express-merchant-app`
+   - `ml-express-mobile-app`（STAFF）
+   - `ml-express-inventory-app`（本仓不含该项目时，在其独立仓库改 `app.config.js` extra.supabaseUrl）
+
+Anon key 仍由客户端携带；Worker 内不得放入 service-role。
+
+---
+
 ### 🛠️ 开发与部署注意事项
 
 1.  **代码完整性**: 由于 `ProfilePage.tsx` 等文件行数极多，修改后必须使用 `npx prettier --write` 确保 JSX 标签完全闭合，防止部署崩溃。
@@ -109,4 +140,4 @@ MARKET LINK EXPRESS 是一个基于 **React/React Native + Supabase + Netlify** 
 
 ---
 *记录人：Cursor AI*
-*存档日期：2026年3月31日*
+*存档日期：2026年8月18日*

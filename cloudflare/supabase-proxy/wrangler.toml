@@ -1,0 +1,10 @@
+name = "ml-supabase-proxy"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+
+# Live public URL: https://ml-supabase-proxy.huangdelun16.workers.dev
+# Optional later: db.market-link-express.com once the apex zone is on Cloudflare.
+
+[vars]
+SUPABASE_HOSTNAME = "uopkyuluxnrewvlmutam.supabase.co"
+SUPABASE_ORIGIN = "https://uopkyuluxnrewvlmutam.supabase.co"

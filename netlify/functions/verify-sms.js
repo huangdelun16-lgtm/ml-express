@@ -2,7 +2,8 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+// Server-side: always the real Supabase origin (not the public Cloudflare proxy used by browsers/apps).
+const supabaseUrl = process.env.SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 

@@ -1,0 +1,8 @@
+/download  https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express.apk  302!
+/download-rider  https://github.com/huangdelun16-lgtm/ml-express/releases/latest/download/ml-express-rider.apk  302!
+
+# Supabase same-origin BFF (must precede SPA fallback)
+/__sb/*  https://uopkyuluxnrewvlmutam.supabase.co/:splat  200!
+
+# SPA — React Router
+/*  /index.html  200

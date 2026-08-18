@@ -89,6 +89,7 @@
     "extra": {
       "googleMapsApiKey": "AIzaSyDRhfmAILQk1L3pIUzLjcYG_Pf4HeY0XJI",
       "googlePlacesApiKey": "AIzaSyC952oez7KyjH9A_Ria4Grbgv2qkW7vCYk",
+      "supabaseUrl": "https://ml-supabase-proxy.huangdelun16.workers.dev",
       "eas": {
         "projectId": "0c1336bd-5ebe-428c-a815-4a91519cdf16"
       }

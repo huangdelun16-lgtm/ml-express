@@ -57,7 +57,7 @@ async function migratePasswords() {
   const { createClient } = require('@supabase/supabase-js');
   const bcrypt = require('bcryptjs');
   
-  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
   const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
   
   if (!supabaseUrl || !supabaseKey) {

@@ -6,7 +6,7 @@
  * 
  * 使用方法：
  * 1. 配置环境变量：
- *    export REACT_APP_SUPABASE_URL="your-supabase-url"
+ *    export SUPABASE_URL="https://uopkyuluxnrewvlmutam.supabase.co"
  *    export SUPABASE_SERVICE_ROLE="your-service-role-key"
  * 
  * 2. 运行脚本：
@@ -18,11 +18,11 @@ const bcrypt = require('bcryptjs');
 const readline = require('readline');
 
 // 配置 Supabase
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://uopkyuluxnrewvlmutam.supabase.co';
 const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE;
 
 if (!supabaseUrl) {
-  console.error('❌ 错误：缺少 REACT_APP_SUPABASE_URL 环境变量');
+  console.error('❌ 错误：缺少 SUPABASE_URL 环境变量');
   process.exit(1);
 }
 
