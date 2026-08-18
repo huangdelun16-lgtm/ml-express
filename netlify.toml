@@ -7,8 +7,7 @@
 #   Publish dir    : build
 #   Functions dir  : netlify/functions（见下方 [build] functions）
 # 环境变量（Site settings → Environment variables）示例：
-#   浏览器：REACT_APP_SUPABASE_URL=https://ml-supabase-proxy.huangdelun16.workers.dev
-#           REACT_APP_SUPABASE_ANON_KEY
+#   浏览器：REACT_APP_SUPABASE_ANON_KEY（生产自动走同源 /__sb → supabase.co）
 #   Functions（服务端，勿改成反代域名）：
 #           SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co
 #   REACT_APP_GOOGLE_MAPS_API_KEY
@@ -26,6 +25,14 @@
   NODE_VERSION = "18"
   NETLIFY_SKIP_PLUGINS = "true"
 
+# 同源 Supabase BFF（缅甸 WiFi 无法直连 *.supabase.co / 不可靠访问 workers.dev）
+# REST / Auth / Storage 走此代理；Realtime WebSocket 由客户端改连 Cloudflare Worker（Netlify 不支持 WS 升级）
+[[redirects]]
+  from = "/__sb/*"
+  to = "https://uopkyuluxnrewvlmutam.supabase.co/:splat"
+  status = 200
+  force = true
+
 # SPA重定向配置 - 解决React Router路由问题
 [[redirects]]
   from = "/*"
@@ -36,7 +43,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss:; media-src 'self' https: data: blob: https://assets.mixkit.co; img-src 'self' data: https: blob:; font-src 'self' https: data:; frame-src 'self' https:; worker-src 'self' blob:;"
+    Content-Security-Policy = "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss: https://ml-supabase-proxy.huangdelun16.workers.dev wss://ml-supabase-proxy.huangdelun16.workers.dev; media-src 'self' https: data: blob: https://assets.mixkit.co; img-src 'self' data: https: blob:; font-src 'self' https: data:; frame-src 'self' https:; worker-src 'self' blob:;"
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
