@@ -1,13 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import LoggerService from './../services/LoggerService';
 import NotificationService from './notificationService';
 import { errorService } from './ErrorService';
 import { retry } from '../utils/retry';
 
-// 使用环境变量配置 Supabase
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+type SupabaseExtra = { supabaseUrl?: string; supabaseAnonKey?: string };
+const extra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra) as SupabaseExtra | undefined;
+
+// 缅甸 ISP 拦截 *.supabase.co；App 走 Cloudflare 反代。
+const PUBLIC_SUPABASE_URL = 'https://db.market-link-express.com';
+const configuredUrl = (
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  extra?.supabaseUrl ||
+  ''
+).replace(/\/$/, '');
+const supabaseUrl =
+  !configuredUrl || configuredUrl.includes('uopkyuluxnrewvlmutam.supabase.co')
+    ? PUBLIC_SUPABASE_URL
+    : configuredUrl;
+const supabaseKey =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || extra?.supabaseAnonKey || '';
 
 // 关键：不要在顶层 throw 错误，这会导致整个 JS Bundle 崩溃，从而出现白屏
 if (!supabaseUrl || !supabaseKey) {

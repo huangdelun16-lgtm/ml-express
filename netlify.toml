@@ -7,7 +7,10 @@
 #   Publish dir    : build
 #   Functions dir  : netlify/functions（见下方 [build] functions）
 # 环境变量（Site settings → Environment variables）示例：
-#   REACT_APP_SUPABASE_URL、REACT_APP_SUPABASE_ANON_KEY
+#   浏览器：REACT_APP_SUPABASE_URL=https://db.market-link-express.com
+#           REACT_APP_SUPABASE_ANON_KEY
+#   Functions（服务端，勿改成反代域名）：
+#           SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co
 #   REACT_APP_GOOGLE_MAPS_API_KEY
 #   以及 netlify/functions 内 send-sms / send-email-code 等所需密钥
 # CLI 部署（在仓库根目录、且已 netlify link 到本 Admin 站点）：npm run deploy:netlify

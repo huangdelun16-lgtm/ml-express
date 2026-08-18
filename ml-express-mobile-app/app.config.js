@@ -1,5 +1,15 @@
 const baseConfig = require('./app.json');
 
+const PUBLIC_SUPABASE_URL = 'https://db.market-link-express.com';
+
+function publicSupabaseUrl(raw) {
+  const url = String(raw || '').replace(/\/$/, '');
+  if (!url || url.includes('uopkyuluxnrewvlmutam.supabase.co')) {
+    return PUBLIC_SUPABASE_URL;
+  }
+  return url;
+}
+
 module.exports = ({ config }) => {
   const expoConfig = baseConfig.expo || {};
   
@@ -29,7 +39,10 @@ module.exports = ({ config }) => {
     },
     extra: {
       ...(expoConfig.extra || {}),
-      googleMapsApiKey
+      googleMapsApiKey,
+      supabaseUrl: publicSupabaseUrl(
+        process.env.EXPO_PUBLIC_SUPABASE_URL || expoConfig.extra?.supabaseUrl
+      ),
     }
   };
 };

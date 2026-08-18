@@ -1,0 +1,9 @@
+name = "ml-express-supabase-proxy"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+
+# After deploy, attach custom domain db.market-link-express.com
+# (or test with the assigned *.workers.dev URL).
+
+[vars]
+SUPABASE_ORIGIN = "https://uopkyuluxnrewvlmutam.supabase.co"

@@ -16,9 +16,13 @@
 
 ### 必须配置的变量：
 
-1. **REACT_APP_SUPABASE_URL**
+1. **REACT_APP_SUPABASE_URL**（浏览器客户端，走 Cloudflare 反代）
+   - 值：`https://db.market-link-express.com`
+   - 用途：绕过缅甸 ISP 对 `*.supabase.co` 的拦截。上游仍是 `https://uopkyuluxnrewvlmutam.supabase.co`。
+
+   **SUPABASE_URL**（仅 Netlify Functions / 服务端）
    - 值：`https://uopkyuluxnrewvlmutam.supabase.co`
-   - 用途：Supabase 数据库 URL
+   - 用途：服务端直连，不要改成 `db.market-link-express.com`
 
 2. **REACT_APP_SUPABASE_ANON_KEY**
    - 值：你的 Supabase Anon Key

@@ -1,15 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-// 使用环境变量配置 Supabase（不再使用硬编码密钥）
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+// 缅甸 ISP 拦截 *.supabase.co；浏览器走 Cloudflare 反代。Netlify Functions 仍直连 supabase.co。
+const PUBLIC_SUPABASE_URL = 'https://db.market-link-express.com';
+const configuredUrl = (process.env.REACT_APP_SUPABASE_URL || '').replace(/\/$/, '');
+const supabaseUrl =
+  !configuredUrl || configuredUrl.includes('uopkyuluxnrewvlmutam.supabase.co')
+    ? PUBLIC_SUPABASE_URL
+    : configuredUrl;
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseKey) {
   console.error('❌ 错误：Supabase 环境变量未配置！');
   console.error('请在 Netlify Dashboard 中配置：');
-  console.error('  - REACT_APP_SUPABASE_URL');
+  console.error('  - REACT_APP_SUPABASE_URL（生产默认 https://db.market-link-express.com）');
   console.error('  - REACT_APP_SUPABASE_ANON_KEY');
-  throw new Error('REACT_APP_SUPABASE_URL 和 REACT_APP_SUPABASE_ANON_KEY 环境变量必须配置！');
+  throw new Error('REACT_APP_SUPABASE_ANON_KEY 环境变量必须配置！');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

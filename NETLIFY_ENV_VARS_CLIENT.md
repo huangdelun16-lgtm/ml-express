@@ -8,7 +8,7 @@
 
 | 变量名 | 说明 | 示例值 |
 |--------|------|--------|
-| `REACT_APP_SUPABASE_URL` | Supabase 项目 URL | `https://uopkyuluxnrewvlmutam.supabase.co` |
+| `REACT_APP_SUPABASE_URL` | 浏览器走 Cloudflare 反代（缅甸 ISP 拦截 *.supabase.co） | `https://db.market-link-express.com` |
 | `REACT_APP_SUPABASE_ANON_KEY` | Supabase 匿名密钥 (Anon Key) | `YOUR_SUPABASE_ANON_KEY_HERE` |
 | `REACT_APP_GOOGLE_MAPS_API_KEY` | Google Maps API 密钥 | `AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE` |
 
@@ -60,13 +60,13 @@
 ```bash
 # 设置环境变量（客户端 Web）
 cd ml-express-client-web
-netlify env:set REACT_APP_SUPABASE_URL "https://uopkyuluxnrewvlmutam.supabase.co"
+netlify env:set REACT_APP_SUPABASE_URL "https://db.market-link-express.com"
 netlify env:set REACT_APP_SUPABASE_ANON_KEY "你的anon key"
 netlify env:set REACT_APP_GOOGLE_MAPS_API_KEY "你的google maps key"
 
 # 设置环境变量（后台管理 Web）
 cd ..  # 回到根目录
-netlify env:set REACT_APP_SUPABASE_URL "https://uopkyuluxnrewvlmutam.supabase.co"
+netlify env:set REACT_APP_SUPABASE_URL "https://db.market-link-express.com"
 netlify env:set REACT_APP_SUPABASE_ANON_KEY "你的anon key"
 netlify env:set REACT_APP_GOOGLE_MAPS_API_KEY "你的google maps key"
 ```
@@ -98,7 +98,7 @@ netlify env:set REACT_APP_GOOGLE_MAPS_API_KEY "你的google maps key"
 根据代码，当前使用的默认值：
 
 ```
-REACT_APP_SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co
+REACT_APP_SUPABASE_URL=https://db.market-link-express.com
 REACT_APP_SUPABASE_ANON_KEY=[请从 Supabase Dashboard → Settings → API → API Keys 获取 Anon Key]
 REACT_APP_GOOGLE_MAPS_API_KEY=AIzaSyDziYSarzsBiZHuyza-YDY9ZkaZILEq0SE
 ```

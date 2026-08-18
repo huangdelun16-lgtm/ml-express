@@ -14,7 +14,7 @@
 
 **已添加的环境变量**:
 ```
-EXPO_PUBLIC_SUPABASE_URL=https://uopkyuluxnrewvlmutam.supabase.co
+EXPO_PUBLIC_SUPABASE_URL=https://db.market-link-express.com
 EXPO_PUBLIC_SUPABASE_ANON_KEY=[请从 Supabase Dashboard → Settings → API → API Keys 获取]
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=[请从 Google Cloud Console 获取]
 ```
