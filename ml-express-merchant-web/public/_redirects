@@ -1,0 +1,7 @@
+/download  https://github.com/huangdelun16-lgtm/ml-express/releases/download/v.2.1.1-merchants/ml-express-merchants.apk  302!
+
+# Supabase same-origin BFF (must precede SPA fallback)
+/__sb/*  https://uopkyuluxnrewvlmutam.supabase.co/:splat  200!
+
+# SPA — React Router
+/*  /index.html  200
