@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { supabase } from "./supabaseClient";
+import { rewritePublicStorageUrl } from "./nativeSupabaseUrl";
 import LoggerService from "../LoggerService";
 
 // 充值服务
@@ -62,7 +63,7 @@ export const rechargeService = {
       } = supabase.storage.from("payment_proofs").getPublicUrl(fileName);
 
       console.log("获取 URL 成功:", publicUrl);
-      return publicUrl;
+      return rewritePublicStorageUrl(publicUrl);
     } catch (error: any) {
       LoggerService.error("uploadProof 核心异常:", error);
       console.error("uploadProof 核心异常详情:", error);

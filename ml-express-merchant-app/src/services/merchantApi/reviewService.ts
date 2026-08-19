@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { supabase } from "./supabaseClient";
+import { rewritePublicStorageUrl } from "./nativeSupabaseUrl";
 import LoggerService from "../LoggerService";
 import type { StoreReview } from "./types";
 
@@ -215,7 +216,7 @@ export const reviewService = {
         data: { publicUrl },
       } = supabase.storage.from("review_images").getPublicUrl(fileName);
 
-      return publicUrl;
+      return rewritePublicStorageUrl(publicUrl);
     } catch (error: any) {
       LoggerService.error("上传评价图片失败:", error);
       return null;

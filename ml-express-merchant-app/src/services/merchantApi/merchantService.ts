@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { supabase } from "./supabaseClient";
+import { rewritePublicStorageUrl } from "./nativeSupabaseUrl";
 import LoggerService from "../LoggerService";
 import type { Product, ProductCategory, ProductPendingUpdate } from "./types";
 import {
@@ -272,7 +273,7 @@ export const merchantService = {
       } = supabase.storage.from("product_images").getPublicUrl(fileName);
 
       console.log("获取商品图片 URL 成功:", publicUrl);
-      return publicUrl;
+      return rewritePublicStorageUrl(publicUrl);
     } catch (error: any) {
       LoggerService.error("uploadProductImage 核心异常:", error);
       console.error("uploadProductImage 核心异常详情:", error);

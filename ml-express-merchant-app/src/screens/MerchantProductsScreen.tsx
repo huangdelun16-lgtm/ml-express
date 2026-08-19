@@ -22,6 +22,7 @@ import { merchantService, Product, ProductCategory, productFormSource, hasPendin
 import { theme } from '../config/theme';
 import { feedbackService } from '../services/FeedbackService';
 import { autoPrepareProductImageUri, autoPrepareProductImageUris } from '../utils/productImageNative';
+import { rewritePublicStorageUrl } from '../services/merchantApi/nativeSupabaseUrl';
 import { pickImageFromLibrary } from '../utils/mediaAccess';
 import ProductVariantsEditor from '../components/ProductVariantsEditor';
 import {
@@ -557,7 +558,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         </TouchableOpacity>
         <View style={styles.productImageContainerList}>
           {item.image_url && !item.image_url.startsWith('file://') ? (
-            <Image source={{ uri: item.image_url }} style={styles.productImage} />
+            <Image source={{ uri: rewritePublicStorageUrl(item.image_url) }} style={styles.productImage} />
           ) : (
             <View style={styles.productImagePlaceholder}>
               <Ionicons name="image-outline" size={32} color="#cbd5e1" />
@@ -774,7 +775,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 activeOpacity={0.6}
               >
                 {productForm.image_url ? (
-                  <Image source={{ uri: productForm.image_url }} style={styles.uploadedImage} />
+                  <Image source={{ uri: rewritePublicStorageUrl(productForm.image_url) }} style={styles.uploadedImage} />
                 ) : (
                   <View style={styles.uploadPlaceholder}>
                     <Ionicons name="camera-outline" size={40} color="#94a3b8" />
@@ -826,7 +827,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detailImagesScroll}>
                     {productForm.detail_image_urls.map((uri, idx) => (
                       <View key={`${uri}-${idx}`} style={styles.detailImageThumbWrap}>
-                        <Image source={{ uri }} style={styles.detailImageThumb} />
+                        <Image source={{ uri: rewritePublicStorageUrl(uri) }} style={styles.detailImageThumb} />
                         <TouchableOpacity
                           style={styles.detailImageRemove}
                           onPress={() => handleRemoveDetailImage(idx)}

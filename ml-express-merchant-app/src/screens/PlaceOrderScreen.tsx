@@ -26,6 +26,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
 import { packageService, systemSettingsService, supabase, merchantService, Product } from '../services/supabase';
+import { rewritePublicStorageUrl } from '../services/merchantApi/nativeSupabaseUrl';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView, ScaleInView } from '../components/Animations';
@@ -3075,7 +3076,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                   <View key={item.id} style={styles.selectorItem}>
                     <View style={styles.selectorImageContainer}>
                       {item.image_url ? (
-                        <Image source={{ uri: item.image_url }} style={styles.selectorImage} />
+                        <Image source={{ uri: rewritePublicStorageUrl(item.image_url) }} style={styles.selectorImage} />
                       ) : (
                         <Ionicons name="image-outline" size={24} color="#cbd5e1" />
                       )}
