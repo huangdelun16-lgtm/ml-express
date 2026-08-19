@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK MERCHANT",
     "slug": "ml-express-merchants",
-    "version": "2.5.3",
+    "version": "2.5.4",
     "scheme": "ml-express-merchants",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.merchants",
-      "buildNumber": "23",
+      "buildNumber": "24",
       "appStoreUrl": "https://apps.apple.com/app/market-link-express/id1234567890",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages. / 需要位置信息以提供准确的配送服务。 / တိကျသော ပို့ဆောင်ရေးဝန်ဆောင်မှုအတွက် တည်နေရာလိုအပ်ပါသည်။",
@@ -30,8 +30,8 @@
         "NSBluetoothPeripheralUsageDescription": "MARKET LINK MERCHANT 需要使用蓝牙扫描并连接附近的小票打印机、标签打印机等设备。 / Uses Bluetooth to scan and connect nearby receipt and label printers.",
         "CFBundleDisplayName": "MARKET LINK MERCHANT",
         "CFBundleName": "MARKET LINK MERCHANT",
-        "CFBundleShortVersionString": "2.5.3",
-        "CFBundleVersion": "23",
+        "CFBundleShortVersionString": "2.5.4",
+        "CFBundleVersion": "24",
         "LSRequiresIPhoneOS": true,
         "UILaunchStoryboardName": "SplashScreen",
         "UIRequiredDeviceCapabilities": [
@@ -62,7 +62,7 @@
         "backgroundColor": "#2E86AB"
       },
       "package": "com.mlexpress.merchants",
-      "versionCode": 23,
+      "versionCode": 24,
       "blockedPermissions": [
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
