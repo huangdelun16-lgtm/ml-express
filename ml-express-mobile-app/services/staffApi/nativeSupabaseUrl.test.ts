@@ -37,19 +37,24 @@ describe('resolveNativeSupabaseUrl', () => {
     expect(nativeClientHeaders(true)).toBeUndefined();
   });
 
-  it('realtime fallback only when not dev', () => {
+  it('realtime fallback is a no-op and does not write workers.dev', () => {
+    const originalWs = UPSTREAM + '/realtime/v1/websocket';
+    const originalHttp = UPSTREAM + '/realtime/v1';
     const client = {
       realtime: {
-        endPoint: UPSTREAM + '/realtime/v1/websocket',
-        httpEndpoint: UPSTREAM + '/realtime/v1',
+        endPoint: originalWs,
+        httpEndpoint: originalHttp,
         headers: {},
+        socketAdapter: { socket: { endPoint: originalWs } },
       },
     };
     applyRealtimeWsFallback(client, true);
-    expect(client.realtime.endPoint).toContain('supabase.co');
+    expect(client.realtime.endPoint).toBe(originalWs);
     applyRealtimeWsFallback(client, false);
-    expect(client.realtime.endPoint.startsWith('wss://')).toBe(true);
-    expect(client.realtime.httpEndpoint).toContain('/realtime/v1');
-    expect(client.realtime.headers['User-Agent']).toContain('Mozilla');
+    expect(JSON.stringify(client)).not.toContain('workers.dev');
+    expect(client.realtime.endPoint).toBe(originalWs);
+    expect(client.realtime.httpEndpoint).toBe(originalHttp);
+    expect(client.realtime.headers['User-Agent']).toBeUndefined();
+    expect(client.realtime.socketAdapter.socket.endPoint).toBe(originalWs);
   });
 });

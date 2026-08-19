@@ -22,7 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigation }: any) {
-  const { language } = useApp();
+  const { language, enableRealtimeAfterSplash } = useApp();
   const [countdown, setCountdown] = useState(5);
   const [dynamicScreen, setDynamicScreen] = useState<WelcomeScreenData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,6 +99,7 @@ export default function WelcomeScreen({ navigation }: any) {
           navigation.replace('Login');
           return;
         }
+        await enableRealtimeAfterSplash();
         navigation.replace('Main');
       } else {
         navigation.replace('Login');

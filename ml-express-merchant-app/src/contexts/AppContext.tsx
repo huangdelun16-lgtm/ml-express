@@ -23,6 +23,7 @@ interface AppContextType {
   setIsDarkMode: (isDark: boolean) => void;
   isGuest: boolean;
   setIsGuest: (isGuest: boolean) => void;
+  enableRealtimeAfterSplash: () => Promise<void>;
 }
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -46,6 +47,7 @@ export function AppProvider({ children }: AppProviderProps) {
   const [isGuest, setIsGuest] = useState(false);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const subscriptionRef = useRef<any>(null);
+  const splashCompleteRef = useRef(false);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -283,6 +285,10 @@ export function AppProvider({ children }: AppProviderProps) {
         }
       };
 
+      if (!splashCompleteRef.current) {
+        return;
+      }
+
       sessionTimerRef.current = setInterval(checkSession, 30000);
       setTimeout(checkSession, 5000);
 
@@ -330,21 +336,34 @@ export function AppProvider({ children }: AppProviderProps) {
     }
   };
 
+  const startPendingPoll = () => {
+    if (pollIntervalRef.current) return;
+    pollIntervalRef.current = setInterval(() => {
+      void fetchPendingOrdersFromServer();
+    }, 30000);
+  };
+
   const refreshSession = async () => {
+    splashCompleteRef.current = true;
     await setupOrderListener();
+    startPendingPoll();
+  };
+
+  const enableRealtimeAfterSplash = async () => {
+    splashCompleteRef.current = true;
+    await setupOrderListener();
+    startPendingPoll();
   };
 
   useEffect(() => {
     void loadInitialData();
-    void setupOrderListener();
-
-    pollIntervalRef.current = setInterval(() => {
-      void fetchPendingOrdersFromServer();
-    }, 30000);
+    // Splash/Welcome: welcome_screens REST only. Realtime + pending poll start
+    // after WelcomeScreen or Login (interactive session).
 
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState !== 'active') return;
       stopOrderAlarm(alarmIntervalRef);
+      if (!splashCompleteRef.current) return;
       void fetchPendingOrdersFromServer();
       void setupOrderListener();
     };
@@ -398,6 +417,7 @@ export function AppProvider({ children }: AppProviderProps) {
         setIsDarkMode,
         isGuest,
         setIsGuest,
+        enableRealtimeAfterSplash,
       }}
     >
       {children}

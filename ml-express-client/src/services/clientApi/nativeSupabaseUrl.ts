@@ -1,10 +1,13 @@
 /**
  * Native REST/Auth/Storage on a Myanmar-reachable Netlify /__sb host.
  * localhost / Expo __DEV__ keeps env extra supabase.co.
- * Realtime WS cannot upgrade through Netlify rewrites — Worker fallback only.
  *
  * Trailing slash is required: supabase-js `new URL('rest/v1', base)` drops
  * `/__sb` unless the base ends with `/`. Always emit `/__sb/` ourselves.
+ *
+ * Realtime WS cannot upgrade through Netlify rewrites. The previous Worker
+ * fallback (`*.workers.dev`) TLS-resets in Myanmar the same way supabase.co
+ * does, and no Cloudflare custom hostname exists. Production must not dial it.
  */
 export const NATIVE_SB_PROXY_URL =
   'https://' + 'market-link-express.com' + '/__sb/';
@@ -52,30 +55,23 @@ type RealtimePatchTarget = {
 };
 
 /**
- * Point Realtime at the Cloudflare Worker while REST/auth/storage stay on /__sb.
- * Handles supabase-js 2.8x (writable endPoint) and 2.10x (Phoenix socketAdapter).
- * Browser-like UA belongs on realtime.headers only (Worker websocket).
+ * Kept as a stable export. Intentionally a no-op: assigning workers.dev
+ * as the Realtime endpoint TLS-resets (CFNetwork -9806) in Myanmar.
  */
 export function applyRealtimeWsFallback(
-  client: RealtimePatchTarget,
-  isDev = isNativeDevRuntime(),
+  _client: RealtimePatchTarget,
+  _isDev = isNativeDevRuntime(),
 ): void {
-  if (isDev) return;
-  const realtime = client.realtime;
-  if (!realtime) return;
+  return;
+}
 
-  const wsUrl = NATIVE_REALTIME_WS_FALLBACK;
-  const httpUrl = NATIVE_REALTIME_HTTP_FALLBACK;
-
-  const phoenix = realtime.socketAdapter && realtime.socketAdapter.socket;
-  if (phoenix) {
-    phoenix.endPoint = wsUrl;
-  } else {
-    realtime.endPoint = wsUrl;
-  }
-  realtime.httpEndpoint = httpUrl;
-  if (!realtime.headers) {
-    realtime.headers = {};
-  }
-  realtime.headers['User-Agent'] = NATIVE_BROWSER_LIKE_UA;
+/** Rewrite stored supabase.co public Storage URLs onto the native /__sb proxy. */
+export function rewritePublicStorageUrl(url: string): string {
+  const raw = String(url || '').trim();
+  if (!raw) return raw;
+  if (raw.startsWith('file://') || raw.startsWith('content://')) return raw;
+  const proxy = NATIVE_SB_PROXY_URL.replace(/\/$/, '');
+  return raw
+    .replace(/^https:\/\/uopkyuluxnrewvlmutam\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(/^https:\/\/[^/]+\.supabase\.co(?=\/|$)/i, proxy);
 }
