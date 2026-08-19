@@ -40,10 +40,13 @@ describe('resolveBrowserSupabaseUrl', () => {
         protocol: 'https:',
       },
     });
-    expect(resolveBrowserSupabaseUrl(UPSTREAM)).toBe('https://admin-market-link-express.com/__sb');
-    expect(resolveBrowserSupabaseUrl('')).toBe('https://admin-market-link-express.com/__sb');
+    expect(resolveBrowserSupabaseUrl(UPSTREAM)).toBe('https://admin-market-link-express.com/__sb/');
+    expect(resolveBrowserSupabaseUrl('')).toBe('https://admin-market-link-express.com/__sb/');
     expect(resolveBrowserSupabaseUrl(SUPABASE_BROWSER_PROXY_URL)).toBe(
-      'https://admin-market-link-express.com/__sb',
+      'https://admin-market-link-express.com/__sb/',
+    );
+    expect(new URL('rest/v1', resolveBrowserSupabaseUrl(UPSTREAM)).href).toBe(
+      'https://admin-market-link-express.com/__sb/rest/v1',
     );
   });
 });

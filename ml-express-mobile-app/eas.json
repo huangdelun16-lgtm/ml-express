@@ -18,7 +18,7 @@
       },
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://admin-market-link-express.com/__sb"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://admin-market-link-express.com/__sb/"
       }
     },
     "apk": {
@@ -27,7 +27,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://admin-market-link-express.com/__sb",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://admin-market-link-express.com/__sb/",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -38,7 +38,7 @@
       },
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://admin-market-link-express.com/__sb"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://admin-market-link-express.com/__sb/"
       }
     }
   },

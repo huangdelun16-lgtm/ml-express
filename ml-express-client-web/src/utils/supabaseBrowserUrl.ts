@@ -44,12 +44,12 @@ export function shouldUseSameOriginProxy(configuredUrl = configuredEnvUrl()): bo
 
 /**
  * REST / Auth / Storage base URL for browser supabase-js.
- * Production Netlify sites: `https://<site>/__sb` (proxied to supabase.co).
+ * Production Netlify sites: `https://<site>/__sb/` (proxied to supabase.co).
  */
 export function resolveBrowserSupabaseUrl(raw?: string): string {
   const configuredUrl = configuredEnvUrl(raw);
   if (shouldUseSameOriginProxy(configuredUrl)) {
-    return `${window.location.origin}/__sb`;
+    return `${window.location.origin}/__sb/`;
   }
   if (configuredUrl) return configuredUrl;
   if (isBrowser() && isLocalDevHost()) {

@@ -2,9 +2,12 @@
  * Native REST/Auth/Storage on a Myanmar-reachable Netlify /__sb host.
  * localhost / Expo __DEV__ keeps env extra supabase.co.
  * Realtime WS cannot upgrade through Netlify rewrites — Worker fallback only.
+ *
+ * Trailing slash is required: supabase-js `new URL('rest/v1', base)` drops
+ * `/__sb` unless the base ends with `/`. Always emit `/__sb/` ourselves.
  */
 export const NATIVE_SB_PROXY_URL =
-  'https://' + 'market-link-express.com' + '/__sb';
+  'https://' + 'market-link-express.com' + '/__sb/';
 
 const WORKER_HOST = 'ml-supabase-proxy.huangdelun16' + '.workers.dev';
 export const NATIVE_REALTIME_WS_FALLBACK =
@@ -20,12 +23,12 @@ export function isNativeDevRuntime(): boolean {
   return typeof __DEV__ !== 'undefined' && __DEV__;
 }
 
-export function nativeClientHeaders(isDev = isNativeDevRuntime()): Record<string, string> | undefined {
-  if (isDev) return undefined;
-  return { 'User-Agent': NATIVE_BROWSER_LIKE_UA };
+/** Never attach User-Agent to REST/Auth/Storage. UA is realtime-WS only. */
+export function nativeClientHeaders(_isDev = isNativeDevRuntime()): Record<string, string> | undefined {
+  return undefined;
 }
 
-/** Production/release always uses /__sb. Dev keeps the configured env URL. */
+/** Production/release always uses /__sb/. Dev keeps the configured env URL. */
 export function resolveNativeSupabaseUrl(
   configuredUrl: string,
   isDev = isNativeDevRuntime(),
@@ -34,7 +37,8 @@ export function resolveNativeSupabaseUrl(
   if (isDev) {
     return configured;
   }
-  return NATIVE_SB_PROXY_URL;
+  const proxy = NATIVE_SB_PROXY_URL;
+  return proxy.endsWith('/') ? proxy : `${proxy}/`;
 }
 
 type RealtimePatchTarget = {
@@ -50,6 +54,7 @@ type RealtimePatchTarget = {
 /**
  * Point Realtime at the Cloudflare Worker while REST/auth/storage stay on /__sb.
  * Handles supabase-js 2.8x (writable endPoint) and 2.10x (Phoenix socketAdapter).
+ * Browser-like UA belongs on realtime.headers only (Worker websocket).
  */
 export function applyRealtimeWsFallback(
   client: RealtimePatchTarget,
@@ -69,7 +74,8 @@ export function applyRealtimeWsFallback(
     realtime.endPoint = wsUrl;
   }
   realtime.httpEndpoint = httpUrl;
-  if (realtime.headers) {
-    realtime.headers['User-Agent'] = NATIVE_BROWSER_LIKE_UA;
+  if (!realtime.headers) {
+    realtime.headers = {};
   }
+  realtime.headers['User-Agent'] = NATIVE_BROWSER_LIKE_UA;
 }

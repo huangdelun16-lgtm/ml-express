@@ -24,7 +24,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://mlexpress-merchants.com/__sb"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://mlexpress-merchants.com/__sb/"
       }
     },
     "apk": {
@@ -34,7 +34,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://mlexpress-merchants.com/__sb"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://mlexpress-merchants.com/__sb/"
       }
     },
     "production": {
@@ -48,7 +48,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://mlexpress-merchants.com/__sb"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://mlexpress-merchants.com/__sb/"
       }
     },
     "testflight": {
@@ -60,7 +60,7 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://mlexpress-merchants.com/__sb"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://mlexpress-merchants.com/__sb/"
       }
     }
   },

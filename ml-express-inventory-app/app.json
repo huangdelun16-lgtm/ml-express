@@ -68,7 +68,7 @@
       "eas": {
         "projectId": "d125c924-b3da-476d-a176-8fa3117bd2ad"
       },
-      "supabaseProxyUrl": "https://admin-market-link-express.com/__sb"
+      "supabaseProxyUrl": "https://admin-market-link-express.com/__sb/"
     },
     "runtimeVersion": {
       "policy": "appVersion"

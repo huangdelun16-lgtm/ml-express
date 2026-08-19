@@ -7,7 +7,7 @@ import {
 } from './nativeSupabaseUrl';
 
 const UPSTREAM = 'https://' + 'uopkyuluxnrewvlmutam' + '.supabase.co';
-const PROXY_HOST = 'admin-market-link-express.com';
+const PROXY_HOST = 'market-link-express.com';
 
 describe('resolveNativeSupabaseUrl', () => {
   it('dev keeps env supabase.co and custom URLs', () => {

@@ -2,7 +2,7 @@
   "expo": {
     "name": "MARKET LINK STAFF",
     "slug": "MarketLinkStaffApp",
-    "version": "2.4.1",
+    "version": "2.4.2",
     "scheme": "ml-express-staff",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.courier",
-      "buildNumber": "79",
+      "buildNumber": "80",
       "infoPlist": {
         "CFBundleDisplayName": "MARKET LINK STAFF",
         "CFBundleName": "MARKET LINK STAFF",
@@ -44,7 +44,7 @@
         "backgroundColor": "#2c5282"
       },
       "package": "com.mlexpress.courier",
-      "versionCode": 79,
+      "versionCode": 80,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
@@ -67,7 +67,7 @@
       "eas": {
         "projectId": "9831d961-9124-46ed-8581-bf406616439f"
       },
-      "supabaseProxyUrl": "https://admin-market-link-express.com/__sb"
+      "supabaseProxyUrl": "https://admin-market-link-express.com/__sb/"
     },
     "plugins": [
       [

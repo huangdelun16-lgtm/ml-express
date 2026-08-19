@@ -48,7 +48,7 @@ const BLOCK_MEDIA_READ = [
  */
 
 /** Production native builds bake absolute /__sb (Myanmar-reachable). Local expo start keeps env. */
-const NATIVE_SB_PROXY_URL = 'https://mlexpress-merchants.com/__sb';
+const NATIVE_SB_PROXY_URL = 'https://mlexpress-merchants.com/__sb/';
 const SUPABASE_UPSTREAM_URL = 'https://uopkyuluxnrewvlmutam.supabase.co';
 function resolveExtraSupabaseUrl(envUrl) {
   const easProfile = process.env.EAS_BUILD_PROFILE || "";

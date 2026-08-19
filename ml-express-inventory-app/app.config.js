@@ -6,7 +6,7 @@ const baseConfig = require('./app.json');
  */
 
 /** Production native builds bake absolute /__sb (Myanmar-reachable). Local expo start keeps env. */
-const NATIVE_SB_PROXY_URL = 'https://' + 'admin-market-link-express.com' + '/__sb';
+const NATIVE_SB_PROXY_URL = 'https://' + 'admin-market-link-express.com' + '/__sb/';
 const SUPABASE_UPSTREAM_URL = 'https://' + 'uopkyuluxnrewvlmutam' + '.supabase.co';
 const DEFAULT_SUPABASE_URL = NATIVE_SB_PROXY_URL;
 const DEFAULT_SUPABASE_ANON_KEY =
