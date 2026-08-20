@@ -35,11 +35,28 @@ class ErrorService {
   // 解析错误并返回标准化的 AppError
   parseError(error: any): AppError {
     if (!error) {
-      return { message: '未知错误' };
+      return { message: '未知错误', isNetworkError: true, originalError: error };
     }
 
-    // 处理网络错误
-    if (error.isNetworkError || error.isTimeout) {
+    const rawMessage = String(
+      error.message || error.error_description || error.error || error.details || '',
+    );
+    const looksNetwork =
+      error.isNetworkError ||
+      error.name === 'AuthRetryableFetchError' ||
+      (error.name === 'TypeError' &&
+        (!rawMessage || /network|fetch|load failed/i.test(rawMessage))) ||
+      /Network request failed|Failed to fetch|NetworkError|Load failed|The Internet connection appears to be offline/i.test(
+        rawMessage,
+      ) ||
+      (typeof error === 'object' &&
+        !rawMessage &&
+        !error.code &&
+        !error.status &&
+        !(error instanceof Error));
+
+    // 处理网络错误（含 RN fetch 失败后的空对象 / TypeError）
+    if (looksNetwork || error.isTimeout) {
       return {
         message: this.getFriendlyMessage(
           error.isTimeout ? '请求超时' : '网络连接失败',
@@ -47,7 +64,7 @@ class ErrorService {
           error
         ),
         isNetworkError: true,
-        isTimeout: error.isTimeout,
+        isTimeout: Boolean(error.isTimeout),
         originalError: error,
       };
     }
@@ -89,6 +106,11 @@ class ErrorService {
       return { message: this.getFriendlyMessage(error) };
     }
 
+    const fallbackMsg = String(error?.message || error?.details || error?.hint || '').trim();
+    if (fallbackMsg) {
+      return { message: this.getFriendlyMessage(fallbackMsg, error?.code, error), originalError: error };
+    }
+
     return {
       message: '发生意外错误',
       originalError: error,
@@ -111,9 +133,12 @@ class ErrorService {
     if (
       message.includes('Network request failed') ||
       message.includes('Failed to fetch') ||
+      message.includes('NetworkError') ||
+      message.includes('Load failed') ||
+      message.includes('网络连接失败') ||
       error?.isNetworkError
     ) {
-      return '网络连接失败，请检查您的网络设置';
+      return '无法连接到服务器，请检查网络后重试';
     }
 
     // 超时错误

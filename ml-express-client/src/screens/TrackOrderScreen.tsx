@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image, FlatList, RefreshControl, Animated, Alert, Modal, Vibration, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image, FlatList, RefreshControl, Animated, Alert, Modal, Vibration, Platform, Linking, BackHandler } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { packageService, supabase, deliveryPhotoService } from '../services/supabase';
 import {
   crossBorderTrackingService,
@@ -13,13 +14,18 @@ import {
 } from '../services/crossBorderTrackingService';
 import { chatService } from '../services/chatService';
 import { useApp } from '../contexts/AppContext';
-import BackToHomeButton from '../components/BackToHomeButton';
+import { APP_CONFIG } from '../config/constants';
+import { getJourneyCopy } from '../utils/orderJourney';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useFocusEffect } from '@react-navigation/native';
 import { feedbackService } from '../services/FeedbackService';
 
 const { width, height } = Dimensions.get('window');
+const TEAL = '#2C98A6';
+const PAGE_BG = '#F3F5F7';
+const NAVY = '#0f172a';
+const MAP_HERO = Math.round(height * 0.42);
 
 interface Package {
   id: string;
@@ -58,6 +64,7 @@ interface TrackingEvent {
 
 export default function TrackOrderScreen({ navigation, route }: any) {
   const { language } = useApp();
+  const insets = useSafeAreaInsets();
   const [trackingCode, setTrackingCode] = useState(route?.params?.orderId || '');
   const [loading, setLoading] = useState(false);
   const [packageData, setPackageData] = useState<Package | null>(null);
@@ -65,6 +72,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([]);
   const [searched, setSearched] = useState(false);
   const [courierId, setCourierId] = useState<string | null>(null);
+  const [courierPhone, setCourierPhone] = useState<string | null>(null);
   const [riderLocation, setRiderLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null); // 🚀 新增：预计剩余时间（分钟）
   const [deliveryPhotos, setDeliveryPhotos] = useState<any[]>([]); // 🚀 新增：配送照片状态
@@ -329,22 +337,26 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             try {
               const { data } = await supabase
                 .from('couriers')
-                .select('id')
+                .select('id, phone')
                 .eq('name', order.courier)
                 .single();
               
               if (data) {
                 setCourierId(data.id);
+                setCourierPhone(data.phone || null);
               } else {
                 setCourierId(order.courier);
+                setCourierPhone(null);
               }
             } catch (e) {
               setCourierId(order.courier);
+              setCourierPhone(null);
             }
           };
           fetchCourier();
         } else {
           setCourierId(null);
+          setCourierPhone(null);
           setRiderLocation(null);
         }
         
@@ -368,6 +380,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           setPackageData(null);
           setTrackingHistory([]);
           setCourierId(null);
+          setCourierPhone(null);
           setRiderLocation(null);
           setCrossBorderData(crossBorder);
           showToast(language === 'zh' ? '已找到跨境包裹' : 'Cross-border shipment found', 'success');
@@ -582,6 +595,21 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       mapErrorTitle: '地图加载失败',
       mapErrorDesc: '请稍后重试或检查网络与定位权限',
       chatWithCourier: '联系骑手',
+      callCourier: '电话联系',
+      messageCourier: '发送消息',
+      customerService: '客服',
+      etaMinutes: '预计 {n} 分钟送达',
+      etaByOption: '按配送选项送达',
+      riderDelivering: '骑手正在配送',
+      noCourierPhone: '暂无骑手电话',
+      stepPlaced: '已下单',
+      stepPreparing: '商家备货',
+      stepPicked: '骑手取货',
+      stepDelivering: '正在配送',
+      stepArrive: '待送达',
+      stepArrived: '已送达',
+      moreItems: '等',
+      itemsUnit: '件',
       inputMessage: '输入消息...',
       sendMessage: '发送',
       noMessages: '暂无消息',
@@ -632,6 +660,21 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       mapErrorTitle: 'Map failed to load',
       mapErrorDesc: 'Please try again later or check network and location permissions.',
       chatWithCourier: 'Chat with Courier',
+      callCourier: 'Call',
+      messageCourier: 'Message',
+      customerService: 'Support',
+      etaMinutes: 'ETA {n} min',
+      etaByOption: 'By delivery option',
+      riderDelivering: 'Rider is delivering',
+      noCourierPhone: 'Courier phone unavailable',
+      stepPlaced: 'Placed',
+      stepPreparing: 'Preparing',
+      stepPicked: 'Picked up',
+      stepDelivering: 'Delivering',
+      stepArrive: 'Out for delivery',
+      stepArrived: 'Delivered',
+      moreItems: '',
+      itemsUnit: 'items',
       inputMessage: 'Type a message...',
       sendMessage: 'Send',
       noMessages: 'No messages yet',
@@ -682,6 +725,21 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       mapErrorTitle: 'မြေပုံမရပါ',
       mapErrorDesc: 'ခဏနေရင် ထပ်ကြိုးစားပါ သို့မဟုတ် အင်တာနက်/တည်နေရာခွင့်ပြုမှုစစ်ဆေးပါ',
       chatWithCourier: 'ပို့ဆောင်သူနှင့် စကားပြောရန်',
+      callCourier: 'ခေါ်ဆိုရန်',
+      messageCourier: 'မက်ဆေ့ခ်ျ',
+      customerService: 'ဝန်ဆောင်မှု',
+      etaMinutes: '{n} မိနစ်ခန့်',
+      etaByOption: 'ပို့ဆောင်မှု ရွေးချယ်မှုအတိုင်း',
+      riderDelivering: 'ပို့ဆောင်နေသည်',
+      noCourierPhone: 'ဖုန်းမရှိပါ',
+      stepPlaced: 'မှာယူပြီး',
+      stepPreparing: 'ပြင်ဆင်နေ',
+      stepPicked: 'ယူပြီး',
+      stepDelivering: 'ပို့ဆောင်နေ',
+      stepArrive: 'ပို့ဆောင်ရန်',
+      stepArrived: 'ပို့ပြီး',
+      moreItems: '',
+      itemsUnit: 'ခု',
       inputMessage: 'မက်ဆေ့ခ်ျရိုက်ပါ...',
       sendMessage: 'ပို့မည်',
       noMessages: 'မက်ဆေ့ခ်ျမရှိပါ',
@@ -739,50 +797,383 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     });
   };
 
+  const formatHm = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  const eventTimeFor = (statuses: string[]) => {
+    const ev = trackingHistory.find((e) => statuses.includes(e.status));
+    return ev?.event_time;
+  };
+
+  const timelineIndex = (status: string) => {
+    if (['已送达', '已完成', '已签收'].includes(status)) return 4;
+    if (['配送中', '待收款', '异常上报'].includes(status)) return 3;
+    if (status === '已取件') return 2;
+    if (['待取件', '待确认', '打包中'].includes(status)) return 1;
+    return 0;
+  };
+
+  const openCourierPhone = () => {
+    if (!courierPhone) {
+      Alert.alert(t.noCourierPhone);
+      return;
+    }
+    Linking.openURL(`tel:${courierPhone}`).catch(() => Alert.alert(t.noCourierPhone));
+  };
+
+  const openSupport = () => {
+    Linking.openURL(`tel:${APP_CONFIG.CONTACT.PHONE}`).catch(() => {});
+  };
+
+  const closeTrackingDetail = useCallback(() => {
+    setPackageData(null);
+    setCrossBorderData(null);
+    setTrackingHistory([]);
+    setSearched(false);
+    setTrackingCode('');
+    setCourierId(null);
+    setCourierPhone(null);
+    setRiderLocation(null);
+    setEstimatedTime(null);
+    setDeliveryPhotos([]);
+    setShowChatModal(false);
+    setUnreadCount(0);
+    setLoading(false);
+    if (route?.params?.orderId) {
+      navigation.setParams({ orderId: undefined });
+    }
+  }, [navigation, route?.params?.orderId]);
+
+  const handleTrackBack = useCallback(() => {
+    if (packageData || crossBorderData) {
+      closeTrackingDetail();
+      return;
+    }
+    navigation.navigate('Home');
+  }, [packageData, crossBorderData, closeTrackingDetail, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleTrackBack();
+        return true;
+      });
+      return () => sub.remove();
+    }, [handleTrackBack]),
+  );
+
+  const openChat = () => {
+    if (!packageData) return;
+    setShowChatModal(true);
+    setUnreadCount(0);
+    if (packageData.id && currentUserId) {
+      chatService.markAsRead(packageData.id, currentUserId);
+    }
+  };
+
+  const renderPageHeader = (overlay = false) => (
+    <View style={[ui.navRow, overlay && ui.navRowOverlay, { paddingTop: insets.top + 6 }]}>
+      <TouchableOpacity
+        style={ui.navBtn}
+        onPress={handleTrackBack}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="chevron-back" size={22} color={NAVY} />
+      </TouchableOpacity>
+      <Text style={ui.navTitle} numberOfLines={1}>{t.title}</Text>
+      <TouchableOpacity style={ui.supportBtn} onPress={openSupport}>
+        <Ionicons name="headset-outline" size={18} color={NAVY} />
+        <Text style={ui.supportLabel}>{t.customerService}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const chatModal = (
+      <Modal
+        visible={showChatModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowChatModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.chatModalContent, isDarkMode && styles.darkChatModal]}>
+            <View style={[styles.chatHeader, isDarkMode && styles.darkChatHeader]}>
+              <View>
+                <Text style={[styles.chatTitle, isDarkMode && styles.darkText]}>
+                  {t.chatWithCourier}
+                </Text>
+                <Text style={styles.chatSubtitle}>{packageData?.courier}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowChatModal(false)} style={styles.chatCloseBtn}>
+                <Ionicons name="close" size={24} color={isDarkMode ? "#fff" : "#1e293b"} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              style={[styles.messageList, isDarkMode && styles.darkMessageList]}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              ListEmptyComponent={(
+                <View style={styles.emptyChat}>
+                  <Text style={styles.emptyChatText}>{t.noMessages}</Text>
+                </View>
+              )}
+              renderItem={({ item }) => {
+                const isMine = item.sender_id === currentUserId;
+                return (
+                  <View style={[
+                    styles.messageWrapper,
+                    isMine ? styles.myMessageWrapper : styles.otherMessageWrapper
+                  ]}>
+                    <View style={[
+                      styles.messageBubble,
+                      isMine ? styles.myBubble : styles.otherBubble,
+                      isDarkMode && !isMine && styles.darkOtherBubble
+                    ]}>
+                      <Text style={[
+                        styles.messageText,
+                        isMine ? styles.myMessageText : (isDarkMode ? styles.darkText : styles.otherMessageText)
+                      ]}>
+                        {item.message}
+                      </Text>
+                    </View>
+                    <Text style={styles.messageTime}>
+                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                );
+              }}
+            />
+            <View style={[styles.chatInputContainer, isDarkMode && styles.darkChatHeader]}>
+              <TextInput
+                style={[styles.chatInput, isDarkMode && styles.darkChatInput]}
+                placeholder={t.inputMessage}
+                placeholderTextColor={isDarkMode ? "#94a3b8" : "#9ca3af"}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+              />
+              <TouchableOpacity
+                disabled={!inputText.trim() || sendingMessage}
+                onPress={handleSendMessage}
+                style={[
+                  styles.sendBtn,
+                  !inputText.trim() && styles.sendBtnDisabled
+                ]}
+              >
+                {sendingMessage ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+  );
+
+  if (packageData && !loading) {
+    const showMap = ['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(packageData.status);
+    const idx = timelineIndex(packageData.status);
+    const journey = getJourneyCopy(packageData.status, language as 'zh' | 'en' | 'my');
+    const headline =
+      packageData.status === '配送中' || packageData.status === '待收款'
+        ? t.riderDelivering
+        : journey.headline;
+    const etaText =
+      estimatedTime != null
+        ? t.etaMinutes.replace('{n}', String(estimatedTime))
+        : t.etaByOption;
+    const steps = [
+      { label: t.stepPlaced, time: formatHm(packageData.created_at) },
+      { label: t.stepPreparing, time: formatHm(eventTimeFor(['打包中', '待取件', '待确认'])) },
+      { label: t.stepPicked, time: formatHm(packageData.pickup_time || eventTimeFor(['已取件'])) },
+      { label: t.stepDelivering, time: formatHm(eventTimeFor(['配送中', '待收款'])) },
+      { label: idx >= 4 ? t.stepArrived : t.stepArrive, time: formatHm(packageData.delivery_time || eventTimeFor(['已送达'])) },
+    ];
+    const courierName = packageData.courier && packageData.courier !== '待分配' ? packageData.courier : t.courier;
+    const summaryText = packageData.description || packageData.package_type || t.orderInfo;
+
+    return (
+      <View style={ui.page}>
+        <View style={ui.hero}>
+          {showMap && mapMounted && isOnline && !mapError ? (
+            <MapView
+              ref={mapRef}
+              provider={PROVIDER_GOOGLE}
+              style={StyleSheet.absoluteFill}
+              onMapReady={() => setMapError(false)}
+              initialRegion={{
+                latitude: riderLocation?.latitude || packageData.sender_latitude || 16.8661,
+                longitude: riderLocation?.longitude || packageData.sender_longitude || 96.1951,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              }}
+            >
+              {!!packageData.sender_latitude && !!packageData.sender_longitude ? (
+                <Marker
+                  coordinate={{
+                    latitude: packageData.sender_latitude,
+                    longitude: packageData.sender_longitude,
+                  }}
+                  title="发货点"
+                  pinColor={TEAL}
+                />
+              ) : null}
+              {!!packageData.receiver_latitude && !!packageData.receiver_longitude ? (
+                <Marker
+                  coordinate={{
+                    latitude: packageData.receiver_latitude,
+                    longitude: packageData.receiver_longitude,
+                  }}
+                  title="我的位置"
+                  pinColor="#ef4444"
+                />
+              ) : null}
+              {!!riderLocation ? (
+                <Marker.Animated
+                  coordinate={riderAnimatedLocation as any}
+                  title={language === 'zh' ? '骑手位置' : 'Rider Location'}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                >
+                  <View style={ui.riderPin}>
+                    <Text style={{ fontSize: 22 }}>🛵</Text>
+                  </View>
+                </Marker.Animated>
+              ) : null}
+              {!!riderLocation && !!packageData.receiver_latitude && !!packageData.receiver_longitude ? (
+                <Polyline
+                  coordinates={[
+                    riderLocation,
+                    {
+                      latitude: packageData.receiver_latitude,
+                      longitude: packageData.receiver_longitude,
+                    },
+                  ]}
+                  strokeColor={TEAL}
+                  strokeWidth={4}
+                />
+              ) : null}
+            </MapView>
+          ) : (
+            <LinearGradient colors={['#d8eef1', '#b7dce1', '#e8f5f6']} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={ui.heroScrim} pointerEvents="none" />
+          {renderPageHeader(true)}
+          <View style={ui.statusFloat}>
+            <Text style={ui.statusHeadline} numberOfLines={2}>{headline}</Text>
+            <Text style={ui.statusEta}>{etaText}</Text>
+          </View>
+        </View>
+
+        <View style={ui.sheet}>
+          <View style={ui.riderBar}>
+            <View style={ui.riderAvatar}>
+              <Text style={ui.riderAvatarText}>{(courierName || '骑').trim().charAt(0)}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={ui.riderName} numberOfLines={1}>{courierName}</Text>
+              <Text style={ui.riderMeta}>{packageData.status}</Text>
+            </View>
+            <TouchableOpacity style={ui.actionCol} onPress={openCourierPhone}>
+              <View style={ui.actionCircle}>
+                <Ionicons name="call" size={18} color="#fff" />
+              </View>
+              <Text style={ui.actionLabel}>{t.callCourier}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={ui.actionCol} onPress={openChat}>
+              <View style={ui.actionCircle}>
+                <Ionicons name="chatbubble" size={18} color="#fff" />
+                {unreadCount > 0 ? (
+                  <View style={ui.unreadDot}>
+                    <Text style={ui.unreadDotText}>{unreadCount}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={ui.actionLabel}>{t.messageCourier}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12 }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TEAL} />}
+          >
+            {steps.map((step, i) => {
+              const done = i < idx;
+              const current = i === idx;
+              return (
+                <View key={`${step.label}-${i}`} style={ui.tlRow}>
+                  <View style={ui.tlRail}>
+                    <View style={[ui.tlDot, done && ui.tlDotDone, current && ui.tlDotCurrent]}>
+                      {done ? <Ionicons name="checkmark" size={11} color="#fff" /> : null}
+                    </View>
+                    {i < steps.length - 1 ? <View style={[ui.tlLine, i < idx && ui.tlLineDone]} /> : null}
+                  </View>
+                  <View style={ui.tlBody}>
+                    <Text style={[ui.tlLabel, current && ui.tlLabelCurrent]}>{step.label}</Text>
+                    {step.time ? <Text style={ui.tlTime}>{step.time}</Text> : null}
+                  </View>
+                </View>
+              );
+            })}
+
+            <DeliveryProofSection />
+
+            <View style={ui.miniCard}>
+              <Text style={ui.miniCardTitle}>{t.senderInfo}</Text>
+              <Text style={ui.miniCardText}>{packageData.sender_name}  {packageData.sender_phone}</Text>
+              <Text style={ui.miniCardMuted}>{packageData.sender_address}</Text>
+            </View>
+            <View style={ui.miniCard}>
+              <Text style={ui.miniCardTitle}>{t.receiverInfo}</Text>
+              <Text style={ui.miniCardText}>{packageData.receiver_name}  {packageData.receiver_phone}</Text>
+              <Text style={ui.miniCardMuted}>{packageData.receiver_address}</Text>
+            </View>
+          </ScrollView>
+
+          <TouchableOpacity
+            style={ui.summaryBar}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('OrderDetail', { orderId: packageData.id })}
+          >
+            <View style={ui.summaryThumb}>
+              <Ionicons name="cube-outline" size={22} color={TEAL} />
+            </View>
+            <Text style={ui.summaryName} numberOfLines={1}>{summaryText}</Text>
+            <Text style={ui.summaryPrice}>{Number(packageData.price || 0).toLocaleString()} MMK</Text>
+            <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+          </TouchableOpacity>
+        </View>
+        {chatModal}
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.container, isDarkMode && styles.darkContainer]}>
-      {/* 优化背景视觉效果 */}
-      <LinearGradient
-        colors={isDarkMode ? ['#0f172a', '#1e293b', '#0f172a'] : ['#1e3a8a', '#2563eb', '#f8fafc']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 0.4 }}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* 背景装饰性圆圈 */}
-      <View style={{
-        position: 'absolute',
-        top: -100,
-        right: -100,
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        zIndex: 0
-      }} />
-      <View style={{
-        position: 'absolute',
-        top: 150,
-        left: -50,
-        width: 150,
-        height: 150,
-        borderRadius: 75,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        zIndex: 0
-      }} />
+    <View style={ui.page}>
+      {renderPageHeader(false)}
 
       <ScrollView 
         style={styles.scrollView} 
-        contentContainerStyle={[styles.scrollContent, { paddingTop: 60 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 8 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TEAL} />
         }
       >
-        <View style={[styles.header, { marginBottom: 30, paddingHorizontal: 20 }]}>
-          <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
-          <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
-          <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16 }}>{t.subtitle}</Text>
-        </View>
+        <Text style={ui.browseSubtitle}>{t.subtitle}</Text>
 
         {/* 正在配送中的订单列表 (快捷访问) - 始终显示，除非列表为空 */}
         {inTransitOrders.length > 0 && (
@@ -853,7 +1244,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             disabled={loading}
           >
             <LinearGradient
-              colors={['#3b82f6', '#2563eb']}
+              colors={[TEAL, '#1F7A86']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.trackButtonGradient}
@@ -876,7 +1267,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         {/* 加载中 */}
         {loading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3b82f6" />
+            <ActivityIndicator size="large" color={TEAL} />
             <Text style={styles.loadingText}>{t.searching}</Text>
           </View>
         )}
@@ -1005,8 +1396,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           </>
         )}
 
-        {/* 订单信息 */}
-        {packageData && !loading && (
+        {false && packageData && (
           <>
             {/* 实时地图追踪 */}
             {(['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(packageData.status)) && (
@@ -1248,97 +1638,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* 🚀 新增：聊天模态框 (In-App Chat) */}
-      <Modal
-        visible={showChatModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowChatModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.chatModalContent, isDarkMode && styles.darkChatModal]}>
-            {/* 聊天页眉 */}
-            <View style={[styles.chatHeader, isDarkMode && styles.darkChatHeader]}>
-              <View>
-                <Text style={[styles.chatTitle, isDarkMode && styles.darkText]}>
-                  {t.chatWithCourier}
-                </Text>
-                <Text style={styles.chatSubtitle}>{packageData?.courier}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowChatModal(false)} style={styles.chatCloseBtn}>
-                <Ionicons name="close" size={24} color={isDarkMode ? "#fff" : "#1e293b"} />
-              </TouchableOpacity>
-            </View>
-
-            {/* 消息列表 */}
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={(item) => item.id}
-              style={[styles.messageList, isDarkMode && styles.darkMessageList]}
-              contentContainerStyle={{ paddingBottom: 20 }}
-              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-              ListEmptyComponent={(
-                <View style={styles.emptyChat}>
-                  <Text style={styles.emptyChatText}>{t.noMessages}</Text>
-                </View>
-              )}
-              renderItem={({ item }) => {
-                const isMine = item.sender_id === currentUserId;
-                return (
-                  <View style={[
-                    styles.messageWrapper,
-                    isMine ? styles.myMessageWrapper : styles.otherMessageWrapper
-                  ]}>
-                    <View style={[
-                      styles.messageBubble,
-                      isMine ? styles.myBubble : styles.otherBubble,
-                      isDarkMode && !isMine && styles.darkOtherBubble
-                    ]}>
-                      <Text style={[
-                        styles.messageText,
-                        isMine ? styles.myMessageText : (isDarkMode ? styles.darkText : styles.otherMessageText)
-                      ]}>
-                        {item.message}
-                      </Text>
-                    </View>
-                    <Text style={styles.messageTime}>
-                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
-                );
-              }}
-            />
-
-            {/* 输入区域 */}
-            <View style={[styles.chatInputContainer, isDarkMode && styles.darkChatHeader]}>
-              <TextInput
-                style={[styles.chatInput, isDarkMode && styles.darkChatInput]}
-                placeholder={t.inputMessage}
-                placeholderTextColor={isDarkMode ? "#94a3b8" : "#9ca3af"}
-                value={inputText}
-                onChangeText={setInputText}
-                multiline
-              />
-              <TouchableOpacity 
-                disabled={!inputText.trim() || sendingMessage}
-                onPress={handleSendMessage}
-                style={[
-                  styles.sendBtn,
-                  !inputText.trim() && styles.sendBtnDisabled
-                ]}
-              >
-                {sendingMessage ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="send" size={20} color="#fff" />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {chatModal}
     </View>
   );
 }
@@ -1346,7 +1646,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: PAGE_BG,
   },
   header: {
     paddingTop: 60,
@@ -1833,7 +2133,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   myBubble: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: TEAL,
     borderBottomRightRadius: 4,
   },
   otherBubble: {
@@ -1893,7 +2193,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#3b82f6',
+    backgroundColor: TEAL,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1919,7 +2219,7 @@ const styles = StyleSheet.create({
   ongoingTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: NAVY,
     marginBottom: 12,
     paddingHorizontal: 4,
   },
@@ -1966,8 +2266,295 @@ const styles = StyleSheet.create({
   },
   ongoingTap: {
     fontSize: 10,
-    color: '#3b82f6',
+    color: TEAL,
     fontWeight: '600',
     marginTop: 4,
+  },
+});
+
+const ui = StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: PAGE_BG,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  navRowOverlay: {
+    zIndex: 8,
+  },
+  navBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  navTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '800',
+    color: NAVY,
+  },
+  supportBtn: {
+    width: 48,
+    alignItems: 'center',
+  },
+  supportLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: NAVY,
+    marginTop: 2,
+  },
+  browseSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
+    marginBottom: 14,
+  },
+  hero: {
+    height: MAP_HERO,
+    backgroundColor: '#d8eef1',
+    overflow: 'hidden',
+  },
+  heroScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  statusFloat: {
+    position: 'absolute',
+    left: 16,
+    bottom: 28,
+    maxWidth: width * 0.52,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
+    zIndex: 6,
+  },
+  statusHeadline: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: NAVY,
+    lineHeight: 24,
+  },
+  statusEta: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: '700',
+    color: TEAL,
+  },
+  riderPin: {
+    backgroundColor: '#fff',
+    padding: 4,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: TEAL,
+  },
+  sheet: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -18,
+    paddingTop: 16,
+    overflow: 'hidden',
+    zIndex: 6,
+  },
+  riderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  riderAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: TEAL,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  riderAvatarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  riderName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: NAVY,
+  },
+  riderMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  actionCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: TEAL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  actionCol: {
+    alignItems: 'center',
+    width: 56,
+  },
+  actionLabel: {
+    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  unreadDotText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  actionHint: {
+    paddingHorizontal: 20,
+    marginTop: 6,
+    marginBottom: 8,
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  tlRow: {
+    flexDirection: 'row',
+    minHeight: 44,
+  },
+  tlRail: {
+    width: 22,
+    alignItems: 'center',
+  },
+  tlDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tlDotDone: {
+    backgroundColor: TEAL,
+    borderColor: TEAL,
+  },
+  tlDotCurrent: {
+    borderColor: TEAL,
+    borderWidth: 3,
+    backgroundColor: '#fff',
+  },
+  tlLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 2,
+  },
+  tlLineDone: {
+    backgroundColor: TEAL,
+  },
+  tlBody: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingBottom: 16,
+    paddingLeft: 10,
+  },
+  tlLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  tlLabelCurrent: {
+    color: TEAL,
+  },
+  tlTime: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  miniCard: {
+    backgroundColor: PAGE_BG,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  miniCardTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  miniCardText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: NAVY,
+  },
+  miniCardMuted: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#64748b',
+  },
+  summaryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eef2f6',
+    gap: 10,
+  },
+  summaryThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#e8f5f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: NAVY,
+  },
+  summaryPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: NAVY,
   },
 });

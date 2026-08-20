@@ -1,26 +1,38 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LoggerService from './../services/LoggerService';
 import { profileTranslations } from './profile/profileTranslations';
-import { profileStyles as styles } from './profile/profileStyles';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, FlatList, ActivityIndicator, Image, Animated, PanResponder } from 'react-native';
+import { profileStyles as styles, meStyles as me } from './profile/profileStyles';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, ActivityIndicator, Image, Vibration } from 'react-native';
 import { Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { Vibration } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import * as MediaLibrary from 'expo-media-library';
-import { ensureSaveToLibraryPermission, pickImageFromLibrary } from '../utils/mediaAccess';
-import * as FileSystem from 'expo-file-system';
+import { ensureSaveToLibraryPermission, pickImageFromLibrary, takePhotoWithCamera } from '../utils/mediaAccess';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
-import { customerService, packageService, rechargeService, supabase, fetchRechargeQrUrlMap, getDefaultRechargeQrUrlMap } from '../services/supabase';
+import { customerService, packageService, rechargeService, addressService, supabase, fetchRechargeQrUrlMap, getDefaultRechargeQrUrlMap } from '../services/supabase';
+import { remoteImageUri } from '../services/clientApi/nativeSupabaseUrl';
+import { persistUserAvatarUrl, hydrateUserAvatarFromServer } from '../utils/userAvatar';
 import Toast from '../components/Toast';
-import BackToHomeButton from '../components/BackToHomeButton';
-import { theme } from '../config/theme';
-import Skeleton, { StatsCardSkeleton } from '../components/Skeleton';
 import { feedbackService } from '../services/FeedbackService';
+import { APP_CONFIG } from '../config/constants';
+import BrandRider from '../components/BrandRider';
+import MyOrdersBar from '../components/MyOrdersBar';
+import {
+  ProfileAvatar3D,
+  ClayCoupon,
+  ClayCoin,
+  ClayHeart,
+  ClayPin,
+  ClayHeadset,
+  ClayGlobe,
+  ClayInfo,
+} from '../components/ProfileClayIcons';
 import {
   checkAndroidAppUpdate,
   checkExpoOtaUpdateAvailable,
@@ -55,7 +67,8 @@ function formatUpdateMessage(template: string, vars: Record<string, string>): st
 
 export default function ProfileScreen({ navigation }: any) {
   const { language, setLanguage, isDarkMode, setIsDarkMode, isGuest, setIsGuest } = useApp();
-  const { showLoading, hideLoading } = useLoading(); // 🚀 新增：加载状态控制
+  const { showLoading, hideLoading } = useLoading();
+  const insets = useSafeAreaInsets();
   const appVersion = Constants.expoConfig?.version ?? '1.1.0';
   const buildVersion = getInstalledBuildVersion();
   const [refreshing, setRefreshing] = useState(false);
@@ -63,6 +76,9 @@ export default function ProfileScreen({ navigation }: any) {
   const [userName, setUserName] = useState<string>('访客用户');
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
+  const [avatarUri, setAvatarUri] = useState<string>('');
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [accountBalance, setAccountBalance] = useState<number>(0); // 🚀 新增：账户余额
   const [userType, setUserType] = useState<string>('customer');
   const [orderStats, setOrderStats] = useState({
@@ -70,8 +86,17 @@ export default function ProfileScreen({ navigation }: any) {
     pending: 0,
     inTransit: 0,
     delivered: 0,
+    pendingPay: 0,
+    pendingAccept: 0,
+    awaitingDelivery: 0,
+    delivering: 0,
+    afterSale: 0,
+    cancelled: 0,
+    deliveredIds: [] as string[],
   });
-  const [loadingStats, setLoadingStats] = useState(true);
+  const [toReviewCount, setToReviewCount] = useState(0);
+  const [addressCount, setAddressCount] = useState(0);
+  const [showSettingsSheet, setShowSettingsSheet] = useState(false);
 
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -264,6 +289,27 @@ export default function ProfileScreen({ navigation }: any) {
     loadNotificationSettings();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const currentUser = await AsyncStorage.getItem('currentUser');
+          if (!currentUser) return;
+          const user = JSON.parse(currentUser);
+          if (!user?.id || user.id === 'guest') return;
+          const addrs = await addressService.getAddresses(user.id);
+          if (!cancelled) setAddressCount(addrs.length);
+        } catch {
+          /* ignore */
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
+
   const loadUserData = async () => {
     try {
       const currentUser = await AsyncStorage.getItem('currentUser');
@@ -274,6 +320,23 @@ export default function ProfileScreen({ navigation }: any) {
         setUserName(t.guest);
         setUserEmail('');
         setUserPhone('');
+        setAvatarUri('');
+        setAccountBalance(0);
+        setAddressCount(0);
+        setToReviewCount(0);
+        setOrderStats({
+          total: 0,
+          pending: 0,
+          inTransit: 0,
+          delivered: 0,
+          pendingPay: 0,
+          pendingAccept: 0,
+          awaitingDelivery: 0,
+          delivering: 0,
+          afterSale: 0,
+          cancelled: 0,
+          deliveredIds: [],
+        });
         return;
       }
 
@@ -296,8 +359,11 @@ export default function ProfileScreen({ navigation }: any) {
         setUserName(t.guest);
         setUserEmail('');
         setUserPhone('');
+        setAvatarUri('');
         setAccountBalance(0);
         setUserType('customer');
+        setAddressCount(0);
+        setToReviewCount(0);
         navigation.replace('Login');
         return;
       }
@@ -309,6 +375,10 @@ export default function ProfileScreen({ navigation }: any) {
       setUserPhone(user.phone || '');
       setAccountBalance(user.balance || 0);
 
+      const cachedAvatar = await AsyncStorage.getItem(`userAvatarUrl_${user.id}`);
+      setAvatarUri(user.avatar_url || cachedAvatar || '');
+      setAvatarFailed(false);
+
       let finalUserType = detectedUserType;
       if (detectedUserType === 'customer' && (user.balance || 0) > 0) {
         finalUserType = 'vip';
@@ -319,7 +389,7 @@ export default function ProfileScreen({ navigation }: any) {
         try {
           const { data: latestRaw, error: userError } = await supabase
             .from('users')
-            .select('balance, user_type, name, phone, email')
+            .select('balance, user_type, name, phone, email, avatar_url')
             .eq('id', user.id)
             .limit(1)
             .maybeSingle();
@@ -342,7 +412,11 @@ export default function ProfileScreen({ navigation }: any) {
             const currentUserStr = await AsyncStorage.getItem('currentUser');
             if (currentUserStr) {
               const localUser = JSON.parse(currentUserStr);
-              const mergedUser = { ...localUser, ...latestRaw };
+              const mergedUser = {
+                ...localUser,
+                ...latestRaw,
+                avatar_url: latestRaw.avatar_url || localUser.avatar_url || '',
+              };
               await AsyncStorage.setItem('currentUser', JSON.stringify(mergedUser));
             }
           } else if (userError) {
@@ -352,15 +426,47 @@ export default function ProfileScreen({ navigation }: any) {
           console.warn('❌ 获取最新用户信息异常:', error);
         }
 
-        setLoadingStats(true);
+        try {
+          const remoteAvatar = await hydrateUserAvatarFromServer(user.id);
+          if (remoteAvatar) {
+            setAvatarUri(remoteAvatar);
+            setAvatarFailed(false);
+          }
+        } catch {
+          /* 沿用本地缓存 */
+        }
+
         const stats = await packageService.getOrderStats(
           user.id,
           user.email,
           user.phone,
           detectedUserType,
         );
-        setOrderStats(stats);
-        setLoadingStats(false);
+        setOrderStats({
+          total: stats.total,
+          pending: stats.pending,
+          inTransit: stats.inTransit,
+          delivered: stats.delivered,
+          pendingPay: stats.pendingPay || 0,
+          pendingAccept: stats.pendingAccept || 0,
+          awaitingDelivery: stats.awaitingDelivery || 0,
+          delivering: stats.delivering || 0,
+          afterSale: stats.afterSale || 0,
+          cancelled: stats.cancelled || 0,
+          deliveredIds: stats.deliveredIds || [],
+        });
+        try {
+          const [addrs, reviewRes] = await Promise.all([
+            addressService.getAddresses(user.id),
+            supabase.from('store_reviews').select('order_id').eq('user_id', user.id),
+          ]);
+          setAddressCount(addrs.length);
+          const reviewed = new Set((reviewRes.data || []).map((r: { order_id: string }) => r.order_id));
+          setToReviewCount((stats.deliveredIds || []).filter((id: string) => !reviewed.has(id)).length);
+        } catch {
+          setAddressCount(0);
+          setToReviewCount(stats.delivered || 0);
+        }
       }
     } catch (error) {
       LoggerService.error('加载用户数据失败:', error);
@@ -376,6 +482,110 @@ export default function ProfileScreen({ navigation }: any) {
   const handleLogin = () => {
     navigation.replace('Login');
   };
+
+  const persistAvatarLocal = async (uid: string, url: string | null) => {
+    await persistUserAvatarUrl(uid, url);
+  };
+
+  const applyAvatarFromPicker = async (uri: string) => {
+    if (!userId) return;
+    setAvatarUri(uri);
+    setUploadingAvatar(true);
+    try {
+      const uploaded = await customerService.uploadAvatar(userId, uri);
+      if (!uploaded) {
+        showToast(t.avatarUpdateFailed, 'error');
+        return;
+      }
+      setAvatarUri(`${uploaded}${uploaded.includes('?') ? '&' : '?'}v=${Date.now()}`);
+      setAvatarFailed(false);
+      await persistAvatarLocal(userId, uploaded);
+      const saved = await customerService.updateUser(userId, { avatar_url: uploaded }, userType);
+      if (!saved.success && saved.error?.code !== 'NO_AVATAR_COLUMN') {
+        LoggerService.warn('保存头像地址失败:', saved.error);
+      }
+      showToast(t.avatarUpdated, 'success');
+    } catch (error) {
+      LoggerService.error('更换头像失败:', error);
+      showToast(t.avatarUpdateFailed, 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!userId) return;
+    setAvatarUri('');
+    setAvatarFailed(false);
+    await persistAvatarLocal(userId, null);
+    await customerService.removeAvatar(userId);
+    showToast(t.avatarUpdated, 'success');
+  };
+
+  const pickAvatarOptions = {
+    mediaTypes: ['images'] as ['images'],
+    allowsEditing: true,
+    aspect: [1, 1] as [number, number],
+    quality: 0.7,
+  };
+
+  const handleChangeAvatar = () => {
+    if (isGuest) {
+      handleLogin();
+      return;
+    }
+    const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+      {
+        text: t.chooseFromAlbum,
+        onPress: async () => {
+          try {
+            const result = await pickImageFromLibrary(pickAvatarOptions);
+            if (result.canceled && result.assets === null) {
+              Alert.alert(t.changeAvatar, language === 'zh' ? '需要相册权限才能选择图片' : 'Photo library permission is required');
+              return;
+            }
+            const uri = result.assets?.[0]?.uri;
+            if (!result.canceled && uri) await applyAvatarFromPicker(uri);
+          } catch (error) {
+            LoggerService.error('选择头像失败:', error);
+            showToast(t.avatarUpdateFailed, 'error');
+          }
+        },
+      },
+      {
+        text: t.takePhoto,
+        onPress: async () => {
+          try {
+            const result = await takePhotoWithCamera(pickAvatarOptions);
+            if (result.canceled && result.assets === null) {
+              Alert.alert(t.changeAvatar, t.cameraPermission);
+              return;
+            }
+            const uri = result.assets?.[0]?.uri;
+            if (!result.canceled && uri) await applyAvatarFromPicker(uri);
+          } catch (error) {
+            LoggerService.error('拍摄头像失败:', error);
+            showToast(t.avatarUpdateFailed, 'error');
+          }
+        },
+      },
+    ];
+    if (avatarUri) {
+      buttons.push({
+        text: t.removeAvatar,
+        style: 'destructive',
+        onPress: () => void handleRemoveAvatar(),
+      });
+    }
+    buttons.push({ text: t.cancel, style: 'cancel' });
+    Alert.alert(t.changeAvatar, t.changeAvatarHint, buttons);
+  };
+
+  const displayAvatarUri = (() => {
+    if (!avatarUri || avatarFailed) return undefined;
+    if (avatarUri.startsWith('file://') || avatarUri.startsWith('content://')) return avatarUri;
+    return remoteImageUri(avatarUri);
+  })();
 
   const handleLogout = async () => {
     Alert.alert(
@@ -706,8 +916,10 @@ export default function ProfileScreen({ navigation }: any) {
         setShowRechargeModal(true);
         break;
       case 'coupons':
+      case 'points':
+      case 'favorites':
       case 'help':
-        showToast(language === 'zh' ? '即将推出' : 'Coming soon', 'info');
+        showToast(t.comingSoon, 'info');
         break;
       case 'notificationTest':
         navigation.navigate('NotificationWorkflow');
@@ -719,8 +931,50 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleLanguageChange = (lang: 'zh' | 'en' | 'my') => {
     setLanguage(lang);
-    showToast(`${translations[lang].language}: ${lang === 'zh' ? '中文' : lang === 'en' ? 'English' : 'မြန်မာ'}`, 'success');
   };
+
+  const requireLoginThen = (next?: () => void) => {
+    if (!isGuest) {
+      next?.();
+      return;
+    }
+    Alert.alert(t.pleaseLogin, '', [
+      { text: t.cancel, style: 'cancel' },
+      { text: t.confirm, onPress: handleLogin },
+    ]);
+  };
+
+  const openOrders = (filterStatus = 'all') => {
+    requireLoginThen(() => navigation.navigate('MyOrders', { filterStatus }));
+  };
+
+  const openCustomerService = () => {
+    const numbers = [
+      { display: '(+95) 09788848928', tel: '+959788848928' },
+      { display: '(+95) 09941118588', tel: '+959941118588' },
+      { display: '(+95) 09941118688', tel: '+959941118688' },
+    ];
+    Alert.alert(
+      language === 'zh' ? '选择拨打的客服热线' : language === 'en' ? 'Choose a hotline number' : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ',
+      APP_CONFIG.CONTACT.PHONE_DISPLAY,
+      [
+        ...numbers.map((n) => ({
+          text: n.display,
+          onPress: () => Linking.openURL(`tel:${n.tel}`),
+        })),
+        { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' as const },
+      ],
+    );
+  };
+
+  const memberBadgeLabel = () => {
+    if (accountBalance > 0 || userType === 'vip') return 'VIP';
+    if (userType === 'admin') return t.admin;
+    if (userType === 'courier') return t.courier;
+    return t.member;
+  };
+
+  const completedLine = (t.completedOrders || '已完成 {n} 单').replace('{n}', String(orderStats.delivered || 0));
 
   // 加载通知设置
   const loadNotificationSettings = async () => {
@@ -764,336 +1018,280 @@ export default function ProfileScreen({ navigation }: any) {
     });
   };
 
-  const renderUserCard = () => (
-    <LinearGradient
-      colors={theme.colors.gradients.blue as [string, string]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.userCard}
-    >
-      <View style={styles.userHeaderRow}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.userInfo}>
-          <View style={styles.userNameRow}>
-            <Text style={styles.userName} numberOfLines={1}>{userName}</Text>
-            {!isGuest && (
-              <View style={[
-                styles.userBadge,
-                (accountBalance > 0 || userType === 'vip') && styles.vipBadge,
-                userType === 'admin' && styles.adminBadge,
-                userType === 'courier' && styles.courierBadge,
-                (!userType || userType === 'customer' || userType === 'member') && !(accountBalance > 0 || userType === 'vip') && styles.memberBadge
-              ]}>
-                <Text style={[
-                  styles.userBadgeText,
-                  (accountBalance > 0 || userType === 'vip') && styles.vipBadgeText,
-                  userType === 'admin' && styles.adminBadgeText,
-                  userType === 'courier' && styles.courierBadgeText,
-                  (!userType || userType === 'customer' || userType === 'member') && styles.memberBadgeText
-                ]}>
-                  {(accountBalance > 0 || userType === 'vip') ? 'VIP' : (
-                    userType === 'admin' ? t.admin : (userType === 'courier' ? t.courier : 'MEMBER')
-                  )}
-                </Text>
-              </View>
-            )}
-          </View>
-          
-          {isGuest ? (
-            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-              <Text style={styles.loginButtonText}>{t.login}</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.contactInfoContainer}>
-              <View style={styles.contactRow}>
-                <Ionicons name="call-outline" size={16} color="rgba(255,255,255,0.9)" />
-                <Text style={styles.userContact}>{userPhone || '未绑定电话'}</Text>
-              </View>
-              <View style={styles.contactRow}>
-                <Ionicons name="mail-outline" size={16} color="rgba(255,255,255,0.9)" />
-                <Text style={styles.userContact}>{userEmail || '未绑定邮箱'}</Text>
-              </View>
-              {!isGuest && (
-                <View style={[styles.contactRow, { marginTop: 4, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }]}>
-                  <Ionicons name="wallet-outline" size={16} color="#fbbf24" />
-                  <Text style={[styles.userContact, { color: '#fbbf24', fontWeight: 'bold' }]}>
-                    {language === 'zh' ? '账户余额' : 'Balance'}: {formatMoney(accountBalance)} MMK
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
+  const renderMePage = () => {
+    const statItems = [
+      { key: 'coupons', label: t.coupons, value: 0, icon: <ClayCoupon size={32} />, action: 'coupons' },
+      { key: 'points', label: t.points, value: 0, icon: <ClayCoin size={32} />, action: 'points' },
+      { key: 'favorites', label: t.favorites, value: 0, icon: <ClayHeart size={32} />, action: 'favorites' },
+      { key: 'addresses', label: t.addresses, value: addressCount, icon: <ClayPin size={32} />, action: 'address' },
+    ];
 
-        {!isGuest && (
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-            <Ionicons name="create-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        )}
-      </View>
-    </LinearGradient>
-  );
-
-  const renderOrderStats = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t.orderStats}</Text>
-      <View style={styles.statsGrid}>
-        {loadingStats ? (
-          <>
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-          </>
-        ) : (
-          [
-            { label: t.totalOrders, value: orderStats.total, color: '#3b82f6', icon: '📦' },
-            { label: t.pendingOrders, value: orderStats.pending, color: '#f59e0b', icon: '⏳' },
-            { label: t.inTransitOrders, value: orderStats.inTransit, color: '#8b5cf6', icon: '🚚' },
-            { label: t.deliveredOrders, value: orderStats.delivered, color: '#10b981', icon: '✅' },
-          ].map((stat, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.statCard}
-              onPress={() => navigation.navigate('MyOrders')}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[stat.color, `${stat.color}dd`]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.statGradient}
-              >
-                <View style={styles.statContent}>
-                  <Text style={stat.icon === '📦' ? styles.statIcon : styles.statIconSmall}>{stat.icon}</Text>
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
-    </View>
-  );
-
-  const renderQuickActions = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t.quickActions}</Text>
-      <View style={styles.actionGrid}>
-        {[
-          { label: t.myProfile, icon: '👤', action: 'profile', color: '#3b82f6' },
-          { label: t.addressManagement, icon: '📍', action: 'address', color: '#f59e0b' },
-          { label: '通知中心', icon: '🔔', action: 'notifications', color: '#8b5cf6' },
-          { label: t.recharge, icon: '💰', action: 'recharge', color: '#10b981' }, // 🚀 新增：充值按钮
-        ].map((action, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.actionCard}
-            onPress={() => handleQuickAction(action.action)}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: `${action.color}20` }]}>
-              <Text style={styles.actionIconText}>{action.icon}</Text>
-            </View>
-            <Text style={styles.actionLabel}>{action.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-  const renderSettings = () => (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>{t.settings}</Text>
-      <View style={[styles.settingsList, isDarkMode && styles.darkSettingsList]}>
-        {/* 语言设置 */}
-        <TouchableOpacity style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}>
-          <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>🌐</Text>
-            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.language}</Text>
-          </View>
-          <View style={styles.languageButtons}>
-            {[
-              { code: 'zh', label: '中' },
-              { code: 'en', label: 'EN' },
-              { code: 'my', label: 'မြန်' },
-            ].map((lang) => (
-              <TouchableOpacity
-                key={lang.code}
-                style={[
-                  styles.languageButton,
-                  language === lang.code && styles.languageButtonActive
-                ]}
-                onPress={() => handleLanguageChange(lang.code as 'zh' | 'en' | 'my')}
-              >
-                <Text style={[
-                  styles.languageButtonText,
-                  language === lang.code && styles.languageButtonTextActive
-                ]}>
-                  {lang.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-
-        {/* 🚀 深色模式切换 */}
-        <View style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}>
-          <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>{isDarkMode ? '🌙' : '☀️'}</Text>
-            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{language === 'zh' ? '深色模式' : 'Dark Mode'}</Text>
-          </View>
-          <Switch
-            value={isDarkMode}
-            onValueChange={setIsDarkMode}
-            trackColor={{ false: '#cbd5e1', true: '#1e3a8a' }}
-            thumbColor={isDarkMode ? '#3b82f6' : '#f4f3f4'}
+    return (
+      <>
+        <View style={[me.hero, { paddingTop: insets.top + 6 }]}>
+          <LinearGradient
+            colors={['#B6DFFB', '#D7F1F5', '#EAF7F6']}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={StyleSheet.absoluteFill}
           />
+          <View style={me.topBar}>
+            <View style={{ width: 40 }} />
+            <TouchableOpacity
+              style={me.gearBtn}
+              onPress={() => setShowSettingsSheet(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="settings-outline" size={20} color="#176978" />
+            </TouchableOpacity>
+          </View>
+          <View style={me.brandRow}>
+            <View style={me.brandLeft}>
+              <Image
+                source={require('../../assets/login-logo.png')}
+                style={me.logoImg}
+                resizeMode="contain"
+              />
+              <View style={me.wordmark}>
+                <Text style={me.brandKicker}>MARKET LINK</Text>
+                <View style={me.brandHairline} />
+                <Text style={me.brandSub}>EXPRESS</Text>
+              </View>
+            </View>
+            <BrandRider width={Math.round(Math.min(136, width * 0.34))} />
+          </View>
         </View>
 
-        {/* 消息中心 */}
-        <TouchableOpacity 
-          style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
-          onPress={() => navigation.navigate('NotificationCenter')}
-        >
-          <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>📩</Text>
-            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.title === '账户' ? '消息中心' : t.title === 'Profile' ? 'Notification Center' : 'အသိပေးချက်ဗဟို'}</Text>
+        <View style={me.profileCard}>
+          <View style={me.identity}>
+            <TouchableOpacity
+              style={me.avatarHit}
+              onPress={handleChangeAvatar}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={isGuest ? t.tapToLogin : t.changeAvatar}
+            >
+              <View style={me.avatarRing}>
+                {displayAvatarUri ? (
+                  <Image
+                    source={{ uri: displayAvatarUri }}
+                    style={me.avatarImage}
+                    onError={() => setAvatarFailed(true)}
+                  />
+                ) : (
+                  <ProfileAvatar3D size={64} />
+                )}
+                {uploadingAvatar ? (
+                  <View style={me.avatarLoading}>
+                    <ActivityIndicator color="#fff" size="small" />
+                  </View>
+                ) : null}
+              </View>
+              <View style={me.avatarCamBadge}>
+                <Ionicons name="camera" size={12} color="#fff" />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              onPress={() => (isGuest ? handleLogin() : handleEditProfile())}
+              activeOpacity={0.86}
+            >
+              <View style={me.nameRow}>
+                <Text style={me.userName} numberOfLines={1}>{userName}</Text>
+                {!isGuest ? (
+                  <View style={me.memberPill}>
+                    <Text style={me.memberPillText}>{memberBadgeLabel()}</Text>
+                  </View>
+                ) : null}
+              </View>
+              {isGuest ? (
+                <Text style={me.subLine}>{t.tapToLogin}</Text>
+              ) : (
+                <Text style={me.subLine}>{completedLine}</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => (isGuest ? handleLogin() : handleEditProfile())}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-forward" size={18} color="#C5D0DA" />
+            </TouchableOpacity>
           </View>
-          <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
-        </TouchableOpacity>
+          {!isGuest ? (
+            <TouchableOpacity
+              style={me.walletBar}
+              onPress={() => handleQuickAction('recharge')}
+              activeOpacity={0.88}
+            >
+              <View style={me.walletIcon}>
+                <Ionicons name="wallet" size={16} color="#fff" />
+              </View>
+              <Text style={me.walletLabel}>{t.walletBalance}</Text>
+              <Text style={me.walletValue}>{formatMoney(accountBalance)} MMK</Text>
+              <Text style={me.walletCta}>{t.goRecharge}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-        {/* 通知设置 */}
-        <TouchableOpacity 
-          style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
-          onPress={openNotificationSettings}
-        >
-          <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>🔔</Text>
-            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.notifications}</Text>
-          </View>
-          <View style={styles.settingRight}>
-            <View style={[
-              styles.notificationToggle,
-              { backgroundColor: notificationSettings.pushNotifications ? '#10b981' : '#d1d5db' }
-            ]}>
-              <Text style={styles.notificationToggleText}>
-                {notificationSettings.pushNotifications ? 'ON' : 'OFF'}
-              </Text>
-            </View>
-            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
-          </View>
-        </TouchableOpacity>
+        <View style={me.statCard}>
+          {statItems.map((item, index) => (
+            <TouchableOpacity
+              key={item.key}
+              style={[me.statCell, index > 0 && me.statCellBorder]}
+              activeOpacity={0.85}
+              onPress={() => handleQuickAction(item.action)}
+            >
+              <View style={me.statIconWell}>{item.icon}</View>
+              <Text style={me.statValue}>{formatMoney(item.value)}</Text>
+              <Text style={me.statLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        {/* 关于我们 */}
-        <TouchableOpacity 
-          style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
-          onPress={() => setShowAboutModal(true)}
-        >
-          <View style={styles.settingLeft}>
-            <Text style={styles.settingIcon}>ℹ️</Text>
-            <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.aboutUs}</Text>
-          </View>
-          <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
-        </TouchableOpacity>
+        <MyOrdersBar
+          counts={{
+            accept: orderStats.pendingAccept + orderStats.pendingPay,
+            pickup: Math.max(0, orderStats.awaitingDelivery - orderStats.pendingAccept),
+            ship: orderStats.delivering,
+            done: orderStats.delivered,
+            cancel: orderStats.cancelled,
+          }}
+          onPressAll={() => openOrders('all')}
+          onPressItem={(_key, filter) => openOrders(filter)}
+        />
 
-        {/* 修改密码 */}
-        {!isGuest && (
-          <TouchableOpacity 
-            style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
-            onPress={() => setShowPasswordModal(true)}
-          >
-            <View style={styles.settingLeft}>
-              <Text style={styles.settingIcon}>🔒</Text>
-              <Text style={[styles.settingLabel, isDarkMode && styles.darkText]}>{t.changePassword}</Text>
-            </View>
-            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
+        <View style={me.menuCard}>
+          <TouchableOpacity style={me.menuRow} onPress={() => handleQuickAction('address')}>
+            <View style={me.menuIcon}><ClayPin size={26} /></View>
+            <Text style={me.menuLabel}>{t.shippingAddress}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
-        )}
-
-        {/* 注销账号 */}
-        {!isGuest && (
-          <TouchableOpacity 
-            style={[styles.settingItem, isDarkMode && styles.darkSettingItem]}
-            onPress={handleDeleteAccount}
-          >
-            <View style={styles.settingLeft}>
-              <Text style={[styles.settingIcon, { color: theme.colors.error.DEFAULT }]}>🗑️</Text>
-              <Text style={[styles.settingLabel, { color: theme.colors.error.DEFAULT }]}>{t.deleteAccount}</Text>
+          <View style={me.menuDivider} />
+          <View style={me.menuRow}>
+            <View style={me.menuIcon}><ClayGlobe size={26} /></View>
+            <Text style={me.menuLabel}>{t.languageSettings}</Text>
+            <View style={me.langSeg}>
+              {([
+                { code: 'zh' as const, label: '中文' },
+                { code: 'en' as const, label: 'EN' },
+                { code: 'my' as const, label: 'မြန်မာ' },
+              ]).map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[me.langChip, language === lang.code && me.langChipOn]}
+                  onPress={() => handleLanguageChange(lang.code)}
+                >
+                  <Text style={[me.langChipText, language === lang.code && me.langChipTextOn]}>{lang.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            <Text style={[styles.settingArrow, isDarkMode && styles.darkText]}>›</Text>
+          </View>
+          <View style={me.menuDivider} />
+          <TouchableOpacity style={me.menuRow} onPress={openCustomerService}>
+            <View style={me.menuIcon}><ClayHeadset size={26} /></View>
+            <Text style={me.menuLabel}>{t.customerService}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
+          <View style={me.menuDivider} />
+          <TouchableOpacity style={[me.menuRow, { paddingBottom: 4 }]} onPress={() => setShowAboutModal(true)}>
+            <View style={me.menuIcon}><ClayInfo size={26} /></View>
+            <Text style={me.menuLabel}>{t.aboutBrand}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
+          </TouchableOpacity>
+        </View>
+      </>
+    );
+  };
 
   return (
-    <View style={[styles.container, isDarkMode && styles.darkContainer]}>
+    <View style={me.container}>
       <LinearGradient
-        colors={isDarkMode ? ['#0f172a', '#1e293b', '#0f172a'] : ['#1e3a8a', '#2563eb', '#f8fafc']}
+        colors={['#B6DFFB', '#E7F5F7', '#F3F5F7']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 0.4 }}
+        end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {/* 背景装饰性圆圈 */}
-      <View style={{
-        position: 'absolute',
-        top: -100,
-        right: -100,
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        zIndex: 0
-      }} />
-      <View style={{
-        position: 'absolute',
-        top: 150,
-        left: -50,
-        width: 150,
-        height: 150,
-        borderRadius: 75,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        zIndex: 0
-      }} />
-
-      <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
-        <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
-        <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
-      </View>
 
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        style={me.scroll}
+        contentContainerStyle={me.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} tintColor={isDarkMode ? '#ffffff' : '#3b82f6'} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2C98A6']} tintColor="#2C98A6" />
         }
       >
-        {renderUserCard()}
-        {!isGuest && renderOrderStats()}
-        {renderQuickActions()}
-        {renderSettings()}
-
-        {!isGuest && (
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>🚪 {t.logout}</Text>
-          </TouchableOpacity>
-        )}
-
-        <View style={styles.footer}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Text style={styles.footerText}>MARKET LINK EXPRESS</Text>
-            <Text style={[styles.footerText, { fontStyle: 'italic', marginLeft: 8, fontSize: 10 }]}>Delivery Service</Text>
-          </View>
-          <Text style={styles.footerVersion}>v{appVersion}</Text>
-        </View>
+        {renderMePage()}
       </ScrollView>
+
+      <Modal
+        visible={showSettingsSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSettingsSheet(false)}
+      >
+        <View style={me.sheetOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowSettingsSheet(false)} />
+          <View style={[me.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={me.sheetHandle} />
+            <Text style={me.sheetTitle}>{t.extraSettings}</Text>
+            {!isGuest ? (
+              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); handleEditProfile(); }}>
+                <Ionicons name="person-circle-outline" size={22} color="#2C98A6" />
+                <Text style={me.sheetRowText}>{t.editProfile}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); handleLogin(); }}>
+                <Ionicons name="log-in-outline" size={22} color="#2C98A6" />
+                <Text style={me.sheetRowText}>{t.login}</Text>
+              </TouchableOpacity>
+            )}
+            {!isGuest ? (
+              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); setShowRechargeModal(true); }}>
+                <Ionicons name="wallet-outline" size={22} color="#2C98A6" />
+                <Text style={me.sheetRowText}>{t.recharge}</Text>
+                <Text style={me.sheetMeta}>{formatMoney(accountBalance)} MMK</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); navigation.navigate('NotificationCenter'); }}>
+              <Ionicons name="notifications-outline" size={22} color="#2C98A6" />
+              <Text style={me.sheetRowText}>{language === 'zh' ? '消息中心' : language === 'en' ? 'Inbox' : 'အသိပေးချက်'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); openNotificationSettings(); }}>
+              <Ionicons name="settings-outline" size={22} color="#2C98A6" />
+              <Text style={me.sheetRowText}>{t.notifications}</Text>
+            </TouchableOpacity>
+            <View style={me.sheetRow}>
+              <Ionicons name={isDarkMode ? 'moon' : 'sunny-outline'} size={22} color="#2C98A6" />
+              <Text style={me.sheetRowText}>{language === 'zh' ? '深色模式' : 'Dark Mode'}</Text>
+              <Switch
+                value={isDarkMode}
+                onValueChange={setIsDarkMode}
+                trackColor={{ false: '#cbd5e1', true: '#2C98A6' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+            {!isGuest ? (
+              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); setShowPasswordModal(true); }}>
+                <Ionicons name="lock-closed-outline" size={22} color="#2C98A6" />
+                <Text style={me.sheetRowText}>{t.changePassword}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {!isGuest ? (
+              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); handleLogout(); }}>
+                <Ionicons name="log-out-outline" size={22} color="#ef4444" />
+                <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.logout}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {!isGuest ? (
+              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); handleDeleteAccount(); }}>
+                <Ionicons name="trash-outline" size={22} color="#ef4444" />
+                <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.deleteAccount}</Text>
+              </TouchableOpacity>
+            ) : null}
+            <Text style={me.sheetVer}>v{appVersion}</Text>
+          </View>
+        </View>
+      </Modal>
 
       {/* 编辑资料模态框 */}
       <Modal
@@ -1122,6 +1320,31 @@ export default function ProfileScreen({ navigation }: any) {
             </LinearGradient>
 
             <ScrollView style={{ padding: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <TouchableOpacity
+                style={{ alignItems: 'center', marginBottom: 20 }}
+                onPress={handleChangeAvatar}
+                activeOpacity={0.85}
+              >
+                <View style={[me.avatarRing, { width: 84, height: 84, borderRadius: 42 }]}>
+                  {displayAvatarUri ? (
+                    <Image
+                      source={{ uri: displayAvatarUri }}
+                      style={{ width: 84, height: 84 }}
+                      onError={() => setAvatarFailed(true)}
+                    />
+                  ) : (
+                    <ProfileAvatar3D size={84} />
+                  )}
+                  {uploadingAvatar ? (
+                    <View style={me.avatarLoading}>
+                      <ActivityIndicator color="#fff" size="small" />
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '700', color: '#2C98A6' }}>
+                  {t.changeAvatar}
+                </Text>
+              </TouchableOpacity>
               <View style={{ gap: 20, marginBottom: 24 }}>
                 <View>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '姓名 / 店名' : 'Full Name'}</Text>

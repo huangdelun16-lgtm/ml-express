@@ -15,6 +15,7 @@ import {
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
 import '../styles/merchantProductsPage.css';
 import { feedbackService } from '../services/FeedbackService';
+import StorageImg from '../components/StorageImg';
 
 const StoreProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -308,13 +309,15 @@ const StoreProductsPage: React.FC = () => {
           {products.map((product) => (
             <article key={product.id} className="merchant-product-card">
               <div className="merchant-product-card__media">
-                {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} loading="lazy" />
-                ) : (
-                  <span className="merchant-product-card__placeholder" aria-hidden>
-                    📦
-                  </span>
-                )}
+                <StorageImg
+                  src={product.image_url}
+                  alt={product.name}
+                  fallback={
+                    <span className="merchant-product-card__placeholder" aria-hidden>
+                      📦
+                    </span>
+                  }
+                />
                 <button
                   type="button"
                   className={`merchant-product-card__badge ${
@@ -452,7 +455,7 @@ const StoreProductsPage: React.FC = () => {
                 tabIndex={0}
               >
                 {productForm.image_url ? (
-                  <img src={productForm.image_url} alt="" />
+                  <StorageImg src={productForm.image_url} alt="" />
                 ) : (
                   <>
                     <span style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }} aria-hidden>
@@ -529,7 +532,7 @@ const StoreProductsPage: React.FC = () => {
                     <div className="merchant-product-modal__detail-scroll">
                       {productForm.detail_image_urls.map((url, idx) => (
                         <div key={`${url}-${idx}`} className="merchant-product-modal__detail-thumb">
-                          <img src={url} alt="" />
+                          <StorageImg src={url} alt="" />
                           <button
                             type="button"
                             className="merchant-product-modal__detail-remove"

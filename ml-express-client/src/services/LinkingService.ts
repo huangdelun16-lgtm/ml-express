@@ -23,7 +23,7 @@ class LinkingService {
     const { path, queryParams } = Linking.parse(url);
     
     if (path === 'order' && queryParams?.id) {
-      this.navigationRef.navigate('TrackOrder', { orderId: queryParams.id });
+      this.navigationRef.navigate('Main', { screen: 'TrackOrder', params: { orderId: queryParams.id } });
     }
   }
 }

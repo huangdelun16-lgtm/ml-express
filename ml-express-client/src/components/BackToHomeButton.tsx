@@ -27,7 +27,7 @@ export default function BackToHomeButton({ navigation, position = 'topRight', st
   const currentT = t[language] || t.zh;
 
   const handleBackToHome = () => {
-    navigation.navigate('Main');
+    navigation.navigate('Main', { screen: 'Home' });
   };
 
   const getPositionStyle = () => {

@@ -158,12 +158,12 @@ const MapModal = memo<MapModalProps>(({
               paddingVertical: 8,
               borderRadius: 8,
               borderWidth: 1,
-              borderColor: '#3b82f6',
+              borderColor: '#2C98A6',
             }}
           >
             <Text style={{
               fontSize: 14,
-              color: '#3b82f6',
+              color: '#2C98A6',
               fontWeight: '600',
             }}>
               📍 {currentT.useCurrentLocation}

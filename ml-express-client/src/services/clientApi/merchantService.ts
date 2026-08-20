@@ -1,6 +1,17 @@
 import { supabase } from './supabaseClient';
 import LoggerService from '../LoggerService';
 import type { Product, ProductCategory } from './types';
+import { rewritePublicStorageUrl } from './nativeSupabaseUrl';
+
+function withPublicImages<T extends { image_url?: string; detail_image_urls?: string[] }>(row: T): T {
+  return {
+    ...row,
+    image_url: row.image_url ? rewritePublicStorageUrl(row.image_url) : row.image_url,
+    detail_image_urls: Array.isArray(row.detail_image_urls)
+      ? row.detail_image_urls.map((url) => rewritePublicStorageUrl(url))
+      : row.detail_image_urls,
+  };
+}
 
 export const merchantService = {
   /** 客户侧同城商品：仅 Admin 已通过且在售（与 client-web 一致） */
@@ -15,7 +26,7 @@ export const merchantService = {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map((row) => withPublicImages(row as Product));
     } catch (error) {
       LoggerService.error('获取公开商店商品失败:', error);
       return [];
@@ -60,12 +71,14 @@ export const merchantService = {
         .limit(20);
 
       if (error) throw error;
-      return (data || []).filter((row) => {
-        const store = row.delivery_stores as { store_type?: string; mall_visible?: boolean } | null;
-        if (!store) return false;
-        if (store.mall_visible === false) return false;
-        return store.store_type !== 'transit_station';
-      });
+      return (data || [])
+        .filter((row) => {
+          const store = row.delivery_stores as { store_type?: string; mall_visible?: boolean } | null;
+          if (!store) return false;
+          if (store.mall_visible === false) return false;
+          return store.store_type !== 'transit_station';
+        })
+        .map((row) => withPublicImages(row));
     } catch (error) {
       LoggerService.error('搜索商品失败:', error);
       return [];

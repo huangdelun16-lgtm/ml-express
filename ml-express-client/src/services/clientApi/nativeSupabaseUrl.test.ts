@@ -3,6 +3,7 @@ import {
   NATIVE_SB_PROXY_URL,
   applyRealtimeWsFallback,
   nativeClientHeaders,
+  remoteImageUri,
   resolveNativeSupabaseUrl,
   rewritePublicStorageUrl,
 } from './nativeSupabaseUrl';
@@ -11,13 +12,29 @@ const UPSTREAM = 'https://' + 'uopkyuluxnrewvlmutam' + '.supabase.co';
 const PROXY_HOST = 'market-link-express.com';
 
 describe('resolveNativeSupabaseUrl', () => {
-  it('dev keeps env supabase.co and custom URLs', () => {
-    expect(resolveNativeSupabaseUrl(UPSTREAM, true)).toBe(UPSTREAM);
+  it('dev remaps supabase.co to /__sb (Myanmar cannot reach origin)', () => {
+    expect(resolveNativeSupabaseUrl(UPSTREAM, true)).toBe(NATIVE_SB_PROXY_URL);
     expect(resolveNativeSupabaseUrl('https://sb.example.com', true)).toBe('https://sb.example.com');
   });
 
-  it('dev empty stays empty (caller uses placeholder)', () => {
-    expect(resolveNativeSupabaseUrl('', true)).toBe('');
+  it('allowDirect keeps supabase.co in local VPN debugging', () => {
+    expect(resolveNativeSupabaseUrl(UPSTREAM, true, { allowDirect: true })).toBe(UPSTREAM);
+  });
+
+  it('dev keeps trailing slash when env already points at /__sb', () => {
+    expect(resolveNativeSupabaseUrl('https://market-link-express.com/__sb/', true)).toBe(
+      'https://market-link-express.com/__sb/',
+    );
+  });
+
+  it('Expo Go always uses /__sb even if env is supabase.co', () => {
+    expect(resolveNativeSupabaseUrl(UPSTREAM, true, { expoGo: true })).toBe(NATIVE_SB_PROXY_URL);
+    expect(new URL('rest/v1', resolveNativeSupabaseUrl(UPSTREAM, true, { expoGo: true })).href).toBe(
+      'https://' + PROXY_HOST + '/__sb/rest/v1',
+    );
+    expect(resolveNativeSupabaseUrl(UPSTREAM, true, { expoGo: true, allowDirect: true })).toBe(
+      NATIVE_SB_PROXY_URL,
+    );
   });
 
   it('release remaps any configured URL to absolute /__sb/ with trailing slash', () => {
@@ -67,5 +84,31 @@ describe('rewritePublicStorageUrl', () => {
         'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/product_images/x.jpg',
       ),
     ).toBe('https://market-link-express.com/__sb/storage/v1/object/public/product_images/x.jpg');
+  });
+
+  it('rewrites http supabase.co storage URLs', () => {
+    expect(
+      rewritePublicStorageUrl(
+        'http://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/product_images/x.jpg',
+      ),
+    ).toBe('https://market-link-express.com/__sb/storage/v1/object/public/product_images/x.jpg');
+  });
+
+  it('rewrites merchant /__sb storage URLs onto the customer proxy', () => {
+    expect(
+      rewritePublicStorageUrl(
+        'https://mlexpress-merchants.com/__sb/storage/v1/object/public/product_images/x.jpg',
+      ),
+    ).toBe('https://market-link-express.com/__sb/storage/v1/object/public/product_images/x.jpg');
+  });
+});
+
+describe('remoteImageUri', () => {
+  it('rewrites supabase.co and drops local file URIs', () => {
+    expect(
+      remoteImageUri('https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/product_images/x.jpg'),
+    ).toBe('https://market-link-express.com/__sb/storage/v1/object/public/product_images/x.jpg');
+    expect(remoteImageUri('file:///tmp/x.jpg')).toBeUndefined();
+    expect(remoteImageUri('')).toBeUndefined();
   });
 });

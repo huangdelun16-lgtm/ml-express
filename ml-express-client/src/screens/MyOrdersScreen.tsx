@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, RefreshControl, Dimensions, Alert, ActivityIndicator, DeviceEventEmitter, Image, Vibration, Animated, Modal, TextInput, Platform, ListRenderItem } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity, RefreshControl, Dimensions, Alert, ActivityIndicator, DeviceEventEmitter, Image, Vibration, Modal, TextInput, Platform, ListRenderItem, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,12 +8,19 @@ import { packageService, supabase, reviewService } from '../services/supabase';
 import { chatService } from '../services/chatService';
 import LoggerService from '../services/LoggerService';
 import { useApp } from '../contexts/AppContext';
-import BackToHomeButton from '../components/BackToHomeButton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorService } from '../services/ErrorService';
 import { feedbackService } from '../services/FeedbackService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
 import { useFocusEffect } from '@react-navigation/native';
+import { ProfileAvatar3D } from '../components/ProfileClayIcons';
+import {
+  avatarDisplayUri,
+  hydrateUserAvatarFromServer,
+  loadUserAvatarUrl,
+  USER_AVATAR_UPDATED,
+} from '../utils/userAvatar';
 import {
   getDismissedReviewOrderIds,
   addDismissedReviewOrderId,
@@ -21,6 +28,10 @@ import {
 } from '../utils/reviewPromptStorage';
 
 const { width } = Dimensions.get('window');
+const TEAL = '#2C98A6';
+const NAVY = '#1A2B48';
+const MUTED = '#8A94A6';
+const PAGE_BG = '#F5F7FA';
 
 interface Order {
   id: string;
@@ -53,6 +64,7 @@ interface Order {
 
 export default function MyOrdersScreen({ navigation, route }: any) {
   const { language } = useApp();
+  const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   // 从路由参数中获取筛选状态，默认为'all'
@@ -60,6 +72,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
+  const [avatarUri, setAvatarUri] = useState('');
   
   // 筛选卡片的位置记录
   const filterCardPositions = useRef<{[key: string]: number}>({});
@@ -91,39 +104,22 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const chatSubscriptionRef = useRef<any>(null);
 
-  // 🚀 新增：呼吸灯动画状态
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-
-  // 🚀 启动呼吸灯动画
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 1200,
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, []);
-
   // 翻译
   const translations: any = {
     zh: {
       title: '我的订单',
       all: '全部',
+      waitingAccept: '待接单',
+      packing: '打包中',
       pending: '待取件',
       pickedUp: '已取件',
       inTransit: '配送中',
       delivered: '已送达',
+      completed: '已完成',
       cancelled: '已取消',
+      pendingPay: '待收款',
+      unassigned: '待分配',
+      orderCount: '全部 {n} 个订单',
       noOrders: '暂无订单',
       noOrdersDesc: '快来下单吧！',
       sender: '寄件人',
@@ -147,11 +143,17 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     en: {
       title: 'My Orders',
       all: 'All',
-      pending: 'Pending',
+      waitingAccept: 'To accept',
+      packing: 'Packing',
+      pending: 'Pickup',
       pickedUp: 'Picked Up',
-      inTransit: 'In Transit',
+      inTransit: 'Delivering',
       delivered: 'Delivered',
+      completed: 'Completed',
       cancelled: 'Cancelled',
+      pendingPay: 'Unpaid',
+      unassigned: 'Unassigned',
+      orderCount: '{n} orders in total',
       noOrders: 'No Orders',
       noOrdersDesc: 'Place your first order now!',
       sender: 'Sender',
@@ -175,11 +177,17 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     my: {
       title: 'ကျွန်ုပ်၏ အော်ဒါများ',
       all: 'အားလုံး',
-      pending: 'စောင့်ဆိုင်းဆဲ',
+      waitingAccept: 'လက်ခံရန်',
+      packing: 'ထုပ်ပိုးနေ',
+      pending: 'ထုပ်ယူရန်',
       pickedUp: 'ထုပ်ယူပြီး',
       inTransit: 'ပို့ဆောင်နေသည်',
       delivered: 'ပို့ဆောင်ပြီး',
+      completed: 'ပြီးပါပြီ',
       cancelled: 'ပယ်ဖျက်ပြီး',
+      pendingPay: 'ငွေကောက်ရန်',
+      unassigned: 'ခွဲမပေးရသေး',
+      orderCount: 'အော်ဒါ {n} ခု',
       noOrders: 'အော်ဒါမရှိပါ',
       noOrdersDesc: 'အော်ဒါတင်ပါ!',
       sender: 'ပို့သူ',
@@ -229,16 +237,15 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     else feedbackService.info(message);
   };
 
-  // 状态过滤器
+  // 状态过滤器（筛选 key 与「我的」页跳转、后端状态一致）
   const statusFilters = [
-    { key: 'all', label: t.all, color: '#6b7280' },
-    { key: '待确认', label: language === 'zh' ? '待接单' : 'Pending', color: '#f97316' },
-    { key: '打包中', label: language === 'zh' ? '打包中' : 'Packing', color: '#10b981' },
-    { key: '待取件', label: t.pending, color: '#f59e0b' },
-    { key: '已取件', label: t.pickedUp, color: '#3b82f6' },
-    { key: '配送中', label: t.inTransit, color: '#8b5cf6' },
-    { key: '已送达', label: t.delivered, color: '#10b981' },
-    { key: '已取消', label: t.cancelled, color: '#ef4444' },
+    { key: 'all', label: t.all },
+    { key: '待确认', label: t.waitingAccept },
+    { key: '打包中', label: t.packing },
+    { key: '待取件', label: t.pending },
+    { key: '配送中', label: t.inTransit },
+    { key: '已送达', label: t.completed },
+    { key: '已取消', label: t.cancelled },
   ];
 
   // 加载用户ID
@@ -286,6 +293,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   /** 有未评价的已送达/已完成单时，进入页面后自动弹评价（关闭=不再自动打扰，仍可从列表手动点「评价」） */
   useFocusEffect(
     useCallback(() => {
+      void loadUserAvatarUrl(customerId).then((url) => {
+        if (customerId && customerId !== 'guest') setAvatarUri(url);
+      });
       if (loading || !customerId) {
         return () => {};
       }
@@ -310,6 +320,15 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       return () => clearTimeout(t);
     }, [customerId, loading])
   );
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(USER_AVATAR_UPDATED, (payload: { userId?: string; url?: string }) => {
+      if (!payload) return;
+      if (payload.userId && customerId && payload.userId !== customerId) return;
+      setAvatarUri(payload.url || '');
+    });
+    return () => sub.remove();
+  }, [customerId]);
 
   // 打开评价弹窗时解析店铺名（delivery_stores）
   useEffect(() => {
@@ -397,6 +416,13 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       if (userData) {
         const user = JSON.parse(userData);
         setCustomerId(user.id);
+        const photo = await loadUserAvatarUrl(user.id);
+        setAvatarUri(isGuest === 'true' || user.id === 'guest' ? '' : photo);
+        if (isGuest !== 'true' && user.id && user.id !== 'guest') {
+          void hydrateUserAvatarFromServer(user.id).then((url) => {
+            if (url) setAvatarUri(url);
+          });
+        }
         
         // 如果是访客，不加载订单
         if (isGuest === 'true' || user.id === 'guest') {
@@ -524,8 +550,89 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   // 获取状态颜色
   const getStatusColor = (status: string) => {
-    const filter = statusFilters.find(f => f.key === status);
-    return filter?.color || '#6b7280';
+    const colors: Record<string, string> = {
+      '待确认': TEAL,
+      '打包中': TEAL,
+      '待取件': TEAL,
+      '已取件': TEAL,
+      '配送中': TEAL,
+      '待收款': '#F59E0B',
+      '已送达': TEAL,
+      '已完成': TEAL,
+      '已取消': '#94A3B8',
+    };
+    return colors[status] || TEAL;
+  };
+
+  const formatPackageSpec = (type: string, weight: string) => {
+    const raw = type || '';
+    let name = raw;
+    if (raw.includes('标准件')) name = language === 'en' ? 'Standard' : language === 'my' ? 'စံပါဆယ်' : '标准件';
+    else if (raw.includes('超重')) name = language === 'en' ? 'Overweight' : language === 'my' ? 'အလေးပို' : '超重件';
+    else if (raw.includes('超规')) name = language === 'en' ? 'Oversized' : language === 'my' ? 'အရွယ်ကြီး' : '超规件';
+    else if (raw.includes('文件') || raw.toLowerCase().includes('document')) name = language === 'en' ? 'Document' : language === 'my' ? 'စာရွက်' : '文件';
+    else if (raw.includes('易碎')) name = language === 'en' ? 'Fragile' : language === 'my' ? 'ကျိုးလွယ်' : '易碎品';
+    else if (raw.includes('食品') || raw.includes('饮料')) name = language === 'en' ? 'Food' : language === 'my' ? 'အစားအစာ' : '食品饮料';
+    else if (raw.includes('顺路')) name = language === 'en' ? 'Way-side' : language === 'my' ? 'တန်တန်' : '顺路递';
+    else name = getPackageTypeTranslation(raw);
+
+    const parts = [name];
+    const size = raw.match(/(\d+\s*[x×]\s*\d+\s*[x×]\s*\d+\s*cm)/i);
+    if (size) parts.push(size[1].replace(/\s/g, '').replace(/×/g, 'x'));
+    else if (raw.includes('45x60x15')) parts.push('45x60x15cm');
+
+    const w = (weight || '').trim();
+    if (w && w !== '0') {
+      parts.push(/kg/i.test(w) ? w.replace(/\s/g, '').toUpperCase() : `${w}KG`);
+    } else if (raw.includes('5KG')) {
+      parts.push('5KG');
+    }
+    return parts.join(' · ');
+  };
+
+  const formatPrice = (price: string) => {
+    const n = Number(String(price || '0').replace(/[^0-9.]/g, ''));
+    return `${Number.isFinite(n) ? n.toLocaleString() : price} MMK`;
+  };
+
+  const showPendingPay = (order: Order) => {
+    if (order.status === '待收款') return true;
+    if (order.payment_method === 'cash' && !['已送达', '已完成', '已取消'].includes(order.status)) return true;
+    return false;
+  };
+
+  const openLocation = (lat?: number, lng?: number, label?: string) => {
+    if (!lat || !lng) return;
+    const q = encodeURIComponent(label || '');
+    const url =
+      Platform.OS === 'ios'
+        ? `maps:0,0?q=${q}@${lat},${lng}`
+        : `geo:${lat},${lng}?q=${lat},${lng}(${q})`;
+    Linking.openURL(url).catch(() => {});
+  };
+
+  const handleCallCourier = async (order: Order) => {
+    if (!order.courier || order.courier === '待分配') {
+      Alert.alert(
+        language === 'zh' ? '提示' : 'Notice',
+        language === 'zh' ? '暂无配送员信息' : 'Courier not assigned yet'
+      );
+      return;
+    }
+    try {
+      const { data } = await supabase
+        .from('couriers')
+        .select('phone')
+        .eq('name', order.courier)
+        .maybeSingle();
+      if (data?.phone) {
+        Linking.openURL(`tel:${data.phone}`);
+        return;
+      }
+    } catch {
+      // fall through to track page
+    }
+    navigation.navigate('Main', { screen: 'TrackOrder', params: { orderId: order.id } });
   };
 
   // 翻译包裹类型
@@ -560,13 +667,13 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const formatDate = (dateString: string) => {
     if (!dateString) return '--';
     const date = new Date(dateString);
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    if (Number.isNaN(date.getTime())) return dateString;
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const h = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${y}/${m}/${d} ${h}:${min}`;
   };
 
   // 查看详情
@@ -682,150 +789,232 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     }
   };
 
-  const renderOrderItem: ListRenderItem<Order> = ({ item: order }) => (
+  const renderPartyRow = (
+    icon: keyof typeof Ionicons.glyphMap,
+    name: string,
+    phone: string,
+    address: string,
+    lat?: number,
+    lng?: number,
+  ) => (
+    <View style={styles.partyRow}>
+      <View style={styles.partyIconWrap}>
+        <Ionicons name={icon} size={16} color={TEAL} />
+      </View>
+      <View style={styles.partyBody}>
+        <Text style={styles.partyName} numberOfLines={1}>
+          {name}
+          {phone ? `  ${phone}` : ''}
+        </Text>
+        <Text style={styles.partyAddress} numberOfLines={1}>{address}</Text>
+      </View>
+      <TouchableOpacity
+        style={styles.partyPinBtn}
+        onPress={() => openLocation(lat, lng, name)}
+        disabled={!lat || !lng}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="location" size={16} color={lat && lng ? TEAL : '#CBD5E1'} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderOrderItem: ListRenderItem<Order> = ({ item: order }) => {
+    const appLang: AppLang = language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
+    const statusHint = getOrderListJourneyHint(order.status, appLang);
+    const courierName = order.courier && order.courier !== '待分配' ? order.courier : t.unassigned;
+    const hasCourier = Boolean(order.courier && order.courier !== '待分配');
+
+    return (
+      <TouchableOpacity
+        style={styles.orderCard}
+        onPress={() => handleViewDetail(order.id)}
+        activeOpacity={0.85}
+      >
+        {unreadCounts[order.id] > 0 && (
+          <View style={styles.cardUnreadBadge}>
+            <Ionicons name="chatbubble" size={10} color="#fff" />
+            <Text style={styles.cardUnreadBadgeText}>{unreadCounts[order.id]}</Text>
+          </View>
+        )}
+
+        <View style={styles.orderHeader}>
+          <View style={styles.orderHeaderLeft}>
+            <View style={styles.orderIdChip}>
+              <Text style={styles.orderIdChipText}>#{order.id.slice(-6).toUpperCase()}</Text>
+            </View>
+            <Text style={styles.orderPackageSpec} numberOfLines={1}>
+              {formatPackageSpec(order.package_type, order.weight)}
+            </Text>
+          </View>
+          <View style={styles.orderStatusWrap}>
+            <Ionicons name="bicycle" size={14} color={getStatusColor(order.status)} />
+            <Text style={[styles.orderStatusText, { color: getStatusColor(order.status) }]} numberOfLines={1}>
+              {statusHint}
+            </Text>
+          </View>
+        </View>
+
+        {renderPartyRow(
+          'cube-outline',
+          order.sender_name,
+          order.sender_phone,
+          order.sender_address,
+          order.sender_latitude,
+          order.sender_longitude,
+        )}
+        {renderPartyRow(
+          'person-outline',
+          order.receiver_name,
+          order.receiver_phone,
+          order.receiver_address,
+          order.receiver_latitude,
+          order.receiver_longitude,
+        )}
+
+        <View style={styles.partyRow}>
+          <View style={styles.partyIconWrap}>
+            <Ionicons name="bicycle-outline" size={16} color={TEAL} />
+          </View>
+          <View style={styles.partyBody}>
+            <Text style={styles.partyName} numberOfLines={1}>{courierName}</Text>
+          </View>
+          {unreadCounts[order.id] > 0 ? (
+            <View style={styles.courierUnreadDot}>
+              <Ionicons name="chatbubble-ellipses" size={12} color={TEAL} />
+            </View>
+          ) : null}
+          <TouchableOpacity
+            style={[styles.callBtn, !hasCourier && { opacity: 0.45 }]}
+            onPress={() => handleCallCourier(order)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons name="call" size={14} color={TEAL} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.orderFooter}>
+          <View style={styles.orderFooterLeft}>
+            <View style={styles.priceRow}>
+              <Text style={styles.orderPrice}>{formatPrice(order.price)}</Text>
+              {showPendingPay(order) ? (
+                <View style={styles.pendingPayBadge}>
+                  <Text style={styles.pendingPayText}>{t.pendingPay}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
+          </View>
+          <View style={styles.footerActions}>
+            {(order.status === '已送达' || order.status === '已完成') && !reviewedOrderIds.has(order.id) && (
+              <TouchableOpacity
+                style={styles.rateButton}
+                onPress={() => handleOpenReviewModal(order)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.rateButtonText}>{t.rate}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              style={[
-                styles.orderCard,
-                unreadCounts[order.id] > 0 && styles.unreadOrderCard
-              ]}
+              style={styles.detailButton}
               onPress={() => handleViewDetail(order.id)}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
-              {/* 🚀 新增：卡片右上角消息提醒 */}
-              {unreadCounts[order.id] > 0 && (
-                <View style={styles.cardUnreadBadge}>
-                  <Text style={styles.cardUnreadBadgeText}>💬 {unreadCounts[order.id]}</Text>
-                </View>
-              )}
-              {/* 订单头部 */}
-              <View style={styles.orderHeader}>
-                <View style={styles.orderHeaderLeft}>
-                  <Text style={styles.orderIdBadge}>#{order.id.slice(-6).toUpperCase()}</Text>
-                  <Text style={styles.orderPackageType}>{getPackageTypeTranslation(order.package_type)}</Text>
-                  <Text style={styles.orderWeight}>{order.weight}</Text>
-                </View>
-                <View style={[styles.orderStatus, { backgroundColor: getStatusColor(order.status) }]}>
-                  <Text style={styles.orderStatusText}>{getStatusTranslation(order.status)}</Text>
-                </View>
-              </View>
-              {(() => {
-                const appLang: AppLang =
-                  language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh';
-                return (
-                  <Text style={styles.orderJourneyHint} numberOfLines={2}>
-                    {getOrderListJourneyHint(order.status, appLang)}
-                  </Text>
-                );
-              })()}
-
-              {/* 寄件人信息 */}
-              <View style={styles.orderInfo}>
-                <View style={styles.orderInfoRow}>
-                  <Text style={styles.orderInfoIcon}>📤</Text>
-                  <Text style={styles.orderInfoLabel}>{t.sender}:</Text>
-                  <Text style={styles.orderInfoValue}>{order.sender_name}</Text>
-                  <Text style={styles.orderInfoPhone}>{order.sender_phone}</Text>
-                </View>
-                <View style={styles.orderInfoRow}>
-                  <Text style={styles.orderInfoIcon}>📍</Text>
-                  <Text style={styles.orderInfoAddress} numberOfLines={1}>
-                    {order.sender_address}
-                  </Text>
-                  {order.sender_latitude && order.sender_longitude && (
-                    <Text style={styles.orderInfoCoords}>
-                      ({order.sender_latitude.toFixed(6)}, {order.sender_longitude.toFixed(6)})
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* 收件人信息 */}
-              <View style={styles.orderInfo}>
-                <View style={styles.orderInfoRow}>
-                  <Text style={styles.orderInfoIcon}>👤</Text>
-                  <Text style={styles.orderInfoLabel}>{t.receiver}:</Text>
-                  <Text style={styles.orderInfoValue}>{order.receiver_name}</Text>
-                  <Text style={styles.orderInfoPhone}>{order.receiver_phone}</Text>
-                </View>
-                <View style={styles.orderInfoRow}>
-                  <Text style={styles.orderInfoIcon}>📍</Text>
-                  <Text style={styles.orderInfoAddress} numberOfLines={1}>
-                    {order.receiver_address}
-                  </Text>
-                  {order.receiver_latitude && order.receiver_longitude && (
-                    <Text style={styles.orderInfoCoords}>
-                      ({order.receiver_latitude.toFixed(6)}, {order.receiver_longitude.toFixed(6)})
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* 配送员信息（如有） */}
-              {order.courier && (
-                <View style={styles.orderCourier}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <Text style={styles.orderCourierIcon}>🏍️</Text>
-                    <Text style={styles.orderCourierText}>
-                      {t.courier}: {order.courier}
-                    </Text>
-                  </View>
-                  {/* 🚀 新增：配送员小框里的消息提示 */}
-                  {unreadCounts[order.id] > 0 && (
-                    <View style={styles.courierUnreadContainer}>
-                      <Ionicons name="chatbubble-ellipses" size={14} color="#3b82f6" />
-                      <Text style={styles.courierUnreadText}>{language === 'zh' ? '新消息' : 'New Msg'}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* 订单底部 */}
-              <View style={styles.orderFooter}>
-                <View style={styles.orderFooterLeft}>
-                  <Text style={styles.orderPrice}>{order.price} MMK</Text>
-                  <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <TouchableOpacity
-                    style={styles.detailButton}
-                    onPress={() => handleViewDetail(order.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.detailButtonText}>{t.detail}</Text>
-                    <Text style={styles.detailButtonIcon}>→</Text>
-                  </TouchableOpacity>
-                  
-                  {/* 🚀 新增：评价按钮 */}
-                  {(order.status === '已送达' || order.status === '已完成') && !reviewedOrderIds.has(order.id) && (
-                    <TouchableOpacity
-                      style={[styles.detailButton, { backgroundColor: '#fbbf24', marginLeft: 8 }]}
-                      onPress={() => handleOpenReviewModal(order)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.detailButtonText, { color: '#ffffff' }]}>⭐ {t.rate}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
+              <Text style={styles.detailButtonText}>{t.detail}</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const orderCountLabel = String(t.orderCount || '').replace('{n}', String(orders.length));
+
+  const renderPageHeader = () => (
+    <LinearGradient
+      colors={['#2C98A6', '#5BB8C4', PAGE_BG]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={[styles.pageHeader, { paddingTop: Math.max(insets.top, 12) }]}
+    >
+      <View style={styles.navRow}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.navigate('Main', { screen: 'Home' })}
+          accessibilityRole="button"
+          activeOpacity={0.85}
+        >
+          <Ionicons name="chevron-back" size={22} color={NAVY} />
+        </TouchableOpacity>
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle}>{t.title}</Text>
+          <Text style={styles.headerSubtitle}>{orderCountLabel}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.headerAvatar}
+          onPress={() => navigation.navigate('Main', { screen: 'Profile' })}
+          activeOpacity={0.85}
+        >
+          {avatarDisplayUri(avatarUri) ? (
+            <Image
+              source={{ uri: avatarDisplayUri(avatarUri) }}
+              style={styles.headerAvatarImage}
+              onError={() => setAvatarUri('')}
+            />
+          ) : (
+            <ProfileAvatar3D size={40} />
+          )}
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  );
+
+  const renderFilters = () => (
+    <View style={styles.filtersContainer}>
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filtersContent}
+      >
+        {statusFilters.map((filter) => {
+          const active = selectedStatus === filter.key;
+          const count =
+            filter.key === 'all'
+              ? orders.length
+              : orders.filter((o) => o.status === filter.key).length;
+          return (
+            <TouchableOpacity
+              key={filter.key}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+              onPress={() => handleStatusChange(filter.key)}
+              onLayout={(event) => {
+                filterCardPositions.current[filter.key] = event.nativeEvent.layout.x;
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                {filter.label}
+              </Text>
+              {filter.key !== 'all' && count > 0 && !active ? (
+                <View style={styles.filterCountBadge}>
+                  <Text style={styles.filterCountBadgeText}>{count > 99 ? '99+' : String(count)}</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#1e3a8a', '#2563eb', '#f8fafc']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 0.4 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 20 }}>
-          <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
-          <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
-        </View>
-        
+        {renderPageHeader()}
+        {renderFilters()}
         <View style={styles.content}>
-          <View style={{ padding: 20 }}>
+          <View style={{ padding: 16 }}>
             <OrderSkeleton />
             <OrderSkeleton />
             <OrderSkeleton />
@@ -837,141 +1026,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
     return (
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#1e3a8a', '#2563eb', '#f8fafc']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 0.4 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* 背景装饰性圆圈 */}
-        <View style={{
-          position: 'absolute',
-          top: -100,
-          right: -100,
-          width: 300,
-          height: 300,
-          borderRadius: 150,
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          zIndex: 0
-        }} />
-        <View style={{
-          position: 'absolute',
-          top: 150,
-          left: -50,
-          width: 150,
-          height: 150,
-          borderRadius: 75,
-          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-          zIndex: 0
-        }} />
-
-      <View style={{ paddingTop: 60, paddingHorizontal: 20, marginBottom: 10 }}>
-        <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '800' }}>{t.title}</Text>
-        <View style={{ height: 3, width: 40, backgroundColor: '#fbbf24', borderRadius: 2, marginTop: 8 }} />
-        <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16, marginTop: 8 }}>
-          {t.all} {orders.length} {language === 'zh' ? '个订单' : language === 'en' ? 'Orders' : 'အော်ဒါ'}
-        </Text>
-      </View>
-
-      {/* 状态筛选器 */}
-      <View style={styles.filtersContainer}>
-        <ScrollView 
-          ref={scrollViewRef}
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
-        >
-          {statusFilters.map((filter) => {
-            const categoryUnreadTotal = filter.key === 'all' ? 0 : orders
-              .filter(o => o.status === filter.key)
-              .reduce((sum, o) => sum + (unreadCounts[o.id] || 0), 0);
-            const hasUnread = categoryUnreadTotal > 0;
-
-            return (
-              <TouchableOpacity
-                key={filter.key}
-                style={[
-                  styles.filterChip,
-                  selectedStatus === filter.key && styles.filterChipActive,
-                  hasUnread && styles.filterChipWithUnread,
-                ]}
-                onPress={() => handleStatusChange(filter.key)}
-                onLayout={(event) => {
-                  const { x } = event.nativeEvent.layout;
-                  filterCardPositions.current[filter.key] = x;
-                }}
-                activeOpacity={0.7}
-              >
-                {/* 🚀 呼吸灯光晕背景 */}
-                {hasUnread && (
-                  <Animated.View 
-                    style={[
-                      styles.pulseGlow, 
-                      { 
-                        opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.4] }),
-                        transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] }) }]
-                      }
-                    ]} 
-                  />
-                )}
-
-                <LinearGradient
-                  colors={
-                    selectedStatus === filter.key
-                      ? [filter.color, filter.color + 'dd']
-                      : ['#ffffff', '#ffffff']
-                  }
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[
-                    styles.filterChipGradient,
-                    hasUnread && { borderWidth: 2, borderColor: '#3b82f6' }
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedStatus === filter.key && styles.filterChipTextActive,
-                      hasUnread && selectedStatus !== filter.key && { color: '#2563eb', fontWeight: '900' }
-                    ]}
-                  >
-                    {filter.label}
-                  </Text>
-                  {filter.key !== 'all' && (
-                    <View
-                      style={[
-                        styles.filterBadge,
-                        { backgroundColor: selectedStatus === filter.key ? '#ffffff33' : filter.color + '33' },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.filterBadgeText,
-                          { color: selectedStatus === filter.key ? '#ffffff' : filter.color },
-                        ]}
-                      >
-                        {orders.filter(o => o.status === filter.key).length}
-                      </Text>
-                    </View>
-                  )}
-                  
-                  {/* 🚀 显著的蓝色消息徽章 */}
-                  {hasUnread && (
-                    <Animated.View style={[
-                      styles.filterUnreadBadge,
-                      {
-                        transform: [{ translateY: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) }]
-                      }
-                    ]}>
-                      <Text style={styles.filterUnreadBadgeText}>💬 {categoryUnreadTotal}</Text>
-                    </Animated.View>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+        {renderPageHeader()}
+        {renderFilters()}
 
       {/* 订单列表 */}
       <FlatList
@@ -985,28 +1041,23 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         windowSize={7}
         removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[TEAL]} tintColor={TEAL} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📦</Text>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="cube-outline" size={42} color={TEAL} />
+            </View>
             <Text style={styles.emptyText}>{t.noOrders}</Text>
             <Text style={styles.emptyDesc}>{t.noOrdersDesc}</Text>
             <TouchableOpacity
               style={styles.emptyButton}
               onPress={() => navigation.navigate('PlaceOrder')}
-              activeOpacity={0.7}
+              activeOpacity={0.85}
             >
-              <LinearGradient
-                colors={['#3b82f6', '#2563eb']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.emptyButtonGradient}
-              >
-                <Text style={styles.emptyButtonText}>
-                  {language === 'zh' ? '立即下单' : language === 'en' ? 'Place Order' : 'အော်ဒါတင်'}
-                </Text>
-              </LinearGradient>
+              <Text style={styles.emptyButtonText}>
+                {language === 'zh' ? '立即下单' : language === 'en' ? 'Place Order' : 'အော်ဒါတင်'}
+              </Text>
             </TouchableOpacity>
           </View>
         }
@@ -1186,390 +1237,353 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: PAGE_BG,
   },
   content: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  pageHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 18,
+  },
+  navRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    minHeight: 56,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748b',
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: '#000',
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#1A2B48',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 4,
+  },
+  headerTitles: {
+    flex: 1,
+    marginHorizontal: 12,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#ffffff',
-    marginBottom: 8,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 2,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.88)',
+    fontWeight: '600',
+  },
+  headerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.85)',
+    shadowColor: '#1A2B48',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  headerAvatarImage: {
+    width: 44,
+    height: 44,
   },
   filtersContainer: {
-    marginTop: -15,
-    paddingBottom: 10,
+    marginTop: -6,
+    paddingBottom: 8,
   },
   filtersContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
     gap: 10,
   },
   filterChip: {
+    backgroundColor: '#ffffff',
     borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    position: 'relative',
+    overflow: 'visible',
+    shadowColor: '#1A2B48',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   filterChipActive: {
-    shadowOpacity: 0.2,
-    elevation: 6,
-  },
-  filterChipGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
+    backgroundColor: TEAL,
   },
   filterChipText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
+    fontWeight: '700',
+    color: NAVY,
   },
   filterChipTextActive: {
     color: '#ffffff',
   },
-  filterBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  filterBadgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  filterUnreadBadge: {
+  filterCountBadge: {
     position: 'absolute',
-    top: -10,
-    right: -10,
-    backgroundColor: '#3b82f6', // 蓝色背景，与卡片一致
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    justifyContent: 'center',
+    top: -6,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
     alignItems: 'center',
-    zIndex: 20,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
     borderWidth: 1.5,
     borderColor: '#fff',
-    elevation: 4,
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
   },
-  filterUnreadBadgeText: {
-    color: 'white',
+  filterCountBadgeText: {
+    color: '#ffffff',
     fontSize: 10,
-    fontWeight: '900',
-  },
-  // 🚀 新增：呼吸灯光晕样式
-  pulseGlow: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 24,
-    backgroundColor: '#3b82f6',
-    zIndex: -1,
-  },
-  filterChipWithUnread: {
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 8,
+    fontWeight: '800',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 24,
   },
   emptyContainer: {
-    marginTop: 60,
+    marginTop: 48,
     alignItems: 'center',
     paddingHorizontal: 40,
   },
-  emptyIcon: {
-    fontSize: 78,
-    marginBottom: 20,
+  emptyIconWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 24,
+    backgroundColor: '#e8f5f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '800',
+    color: NAVY,
+    marginBottom: 6,
   },
   emptyDesc: {
-    fontSize: 16,
-    color: '#64748b',
-    marginBottom: 30,
+    fontSize: 14,
+    color: MUTED,
+    marginBottom: 24,
     textAlign: 'center',
   },
   emptyButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  emptyButtonGradient: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
+    backgroundColor: TEAL,
+    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
   },
   emptyButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#ffffff',
   },
   orderCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+    shadowColor: '#1A2B48',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
     position: 'relative',
-  },
-  // 🚀 新增：有未读消息的订单卡片样式
-  unreadOrderCard: {
-    borderColor: '#3b82f6',
-    borderWidth: 2,
-    backgroundColor: '#f0f7ff',
   },
   cardUnreadBadge: {
     position: 'absolute',
-    top: -10,
-    right: 16,
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    top: -8,
+    right: 14,
+    backgroundColor: TEAL,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
     zIndex: 10,
-    elevation: 5,
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   cardUnreadBadgeText: {
     color: 'white',
-    fontSize: 12,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '800',
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  orderJourneyHint: {
-    fontSize: 13,
-    color: '#64748b',
-    lineHeight: 18,
-    marginBottom: 10,
+    marginBottom: 12,
+    gap: 8,
   },
   orderHeaderLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    minWidth: 0,
   },
-  orderIdBadge: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#1e3a8a',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  orderPackageType: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  orderWeight: {
-    fontSize: 14,
-    color: '#64748b',
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  orderIdChip: {
+    backgroundColor: TEAL,
     borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  orderStatus: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+  orderIdChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  orderPackageSpec: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: MUTED,
+  },
+  orderStatusWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: '42%',
   },
   orderStatusText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontWeight: '700',
+    flexShrink: 1,
   },
-  orderInfo: {
-    marginBottom: 12,
-  },
-  orderInfoRow: {
+  partyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
   },
-  orderInfoIcon: {
-    fontSize: 14,
-    marginRight: 8,
+  partyIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#e8f5f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
-  orderInfoLabel: {
-    fontSize: 14,
-    color: '#64748b',
-    marginRight: 8,
-  },
-  orderInfoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginRight: 8,
-  },
-  orderInfoPhone: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  orderInfoAddress: {
-    fontSize: 13,
-    color: '#64748b',
+  partyBody: {
     flex: 1,
-    marginLeft: 4,
+    minWidth: 0,
   },
-  orderInfoCoords: {
-    fontSize: 11,
-    color: '#059669',
-    fontWeight: '500',
-    marginLeft: 8,
-    backgroundColor: '#f0fdf4',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  orderCourier: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0f9ff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e0f2fe',
-  },
-  courierUnreadContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#3b82f6',
-  },
-  courierUnreadText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-  },
-  orderCourierIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  orderCourierText: {
+  partyName: {
     fontSize: 14,
-    color: '#0369a1',
-    fontWeight: '600',
+    fontWeight: '700',
+    color: NAVY,
+  },
+  partyAddress: {
+    fontSize: 12,
+    color: MUTED,
+    marginTop: 2,
+  },
+  partyPinBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  callBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    borderColor: TEAL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  courierUnreadDot: {
+    marginRight: 6,
   },
   orderFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: '#eef2f6',
+    marginTop: 4,
   },
   orderFooterLeft: {
     flex: 1,
+    minWidth: 0,
+    marginRight: 10,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   orderPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: '800',
+    color: TEAL,
+  },
+  pendingPayBadge: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  pendingPayText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#D97706',
   },
   orderTime: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: MUTED,
+    marginTop: 4,
   },
-  detailButton: {
+  footerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 4,
+    gap: 8,
+  },
+  detailButton: {
+    borderWidth: 1.5,
+    borderColor: TEAL,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
   },
   detailButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563eb',
+    fontSize: 13,
+    fontWeight: '700',
+    color: TEAL,
   },
-  detailButtonIcon: {
-    fontSize: 16,
-    color: '#2563eb',
-    fontWeight: 'bold',
+  rateButton: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  rateButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#D97706',
   },
   // 🚀 新增评价 Modal 样式
   modalOverlay: {

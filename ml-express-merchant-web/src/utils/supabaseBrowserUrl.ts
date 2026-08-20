@@ -9,6 +9,7 @@ export const SUPABASE_BROWSER_PROXY_URL = SUPABASE_WORKER_ORIGIN;
 export const SUPABASE_WORKER_HOST = 'ml-supabase-proxy.huangdelun16.workers.dev';
 export const SUPABASE_REALTIME_WS_FALLBACK =
   'wss://ml-supabase-proxy.huangdelun16.workers.dev/realtime/v1/websocket';
+export const MERCHANT_PUBLIC_SB_PROXY = 'https://mlexpress-merchants.com/__sb';
 
 function configuredEnvUrl(raw?: string): string {
   const source = raw !== undefined ? raw : process.env.REACT_APP_SUPABASE_URL;
@@ -71,4 +72,41 @@ export function applyNetlifyRealtimeFallback(client: SupabaseClient): void {
   };
   realtime.endPoint = SUPABASE_REALTIME_WS_FALLBACK;
   realtime.httpEndpoint = `${SUPABASE_WORKER_ORIGIN}/realtime/v1`;
+}
+
+function storageProxyBase(): string {
+  if (isBrowser() && !isLocalDevHost()) {
+    return `${window.location.origin}/__sb`;
+  }
+  return MERCHANT_PUBLIC_SB_PROXY;
+}
+
+/**
+ * Myanmar cannot reach *.supabase.co. Rewrite stored public Storage URLs
+ * onto the current site's /__sb proxy (or the production merchant proxy in local dev).
+ */
+export function rewritePublicStorageUrl(url: string): string {
+  const raw = String(url || '').trim();
+  if (!raw) return raw;
+  if (/^(blob:|data:|file:|content:)/i.test(raw)) return raw;
+  const proxy = storageProxyBase().replace(/\/$/, '');
+  return raw
+    .replace(/^https?:\/\/uopkyuluxnrewvlmutam\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(/^https?:\/\/[^/]+\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(
+      /^https?:\/\/(?:www\.)?(?:mlexpress-merchants\.com|market-link-express\.com|admin-market-link-express\.com)\/__sb(?=\/|$)/i,
+      proxy,
+    );
+}
+
+/** Display URL for a stored product / cover image. Empty or local-file paths return undefined. */
+export function publicStorageUrl(url?: string | null): string | undefined {
+  const raw = String(url || '').trim();
+  if (!raw || /^(file:|content:)/i.test(raw)) return undefined;
+  if (/^(blob:|data:)/i.test(raw)) return raw;
+  if (/^https?:\/\//i.test(raw)) return rewritePublicStorageUrl(raw);
+  const path = raw.replace(/^\/+/, '').replace(/^product_images\//, '');
+  return rewritePublicStorageUrl(
+    `${MERCHANT_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/${path}`,
+  );
 }

@@ -239,7 +239,7 @@ export const packageService = {
       const runQuery = async (includeCustomerId: boolean) => {
         let query = supabase
           .from('packages')
-          .select('status')
+          .select('id, status')
           .order('created_at', { ascending: false });
 
         const conditions: string[] = [];
@@ -256,12 +256,19 @@ export const packageService = {
           throw error;
         }
 
+        const rows = data || [];
         const stats = {
-          total: data?.length || 0,
-          pending: data?.filter(p => ['待确认', '待取件', '待收款'].includes(p.status)).length || 0,
-          inTransit: data?.filter(p => ['已取件', '配送中'].includes(p.status)).length || 0,
-          delivered: data?.filter(p => p.status === '已送达').length || 0,
-          cancelled: data?.filter(p => p.status === '已取消').length || 0,
+          total: rows.length,
+          pending: rows.filter(p => ['待确认', '待取件', '待收款'].includes(p.status)).length,
+          inTransit: rows.filter(p => ['已取件', '配送中'].includes(p.status)).length,
+          delivered: rows.filter(p => p.status === '已送达' || p.status === '已完成').length,
+          cancelled: rows.filter(p => p.status === '已取消').length,
+          pendingPay: rows.filter(p => p.status === '待收款').length,
+          pendingAccept: rows.filter(p => p.status === '待确认').length,
+          awaitingDelivery: rows.filter(p => ['待确认', '打包中', '待取件'].includes(p.status)).length,
+          delivering: rows.filter(p => ['已取件', '配送中'].includes(p.status)).length,
+          afterSale: rows.filter(p => ['已取消', '异常上报'].includes(p.status)).length,
+          deliveredIds: rows.filter(p => p.status === '已送达' || p.status === '已完成').map(p => p.id),
         };
 
         return stats;
@@ -284,6 +291,12 @@ export const packageService = {
         inTransit: 0,
         delivered: 0,
         cancelled: 0,
+        pendingPay: 0,
+        pendingAccept: 0,
+        awaitingDelivery: 0,
+        delivering: 0,
+        afterSale: 0,
+        deliveredIds: [] as string[],
       };
     }
   },

@@ -10,18 +10,45 @@ import { useApp } from '../contexts/AppContext';
 
 interface LanguageSelectorProps {
   position?: 'absolute' | 'relative';
+  variant?: 'dropdown' | 'pills';
 }
 
-export default function LanguageSelector({ position = 'absolute' }: LanguageSelectorProps) {
+const TEAL = '#2C98A6';
+const NAVY = '#1A2B48';
+
+export default function LanguageSelector({
+  position = 'absolute',
+  variant = 'dropdown',
+}: LanguageSelectorProps) {
   const { language, setLanguage } = useApp();
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
-  // 语言选项
   const languages = [
-    { code: 'zh' as const, name: '中文', flag: '🇨🇳' },
-    { code: 'en' as const, name: 'English', flag: '🇬🇧' },
-    { code: 'my' as const, name: 'မြန်မာ', flag: '🇲🇲' },
+    { code: 'zh' as const, name: '中文', flag: '🇨🇳', short: '中文' },
+    { code: 'en' as const, name: 'English', flag: '🇬🇧', short: 'EN' },
+    { code: 'my' as const, name: 'မြန်မာ', flag: '🇲🇲', short: 'မြန်မာ' },
   ];
+
+  if (variant === 'pills') {
+    return (
+      <View style={styles.pillsRow}>
+        {languages.map((item) => {
+          const active = language === item.code;
+          return (
+            <TouchableOpacity
+              key={item.code}
+              onPress={() => setLanguage(item.code)}
+              style={[styles.pill, active && styles.pillOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[styles.pillText, active && styles.pillTextOn]}>{item.short}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  }
 
   const currentLanguage = languages.find(lang => lang.code === language);
 
@@ -78,6 +105,32 @@ export default function LanguageSelector({ position = 'absolute' }: LanguageSele
 }
 
 const styles = StyleSheet.create({
+  pillsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: 5,
+  },
+  pill: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D5DEE8',
+  },
+  pillOn: {
+    backgroundColor: TEAL,
+    borderColor: TEAL,
+  },
+  pillText: {
+    color: NAVY,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pillTextOn: {
+    color: '#FFFFFF',
+  },
   languageSelectorContainer: {
     zIndex: 1000,
   },

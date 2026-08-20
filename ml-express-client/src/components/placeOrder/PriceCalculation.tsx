@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MoneyIcon } from '../Icon';
 import { ScaleInView } from '../Animations';
 
@@ -165,58 +165,67 @@ const PriceCalculation = memo<PriceCalculationProps>(({
               )}
               <View style={styles.priceDivider} />
               
-              {/* 🚀 新增：支付方式选择 (开关形式) */}
-              <View style={{ marginBottom: 15, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 12 }}>
+              {/* 支付方式选择 */}
+              <View style={{ marginBottom: 15, padding: 12, backgroundColor: '#f8fafc', borderRadius: 12 }}>
                 <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#475569', marginBottom: 12 }}>
                   {currentT.shippingFeePayment}
                 </Text>
-                
-                {accountBalance !== undefined && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ 
-                        fontSize: 14, 
-                        color: paymentMethod === 'balance' ? '#1e293b' : '#64748b', 
-                        fontWeight: paymentMethod === 'balance' ? 'bold' : 'normal',
-                        opacity: accountBalance === 0 ? 0.5 : 1
-                      }}>
-                        {currentT.courierFeeBalance}
-                      </Text>
-                      {paymentMethod === 'balance' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
-                      {accountBalance === 0 && (
-                        <Text style={{ fontSize: 10, color: '#ef4444' }}>({language === 'zh' ? '未充值' : 'No Balance'})</Text>
-                      )}
-                    </View>
-                    <Switch
-                      value={paymentMethod === 'balance'}
-                      disabled={accountBalance === 0} // 🚀 余额为0时禁止开启
-                      onValueChange={(val) => onPaymentMethodChange(val ? 'balance' : 'cash')}
-                      trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
-                      thumbColor="#ffffff"
-                    />
-                  </View>
-                )}
 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 14, color: paymentMethod === 'cash' ? '#1e293b' : '#64748b', fontWeight: paymentMethod === 'cash' ? 'bold' : 'normal' }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      paddingVertical: 10,
+                      borderRadius: 20,
+                      borderWidth: 1,
+                      borderColor: paymentMethod === 'cash' ? '#2C98A6' : '#e2e8f0',
+                      backgroundColor: paymentMethod === 'cash' ? '#2C98A6' : '#fff',
+                    }}
+                    onPress={() => onPaymentMethodChange('cash')}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: paymentMethod === 'cash' ? '#fff' : '#0f172a' }}>
                       {currentT.courierFeeCash}
                     </Text>
-                    {paymentMethod === 'cash' && <Text style={{ fontSize: 10, color: '#10b981' }}>[Active]</Text>}
-                  </View>
-                  <Switch
-                    value={paymentMethod === 'cash'}
-                    disabled={accountBalance === 0} // 🚀 余额为0时锁定为现金支付
-                    onValueChange={(val) => onPaymentMethodChange(val ? 'cash' : 'balance')}
-                    trackColor={{ false: '#cbd5e1', true: '#3b82f6' }}
-                    thumbColor="#ffffff"
-                  />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      paddingVertical: 10,
+                      borderRadius: 20,
+                      borderWidth: 1,
+                      borderColor: paymentMethod === 'balance' ? '#2C98A6' : '#e2e8f0',
+                      backgroundColor: paymentMethod === 'balance' ? '#2C98A6' : '#fff',
+                      opacity: accountBalance === 0 ? 0.45 : 1,
+                    }}
+                    disabled={accountBalance === 0}
+                    onPress={() => onPaymentMethodChange('balance')}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: paymentMethod === 'balance' ? '#fff' : '#0f172a' }}>
+                      {currentT.courierFeeBalance}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                
+
+                {accountBalance === 0 && (
+                  <Text style={{ fontSize: 10, color: '#ef4444', textAlign: 'center', marginTop: 8 }}>
+                    {language === 'zh' ? '未充值' : 'No Balance'}
+                  </Text>
+                )}
+
                 {paymentMethod === 'balance' && accountBalance !== undefined && (
                   <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
                     <Text style={{ fontSize: 11, color: accountBalance < parseFloat(calculatedPrice) ? '#ef4444' : '#10b981', textAlign: 'center' }}>
-                      {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK 
+                      {currentT.accountBalance}: {accountBalance.toLocaleString()} MMK
                       {accountBalance < parseFloat(calculatedPrice) ? ` (${currentT.insufficientBalance})` : ''}
                     </Text>
                   </View>

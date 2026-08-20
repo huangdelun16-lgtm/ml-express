@@ -28,6 +28,7 @@ import { getMerchantStoreTypeLabel } from "../services/_shared/merchantStoreType
 import type { StoreTypeLang } from "../services/_shared/merchantStoreTypes";
 import { autoPrepareProductImageForUpload } from "../utils/productImagePrepare";
 import ProductVariantsEditor from "../components/ProductVariantsEditor";
+import StorageImg from "../components/StorageImg";
 import {
   defaultMerchantProductForm,
   merchantProductFormFromProduct,
@@ -6573,7 +6574,7 @@ const ProfilePage: React.FC = () => {
                       >
                         {product.image_url &&
                         !product.image_url.startsWith("file://") ? (
-                          <img
+                          <StorageImg
                             src={product.image_url}
                             alt={product.name}
                             style={{
@@ -6581,6 +6582,7 @@ const ProfilePage: React.FC = () => {
                               height: "100%",
                               objectFit: "cover",
                             }}
+                            fallback={<span style={{ fontSize: "3rem" }}>🖼️</span>}
                           />
                         ) : (
                           <span style={{ fontSize: "3rem" }}>🖼️</span>
@@ -6817,7 +6819,7 @@ const ProfilePage: React.FC = () => {
                 }}
               >
                 {productForm.image_url ? (
-                  <img
+                  <StorageImg
                     src={productForm.image_url}
                     alt="Preview"
                     style={{
@@ -6982,7 +6984,7 @@ const ProfilePage: React.FC = () => {
                             border: "1px solid rgba(255,255,255,0.12)",
                           }}
                         >
-                          <img
+                          <StorageImg
                             src={url}
                             alt=""
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}

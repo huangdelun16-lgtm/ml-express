@@ -11,6 +11,8 @@ type Props = {
 };
 
 const STEP_COUNT = 4;
+const TEAL = '#2C98A6';
+const NAVY = '#0f172a';
 
 export default function OrderWizardProgress({ currentStep, labels, language, compact = false }: Props) {
   return (
@@ -60,7 +62,7 @@ export default function OrderWizardProgress({ currentStep, labels, language, com
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 10,
     paddingHorizontal: 4,
   },
   wrapCompact: {
@@ -81,9 +83,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#e8edf2',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -93,45 +95,45 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   dotDone: {
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
+    backgroundColor: TEAL,
+    borderColor: TEAL,
   },
   dotActive: {
-    backgroundColor: '#fbbf24',
-    borderColor: '#fbbf24',
+    backgroundColor: TEAL,
+    borderColor: TEAL,
   },
   dotText: {
     fontSize: 12,
     fontWeight: '800',
-    color: 'rgba(255,255,255,0.7)',
+    color: '#94a3b8',
   },
   dotTextCompact: {
     fontSize: 10,
   },
   dotTextOn: {
-    color: '#0f172a',
+    color: '#fff',
   },
   line: {
     position: 'absolute',
     left: '58%',
     right: '-42%',
     height: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#e2e8f0',
     top: 13,
     zIndex: -1,
   },
   lineDone: {
-    backgroundColor: '#10b981',
+    backgroundColor: TEAL,
   },
   label: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.55)',
+    color: '#94a3b8',
     fontWeight: '600',
     textAlign: 'center',
     paddingHorizontal: 2,
   },
   labelActive: {
-    color: '#fbbf24',
+    color: NAVY,
     fontWeight: '800',
   },
 });

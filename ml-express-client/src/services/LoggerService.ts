@@ -69,6 +69,20 @@ function sanitizeData(data: any): any {
     return sanitized;
   }
 
+  // Error.message / name 默认不可枚举，直接 Object.entries 会打成空对象
+  if (data instanceof Error) {
+    const extras: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data as unknown as Record<string, unknown>)) {
+      extras[key] = sanitizeData(value);
+    }
+    return {
+      name: data.name,
+      message: data.message,
+      stack: data.stack,
+      ...extras,
+    };
+  }
+
   // 如果是对象，递归处理
   if (typeof data === 'object' && !Array.isArray(data)) {
     const sanitized: any = {};

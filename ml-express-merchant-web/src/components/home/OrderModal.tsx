@@ -22,6 +22,7 @@ import {
   type OrderWizardStepIndex,
 } from './orderModalWizard';
 import Logo from '../Logo';
+import StorageImg from '../StorageImg';
 import { feedbackService } from '../../services/FeedbackService';
 
 /** 创建订单弹窗：统一视觉（与客户端 Web 对齐） */
@@ -1793,11 +1794,12 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       border: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
                       <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#0f172a', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <span style={{ fontSize: '1.5rem' }}>📦</span>
-                        )}
+                        <StorageImg
+                          src={item.image_url}
+                          alt={item.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          fallback={<span style={{ fontSize: '1.5rem' }}>📦</span>}
+                        />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ color: 'white', fontWeight: 'bold', marginBottom: '4px' }}>{item.name}</div>

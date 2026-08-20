@@ -151,17 +151,17 @@ const receiverStyles = StyleSheet.create({
     gap: 8,
   },
   addressBookBtn: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#e8f5f6',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: '#b7dce1',
     flexShrink: 0,
   },
   addressBookBtnText: {
     fontSize: 12,
-    color: '#2563eb',
+    color: '#2C98A6',
     fontWeight: '700',
   },
 });

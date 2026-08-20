@@ -811,7 +811,7 @@ export default function OrderDetailScreen({ route, navigation }: any) {
                 {journey.suggestTrack && order.status !== '已取消' && (
                   <TouchableOpacity
                     style={styles.journeyActionBtn}
-                    onPress={() => navigation.navigate('TrackOrder', { orderId: order.id })}
+                    onPress={() => navigation.navigate('Main', { screen: 'TrackOrder', params: { orderId: order.id } })}
                     activeOpacity={0.85}
                   >
                     <Ionicons name="map-outline" size={18} color="#fff" />

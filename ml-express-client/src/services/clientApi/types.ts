@@ -35,6 +35,7 @@ export interface User {
   balance?: number; // 🚀 新增：账户余额
   rating: number;
   notes: string;
+  avatar_url?: string;
   created_at?: string;
   updated_at?: string;
 }

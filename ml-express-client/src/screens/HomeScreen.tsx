@@ -1,21 +1,49 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Image, Dimensions, Animated, RefreshControl, Alert, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Linking,
+  Image,
+  Dimensions,
+  RefreshControl,
+  Alert,
+  Platform,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useApp } from '../contexts/AppContext';
-import { useLoading } from '../contexts/LoadingContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Skeleton, { StatsCardSkeleton, OrderCardSkeleton } from '../components/Skeleton';
-import TutorialModal from '../components/TutorialModal';
 import { Ionicons } from '@expo/vector-icons';
+import { useApp } from '../contexts/AppContext';
+import TutorialModal from '../components/TutorialModal';
+import BrandRider from '../components/BrandRider';
+import {
+  ClayBook,
+  ClayBox,
+  ClayHeadset,
+  ClayMapBoard,
+  ClayPagodas,
+  ClayScooter,
+  ClayShoppingBag,
+  ClayStoreFront,
+  ProfileAvatar3D,
+} from '../components/ProfileClayIcons';
 import { packageService, bannerService, Banner } from '../services/supabase';
 import { errorService } from '../services/ErrorService';
-import { isGuestMode, promptGuestLogin } from '../utils/guestSession';
-import { theme } from '../config/theme';
 import { APP_CONFIG } from '../config/constants';
-import { analytics, EventType } from '../services/AnalyticsService';
+import { analytics } from '../services/AnalyticsService';
+import { avatarDisplayUri, hydrateUserAvatarFromServer, loadUserAvatarUrl } from '../utils/userAvatar';
 
 const { width } = Dimensions.get('window');
+const TEAL = '#2C98A6';
+const NAVY = '#1A2B48';
+const MUTED = '#8A94A6';
+const PAGE = '#F4F7FA';
+const CARD = '#FFFFFF';
+const BANNER_W = width - 32;
 
 const HOTLINE_NUMBERS = [
   { display: APP_CONFIG.CONTACT.PHONE_DISPLAY, tel: APP_CONFIG.CONTACT.PHONE },
@@ -23,83 +51,32 @@ const HOTLINE_NUMBERS = [
   { display: '(+95) 09941118688', tel: '+959941118688' },
 ];
 
-const HERO_GRADIENT: [string, string, ...string[]] = ['#0b1220', '#0f2744', '#1e3a8a', '#312e81'];
-const QUICK_ACTION_WIDTH = (width - 56) / 2;
-
-const HomeSectionHeader = React.memo(
-  ({
-    kicker,
-    title,
-    actionLabel,
-    onAction,
-    dark,
-  }: {
-    kicker?: string;
-    title: string;
-    actionLabel?: string;
-    onAction?: () => void;
-    dark?: boolean;
-  }) => (
-    <View style={styles.sectionHeaderWrap}>
-      <LinearGradient
-        colors={['#fbbf24', '#f59e0b', 'rgba(245,158,11,0.15)']}
-        style={styles.sectionHeaderAccent}
-      />
-      <View style={styles.sectionHeaderTextCol}>
-        {kicker ? (
-          <Text style={[styles.sectionKicker, dark && styles.sectionKickerDark]}>{kicker}</Text>
-        ) : null}
-        <Text style={[styles.sectionTitle, dark && styles.darkText]}>{title}</Text>
-      </View>
-      {actionLabel && onAction ? (
-        <TouchableOpacity onPress={onAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.viewAllButton}>{actionLabel}</Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
-  ),
-);
-
-const QuickActionTile = React.memo(
-  ({
-    colors,
-    icon,
-    label,
-    onPress,
-    accessibilityLabel,
-    accessibilityHint,
-  }: {
-    colors: [string, string, ...string[]];
-    icon: string;
-    label: string;
-    onPress: () => void;
-    accessibilityLabel: string;
-    accessibilityHint?: string;
-  }) => (
-    <TouchableOpacity
-      style={styles.quickActionOuter}
-      onPress={onPress}
-      activeOpacity={0.88}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint={accessibilityHint}
-    >
-      <LinearGradient
-        colors={['rgba(255,255,255,0.42)', 'rgba(255,255,255,0.1)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.quickActionBorderGr}
-      >
-        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickActionGradient}>
-          <View style={styles.quickActionIconGlass}>
-            <Text style={styles.quickActionIcon}>{icon}</Text>
-          </View>
-          <Text style={styles.quickActionText}>{label}</Text>
-        </LinearGradient>
-      </LinearGradient>
-    </TouchableOpacity>
-  ),
-);
+const FALLBACK_BANNERS: Banner[] = [
+  {
+    id: 'fallback-mdy',
+    title: '曼德勒同城',
+    subtitle: '2,000 Ks / 趟',
+    burmese_title: 'မန္တလေးမြို့တွင်း ၂၀၀၀ ကျပ် / ခရီး',
+    bg_color_start: '#D7F3F6',
+    bg_color_end: '#F2FBFC',
+  },
+  {
+    id: 'fallback-track',
+    title: '实时定位追踪',
+    subtitle: '5 分钟接单 · 全程可视',
+    burmese_title: 'အချိန်နှင့်တပြေးညီ ခြေရာခံနိုင်သည်',
+    bg_color_start: '#E4F6F8',
+    bg_color_end: '#F7FCFD',
+  },
+  {
+    id: 'fallback-fast',
+    title: '同城闪送',
+    subtitle: '急送 30 分钟到家',
+    burmese_title: '၃၀ မိနစ်အတွင်း အိမ်အရောက်',
+    bg_color_start: '#DDF1F4',
+    bg_color_end: '#F4FBFC',
+  },
+];
 
 interface OrderStats {
   total: number;
@@ -109,19 +86,81 @@ interface OrderStats {
   cancelled: number;
 }
 
-interface RecentOrder {
-  id: string;
-  receiver_name: string;
-  receiver_address: string;
-  status: string;
-  created_at: string;
-  price: string;
-}
-
 export default function HomeScreen({ navigation }: any) {
-  const { language, isDarkMode } = useApp();
-  const { showLoading, hideLoading } = useLoading();
-  
+  const { language } = useApp();
+  const insets = useSafeAreaInsets();
+  const [refreshing, setRefreshing] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [avatarUri, setAvatarUri] = useState('');
+  const [orderStats, setOrderStats] = useState<OrderStats>({
+    total: 0,
+    pending: 0,
+    inTransit: 0,
+    delivered: 0,
+    cancelled: 0,
+  });
+  const bannerScrollRef = useRef<ScrollView>(null);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [isBannerPaused, setIsBannerPaused] = useState(false);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
+
+  const displayBanners = banners.length > 0 ? banners : FALLBACK_BANNERS;
+  const totalBanners = displayBanners.length;
+
+  const t = {
+    zh: {
+      slogan: '同城闪送 · 30 分钟到家',
+      hello: '你好',
+      guest: '访客',
+      howToUse: '使用教学',
+      howToUseHint: '新手上路 · 图文详解',
+      logistics: '我的物流',
+      inProgress: '进行中',
+      pendingPickup: '待取件',
+      orderNow: '立即下单',
+      nearbyStores: '附近商店',
+      trackOrder: '订单追踪',
+      support: '客服',
+      promoUntil: '活动至 2026年1月',
+      newBadge: 'NEW',
+    },
+    en: {
+      slogan: 'City flash · 30 min delivery',
+      hello: 'Hi',
+      guest: 'Guest',
+      howToUse: 'How to use',
+      howToUseHint: 'Beginner guide',
+      logistics: 'My logistics',
+      inProgress: 'In progress',
+      pendingPickup: 'Pickup',
+      orderNow: 'Order now',
+      nearbyStores: 'Nearby stores',
+      trackOrder: 'Track order',
+      support: 'Support',
+      promoUntil: 'Until Jan 2026',
+      newBadge: 'NEW',
+    },
+    my: {
+      slogan: 'မြို့တွင်း · ၃၀ မိနစ်',
+      hello: 'မင်္ဂလာပါ',
+      guest: 'ဧည့်သည်',
+      howToUse: 'အသုံးပြုနည်း',
+      howToUseHint: 'စတင်သူလမ်းညွှန်',
+      logistics: 'ကျွန်ုပ်၏ပို့ဆောင်မှု',
+      inProgress: 'ဆောင်ရွက်နေဆဲ',
+      pendingPickup: 'ထုပ်ယူရန်',
+      orderNow: 'ယခုမှာယူ',
+      nearbyStores: 'အနီးဆိုင်',
+      trackOrder: 'ခြေရာခံ',
+      support: 'ဝန်ဆောင်မှု',
+      promoUntil: '၂၀၂၆ ဇန်နဝါရီ အထိ',
+      newBadge: 'NEW',
+    },
+  }[language];
+
   useEffect(() => {
     analytics.trackPageView('HomeScreen');
     loadBanners();
@@ -131,292 +170,39 @@ export default function HomeScreen({ navigation }: any) {
     try {
       const activeBanners = await bannerService.getActiveBanners();
       setBanners(activeBanners);
-      setLoadingBanners(false);
     } catch (error) {
       console.error('Failed to load banners:', error);
-      setLoadingBanners(false);
     }
   };
 
-  // 每次页面获得焦点时，重新检查登录状态和数据
   useFocusEffect(
     useCallback(() => {
       const checkAuthAndLoadData = async () => {
         try {
           const storedUserId = await AsyncStorage.getItem('userId');
           const guestMode = await AsyncStorage.getItem('isGuest');
-
-          // 强制检查：如果未登录且非访客模式，直接跳转到登录页
           if (!storedUserId && guestMode !== 'true') {
             navigation.replace('Login');
             return;
           }
-
           loadUserData();
         } catch (error) {
           console.error('Auth check failed:', error);
         }
       };
-
       checkAuthAndLoadData();
     }, [])
   );
 
-  const [refreshing, setRefreshing] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isGuest, setIsGuest] = useState(false);
-  const [userType, setUserType] = useState<string | null>(null);
-  const [userName, setUserName] = useState('');
-  const [orderStats, setOrderStats] = useState<OrderStats>({
-    total: 0,
-    pending: 0,
-    inTransit: 0,
-    delivered: 0,
-    cancelled: 0,
-  });
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [loadingRecentOrders, setLoadingRecentOrders] = useState(true);
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-  const scrollY = new Animated.Value(0);
-  const bannerScrollRef = useRef<ScrollView>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  const [isBannerPaused, setIsBannerPaused] = useState(false);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [loadingBanners, setLoadingBanners] = useState(true);
-  const [showTutorialModal, setShowTutorialModal] = useState(false);
-  const TOTAL_BANNERS = banners.length > 0 ? banners.length : 3;
-
-  // 自动轮播逻辑
   useEffect(() => {
-    if (isBannerPaused) return; // 如果暂停，不执行轮播
-
+    if (isBannerPaused || totalBanners <= 1) return;
     const timer = setInterval(() => {
-      let nextIndex = currentBannerIndex + 1;
-      if (nextIndex >= TOTAL_BANNERS) {
-        nextIndex = 0;
-      }
-      
-      if (bannerScrollRef.current) {
-        bannerScrollRef.current.scrollTo({
-          x: nextIndex * (width - 32), // 宽度需要计算 padding
-          animated: true,
-        });
-        setCurrentBannerIndex(nextIndex);
-      }
-    }, 5000); // 5秒切换
-
+      const nextIndex = (currentBannerIndex + 1) % totalBanners;
+      bannerScrollRef.current?.scrollTo({ x: nextIndex * BANNER_W, animated: true });
+      setCurrentBannerIndex(nextIndex);
+    }, 5000);
     return () => clearInterval(timer);
-  }, [currentBannerIndex, isBannerPaused]);
-
-  const t = {
-    zh: {
-      title: 'MARKET LINK EXPRESS',
-      subtitle: '快速、安全、可靠的同城配送服务',
-      welcome: '欢迎',
-      welcomeBack: '欢迎回来',
-      guest: '访客',
-      placeOrder: '立即下单',
-      trackOrder: '追踪订单',
-      myOrders: '我的订单',
-      profile: '个人中心',
-      orderStats: '订单统计',
-      totalOrders: '全部订单',
-      pendingOrders: '待取件',
-      inTransitOrders: '配送中',
-      deliveredOrders: '已送达',
-  chatWithCourier: '联系配送员',
-  chatWithCustomer: '联系客户',
-  inputMessage: '输入消息...',
-  sendMessage: '发送',
-  noMessages: '暂无消息',
-  newChatMessage: '您有新的消息',
-      services: '核心服务',
-      service1Title: '快速配送',
-      service1Desc: '准时达1小时内送达\n急送达30分钟内送达',
-      service2Title: '安全可靠',
-      service2Desc: '专业配送团队\n全程保险保障',
-      service3Title: '实时追踪',
-      service3Desc: '随时查看包裹位置\n配送员实时定位',
-      service4Title: '价格透明',
-      service4Desc: '明码标价计费\n无隐藏费用',
-      recentOrders: '最近订单',
-      viewAll: '查看全部',
-      noOrders: '暂无订单',
-      noOrdersDesc: '您还没有创建订单\n点击下方按钮开始下单',
-      receiver: '收件人',
-      address: '地址',
-      status: '状态',
-      price: '金额',
-      contact: '联系我们',
-      phone: '客服热线',
-      email: '商务合作',
-      wechatId: 'WeChat ID',
-      wechatValue: 'AMT349',
-      viber: 'Viber',
-      viberValue: '09259369349',
-      gmail: 'Gmail',
-      gmailValue: 'huangdelun16@gmail.com',
-      features: '为什么选择我们',
-      feature1: '7×24小时客服',
-      feature2: '覆盖全缅甸主要城市',
-      feature3: '专业配送团队',
-      feature4: '智能路线优化',
-      loginToSeeOrders: '登录后查看订单',
-      loginNow: '立即登录',
-      cityMall: '同城商场',
-      shoppingCart: '购物车',
-      howToUse: '使用教学',
-      comingSoon: '敬请期待',
-    },
-    en: {
-      title: 'MARKET LINK EXPRESS',
-      subtitle: 'Fast, Safe, and Reliable Same-City Delivery',
-      welcome: 'Welcome',
-      welcomeBack: 'Welcome Back',
-      guest: 'Guest',
-      placeOrder: 'Place Order',
-      trackOrder: 'Track Order',
-      myOrders: 'My Orders',
-      profile: 'Profile',
-      orderStats: 'Order Statistics',
-      totalOrders: 'Total Orders',
-      pendingOrders: 'Pending',
-      inTransitOrders: 'In Transit',
-      deliveredOrders: 'Delivered',
-  chatWithCourier: 'Chat with Courier',
-  chatWithCustomer: 'Chat with Customer',
-  inputMessage: 'Type a message...',
-  sendMessage: 'Send',
-  noMessages: 'No messages',
-  newChatMessage: 'You have a new message',
-      services: 'Core Services',
-      service1Title: 'Fast Delivery',
-      service1Desc: 'On-Time: within 1 hour\nExpress: within 30 mins',
-      service2Title: 'Safe & Reliable',
-      service2Desc: 'Professional team\nFull insurance',
-      service3Title: 'Real-time Tracking',
-      service3Desc: 'Check package location\nCourier live tracking',
-      service4Title: 'Transparent Pricing',
-      service4Desc: 'Clear pricing rules\nNo hidden fees',
-      recentOrders: 'Recent Orders',
-      viewAll: 'View All',
-      noOrders: 'No Orders',
-      noOrdersDesc: 'You haven\'t created any orders yet\nTap below to start',
-      receiver: 'Receiver',
-      address: 'Address',
-      status: 'Status',
-      price: 'Price',
-      contact: 'Contact Us',
-      phone: 'Hotline',
-      email: 'Business Cooperation',
-      wechatId: 'WeChat ID',
-      wechatValue: 'AMT349',
-      viber: 'Viber',
-      viberValue: '09259369349',
-      gmail: 'Gmail',
-      gmailValue: 'huangdelun16@gmail.com',
-      features: 'Why Choose Us',
-      feature1: '24/7 Customer Service',
-      feature2: 'Myanmar-wide Coverage',
-      feature3: 'Professional Team',
-      feature4: 'Smart Route Optimization',
-      loginToSeeOrders: 'Login to see orders',
-      loginNow: 'Login Now',
-      cityMall: 'City Mall',
-      shoppingCart: 'Cart',
-      howToUse: 'Usage Guide',
-      comingSoon: 'Coming Soon',
-    },
-    my: {
-      title: 'MARKET LINK EXPRESS',
-      subtitle: 'မြန်ဆန်၊ ဘေးကင်းပြီး ယုံကြည်ရသော ပို့ဆောင်ရေး',
-      welcome: 'ကြိုဆိုပါတယ်',
-      welcomeBack: 'ပြန်လည်ကြိုဆိုပါတယ်',
-      guest: 'ဧည့်သည်',
-      placeOrder: 'အမှာစာတင်',
-      trackOrder: 'ခြေရာခံ',
-      myOrders: 'ကျွန်ုပ်၏အမှာစာများ',
-      profile: 'ကိုယ်ရေး',
-      orderStats: 'အမှာစာစာရင်းအင်း',
-      totalOrders: 'စုစုပေါင်း',
-      pendingOrders: 'ဆိုင်းငံ့',
-      inTransitOrders: 'ပို့ဆောင်နေဆဲ',
-      deliveredOrders: 'ပို့ဆောင်ပြီး',
-  chatWithCourier: 'ပို့ဆောင်သူနှင့် စကားပြောရန်',
-  chatWithCustomer: 'ဖောက်သည်နှင့် စကားပြောရန်',
-  inputMessage: 'မက်ဆေ့ခ်ျရိုက်ပါ...',
-  sendMessage: 'ပို့မည်',
-  noMessages: 'မက်ဆေ့ခ်ျမရှိပါ',
-  newChatMessage: 'သင့်တွင် မက်ဆေ့ခ်ျအသစ်ရှိသည်',
-      services: 'အဓိကဝန်ဆောင်မှုများ',
-      service1Title: 'မြန်ဆန်သောပို့ဆောင်ရေး',
-      service1Desc: '၁နာရီအတွင်း\n၃၀မိနစ်အမြန်ပို့',
-      service2Title: 'ဘေးကင်းယုံကြည်',
-      service2Desc: 'ပရော်ဖက်ရှင်နယ်အဖွဲ့\nအာမခံအပြည့်အဝ',
-      service3Title: 'တိုက်ရိုက်ခြေရာခံ',
-      service3Desc: 'အချိန်မရွေးစစ်ဆေးနိုင်\nမော်တော်ဆိုင်ကယ်တည်နေရာ',
-      service4Title: 'ပွင့်လင်းသောစျေးနှုန်း',
-      service4Desc: 'ရှင်းလင်းသောစျေးနှုန်း\nလျှို့ဝှက်ကုန်ကျစရိတ်မရှိ',
-      recentOrders: 'မကြာသေးမီအမှာစာများ',
-      viewAll: 'အားလုံးကြည့်',
-      noOrders: 'အမှာစာမရှိသေးပါ',
-      noOrdersDesc: 'သင်မှာယူမှုမရှိသေးပါ\nအောက်ပါခလုတ်ကိုနှိပ်ပြီးစတင်ပါ',
-      receiver: 'လက်ခံသူ',
-      address: 'လိပ်စာ',
-      status: 'အခြေအနေ',
-      price: 'စျေးနှုန်း',
-      contact: 'ဆက်သွယ်ရန်',
-      phone: 'ဖုန်း',
-      email: 'စီးပွားရေးပူးပေါင်းဆောင်ရွက်မှု',
-      wechatId: 'WeChat ID',
-      wechatValue: 'AMT349',
-      viber: 'Viber',
-      viberValue: '09259369349',
-      gmail: 'Gmail',
-      gmailValue: 'huangdelun16@gmail.com',
-      features: 'ကျွန်ုပ်တို့ကိုရွေးချယ်ရသည့်အကြောင်းရင်း',
-      feature1: '၂၄နာရီဝန်ဆောင်မှု',
-      feature2: 'မြန်မာတစ်နိုင်ငံလုံး',
-      feature3: 'ကျွမ်းကျင်သောအဖွဲ့',
-      feature4: 'စမတ်လမ်းကြောင်း',
-      loginToSeeOrders: 'အမှာစာများကြည့်ရန် ဝင်ရောက်ပါ',
-      loginNow: 'ယခုဝင်ရောက်',
-      cityMall: 'မြို့တွင်းဈေးဝယ်စင်တာ',
-      shoppingCart: 'ဈေးဝယ်လှည်း',
-      howToUse: 'အသုံးပြုနည်းလမ်းညွှန်',
-      comingSoon: 'မကြာမီလာမည်',
-    },
-  };
-
-  const currentT = t[language];
-  const hotlineDisplay = HOTLINE_NUMBERS.map(item => item.display).join('\n');
-
-  const handleCallHotline = () => {
-    const cancelText = language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'မဆက်တော့ပါ';
-    const title =
-      language === 'zh'
-        ? '选择拨打的客服热线'
-        : language === 'en'
-        ? 'Choose a hotline number'
-        : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ';
-
-    Alert.alert(
-      title,
-      '',
-      [
-        ...HOTLINE_NUMBERS.map(item => ({
-          text: item.display,
-          onPress: () => Linking.openURL(`tel:${item.tel}`),
-        })),
-        { text: cancelText, style: 'cancel' },
-      ]
-    );
-  };
-
-  // 加载用户信息和订单数据
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  }, [currentBannerIndex, isBannerPaused, totalBanners]);
 
   const loadUserData = async () => {
     try {
@@ -424,1607 +210,498 @@ export default function HomeScreen({ navigation }: any) {
       const storedUserName = await AsyncStorage.getItem('userName');
       const storedUserEmail = await AsyncStorage.getItem('userEmail');
       const storedUserPhone = await AsyncStorage.getItem('userPhone');
-      const storedUserType = await AsyncStorage.getItem('userType');
       const guestMode = await AsyncStorage.getItem('isGuest');
-      
+
       setUserId(storedUserId);
       setUserName(storedUserName || '');
-      
-      // 会员 App 仅 customer / vip / guest；商家会话由 AppContext 清掉
-      const finalUserType = storedUserType?.toLowerCase() || null;
-      setUserType(finalUserType);
-      
       setIsGuest(guestMode === 'true');
 
-      // 如果是已登录用户（非访客），按客户身份加载订单数据
       if (storedUserId && guestMode !== 'true') {
-        await loadOrderData(storedUserId, storedUserEmail || undefined, storedUserPhone || undefined, 'customer');
+        const [photo, remote] = await Promise.all([
+          loadUserAvatarUrl(storedUserId),
+          hydrateUserAvatarFromServer(storedUserId).catch(() => ''),
+        ]);
+        setAvatarUri(remote || photo);
+        await loadOrderData(storedUserId, storedUserEmail || undefined, storedUserPhone || undefined);
+      } else {
+        setAvatarUri('');
+        setOrderStats({ total: 0, pending: 0, inTransit: 0, delivered: 0, cancelled: 0 });
       }
     } catch (error) {
       errorService.handleError(error, { context: 'HomeScreen.loadUserData', silent: true });
     }
   };
 
-  const loadOrderData = async (customerId: string, email?: string, phone?: string, userType?: string) => {
+  const loadOrderData = async (customerId: string, email?: string, phone?: string) => {
     try {
-      setLoadingStats(true);
-      setLoadingRecentOrders(true);
-      
-      // 获取订单统计
-      const stats = await packageService.getOrderStats(customerId, email, phone, userType);
+      const stats = await packageService.getOrderStats(customerId, email, phone, 'customer');
       setOrderStats(stats);
-      setLoadingStats(false);
-
-      // 获取最近的订单
-      const orders = await packageService.getRecentOrders(customerId, 3, email, phone, userType);
-      setRecentOrders(orders as RecentOrder[]);
-      setLoadingRecentOrders(false);
     } catch (error) {
-      setLoadingStats(false);
-      setLoadingRecentOrders(false);
       errorService.handleError(error, { context: 'HomeScreen.loadOrderData', silent: true });
     }
   };
 
-  // 下拉刷新
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadUserData();
+    await Promise.all([loadUserData(), loadBanners()]);
     setRefreshing(false);
   };
 
-  // 导航处理（带加载效果）
-  const handleNavigateWithLoading = async (screen: string, message: string) => {
-    if (screen === 'MyOrders' && (await isGuestMode())) {
-      promptGuestLogin(navigation, language);
-      return;
+  const requireLogin = () => {
+    if (isGuest || !userId) {
+      navigation.navigate('Login');
+      return false;
     }
-    showLoading(message);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    hideLoading();
-    navigation.navigate(screen);
+    return true;
   };
 
-  // 获取状态颜色
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case '待取件':
-        return '#f59e0b';
-      case '已取件':
-      case '配送中':
-        return '#3b82f6';
-      case '已送达':
-        return '#10b981';
-      case '已取消':
-        return '#ef4444';
-      default:
-        return '#6b7280';
-    }
+  const handleCallHotline = () => {
+    const cancelText = language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'မဆက်တော့ပါ';
+    const title =
+      language === 'zh' ? '选择拨打的客服热线' : language === 'en' ? 'Choose a hotline number' : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ';
+    Alert.alert(title, '', [
+      ...HOTLINE_NUMBERS.map((item) => ({
+        text: item.display,
+        onPress: () => Linking.openURL(`tel:${item.tel}`),
+      })),
+      { text: cancelText, style: 'cancel' as const },
+    ]);
   };
 
-  // 格式化日期
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (minutes < 60) return `${minutes}分钟前`;
-    if (hours < 24) return `${hours}小时前`;
-    if (days < 7) return `${days}天前`;
-    return date.toLocaleDateString();
+  const openOrders = (filterStatus: string) => {
+    if (!requireLogin()) return;
+    navigation.navigate('MyOrders', { filterStatus });
   };
 
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0.9],
-    extrapolate: 'clamp',
-  });
+  const greetName = userName || (isGuest ? t.guest : '');
+  const avatarSrc = avatarDisplayUri(avatarUri);
 
-  const headerScale = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0.95],
-    extrapolate: 'clamp',
-  });
+  const quickActions = [
+    { key: 'order', label: t.orderNow, icon: <ClayScooter size={42} />, onPress: () => navigation.navigate('PlaceOrder') },
+    { key: 'mall', label: t.nearbyStores, icon: <ClayStoreFront size={42} />, onPress: () => navigation.navigate('CityMall') },
+    { key: 'track', label: t.trackOrder, icon: <ClayMapBoard size={42} />, onPress: () => navigation.navigate('TrackOrder') },
+    { key: 'support', label: t.support, icon: <ClayHeadset size={42} />, onPress: handleCallHotline },
+  ];
+
+  const renderBanner = (banner: Banner, index: number) => (
+    <TouchableOpacity
+      key={banner.id || String(index)}
+      activeOpacity={0.92}
+      onPress={() => banner.link_url && Linking.openURL(banner.link_url)}
+      onPressIn={() => setIsBannerPaused(true)}
+      onPressOut={() => setIsBannerPaused(false)}
+      style={styles.bannerCard}
+    >
+      <LinearGradient
+        colors={[banner.bg_color_start || '#D7F3F6', banner.bg_color_end || '#F2FBFC']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.bannerGradient}
+      >
+        <View style={styles.pagodaWrap}>
+          <ClayPagodas width={170} height={92} />
+        </View>
+        <View style={styles.bannerCopy}>
+          <Text style={styles.bannerTitle} numberOfLines={2}>
+            {banner.title}
+          </Text>
+          {banner.subtitle ? (
+            <Text style={styles.bannerPrice} numberOfLines={1}>
+              {banner.subtitle}
+            </Text>
+          ) : null}
+          <Text style={styles.bannerUntil}>{t.promoUntil}</Text>
+          {banner.burmese_title ? (
+            <Text style={styles.bannerMy} numberOfLines={2}>
+              {banner.burmese_title}
+            </Text>
+          ) : null}
+        </View>
+        <BrandRider width={118} style={styles.bannerRider} />
+        {index === 0 ? (
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>{t.newBadge}</Text>
+          </View>
+        ) : null}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
 
   return (
-    <View style={[styles.container, isDarkMode && { backgroundColor: '#0f172a' }]}>
-      <Animated.ScrollView 
-        style={styles.content}
+    <View style={styles.container}>
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#3b82f6"
-            colors={['#3b82f6', '#2563eb']}
-          />
-        }
+        contentContainerStyle={{ paddingBottom: 28 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TEAL} colors={[TEAL]} />}
       >
-        {/* Hero Section with Web Background */}
-        <Animated.View style={{ opacity: headerOpacity, transform: [{ scale: headerScale }] }}>
-          <LinearGradient
-            colors={HERO_GRADIENT}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.headerBackground}
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 4 }]}>
+          <View style={styles.logoTile}>
+            <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          </View>
+          <View style={styles.brandCol}>
+            <Text style={styles.brandName}>MARKET LINK</Text>
+            <Text style={styles.brandSub}>EXPRESS</Text>
+            <Text style={styles.slogan}>{t.slogan}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.helloPill}
+            onPress={() => navigation.navigate(isGuest ? 'Login' : 'Profile')}
+            activeOpacity={0.86}
           >
-            <View style={styles.heroOrbTop} />
-            <View style={styles.heroOrbBottom} />
-            <LinearGradient
-              colors={['rgba(251,191,36,0.35)', 'rgba(59,130,246,0.2)', 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.heroTopShine}
-            />
-
-            <LinearGradient
-              colors={['#fcd34d', '#f59e0b', '#ea580c']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.logoRing}
-            >
-              <View style={styles.logoContainer}>
-                <Image
-                  source={require('../../assets/logo.png')}
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-              </View>
-            </LinearGradient>
-
-            <View style={styles.brandTitleBlock}>
-              <Text style={styles.title}>MARKET LINK</Text>
-              <Text style={styles.titleAccent}>EXPRESS</Text>
-              <View style={styles.brandTaglineRow}>
-                <View style={styles.brandTaglineLine} />
-                <Text style={styles.brandTagline}>DELIVERY SERVICES</Text>
-                <View style={styles.brandTaglineLine} />
-              </View>
+            <Text style={styles.helloText} numberOfLines={1}>
+              {t.hello}{greetName ? `, ${greetName}` : ''}
+            </Text>
+            <View style={styles.helloAvatar}>
+              {avatarSrc ? (
+                <Image source={{ uri: avatarSrc }} style={styles.helloAvatarImg} />
+              ) : (
+                <ProfileAvatar3D size={28} />
+              )}
             </View>
+          </TouchableOpacity>
+        </View>
 
-            <View style={styles.welcomeSection}>
-              <View style={styles.welcomeContainer} accessibilityRole="header">
-                <Text style={styles.welcomeText}>
-                  {userName
-                    ? `${currentT.welcomeBack}, ${userName}!`
-                    : isGuest
-                      ? `${currentT.welcome}, ${currentT.guest}!`
-                      : currentT.welcome}
-                </Text>
-              </View>
+        <TouchableOpacity style={styles.tutorialCard} onPress={() => setShowTutorialModal(true)} activeOpacity={0.88}>
+          <ClayBook size={46} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tutorialTitle}>{t.howToUse}</Text>
+            <Text style={styles.tutorialHint}>{t.howToUseHint}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#C5CDD6" />
+        </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.tutorialFullWidth}
-                onPress={() => setShowTutorialModal(true)}
-                activeOpacity={0.88}
-              >
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.06)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.tutorialGradient}
-                >
-                  <View style={styles.tutorialLeft}>
-                    <LinearGradient
-                      colors={['rgba(59,130,246,0.45)', 'rgba(99,102,241,0.35)']}
-                      style={styles.tutorialIconBg}
-                    >
-                      <Ionicons name="book-outline" size={20} color="#e0f2fe" />
-                    </LinearGradient>
-                    <View>
-                      <Text style={styles.tutorialMainText}>{currentT.howToUse}</Text>
-                      <Text style={styles.tutorialSubText}>
-                        {language === 'zh'
-                          ? '新手上路 · 图文详解'
-                          : language === 'en'
-                            ? 'Quick Start Guide'
-                            : 'အသုံးပြုပုံ အဆင့်ဆင့်လမ်းညွှန်'}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.tutorialChevronWrap}>
-                    <Ionicons name="chevron-forward" size={18} color="#bfdbfe" />
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* 3D 风格广告横幅 (自动轮播) */}
-        <View style={styles.bannerContainer}>
+        <View style={styles.bannerWrap}>
           <ScrollView
             ref={bannerScrollRef}
             horizontal
-            snapToInterval={width - 32}
-            decelerationRate="fast"
+            pagingEnabled
             showsHorizontalScrollIndicator={false}
-            scrollEnabled={true}
-            pagingEnabled={true}
+            snapToInterval={BANNER_W}
+            decelerationRate="fast"
             onMomentumScrollEnd={(event) => {
-              const offsetX = event.nativeEvent.contentOffset.x;
-              const newIndex = Math.round(offsetX / (width - 32));
-              if (newIndex >= 0 && newIndex < TOTAL_BANNERS) {
-                setCurrentBannerIndex(newIndex);
-              }
+              const next = Math.round(event.nativeEvent.contentOffset.x / BANNER_W);
+              if (next >= 0 && next < totalBanners) setCurrentBannerIndex(next);
             }}
-            style={styles.bannerScroll}
-            contentContainerStyle={{ width: (width - 32) * (banners.length || 5) }}
           >
-            {banners.length > 0 ? (
-              banners.map((banner, index) => (
-                <View key={banner.id || index} style={styles.bannerCardWrapper}>
-                  <TouchableOpacity 
-                    activeOpacity={0.9}
-                    onPress={() => banner.link_url && Linking.openURL(banner.link_url)}
-                    style={styles.bannerCard}
-                    onStartShouldSetResponder={() => true}
-                    onResponderGrant={() => setIsBannerPaused(true)}
-                    onResponderRelease={() => setIsBannerPaused(false)}
-                  >
-                    <LinearGradient
-                      colors={[banner.bg_color_start || '#3b82f6', banner.bg_color_end || '#60a5fa']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.bannerGradient}
-                    >
-                      <View style={styles.citySilhouette} />
-                      <View style={styles.bannerContentRow}>
-                        <View style={styles.bannerTextArea}>
-                          {banner.image_url ? (
-                            <Image 
-                              source={{ uri: banner.image_url }} 
-                              style={styles.bannerLogoIcon} 
-                              resizeMode="contain"
-                            />
-                          ) : (
-                            <Image 
-                              source={require('../../assets/logo.png')} 
-                              style={styles.bannerLogoIcon} 
-                              resizeMode="contain"
-                            />
-                          )}
-                          <Text style={styles.bannerHeadline}>{banner.title}</Text>
-                          <Text style={styles.bannerSubHeadline}>{banner.subtitle}</Text>
-                          <Text style={styles.bannerBurmeseText}>{banner.burmese_title}</Text>
-                        </View>
-                        <View style={styles.phoneMockupContainer}>
-                          <View style={styles.phoneMockup}>
-                            <View style={styles.phoneScreen}>
-                              <View style={styles.mapRoute} />
-                              <View style={styles.mapPinRider}><Text style={{fontSize: 24}}>🚀</Text></View>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              ))
-            ) : (
-              <>
-                {/* 第一张卡片：地图追踪 */}
-                <View style={styles.bannerCardWrapper}>
-                  <View 
-                    style={styles.bannerCard}
-                    onStartShouldSetResponder={() => true}
-                    onResponderGrant={() => setIsBannerPaused(true)}
-                    onResponderRelease={() => setIsBannerPaused(false)}
-                  >
-                    <LinearGradient
-                      colors={['#3b82f6', '#60a5fa', '#ffffff']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      locations={[0, 0.6, 1]}
-                      style={styles.bannerGradient}
-                    >
-                      <View style={styles.citySilhouette} />
-                      <View style={styles.bannerContentRow}>
-                        <View style={styles.bannerTextArea}>
-                          <Image 
-                            source={require('../../assets/logo.png')} 
-                            style={styles.bannerLogoIcon} 
-                            resizeMode="contain"
-                          />
-                          <Text style={styles.bannerHeadline}>曼德勒同城快递{'\n'}极速送达</Text>
-                          <Text style={styles.bannerSubHeadline}>5分钟接单 · 实时定位</Text>
-                          <Text style={styles.bannerBurmeseText}>
-                            မန္တလေးမြို့တွင်း မြန်ဆန်စွာပို့ဆောင်ပေးခြင်း
-                          </Text>
-                        </View>
-                        <View style={styles.phoneMockupContainer}>
-                          <View style={styles.phoneMockup}>
-                            <View style={styles.phoneScreen}>
-                              <View style={styles.mapRoute} />
-                              <View style={styles.mapPinSender}><Text style={{fontSize: 10}}>🏠</Text></View>
-                              <View style={styles.mapPinRider}><Text style={{fontSize: 12}}>🛵</Text></View>
-                              <View style={styles.mapPinReceiver}><Text style={{fontSize: 10}}>📍</Text></View>
-                              <View style={styles.floatingCard}>
-                                <Text style={{fontSize: 8, fontWeight: 'bold', color: '#333'}}>正在配送中...</Text>
-                                <Text style={{fontSize: 7, color: '#666'}}>预计 15 分钟送达</Text>
-                              </View>
-                            </View>
-                            <LinearGradient
-                              colors={['rgba(255,255,255,0.4)', 'transparent', 'rgba(255,255,255,0.1)']}
-                              style={styles.phoneReflection}
-                            />
-                          </View>
-                          <View style={[styles.floatingIcon, { top: -10, right: -10 }]}>
-                            <Text style={{fontSize: 24}}>📦</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  </View>
-                </View>
-
-                {/* 第二张卡片：地址填写 */}
-                <View style={styles.bannerCardWrapper}>
-                  <View 
-                    style={styles.bannerCard}
-                    onStartShouldSetResponder={() => true}
-                    onResponderGrant={() => setIsBannerPaused(true)}
-                    onResponderRelease={() => setIsBannerPaused(false)}
-                  >
-                    <LinearGradient
-                      colors={['#f3f4f6', '#ffffff', '#e5e7eb']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.bannerGradient}
-                    >
-                      <View style={styles.bannerContentRow}>
-                        <View style={styles.bannerTextArea}>
-                          <Text style={[styles.bannerHeadline, { color: '#1f2937' }]}>一键填写地址{'\n'}极速上门取件</Text>
-                          <Text style={[styles.bannerSubHeadline, { color: '#4b5563' }]}>实时定位 · 30分钟送达</Text>
-                          <Text style={[styles.bannerBurmeseText, { color: '#6b7280' }]}>
-                            မှန်ကန်သောလိပ်စာ ထည့်သွင်းလိုက်ရုံဖြင့် အမြန်ဆုံးလာရောက်ယူဆောင်ပေးခြင်း
-                          </Text>
-                        </View>
-                        <View style={styles.phoneMockupContainer}>
-                          <View style={[styles.phoneMockup, { backgroundColor: '#f9fafb', borderColor: '#e5e7eb' }]}>
-                            <View style={[styles.phoneScreen, { backgroundColor: '#ffffff', padding: 8 }]}>
-                              <View style={{ width: '100%', height: 6, backgroundColor: '#e5e7eb', borderRadius: 3, marginBottom: 6 }} />
-                              <View style={{ width: '70%', height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, marginBottom: 12 }} />
-                              <View style={{ borderWidth: 1, borderColor: '#3b82f6', borderRadius: 4, padding: 4, marginBottom: 6, backgroundColor: '#eff6ff' }}>
-                                <Text style={{ fontSize: 6, color: '#1e40af' }}>请输入发件地址...</Text>
-                              </View>
-                              <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 4, padding: 4, marginBottom: 6 }}>
-                                <Text style={{ fontSize: 6, color: '#9ca3af' }}>请输入收件地址...</Text>
-                              </View>
-                              <View style={{ position: 'absolute', bottom: 8, left: 8, right: 8, height: 16, backgroundColor: '#3b82f6', borderRadius: 4, justifyContent: 'center', alignItems: 'center' }}>
-                                <Text style={{ color: 'white', fontSize: 6, fontWeight: 'bold' }}>立即下单</Text>
-                              </View>
-                            </View>
-                          </View>
-                          <View style={[styles.floatingIcon, { top: 10, right: -5 }]}>
-                            <Text style={{fontSize: 24}}>📝</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  </View>
-                </View>
-
-                {/* 第三张卡片：上线促销 */}
-                <View style={styles.bannerCardWrapper}>
-                  <View 
-                    style={styles.bannerCard}
-                    onStartShouldSetResponder={() => true}
-                    onResponderGrant={() => setIsBannerPaused(true)}
-                    onResponderRelease={() => setIsBannerPaused(false)}
-                  >
-                    <LinearGradient
-                      colors={['#1e293b', '#334155', '#475569']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.bannerGradient}
-                    >
-                      <View style={styles.bannerContentRow}>
-                        <View style={styles.bannerTextArea}>
-                          <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start', marginBottom: 8 }}>
-                            <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>NEW LAUNCH</Text>
-                          </View>
-                          <Text style={[styles.bannerHeadline, { color: 'white', fontSize: 18 }]}>MDY同城2000MMK/趟</Text>
-                          <Text style={[styles.bannerSubHeadline, { color: '#cbd5e1' }]}>活动仅限 2026年1月</Text>
-                          <Text style={[styles.bannerBurmeseText, { color: '#94a3b8' }]}>
-                            Software စမ်းသပ်အသုံးပြုကာလအတွင်း MDY မြို့တွင်း 2000MMK/တစ်ကြိမ်
-                          </Text>
-                        </View>
-                        <View style={styles.phoneMockupContainer}>
-                          <View style={[styles.phoneMockup, { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' }]}>
-                            <View style={[styles.phoneScreen, { backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }]}>
-                              <Text style={{ fontSize: 20 }}>🚀</Text>
-                              <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#1e293b', marginTop: 4 }}>GRAND OPENING</Text>
-                              <Text style={{ fontSize: 6, color: '#64748b' }}>Jan 1, 2026</Text>
-                              <View style={{ width: '80%', height: 3, backgroundColor: '#e2e8f0', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
-                                <View style={{ width: '60%', height: '100%', backgroundColor: '#3b82f6' }} />
-                              </View>
-                            </View>
-                          </View>
-                          <View style={[styles.floatingIcon, { top: -5, right: -5 }]}>
-                            <Text style={{fontSize: 24}}>✨</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  </View>
-                </View>
-              </>
-            )}
+            {displayBanners.map(renderBanner)}
           </ScrollView>
-          
-          {/* 圆点指示器 - 位于卡片下方中间 */}
-          <View style={styles.bannerIndicatorContainer}>
-            <View style={styles.bannerIndicatorDots}>
-              {Array.from({ length: TOTAL_BANNERS }).map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.bannerIndicatorDot,
-                    currentBannerIndex === index && styles.bannerIndicatorDotActive,
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-        </View>
-
-        {/* Quick Action Cards */}
-        <View style={styles.quickActionsContainer}>
-          <HomeSectionHeader
-            kicker={
-              language === 'zh' ? '快捷入口' : language === 'en' ? 'Quick access' : 'အမြန်ဝင်ရောက်မှု'
-            }
-            title={language === 'zh' ? '常用服务' : language === 'en' ? 'Services' : 'ဝန်ဆောင်မှုများ'}
-            dark={isDarkMode}
-          />
-          <View style={styles.quickActionsGrid}>
-            <QuickActionTile
-              colors={['#f59e0b', '#c2410c']}
-              icon="📦"
-              label={currentT.placeOrder}
-              onPress={() => handleNavigateWithLoading('PlaceOrder', `${currentT.placeOrder}...`)}
-              accessibilityLabel={currentT.placeOrder}
-              accessibilityHint="跳转到下单页面"
-            />
-            {(isGuest || userType === 'customer' || userType === 'vip') && (
-              <QuickActionTile
-                colors={['#3b82f6', '#312e81']}
-                icon="🏪"
-                label={currentT.cityMall}
-                onPress={() => navigation.navigate('CityMall')}
-                accessibilityLabel={currentT.cityMall}
+          <View style={styles.dots}>
+            {displayBanners.map((banner, index) => (
+              <View
+                key={banner.id || `dot-${index}`}
+                style={[styles.dot, currentBannerIndex === index && styles.dotActive]}
               />
-            )}
-            <QuickActionTile
-              colors={['#8b5cf6', '#6d28d9']}
-              icon="📋"
-              label={currentT.myOrders}
-              onPress={() => handleNavigateWithLoading('MyOrders', `${currentT.myOrders}...`)}
-              accessibilityLabel={currentT.myOrders}
-              accessibilityHint="查看我的订单列表"
-            />
-            {(isGuest || userType === 'customer' || userType === 'vip') && (
-              <QuickActionTile
-                colors={['#fbbf24', '#d97706']}
-                icon="🛒"
-                label={currentT.shoppingCart}
-                onPress={() => navigation.navigate('Cart')}
-                accessibilityLabel={currentT.shoppingCart}
-              />
-            )}
-            <QuickActionTile
-              colors={['#38bdf8', '#2563eb']}
-              icon="🔍"
-              label={currentT.trackOrder}
-              onPress={() => handleNavigateWithLoading('TrackOrder', `${currentT.trackOrder}...`)}
-              accessibilityLabel={currentT.trackOrder}
-              accessibilityHint="跳转到订单追踪页面"
-            />
-            <QuickActionTile
-              colors={['#34d399', '#059669']}
-              icon="👤"
-              label={currentT.profile}
-              onPress={() => handleNavigateWithLoading('Profile', `${currentT.profile}...`)}
-              accessibilityLabel={currentT.profile}
-              accessibilityHint="查看个人中心"
-            />
-          </View>
-        </View>
-
-        {/* 最近订单 */}
-        {!isGuest && userId && (
-          <View style={styles.recentOrdersContainer}>
-            <HomeSectionHeader
-              kicker={
-                language === 'zh' ? '我的物流' : language === 'en' ? 'Your orders' : 'သင်၏အော်ဒါများ'
-              }
-              title={currentT.recentOrders}
-              actionLabel={recentOrders.length > 0 ? `${currentT.viewAll} →` : undefined}
-              onAction={recentOrders.length > 0 ? () => navigation.navigate('MyOrders') : undefined}
-              dark={isDarkMode}
-            />
-
-            {loadingRecentOrders ? (
-              <>
-                <OrderCardSkeleton />
-                <OrderCardSkeleton />
-              </>
-            ) : recentOrders.length === 0 ? (
-              <View style={styles.noOrdersCard}>
-                <Text style={styles.noOrdersIcon}>📭</Text>
-                <Text style={styles.noOrdersText}>{currentT.noOrders}</Text>
-                <Text style={styles.noOrdersDesc}>{currentT.noOrdersDesc}</Text>
-                <TouchableOpacity
-                  style={styles.startOrderButton}
-                  onPress={() => navigation.navigate('PlaceOrder')}
-                  activeOpacity={0.7}
-                >
-                  <LinearGradient
-                    colors={['#3b82f6', '#2563eb']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.startOrderGradient}
-                  >
-                    <Text style={styles.startOrderText}>{currentT.placeOrder}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              recentOrders.map((order) => (
-                <TouchableOpacity
-                  key={order.id}
-                  style={[styles.orderCard, isDarkMode && styles.darkCard]}
-                  onPress={() => navigation.navigate('OrderDetail', { orderId: order.id })}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel={`订单 ${order.id}, 收件人 ${order.receiver_name}, 状态 ${order.status}`}
-                >
-                  <View style={styles.orderHeader}>
-                    <View style={styles.orderInfo}>
-                      <Text style={styles.orderReceiver}>
-                        {currentT.receiver}: {order.receiver_name}
-                      </Text>
-                      <Text style={styles.orderAddress} numberOfLines={1}>
-                        📍 {order.receiver_address}
-                      </Text>
-                    </View>
-                    <View style={[styles.orderStatus, { backgroundColor: getStatusColor(order.status) }]}>
-                      <Text style={styles.orderStatusText}>{order.status}</Text>
-                  </View>
-                </View>
-                <View style={styles.orderFooter}>
-                  <Text style={styles.orderPrice}>{order.price} MMK</Text>
-                  <Text style={styles.orderTime}>{formatDate(order.created_at)}</Text>
-                </View>
-              </TouchableOpacity>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* 访客提示 */}
-        {isGuest && (
-          <View style={styles.guestPromptCard}>
-            <Text style={styles.guestPromptIcon}>🔐</Text>
-            <Text style={styles.guestPromptTitle}>{currentT.loginToSeeOrders}</Text>
-            <TouchableOpacity
-              style={styles.guestLoginButton}
-              onPress={() => navigation.navigate('Login')}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['#3b82f6', '#2563eb']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.guestLoginGradient}
-              >
-                <Text style={styles.guestLoginText}>{currentT.loginNow}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Services Section */}
-        <View style={styles.servicesSection}>
-          <HomeSectionHeader
-            kicker={
-              language === 'zh' ? '品质保障' : language === 'en' ? 'Our promise' : 'ကတိပေးချက်'
-            }
-            title={currentT.services}
-            dark={isDarkMode}
-          />
-          <View style={styles.servicesGrid}>
-            <View style={styles.serviceCard}>
-              <LinearGradient
-                colors={['#fbbf24', '#f59e0b']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.serviceGradient}
-              >
-                <View style={styles.iconContainer}>
-                <Text style={styles.serviceIcon}>⚡</Text>
-                </View>
-                <View style={styles.textContainer}>
-                <Text style={styles.serviceTitle}>{currentT.service1Title}</Text>
-                <Text style={styles.serviceDesc}>{currentT.service1Desc}</Text>
-                </View>
-              </LinearGradient>
-            </View>
-
-            <View style={styles.serviceCard}>
-              <LinearGradient
-                colors={['#60a5fa', '#3b82f6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.serviceGradient}
-              >
-                <View style={styles.iconContainer}>
-                <Text style={styles.serviceIcon}>🛡️</Text>
-                </View>
-                <View style={styles.textContainer}>
-                <Text style={styles.serviceTitle}>{currentT.service2Title}</Text>
-                <Text style={styles.serviceDesc}>{currentT.service2Desc}</Text>
-                </View>
-              </LinearGradient>
-            </View>
-
-            <View style={styles.serviceCard}>
-              <LinearGradient
-                colors={['#a78bfa', '#8b5cf6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.serviceGradient}
-              >
-                <View style={styles.iconContainer}>
-                <Text style={styles.serviceIcon}>📍</Text>
-                </View>
-                <View style={styles.textContainer}>
-                <Text style={styles.serviceTitle}>{currentT.service3Title}</Text>
-                <Text style={styles.serviceDesc}>{currentT.service3Desc}</Text>
-                </View>
-              </LinearGradient>
-            </View>
-
-            <View style={styles.serviceCard}>
-              <LinearGradient
-                colors={['#34d399', '#10b981']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.serviceGradient}
-              >
-                <View style={styles.iconContainer}>
-                <Text style={styles.serviceIcon}>💰</Text>
-                </View>
-                <View style={styles.textContainer}>
-                <Text style={styles.serviceTitle}>{currentT.service4Title}</Text>
-                <Text style={styles.serviceDesc}>{currentT.service4Desc}</Text>
-                </View>
-              </LinearGradient>
-            </View>
-          </View>
-        </View>
-
-        {/* Why Choose Us Section */}
-        <View style={styles.whyChooseUsSection}>
-          <HomeSectionHeader
-            kicker={
-              language === 'zh' ? '值得信赖' : language === 'en' ? 'Why us' : 'ဘာကြောင့် ကျွန်ုပ်တို့'
-            }
-            title={currentT.features}
-            dark={isDarkMode}
-          />
-          <View style={[styles.whyChooseUsCard, isDarkMode && styles.darkCard]}>
-            {[currentT.feature1, currentT.feature2, currentT.feature3, currentT.feature4].map((feature, index) => (
-              <View key={index} style={styles.featureItem}>
-                <View style={styles.featureIconWrap}>
-                  <Text style={styles.featureIcon}>✓</Text>
-                </View>
-                <Text style={[styles.featureText, isDarkMode && styles.darkText]}>{feature}</Text>
-              </View>
             ))}
           </View>
         </View>
 
-        {/* Contact Section */}
-        <View style={styles.contactSection}>
-          <HomeSectionHeader
-            kicker={
-              language === 'zh' ? '随时联系' : language === 'en' ? 'Reach us' : 'ဆက်သွယ်ရန်'
-            }
-            title={currentT.contact}
-            dark={isDarkMode}
-          />
-          <View style={styles.contactGrid}>
-            <TouchableOpacity
-              style={styles.contactCard}
-              onPress={handleCallHotline}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`${currentT.phone}: ${hotlineDisplay}`}
-            >
-              <LinearGradient
-                colors={['#3b82f6', '#2563eb']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.contactGradient}
-              >
-                <View style={styles.iconContainer}>
-                <Text style={styles.contactIcon}>📞</Text>
-                </View>
-                <View style={styles.textContainer}>
-                <Text style={styles.contactLabel}>{currentT.phone}</Text>
-                  <Text style={styles.contactValue}>{hotlineDisplay}</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.contactCard}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['#fa709a', '#fee140']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.contactGradient}
-              >
-                <View style={styles.iconContainer}>
-                  <Text style={styles.contactIcon}>🤝</Text>
-                </View>
-                <View style={styles.textContainer}>
-                <Text style={styles.contactLabel}>{currentT.email}</Text>
-                  <View style={styles.businessInfoContainer}>
-                    <View style={styles.businessRow}>
-                      <Text style={styles.contactSubLabel}>{currentT.wechatId}: </Text>
-                      <Text style={styles.contactSubValue}>{currentT.wechatValue}</Text>
-                    </View>
-                    <View style={styles.businessRow}>
-                      <Text style={styles.contactSubLabel}>{currentT.viber}: </Text>
-                      <Text style={styles.contactSubValue}>{currentT.viberValue}</Text>
-                    </View>
-                    <View style={styles.businessRow}>
-                      <Text style={styles.contactSubLabel}>{currentT.gmail}: </Text>
-                      <Text style={styles.contactSubValue}>{currentT.gmailValue}</Text>
-                    </View>
-                  </View>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionBar} />
+          <Text style={styles.sectionTitle}>{t.logistics}</Text>
+        </View>
+        <View style={styles.logisticsRow}>
+          <TouchableOpacity style={styles.logisticsCard} onPress={() => openOrders('配送中')} activeOpacity={0.88}>
+            <Text style={styles.logisticsLabel}>{t.inProgress}</Text>
+            <Text style={styles.logisticsValue}>{orderStats.inTransit}</Text>
+            <View style={styles.logisticsIcon}>
+              <ClayBox size={40} />
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#C5CDD6" style={styles.logisticsChevron} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logisticsCard} onPress={() => openOrders('待取件')} activeOpacity={0.88}>
+            <Text style={styles.logisticsLabel}>{t.pendingPickup}</Text>
+            <Text style={styles.logisticsValue}>{orderStats.pending}</Text>
+            <View style={styles.logisticsIcon}>
+              <ClayShoppingBag size={40} />
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#C5CDD6" style={styles.logisticsChevron} />
+          </TouchableOpacity>
         </View>
 
-        {/* Bottom Spacing */}
-        <View style={{ height: 60 }} />
-      </Animated.ScrollView>
+        <View style={styles.actionsRow}>
+          {quickActions.map((item) => (
+            <TouchableOpacity key={item.key} style={styles.actionCard} onPress={item.onPress} activeOpacity={0.88}>
+              {item.icon}
+              <Text style={styles.actionLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
 
-      <TutorialModal 
-        isVisible={showTutorialModal}
-        onClose={() => setShowTutorialModal(false)}
-      />
+      <TutorialModal isVisible={showTutorialModal} onClose={() => setShowTutorialModal(false)} />
     </View>
   );
 }
 
+const cardShadow = Platform.select({
+  ios: {
+    shadowColor: '#1A2B48',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+  },
+  default: { elevation: 3 },
+});
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef2f7',
+    backgroundColor: PAGE,
   },
-  content: {
-    flex: 1,
-  },
-  headerBackground: {
-    paddingTop: Platform.OS === 'ios' ? 56 : 44,
-    paddingBottom: 28,
-    paddingHorizontal: 20,
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    overflow: 'hidden',
-    position: 'relative',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    gap: 10,
   },
-  heroOrbTop: {
-    position: 'absolute',
-    top: -80,
-    right: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(59, 130, 246, 0.22)',
-  },
-  heroOrbBottom: {
-    position: 'absolute',
-    bottom: -40,
-    left: -50,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(251, 191, 36, 0.12)',
-  },
-  heroTopShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-  },
-  logoRing: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    padding: 2,
-    marginBottom: 14,
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  logoContainer: {
-    flex: 1,
-    borderRadius: 36,
-    backgroundColor: '#0f172a',
-    padding: 6,
+  logoTile: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: CARD,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    overflow: 'hidden',
+    ...cardShadow,
   },
   logo: {
-    width: '100%',
-    height: '100%',
+    width: 44,
+    height: 44,
   },
-  brandTitleBlock: {
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#f8fafc',
-    textAlign: 'center',
-    letterSpacing: 1.2,
-  },
-  titleAccent: {
-    fontSize: 22,
-    fontStyle: 'italic',
-    fontWeight: '800',
-    color: '#fbbf24',
-    marginTop: -2,
-    letterSpacing: 0.8,
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-  },
-  brandTaglineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 10,
-  },
-  brandTaglineLine: {
-    width: 28,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  brandTagline: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    color: 'rgba(226, 232, 240, 0.85)',
-    fontStyle: 'italic',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.95)',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  welcomeContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    marginTop: 4,
-  },
-  welcomeText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#f1f5f9',
-    letterSpacing: 0.2,
-  },
-  welcomeSection: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 10,
-  },
-  tutorialFullWidth: {
-    width: '100%',
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-  },
-  tutorialGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  tutorialLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  tutorialIconBg: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tutorialChevronWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tutorialMainText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#f8fafc',
-  },
-  tutorialSubText: {
-    fontSize: 11,
-    color: 'rgba(226, 232, 240, 0.72)',
-    marginTop: 3,
-    fontWeight: '500',
-  },
-  bannerContainer: {
-    paddingHorizontal: 16,
-    marginTop: -30,
-    marginBottom: 16,
-  },
-  bannerScroll: {
-    overflow: 'hidden',
-  },
-  bannerCardWrapper: {
-    width: width - 32,
-    paddingRight: 0,
-    overflow: 'visible',
-  },
-  bannerCard: {
-    width: '100%',
-    height: 240,
-    borderRadius: 22,
-    overflow: 'hidden',
-    ...theme.shadows.medium,
-    elevation: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  bannerGradient: {
-    flex: 1,
-    padding: 20,
-    position: 'relative',
-  },
-  citySilhouette: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderTopLeftRadius: 100,
-    borderTopRightRadius: 50,
-    opacity: 0.5,
-  },
-  bannerContentRow: {
-    flexDirection: 'row',
-    height: '100%',
-  },
-  bannerTextArea: {
-    flex: 1.2,
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  bannerLogoIcon: {
-    width: 32,
-    height: 32,
-    marginBottom: 8,
-  },
-  bannerBrandName: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#ffffff',
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  bannerHeadline: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#ffffff',
-    marginBottom: 4,
-    lineHeight: 22,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  bannerSubHeadline: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 6,
-    lineHeight: 14,
-    fontWeight: '500',
-  },
-  bannerBurmeseText: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginBottom: 12,
-    lineHeight: 14,
-    fontStyle: 'italic',
-  },
-  bannerCtaButton: {
-    backgroundColor: '#fbbf24', // 黄色按钮
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  bannerCtaText: {
-    color: '#1e3a8a',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  
-  // 3D 手机模型样式
-  phoneMockupContainer: {
-    flex: 0.8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  phoneMockup: {
-    width: 100,
-    height: 210,
-    backgroundColor: '#1f2937', // 手机边框
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#374151',
-    transform: [
-      { perspective: 800 },
-      { rotateY: '-15deg' },
-      { rotateX: '10deg' },
-      { rotateZ: '-5deg' },
-    ],
-    shadowColor: '#000',
-    shadowOffset: { width: 10, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 10,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  phoneScreen: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-    margin: 3,
-    borderRadius: 8,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  phoneReflection: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 10,
-  },
-  mapRoute: {
-    position: 'absolute',
-    top: 40,
-    left: 20,
-    width: 40,
-    height: 60,
-    borderLeftWidth: 2,
-    borderBottomWidth: 2,
-    borderColor: '#3b82f6',
-    borderStyle: 'dashed',
-    borderRadius: 10,
-  },
-  mapPinSender: {
-    position: 'absolute',
-    top: 35,
-    left: 15,
-  },
-  mapPinReceiver: {
-    position: 'absolute',
-    bottom: 40,
-    right: 20,
-  },
-  mapPinRider: {
-    position: 'absolute',
-    top: 80,
-    left: 40,
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 2,
-    elevation: 2,
-  },
-  floatingCard: {
-    position: 'absolute',
-    bottom: 10,
-    left: 5,
-    right: 5,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 6,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  floatingIcon: {
-    position: 'absolute',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    padding: 5,
-  },
-  quickActionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 22,
-  },
-  sectionHeaderWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    gap: 10,
-  },
-  sectionHeaderAccent: {
-    width: 3,
-    height: 36,
-    borderRadius: 3,
-  },
-  sectionHeaderTextCol: {
+  brandCol: {
     flex: 1,
     minWidth: 0,
   },
-  sectionKicker: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    color: '#b45309',
-    marginBottom: 3,
-    textTransform: 'uppercase',
-  },
-  sectionKickerDark: {
-    color: '#fbbf24',
-  },
-  sectionTitle: {
-    fontSize: 19,
+  brandName: {
+    fontSize: 16,
     fontWeight: '800',
-    color: '#0f172a',
-    letterSpacing: -0.2,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  quickActionOuter: {
-    width: QUICK_ACTION_WIDTH,
-    height: 118,
-    borderRadius: 18,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  quickActionBorderGr: {
-    flex: 1,
-    borderRadius: 18,
-    padding: 1.5,
-  },
-  quickActionGradient: {
-    flex: 1,
-    borderRadius: 16.5,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickActionIconGlass: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  quickActionIcon: {
-    fontSize: 26,
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
+    color: NAVY,
     letterSpacing: 0.2,
   },
-  recentOrdersContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
+  brandSub: {
+    marginTop: -1,
+    fontSize: 15,
+    fontWeight: '800',
+    color: TEAL,
+    letterSpacing: 0.6,
   },
-  darkText: {
-    color: '#f8fafc',
+  slogan: {
+    marginTop: 2,
+    fontSize: 11,
+    color: MUTED,
+    fontWeight: '600',
   },
-  darkCard: {
-    backgroundColor: '#1e293b',
-    borderColor: '#334155',
-    borderWidth: 1,
+  helloPill: {
+    maxWidth: 132,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD,
+    borderRadius: 999,
+    paddingLeft: 10,
+    paddingRight: 4,
+    paddingVertical: 4,
+    gap: 6,
+    ...cardShadow,
   },
-  viewAllButton: {
-    fontSize: 13,
-    color: '#2563eb',
+  helloText: {
+    flexShrink: 1,
+    fontSize: 12,
     fontWeight: '700',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: 'rgba(37, 99, 235, 0.08)',
-    borderRadius: 8,
-    overflow: 'hidden',
+    color: NAVY,
   },
-  noOrdersCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 32,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.18)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  noOrdersIcon: {
-    fontSize: 58,
-    marginBottom: 16,
-  },
-  noOrdersText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  noOrdersDesc: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  startOrderButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  startOrderGradient: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-  },
-  startOrderText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  orderCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.16)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.07,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  orderInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  orderReceiver: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  orderAddress: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  orderStatus: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  orderStatusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
-  },
-  orderPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-  },
-  orderTime: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  guestPromptCard: {
-    marginHorizontal: 20,
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 32,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.18)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 4,
-    marginBottom: 24,
-  },
-  guestPromptIcon: {
-    fontSize: 58,
-    marginBottom: 16,
-  },
-  guestPromptTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 20,
-  },
-  guestLoginButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  guestLoginGradient: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-  },
-  guestLoginText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  servicesSection: {
-    paddingHorizontal: 16,
-    marginBottom: 18,
-  },
-  servicesGrid: {
-    flexDirection: 'column',
-    gap: 16,
-  },
-  serviceCard: {
-    width: '100%',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  serviceGradient: {
-    padding: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  serviceIcon: {
-    fontSize: 26,
-  },
-  serviceTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  serviceDesc: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.85)',
-    lineHeight: 20,
-    fontWeight: '500',
-  },
-  whyChooseUsSection: {
-    paddingHorizontal: 16,
-    marginBottom: 18,
-  },
-  whyChooseUsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.16)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.07,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
-  },
-  featureIconWrap: {
+  helloAvatar: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  featureIcon: {
-    fontSize: 14,
-    color: '#059669',
-    fontWeight: '800',
-  },
-  featureText: {
-    fontSize: 15,
-    color: '#1e293b',
-    flex: 1,
-  },
-  contactSection: {
-    paddingHorizontal: 16,
-    marginBottom: 18,
-  },
-  contactGrid: {
-    flexDirection: 'column',
-    gap: 16,
-  },
-  contactCard: {
-    width: '100%',
-    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#E7F7F9',
   },
-  contactGradient: {
-    padding: 24,
+  helloAvatarImg: {
+    width: 28,
+    height: 28,
+  },
+  tutorialCard: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: CARD,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    gap: 12,
+    ...cardShadow,
   },
-  iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+  tutorialTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: NAVY,
   },
-  contactIcon: {
-    fontSize: 26,
+  tutorialHint: {
+    marginTop: 3,
+    fontSize: 12,
+    color: MUTED,
+    fontWeight: '600',
   },
-  textContainer: {
+  bannerWrap: {
+    marginTop: 14,
+    paddingHorizontal: 16,
+  },
+  bannerCard: {
+    width: BANNER_W,
+    height: 168,
+    borderRadius: 24,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  bannerGradient: {
     flex: 1,
-  },
-  contactLabel: {
-    fontSize: 17,
-    color: 'rgba(255, 255, 255, 0.95)',
-    marginBottom: 4,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  contactValue: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  businessInfoContainer: {
-    marginTop: 2,
-  },
-  businessRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  contactSubLabel: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontWeight: '500',
-  },
-  contactSubValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  // 圆点指示器样式
-  bannerIndicatorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     justifyContent: 'center',
-    marginTop: 12,
-    marginBottom: 8,
   },
-  bannerIndicatorDots: {
+  pagodaWrap: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    opacity: 0.9,
+  },
+  bannerCopy: {
+    maxWidth: '58%',
+    zIndex: 2,
+  },
+  bannerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: NAVY,
+  },
+  bannerPrice: {
+    marginTop: 6,
+    fontSize: 20,
+    fontWeight: '800',
+    color: TEAL,
+  },
+  bannerUntil: {
+    marginTop: 6,
+    fontSize: 12,
+    color: MUTED,
+    fontWeight: '600',
+  },
+  bannerMy: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#7A8899',
+  },
+  bannerRider: {
+    position: 'absolute',
+    right: 4,
+    bottom: -6,
+  },
+  newBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: TEAL,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  newBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  dots: {
     flexDirection: 'row',
+    justifyContent: 'center',
     gap: 6,
-    alignItems: 'center',
+    marginTop: 10,
   },
-  bannerIndicatorDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#cbd5e1',
-  },
-  bannerIndicatorDotActive: {
-    backgroundColor: '#2563eb',
-    width: 22,
+  dot: {
+    width: 7,
+    height: 7,
     borderRadius: 4,
+    backgroundColor: '#D5DEE6',
+  },
+  dotActive: {
+    width: 16,
+    backgroundColor: TEAL,
+  },
+  sectionHead: {
+    marginTop: 18,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionBar: {
+    width: 4,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: TEAL,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: NAVY,
+  },
+  logisticsRow: {
+    marginTop: 12,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  logisticsCard: {
+    flex: 1,
+    backgroundColor: CARD,
+    borderRadius: 22,
+    padding: 16,
+    minHeight: 108,
+    ...cardShadow,
+  },
+  logisticsLabel: {
+    fontSize: 13,
+    color: MUTED,
+    fontWeight: '700',
+  },
+  logisticsValue: {
+    marginTop: 6,
+    fontSize: 32,
+    fontWeight: '800',
+    color: TEAL,
+  },
+  logisticsIcon: {
+    position: 'absolute',
+    right: 14,
+    bottom: 12,
+  },
+  logisticsChevron: {
+    position: 'absolute',
+    right: 12,
+    top: 16,
+  },
+  actionsRow: {
+    marginTop: 14,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: CARD,
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    gap: 8,
+    ...cardShadow,
+  },
+  actionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: NAVY,
+    textAlign: 'center',
   },
 });

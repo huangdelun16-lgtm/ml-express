@@ -31,7 +31,7 @@ import { packageService, systemSettingsService, supabase, Product } from '../ser
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
 import { FadeInView, ScaleInView } from '../components/Animations';
-import { PackageIcon, LocationIcon, MapIcon, MoneyIcon, ClockIcon, DeliveryIcon } from '../components/Icon';
+import { MoneyIcon } from '../components/Icon';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorService } from '../services/ErrorService';
@@ -49,6 +49,7 @@ import OrderWizardProgress, { OrderWizardStepIndex } from '../components/placeOr
 import { promptGuestLogin } from '../utils/guestSession';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const TEAL = '#2C98A6';
 
 import * as MediaLibrary from 'expo-media-library';
 import { ensureSaveToLibraryPermission } from '../utils/mediaAccess';
@@ -389,6 +390,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
   const [qrOrderId, setQrOrderId] = useState('');
   const [qrOrderPrice, setQrOrderPrice] = useState('');
+  const [qrMallSummary, setQrMallSummary] = useState<{
+    productAmount: number;
+    deliveryFee: number;
+    coupon: number;
+    paidAmount: number;
+    remarks: string;
+  } | null>(null);
   
   // 支付方式（默认现金，二维码开发中）
   const [paymentMethod, setPaymentMethod] = useState<'balance' | 'cash'>('cash');
@@ -445,6 +453,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       selectedProducts: '已选商品',
       totalProductPrice: '商品总价',
       deliveryOptions: '配送选项',
+      deliveryByOption: '按配送选项送达',
+      payableAmount: '应付金额',
       deliverySpeed: '配送速度',
       speedStandard: '准时达（1小时内）',
       speedExpress: '急送达（30分钟内）',
@@ -471,7 +481,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       kmUnit: '公里',
       orderNumber: '订单号',
       totalAmount: '总金额',
-      qrHint: '请保存此二维码，用于取件和追踪',
+      paidAmount: '实付金额',
+      productAmount: '商品金额',
+      deliveryFee: '配送费',
+      coupon: '优惠券',
+      remarksOptional: '备注（选填）',
+      noRemarks: '无',
+      qrTitle: '订单已提交',
+      qrHint: '请向骑手出示此二维码，用于取件扫描',
+      saveQR: '保存二维码',
+      qrClose: '关闭',
       viewOrders: '查看订单',
       continueOrder: '继续下单',
       kgUnit: '公斤',
@@ -572,6 +591,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       selectedProducts: 'Selected',
       totalProductPrice: 'Total Price',
       deliveryOptions: 'Delivery Options',
+      deliveryByOption: 'By delivery option',
+      payableAmount: 'Amount due',
       deliverySpeed: 'Delivery Speed',
       speedStandard: 'Standard (within 1 hour)',
       speedExpress: 'Express (within 30 mins)',
@@ -598,7 +619,16 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       kmUnit: 'km',
       orderNumber: 'Order Number',
       totalAmount: 'Total Amount',
-      qrHint: 'Please save this QR code for pickup and tracking',
+      paidAmount: 'Amount paid',
+      productAmount: 'Item amount',
+      deliveryFee: 'Delivery fee',
+      coupon: 'Coupon',
+      remarksOptional: 'Notes (optional)',
+      noRemarks: 'None',
+      qrTitle: 'Order submitted',
+      qrHint: 'Show this QR code to the courier for pickup',
+      saveQR: 'Save QR code',
+      qrClose: 'Close',
       viewOrders: 'View Orders',
       continueOrder: 'Continue Ordering',
       kgUnit: 'kg',
@@ -696,6 +726,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       collect: 'ငွေကောက်ခံမည်',
       noCollect: 'ငွေမကောက်ခံပါ',
       deliveryOptions: 'ပို့ဆောင်ရေးရွေးချယ်မှု',
+      deliveryByOption: 'ပို့ဆောင်မှု ရွေးချယ်မှုအတိုင်း',
+      payableAmount: 'ပေးရမည့်ပမာဏ',
       deliverySpeed: 'ပို့ဆောင်မြန်နှုန်း',
       speedStandard: 'စံချိန် (၁နာရီအတွင်း)',
       speedExpress: 'အမြန် (၃၀မိနစ်အတွင်း)',
@@ -723,8 +755,17 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       kmUnit: 'ကီလိုမီတာ',
       orderNumber: 'အမှာစာနံပါတ်',
       totalAmount: 'စုစုပေါင်းပမာဏ',
-      qrHint: 'ဤ QR ကုဒ်ကိုသိမ်းဆည်းပါ၊ ထုတ်ယူရန်နှင့်ခြေရာခံရန်အတွက်',
-      viewOrders: 'အမှာစာများကြည့်ရန်',
+      paidAmount: 'ပေးပြီးပမာဏ',
+      productAmount: 'ကုန်ပစ္စည်းပမာဏ',
+      deliveryFee: 'ပို့ဆောင်ခ',
+      coupon: 'ကူပွန်',
+      remarksOptional: 'မှတ်ချက် (ရွေးချယ်)',
+      noRemarks: 'မရှိပါ',
+      qrTitle: 'အော်ဒါတင်ပြီးပါပြီ',
+      qrHint: 'ပစ္စည်းယူသည့်အခါ ဤ QR ကုဒ်ကို စီးနင်းသူအား ပြပေးပါ',
+      saveQR: 'QR ကုဒ်သိမ်းမည်',
+      qrClose: 'ပိတ်မည်',
+      viewOrders: 'အော်ဒါကြည့်ရန်',
       continueOrder: 'ဆက်လက်မှာယူမည်',
       kgUnit: 'ကီလိုဂရမ်',
       orderSavedOfflineTitle: 'အင်တာနက် မတော်တဆ ချိတ်ဆက်မရှိသဖြင့် အော်ဒါကို အော့ဖ်လိုင်း သိမ်းဆည်းထားပါသည်',
@@ -1627,11 +1668,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   };
 
   const handleWizardExit = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
-    navigation.navigate('Main');
+    navigation.navigate('Home');
   };
 
   // 提交订单
@@ -1959,6 +1996,23 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         // 注意：这是包裹二维码，不是支付二维码
         setQrOrderId(orderId);
         setQrOrderPrice(isCalculated ? calculatedPrice : price);
+        const incomingMallItems = route.params?.selectedProducts;
+        const isMallOrder =
+          (Array.isArray(incomingMallItems) && incomingMallItems.length > 0) || cartTotal > 0;
+        if (isMallOrder) {
+          const deliveryFee = Math.round(Number(isCalculated ? calculatedPrice : price) || 0);
+          const productAmount = Math.round(Number(cartTotal) || 0);
+          const coupon = 0;
+          setQrMallSummary({
+            productAmount,
+            deliveryFee,
+            coupon,
+            paidAmount: Math.max(0, productAmount + deliveryFee - coupon),
+            remarks: collectMallRemarks(),
+          });
+        } else {
+          setQrMallSummary(null);
+        }
         setShowQRCodeModal(true);
         setWizardStep(0);
         // 不再显示Alert，因为二维码模态框已经包含了成功信息
@@ -2097,6 +2151,46 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     }
   };
 
+  const collectMallRemarks = () => {
+    const segments: string[] = [];
+    const seen = new Set<string>();
+
+    const addFromProduct = (product?: CartItem | Product | null) => {
+      if (!product) return;
+      const cartItem = product as CartItem;
+      const key = getCartItemLineKey(cartItem);
+      if (seen.has(key)) return;
+      seen.add(key);
+      let note: string | undefined;
+      if (cartItem.customer_remarks?.length) {
+        note = summarizeCustomerRemarks(cartItem.customer_remarks);
+      } else if (cartItem.customer_remark?.trim()) {
+        note = cartItem.customer_remark.trim();
+      }
+      if (note) {
+        segments.push(cartItem.name ? `${cartItem.name}: ${note}` : note);
+      }
+    };
+
+    const incoming = route.params?.selectedProducts;
+    if (Array.isArray(incoming)) {
+      incoming.forEach((item: CartItem) => addFromProduct(item));
+    }
+    Object.entries(selectedProducts).forEach(([lineKey]) => {
+      const found =
+        merchantProducts.find((p) => getCartItemLineKey(p as CartItem) === lineKey) ??
+        merchantProducts.find((p) => p.id === lineKey);
+      addFromProduct(found);
+    });
+
+    if (segments.length === 1) {
+      const only = segments[0];
+      const sep = only.indexOf(': ');
+      return sep >= 0 ? only.slice(sep + 2) : only;
+    }
+    return segments.join('\n');
+  };
+
   // 重置表单（下单成功或关闭二维码后回到第 1 步「地址」）
   const resetForm = () => {
     setWizardStep(0);
@@ -2120,6 +2214,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     setDistance(0);
     setSelectedProducts({}); // 同时重置选中的商品
     setHasCOD(true); // 重置为默认有代收
+    setQrMallSummary(null);
   };
 
   // 处理包裹类型点击
@@ -2178,38 +2273,13 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   const renderWizardActionBar = () => (
     <View style={wizardStyles.actionBar}>
       <View style={wizardStyles.actionBarSide}>
-        {wizardStep > 0 ? (
-          <TouchableOpacity
-            style={wizardStyles.actionBack}
-            onPress={handleWizardBack}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={(currentT as { wizardBack?: string }).wizardBack}
-          >
-            <Ionicons name="chevron-back" size={18} color="#e2e8f0" />
-            <Text style={wizardStyles.backBtnText}>
-              {(currentT as { wizardBack?: string }).wizardBack ?? '上一步'}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={wizardStyles.actionBack}
-            onPress={handleWizardExit}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={(currentT as { wizardExit?: string }).wizardExit}
-          >
-            <Ionicons name="close" size={18} color="#e2e8f0" />
-            <Text style={wizardStyles.backBtnText}>
-              {(currentT as { wizardExit?: string }).wizardExit ?? '退出'}
-            </Text>
-          </TouchableOpacity>
-        )}
+        <Text style={wizardStyles.payableLabel}>
+          {(currentT as { payableAmount?: string }).payableAmount || currentT.totalPrice}
+        </Text>
+        <Text style={wizardStyles.payableValue}>
+          {isCalculated ? `${Number(calculatedPrice).toLocaleString()} MMK` : '—'}
+        </Text>
       </View>
-
-      <Text style={wizardStyles.stepIndicator}>
-        {wizardStep + 1} / {WIZARD_LAST_STEP + 1}
-      </Text>
 
       <View style={[wizardStyles.actionBarSide, wizardStyles.actionBarSideEnd]}>
         {wizardStep < WIZARD_LAST_STEP ? (
@@ -2220,17 +2290,12 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             accessibilityRole="button"
             accessibilityLabel={(currentT as { wizardNext?: string }).wizardNext}
           >
-            <LinearGradient
-              colors={['#3b82f6', '#2563eb']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={wizardStyles.actionPrimaryGradient}
-            >
+            <View style={wizardStyles.actionPrimaryGradient}>
               <Text style={wizardStyles.nextBtnText}>
                 {(currentT as { wizardNext?: string }).wizardNext ?? '下一步'}
               </Text>
               <Ionicons name="chevron-forward" size={18} color="#fff" />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -2241,17 +2306,11 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             accessibilityRole="button"
             accessibilityLabel={currentT.submitOrder}
           >
-            <LinearGradient
-              colors={['#3b82f6', '#2563eb', '#1d4ed8']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={wizardStyles.actionPrimaryGradient}
-            >
-              <DeliveryIcon size={20} color="#ffffff" />
+            <View style={wizardStyles.actionPrimaryGradient}>
               <Text style={wizardStyles.nextBtnText} numberOfLines={1}>
                 {isSubmitting ? currentT.creating : currentT.submitOrder}
               </Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )}
       </View>
@@ -2259,39 +2318,10 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
   );
 
   const bottomBarInset = Math.max(insets.bottom, 10);
-  const bottomBarHeight = 52 + bottomBarInset;
+  const bottomBarHeight = 72 + bottomBarInset;
 
   return (
     <View style={styles.container}>
-      {/* 优化背景视觉效果 */}
-      <LinearGradient
-        colors={['#0f172a', '#1e3a8a', '#334155']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* 背景装饰性圆圈 */}
-      <View style={{
-        position: 'absolute',
-        top: -100,
-        right: -100,
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        zIndex: 0
-      }} />
-      <View style={{
-        position: 'absolute',
-        top: 150,
-        left: -50,
-        width: 150,
-        height: 150,
-        borderRadius: 75,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        zIndex: 0
-      }} />
-
       <View style={wizardStyles.mainColumn}>
         <View
           style={[
@@ -2300,52 +2330,24 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             keyboardVisible && wizardStyles.topChromeCompact,
           ]}
         >
-          <View
-            style={[
-              styles.header,
-              {
-                marginBottom: keyboardVisible ? 0 : 4,
-                paddingTop: 0,
-                paddingBottom: keyboardVisible ? 4 : 10,
-                paddingHorizontal: 0,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.headerTitle,
-                {
-                  color: '#ffffff',
-                  fontSize: keyboardVisible ? 20 : 24,
-                  fontWeight: '800',
-                  marginBottom: 0,
-                },
-              ]}
+          <View style={wizardStyles.navRow}>
+            <TouchableOpacity
+              style={wizardStyles.navBtn}
+              onPress={wizardStep > 0 ? handleWizardBack : handleWizardExit}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                wizardStep > 0
+                  ? (currentT as { wizardBack?: string }).wizardBack
+                  : (currentT as { wizardExit?: string }).wizardExit
+              }
             >
+              <Ionicons name="chevron-back" size={22} color="#0f172a" />
+            </TouchableOpacity>
+            <Text style={wizardStyles.navTitle} numberOfLines={1}>
               {currentT.title}
             </Text>
-            {!keyboardVisible && (
-              <>
-                <View
-                  style={{
-                    height: 3,
-                    width: 32,
-                    backgroundColor: '#fbbf24',
-                    borderRadius: 2,
-                    marginTop: 5,
-                    marginBottom: 5,
-                  }}
-                />
-                <Text
-                  style={[
-                    styles.headerSubtitle,
-                    { color: 'rgba(255, 255, 255, 0.88)', fontSize: 13 },
-                  ]}
-                >
-                  {currentT.subtitle}
-                </Text>
-              </>
-            )}
+            <View style={wizardStyles.navSide} />
           </View>
 
           <OrderWizardProgress
@@ -2473,7 +2475,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                     <Switch
                       value={hasCOD}
                       onValueChange={handleToggleCOD}
-                      trackColor={{ false: '#e2e8f0', true: '#3b82f6' }}
+                      trackColor={{ false: '#e2e8f0', true: TEAL }}
                       thumbColor="#ffffff"
                     />
                     <Text style={[styles.codToggleLabel, hasCOD && styles.codToggleLabelActive]}>{currentT.collect}</Text>
@@ -2605,14 +2607,14 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         <View style={styles.timePickerOverlay}>
           <View style={styles.timePickerContent}>
             <LinearGradient
-              colors={['#1e3a8a', '#2563eb']}
+              colors={[TEAL, '#1F7A86']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.timePickerHeader}
             >
               <View style={styles.timePickerHeaderContent}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="time" size={24} color="#fbbf24" style={{ marginRight: 10 }} />
+                  <Ionicons name="time" size={24} color="#fff" style={{ marginRight: 10 }} />
                   <View>
                     <Text style={styles.timePickerTitle}>{currentT.timePicker.title}</Text>
                     <Text style={styles.timePickerSubtitle}>{currentT.timePicker.subtitle}</Text>
@@ -2637,34 +2639,34 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                   <TouchableOpacity
                     style={[
                       styles.quickSelectButton,
-                      selectedDate === 'Today' && { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }
+                      selectedDate === 'Today' && { borderColor: TEAL, backgroundColor: '#e8f5f6' }
                     ]}
                     onPress={() => setSelectedDate('Today')}
                   >
                     <Ionicons 
                       name={selectedDate === 'Today' ? "checkmark-circle" : "ellipse-outline"} 
                       size={20} 
-                      color={selectedDate === 'Today' ? "#3b82f6" : "#cbd5e1"} 
+                      color={selectedDate === 'Today' ? TEAL : "#cbd5e1"} 
                       style={{ marginRight: 6 }}
                     />
-                    <Text style={[styles.quickSelectButtonText, selectedDate === 'Today' && { color: '#3b82f6' }]}>
+                    <Text style={[styles.quickSelectButtonText, selectedDate === 'Today' && { color: TEAL }]}>
                       {currentT.timePicker.today}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
                       styles.quickSelectButton,
-                      selectedDate === 'Tomorrow' && { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }
+                      selectedDate === 'Tomorrow' && { borderColor: TEAL, backgroundColor: '#e8f5f6' }
                     ]}
                     onPress={() => setSelectedDate('Tomorrow')}
                   >
                     <Ionicons 
                       name={selectedDate === 'Tomorrow' ? "checkmark-circle" : "ellipse-outline"} 
                       size={20} 
-                      color={selectedDate === 'Tomorrow' ? "#3b82f6" : "#cbd5e1"} 
+                      color={selectedDate === 'Tomorrow' ? TEAL : "#cbd5e1"} 
                       style={{ marginRight: 6 }}
                     />
-                    <Text style={[styles.quickSelectButtonText, selectedDate === 'Tomorrow' && { color: '#3b82f6' }]}>
+                    <Text style={[styles.quickSelectButtonText, selectedDate === 'Tomorrow' && { color: TEAL }]}>
                       {currentT.timePicker.tomorrow}
                     </Text>
                   </TouchableOpacity>
@@ -2730,7 +2732,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
                 }}
               >
                 <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
+                  colors={[TEAL, '#1F7A86']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.timePickerConfirmGradient}
@@ -2744,7 +2746,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         </View>
       </Modal>
 
-      {/* QR码模态框 */}
+      {/* 提交成功后的取件二维码（视觉对齐确认订单页） */}
       <Modal
         visible={showQRCodeModal}
         transparent
@@ -2756,90 +2758,155 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
       >
         <View style={styles.qrModalOverlay}>
           <View style={styles.qrModalContent}>
-            <LinearGradient
-              colors={['#2E86AB', '#4CA1CF']}
-              style={styles.qrModalHeader}
-            >
-              <Text style={styles.qrModalTitle}>📱 {language === 'zh' ? '订单创建成功' : language === 'en' ? 'Order Created' : 'အော်ဒါအောင်မြင်သည်'}</Text>
+            <View style={styles.qrModalHeader}>
               <TouchableOpacity
                 onPress={() => {
                   setShowQRCodeModal(false);
                   resetForm();
                 }}
                 style={styles.qrModalClose}
+                accessibilityRole="button"
+                accessibilityLabel={currentT.qrClose}
               >
-                <Text style={styles.qrModalCloseText}>✕</Text>
+                <Ionicons name="chevron-back" size={20} color="#1A2B48" />
               </TouchableOpacity>
-            </LinearGradient>
+              <Text style={styles.qrModalTitle}>{currentT.qrTitle}</Text>
+              <View style={styles.qrModalHeaderSpacer} />
+            </View>
 
-            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ backgroundColor: 'white' }}>
+            <ScrollView
+              style={{ maxHeight: SCREEN_HEIGHT * (qrMallSummary ? 0.68 : 0.62) }}
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+            >
+            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={styles.qrShot}>
               <View style={styles.qrModalBody}>
-                <Text style={styles.qrInfoText}>📦 {language === 'zh' ? '订单号' : language === 'en' ? 'Order ID' : 'အော်ဒါနံပါတ်'}</Text>
-                <Text style={styles.qrOrderId}>{qrOrderId}</Text>
-
-                <View style={styles.qrCodeContainer}>
-                  <View style={styles.qrCodeWrapper}>
-                    <QRCode
-                      value={qrOrderId}
-                      size={200}
-                      color="#2E86AB"
-                      backgroundColor="white"
-                    />
+                <View style={styles.qrCard}>
+                  <View style={styles.qrSuccessBadge}>
+                    <Ionicons name="checkmark" size={22} color="#ffffff" />
                   </View>
+                  <Text style={styles.qrSuccessText}>{currentT.orderSuccess}</Text>
+
+                  <View style={styles.qrCodeContainer}>
+                    <View style={styles.qrCodeWrapper}>
+                      <QRCode
+                        value={qrOrderId}
+                        size={188}
+                        color={TEAL}
+                        backgroundColor="white"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.qrTicketRow}>
+                    {Array.from({ length: 20 }).map((_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.qrTicketDashSeg,
+                          { backgroundColor: i % 2 === 0 ? '#E85D4C' : '#4A7BD4' },
+                        ]}
+                      />
+                    ))}
+                  </View>
+
+                  <Text style={styles.qrInfoText}>{currentT.orderNumber}</Text>
+                  <Text style={styles.qrOrderId}>{qrOrderId}</Text>
+                  <Text style={styles.qrHint}>{currentT.qrHint}</Text>
+
+                  {!qrMallSummary ? (
+                    <View style={styles.qrPaidRow}>
+                      <Text style={styles.qrPaidLabel}>{currentT.paidAmount}</Text>
+                      <Text style={styles.qrOrderPrice}>{qrOrderPrice} MMK</Text>
+                    </View>
+                  ) : null}
                 </View>
-
-                <Text style={styles.qrHint}>
-                  {language === 'zh' ? '请向骑手出示此二维码以供取件扫描' : language === 'en' ? 'Please show this QR code to the courier' : 'ပစ္စည်းယူသည့်အခါ ဤ QR ကုဒ်ကို ပြပေးပါ'}
-                </Text>
-
-                <Text style={styles.qrOrderPrice}>{qrOrderPrice} MMK</Text>
               </View>
             </ViewShot>
 
-            <View style={styles.qrModalButtons}>
+            {qrMallSummary ? (
+              <View style={[styles.qrModalBody, { paddingTop: 0 }]}>
+                <View style={styles.qrBreakdownCard}>
+                  <View style={styles.qrBreakdownRow}>
+                    <Text style={styles.qrBreakdownLabel}>{currentT.productAmount}</Text>
+                    <Text style={styles.qrBreakdownValue}>
+                      {qrMallSummary.productAmount.toLocaleString()} MMK
+                    </Text>
+                  </View>
+                  <View style={styles.qrBreakdownRow}>
+                    <Text style={styles.qrBreakdownLabel}>{currentT.deliveryFee}</Text>
+                    <Text style={styles.qrBreakdownValue}>
+                      {qrMallSummary.deliveryFee.toLocaleString()} MMK
+                    </Text>
+                  </View>
+                  <View style={styles.qrBreakdownRow}>
+                    <Text style={styles.qrBreakdownLabel}>{currentT.coupon}</Text>
+                    <Text
+                      style={[
+                        styles.qrBreakdownValue,
+                        qrMallSummary.coupon > 0 ? styles.qrBreakdownCoupon : null,
+                      ]}
+                    >
+                      {qrMallSummary.coupon > 0
+                        ? `-${qrMallSummary.coupon.toLocaleString()} MMK`
+                        : `0 MMK`}
+                    </Text>
+                  </View>
+                  <View style={styles.qrBreakdownDivider} />
+                  <View style={styles.qrBreakdownRow}>
+                    <Text style={styles.qrBreakdownTotalLabel}>{currentT.paidAmount}</Text>
+                    <Text style={styles.qrBreakdownTotalValue}>
+                      {qrMallSummary.paidAmount.toLocaleString()} MMK
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.qrRemarkCard}>
+                  <Text style={styles.qrRemarkTitle}>{currentT.remarksOptional}</Text>
+                  <Text style={styles.qrRemarkText}>
+                    {qrMallSummary.remarks.trim() ? qrMallSummary.remarks : currentT.noRemarks}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+            </ScrollView>
+
+            <View style={styles.qrModalFooter}>
               <TouchableOpacity
-                style={styles.qrButton}
+                style={styles.qrSecondaryBtn}
                 onPress={handleSaveQRCode}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={currentT.saveQR}
               >
-                <LinearGradient
-                  colors={['#10b981', '#059669']}
-                  style={styles.qrButtonGradient}
-                >
-                  <Text style={styles.qrButtonText}>💾 {language === 'zh' ? '保存二维码' : language === 'en' ? 'Save QR' : 'သိမ်းဆည်းမည်'}</Text>
-                </LinearGradient>
+                <Ionicons name="download-outline" size={18} color={TEAL} />
+                <Text style={styles.qrSecondaryBtnText}>{currentT.saveQR}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.qrButton}
-                onPress={() => {
-                  setShowQRCodeModal(false);
-                  resetForm();
-                  navigation.navigate('MyOrders');
-                }}
-              >
-                <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
-                  style={styles.qrButtonGradient}
+              <View style={styles.qrActionBar}>
+                <View style={styles.qrActionBarSide}>
+                  <Text style={styles.qrPayableLabel}>{currentT.payableAmount}</Text>
+                  <Text style={styles.qrPayableValue}>
+                    {qrMallSummary
+                      ? `${qrMallSummary.paidAmount.toLocaleString()} MMK`
+                      : `${qrOrderPrice} MMK`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.qrPrimaryBtn}
+                  onPress={() => {
+                    setShowQRCodeModal(false);
+                    resetForm();
+                    navigation.navigate('Main', { screen: 'MyOrders' });
+                  }}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={currentT.viewOrders}
                 >
-                  <Text style={styles.qrButtonText}>📄 {language === 'zh' ? '查看订单' : language === 'en' ? 'View Orders' : 'အော်ဒါကြည့်ရန်'}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <Text style={styles.qrPrimaryBtnText}>{currentT.viewOrders}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <TouchableOpacity
-              style={{
-                alignItems: 'center',
-                paddingVertical: 15,
-                borderTopWidth: 1,
-                borderTopColor: '#f1f5f9'
-              }}
-              onPress={() => {
-                setShowQRCodeModal(false);
-                resetForm();
-              }}
-            >
-              <Text style={{ color: '#64748b', fontWeight: 'bold' }}>{language === 'zh' ? '关闭' : language === 'en' ? 'Close' : 'ပိတ်မည်'}</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>

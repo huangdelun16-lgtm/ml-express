@@ -96,8 +96,8 @@ const SenderForm = memo<SenderFormProps>(({
             <Switch
               value={useMyInfo}
               onValueChange={onUseMyInfoChange}
-              trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
-              thumbColor={useMyInfo ? '#2563eb' : '#f8fafc'}
+              trackColor={{ false: '#cbd5e1', true: '#2C98A6' }}
+              thumbColor={useMyInfo ? '#2C98A6' : '#f8fafc'}
               ios_backgroundColor="#cbd5e1"
               style={localStyles.myInfoSwitch}
             />
@@ -197,21 +197,21 @@ const localStyles = StyleSheet.create({
     gap: 8,
   },
   addressBookBtn: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#e8f5f6',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: '#b7dce1',
     flexShrink: 0,
   },
   addressBookBtnText: {
     fontSize: 11,
-    color: '#2563eb',
+    color: '#2C98A6',
     fontWeight: '700',
   },
   lockBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: 'rgba(44, 152, 166, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -219,7 +219,7 @@ const localStyles = StyleSheet.create({
   },
   lockBadgeText: {
     fontSize: 10,
-    color: '#3b82f6',
+    color: '#2C98A6',
     fontWeight: '700',
   },
   myInfoRow: {

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { applyNetlifyRealtimeFallback, resolveBrowserSupabaseUrl } from '../utils/supabaseBrowserUrl';
+import { applyNetlifyRealtimeFallback, resolveBrowserSupabaseUrl, rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 import LoggerService from './LoggerService';
 import { getProductItemFeeMmkForPackage } from '../utils/parseMerchantProductFee';
 import type {
@@ -1428,7 +1428,7 @@ export const merchantService = {
         .from('product_images')
         .getPublicUrl(fileName);
 
-      return publicUrl;
+      return rewritePublicStorageUrl(publicUrl);
     } catch (error: any) {
       LoggerService.error('上传商品图片失败:', error?.message || '未知错误');
       return null;

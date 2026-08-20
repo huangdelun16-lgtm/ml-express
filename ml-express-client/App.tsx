@@ -31,22 +31,16 @@ import NetworkStatus from './src/components/NetworkStatus';
 import { GlobalToast } from './src/components/GlobalToast';
 
 // 引入所有页面
-import HomeScreen from './src/screens/HomeScreen';
+import MainTabNavigator from './src/navigation/MainTabNavigator';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
-import PlaceOrderScreen from './src/screens/PlaceOrderScreen';
-import MyOrdersScreen from './src/screens/MyOrdersScreen';
-import TrackOrderScreen from './src/screens/TrackOrderScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
 import OrderDetailScreen from './src/screens/OrderDetailScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import NotificationWorkflowScreen from './src/screens/NotificationWorkflowScreen';
 import AddressBookScreen from './src/screens/AddressBookScreen';
 import NotificationCenterScreen from './src/screens/NotificationCenterScreen';
 import MerchantProductsScreen from './src/screens/MerchantProductsScreen';
-import CityMallScreen from './src/screens/CityMallScreen';
-import CartScreen from './src/screens/CartScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -58,11 +52,17 @@ const linking = {
       Login: 'login',
       Welcome: 'welcome',
       Register: 'register',
-      Main: '',
-      PlaceOrder: 'place-order',
-      MyOrders: 'my-orders',
-      TrackOrder: 'track-order',
-      Profile: 'profile',
+      Main: {
+        screens: {
+          Home: '',
+          PlaceOrder: 'place-order',
+          CityMall: 'mall',
+          Cart: 'cart',
+          MyOrders: 'my-orders',
+          TrackOrder: 'track-order',
+          Profile: 'profile',
+        },
+      },
       OrderDetail: 'order/:orderId',
       NotificationSettings: 'settings/notifications',
       NotificationWorkflow: 'settings/notifications/workflow',
@@ -118,38 +118,9 @@ function AppContent({ onLayoutRootView }: any) {
           
           <Stack.Screen 
             name="Main" 
-            component={HomeScreen}
+            component={MainTabNavigator}
             options={{
               animation: 'fade',
-            }}
-          />
-          
-          <Stack.Screen 
-            name="PlaceOrder" 
-            component={PlaceOrderScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen 
-            name="MyOrders" 
-            component={MyOrdersScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen 
-            name="TrackOrder" 
-            component={TrackOrderScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen 
-            name="Profile" 
-            component={ProfileScreen}
-            options={{
-              animation: 'slide_from_right',
             }}
           />
           
@@ -191,20 +162,6 @@ function AppContent({ onLayoutRootView }: any) {
           <Stack.Screen 
             name="MerchantProducts" 
             component={MerchantProductsScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen 
-            name="CityMall" 
-            component={CityMallScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen 
-            name="Cart" 
-            component={CartScreen}
             options={{
               animation: 'slide_from_right',
             }}
