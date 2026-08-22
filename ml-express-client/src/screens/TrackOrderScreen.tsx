@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image, FlatList, RefreshControl, Animated, Alert, Modal, Vibration, Platform, Linking, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, RefreshControl, Animated, Alert, Linking, BackHandler } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,6 @@ import {
   crossBorderStatusColor,
   type CrossBorderTrackingResult,
 } from '../services/crossBorderTrackingService';
-import { chatService } from '../services/chatService';
 import { useApp } from '../contexts/AppContext';
 import { APP_CONFIG } from '../config/constants';
 import { getJourneyCopy } from '../utils/orderJourney';
@@ -20,12 +19,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useFocusEffect } from '@react-navigation/native';
 import { feedbackService } from '../services/FeedbackService';
-
-const { width, height } = Dimensions.get('window');
-const TEAL = '#2C98A6';
-const PAGE_BG = '#F3F5F7';
-const NAVY = '#0f172a';
-const MAP_HERO = Math.round(height * 0.42);
+import { common } from '../i18n';
+import { getTrackOrderCopy } from './trackOrder/trackOrderCopy';
+import { styles, ui, TEAL, NAVY } from './trackOrder/trackOrderStyles';
+import { calculateEtaMinutes, formatHm, formatTrackDate, toCourierLatLng } from './trackOrder/trackOrderUtils';
+import CourierChatModal from '../components/orderChat/CourierChatModal';
+import DeliveryProofSection from '../components/trackOrder/DeliveryProofSection';
+import { useOrderChat } from '../hooks/useOrderChat';
 
 interface Package {
   id: string;
@@ -64,6 +64,7 @@ interface TrackingEvent {
 
 export default function TrackOrderScreen({ navigation, route }: any) {
   const { language } = useApp();
+  const c = common(language);
   const insets = useSafeAreaInsets();
   const [trackingCode, setTrackingCode] = useState(route?.params?.orderId || '');
   const [loading, setLoading] = useState(false);
@@ -96,137 +97,29 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const mapRef = useRef<MapView>(null);
   const { isDarkMode } = useApp(); // 🚀 获取主题状态
 
-  // 🚀 聊天相关状态
-  const [showChatModal, setShowChatModal] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const chatSubscriptionRef = useRef<any>(null);
-  const flatListRef = useRef<FlatList>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // 🚀 获取当前用户 ID 用于聊天
   useEffect(() => {
     AsyncStorage.getItem('userId').then(id => setCurrentUserId(id));
   }, []);
 
-  // 🚀 加载聊天记录并订阅实时更新
-  const loadChatMessages = async (orderId: string) => {
-    if (!orderId) return;
-    const chatMsgs = await chatService.getOrderMessages(orderId);
-    setMessages(chatMsgs);
-    
-    // 订阅新消息
-    if (chatSubscriptionRef.current) {
-      chatSubscriptionRef.current.unsubscribe();
-    }
-    
-    chatSubscriptionRef.current = chatService.subscribeToMessages(orderId, (newMsg) => {
-      setMessages(prev => {
-        if (prev.some(m => m.id === newMsg.id)) return prev;
-        return [...prev, newMsg];
-      });
-      
-      // 如果聊天框没打开，且是对方发的消息，增加未读数
-      if (!showChatModal && newMsg.sender_id !== currentUserId) {
-        setUnreadCount(prev => prev + 1);
-        Vibration.vibrate(100);
-      }
-    });
-  };
+  const {
+    showChatModal,
+    openChat,
+    closeChat,
+    messages,
+    inputText,
+    setInputText,
+    sending,
+    sendMessage,
+    unreadCount,
+  } = useOrderChat({
+    orderId: packageData?.id,
+    userId: currentUserId,
+    enabled: Boolean(packageData?.id),
+    sendFailedText: c.sendFailed,
+  });
 
-  // 🚀 发送消息逻辑
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || !currentUserId || !packageData?.id) return;
-    
-    const messageText = inputText.trim();
-    
-    // 🚀 乐观更新
-    const optimisticMsg = {
-      id: 'temp-' + Date.now(),
-      order_id: packageData.id,
-      sender_id: currentUserId,
-      sender_type: 'customer',
-      message: messageText,
-      created_at: new Date().toISOString(),
-      is_read: false
-    };
-    setMessages(prev => [...prev, optimisticMsg]);
-    setInputText('');
-    
-    const result = await chatService.sendMessage({
-      order_id: packageData.id,
-      sender_id: currentUserId,
-      sender_type: 'customer',
-      message: messageText
-    });
-    
-    if (!result.success) {
-      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
-      setInputText(messageText);
-      feedbackService.error(language === 'zh' ? '消息发送失败' : 'Failed to send message');
-    }
-  };
-
-  // 未读消息：屏内 focus 时低频轮询；聊天弹窗打开时提高频率
-  useEffect(() => {
-    if (!packageData?.id || !currentUserId || !mapMounted) return;
-
-    let cancelled = false;
-    const checkUnread = async () => {
-      const count = await chatService.getUnreadCount(currentUserId);
-      if (!cancelled) setUnreadCount(count);
-    };
-
-    checkUnread();
-    const intervalMs = showChatModal ? 8000 : 30000;
-    const timer = setInterval(checkUnread, intervalMs);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [packageData?.id, currentUserId, showChatModal, mapMounted]);
-
-  // 🚀 当页面切换订单时重新加载聊天
-  useEffect(() => {
-    if (packageData?.id) {
-      loadChatMessages(packageData.id);
-    }
-    return () => {
-      if (chatSubscriptionRef.current) {
-        chatSubscriptionRef.current.unsubscribe();
-      }
-    };
-  }, [packageData?.id]);
-
-  // 🚀 新增：配送凭证图片组件
-  const DeliveryProofSection = () => {
-    if (deliveryPhotos.length === 0) return null;
-    return (
-      <View style={[styles.card, isDarkMode && styles.darkCard]}>
-        <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📸 {language === 'zh' ? '配送凭证' : 'Delivery Proof'}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-          {deliveryPhotos.map((photo, index) => (
-            <TouchableOpacity 
-              key={index}
-              onPress={() => {
-                // 这里可以增加查看大图逻辑
-                Alert.alert(language === 'zh' ? '查看照片' : 'View Photo');
-              }}
-            >
-              <Image 
-                source={{ uri: photo.photo_url }} 
-                style={styles.proofImage} 
-                resizeMode="cover"
-              />
-              <Text style={styles.proofTime}>{formatDate(photo.upload_time)}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    );
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -372,7 +265,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           setDeliveryPhotos([]);
         }
         
-        showToast(language === 'zh' ? '查询成功！' : 'Found!', 'success');
+        showToast(c.found, 'success');
       } else {
         // 同城未命中时，尝试 Inventory 跨境物流（快递单号 / 入库单号）
         const crossBorder = await crossBorderTrackingService.trackByCode(code.trim());
@@ -383,7 +276,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           setCourierPhone(null);
           setRiderLocation(null);
           setCrossBorderData(crossBorder);
-          showToast(language === 'zh' ? '已找到跨境包裹' : 'Cross-border shipment found', 'success');
+          showToast(c.crossBorderFound, 'success');
         } else {
           setPackageData(null);
           setCrossBorderData(null);
@@ -402,27 +295,6 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     }
   };
 
-  // 🚀 计算 ETA (预计到达时间)
-  const calculateETA = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // 地球半径 km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
-    
-    // 假设城市内平均时速 25km/h，包含红绿灯等因素
-    const avgSpeed = 25; 
-    const timeInHours = distance / avgSpeed;
-    const timeInMinutes = Math.round(timeInHours * 60) + 5; // 额外增加5分钟缓冲
-    
-    return Math.max(2, timeInMinutes); // 最少显示2分钟
-  };
-
-
   // 地图仅在屏获得焦点时挂载，离屏卸载以降低原生资源占用
   useFocusEffect(
     useCallback(() => {
@@ -434,32 +306,58 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     }, [])
   );
 
-  // 监听骑手实时位置
+  // 监听骑手位置：Realtime 能通则即时推送；缅甸走 REST 轮询兜底
   useEffect(() => {
     let channel: any = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-    // 🚀 优化：扩大实时追踪的状态范围 (包括待取件、已取件、配送中、异常上报等)
     const activeTrackingStatuses = ['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'];
     const isTrackingActive = packageData && activeTrackingStatuses.includes(packageData.status);
 
-    if (mapMounted && isOnline && isTrackingActive && courierId) {
-      console.log('📡 启动骑手实时追踪:', courierId);
-      
-      // 1. 获取初始位置
-      supabase
-        .from('courier_locations')
-        .select('latitude, longitude')
-        .eq('courier_id', courierId)
-        .single()
-        .then(({ data }) => {
-          if (data) {
-            const initialLoc = { latitude: Number(data.latitude), longitude: Number(data.longitude) };
-            setRiderLocation(initialLoc);
-            (riderAnimatedLocation as any).setValue({ ...initialLoc, latitudeDelta: 0, longitudeDelta: 0 });
-          }
-        });
+    const applyLoc = (newLoc: { latitude: number; longitude: number }) => {
+      setRiderLocation(newLoc);
+      if (packageData?.receiver_latitude && packageData?.receiver_longitude) {
+        setEstimatedTime(calculateEtaMinutes(
+          newLoc.latitude,
+          newLoc.longitude,
+          Number(packageData.receiver_latitude),
+          Number(packageData.receiver_longitude),
+        ));
+      }
+      (riderAnimatedLocation as any).timing({
+        ...newLoc,
+        latitudeDelta: 0,
+        longitudeDelta: 0,
+        duration: 2000,
+        useNativeDriver: false,
+      }).start();
+    };
 
-      // 2. 订阅位置更新
+    if (mapMounted && isOnline && isTrackingActive && courierId) {
+      const pull = () => {
+        supabase
+          .from('courier_locations')
+          .select('latitude, longitude')
+          .eq('courier_id', courierId)
+          .single()
+          .then(({ data }) => {
+            const loc = toCourierLatLng(data);
+            if (!loc) return;
+            setRiderLocation(loc);
+            (riderAnimatedLocation as any).setValue({ ...loc, latitudeDelta: 0, longitudeDelta: 0 });
+            if (packageData?.receiver_latitude && packageData?.receiver_longitude) {
+              setEstimatedTime(calculateEtaMinutes(
+                loc.latitude,
+                loc.longitude,
+                Number(packageData.receiver_latitude),
+                Number(packageData.receiver_longitude),
+              ));
+            }
+          });
+      };
+      pull();
+      pollTimer = setInterval(pull, 8000);
+
       channel = supabase
         .channel(`rider-tracking-${courierId}`)
         .on(
@@ -471,44 +369,18 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             filter: `courier_id=eq.${courierId}`
           },
           (payload) => {
-            console.log('📍 收到骑手位置更新:', payload.new);
-            const newLoc = {
-              latitude: Number(payload.new.latitude),
-              longitude: Number(payload.new.longitude)
-            };
-            setRiderLocation(newLoc);
-
-            // 🚀 计算预计到达时间
-            if (packageData?.receiver_latitude && packageData?.receiver_longitude) {
-              const eta = calculateETA(
-                newLoc.latitude, 
-                newLoc.longitude, 
-                Number(packageData.receiver_latitude), 
-                Number(packageData.receiver_longitude)
-              );
-              setEstimatedTime(eta);
-            }
-            
-            // 🚀 核心优化：执行平滑移动动画
-            (riderAnimatedLocation as any).timing({
-              ...newLoc,
-              latitudeDelta: 0,
-              longitudeDelta: 0,
-              duration: 2000, // 2秒平滑过渡
-              useNativeDriver: false
-            }).start();
+            const loc = toCourierLatLng(payload.new as { latitude?: unknown; longitude?: unknown });
+            if (loc) applyLoc(loc);
           }
         )
         .subscribe();
     }
 
     return () => {
-      if (channel) {
-        console.log('🛑 停止骑手实时追踪');
-        supabase.removeChannel(channel);
-      }
+      if (pollTimer) clearInterval(pollTimer);
+      if (channel) supabase.removeChannel(channel);
     };
-  }, [packageData?.status, courierId, isOnline, mapMounted]);
+  }, [packageData?.status, packageData?.receiver_latitude, packageData?.receiver_longitude, courierId, isOnline, mapMounted]);
 
   // 地图视野：首次立即适配，之后最多每 4 秒跟随一次，避免每次 Realtime 都重绘视野
   useEffect(() => {
@@ -547,206 +419,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     }
   }, [packageData, riderLocation, mapMounted]);
 
-  // 翻译
-  const translations: any = {
-    zh: {
-      title: '追踪订单',
-      subtitle: '输入订单号、快递单号或入库单号查询',
-      inputPlaceholder: '订单号 / 快递单号 / 入库单号',
-      crossBorderBadge: '跨境物流',
-      inboundBarcode: '入库单号',
-      expressBarcode: '快递单号',
-      destination: '目的地',
-      productName: '商品',
-      trackButton: '查询',
-      scanButton: '扫码查询',
-      notFound: '未找到订单',
-      notFoundDesc: '请检查订单号是否正确',
-      orderInfo: '订单信息',
-      orderNumber: '订单号',
-      status: '当前状态',
-      packageType: '包裹类型',
-      weight: '重量',
-      price: '价格',
-      courier: '配送员',
-      distance: '配送距离',
-      senderInfo: '寄件信息',
-      sender: '寄件人',
-      senderPhone: '联系电话',
-      senderAddress: '寄件地址',
-      receiverInfo: '收件信息',
-      receiver: '收件人',
-      receiverPhone: '联系电话',
-      receiverAddress: '收件地址',
-      trackingHistory: '追踪历史',
-      noHistory: '暂无追踪记录',
-      createdAt: '下单时间',
-      pickedUpAt: '取件时间',
-      deliveredAt: '送达时间',
-      inputError: '请输入订单号',
-      searchError: '查询失败',
-      searching: '查询中...',
-      ongoingOrders: '未完成订单',
-      tapToTrack: '点击立即追踪',
-      offlineSearch: '当前网络不可用，请连接网络后再查询',
-      offlineBanner: '当前处于离线状态，地图与实时追踪不可用',
-      mapOfflineTitle: '网络不可用',
-      mapOfflineDesc: '已为您保留订单详情，联网后可查看实时地图',
-      mapErrorTitle: '地图加载失败',
-      mapErrorDesc: '请稍后重试或检查网络与定位权限',
-      chatWithCourier: '联系骑手',
-      callCourier: '电话联系',
-      messageCourier: '发送消息',
-      customerService: '客服',
-      etaMinutes: '预计 {n} 分钟送达',
-      etaByOption: '按配送选项送达',
-      riderDelivering: '骑手正在配送',
-      noCourierPhone: '暂无骑手电话',
-      stepPlaced: '已下单',
-      stepPreparing: '商家备货',
-      stepPicked: '骑手取货',
-      stepDelivering: '正在配送',
-      stepArrive: '待送达',
-      stepArrived: '已送达',
-      moreItems: '等',
-      itemsUnit: '件',
-      inputMessage: '输入消息...',
-      sendMessage: '发送',
-      noMessages: '暂无消息',
-    },
-    en: {
-      title: 'Track Order',
-      subtitle: 'Order ID, express waybill, or inbound barcode',
-      inputPlaceholder: 'Order / express / inbound barcode',
-      crossBorderBadge: 'Cross-border',
-      inboundBarcode: 'Inbound barcode',
-      expressBarcode: 'Express waybill',
-      destination: 'Destination',
-      productName: 'Product',
-      trackButton: 'Track',
-      scanButton: 'Scan',
-      notFound: 'Order Not Found',
-      notFoundDesc: 'Please check the order number',
-      orderInfo: 'Order Information',
-      orderNumber: 'Order No.',
-      status: 'Status',
-      packageType: 'Type',
-      weight: 'Weight',
-      price: 'Price',
-      courier: 'Courier',
-      distance: 'Distance',
-      senderInfo: 'Sender',
-      sender: 'Name',
-      senderPhone: 'Phone',
-      senderAddress: 'Address',
-      receiverInfo: 'Receiver',
-      receiver: 'Name',
-      receiverPhone: 'Phone',
-      receiverAddress: 'Address',
-      trackingHistory: 'Tracking History',
-      noHistory: 'No tracking records',
-      createdAt: 'Created',
-      pickedUpAt: 'Picked Up',
-      deliveredAt: 'Delivered',
-      inputError: 'Please enter order number',
-      searchError: 'Search failed',
-      searching: 'Searching...',
-      ongoingOrders: 'Unfinished Orders',
-      tapToTrack: 'Tap to track live',
-      offlineSearch: 'You are offline. Please connect to the network to search.',
-      offlineBanner: 'You are offline. Map and live tracking are unavailable.',
-      mapOfflineTitle: 'Offline',
-      mapOfflineDesc: 'Order details are available; live map will resume when online.',
-      mapErrorTitle: 'Map failed to load',
-      mapErrorDesc: 'Please try again later or check network and location permissions.',
-      chatWithCourier: 'Chat with Courier',
-      callCourier: 'Call',
-      messageCourier: 'Message',
-      customerService: 'Support',
-      etaMinutes: 'ETA {n} min',
-      etaByOption: 'By delivery option',
-      riderDelivering: 'Rider is delivering',
-      noCourierPhone: 'Courier phone unavailable',
-      stepPlaced: 'Placed',
-      stepPreparing: 'Preparing',
-      stepPicked: 'Picked up',
-      stepDelivering: 'Delivering',
-      stepArrive: 'Out for delivery',
-      stepArrived: 'Delivered',
-      moreItems: '',
-      itemsUnit: 'items',
-      inputMessage: 'Type a message...',
-      sendMessage: 'Send',
-      noMessages: 'No messages yet',
-    },
-    my: {
-      title: 'အော်ဒါခြေရာခံ',
-      subtitle: 'အော်ဒါ / express / inbound barcode',
-      inputPlaceholder: 'အော်ဒါ / express / inbound',
-      crossBorderBadge: 'Cross-border',
-      inboundBarcode: 'Inbound barcode',
-      expressBarcode: 'Express waybill',
-      destination: 'Destination',
-      productName: 'Product',
-      trackButton: 'ရှာဖွေ',
-      scanButton: 'စကန်ဖတ်',
-      notFound: 'အော်ဒါမတွေ့ပါ',
-      notFoundDesc: 'အော်ဒါနံပါတ်ကိုစစ်ဆေးပါ',
-      orderInfo: 'အော်ဒါအချက်အလက်',
-      orderNumber: 'အော်ဒါနံပါတ်',
-      status: 'အခြေအနေ',
-      packageType: 'အမျိုးအစား',
-      weight: 'အလေးချိန်',
-      price: 'စျေးနှုန်း',
-      courier: 'ပို့ဆောင်သူ',
-      distance: 'အကွာအဝေး',
-      senderInfo: 'ပို့သူ',
-      sender: 'အမည်',
-      senderPhone: 'ဖုန်း',
-      senderAddress: 'လိပ်စာ',
-      receiverInfo: 'လက်ခံသူ',
-      receiver: 'အမည်',
-      receiverPhone: 'ဖုန်း',
-      receiverAddress: 'လိပ်စာ',
-      trackingHistory: 'ခြေရာခံမှတ်တမ်း',
-      noHistory: 'မှတ်တမ်းမရှိ',
-      createdAt: 'ဖန်တီးချိန်',
-      pickedUpAt: 'ထုတ်ယူချိန်',
-      deliveredAt: 'ပို့ဆောင်ချိန်',
-      inputError: 'အော်ဒါနံပါတ်ထည့်ပါ',
-      searchError: 'ရှာဖွေမှုမအောင်မြင်',
-      searching: 'ရှာဖွေနေသည်...',
-      ongoingOrders: 'မပြီးသေးသော အော်ဒါများ',
-      tapToTrack: 'တိုက်ရိုက်ခြေရာခံရန် နှိပ်ပါ',
-      offlineSearch: 'အင်တာနက်မရှိပါ၊ ချိတ်ဆက်ပြီးမှ ရှာဖွေပါ',
-      offlineBanner: 'အင်တာနက်မရှိပါ၊ မြေပုံနှင့် တိုက်ရိုက်ခြေရာခံမှုမရနိုင်ပါ',
-      mapOfflineTitle: 'အင်တာနက်မရှိပါ',
-      mapOfflineDesc: 'အော်ဒါအသေးစိတ်ပြန်လည်ကြည့်နိုင်ပြီး အင်တာနက်ရသောအခါ မြေပုံမြင်နိုင်သည်',
-      mapErrorTitle: 'မြေပုံမရပါ',
-      mapErrorDesc: 'ခဏနေရင် ထပ်ကြိုးစားပါ သို့မဟုတ် အင်တာနက်/တည်နေရာခွင့်ပြုမှုစစ်ဆေးပါ',
-      chatWithCourier: 'ပို့ဆောင်သူနှင့် စကားပြောရန်',
-      callCourier: 'ခေါ်ဆိုရန်',
-      messageCourier: 'မက်ဆေ့ခ်ျ',
-      customerService: 'ဝန်ဆောင်မှု',
-      etaMinutes: '{n} မိနစ်ခန့်',
-      etaByOption: 'ပို့ဆောင်မှု ရွေးချယ်မှုအတိုင်း',
-      riderDelivering: 'ပို့ဆောင်နေသည်',
-      noCourierPhone: 'ဖုန်းမရှိပါ',
-      stepPlaced: 'မှာယူပြီး',
-      stepPreparing: 'ပြင်ဆင်နေ',
-      stepPicked: 'ယူပြီး',
-      stepDelivering: 'ပို့ဆောင်နေ',
-      stepArrive: 'ပို့ဆောင်ရန်',
-      stepArrived: 'ပို့ပြီး',
-      moreItems: '',
-      itemsUnit: 'ခု',
-      inputMessage: 'မက်ဆေ့ခ်ျရိုက်ပါ...',
-      sendMessage: 'ပို့မည်',
-      noMessages: 'မက်ဆေ့ခ်ျမရှိပါ',
-    },
-  };
-
-  const t = translations[language] || translations.zh;
+  const t = getTrackOrderCopy(language);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     if (type === 'success') feedbackService.success(message);
@@ -766,12 +439,12 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       '待确认': '#f97316',
       '待取件': '#f59e0b',
       '待收款': '#f59e0b',
-      '打包中': '#0ea5e9',
-      '已取件': '#3b82f6',
+      '打包中': '#3BAFBD',
+      '已取件': '#2C98A6',
       '配送中': '#8b5cf6',
       '已送达': '#10b981',
       '已取消': '#ef4444',
-      '已到达瑞丽仓库': '#3b82f6',
+      '已到达瑞丽仓库': '#2C98A6',
       '已装车': '#8b5cf6',
       '已抵达目的地': '#22c55e',
       '已签收': '#10b981',
@@ -784,27 +457,6 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     return [...crossBorderData.events].reverse();
   }, [crossBorderData]);
 
-  // 格式化日期
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '--';
-    const date = new Date(dateString);
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatHm = (dateString?: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return '';
-    const hh = String(date.getHours()).padStart(2, '0');
-    const mm = String(date.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
-  };
 
   const eventTimeFor = (statuses: string[]) => {
     const ev = trackingHistory.find((e) => statuses.includes(e.status));
@@ -842,13 +494,12 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     setRiderLocation(null);
     setEstimatedTime(null);
     setDeliveryPhotos([]);
-    setShowChatModal(false);
-    setUnreadCount(0);
+    closeChat();
     setLoading(false);
     if (route?.params?.orderId) {
       navigation.setParams({ orderId: undefined });
     }
-  }, [navigation, route?.params?.orderId]);
+  }, [navigation, route?.params?.orderId, closeChat]);
 
   const handleTrackBack = useCallback(() => {
     if (packageData || crossBorderData) {
@@ -868,15 +519,6 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     }, [handleTrackBack]),
   );
 
-  const openChat = () => {
-    if (!packageData) return;
-    setShowChatModal(true);
-    setUnreadCount(0);
-    if (packageData.id && currentUserId) {
-      chatService.markAsRead(packageData.id, currentUserId);
-    }
-  };
-
   const renderPageHeader = (overlay = false) => (
     <View style={[ui.navRow, overlay && ui.navRowOverlay, { paddingTop: insets.top + 6 }]}>
       <TouchableOpacity
@@ -895,91 +537,21 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   );
 
   const chatModal = (
-      <Modal
-        visible={showChatModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowChatModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.chatModalContent, isDarkMode && styles.darkChatModal]}>
-            <View style={[styles.chatHeader, isDarkMode && styles.darkChatHeader]}>
-              <View>
-                <Text style={[styles.chatTitle, isDarkMode && styles.darkText]}>
-                  {t.chatWithCourier}
-                </Text>
-                <Text style={styles.chatSubtitle}>{packageData?.courier}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowChatModal(false)} style={styles.chatCloseBtn}>
-                <Ionicons name="close" size={24} color={isDarkMode ? "#fff" : "#1e293b"} />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={(item) => item.id}
-              style={[styles.messageList, isDarkMode && styles.darkMessageList]}
-              contentContainerStyle={{ paddingBottom: 20 }}
-              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-              ListEmptyComponent={(
-                <View style={styles.emptyChat}>
-                  <Text style={styles.emptyChatText}>{t.noMessages}</Text>
-                </View>
-              )}
-              renderItem={({ item }) => {
-                const isMine = item.sender_id === currentUserId;
-                return (
-                  <View style={[
-                    styles.messageWrapper,
-                    isMine ? styles.myMessageWrapper : styles.otherMessageWrapper
-                  ]}>
-                    <View style={[
-                      styles.messageBubble,
-                      isMine ? styles.myBubble : styles.otherBubble,
-                      isDarkMode && !isMine && styles.darkOtherBubble
-                    ]}>
-                      <Text style={[
-                        styles.messageText,
-                        isMine ? styles.myMessageText : (isDarkMode ? styles.darkText : styles.otherMessageText)
-                      ]}>
-                        {item.message}
-                      </Text>
-                    </View>
-                    <Text style={styles.messageTime}>
-                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
-                );
-              }}
-            />
-            <View style={[styles.chatInputContainer, isDarkMode && styles.darkChatHeader]}>
-              <TextInput
-                style={[styles.chatInput, isDarkMode && styles.darkChatInput]}
-                placeholder={t.inputMessage}
-                placeholderTextColor={isDarkMode ? "#94a3b8" : "#9ca3af"}
-                value={inputText}
-                onChangeText={setInputText}
-                multiline
-              />
-              <TouchableOpacity
-                disabled={!inputText.trim() || sendingMessage}
-                onPress={handleSendMessage}
-                style={[
-                  styles.sendBtn,
-                  !inputText.trim() && styles.sendBtnDisabled
-                ]}
-              >
-                {sendingMessage ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="send" size={20} color="#fff" />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+    <CourierChatModal
+      visible={showChatModal}
+      title={t.chatWithCourier}
+      subtitle={packageData?.courier}
+      emptyText={t.noMessages}
+      inputPlaceholder={t.inputMessage}
+      messages={messages}
+      currentUserId={currentUserId}
+      inputText={inputText}
+      sending={sending}
+      isDarkMode={isDarkMode}
+      onChangeInput={setInputText}
+      onSend={sendMessage}
+      onClose={closeChat}
+    />
   );
 
   if (packageData && !loading) {
@@ -1043,7 +615,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               {!!riderLocation ? (
                 <Marker.Animated
                   coordinate={riderAnimatedLocation as any}
-                  title={language === 'zh' ? '骑手位置' : 'Rider Location'}
+                  title={c.riderLocation}
                   anchor={{ x: 0.5, y: 0.5 }}
                 >
                   <View style={ui.riderPin}>
@@ -1129,7 +701,13 @@ export default function TrackOrderScreen({ navigation, route }: any) {
               );
             })}
 
-            <DeliveryProofSection />
+            <DeliveryProofSection
+              photos={deliveryPhotos}
+              styles={styles}
+              isDarkMode={isDarkMode}
+              title={c.deliveryProof}
+              viewPhotoLabel={c.viewPhoto}
+            />
 
             <View style={ui.miniCard}>
               <Text style={ui.miniCardTitle}>{t.senderInfo}</Text>
@@ -1198,21 +776,21 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                   >
                     <LinearGradient
                       colors={isSelected 
-                        ? (isDarkMode ? ['#1e3a8a', '#1e40af'] : ['#eff6ff', '#dbeafe']) 
+                        ? (isDarkMode ? ['#164E56', '#1E6F7A'] : ['#E8F6F8', '#D7F3F6']) 
                         : (isDarkMode ? ['#1e293b', '#0f172a'] : ['#ffffff', '#f1f5f9'])}
                       style={styles.ongoingCardGradient}
                     >
                       <View style={styles.ongoingCardHeader}>
-                        <Text style={[styles.ongoingOrderId, (isSelected || isDarkMode) && { color: '#60a5fa' }]}>
+                        <Text style={[styles.ongoingOrderId, (isSelected || isDarkMode) && { color: '#5BB8C4' }]}>
                           #{order.id.slice(-6).toUpperCase()}
                         </Text>
-                        <View style={[styles.ongoingBadge, isSelected && { backgroundColor: '#3b82f6' }]}>
+                        <View style={[styles.ongoingBadge, isSelected && { backgroundColor: '#2C98A6' }]}>
                           <Text style={styles.ongoingBadgeText}>{order.status}</Text>
                         </View>
                       </View>
                       <Text style={[styles.ongoingAddress, isDarkMode && { color: '#94a3b8' }]} numberOfLines={1}>📍 {order.receiver_address}</Text>
-                      <Text style={[styles.ongoingTap, isSelected && { fontWeight: 'bold' }, isDarkMode && { color: '#60a5fa' }]}>
-                        {isSelected ? '👀 ' + (language === 'zh' ? '正在追踪' : 'Tracking') : t.tapToTrack}
+                      <Text style={[styles.ongoingTap, isSelected && { fontWeight: 'bold' }, isDarkMode && { color: '#5BB8C4' }]}>
+                        {isSelected ? '👀 ' + c.trackingNow : t.tapToTrack}
                       </Text>
                     </LinearGradient>
                   </TouchableOpacity>
@@ -1387,246 +965,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                           {event.note}
                         </Text>
                       ) : null}
-                      <Text style={styles.trackingTime}>{formatDate(event.event_time)}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </>
-        )}
-
-        {false && packageData && (
-          <>
-            {/* 实时地图追踪 */}
-            {(['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(packageData.status)) && (
-              <View style={[styles.mapContainer, isDarkMode && { borderColor: '#1e293b', borderWidth: 1 }]}>
-                {!mapMounted || !isOnline || mapError ? (
-                  <View style={styles.mapFallback}>
-                    <Text style={styles.mapFallbackIcon}>🛰️</Text>
-                    <Text style={styles.mapFallbackTitle}>
-                      {!mapMounted
-                        ? (language === 'zh' ? '地图准备中' : language === 'en' ? 'Preparing map' : 'မြေပုံပြင်ဆင်နေသည်')
-                        : !isOnline
-                          ? t.mapOfflineTitle
-                          : t.mapErrorTitle}
-                    </Text>
-                    <Text style={styles.mapFallbackDesc}>
-                      {!mapMounted
-                        ? (language === 'zh' ? '进入页面后加载实时地图' : language === 'en' ? 'Live map loads when this screen is active' : 'ဤစာမျက်နှာတွင် မြေပုံဖွင့်မည်')
-                        : !isOnline
-                          ? t.mapOfflineDesc
-                          : t.mapErrorDesc}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <MapView
-                      ref={mapRef}
-                      provider={PROVIDER_GOOGLE}
-                      style={styles.map}
-                      onMapReady={() => setMapError(false)}
-                      initialRegion={{
-                        latitude: riderLocation?.latitude || packageData.sender_latitude || 16.8661,
-                        longitude: riderLocation?.longitude || packageData.sender_longitude || 96.1951,
-                        latitudeDelta: 0.05,
-                        longitudeDelta: 0.05,
-                      }}
-                    >
-                      {/* 起点标记 */}
-                      {!!packageData.sender_latitude && !!packageData.sender_longitude ? (
-                        <Marker
-                          coordinate={{
-                            latitude: packageData.sender_latitude,
-                            longitude: packageData.sender_longitude
-                          }}
-                          title="发货点"
-                          pinColor="#3b82f6"
-                        />
-                      ) : null}
-
-                      {/* 终点标记 */}
-                      {!!packageData.receiver_latitude && !!packageData.receiver_longitude ? (
-                        <Marker
-                          coordinate={{
-                            latitude: packageData.receiver_latitude,
-                            longitude: packageData.receiver_longitude
-                          }}
-                          title="我的位置"
-                          pinColor="#ef4444"
-                        />
-                      ) : null}
-
-                      {/* 骑手标记 - 使用动画标记实现平滑移动 */}
-                      {!!riderLocation ? (
-                        <Marker.Animated
-                          coordinate={riderAnimatedLocation as any}
-                          title={language === 'zh' ? '骑手位置' : 'Rider Location'}
-                          anchor={{ x: 0.5, y: 0.5 }}
-                        >
-                          <View style={styles.riderMarker}>
-                            <Text style={{ fontSize: 24 }}>🛵</Text>
-                          </View>
-                        </Marker.Animated>
-                      ) : null}
-
-                      {/* 路线预览 */}
-                      {!!riderLocation && !!packageData.receiver_latitude && !!packageData.receiver_longitude ? (
-                        <Polyline
-                          coordinates={[
-                            riderLocation,
-                            {
-                              latitude: packageData.receiver_latitude,
-                              longitude: packageData.receiver_longitude
-                            }
-                          ]}
-                          strokeColor="#3b82f6"
-                          strokeWidth={3}
-                          lineDashPattern={[5, 5]}
-                        />
-                      ) : null}
-                    </MapView>
-                    
-                    <View style={styles.mapOverlay}>
-                      <Text style={styles.mapOverlayText}>
-                        ✨ {language === 'zh' ? '正在为您进行实时追踪' : language === 'en' ? 'Live Tracking Enabled' : 'တိုက်ရိုက်ခြေရာခံနေသည်'}
-                      </Text>
-                    </View>
-                  </>
-                )}
-              </View>
-            )}
-
-            {/* 状态卡片 */}
-            <View style={styles.statusCard}>
-              <LinearGradient
-                colors={[getStatusColor(packageData.status), getStatusColor(packageData.status) + 'dd']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.statusGradient}
-              >
-                {/* 🚀 新增：预计送达时间显示 */}
-                {estimatedTime !== null && (packageData.status === '配送中' || packageData.status === '已取件') && (
-                  <View style={[styles.etaContainer, isDarkMode && { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-                    <Text style={styles.etaLabel}>{language === 'zh' ? '预计送达' : 'Estimated Arrival'}</Text>
-                    <Text style={styles.etaValue}>
-                      {estimatedTime} <Text style={{ fontSize: 16 }}>{language === 'zh' ? '分钟' : 'mins'}</Text>
-                    </Text>
-                  </View>
-                )}
-                
-                <Text style={styles.statusIcon}>📦</Text>
-                <Text style={styles.statusText}>{packageData.status}</Text>
-                <Text style={styles.statusTime}>{formatDate(packageData.created_at)}</Text>
-              </LinearGradient>
-            </View>
-
-            {/* 🚀 新增：配送凭证 */}
-            <DeliveryProofSection />
-
-            {/* 订单信息卡片 */}
-            <View style={[styles.card, isDarkMode && styles.darkCard]}>
-              <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📋 {t.orderInfo}</Text>
-              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
-                <Text style={styles.infoLabel}>{t.orderNumber}:</Text>
-                <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.id}</Text>
-              </View>
-              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
-                <Text style={styles.infoLabel}>{t.packageType}:</Text>
-                <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.package_type}</Text>
-              </View>
-              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
-                <Text style={styles.infoLabel}>{t.weight}:</Text>
-                <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.weight}</Text>
-              </View>
-              <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
-                <Text style={styles.infoLabel}>{t.price}:</Text>
-                <Text style={styles.infoPriceValue}>{packageData.price} MMK</Text>
-              </View>
-              {packageData.courier && (
-                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow, { alignItems: 'center' }]}>
-                  <Text style={styles.infoLabel}>{t.courier}:</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end', gap: 10 }}>
-                    <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.courier}</Text>
-                    {/* 🚀 聊天入口按钮 */}
-                    <TouchableOpacity 
-                      style={styles.miniChatBtn}
-                      onPress={() => {
-                        setShowChatModal(true);
-                        setUnreadCount(0);
-                        if (packageData.id && currentUserId) {
-                          chatService.markAsRead(packageData.id, currentUserId);
-                        }
-                      }}
-                    >
-                      <Ionicons name="chatbubble-ellipses" size={18} color="#3b82f6" />
-                      {unreadCount > 0 && (
-                        <View style={styles.miniUnreadBadge}>
-                          <Text style={styles.miniUnreadBadgeText}>{unreadCount}</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-              {packageData.delivery_distance && (
-                <View style={[styles.infoRow, isDarkMode && styles.darkInfoRow]}>
-                  <Text style={styles.infoLabel}>{t.distance}:</Text>
-                  <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.delivery_distance} km</Text>
-                </View>
-              )}
-            </View>
-
-            {/* 寄件信息 */}
-            <View style={[styles.card, isDarkMode && styles.darkCard]}>
-              <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📤 {t.senderInfo}</Text>
-              <View style={[styles.addressContainer, isDarkMode && styles.darkAddressContainer]}>
-                <View style={styles.addressRow}>
-                  <Text style={[styles.addressName, isDarkMode && styles.darkText]}>{packageData.sender_name}</Text>
-                  <Text style={styles.addressPhone}>📞 {packageData.sender_phone}</Text>
-                </View>
-                <Text style={[styles.addressText, isDarkMode && { color: '#94a3b8' }]}>📍 {packageData.sender_address}</Text>
-              </View>
-            </View>
-
-            {/* 收件信息 */}
-            <View style={[styles.card, isDarkMode && styles.darkCard]}>
-              <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📥 {t.receiverInfo}</Text>
-              <View style={[styles.addressContainer, isDarkMode && styles.darkAddressContainer]}>
-                <View style={styles.addressRow}>
-                  <Text style={[styles.addressName, isDarkMode && styles.darkText]}>{packageData.receiver_name}</Text>
-                  <Text style={styles.addressPhone}>📞 {packageData.receiver_phone}</Text>
-                </View>
-                <Text style={[styles.addressText, isDarkMode && { color: '#94a3b8' }]}>📍 {packageData.receiver_address}</Text>
-              </View>
-            </View>
-
-            {/* 追踪历史 */}
-            {trackingHistory.length > 0 && (
-              <View style={[styles.card, isDarkMode && styles.darkCard]}>
-                <Text style={[styles.cardTitle, isDarkMode && styles.darkText]}>📍 {t.trackingHistory}</Text>
-                {trackingHistory.map((event, index) => (
-                  <View key={event.id} style={styles.trackingItem}>
-                    <View style={styles.trackingDot}>
-                      <View
-                        style={[
-                          styles.trackingDotInner,
-                          index === 0 && styles.trackingDotActive,
-                          isDarkMode && { borderColor: '#1e293b' }
-                        ]}
-                      />
-                      {index !== trackingHistory.length - 1 && (
-                        <View style={[styles.trackingLine, isDarkMode && { backgroundColor: '#1e293b' }]} />
-                      )}
-                    </View>
-                    <View style={styles.trackingContent}>
-                      <Text style={[styles.trackingStatus, isDarkMode && styles.darkText]}>{event.status}</Text>
-                      {event.note && (
-                        <Text style={[styles.trackingNote, isDarkMode && { color: '#94a3b8' }]}>{event.note}</Text>
-                      )}
-                      <Text style={styles.trackingTime}>
-                        {formatDate(event.event_time)}
-                      </Text>
+                      <Text style={styles.trackingTime}>{formatTrackDate(event.event_time)}</Text>
                     </View>
                   </View>
                 ))}
@@ -1642,919 +981,3 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: PAGE_BG,
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  searchContainer: {
-    marginBottom: 24,
-    gap: 12,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  searchIcon: {
-    fontSize: 18,
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1e293b',
-    paddingVertical: 16,
-  },
-  trackButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  trackButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  trackButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748b',
-  },
-  notFoundContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  notFoundIcon: {
-    fontSize: 78,
-    marginBottom: 20,
-  },
-  notFoundText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  notFoundDesc: {
-    fontSize: 16,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  statusCard: {
-    marginBottom: 24,
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 10,
-  },
-  statusGradient: {
-    padding: 30,
-    alignItems: 'center',
-  },
-  statusHeader: {
-    alignItems: 'center',
-  },
-  statusBadge: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-  },
-  etaContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 15,
-    marginBottom: 15,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  etaLabel: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  etaValue: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  statusIcon: {
-    fontSize: 58,
-    marginBottom: 16,
-  },
-  statusText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  statusTime: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#64748b',
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    flex: 2,
-    textAlign: 'right',
-  },
-  infoPriceValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-    flex: 2,
-    textAlign: 'right',
-  },
-  addressContainer: {
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 12,
-  },
-  addressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  addressName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  addressPhone: {
-    fontSize: 13,
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  addressText: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
-  },
-  trackingItem: {
-    flexDirection: 'row',
-    marginBottom: 20,
-  },
-  trackingDot: {
-    width: 40,
-    alignItems: 'center',
-  },
-  trackingDotInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#cbd5e1',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  trackingDotActive: {
-    backgroundColor: '#3b82f6',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  trackingLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: '#e2e8f0',
-    marginTop: 4,
-  },
-  trackingContent: {
-    flex: 1,
-    paddingLeft: 12,
-  },
-  trackingStatus: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  trackingNote: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 4,
-  },
-  trackingTime: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  mapContainer: {
-    height: 300,
-    width: '100%',
-    borderRadius: 24,
-    overflow: 'hidden',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  map: {
-    flex: 1,
-  },
-  mapFallback: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  mapFallbackIcon: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  mapFallbackTitle: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  mapFallbackDesc: {
-    color: '#cbd5e1',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  riderMarker: {
-    backgroundColor: 'white',
-    padding: 5,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#3b82f6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  mapOverlay: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    right: 12,
-    backgroundColor: 'rgba(30, 58, 138, 0.85)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  mapOverlayText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  darkContainer: {
-    backgroundColor: '#0f172a',
-  },
-  darkCard: {
-    backgroundColor: '#1e293b',
-    borderColor: '#334155',
-  },
-  darkText: {
-    color: '#f8fafc',
-  },
-  darkInfoRow: {
-    borderBottomColor: '#334155',
-  },
-  darkAddressContainer: {
-    backgroundColor: '#0f172a',
-  },
-  darkSearchInput: {
-    backgroundColor: '#1e293b',
-    borderColor: '#334155',
-  },
-  proofImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 12,
-    backgroundColor: '#f1f5f9',
-  },
-  proofTime: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  // 🚀 聊天相关样式
-  miniChatBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  miniUnreadBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#ef4444',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  miniUnreadBadgeText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  chatModalContent: {
-    height: '80%',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-  },
-  darkChatModal: {
-    backgroundColor: '#0f172a',
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    backgroundColor: '#fff',
-  },
-  darkChatHeader: {
-    backgroundColor: '#1e293b',
-    borderBottomColor: '#334155',
-  },
-  chatTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  chatSubtitle: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 2,
-  },
-  chatCloseBtn: {
-    padding: 4,
-  },
-  messageList: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#f8fafc',
-  },
-  darkMessageList: {
-    backgroundColor: '#0f172a',
-  },
-  emptyChat: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyChatText: {
-    color: '#94a3b8',
-    fontSize: 14,
-  },
-  messageWrapper: {
-    marginBottom: 16,
-    maxWidth: '80%',
-  },
-  myMessageWrapper: {
-    alignSelf: 'flex-end',
-  },
-  otherMessageWrapper: {
-    alignSelf: 'flex-start',
-  },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 16,
-  },
-  myBubble: {
-    backgroundColor: TEAL,
-    borderBottomRightRadius: 4,
-  },
-  otherBubble: {
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  darkOtherBubble: {
-    backgroundColor: '#1e293b',
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 24, // 🚀 增加行高
-    paddingVertical: 2, // 🚀 增加垂直边距
-  },
-  myMessageText: {
-    color: '#fff',
-  },
-  otherMessageText: {
-    color: '#1e293b',
-  },
-  messageTime: {
-    fontSize: 10,
-    color: '#94a3b8',
-    marginTop: 4,
-    textAlign: 'right',
-  },
-  chatInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    gap: 12,
-  },
-  chatInput: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    maxHeight: 100,
-    fontSize: 15,
-    color: '#1e293b',
-  },
-  darkChatInput: {
-    backgroundColor: '#0f172a',
-    color: '#f8fafc',
-  },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: TEAL,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendBtnDisabled: {
-    backgroundColor: '#e2e8f0',
-  },
-  offlineBanner: {
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  offlineBannerText: {
-    color: '#e2e8f0',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  ongoingContainer: {
-    marginBottom: 20,
-  },
-  ongoingTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: NAVY,
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  ongoingCard: {
-    width: 200,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  ongoingCardGradient: {
-    padding: 16,
-    height: 100,
-    justifyContent: 'space-between',
-  },
-  ongoingCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  ongoingOrderId: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1e3a8a',
-  },
-  ongoingBadge: {
-    backgroundColor: '#8b5cf6',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  ongoingBadgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  ongoingAddress: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 8,
-  },
-  ongoingTap: {
-    fontSize: 10,
-    color: TEAL,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-});
-
-const ui = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: PAGE_BG,
-  },
-  navRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-  },
-  navRowOverlay: {
-    zIndex: 8,
-  },
-  navBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e8edf2',
-  },
-  navTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '800',
-    color: NAVY,
-  },
-  supportBtn: {
-    width: 48,
-    alignItems: 'center',
-  },
-  supportLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: NAVY,
-    marginTop: 2,
-  },
-  browseSubtitle: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '600',
-    marginBottom: 14,
-  },
-  hero: {
-    height: MAP_HERO,
-    backgroundColor: '#d8eef1',
-    overflow: 'hidden',
-  },
-  heroScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  statusFloat: {
-    position: 'absolute',
-    left: 16,
-    bottom: 28,
-    maxWidth: width * 0.52,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
-    zIndex: 6,
-  },
-  statusHeadline: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: NAVY,
-    lineHeight: 24,
-  },
-  statusEta: {
-    marginTop: 6,
-    fontSize: 13,
-    fontWeight: '700',
-    color: TEAL,
-  },
-  riderPin: {
-    backgroundColor: '#fff',
-    padding: 4,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: TEAL,
-  },
-  sheet: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -18,
-    paddingTop: 16,
-    overflow: 'hidden',
-    zIndex: 6,
-  },
-  riderBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  riderAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: TEAL,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  riderAvatarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  riderName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: NAVY,
-  },
-  riderMeta: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  actionCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: TEAL,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  actionCol: {
-    alignItems: 'center',
-    width: 56,
-  },
-  actionLabel: {
-    marginTop: 4,
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  unreadDot: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#ef4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  unreadDotText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  actionHint: {
-    paddingHorizontal: 20,
-    marginTop: 6,
-    marginBottom: 8,
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  tlRow: {
-    flexDirection: 'row',
-    minHeight: 44,
-  },
-  tlRail: {
-    width: 22,
-    alignItems: 'center',
-  },
-  tlDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tlDotDone: {
-    backgroundColor: TEAL,
-    borderColor: TEAL,
-  },
-  tlDotCurrent: {
-    borderColor: TEAL,
-    borderWidth: 3,
-    backgroundColor: '#fff',
-  },
-  tlLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 2,
-  },
-  tlLineDone: {
-    backgroundColor: TEAL,
-  },
-  tlBody: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingBottom: 16,
-    paddingLeft: 10,
-  },
-  tlLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  tlLabelCurrent: {
-    color: TEAL,
-  },
-  tlTime: {
-    fontSize: 12,
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  miniCard: {
-    backgroundColor: PAGE_BG,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-  },
-  miniCardTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#64748b',
-    marginBottom: 4,
-  },
-  miniCardText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: NAVY,
-  },
-  miniCardMuted: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#64748b',
-  },
-  summaryBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eef2f6',
-    gap: 10,
-  },
-  summaryThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#e8f5f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  summaryName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: NAVY,
-  },
-  summaryPrice: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: NAVY,
-  },
-});

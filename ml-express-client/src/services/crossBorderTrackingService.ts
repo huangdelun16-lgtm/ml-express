@@ -58,7 +58,7 @@ export function crossBorderStatusColor(statusKey: CrossBorderStatusKey): string 
     case 'loaded':
       return '#8b5cf6';
     case 'origin_arrived':
-      return '#3b82f6';
+      return '#2C98A6';
     default:
       return '#6b7280';
   }

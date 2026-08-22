@@ -89,7 +89,7 @@ const StoreCard = React.memo(({ item, status, language, t, productMatches, stats
     : status.reason === 'closed_today'
       ? t.closedToday
       : status.reason === 'vacation'
-        ? (language === 'zh' ? '预设休假' : 'Vacation')
+        ? t.onVacation
         : t.closedNow;
   const iconGradient = STORE_TYPE_GRADIENT[item.store_type] || DEFAULT_STORE_GRADIENT;
   const rating = stats?.average > 0 ? stats.average : 4.9;
@@ -319,6 +319,11 @@ export default function CityMallScreen({ navigation }: any) {
       openNow: '正在营业',
       closedNow: '休息中',
       closedToday: '今日暂停营业',
+      onVacation: '预设休假',
+      tryOtherRegion: '请尝试切换到其他地区看看',
+      tryOtherKeyword: '换个关键词搜搜看吧',
+      anonymous: '匿名用户',
+      notice: '提示',
       reviews: '条评价',
       noReviews: '暂无评价内容',
       merchantReply: '商家回复',
@@ -345,6 +350,11 @@ export default function CityMallScreen({ navigation }: any) {
       openNow: 'Open Now',
       closedNow: 'Closed',
       closedToday: 'Closed Today',
+      onVacation: 'On vacation',
+      tryOtherRegion: 'Try switching to another region',
+      tryOtherKeyword: 'Try another keyword',
+      anonymous: 'Anonymous',
+      notice: 'Notice',
       reviews: 'Reviews',
       noReviews: 'No reviews yet',
       merchantReply: 'Merchant Reply',
@@ -371,6 +381,11 @@ export default function CityMallScreen({ navigation }: any) {
       openNow: 'ဆိုင်ဖွင့်ထားသည်',
       closedNow: 'ဆိုင်ပိတ်ထားသည်',
       closedToday: 'ယနေ့ ဆိုင်ပိတ်သည်',
+      onVacation: 'အားလပ်ရက်',
+      tryOtherRegion: 'အခြားဒေသသို့ ပြောင်းကြည့်ပါ',
+      tryOtherKeyword: 'အခြားစကားလုံးဖြင့် ရှာကြည့်ပါ',
+      anonymous: 'အမည်မဖော်သူ',
+      notice: 'အသိပေးချက်',
       reviews: 'ခု မှတ်ချက်',
       noReviews: 'မှတ်ချက်မရှိသေးပါ',
       merchantReply: 'ဆိုင်၏ပြန်လည်ဖြေကြားချက်',
@@ -568,7 +583,7 @@ export default function CityMallScreen({ navigation }: any) {
 
   const handleStoreVisit = useCallback((item: any, status: any) => {
     if (!status.isOpen) {
-      Alert.alert('提示', t.closedToday);
+      Alert.alert(t.notice, t.closedToday);
       return;
     }
     navigation.navigate('MerchantProducts', { storeId: item.id, storeName: item.store_name });
@@ -729,7 +744,7 @@ export default function CityMallScreen({ navigation }: any) {
                   }}
                 >
                   <LinearGradient
-                    colors={[item.bg_color_start || '#3b82f6', item.bg_color_end || '#1e40af']}
+                    colors={[item.bg_color_start || '#2C98A6', item.bg_color_end || '#1E6F7A']}
                     style={styles.bannerGradient}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   >
@@ -861,7 +876,7 @@ export default function CityMallScreen({ navigation }: any) {
                 <View style={styles.emptyIconCircle}><Ionicons name={searchMode === 'stores' ? "business-outline" : "cube-outline"} size={60} color="#cbd5e1" /></View>
                 <Text style={styles.emptyText}>{searchMode === 'stores' ? t.noStores : t.noProducts}</Text>
                 <Text style={styles.emptySubtext}>
-                  {searchMode === 'stores' ? (language === 'zh' ? '请尝试切换到其他地区看看' : 'Try switching to another region') : (language === 'zh' ? '换个关键词搜搜看吧' : 'Try another keyword')}
+                  {searchMode === 'stores' ? t.tryOtherRegion : t.tryOtherKeyword}
                 </Text>
               </View>
             ) : null
@@ -894,7 +909,7 @@ export default function CityMallScreen({ navigation }: any) {
                     <View style={styles.reviewUserRow}>
                       <View style={styles.userInfoLeft}>
                         <View style={styles.userAvatar}><Text style={styles.avatarText}>{review.is_anonymous ? '匿' : (review.user_name?.charAt(0).toUpperCase() || 'U')}</Text></View>
-                        <Text style={styles.userNameText}>{review.is_anonymous ? (language === 'zh' ? '匿名用户' : 'Anonymous') : review.user_name}</Text>
+                        <Text style={styles.userNameText}>{review.is_anonymous ? t.anonymous : review.user_name}</Text>
                       </View>
                       <Text style={styles.reviewStars}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</Text>
                     </View>

@@ -54,7 +54,7 @@ export default function BackToHomeButton({ navigation, position = 'topRight', st
 
   const textStyle = [
     styles.text,
-    color === 'white' ? { color: '#1e3a8a' } : {}
+    color === 'white' ? { color: '#1A2B48' } : {}
   ];
 
   return (

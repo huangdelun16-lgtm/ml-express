@@ -1,6 +1,7 @@
 /**
  * Native REST/Auth/Storage on a Myanmar-reachable Netlify /__sb host.
- * localhost / Expo __DEV__ keeps env extra supabase.co.
+ * *.supabase.co is remapped even in Expo __DEV__ (TLS reset in Myanmar).
+ * Set EXPO_PUBLIC_SUPABASE_DIRECT=1 only when a VPN can reach supabase.co.
  *
  * Trailing slash is required: supabase-js `new URL('rest/v1', base)` drops
  * `/__sb` unless the base ends with `/`. Always emit `/__sb/` ourselves.
@@ -31,17 +32,41 @@ export function nativeClientHeaders(_isDev = isNativeDevRuntime()): Record<strin
   return undefined;
 }
 
-/** Production/release always uses /__sb/. Dev keeps the configured env URL. */
+function ensureTrailingSlash(url: string): string {
+  if (!url) return url;
+  return url.endsWith('/') ? url : `${url}/`;
+}
+
+function isSupabaseCoHost(url: string): boolean {
+  return /https?:\/\/[^/\s]*supabase\.co(?=\/|$)/i.test(url);
+}
+
+/**
+ * Native REST always uses /__sb unless allowDirect is set.
+ * Myanmar Wi-Fi TLS-resets *.supabase.co; Expo Go / __DEV__ env often still
+ * points at supabase.co, which then surfaces as an empty login error.
+ */
 export function resolveNativeSupabaseUrl(
   configuredUrl: string,
   isDev = isNativeDevRuntime(),
+  options?: { expoGo?: boolean; allowDirect?: boolean },
 ): string {
   const configured = String(configuredUrl || '').trim().replace(/\/$/, '');
+  const allowDirect = Boolean(options?.allowDirect) && !options?.expoGo;
+
+  if (options?.expoGo) {
+    return ensureTrailingSlash(NATIVE_SB_PROXY_URL);
+  }
+  if (configured.includes('/__sb')) {
+    return ensureTrailingSlash(configured);
+  }
+  if (!allowDirect && (!configured || isSupabaseCoHost(configured))) {
+    return ensureTrailingSlash(NATIVE_SB_PROXY_URL);
+  }
   if (isDev) {
     return configured;
   }
-  const proxy = NATIVE_SB_PROXY_URL;
-  return proxy.endsWith('/') ? proxy : `${proxy}/`;
+  return ensureTrailingSlash(NATIVE_SB_PROXY_URL);
 }
 
 type RealtimePatchTarget = {
@@ -72,6 +97,10 @@ export function rewritePublicStorageUrl(url: string): string {
   if (raw.startsWith('file://') || raw.startsWith('content://')) return raw;
   const proxy = NATIVE_SB_PROXY_URL.replace(/\/$/, '');
   return raw
-    .replace(/^https:\/\/uopkyuluxnrewvlmutam\.supabase\.co(?=\/|$)/i, proxy)
-    .replace(/^https:\/\/[^/]+\.supabase\.co(?=\/|$)/i, proxy);
+    .replace(/^https?:\/\/uopkyuluxnrewvlmutam\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(/^https?:\/\/[^/]+\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(
+      /^https?:\/\/(?:www\.)?(?:market-link-express\.com|admin-market-link-express\.com)\/__sb(?=\/|$)/i,
+      proxy,
+    );
 }

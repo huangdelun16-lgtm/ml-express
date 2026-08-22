@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2E86AB"
+      "backgroundColor": "#2C98A6"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -57,7 +57,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#2E86AB"
+        "backgroundColor": "#2C98A6"
       },
       "package": "com.mlexpress.client",
       "versionCode": 73,

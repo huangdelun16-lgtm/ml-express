@@ -74,7 +74,7 @@ module.exports = ({ config }) => {
   ).trim();
   const netlifyUrl = (
     process.env.EXPO_PUBLIC_NETLIFY_URL ||
-    'https://admin-market-link-express.netlify.app'
+    'https://mlexpress-merchants.com'
   ).trim();
   const supabaseUrl = resolveExtraSupabaseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL || '');
   const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').trim();

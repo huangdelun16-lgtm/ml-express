@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import LoggerService from '../services/LoggerService';
 import {
   View,
@@ -15,8 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
 import { welcomeScreenService, WelcomeScreen as WelcomeScreenData } from '../services/supabase';
-import { supabase } from '../services/supabase';
-import { isTransitStationStore } from '../services/_shared/merchantLoginGuard';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
@@ -25,7 +23,7 @@ export default function WelcomeScreen({ navigation }: any) {
   const { language, enableRealtimeAfterSplash } = useApp();
   const [countdown, setCountdown] = useState(5);
   const [dynamicScreen, setDynamicScreen] = useState<WelcomeScreenData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const leavingRef = useRef(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -62,53 +60,31 @@ export default function WelcomeScreen({ navigation }: any) {
         const screen = await welcomeScreenService.getActiveWelcomeScreen();
         if (screen) {
           setDynamicScreen(screen);
-          setCountdown(screen.countdown || 5);
         }
       } catch (error) {
         console.warn('Failed to load dynamic welcome screen');
-      } finally {
-        setLoading(false);
       }
     };
-    loadDynamicContent();
+    void loadDynamicContent();
   }, []);
 
-  const navigateToNextScreen = async () => {
+  const navigateToNextScreen = useCallback(async () => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
     try {
       const userId = await AsyncStorage.getItem('userId');
       if (userId) {
-        const storeCode = (await AsyncStorage.getItem('currentStoreCode'))?.trim().toUpperCase() ?? '';
-        let query = supabase.from('delivery_stores').select('id, store_type');
-        if (storeCode) {
-          query = query.eq('store_code', storeCode);
-        } else {
-          query = query.eq('id', userId);
-        }
-        const { data: store } = await query.maybeSingle();
-        if (isTransitStationStore(store)) {
-          await AsyncStorage.multiRemove([
-            'currentUser',
-            'userId',
-            'userEmail',
-            'userName',
-            'userPhone',
-            'userType',
-            'currentStoreCode',
-            'currentSessionId',
-          ]);
-          navigation.replace('Login');
-          return;
-        }
-        await enableRealtimeAfterSplash();
+        void enableRealtimeAfterSplash();
         navigation.replace('Main');
       } else {
         navigation.replace('Login');
       }
     } catch (error) {
+      leavingRef.current = false;
       LoggerService.error('Navigation check failed:', error);
       navigation.replace('Login');
     }
-  };
+  }, [enableRealtimeAfterSplash, navigation]);
 
   useEffect(() => {
     // 动画效果
@@ -148,12 +124,11 @@ export default function WelcomeScreen({ navigation }: any) {
       ])
     ).start();
 
-    // 倒计时逻辑
+    // 倒计时逻辑（不要在 setState 里跳转，也不要等网络）
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigateToNextScreen();
           return 0;
         }
         return prev - 1;
@@ -163,12 +138,17 @@ export default function WelcomeScreen({ navigation }: any) {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (countdown > 0) return;
+    void navigateToNextScreen();
+  }, [countdown, navigateToNextScreen]);
+
   // 渲染背景装饰点
   const renderDecorations = () => {
     return Array(15).fill(0).map((_, i) => (
       <View
         key={i}
-        style={[
+          style={[
           styles.decorationDot,
           {
             top: Math.random() * height,
@@ -178,6 +158,7 @@ export default function WelcomeScreen({ navigation }: any) {
             height: Math.random() * 4,
           }
         ]}
+        pointerEvents="none"
       />
     ));
   };
@@ -193,7 +174,7 @@ export default function WelcomeScreen({ navigation }: any) {
         {renderDecorations()}
         
         {/* 背景环绕光效 */}
-        <View style={styles.bgGlow} />
+        <View style={styles.bgGlow} pointerEvents="none" />
 
         {/* 跳过按钮 */}
         <TouchableOpacity
@@ -218,7 +199,7 @@ export default function WelcomeScreen({ navigation }: any) {
             ]}
           >
             {/* 徽标背景光晕 */}
-            <Animated.View style={[styles.logoGlow, { transform: [{ scale: pulseAnim }] }]} />
+            <Animated.View style={[styles.logoGlow, { transform: [{ scale: pulseAnim }] }]} pointerEvents="none" />
             <View style={styles.logoCircle}>
               {dynamicScreen?.image_url ? (
                 <Image
@@ -293,6 +274,7 @@ export default function WelcomeScreen({ navigation }: any) {
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={styles.buttonGradient}
+              pointerEvents="none"
             >
               <Text style={styles.startButtonText}>
                 {dynamicScreen ? 
@@ -305,7 +287,7 @@ export default function WelcomeScreen({ navigation }: any) {
       </LinearGradient>
 
       {/* 底部点缀图标 */}
-      <View style={styles.bottomStar}>
+      <View style={styles.bottomStar} pointerEvents="none">
         <Ionicons name="sparkles" size={24} color="rgba(255,255,255,0.2)" />
       </View>
     </View>
@@ -453,6 +435,7 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
     paddingHorizontal: 40,
     width: '100%',
+    zIndex: 20,
   },
   startButton: {
     borderRadius: 40,

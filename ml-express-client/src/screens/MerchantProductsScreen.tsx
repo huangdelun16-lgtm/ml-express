@@ -31,6 +31,7 @@ import {
 } from '../services/supabase';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
+import { common } from '../i18n';
 import MyanmarAwareText from '../components/MyanmarAwareText';
 import { adjustStyleForMyanmarText } from '../utils/myanmarText';
 import {
@@ -176,6 +177,17 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       freeDelivery: '满额免配',
       checkout: '去结算',
       itemsUnit: '件',
+      selectVariant: '请先选择规格',
+      outOfStock: '暂无库存',
+      unavailableItem: '商品已下架',
+      cartUpdated: '购物车已更新',
+      clearCartTitle: '清空购物车提示',
+      clearCartBody: '购物车中已存在其他店铺的商品，继续添加将清空原有商品。确定继续吗？',
+      continueAction: '确定',
+      soldOut: '售罄',
+      loadFailed: '加载失败',
+      selectToSeePrice: '请选择规格查看价格',
+      selectVariantTitle: '选择规格',
     },
     en: {
       title: 'Products',
@@ -201,6 +213,17 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       freeDelivery: 'Free delivery over min.',
       checkout: 'Checkout',
       itemsUnit: 'items',
+      selectVariant: 'Please select a variant',
+      outOfStock: 'Out of stock',
+      unavailableItem: 'This item is unavailable',
+      cartUpdated: 'Cart updated',
+      clearCartTitle: 'Clear Cart Notice',
+      clearCartBody: 'Cart already contains items from another store. Adding new items will clear existing ones. Continue?',
+      continueAction: 'Continue',
+      soldOut: 'Sold out',
+      loadFailed: 'Failed to load',
+      selectToSeePrice: 'Select a variant to see price',
+      selectVariantTitle: 'Select variant',
     },
     my: {
       title: 'ကုန်ပစ္စည်းများ',
@@ -214,8 +237,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       productDetail: 'ကုန်ပစ္စည်းအသေးစိတ်',
       description: 'ကုန်ပစ္စည်းအကြောင်းအရာ',
       noDescription: 'ဖော်ပြချက်မရှိပါ',
-      detailImages: 'Product details',
-      detailIntro: 'Details',
+      detailImages: 'အသေးစိတ်ပုံများ',
+      detailIntro: 'အသေးစိတ်',
       itemRemark: 'ဤပစ္စည်းအတွက် မှတ်ချက် (ရွေးချယ်နိုင်)',
       itemRemarkPlaceholder: 'ဥပမာ- သကြားနည်း၊ မစပ်ပါ',
       itemRemarkMultiHint: 'တစ်ခုချင်းစီမှတ်ချက်ထည့်နိုင်',
@@ -226,10 +249,22 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       freeDelivery: 'ပြည့်ရင် ပို့ခအခမဲ့',
       checkout: 'ငွေရှင်းရန်',
       itemsUnit: 'ခု',
+      selectVariant: 'အမျိုးအစား အရင်ရွေးပါ',
+      outOfStock: 'ကုန်ပစ္စည်း မရှိပါ',
+      unavailableItem: 'မရရှိနိုင်ပါ',
+      cartUpdated: 'ဈေးဝယ်လှည်းအပ်ဒိတ်လုပ်ပြီး',
+      clearCartTitle: 'ဈေးဝယ်လှည်း ရှင်းရန်',
+      clearCartBody: 'အခြားဆိုင်မှ ပစ္စည်းများ ရှိနေပါသည်။ ဆက်ထည့်ပါက အဟောင်းများကို ရှင်းပါမည်။ ဆက်လုပ်မလား?',
+      continueAction: 'ဆက်လုပ်မည်',
+      soldOut: 'ရောင်းကုန်',
+      loadFailed: 'တင်၍မရပါ',
+      selectToSeePrice: 'စျေးနှုန်းကြည့်ရန် ရွေးချယ်ပါ',
+      selectVariantTitle: 'အမျိုးအစားရွေးပါ',
     }
   };
 
   const currentT = t[language as keyof typeof t] || t.zh;
+  const c = common(language);
   const isFocused = useIsFocused();
 
   useEffect(() => {
@@ -266,7 +301,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       setCategories(cats || []);
       setReviewStats({ average: stats?.average || 0, count: stats?.count || 0 });
     } catch (error) {
-      showToast('加载失败', 'error');
+      showToast(currentT.loadFailed, 'error');
     } finally {
       setLoading(false);
     }
@@ -377,14 +412,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
       return;
     }
     if (!product.is_available) {
-      showToast(
-        language === 'zh'
-          ? '商品已下架'
-          : language === 'en'
-            ? 'This item is unavailable'
-            : 'မရရှိနိုင်ပါ',
-        'warning'
-      );
+      showToast(currentT.unavailableItem, 'warning');
       navigation.setParams({ openProductDetailId: undefined });
       return;
     }
@@ -434,13 +462,13 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     const pid = selectedProductDetail.id;
     if (productHasVariants(selectedProductDetail) && !selectedVariantId) {
       showToast(
-        language === 'zh' ? '请先选择规格' : 'Please select a variant',
+        currentT.selectVariant,
         'warning',
       );
       return;
     }
     if (detailStockCap === 0) {
-      showToast(language === 'zh' ? '暂无库存' : 'Out of stock', 'warning');
+      showToast(currentT.outOfStock, 'warning');
       return;
     }
     const qty =
@@ -462,14 +490,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         } else {
           updateCartItemDetails(oldKey, qty, padded);
         }
-        showToast(
-          language === 'zh'
-            ? '购物车已更新'
-            : language === 'en'
-              ? 'Cart updated'
-              : 'ဈေးဝယ်လှည်းအပ်ဒိတ်လုပ်ပြီး',
-          'success',
-        );
+        showToast(currentT.cartUpdated, 'success');
       } else {
         addToCart(selectedProductDetail, qty, remarks, variantId);
         showToast(currentT.addedToCart, 'success');
@@ -479,13 +500,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
     if (!fromCart && cartItems.length > 0 && cartItems[0].store_id !== storeId) {
       Alert.alert(
-        language === 'zh' ? '清空购物车提示' : 'Clear Cart Notice',
-        language === 'zh'
-          ? '购物车中已存在其他店铺的商品，继续添加将清空原有商品。确定继续吗？'
-          : 'Cart already contains items from another store. Adding new items will clear existing ones. Continue?',
+        currentT.clearCartTitle,
+        currentT.clearCartBody,
         [
-          { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
-          { text: language === 'zh' ? '确定' : 'Continue', onPress: commitDetailCart },
+          { text: c.cancel, style: 'cancel' },
+          { text: currentT.continueAction, onPress: commitDetailCart },
         ],
       );
       return;
@@ -497,13 +516,11 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const confirmOtherStoreThen = (onOk: () => void) => {
     if (cartItems.length > 0 && cartItems[0].store_id !== storeId) {
       Alert.alert(
-        language === 'zh' ? '清空购物车提示' : 'Clear Cart Notice',
-        language === 'zh'
-          ? '购物车中已存在其他店铺的商品，继续添加将清空原有商品。确定继续吗？'
-          : 'Cart already contains items from another store. Adding new items will clear existing ones. Continue?',
+        currentT.clearCartTitle,
+        currentT.clearCartBody,
         [
-          { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
-          { text: language === 'zh' ? '确定' : 'Continue', onPress: onOk },
+          { text: c.cancel, style: 'cancel' },
+          { text: currentT.continueAction, onPress: onOk },
         ],
       );
       return;
@@ -520,7 +537,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     const cap = maxSelectableStock(item);
     const current = cartQtyForProduct(item.id);
     if (cap === 0 || (cap !== 99999 && current >= cap)) {
-      showToast(language === 'zh' ? '暂无库存' : 'Out of stock', 'warning');
+      showToast(currentT.outOfStock, 'warning');
       return;
     }
     confirmOtherStoreThen(() => {
@@ -780,11 +797,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   <View style={styles.detailPriceRow}>
                     {selectedProductDetail && productHasVariants(selectedProductDetail) && !selectedVariantId ? (
                       <Text style={styles.detailPriceHint}>
-                        {language === 'zh'
-                          ? '请选择规格查看价格'
-                          : language === 'en'
-                            ? 'Select a variant to see price'
-                            : 'စျေးနှုန်းကြည့်ရန် ရွေးချယ်ပါ'}
+                        {currentT.selectToSeePrice}
                       </Text>
                     ) : (
                       <>
@@ -812,7 +825,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 {selectedProductDetail && productHasVariants(selectedProductDetail) ? (
                   <View style={styles.detailSection}>
                     <Text style={styles.detailSectionTitle}>
-                      {language === 'zh' ? '选择规格' : language === 'en' ? 'Select variant' : 'Variant'}
+                      {currentT.selectVariantTitle}
                     </Text>
                     <View style={styles.variantChipRow}>
                       {getAvailableVariants(selectedProductDetail).map((variant) => {
@@ -845,7 +858,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                             >
                               {variant.name}
                               {outOfStock
-                                ? ` (${language === 'zh' ? '售罄' : 'Sold out'})`
+                                ? ` (${currentT.soldOut})`
                                 : ''}
                             </Text>
                           </TouchableOpacity>
@@ -886,9 +899,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                     {selectedProductDetail &&
                     productHasVariants(selectedProductDetail) &&
                     !selectedVariantId
-                      ? language === 'zh'
-                        ? '请先选择规格'
-                        : 'Select variant first'
+                      ? currentT.selectVariant
                       : (detailDisplayProduct ?? selectedProductDetail)?.stock === -1
                         ? currentT.infinite
                         : (detailDisplayProduct ?? selectedProductDetail)?.stock}

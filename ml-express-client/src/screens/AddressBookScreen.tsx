@@ -18,6 +18,7 @@ import { useApp } from '../contexts/AppContext';
 import { addressService, AddressItem } from '../services/supabase';
 import { theme } from '../config/theme';
 import Toast from '../components/Toast';
+import { common } from '../i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapModal from '../components/placeOrder/MapModal';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
@@ -47,8 +48,8 @@ const baseStyles = StyleSheet.create({
   addressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   labelContainer: { flexDirection: 'row', alignItems: 'center' },
   label: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginRight: 8 },
-  defaultBadge: { backgroundColor: '#eff6ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  defaultText: { fontSize: 10, color: '#3b82f6', fontWeight: 'bold' },
+  defaultBadge: { backgroundColor: '#E8F6F8', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  defaultText: { fontSize: 10, color: '#2C98A6', fontWeight: 'bold' },
   deleteBtn: { padding: 4 },
   contactText: { fontSize: 14, color: '#64748b', marginBottom: 4 },
   addressText: { fontSize: 15, color: '#1e293b', lineHeight: 22 },
@@ -84,8 +85,8 @@ const baseStyles = StyleSheet.create({
     gap: 6
   },
   labelButtonActive: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb'
+    backgroundColor: '#1E6F7A',
+    borderColor: '#1E6F7A'
   },
   labelButtonText: {
     fontSize: 14,
@@ -101,7 +102,7 @@ const baseStyles = StyleSheet.create({
     justifyContent: 'center',
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#E8F6F8',
     borderWidth: 1,
     borderColor: '#bfdbfe',
     marginBottom: 16,
@@ -110,11 +111,11 @@ const baseStyles = StyleSheet.create({
   mapBtnText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#2563eb'
+    color: '#1E6F7A'
   },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   checkboxLabel: { marginLeft: 8, fontSize: 15, color: '#1e293b' },
-  saveBtn: { backgroundColor: '#2563eb', borderRadius: 12, padding: 16, alignItems: 'center' },
+  saveBtn: { backgroundColor: '#1E6F7A', borderRadius: 12, padding: 16, alignItems: 'center' },
   saveBtnText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
   
   // 地图模态框样式
@@ -133,7 +134,7 @@ const baseStyles = StyleSheet.create({
   },
   mapCloseButton: { fontSize: 28, color: '#64748b', padding: 8 }, // 增大点击区域
   mapTitle: { fontSize: 18, fontWeight: 'bold' },
-  mapConfirmButton: { fontSize: 28, color: '#2563eb', padding: 8 }, // 增大点击区域
+  mapConfirmButton: { fontSize: 28, color: '#1E6F7A', padding: 8 }, // 增大点击区域
   mapAddressInputContainer: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   mapAddressInput: { backgroundColor: '#f1f5f9', borderRadius: 8, padding: 12, fontSize: 16 },
   suggestionsContainer: { position: 'absolute', top: 120, left: 16, right: 16, backgroundColor: 'white', borderRadius: 8, zIndex: 1000, ...theme.shadows.medium },
@@ -149,6 +150,7 @@ const baseStyles = StyleSheet.create({
 
 export default function AddressBookScreen({ navigation, route }: any) {
   const { language } = useApp();
+  const c = common(language);
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
   const [userId, setUserId] = useState<string>('');
@@ -160,11 +162,11 @@ export default function AddressBookScreen({ navigation, route }: any) {
 
   // 翻译内容 (MapModal 需要)
   const currentT = useMemo(() => ({
-    senderAddress: language === 'zh' ? '寄件地址' : 'Sender Address',
-    receiverAddress: language === 'zh' ? '收件地址' : 'Receiver Address',
-    coordinates: language === 'zh' ? '坐标' : 'Coordinates',
-    useCurrentLocation: language === 'zh' ? '使用当前位置' : 'Use Current Location'
-  }), [language]);
+    senderAddress: c.senderAddress,
+    receiverAddress: c.receiverAddress,
+    coordinates: c.coordinates,
+    useCurrentLocation: c.useCurrentLocation
+  }), [c]);
 
   // 地图选择相关
   const [showMapSelector, setShowMapSelector] = useState(false);
@@ -444,7 +446,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#1e3a8a', '#2563eb']}
+        colors={['#1F7A84', '#2C98A6']}
         style={styles.header}
       >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -473,7 +475,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
 
       <TouchableOpacity style={styles.fab} onPress={openAdd}>
         <LinearGradient
-          colors={['#3b82f6', '#2563eb']}
+          colors={['#2C98A6', '#1E6F7A']}
           style={styles.fabGradient}
         >
           <Ionicons name="add" size={30} color="white" />
@@ -543,7 +545,7 @@ export default function AddressBookScreen({ navigation, route }: any) {
                 style={styles.mapBtn} 
                 onPress={() => setShowMapSelector(true)}
               >
-                <Ionicons name="map-outline" size={20} color="#2563eb" />
+                <Ionicons name="map-outline" size={20} color="#1E6F7A" />
                 <Text style={styles.mapBtnText}>{t.selectOnMap}</Text>
               </TouchableOpacity>
               

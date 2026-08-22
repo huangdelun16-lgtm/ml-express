@@ -9,6 +9,7 @@
  * Realtime WS cannot upgrade through Netlify rewrites. The previous Worker
  * fallback (`*.workers.dev`) TLS-resets in Myanmar the same way supabase.co
  * does, and no Cloudflare custom hostname exists. Production must not dial it.
+ * Native chat / courier location therefore poll REST via /__sb instead of WS.
  */
 export const NATIVE_SB_PROXY_URL =
   'https://' + 'market-link-express.com' + '/__sb/';

@@ -365,7 +365,7 @@ export default function App() {
 
   if (!appIsReady || isLoggedIn === null || !fontsLoaded) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#2E86AB', justifyContent: 'center', alignItems: 'center' }} onLayout={onLayoutRootView}>
+      <View style={{ flex: 1, backgroundColor: '#2C98A6', justifyContent: 'center', alignItems: 'center' }} onLayout={onLayoutRootView}>
         {/* 即使在初始化阶段也显示背景色，避免纯白屏 */}
         <LoadingFallback />
       </View>

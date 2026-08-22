@@ -152,7 +152,7 @@ export const baseStyles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#E8F6F8',
     borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: '#2C98A6',
@@ -357,7 +357,7 @@ export const baseStyles = StyleSheet.create({
     gap: 12,
   },
   mapCurrentLocationButton: {
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#E8F6F8',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -863,7 +863,7 @@ export const baseStyles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   paymentMethodOptionActive: {
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#E8F6F8',
     borderColor: '#2C98A6',
   },
   paymentMethodRadio: {
@@ -1061,22 +1061,22 @@ export const baseStyles = StyleSheet.create({
   },
   // 选中POI信息样式
   selectedPlaceInfo: {
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#E8F6F8',
     borderRadius: 8,
     padding: 12,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#0ea5e9',
+    borderColor: '#2C98A6',
   },
   selectedPlaceName: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#0c4a6e',
+    color: '#164E56',
     marginBottom: 4,
   },
   selectedPlaceAddress: {
     fontSize: 12,
-    color: '#0369a1',
+    color: '#185A63',
   },
   scrollView: {
     flex: 1,
@@ -1134,9 +1134,9 @@ export const baseStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#E8F6F8',
     borderWidth: 1,
-    borderColor: '#dbeafe',
+    borderColor: '#D7F3F6',
   },
   selectProductBtnText: {
     fontSize: 12,

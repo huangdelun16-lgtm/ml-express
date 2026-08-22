@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorService } from '../services/ErrorService';
 import { feedbackService } from '../services/FeedbackService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
+import MyanmarAwareText from '../components/MyanmarAwareText';
+import { common, ratingCaption } from '../i18n';
 import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
 import { useFocusEffect } from '@react-navigation/native';
 import { ProfileAvatar3D } from '../components/ProfileClayIcons';
@@ -139,6 +141,34 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       cod: '代收款',
       totalAmount: '总金额',
       none: '无',
+      placeOrderNow: '立即下单',
+      rateTitle: '评价订单',
+      orderNo: '订单号',
+      store: '商店',
+      courierRider: '配送骑手',
+      noCourierShort: '暂无',
+      merchantProduct: '商家商品',
+      courierService: '骑手配送服务',
+      commentOptional: '评价内容（选填）',
+      commentPlaceholder: '分享您的使用体验...',
+      uploadPhotos: '上传照片 (选填)',
+      photos: '照片',
+      submitReview: '提交评价',
+      packageTypes: {
+        standard: '标准件',
+        document: '文件',
+        fragile: '易碎品',
+        food: '食品饮料',
+        overweight: '超重件',
+        oversized: '超规件',
+      },
+      statusTypes: {
+        pending: '待取件',
+        picked_up: '已取件',
+        in_transit: '配送中',
+        delivered: '已送达',
+        cancelled: '已取消',
+      },
     },
     en: {
       title: 'My Orders',
@@ -173,6 +203,34 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       cod: 'COD',
       totalAmount: 'Total',
       none: 'None',
+      placeOrderNow: 'Place Order',
+      rateTitle: 'Rate Order',
+      orderNo: 'Order no.',
+      store: 'Store',
+      courierRider: 'Courier',
+      noCourierShort: 'N/A',
+      merchantProduct: 'Merchant & product',
+      courierService: 'Delivery / courier',
+      commentOptional: 'Comment (optional)',
+      commentPlaceholder: 'Share your experience...',
+      uploadPhotos: 'Upload Photos (Optional)',
+      photos: 'Photos',
+      submitReview: 'Submit',
+      packageTypes: {
+        standard: 'Standard',
+        document: 'Document',
+        fragile: 'Fragile',
+        food: 'Food',
+        overweight: 'Overweight',
+        oversized: 'Oversized',
+      },
+      statusTypes: {
+        pending: 'Pickup',
+        picked_up: 'Picked Up',
+        in_transit: 'Delivering',
+        delivered: 'Delivered',
+        cancelled: 'Cancelled',
+      },
     },
     my: {
       title: 'ကျွန်ုပ်၏ အော်ဒါများ',
@@ -207,7 +265,19 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       cod: 'ငွေကောက်ခံရန်',
       totalAmount: 'စုစုပေါင်း',
       none: 'မရှိ',
-      // 包裹类型翻译
+      placeOrderNow: 'အော်ဒါတင်',
+      rateTitle: 'အော်ဒါ အဆင့်သတ်မှတ်',
+      orderNo: 'အော်ဒါနံပါတ်',
+      store: 'ဆိုင်',
+      courierRider: 'ပို့ဆောင်သူ',
+      noCourierShort: 'မရှိသေး',
+      merchantProduct: 'ကုန်ပစ္စည်း/ဆိုင်',
+      courierService: 'ပို့ဆောင်မှု',
+      commentOptional: 'မှတ်ချက် (ရွေးချယ်)',
+      commentPlaceholder: 'အတွေ့အကြုံကို မျှဝေပါ...',
+      uploadPhotos: 'ဓာတ်ပုံတင်ရန် (ရွေးချယ်)',
+      photos: 'ဓာတ်ပုံ',
+      submitReview: 'တင်သွင်း',
       packageTypes: {
         'standard': 'စံပါဆယ်',
         'document': 'စာရွက်စာတမ်း',
@@ -229,6 +299,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   const t = translations[language] || translations.zh;
+  const c = common(language);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     if (type === 'success') feedbackService.success(message);
@@ -351,11 +422,18 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     };
   }, [reviewOrder?.id, reviewOrder?.delivery_store_id]);
 
-  // 🚀 新增：实时监听所有订单的消息
+  // 未读：Realtime 能通则即时；缅甸无 WS 时 REST 轮询兜底
   useEffect(() => {
     if (!customerId) return;
+    let cancelled = false;
 
-    // 订阅聊天消息表
+    const refreshUnread = async () => {
+      const ids = ordersRef.current.map((o) => o.id);
+      if (!ids.length) return;
+      const counts = await chatService.getUnreadCountsByOrder(customerId, ids);
+      if (!cancelled) setUnreadCounts(counts);
+    };
+
     chatSubscriptionRef.current = supabase
       .channel('global-unread-counts')
       .on(
@@ -367,13 +445,11 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         },
         (payload) => {
           const newMsg = payload.new as any;
-          // 如果消息不是我发的，且属于我的某个订单
           if (newMsg.sender_id !== customerId) {
             setUnreadCounts(prev => ({
               ...prev,
               [newMsg.order_id]: (prev[newMsg.order_id] || 0) + 1
             }));
-            // 轻微震动提示
             Vibration.vibrate(100);
           }
         }
@@ -387,7 +463,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         },
         (payload) => {
           const updatedMsg = payload.new as any;
-          // 如果消息被标记为已读
           if (updatedMsg.is_read) {
             setUnreadCounts(prev => {
               const currentCount = prev[updatedMsg.order_id] || 0;
@@ -401,7 +476,12 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       )
       .subscribe();
 
+    void refreshUnread();
+    const timer = setInterval(() => { void refreshUnread(); }, 15000);
+
     return () => {
+      cancelled = true;
+      clearInterval(timer);
       if (chatSubscriptionRef.current) {
         supabase.removeChannel(chatSubscriptionRef.current);
       }
@@ -465,23 +545,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       setOrders(data);
       filterOrders(data, selectedStatus);
 
-      // 🚀 新增：获取所有订单的未读消息数
+      // 🚀 新增：获取所有订单的未读消息数（REST，缅甸无 WebSocket 也能更新）
       if (data.length > 0) {
-        const orderIds = data.map(o => o.id);
-        const { data: unreadData, error: unreadError } = await supabase
-          .from('chat_messages')
-          .select('order_id, is_read')
-          .in('order_id', orderIds)
-          .eq('is_read', false)
-          .neq('sender_id', userId);
-        
-        if (!unreadError && unreadData) {
-          const counts: Record<string, number> = {};
-          unreadData.forEach(msg => {
-            counts[msg.order_id] = (counts[msg.order_id] || 0) + 1;
-          });
-          setUnreadCounts(counts);
-        }
+        const counts = await chatService.getUnreadCountsByOrder(userId, data.map((o) => o.id));
+        setUnreadCounts(counts);
       }
 
       // 已写入 store_reviews 的订单
@@ -614,8 +681,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const handleCallCourier = async (order: Order) => {
     if (!order.courier || order.courier === '待分配') {
       Alert.alert(
-        language === 'zh' ? '提示' : 'Notice',
-        language === 'zh' ? '暂无配送员信息' : 'Courier not assigned yet'
+        c.notice,
+        c.noCourier
       );
       return;
     }
@@ -651,8 +718,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     
     // 中文状态映射
     const statusMap: {[key: string]: string} = {
-      '待确认': language === 'zh' ? '待接单' : 'Pending',
-      '打包中': language === 'zh' ? '打包中' : 'Packing',
+      '待确认': t.waitingAccept,
+      '打包中': t.packing,
       '待取件': t.statusTypes['pending'] || status,
       '已取件': t.statusTypes['picked_up'] || status,
       '配送中': t.statusTypes['in_transit'] || status,
@@ -701,7 +768,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   const handleReviewImagePick = async () => {
     if (reviewImages.length >= 6) {
-      showToast(language === 'zh' ? '最多上传6张图片' : 'Max 6 images', 'warning');
+      showToast(c.maxPhotos, 'warning');
       return;
     }
 
@@ -713,7 +780,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     });
 
     if (result.canceled && result.assets === null) {
-      Alert.alert(language === 'zh' ? '权限错误' : 'Permission Error', language === 'zh' ? '需要相册访问权限来上传评价图片' : 'Need photo library access');
+      Alert.alert(c.permissionError, c.galleryPermissionPhoto);
       return;
     }
 
@@ -733,7 +800,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       }
     } catch (error) {
       LoggerService.error('上传评价图片失败:', error);
-      showToast(language === 'zh' ? '上传图片失败' : 'Upload failed', 'error');
+      showToast(c.uploadFailed, 'error');
     } finally {
       setIsUploadingReviewImage(false);
     }
@@ -768,7 +835,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
       const result = await reviewService.createReview(reviewData);
       if (result.success) {
-        showToast(language === 'zh' ? '评价提交成功' : 'Review submitted', 'success');
+        showToast(c.reviewSubmitted, 'success');
         DeviceEventEmitter.emit('order_status_updated');
         
         // 更新已评价列表
@@ -783,7 +850,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         throw new Error('Submit failed');
       }
     } catch (error) {
-      feedbackService.error(language === 'zh' ? '提交评价失败' : 'Failed to submit review');
+      feedbackService.error(c.reviewFailed);
     } finally {
       setIsSubmittingReview(false);
     }
@@ -1056,7 +1123,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               activeOpacity={0.85}
             >
               <Text style={styles.emptyButtonText}>
-                {language === 'zh' ? '立即下单' : language === 'en' ? 'Place Order' : 'အော်ဒါတင်'}
+                {t.placeOrderNow}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1079,7 +1146,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               colors={['#fbbf24', '#f59e0b']}
               style={styles.modalHeader}
             >
-              <Text style={styles.modalTitle}>{language === 'zh' ? '评价订单' : 'Rate Order'}</Text>
+              <MyanmarAwareText text={t.rateTitle} style={styles.modalTitle} myanmarWeight="bold" />
               <TouchableOpacity 
                 style={styles.modalCloseButton}
                 onPress={() => void handleCloseReviewModal()}
@@ -1091,38 +1158,26 @@ export default function MyOrdersScreen({ navigation, route }: any) {
             <ScrollView style={styles.modalBody}>
               <View style={styles.reviewInfoCard}>
                 <View style={styles.reviewInfoBlock}>
-                  <Text style={styles.reviewInfoLabel}>
-                    {language === 'zh' ? '订单号' : 'Order no.'}
-                  </Text>
+                  <MyanmarAwareText text={t.orderNo} style={styles.reviewInfoLabel} myanmarWeight="semibold" />
                   <Text style={styles.reviewInfoValue} selectable>
                     {reviewOrder?.id || '—'}
                   </Text>
                 </View>
                 <View style={[styles.reviewInfoBlock, { marginTop: 10 }]}>
-                  <Text style={styles.reviewInfoLabel}>
-                    {language === 'zh' ? '商店' : 'Store'}
-                  </Text>
+                  <MyanmarAwareText text={t.store} style={styles.reviewInfoLabel} myanmarWeight="semibold" />
                   <Text style={styles.reviewInfoValue} numberOfLines={3}>
                     {reviewStoreName || '—'}
                   </Text>
                 </View>
                 <View style={[styles.reviewInfoBlock, { marginTop: 10 }]}>
-                  <Text style={styles.reviewInfoLabel}>
-                    {language === 'zh' ? '配送骑手' : 'Courier'}
-                  </Text>
+                  <MyanmarAwareText text={t.courierRider} style={styles.reviewInfoLabel} myanmarWeight="semibold" />
                   <Text style={styles.reviewInfoValue} numberOfLines={3}>
-                    {reviewOrder?.courier?.trim()
-                      ? reviewOrder.courier
-                      : language === 'zh'
-                        ? '暂无'
-                        : 'N/A'}
+                    {reviewOrder?.courier?.trim() ? reviewOrder.courier : t.noCourierShort}
                   </Text>
                 </View>
               </View>
               <View style={styles.ratingContainer}>
-                <Text style={styles.ratingLabel}>
-                  {language === 'zh' ? '商家商品' : 'Merchant & product'}
-                </Text>
+                <MyanmarAwareText text={t.merchantProduct} style={styles.ratingLabel} myanmarWeight="semibold" />
                 <View style={styles.starsRow}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
@@ -1134,46 +1189,32 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                     </TouchableOpacity>
                   ))}
                 </View>
-                <Text style={styles.ratingText}>
-                  {reviewRating === 5 ? (language === 'zh' ? '非常满意' : 'Excellent') :
-                   reviewRating === 4 ? (language === 'zh' ? '满意' : 'Good') :
-                   reviewRating === 3 ? (language === 'zh' ? '一般' : 'Average') :
-                   reviewRating === 2 ? (language === 'zh' ? '不满意' : 'Poor') :
-                   (language === 'zh' ? '非常不满意' : 'Very Poor')}
-                </Text>
+                <MyanmarAwareText text={ratingCaption(language, reviewRating)} style={styles.ratingText} myanmarWeight="semibold" />
               </View>
 
               <View style={[styles.ratingContainer, { marginTop: 8 }]}>
-                <Text style={styles.ratingLabel}>
-                  {language === 'zh' ? '骑手配送服务' : 'Delivery / courier'}
-                </Text>
+                <MyanmarAwareText text={t.courierService} style={styles.ratingLabel} myanmarWeight="semibold" />
                 <View style={styles.starsRow}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <TouchableOpacity key={star} onPress={() => setReviewCourierRating(star)}>
                       <Ionicons 
                         name={star <= reviewCourierRating ? "star" : "star-outline"} 
                         size={40} 
-                        color="#3b82f6" 
+                        color="#2C98A6" 
                       />
                     </TouchableOpacity>
                   ))}
                 </View>
-                <Text style={styles.ratingText}>
-                  {reviewCourierRating === 5 ? (language === 'zh' ? '非常满意' : 'Excellent') :
-                   reviewCourierRating === 4 ? (language === 'zh' ? '满意' : 'Good') :
-                   reviewCourierRating === 3 ? (language === 'zh' ? '一般' : 'Average') :
-                   reviewCourierRating === 2 ? (language === 'zh' ? '不满意' : 'Poor') :
-                   (language === 'zh' ? '非常不满意' : 'Very Poor')}
-                </Text>
+                <MyanmarAwareText text={ratingCaption(language, reviewCourierRating)} style={styles.ratingText} myanmarWeight="semibold" />
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{language === 'zh' ? '评价内容（选填）' : 'Comment (optional)'}</Text>
+                <MyanmarAwareText text={t.commentOptional} style={styles.inputLabel} myanmarWeight="semibold" />
                 <TextInput
                   style={styles.textInput}
                   multiline
                   numberOfLines={4}
-                  placeholder={language === 'zh' ? '分享您的使用体验...' : 'Share your experience...'}
+                  placeholder={t.commentPlaceholder}
                   value={reviewComment}
                   onChangeText={setReviewComment}
                 />
@@ -1181,7 +1222,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
               {/* 🚀 新增：评价图片区域 */}
               <View style={styles.reviewImageContainer}>
-                <Text style={styles.inputLabel}>{language === 'zh' ? '上传照片 (选填)' : 'Upload Photos (Optional)'}</Text>
+                <MyanmarAwareText text={t.uploadPhotos} style={styles.inputLabel} myanmarWeight="semibold" />
                 <View style={styles.reviewImageGrid}>
                   {reviewImages.map((img, index) => (
                     <View key={index} style={styles.reviewImageWrapper}>
@@ -1205,7 +1246,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                       ) : (
                         <>
                           <Ionicons name="camera-outline" size={30} color="#94a3b8" />
-                          <Text style={styles.addImageText}>{language === 'zh' ? '照片' : 'Photos'}</Text>
+                          <MyanmarAwareText text={t.photos} style={styles.addImageText} />
                         </>
                       )}
                     </TouchableOpacity>
@@ -1223,7 +1264,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                 {isSubmittingReview ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text style={styles.submitButtonText}>{language === 'zh' ? '提交评价' : 'Submit'}</Text>
+                  <MyanmarAwareText text={t.submitReview} style={styles.submitButtonText} myanmarWeight="bold" />
                 )}
               </TouchableOpacity>
             </View>

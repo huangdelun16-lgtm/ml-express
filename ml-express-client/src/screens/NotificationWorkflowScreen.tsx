@@ -220,7 +220,7 @@ export default function NotificationWorkflowScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#2E86AB', '#1c6a8f', '#4CA1CF']}
+        colors={['#2C98A6', '#1E6F7A', '#5BB8C4']}
         style={styles.header}
       >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -237,7 +237,7 @@ export default function NotificationWorkflowScreen({ navigation }: any) {
 
         <View style={styles.functionsContainer}>
           <Text style={styles.sectionTitle}>📦 订单相关通知</Text>
-          {renderFunctionButton(t.orderUpdate, handleOrderUpdateNotification, '📋', '#3b82f6')}
+          {renderFunctionButton(t.orderUpdate, handleOrderUpdateNotification, '📋', '#2C98A6')}
           {renderFunctionButton(t.deliveryReminder, handleDeliveryReminderNotification, '🚚', '#f59e0b')}
           
           <Text style={styles.sectionTitle}>📢 营销通知</Text>
@@ -251,7 +251,7 @@ export default function NotificationWorkflowScreen({ navigation }: any) {
           {renderFunctionButton(t.requestPermissions, handleRequestPermissions, '🔑', '#10b981')}
           
           <Text style={styles.sectionTitle}>📋 通知管理</Text>
-          {renderFunctionButton(t.getScheduledNotifications, handleGetScheduledNotifications, '📋', '#3b82f6')}
+          {renderFunctionButton(t.getScheduledNotifications, handleGetScheduledNotifications, '📋', '#2C98A6')}
           {renderFunctionButton(t.cancelAllNotifications, handleCancelAllNotifications, '❌', '#ef4444')}
         </View>
       </ScrollView>

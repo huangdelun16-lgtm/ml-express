@@ -20,15 +20,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../contexts/AppContext';
 import TutorialModal from '../components/TutorialModal';
 import BrandRider from '../components/BrandRider';
+import HomeToolsSection from '../components/HomeToolsSection';
 import {
   ClayBook,
-  ClayBox,
-  ClayHeadset,
-  ClayMapBoard,
   ClayPagodas,
-  ClayScooter,
-  ClayShoppingBag,
-  ClayStoreFront,
   ProfileAvatar3D,
 } from '../components/ProfileClayIcons';
 import { packageService, bannerService, Banner } from '../services/supabase';
@@ -36,12 +31,13 @@ import { errorService } from '../services/ErrorService';
 import { APP_CONFIG } from '../config/constants';
 import { analytics } from '../services/AnalyticsService';
 import { avatarDisplayUri, hydrateUserAvatarFromServer, loadUserAvatarUrl } from '../utils/userAvatar';
+import { common } from '../i18n';
 
 const { width } = Dimensions.get('window');
 const TEAL = '#2C98A6';
 const NAVY = '#1A2B48';
 const MUTED = '#8A94A6';
-const PAGE = '#F4F7FA';
+const PAGE = '#F2F5F7';
 const CARD = '#FFFFFF';
 const BANNER_W = width - 32;
 
@@ -88,6 +84,7 @@ interface OrderStats {
 
 export default function HomeScreen({ navigation }: any) {
   const { language } = useApp();
+  const c = common(language);
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -121,7 +118,9 @@ export default function HomeScreen({ navigation }: any) {
       inProgress: '进行中',
       pendingPickup: '待取件',
       orderNow: '立即下单',
-      nearbyStores: '附近商店',
+      orderNowHint: '同城闪送 · 30 分钟',
+      nearbyStores: '附近商家',
+      nearbyHint: '逛商场 · 就近买',
       trackOrder: '订单追踪',
       support: '客服',
       promoUntil: '活动至 2026年1月',
@@ -134,11 +133,13 @@ export default function HomeScreen({ navigation }: any) {
       howToUse: 'How to use',
       howToUseHint: 'Beginner guide',
       logistics: 'My logistics',
-      inProgress: 'In progress',
+      inProgress: 'Ongoing',
       pendingPickup: 'Pickup',
       orderNow: 'Order now',
+      orderNowHint: 'City flash · 30 min',
       nearbyStores: 'Nearby stores',
-      trackOrder: 'Track order',
+      nearbyHint: 'Malls · buy nearby',
+      trackOrder: 'Tracking',
       support: 'Support',
       promoUntil: 'Until Jan 2026',
       newBadge: 'NEW',
@@ -149,11 +150,13 @@ export default function HomeScreen({ navigation }: any) {
       guest: 'ဧည့်သည်',
       howToUse: 'အသုံးပြုနည်း',
       howToUseHint: 'စတင်သူလမ်းညွှန်',
-      logistics: 'ကျွန်ုပ်၏ပို့ဆောင်မှု',
-      inProgress: 'ဆောင်ရွက်နေဆဲ',
+      logistics: 'ကျွန်ုပ်ပို့ဆောင်မှု',
+      inProgress: 'ဆောင်ရွက်ဆဲ',
       pendingPickup: 'ထုပ်ယူရန်',
       orderNow: 'ယခုမှာယူ',
+      orderNowHint: 'မြို့တွင်း · ၃၀ မိနစ်',
       nearbyStores: 'အနီးဆိုင်',
+      nearbyHint: 'စျေးဝယ် · အနီး',
       trackOrder: 'ခြေရာခံ',
       support: 'ဝန်ဆောင်မှု',
       promoUntil: '၂၀၂၆ ဇန်နဝါရီ အထိ',
@@ -256,9 +259,8 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleCallHotline = () => {
-    const cancelText = language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'မဆက်တော့ပါ';
-    const title =
-      language === 'zh' ? '选择拨打的客服热线' : language === 'en' ? 'Choose a hotline number' : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ';
+    const cancelText = c.cancel;
+    const title = c.hotlineTitle;
     Alert.alert(title, '', [
       ...HOTLINE_NUMBERS.map((item) => ({
         text: item.display,
@@ -275,13 +277,6 @@ export default function HomeScreen({ navigation }: any) {
 
   const greetName = userName || (isGuest ? t.guest : '');
   const avatarSrc = avatarDisplayUri(avatarUri);
-
-  const quickActions = [
-    { key: 'order', label: t.orderNow, icon: <ClayScooter size={42} />, onPress: () => navigation.navigate('PlaceOrder') },
-    { key: 'mall', label: t.nearbyStores, icon: <ClayStoreFront size={42} />, onPress: () => navigation.navigate('CityMall') },
-    { key: 'track', label: t.trackOrder, icon: <ClayMapBoard size={42} />, onPress: () => navigation.navigate('TrackOrder') },
-    { key: 'support', label: t.support, icon: <ClayHeadset size={42} />, onPress: handleCallHotline },
-  ];
 
   const renderBanner = (banner: Banner, index: number) => (
     <TouchableOpacity
@@ -395,37 +390,17 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.sectionHead}>
-          <View style={styles.sectionBar} />
-          <Text style={styles.sectionTitle}>{t.logistics}</Text>
-        </View>
-        <View style={styles.logisticsRow}>
-          <TouchableOpacity style={styles.logisticsCard} onPress={() => openOrders('配送中')} activeOpacity={0.88}>
-            <Text style={styles.logisticsLabel}>{t.inProgress}</Text>
-            <Text style={styles.logisticsValue}>{orderStats.inTransit}</Text>
-            <View style={styles.logisticsIcon}>
-              <ClayBox size={40} />
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#C5CDD6" style={styles.logisticsChevron} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.logisticsCard} onPress={() => openOrders('待取件')} activeOpacity={0.88}>
-            <Text style={styles.logisticsLabel}>{t.pendingPickup}</Text>
-            <Text style={styles.logisticsValue}>{orderStats.pending}</Text>
-            <View style={styles.logisticsIcon}>
-              <ClayShoppingBag size={40} />
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#C5CDD6" style={styles.logisticsChevron} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.actionsRow}>
-          {quickActions.map((item) => (
-            <TouchableOpacity key={item.key} style={styles.actionCard} onPress={item.onPress} activeOpacity={0.88}>
-              {item.icon}
-              <Text style={styles.actionLabel}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <HomeToolsSection
+          t={t}
+          inTransit={orderStats.inTransit}
+          pending={orderStats.pending}
+          onOpenInProgress={() => openOrders('配送中')}
+          onOpenPickup={() => openOrders('待取件')}
+          onOrderNow={() => navigation.navigate('PlaceOrder')}
+          onNearby={() => navigation.navigate('CityMall')}
+          onTrack={() => navigation.navigate('TrackOrder')}
+          onSupport={handleCallHotline}
+        />
       </ScrollView>
 
       <TutorialModal isVisible={showTutorialModal} onClose={() => setShowTutorialModal(false)} />
@@ -629,79 +604,5 @@ const styles = StyleSheet.create({
     width: 16,
     backgroundColor: TEAL,
   },
-  sectionHead: {
-    marginTop: 18,
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionBar: {
-    width: 4,
-    height: 16,
-    borderRadius: 2,
-    backgroundColor: TEAL,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: NAVY,
-  },
-  logisticsRow: {
-    marginTop: 12,
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  logisticsCard: {
-    flex: 1,
-    backgroundColor: CARD,
-    borderRadius: 22,
-    padding: 16,
-    minHeight: 108,
-    ...cardShadow,
-  },
-  logisticsLabel: {
-    fontSize: 13,
-    color: MUTED,
-    fontWeight: '700',
-  },
-  logisticsValue: {
-    marginTop: 6,
-    fontSize: 32,
-    fontWeight: '800',
-    color: TEAL,
-  },
-  logisticsIcon: {
-    position: 'absolute',
-    right: 14,
-    bottom: 12,
-  },
-  logisticsChevron: {
-    position: 'absolute',
-    right: 12,
-    top: 16,
-  },
-  actionsRow: {
-    marginTop: 14,
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionCard: {
-    flex: 1,
-    backgroundColor: CARD,
-    borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    gap: 8,
-    ...cardShadow,
-  },
-  actionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: NAVY,
-    textAlign: 'center',
-  },
 });
+

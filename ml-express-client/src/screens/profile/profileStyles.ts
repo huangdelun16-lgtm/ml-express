@@ -43,7 +43,7 @@ export const profileStyles = StyleSheet.create({
     borderRadius: 24,
     padding: theme.spacing.l,
     marginBottom: theme.spacing.xl,
-    shadowColor: '#1e3a8a',
+    shadowColor: '#1E6F7A',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.2,
     shadowRadius: 24,
@@ -99,7 +99,7 @@ export const profileStyles = StyleSheet.create({
     fontWeight: '600',
   },
   merchantsBadge: {
-    backgroundColor: '#3b82f6', // 蓝色背景
+    backgroundColor: '#2C98A6',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
   },
@@ -135,7 +135,7 @@ export const profileStyles = StyleSheet.create({
     fontWeight: '800',
   },
   memberBadge: {
-    backgroundColor: '#3b82f6', // 蓝色背景
+    backgroundColor: '#2C98A6',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
   },
@@ -250,7 +250,7 @@ export const profileStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.s,
-    shadowColor: '#1e3a8a',
+    shadowColor: '#1E6F7A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -268,7 +268,7 @@ export const profileStyles = StyleSheet.create({
     backgroundColor: theme.colors.background.paper,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#1e3a8a',
+    shadowColor: '#1E6F7A',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 20,
@@ -713,8 +713,8 @@ export const profileStyles = StyleSheet.create({
     borderColor: 'transparent',
   },
   printerTypeCardActive: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#3b82f6',
+    backgroundColor: '#E8F6F8',
+    borderColor: '#2C98A6',
   },
   printerTypeLabel: {
     fontSize: 12,
@@ -723,7 +723,7 @@ export const profileStyles = StyleSheet.create({
     textAlign: 'center',
   },
   printerTypeLabelActive: {
-    color: '#3b82f6',
+    color: '#2C98A6',
     fontWeight: 'bold',
   },
   printerInput: {

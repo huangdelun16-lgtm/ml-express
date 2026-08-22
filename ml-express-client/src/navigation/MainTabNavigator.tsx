@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
 import { useCart } from '../contexts/CartContext';
+import MyanmarAwareText from '../components/MyanmarAwareText';
 import HomeScreen from '../screens/HomeScreen';
 import PlaceOrderScreen from '../screens/PlaceOrderScreen';
 import CityMallScreen from '../screens/CityMallScreen';
@@ -155,9 +156,9 @@ function ScrollableTabBar({ state, descriptors, navigation }: BottomTabBarProps)
                   </View>
                 ) : null}
               </View>
-              <Text style={[styles.label, { color }]} numberOfLines={1}>
+              <MyanmarAwareText style={[styles.label, { color }]} numberOfLines={1} myanmarWeight="semibold">
                 {label}
-              </Text>
+              </MyanmarAwareText>
             </TouchableOpacity>
           );
         })}

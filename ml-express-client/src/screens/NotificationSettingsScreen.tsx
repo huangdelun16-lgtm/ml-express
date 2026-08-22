@@ -289,7 +289,7 @@ export default function NotificationSettingsScreen({ navigation, route }: any) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#2E86AB', '#1c6a8f', '#4CA1CF']}
+        colors={['#2C98A6', '#1E6F7A', '#5BB8C4']}
         style={styles.header}
       >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -452,13 +452,13 @@ const styles = StyleSheet.create({
   permBadge: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2563eb',
+    color: '#1E6F7A',
     maxWidth: 100,
     textAlign: 'right',
   },
   permSettingsBtn: {
     marginTop: 12,
-    backgroundColor: '#1e3a8a',
+    backgroundColor: '#185A63',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',

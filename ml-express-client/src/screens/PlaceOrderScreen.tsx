@@ -3,7 +3,6 @@ import { baseStyles, wizardStyles } from '../components/placeOrder/placeOrderSty
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TextInput,
   TouchableOpacity,
@@ -11,18 +10,13 @@ import {
   Platform,
   Keyboard,
   Switch,
-  Modal,
-  Dimensions,
   Image,
   ActivityIndicator,
-  FlatList,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import QRCode from 'react-native-qrcode-svg';
 import NetInfo from '@react-native-community/netinfo';
 import { useApp } from '../contexts/AppContext';
 import { useLoading } from '../contexts/LoadingContext';
@@ -30,13 +24,15 @@ import { useCart, summarizeCustomerRemarks, getCartItemLineKey, CartItem } from 
 import { packageService, systemSettingsService, supabase, Product } from '../services/supabase';
 import { databaseService } from '../services/DatabaseService';
 import { usePlaceAutocomplete } from '../hooks/usePlaceAutocomplete';
-import { FadeInView, ScaleInView } from '../components/Animations';
+import { FadeInView } from '../components/Animations';
 import { MoneyIcon } from '../components/Icon';
 import { useLanguageStyles } from '../hooks/useLanguageStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorService } from '../services/ErrorService';
 import { feedbackService } from '../services/FeedbackService';
 import { analytics } from '../services/AnalyticsService';
+import { common } from '../i18n';
+import { getPlaceOrderCopy } from './placeOrder/placeOrderCopy';
 import LoggerService from '../services/LoggerService';
 // 导入拆分后的组件
 import SenderForm from '../components/placeOrder/SenderForm';
@@ -46,16 +42,12 @@ import DeliveryOptions from '../components/placeOrder/DeliveryOptions';
 import PriceCalculation from '../components/placeOrder/PriceCalculation';
 import MapModal from '../components/placeOrder/MapModal';
 import OrderWizardProgress, { OrderWizardStepIndex } from '../components/placeOrder/OrderWizardProgress';
+import OrderQrModal from '../components/placeOrder/OrderQrModal';
+import ScheduledTimePickerModal from '../components/placeOrder/ScheduledTimePickerModal';
+import PackageTypeInfoModal from '../components/placeOrder/PackageTypeInfoModal';
 import { promptGuestLogin } from '../utils/guestSession';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TEAL = '#2C98A6';
-
-import * as MediaLibrary from 'expo-media-library';
-import { ensureSaveToLibraryPermission } from '../utils/mediaAccess';
-import * as Sharing from 'expo-sharing'; // 即使没在package.json，有时expo自带
-import * as FileSystem from 'expo-file-system/legacy';
-import ViewShot, { captureRef } from 'react-native-view-shot';
 
 import Toast from '../components/Toast';
 
@@ -63,13 +55,12 @@ const WIZARD_LAST_STEP: OrderWizardStepIndex = 3;
 
 export default function PlaceOrderScreen({ navigation, route }: any) {
   const { language } = useApp();
+  const c = common(language);
   const insets = useSafeAreaInsets();
   const { showLoading, hideLoading } = useLoading();
   const { clearCart } = useCart();
   const styles = useLanguageStyles(baseStyles);
   
-  // QR码保存引用
-  const viewShotRef = useRef<any>(null);
   const submitGuardRef = useRef(0);
   const orderDraftRef = useRef<{
     orderId: string;
@@ -138,47 +129,6 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
 
     handleIncomingProducts();
   }, [route.params?.selectedProducts]);
-
-  // 保存二维码到相册
-  const handleSaveQRCode = async () => {
-    try {
-      showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
-      
-      // 检查相册权限
-      const granted = await ensureSaveToLibraryPermission();
-      if (!granted) {
-        hideLoading();
-        Alert.alert(
-          language === 'zh' ? '权限提示' : 'Permission Required',
-          language === 'zh' ? '需要相册权限才能保存二维码' : 'Photo library permission is required to save QR code'
-        );
-        return;
-      }
-
-      // 截取视图
-      const uri = await captureRef(viewShotRef, {
-        format: 'png',
-        quality: 1.0,
-      });
-
-      // 保存到本地文件（可选，captureRef 返回的已经是本地临时文件）
-      // 保存到相册
-      await MediaLibrary.saveToLibraryAsync(uri);
-      
-      hideLoading();
-      Alert.alert(
-        language === 'zh' ? '保存成功' : 'Saved!',
-        language === 'zh' ? '二维码已保存到您的相册' : 'QR code has been saved to your gallery'
-      );
-    } catch (error) {
-      hideLoading();
-      LoggerService.error('保存二维码失败:', error);
-      Alert.alert(
-        language === 'zh' ? '保存失败' : 'Save Failed',
-        language === 'zh' ? '无法保存图片，请稍后重试' : 'Unable to save image, please try again'
-      );
-    }
-  };
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -421,422 +371,7 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
     free_km_threshold: 3,
   });
 
-  const t = {
-    zh: {
-      title: '立即下单',
-      subtitle: '请填写订单信息',
-      wizardSteps: ['地址', '包裹', '配送', '确认'],
-      wizardNext: '下一步',
-      wizardBack: '上一步',
-      wizardExit: '退出',
-      guestLoginToSubmit: '登录后即可提交订单',
-      senderInfo: '寄件人信息',
-      useMyInfo: '使用我的信息',
-      senderName: '寄件人姓名',
-      senderPhone: '寄件人电话',
-      senderAddress: '取件地址',
-      useCurrentLocation: '使用当前位置',
-      openMap: '打开地图',
-      receiverInfo: '收件人信息',
-      receiverName: '收件人姓名',
-      receiverPhone: '收件人电话',
-      receiverAddress: '送达地址',
-      packageInfo: '包裹信息',
-      packageType: '包裹类型',
-      weight: '重量（kg）',
-      description: '物品描述（选填）',
-      codAmount: '代收款 (COD)',
-      hasCOD: '代收状态',
-      collect: '有代收',
-      noCollect: '无代收',
-      selectProduct: '选择商品',
-      selectedProducts: '已选商品',
-      totalProductPrice: '商品总价',
-      deliveryOptions: '配送选项',
-      deliveryByOption: '按配送选项送达',
-      payableAmount: '应付金额',
-      deliverySpeed: '配送速度',
-      speedStandard: '准时达（1小时内）',
-      speedExpress: '急送达（30分钟内）',
-      speedScheduled: '定时达（指定时间）',
-      speedWaySide: '顺路递（24小时内）',
-      scheduledTime: '指定送达时间',
-      priceEstimate: '预估价格',
-      distance: '配送距离',
-      basePrice: '起步价',
-      distancePrice: '里程费',
-      speedPrice: '时效费',
-      totalPrice: '总计',
-      calculateButton: '计算',
-      priceEstimateAutoHint: '填写地址、包裹与配送选项后将自动显示费用',
-      priceEstimateAutoSubtext: '超重/超规件请填写重量',
-      calculating: '计算中...',
-      calculateSuccess: '计算完成',
-      calculateFailed: '计算失败',
-      submitOrder: '提交订单',
-      fillRequired: '请填写所有必填项',
-      orderSuccess: '订单创建成功',
-      orderFailed: '订单创建失败',
-      creating: '正在创建订单...',
-      kmUnit: '公里',
-      orderNumber: '订单号',
-      totalAmount: '总金额',
-      paidAmount: '实付金额',
-      productAmount: '商品金额',
-      deliveryFee: '配送费',
-      coupon: '优惠券',
-      remarksOptional: '备注（选填）',
-      noRemarks: '无',
-      qrTitle: '订单已提交',
-      qrHint: '请向骑手出示此二维码，用于取件扫描',
-      saveQR: '保存二维码',
-      qrClose: '关闭',
-      viewOrders: '查看订单',
-      continueOrder: '继续下单',
-      kgUnit: '公斤',
-      orderSavedOfflineTitle: '网络不稳定，已离线保存订单',
-      orderSavedOfflineDescription: '我们会在网络恢复后自动同步，请勿重复提交。',
-      orderSavedOfflineAction: '好的',
-      placeholders: {
-        name: '请输入姓名',
-        phone: '请输入电话号码',
-        address: '请输入详细地址',
-        weight: '请输入重量',
-        codAmount: '请输入代收款金额',
-        description: '如：衣服、食品等',
-        scheduledTime: '如：今天18:00',
-      },
-      paymentMethod: '支付方式',
-      balancePayment: '余额支付',
-      cashPayment: '现金支付',
-      courierFeeBalance: '跑腿费 (余额支付)',
-      courierFeeCash: '跑腿费 (现金支付)',
-      shippingFeePayment: '跑腿费支付方式',
-      itemBalancePayment: '商品费用 (仅余额支付)',
-      accountBalance: '账户余额',
-      insufficientBalance: '余额不足',
-      balanceDeducted: '支付成功，已从余额扣除',
-      paymentMethodDesc: '请选择订单支付方式',
-      useBalance: '优先使用余额支付',
-      useCash: '使用现金支付',
-      coordinates: '坐标',
-      packageTypes: {
-        document: '文件',
-        standard: '标准件',
-        overweight: '超重件',
-        oversized: '超规件',
-        fragile: '易碎品',
-        foodDrinks: '食品和饮料',
-        waySide: '顺路递',
-      },
-      packageTypeDetails: {
-        standard: '标准件（45x60x15cm）和（5KG）以内',
-        overweight: '超重件（5KG）以上',
-        oversized: '超规件（45x60x15cm）以上',
-        waySide: '顺路递 (24小时内送达)',
-      },
-      packageTypeInfo: {
-        title: '包裹类型说明',
-        sizeLimit: '尺寸限制',
-        weightLimit: '重量限制',
-        weightRequirement: '重量要求',
-        sizeRequirement: '尺寸要求',
-        description: '说明',
-        standardDescription: '适用于常规大小的包裹，如衣物、文件、小型物品等。',
-        overweightDescription: '适用于重量超过5公斤的包裹。重物品需要额外运费，请确保包装牢固。',
-        oversizedDescription: '适用于尺寸超过标准的大型包裹。大件物品需要额外运费，请提前联系确认是否可以运输。',
-        waySideDescription: '24小时顺路送达。最实惠的配送方式，不计距离和重量费。',
-        understood: '我知道了',
-      },
-      timePicker: {
-        title: '选择送达时间',
-        subtitle: '请选择您期望的送达日期和时间',
-        workingHours: '营业时间: 09:00 - 18:00',
-        selectDate: '选择日期',
-        selectTime: '选择时间',
-        confirm: '确定',
-        cancel: '取消',
-        today: '今天',
-        tomorrow: '明天',
-      },
-    },
-    en: {
-      title: 'Place Order',
-      subtitle: 'Please fill in order information',
-      wizardSteps: ['Address', 'Package', 'Delivery', 'Confirm'],
-      wizardNext: 'Next',
-      wizardBack: 'Back',
-      wizardExit: 'Exit',
-      guestLoginToSubmit: 'Sign in to submit your order',
-      senderInfo: 'Sender Information',
-      useMyInfo: 'Use my info',
-      senderName: 'Sender Name',
-      senderPhone: 'Sender Phone',
-      senderAddress: 'Pickup Address',
-      useCurrentLocation: 'Use current location',
-      openMap: 'Open Map',
-      receiverInfo: 'Receiver Information',
-      receiverName: 'Receiver Name',
-      receiverPhone: 'Receiver Phone',
-      receiverAddress: 'Delivery Address',
-      packageInfo: 'Package Information',
-      packageType: 'Package Type',
-      weight: 'Weight (kg)',
-      description: 'Description (Optional)',
-      codAmount: 'COD Amount',
-      hasCOD: 'COD Status',
-      collect: 'Collect',
-      noCollect: 'No Collect',
-      selectProduct: 'Select Products',
-      selectedProducts: 'Selected',
-      totalProductPrice: 'Total Price',
-      deliveryOptions: 'Delivery Options',
-      deliveryByOption: 'By delivery option',
-      payableAmount: 'Amount due',
-      deliverySpeed: 'Delivery Speed',
-      speedStandard: 'Standard (within 1 hour)',
-      speedExpress: 'Express (within 30 mins)',
-      speedScheduled: 'Scheduled (specific time)',
-      speedWaySide: 'Eco Way (within 24h)',
-      scheduledTime: 'Scheduled Time',
-      priceEstimate: 'Price Estimate',
-      distance: 'Distance',
-      basePrice: 'Base Price',
-      distancePrice: 'Distance Fee',
-      speedPrice: 'Speed Fee',
-      totalPrice: 'Total',
-      calculateButton: 'Calculate',
-      priceEstimateAutoHint: 'Fee updates automatically when address, package and delivery are set',
-      priceEstimateAutoSubtext: 'Enter weight for overweight/oversized items',
-      calculating: 'Calculating...',
-      calculateSuccess: 'Calculation Complete',
-      calculateFailed: 'Calculation Failed',
-      submitOrder: 'Submit Order',
-      fillRequired: 'Please fill all required fields',
-      orderSuccess: 'Order created successfully',
-      orderFailed: 'Failed to create order',
-      creating: 'Creating order...',
-      kmUnit: 'km',
-      orderNumber: 'Order Number',
-      totalAmount: 'Total Amount',
-      paidAmount: 'Amount paid',
-      productAmount: 'Item amount',
-      deliveryFee: 'Delivery fee',
-      coupon: 'Coupon',
-      remarksOptional: 'Notes (optional)',
-      noRemarks: 'None',
-      qrTitle: 'Order submitted',
-      qrHint: 'Show this QR code to the courier for pickup',
-      saveQR: 'Save QR code',
-      qrClose: 'Close',
-      viewOrders: 'View Orders',
-      continueOrder: 'Continue Ordering',
-      kgUnit: 'kg',
-      orderSavedOfflineTitle: 'Order saved offline',
-      orderSavedOfflineDescription: 'We stored this order locally and will sync it automatically once the network recovers. Please do not submit again.',
-      orderSavedOfflineAction: 'Got it',
-      placeholders: {
-        name: 'Enter name',
-        phone: 'Enter phone number',
-        address: 'Enter detailed address',
-        weight: 'Enter weight',
-        codAmount: 'Enter COD amount',
-        description: 'e.g.: Clothes, Food, etc.',
-        scheduledTime: 'e.g.: Today 18:00',
-      },
-      paymentMethod: 'Payment Method',
-      balancePayment: 'Balance Payment',
-      cashPayment: 'Cash Payment',
-      courierFeeBalance: 'Courier Fee (Balance Pay)',
-      courierFeeCash: 'Courier Fee (Cash Pay)',
-      shippingFeePayment: 'Shipping Fee Payment',
-      itemBalancePayment: 'Item Cost (Balance Only)',
-      accountBalance: 'Account Balance',
-      insufficientBalance: 'Insufficient Balance',
-      balanceDeducted: 'Payment successful, deducted from balance',
-      paymentMethodDesc: 'Please select a payment method',
-      useBalance: 'Pay with Balance',
-      useCash: 'Pay with Cash',
-      coordinates: 'Coordinates',
-      packageTypes: {
-        document: 'Document',
-        standard: 'Standard Package',
-        overweight: 'Overweight',
-        oversized: 'Oversized',
-        fragile: 'Fragile',
-        foodDrinks: 'Food & Drinks',
-        waySide: 'Eco Way',
-      },
-      packageTypeDetails: {
-        standard: 'Standard Package (45x60x15cm) and (5KG) or less',
-        overweight: 'Overweight (over 5KG)',
-        oversized: 'Oversized (over 45x60x15cm)',
-        waySide: 'Eco Way (Within 24 Hours)',
-      },
-      packageTypeInfo: {
-        title: 'Package Type Description',
-        sizeLimit: 'Size Limit',
-        weightLimit: 'Weight Limit',
-        weightRequirement: 'Weight Requirement',
-        sizeRequirement: 'Size Requirement',
-        description: 'Description',
-        standardDescription: 'Suitable for regular-sized packages such as clothing, documents, small items, etc.',
-        overweightDescription: 'Suitable for packages weighing over 5KG. Heavy items require additional shipping fees. Please ensure secure packaging.',
-        oversizedDescription: 'Suitable for large packages exceeding standard dimensions. Large items require additional shipping fees. Please contact in advance to confirm transportability.',
-        waySideDescription: 'Delivery within 24 hours. Most affordable way, no distance or weight surcharge.',
-        understood: 'I Understand',
-      },
-      timePicker: {
-        title: 'Select Delivery Time',
-        subtitle: 'Please select your preferred delivery date and time',
-        workingHours: 'Working Hours: 09:00 - 18:00',
-        selectDate: 'Select Date',
-        selectTime: 'Select Time',
-        confirm: 'Confirm',
-        cancel: 'Cancel',
-        today: 'Today',
-        tomorrow: 'Tomorrow',
-      },
-    },
-    my: {
-      title: 'အမှာစာတင်',
-      subtitle: 'အမှာစာအချက်အလက်ဖြည့်ပါ',
-      wizardSteps: ['လိပ်စာ', 'ပါဆယ်', 'ပို့ဆောင်', 'အတည်ပြု'],
-      wizardNext: 'ရှေ့သို့',
-      wizardBack: 'နောက်သို့',
-      wizardExit: 'ထွက်မည်',
-      guestLoginToSubmit: 'အော်ဒါတင်ရန် ဝင်ရောက်ပါ',
-      senderInfo: 'ပေးပို့သူအချက်အလက်',
-      useMyInfo: 'ကျွန်ုပ်၏အချက်အလက်သုံးမည်',
-      senderName: 'ပေးပို့သူအမည်',
-      senderPhone: 'ပေးပို့သူဖုန်း',
-      senderAddress: 'ယူရန်လိပ်စာ',
-      useCurrentLocation: 'လက်ရှိတည်နေရာသုံးမည်',
-      openMap: 'မြေပုံဖွင့်',
-      receiverInfo: 'လက်ခံသူအချက်အလက်',
-      receiverName: 'လက်ခံသူအမည်',
-      receiverPhone: 'လက်ခံသူဖုန်း',
-      receiverAddress: 'ပို့ရန်လိပ်စာ',
-      packageInfo: 'ပါဆယ်အချက်အလက်',
-      packageType: 'ပါဆယ်အမျိုးအစား',
-      weight: 'အလေးချိန် (kg)',
-      description: 'ပစ္စည်းဖော်ပြချက် (ရွေးချယ်)',
-      codAmount: '代收款 (COD)',
-      hasCOD: '代收状态',
-      collect: 'ငွေကောက်ခံမည်',
-      noCollect: 'ငွေမကောက်ခံပါ',
-      deliveryOptions: 'ပို့ဆောင်ရေးရွေးချယ်မှု',
-      deliveryByOption: 'ပို့ဆောင်မှု ရွေးချယ်မှုအတိုင်း',
-      payableAmount: 'ပေးရမည့်ပမာဏ',
-      deliverySpeed: 'ပို့ဆောင်မြန်နှုန်း',
-      speedStandard: 'စံချိန် (၁နာရီအတွင်း)',
-      speedExpress: 'အမြန် (၃၀မိနစ်အတွင်း)',
-      speedScheduled: 'အချိန်သတ်မှတ် (သတ်မှတ်ထားသောအချိန်)',
-      speedWaySide: 'တန်တန်လေးပို့ (၂၄ နာရီအတွင်း)',
-      scheduledTime: 'သတ်မှတ်အချိန်',
-      priceEstimate: 'ခန့်မှန်းစျေးနှုန်း',
-      distance: 'အကွာအဝေး',
-      basePrice: 'အခြေခံစျေးနှုန်း',
-      distancePrice: 'အကွာအဝေးအခကြေး',
-      speedPrice: 'မြန်နှုန်းအခကြေး',
-      totalPrice: 'စုစုပေါင်း',
-      calculateButton: 'တွက်ချက်မည်',
-      priceEstimateAutoHint: 'လိပ်စာ၊ ပါဆယ်နှင့် ပို့ဆောင်ရွေးချယ်မှု ပြီးပါက အလိုအလျောက် ပြသပါမည်',
-      priceEstimateAutoSubtext: 'အလေးချိန်ပိုပါဆယ် သို့မဟုတ် အရွယ်ပိုပါဆယ်အတွက် အလေးချိန်ကို ဖြည့်ပါ',
-      calculating: 'တွက်ချက်နေသည်...',
-      calculateSuccess: 'တွက်ချက်ပြီးပြီ',
-      calculateFailed: 'တွက်ချက်မအောင်မြင်',
-      submitOrder: 'အမှာစာတင်သွင်းမည်',
-      fillRequired: 'လိုအပ်သောအကွက်များဖြည့်ပါ',
-      orderSuccess: 'အမှာစာအောင်မြင်စွာဖန်တီးပြီး',
-      orderFailed: 'အမှာစာဖန်တီးမှုမအောင်မြင်',
-      selectedProducts: 'ကုန်ပစ္စည်းများ',
-      creating: 'အမှာစာဖန်တီးနေသည်...',
-      kmUnit: 'ကီလိုမီတာ',
-      orderNumber: 'အမှာစာနံပါတ်',
-      totalAmount: 'စုစုပေါင်းပမာဏ',
-      paidAmount: 'ပေးပြီးပမာဏ',
-      productAmount: 'ကုန်ပစ္စည်းပမာဏ',
-      deliveryFee: 'ပို့ဆောင်ခ',
-      coupon: 'ကူပွန်',
-      remarksOptional: 'မှတ်ချက် (ရွေးချယ်)',
-      noRemarks: 'မရှိပါ',
-      qrTitle: 'အော်ဒါတင်ပြီးပါပြီ',
-      qrHint: 'ပစ္စည်းယူသည့်အခါ ဤ QR ကုဒ်ကို စီးနင်းသူအား ပြပေးပါ',
-      saveQR: 'QR ကုဒ်သိမ်းမည်',
-      qrClose: 'ပိတ်မည်',
-      viewOrders: 'အော်ဒါကြည့်ရန်',
-      continueOrder: 'ဆက်လက်မှာယူမည်',
-      kgUnit: 'ကီလိုဂရမ်',
-      orderSavedOfflineTitle: 'အင်တာနက် မတော်တဆ ချိတ်ဆက်မရှိသဖြင့် အော်ဒါကို အော့ဖ်လိုင်း သိမ်းဆည်းထားပါသည်',
-      orderSavedOfflineDescription: 'အင်တာနက် ပြန်လည်ရလာပါက အော်ဒါကို အလိုအလျောက် ပို့စ်ပေးမည်ဖြစ်ပြီး ထပ်မံတင်သွင်းရန် မလိုအပ်ပါ။',
-      orderSavedOfflineAction: 'အိုကေ',
-      placeholders: {
-        name: 'အမည်ထည့်ပါ',
-        phone: 'ဖုန်းနံပါတ်ထည့်ပါ',
-        address: 'အသေးစိတ်လိပ်စာထည့်ပါ',
-        weight: 'အလေးချိန်ထည့်ပါ',
-        codAmount: '代收款 (COD) ပမာဏထည့်ပါ',
-        description: 'ဥပမာ: အဝတ်အစား, အစားအစာ',
-        scheduledTime: 'ဥပမာ: ယနေ့ ၁၈:၀၀',
-      },
-      paymentMethod: 'ပေးချေမှုနည်းလမ်း',
-      balancePayment: 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း',
-      cashPayment: 'ငွေသားဖြင့် ပေးချေခြင်း',
-      courierFeeBalance: 'ပို့ဆောင်ခ (လက်ကျန်ငွေဖြင့်)',
-      courierFeeCash: 'ပို့ဆောင်ခ (ငွေသားဖြင့်)',
-      shippingFeePayment: 'ပို့ဆောင်ခ ပေးချေမှုနည်းလမ်း',
-      itemBalancePayment: 'ကုန်ပစ္စည်းဖိုး (လက်ကျန်ငွေဖြင့်သာ)',
-      accountBalance: 'အကောင့်လက်ကျန်ငွေ',
-      insufficientBalance: 'လက်ကျန်ငွေမလုံလောက်ပါ',
-      balanceDeducted: 'ပေးချေမှုအောင်မြင်ပါသည်၊ လက်ကျန်ငွေမှ နုတ်ယူပြီးပါပြီ',
-      paymentMethodDesc: 'ပေးချေမှုနည်းလမ်းကို ရွေးချယ်ပါ',
-      useBalance: 'လက်ကျန်ငွေဖြင့် ပေးချေမည်',
-      useCash: 'ငွေသားဖြင့် ပေးချေမည်',
-      coordinates: 'ကိုဩဒိနိတ်',
-      packageTypes: {
-        document: 'စာရွက်စာတမ်း',
-        standard: 'ပုံမှန်ပါဆယ်',
-        overweight: 'အလေးချိန်ပိုပါဆယ်',
-        oversized: 'အရွယ်အစားကြီးပါဆယ်',
-        fragile: 'ကျိုးပဲ့လွယ်သောပစ္စည်း',
-        foodDrinks: 'အစားအသောက်',
-        waySide: 'တန်တန်လေးပို့',
-      },
-      packageTypeDetails: {
-        standard: 'ပုံမှန်ပါဆယ် (45x60x15cm) နှင့် (5KG) အောက်',
-        overweight: 'အလေးချိန်ပိုပါဆယ် (5KG အထက်)',
-        oversized: 'အရွယ်အစားကြီးပါဆယ် (45x60x15cm အထက်)',
-        waySide: 'တန်တန်လေးပို့ (၂၄ နာရီအတွင်း)',
-      },
-      packageTypeInfo: {
-        title: 'ပါဆယ်အမျိုးအစားရှင်းလင်းချက်',
-        sizeLimit: 'အရွယ်အစားကန့်သတ်ချက်',
-        weightLimit: 'အလေးချိန်ကန့်သတ်ချက်',
-        weightRequirement: 'အလေးချိန်လိုအပ်ချက်',
-        sizeRequirement: 'အရွယ်အစားလိုအပ်ချက်',
-        description: 'ရှင်းလင်းချက်',
-        standardDescription: 'ပုံမှန်အရွယ်အစားရှိသောပါဆယ်များအတွက်သင့်လျော်သည်။ ဥပမာ: အဝတ်အစား၊ စာရွက်စာတမ်း၊ သေးငယ်သောပစ္စည်းများ။',
-        overweightDescription: '၅ကီလိုဂရမ်ထက်ပိုလေးသောပါဆယ်များအတွက်သင့်လျော်သည်။ လေးသောပစ္စည်းများအတွက် အပိုပို့ဆောင်ခ လိုအပ်ပါသည်။ ထုပ်ပိုးမှုခိုင်မာစွာပြုလုပ်ပါ။',
-        oversizedDescription: 'စံချိန်ထက်ကြီးသောအရွယ်အစားရှိသောပါဆယ်များအတွက်သင့်လျော်သည်။ ကြီးမားသောပစ္စည်းများအတွက် အပိုပို့ဆောင်ခ လိုအပ်ပါသည်။ ပို့ဆောင်နိုင်မနိုင်ကို ကြိုတင်ဆက်သွယ်ပါ။',
-        waySideDescription: '၂၄ နာရီအတွင်း တန်တန်လေး ပို့ဆောင်ပေးပါသည်။ စျေးအသက်သာဆုံး ပို့ဆောင်မှုဖြစ်ပြီး အကွာအဝေးနှင့် အလေးချိန်ကြေး မကောက်ခံပါ။',
-        understood: 'နားလည်ပါပြီ',
-      },
-      timePicker: {
-        title: 'ပို့ဆောင်မည့်အချိန်ရွေးပါ',
-        subtitle: 'သင်အလိုရှိသော ပို့ဆောင်မည့်ရက်နှင့် အချိန်ကို ရွေးချယ်ပါ',
-        workingHours: 'ရုံးဖွင့်ချိန်: 09:00 - 18:00',
-        selectDate: 'ရက်စွဲရွေးပါ',
-        selectTime: 'အချိန်ရွေးပါ',
-        confirm: 'အတည်ပြုသည်',
-        cancel: 'ပယ်ဖျက်သည်',
-        today: 'ယနေ့',
-        tomorrow: 'မနက်ဖြန်',
-      },
-    },
-  };
-
-  const currentT = t[language];
+  const currentT = getPlaceOrderCopy(language);
   const wizardStepLabels: string[] =
     (currentT as { wizardSteps?: string[] }).wizardSteps ?? ['地址', '包裹', '配送', '确认'];
 
@@ -1918,9 +1453,9 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
             hideLoading();
             Alert.alert(
               currentT.insufficientBalance, 
-              `${language === 'zh' ? '账户余额' : 'Balance'}: ${accountBalance.toLocaleString()} MMK\n` +
-              `${language === 'zh' ? '商品总计' : 'Items Total'}: ${cartTotal.toLocaleString()} MMK\n\n` +
-              `${language === 'zh' ? '请先充值后再购买商场商品。' : 'Please recharge before buying mall items.'}`
+              `${currentT.accountBalance}: ${accountBalance.toLocaleString()} MMK\n` +
+              `${currentT.itemsTotal}: ${cartTotal.toLocaleString()} MMK\n\n` +
+              `${currentT.rechargeBeforeMall}`
             );
             return;
           }
@@ -1936,8 +1471,8 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
           hideLoading();
           Alert.alert(
             currentT.insufficientBalance, 
-            `${language === 'zh' ? '账户余额' : 'Balance'}: ${accountBalance.toLocaleString()} MMK\n` +
-            `${language === 'zh' ? '总计费用' : 'Total Required'}: ${totalDeduction.toLocaleString()} MMK`
+            `${currentT.accountBalance}: ${accountBalance.toLocaleString()} MMK\n` +
+            `${currentT.totalRequired}: ${totalDeduction.toLocaleString()} MMK`
           );
           return;
         }
@@ -2568,349 +2103,51 @@ export default function PlaceOrderScreen({ navigation, route }: any) {
         onPlaceChange={setSelectedPlace}
       />
       
-      {/* 包裹类型说明模态框 */}
-      <Modal
+      <PackageTypeInfoModal
         visible={showPackageTypeInfo}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowPackageTypeInfo(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{currentT.packageTypeInfo.title}</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              <Text style={styles.modalText}>
-                {selectedPackageTypeInfo === '标准件（45x60x15cm）和（5KG）以内' ? currentT.packageTypeDetails.standard :
-                 selectedPackageTypeInfo === '超重件（5KG）以上' ? currentT.packageTypeDetails.overweight :
-                 selectedPackageTypeInfo === '超规件（45x60x15cm）以上' ? currentT.packageTypeDetails.oversized :
-                 selectedPackageTypeInfo === '顺路递' ? currentT.packageTypeDetails.waySide :
-                 selectedPackageTypeInfo}
-              </Text>
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowPackageTypeInfo(false)}
-            >
-              <Text style={styles.modalCloseButtonText}>{currentT.packageTypeInfo.understood}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        styles={styles}
+        currentT={currentT}
+        selectedPackageTypeInfo={selectedPackageTypeInfo}
+        onClose={() => setShowPackageTypeInfo(false)}
+      />
 
-      {/* 时间选择器模态框 */}
-      <Modal
+      <ScheduledTimePickerModal
         visible={showTimePicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTimePicker(false)}
-      >
-        <View style={styles.timePickerOverlay}>
-          <View style={styles.timePickerContent}>
-            <LinearGradient
-              colors={[TEAL, '#1F7A86']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.timePickerHeader}
-            >
-              <View style={styles.timePickerHeaderContent}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="time" size={24} color="#fff" style={{ marginRight: 10 }} />
-                  <View>
-                    <Text style={styles.timePickerTitle}>{currentT.timePicker.title}</Text>
-                    <Text style={styles.timePickerSubtitle}>{currentT.timePicker.subtitle}</Text>
-                  </View>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowTimePicker(false)}
-                style={styles.timePickerCloseButton}
-              >
-                <Ionicons name="close" size={20} color="#fff" />
-              </TouchableOpacity>
-            </LinearGradient>
+        styles={styles}
+        currentT={currentT}
+        selectedDate={selectedDate}
+        selectedTime={selectedTime}
+        availableTimeSlots={availableTimeSlots}
+        onChangeDate={setSelectedDate}
+        onChangeTime={setSelectedTime}
+        onClose={() => setShowTimePicker(false)}
+        onConfirm={(timeStr) => {
+          setScheduledTime(timeStr);
+          setShowTimePicker(false);
+        }}
+      />
 
-            <View style={styles.timePickerBody}>
-              <View style={styles.quickSelectSection}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                  <Ionicons name="calendar-outline" size={18} color="#64748b" style={{ marginRight: 6 }} />
-                  <Text style={styles.quickSelectTitle}>{currentT.timePicker.selectDate}</Text>
-                </View>
-                <View style={styles.quickSelectGrid}>
-                  <TouchableOpacity
-                    style={[
-                      styles.quickSelectButton,
-                      selectedDate === 'Today' && { borderColor: TEAL, backgroundColor: '#e8f5f6' }
-                    ]}
-                    onPress={() => setSelectedDate('Today')}
-                  >
-                    <Ionicons 
-                      name={selectedDate === 'Today' ? "checkmark-circle" : "ellipse-outline"} 
-                      size={20} 
-                      color={selectedDate === 'Today' ? TEAL : "#cbd5e1"} 
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text style={[styles.quickSelectButtonText, selectedDate === 'Today' && { color: TEAL }]}>
-                      {currentT.timePicker.today}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.quickSelectButton,
-                      selectedDate === 'Tomorrow' && { borderColor: TEAL, backgroundColor: '#e8f5f6' }
-                    ]}
-                    onPress={() => setSelectedDate('Tomorrow')}
-                  >
-                    <Ionicons 
-                      name={selectedDate === 'Tomorrow' ? "checkmark-circle" : "ellipse-outline"} 
-                      size={20} 
-                      color={selectedDate === 'Tomorrow' ? TEAL : "#cbd5e1"} 
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text style={[styles.quickSelectButtonText, selectedDate === 'Tomorrow' && { color: TEAL }]}>
-                      {currentT.timePicker.tomorrow}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.timeSlotsSection}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Ionicons name="time-outline" size={18} color="#64748b" style={{ marginRight: 6 }} />
-                    <Text style={styles.timeSlotsTitle}>{currentT.timePicker.selectTime}</Text>
-                  </View>
-                  <Text style={{ fontSize: 12, color: '#94a3b8' }}>{currentT.timePicker.workingHours}</Text>
-                </View>
-                
-                <ScrollView 
-                  style={styles.timeSlotsContainer} 
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.timeSlotsGrid}
-                >
-                  {availableTimeSlots.length > 0 ? (
-                    availableTimeSlots.map((slot) => (
-                      <TouchableOpacity
-                        key={slot}
-                        style={[
-                          styles.timeSlotButton,
-                          selectedTime === slot && styles.timeSlotButtonActive
-                        ]}
-                        onPress={() => setSelectedTime(slot)}
-                      >
-                        <Text style={[
-                          styles.timeSlotText,
-                          selectedTime === slot && styles.timeSlotTextActive
-                        ]}>{slot}</Text>
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <View style={{ width: '100%', padding: 20, alignItems: 'center' }}>
-                      <Text style={{ color: '#94a3b8' }}>今日配送已截止，请选择明日</Text>
-                    </View>
-                  )}
-                </ScrollView>
-              </View>
-            </View>
-
-            <View style={styles.timePickerButtons}>
-              <TouchableOpacity
-                style={styles.timePickerCancelButton}
-                onPress={() => setShowTimePicker(false)}
-              >
-                <Text style={styles.timePickerCancelText}>{currentT.timePicker.cancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.timePickerConfirmButton}
-                onPress={() => {
-                  if (selectedDate && selectedTime) {
-                    const timeStr = `${selectedDate === 'Today' ? currentT.timePicker.today : currentT.timePicker.tomorrow} ${selectedTime}`;
-                    setScheduledTime(timeStr);
-                    setShowTimePicker(false);
-                  } else {
-                    Alert.alert('提示', '请选择日期并输入时间');
-                  }
-                }}
-              >
-                <LinearGradient
-                  colors={[TEAL, '#1F7A86']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.timePickerConfirmGradient}
-                >
-                  <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.timePickerConfirmText}>{currentT.timePicker.confirm}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 提交成功后的取件二维码（视觉对齐确认订单页） */}
-      <Modal
+      <OrderQrModal
         visible={showQRCodeModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
+        styles={styles}
+        currentT={currentT}
+        language={language}
+        orderId={qrOrderId}
+        orderPrice={qrOrderPrice}
+        mallSummary={qrMallSummary}
+        showLoading={showLoading}
+        hideLoading={hideLoading}
+        onClose={() => {
           setShowQRCodeModal(false);
           resetForm();
         }}
-      >
-        <View style={styles.qrModalOverlay}>
-          <View style={styles.qrModalContent}>
-            <View style={styles.qrModalHeader}>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowQRCodeModal(false);
-                  resetForm();
-                }}
-                style={styles.qrModalClose}
-                accessibilityRole="button"
-                accessibilityLabel={currentT.qrClose}
-              >
-                <Ionicons name="chevron-back" size={20} color="#1A2B48" />
-              </TouchableOpacity>
-              <Text style={styles.qrModalTitle}>{currentT.qrTitle}</Text>
-              <View style={styles.qrModalHeaderSpacer} />
-            </View>
+        onViewOrders={() => {
+          setShowQRCodeModal(false);
+          resetForm();
+          navigation.navigate('Main', { screen: 'MyOrders' });
+        }}
+      />
 
-            <ScrollView
-              style={{ maxHeight: SCREEN_HEIGHT * (qrMallSummary ? 0.68 : 0.62) }}
-              bounces={false}
-              showsVerticalScrollIndicator={false}
-            >
-            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={styles.qrShot}>
-              <View style={styles.qrModalBody}>
-                <View style={styles.qrCard}>
-                  <View style={styles.qrSuccessBadge}>
-                    <Ionicons name="checkmark" size={22} color="#ffffff" />
-                  </View>
-                  <Text style={styles.qrSuccessText}>{currentT.orderSuccess}</Text>
-
-                  <View style={styles.qrCodeContainer}>
-                    <View style={styles.qrCodeWrapper}>
-                      <QRCode
-                        value={qrOrderId}
-                        size={188}
-                        color={TEAL}
-                        backgroundColor="white"
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.qrTicketRow}>
-                    {Array.from({ length: 20 }).map((_, i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.qrTicketDashSeg,
-                          { backgroundColor: i % 2 === 0 ? '#E85D4C' : '#4A7BD4' },
-                        ]}
-                      />
-                    ))}
-                  </View>
-
-                  <Text style={styles.qrInfoText}>{currentT.orderNumber}</Text>
-                  <Text style={styles.qrOrderId}>{qrOrderId}</Text>
-                  <Text style={styles.qrHint}>{currentT.qrHint}</Text>
-
-                  {!qrMallSummary ? (
-                    <View style={styles.qrPaidRow}>
-                      <Text style={styles.qrPaidLabel}>{currentT.paidAmount}</Text>
-                      <Text style={styles.qrOrderPrice}>{qrOrderPrice} MMK</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            </ViewShot>
-
-            {qrMallSummary ? (
-              <View style={[styles.qrModalBody, { paddingTop: 0 }]}>
-                <View style={styles.qrBreakdownCard}>
-                  <View style={styles.qrBreakdownRow}>
-                    <Text style={styles.qrBreakdownLabel}>{currentT.productAmount}</Text>
-                    <Text style={styles.qrBreakdownValue}>
-                      {qrMallSummary.productAmount.toLocaleString()} MMK
-                    </Text>
-                  </View>
-                  <View style={styles.qrBreakdownRow}>
-                    <Text style={styles.qrBreakdownLabel}>{currentT.deliveryFee}</Text>
-                    <Text style={styles.qrBreakdownValue}>
-                      {qrMallSummary.deliveryFee.toLocaleString()} MMK
-                    </Text>
-                  </View>
-                  <View style={styles.qrBreakdownRow}>
-                    <Text style={styles.qrBreakdownLabel}>{currentT.coupon}</Text>
-                    <Text
-                      style={[
-                        styles.qrBreakdownValue,
-                        qrMallSummary.coupon > 0 ? styles.qrBreakdownCoupon : null,
-                      ]}
-                    >
-                      {qrMallSummary.coupon > 0
-                        ? `-${qrMallSummary.coupon.toLocaleString()} MMK`
-                        : `0 MMK`}
-                    </Text>
-                  </View>
-                  <View style={styles.qrBreakdownDivider} />
-                  <View style={styles.qrBreakdownRow}>
-                    <Text style={styles.qrBreakdownTotalLabel}>{currentT.paidAmount}</Text>
-                    <Text style={styles.qrBreakdownTotalValue}>
-                      {qrMallSummary.paidAmount.toLocaleString()} MMK
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.qrRemarkCard}>
-                  <Text style={styles.qrRemarkTitle}>{currentT.remarksOptional}</Text>
-                  <Text style={styles.qrRemarkText}>
-                    {qrMallSummary.remarks.trim() ? qrMallSummary.remarks : currentT.noRemarks}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-            </ScrollView>
-
-            <View style={styles.qrModalFooter}>
-              <TouchableOpacity
-                style={styles.qrSecondaryBtn}
-                onPress={handleSaveQRCode}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-                accessibilityLabel={currentT.saveQR}
-              >
-                <Ionicons name="download-outline" size={18} color={TEAL} />
-                <Text style={styles.qrSecondaryBtnText}>{currentT.saveQR}</Text>
-              </TouchableOpacity>
-
-              <View style={styles.qrActionBar}>
-                <View style={styles.qrActionBarSide}>
-                  <Text style={styles.qrPayableLabel}>{currentT.payableAmount}</Text>
-                  <Text style={styles.qrPayableValue}>
-                    {qrMallSummary
-                      ? `${qrMallSummary.paidAmount.toLocaleString()} MMK`
-                      : `${qrOrderPrice} MMK`}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.qrPrimaryBtn}
-                  onPress={() => {
-                    setShowQRCodeModal(false);
-                    resetForm();
-                    navigation.navigate('Main', { screen: 'MyOrders' });
-                  }}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel={currentT.viewOrders}
-                >
-                  <Text style={styles.qrPrimaryBtnText}>{currentT.viewOrders}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      {/* 🚀 移除多余的空 Modal */}
       <Toast 
         visible={toastVisible}
         message={toastMessage}

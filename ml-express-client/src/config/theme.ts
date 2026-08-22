@@ -1,13 +1,13 @@
 export const colors = {
-  // 品牌色
-  brand: '#2E86AB',
+  // 品牌色（与首页 / 我的 页一致）
+  brand: '#2C98A6',
   
-  // 主色调 (Blue)
+  // 主色调 (Teal)
   primary: {
-    light: '#93c5fd', // blue-300
-    DEFAULT: '#3b82f6', // blue-500
-    dark: '#2563eb', // blue-600
-    darker: '#1d4ed8', // blue-700
+    light: '#7EC8D2',
+    DEFAULT: '#2C98A6',
+    dark: '#1E6F7A',
+    darker: '#185A63',
   },
   
   // 辅助色 (Amber/Orange)
@@ -37,10 +37,10 @@ export const colors = {
     bg: '#fffbeb', // amber-50
   },
   info: {
-    light: '#93c5fd', // blue-300
-    DEFAULT: '#3b82f6', // blue-500
-    dark: '#2563eb', // blue-600
-    bg: '#eff6ff', // blue-50
+    light: '#7EC8D2',
+    DEFAULT: '#2C98A6',
+    dark: '#1E6F7A',
+    bg: '#E8F6F8',
   },
   
   // 文本色
@@ -75,8 +75,8 @@ export const colors = {
   
   // 渐变色预设
   gradients: {
-    primary: ['#b0d3e8', '#7895a3'],
-    blue: ['#3b82f6', '#2563eb'],
+    primary: ['#2C98A6', '#1E6F7A'],
+    blue: ['#2C98A6', '#1E6F7A'],
     green: ['#10b981', '#059669'],
     orange: ['#f59e0b', '#d97706'],
     red: ['#ef4444', '#dc2626'],

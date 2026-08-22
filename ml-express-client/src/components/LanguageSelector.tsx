@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   languageOptionActive: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#E8F6F8',
   },
   languageOptionFlag: {
     fontSize: 20,
@@ -205,12 +205,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   languageOptionTextActive: {
-    color: '#3b82f6',
+    color: '#2C98A6',
     fontWeight: '700',
   },
   languageCheckmark: {
     fontSize: 16,
-    color: '#3b82f6',
+    color: '#2C98A6',
     fontWeight: 'bold',
   },
 });

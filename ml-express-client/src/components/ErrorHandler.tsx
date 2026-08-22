@@ -139,7 +139,7 @@ export class ErrorBoundary extends React.Component<
             onPress={() => this.setState({ hasError: false, error: undefined })}
           >
             <LinearGradient
-              colors={['#2E86AB', '#4CA1CF']}
+              colors={['#2C98A6', '#5BB8C4']}
               style={styles.errorBoundaryButtonGradient}
             >
               <Text style={styles.errorBoundaryButtonText}>重试</Text>

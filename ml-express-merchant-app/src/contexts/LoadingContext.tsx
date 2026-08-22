@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import DeliveryLoadingAnimation from '../components/DeliveryLoadingAnimation';
 import PackageLoadingAnimation from '../components/PackageLoadingAnimation';
 
 type AnimationType = 'delivery' | 'package';
@@ -19,11 +18,9 @@ interface LoadingProviderProps {
 export function LoadingProvider({ children }: LoadingProviderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('加载中...');
-  const [animationType, setAnimationType] = useState<AnimationType>('package');
 
-  const showLoading = (msg?: string, type: AnimationType = 'package') => {
+  const showLoading = (msg?: string, _type: AnimationType = 'package') => {
     setMessage(msg || '加载中...');
-    setAnimationType(type);
     setIsLoading(true);
   };
 
@@ -34,10 +31,7 @@ export function LoadingProvider({ children }: LoadingProviderProps) {
   return (
     <LoadingContext.Provider value={{ showLoading, hideLoading, isLoading }}>
       {children}
-      {isLoading && animationType === 'delivery' && (
-        <DeliveryLoadingAnimation message={message} showOverlay={true} />
-      )}
-      {isLoading && animationType === 'package' && (
+      {isLoading && (
         <PackageLoadingAnimation message={message} showOverlay={true} />
       )}
     </LoadingContext.Provider>
@@ -51,4 +45,3 @@ export function useLoading() {
   }
   return context;
 }
-

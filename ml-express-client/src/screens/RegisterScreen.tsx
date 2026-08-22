@@ -475,7 +475,7 @@ export default function RegisterScreen({ navigation }: any) {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#3b82f6', '#2563eb', '#1d4ed8']}
+                colors={['#2C98A6', '#1E6F7A', '#185A63']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.registerGradient}
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sendCodeButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#2C98A6',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 8,
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
   registerButton: {
     marginTop: 6,
     borderRadius: 10,
-    shadowColor: '#3b82f6',
+    shadowColor: '#2C98A6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
   },
   loginLink: {
     fontSize: 14,
-    color: '#3b82f6',
+    color: '#2C98A6',
     fontWeight: '700',
   },
 });

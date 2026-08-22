@@ -20,6 +20,7 @@ import { remoteImageUri } from '../services/clientApi/nativeSupabaseUrl';
 import { persistUserAvatarUrl, hydrateUserAvatarFromServer } from '../utils/userAvatar';
 import Toast from '../components/Toast';
 import { feedbackService } from '../services/FeedbackService';
+import { common, tt } from '../i18n';
 import { APP_CONFIG } from '../config/constants';
 import BrandRider from '../components/BrandRider';
 import MyOrdersBar from '../components/MyOrdersBar';
@@ -32,6 +33,7 @@ import {
   ClayHeadset,
   ClayGlobe,
   ClayInfo,
+  ClayGear,
 } from '../components/ProfileClayIcons';
 import {
   checkAndroidAppUpdate,
@@ -175,7 +177,8 @@ export default function ProfileScreen({ navigation }: any) {
   // 多语言翻译
   const translations = profileTranslations;
   const t = translations[language as keyof typeof translations];
-  const cancelLabel = language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်မည်';
+  const c = common(language);
+  const cancelLabel = c.cancel;
 
   const handleCheckAppUpdate = () => {
     if (checkingAppUpdate) return;
@@ -541,7 +544,7 @@ export default function ProfileScreen({ navigation }: any) {
           try {
             const result = await pickImageFromLibrary(pickAvatarOptions);
             if (result.canceled && result.assets === null) {
-              Alert.alert(t.changeAvatar, language === 'zh' ? '需要相册权限才能选择图片' : 'Photo library permission is required');
+              Alert.alert(t.changeAvatar, c.galleryPermissionAvatar);
               return;
             }
             const uri = result.assets?.[0]?.uri;
@@ -660,7 +663,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleSaveProfile = async () => {
     if (!editForm.name || !editForm.phone) {
-      showToast(language === 'zh' ? '请填写姓名和电话' : 'Please fill name and phone', 'warning');
+      showToast(c.fillNamePhone, 'warning');
       return;
     }
 
@@ -722,7 +725,7 @@ export default function ProfileScreen({ navigation }: any) {
     Vibration.vibrate(50); // 🚀 点击反馈
     try {
       console.log('🚀 开始保存二维码...', amount);
-      showLoading(language === 'zh' ? '正在保存...' : 'Saving...', 'package');
+      showLoading(c.saving, 'package');
       
       const granted = await ensureSaveToLibraryPermission();
       if (!granted) {
@@ -748,8 +751,8 @@ export default function ProfileScreen({ navigation }: any) {
         
         hideLoading();
         Alert.alert(
-          language === 'zh' ? '保存成功' : 'Saved!',
-          language === 'zh' ? '收款码已保存到您的相册，请打开 KBZPay 支付' : 'QR code saved to gallery, please pay with KBZPay'
+          c.saved,
+          c.qrSavedPay
         );
       } else {
         throw new Error('截图失败');
@@ -803,7 +806,7 @@ export default function ProfileScreen({ navigation }: any) {
     }
 
     try {
-      showLoading(language === 'zh' ? '正在提交申请...' : 'Submitting...', 'package');
+      showLoading(c.submitting, 'package');
       console.log('正在准备上传凭证:', rechargeProofUri);
       Alert.alert('提示', '正在上传凭证，请稍候...');
       
@@ -836,8 +839,8 @@ export default function ProfileScreen({ navigation }: any) {
 
       hideLoading();
       Alert.alert(
-        language === 'zh' ? '提交成功' : 'Submitted',
-        language === 'zh' ? '您的充值申请已提交，管理员审核通过后余额将自动到账。' : 'Your recharge request has been submitted. Balance will be updated after admin review.',
+        c.submitted,
+        c.rechargeSubmitted,
         [{ text: t.confirm, onPress: () => setShowPaymentQRModal(false) }]
       );
       
@@ -855,20 +858,20 @@ export default function ProfileScreen({ navigation }: any) {
       }
 
       Alert.alert(
-        language === 'zh' ? '提交失败' : 'Failed',
-        language === 'zh' ? `充值申请提交失败，请联系客服。\n错误详情: ${errorMsg}` : `Submission failed.\nError: ${errorMsg}`
+        c.submitFailed,
+        tt(language, `充值申请提交失败，请联系客服。\n错误详情: ${errorMsg}`, `Submission failed.\nError: ${errorMsg}`, `ငွေဖြည့်လျှောက်လွှာ မအောင်မြင်ပါ။\nအမှား: ${errorMsg}`)
       );
     }
   };
 
   const handleChangePassword = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      showToast(language === 'zh' ? '请填写所有密码字段' : 'Please fill all password fields', 'warning');
+      showToast(c.fillAllPassword, 'warning');
       return;
     }
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showToast(language === 'zh' ? '新密码和确认密码不匹配' : 'Passwords do not match', 'error');
+      showToast(c.passwordMismatch, 'error');
       return;
     }
 
@@ -881,15 +884,15 @@ export default function ProfileScreen({ navigation }: any) {
       );
 
       if (result.success) {
-        showToast(language === 'zh' ? '密码修改成功' : 'Password updated', 'success');
+        showToast(c.passwordUpdated, 'success');
         setShowPasswordModal(false);
         setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
-        showToast(result.error?.message || (language === 'zh' ? '修改失败' : 'Update failed'), 'error');
+        showToast(result.error?.message || c.updateFailed, 'error');
       }
     } catch (error) {
       LoggerService.error('修改密码失败:', error);
-      showToast(language === 'zh' ? '修改失败，请重试' : 'Update failed, please try again', 'error');
+      showToast(c.updateFailedRetry, 'error');
     }
   };
 
@@ -955,14 +958,14 @@ export default function ProfileScreen({ navigation }: any) {
       { display: '(+95) 09941118688', tel: '+959941118688' },
     ];
     Alert.alert(
-      language === 'zh' ? '选择拨打的客服热线' : language === 'en' ? 'Choose a hotline number' : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ',
+      c.hotlineTitle,
       APP_CONFIG.CONTACT.PHONE_DISPLAY,
       [
         ...numbers.map((n) => ({
           text: n.display,
           onPress: () => Linking.openURL(`tel:${n.tel}`),
         })),
-        { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' as const },
+        { text: c.cancel, style: 'cancel' as const },
       ],
     );
   };
@@ -1035,16 +1038,6 @@ export default function ProfileScreen({ navigation }: any) {
             end={{ x: 0.85, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <View style={me.topBar}>
-            <View style={{ width: 40 }} />
-            <TouchableOpacity
-              style={me.gearBtn}
-              onPress={() => setShowSettingsSheet(true)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="settings-outline" size={20} color="#176978" />
-            </TouchableOpacity>
-          </View>
           <View style={me.brandRow}>
             <View style={me.brandLeft}>
               <Image
@@ -1193,9 +1186,18 @@ export default function ProfileScreen({ navigation }: any) {
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
           <View style={me.menuDivider} />
-          <TouchableOpacity style={[me.menuRow, { paddingBottom: 4 }]} onPress={() => setShowAboutModal(true)}>
+          <TouchableOpacity style={me.menuRow} onPress={() => setShowAboutModal(true)}>
             <View style={me.menuIcon}><ClayInfo size={26} /></View>
             <Text style={me.menuLabel}>{t.aboutBrand}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
+          </TouchableOpacity>
+          <View style={me.menuDivider} />
+          <TouchableOpacity
+            style={[me.menuRow, { paddingBottom: 4 }]}
+            onPress={() => setShowSettingsSheet(true)}
+          >
+            <View style={me.menuIcon}><ClayGear size={26} /></View>
+            <Text style={me.menuLabel}>{t.settings}</Text>
             <Ionicons name="chevron-forward" size={18} color="#D0D7DE" />
           </TouchableOpacity>
         </View>
@@ -1254,7 +1256,7 @@ export default function ProfileScreen({ navigation }: any) {
             ) : null}
             <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); navigation.navigate('NotificationCenter'); }}>
               <Ionicons name="notifications-outline" size={22} color="#2C98A6" />
-              <Text style={me.sheetRowText}>{language === 'zh' ? '消息中心' : language === 'en' ? 'Inbox' : 'အသိပေးချက်'}</Text>
+                <Text style={me.sheetRowText}>{t.inbox}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); openNotificationSettings(); }}>
               <Ionicons name="settings-outline" size={22} color="#2C98A6" />
@@ -1262,7 +1264,7 @@ export default function ProfileScreen({ navigation }: any) {
             </TouchableOpacity>
             <View style={me.sheetRow}>
               <Ionicons name={isDarkMode ? 'moon' : 'sunny-outline'} size={22} color="#2C98A6" />
-              <Text style={me.sheetRowText}>{language === 'zh' ? '深色模式' : 'Dark Mode'}</Text>
+              <Text style={me.sheetRowText}>{t.darkMode}</Text>
               <Switch
                 value={isDarkMode}
                 onValueChange={setIsDarkMode}
@@ -1303,7 +1305,7 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={[styles.modalOverlay, { justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.7)' }]}>
           <View style={[styles.modalContent, { borderRadius: 32, padding: 0, overflow: 'hidden', backgroundColor: '#ffffff' }]}>
             <LinearGradient
-              colors={['#1e3a8a', '#2563eb']}
+              colors={['#1F7A84', '#2C98A6']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{ padding: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
@@ -1347,7 +1349,7 @@ export default function ProfileScreen({ navigation }: any) {
               </TouchableOpacity>
               <View style={{ gap: 20, marginBottom: 24 }}>
                 <View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '姓名 / 店名' : 'Full Name'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{t.fullName}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16 }}>
                     <Ionicons name="person-outline" size={20} color="#94a3b8" />
                     <TextInput
@@ -1361,7 +1363,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
 
                 <View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '电子邮箱' : 'Email Address'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{t.emailAddress}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16 }}>
                     <Ionicons name="mail-outline" size={20} color="#94a3b8" />
                     <TextInput
@@ -1376,7 +1378,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
 
                 <View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '联系电话' : 'Phone Number'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{t.phoneNumber}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16 }}>
                     <Ionicons name="call-outline" size={20} color="#94a3b8" />
                     <TextInput
@@ -1391,7 +1393,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
 
                 <View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{language === 'zh' ? '详细地址' : 'Address'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748b', marginBottom: 8, marginLeft: 4 }}>{t.detailAddress}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', paddingHorizontal: 16, paddingTop: 12 }}>
                     <Ionicons name="location-outline" size={20} color="#94a3b8" style={{ marginTop: 2 }} />
                     <TextInput
@@ -1420,7 +1422,7 @@ export default function ProfileScreen({ navigation }: any) {
                   disabled={isSavingProfile}
                 >
                   <LinearGradient
-                    colors={['#3b82f6', '#2563eb']}
+                    colors={['#2C98A6', '#1E6F7A']}
                     style={{ flex: 1, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 8 }}
                   >
                     {isSavingProfile ? (
@@ -1489,7 +1491,7 @@ export default function ProfileScreen({ navigation }: any) {
                 onPress={handleChangePassword}
               >
                 <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
+                  colors={['#2C98A6', '#1E6F7A']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.modalButtonGradient}
@@ -1559,14 +1561,14 @@ export default function ProfileScreen({ navigation }: any) {
                       { display: '(+95) 09941118688', tel: '+959941118688' }
                     ];
                     Alert.alert(
-                      language === 'zh' ? '选择拨打的客服热线' : language === 'en' ? 'Choose a hotline number' : 'ဖုန်းနံပါတ်ကို ရွေးချယ်ပါ',
+                      c.hotlineTitle,
                       '',
                       [
                         ...numbers.map(n => ({
                           text: n.display,
                           onPress: () => Linking.openURL(`tel:${n.tel}`)
                         })),
-                        { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' }
+                        { text: c.cancel, style: 'cancel' }
                       ]
                     );
                   }}
@@ -1593,12 +1595,8 @@ export default function ProfileScreen({ navigation }: any) {
                     const privacyUrl = 'https://mlexpress.com/privacy';
                     Linking.openURL(privacyUrl).catch(() => {
                       Alert.alert(
-                        language === 'zh' ? '无法打开链接' : language === 'en' ? 'Cannot open link' : 'လင့်ခ်ဖွင့်ရန်မအောင်မြင်ပါ',
-                        language === 'zh' 
-                          ? '请稍后访问: ' + privacyUrl
-                          : language === 'en'
-                          ? 'Please visit later: ' + privacyUrl
-                          : 'ကျေးဇူးပြု၍ နောက်မှ လည်ပတ်ပါ: ' + privacyUrl
+                        c.cannotOpenLink,
+                        tt(language, '请稍后访问: ' + privacyUrl, 'Please visit later: ' + privacyUrl, 'ကျေးဇူးပြု၍ နောက်မှ လည်ပတ်ပါ: ' + privacyUrl)
                       );
                     });
                   }}
@@ -1616,12 +1614,8 @@ export default function ProfileScreen({ navigation }: any) {
                     const termsUrl = 'https://mlexpress.com/terms';
                     Linking.openURL(termsUrl).catch(() => {
                       Alert.alert(
-                        language === 'zh' ? '无法打开链接' : language === 'en' ? 'Cannot open link' : 'လင့်ခ်ဖွင့်ရန်မအောင်မြင်ပါ',
-                        language === 'zh' 
-                          ? '请稍后访问: ' + termsUrl
-                          : language === 'en'
-                          ? 'Please visit later: ' + termsUrl
-                          : 'ကျေးဇူးပြု၍ နောက်မှ လည်ပတ်ပါ: ' + termsUrl
+                        c.cannotOpenLink,
+                        tt(language, '请稍后访问: ' + termsUrl, 'Please visit later: ' + termsUrl, 'ကျေးဇူးပြု၍ နောက်မှ လည်ပတ်ပါ: ' + termsUrl)
                       );
                     });
                   }}
@@ -1644,7 +1638,7 @@ export default function ProfileScreen({ navigation }: any) {
                 onPress={() => setShowAboutModal(false)}
               >
                 <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
+                  colors={['#2C98A6', '#1E6F7A']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.modalButtonGradient}
@@ -1669,7 +1663,7 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { padding: 0, overflow: 'hidden' }]}>
             <LinearGradient
-              colors={['#1e3a8a', '#2563eb']}
+              colors={['#1F7A84', '#2C98A6']}
               style={{ padding: 20, alignItems: 'center' }}
             >
               <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>💰 {t.recharge}</Text>
@@ -1700,13 +1694,13 @@ export default function ProfileScreen({ navigation }: any) {
                         padding: 16,
                         borderRadius: 12,
                         borderWidth: 2,
-                        borderColor: selectedRechargeAmount === item.amount ? '#3b82f6' : '#f1f5f9',
-                        backgroundColor: selectedRechargeAmount === item.amount ? '#eff6ff' : 'white',
+                        borderColor: selectedRechargeAmount === item.amount ? '#2C98A6' : '#f1f5f9',
+                        backgroundColor: selectedRechargeAmount === item.amount ? '#E8F6F8' : 'white',
                         alignItems: 'center',
                         marginBottom: 4,
                       }}
                     >
-                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: selectedRechargeAmount === item.amount ? '#3b82f6' : '#1e293b' }}>
+                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: selectedRechargeAmount === item.amount ? '#2C98A6' : '#1e293b' }}>
                         {item.label}
                       </Text>
                       <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>MMK</Text>
@@ -1734,7 +1728,7 @@ export default function ProfileScreen({ navigation }: any) {
                     onPress={handleOpenPaymentQR}
                   >
                     <LinearGradient
-                      colors={['#3b82f6', '#2563eb']}
+                      colors={['#2C98A6', '#1E6F7A']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.modalButtonGradient}
@@ -1761,7 +1755,7 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { padding: 0, overflow: 'hidden' }]}>
             <LinearGradient
-              colors={['#1e3a8a', '#2563eb'] as any}
+              colors={['#1F7A84', '#2C98A6'] as any}
               style={{ padding: 20, alignItems: 'center' }}
             >
               <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>{t.paymentQRTitle}</Text>
@@ -1793,7 +1787,7 @@ export default function ProfileScreen({ navigation }: any) {
                       <View style={{ alignItems: 'center' }}>
                         <Ionicons name="qr-code-outline" size={120} color="#cbd5e1" />
                         <Text style={{ marginTop: 10, color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>
-                          {language === 'zh' ? '加载中...' : 'Loading...'}
+                          {c.loading}
                         </Text>
                       </View>
                     )}
@@ -1827,7 +1821,7 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 }}>
                 <Ionicons name="information-circle-outline" size={14} color="#64748b" />
                 <Text style={{ color: '#64748b', fontSize: 12 }}>
-                  {language === 'zh' ? '点击右上角或长按图片可保存' : 'Tap icon or long press to save'}
+                  {c.tapOrLongPressToSave}
                 </Text>
               </View>
 
@@ -1846,9 +1840,9 @@ export default function ProfileScreen({ navigation }: any) {
                   marginBottom: 20
                 }}
               >
-                <Ionicons name={rechargeProofUri ? "checkmark-circle" : "cloud-upload-outline"} size={24} color={rechargeProofUri ? "#10b981" : "#3b82f6"} />
+                <Ionicons name={rechargeProofUri ? "checkmark-circle" : "cloud-upload-outline"} size={24} color={rechargeProofUri ? "#10b981" : "#2C98A6"} />
                 <Text style={{ marginLeft: 8, fontWeight: 'bold', color: rechargeProofUri ? "#10b981" : "#1e293b" }}>
-                  {rechargeProofUri ? (language === 'zh' ? '凭证已选择' : 'Proof Selected') : t.uploadPaymentRecord}
+                  {rechargeProofUri ? c.proofSelected : t.uploadPaymentRecord}
                 </Text>
               </TouchableOpacity>
 

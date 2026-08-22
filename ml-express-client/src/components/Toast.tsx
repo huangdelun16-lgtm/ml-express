@@ -75,7 +75,7 @@ export default function Toast({
         return '#f59e0b';
       case 'info':
       default:
-        return '#3b82f6';
+        return '#2C98A6';
     }
   };
 

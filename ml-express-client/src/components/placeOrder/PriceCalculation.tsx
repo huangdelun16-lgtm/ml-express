@@ -2,6 +2,7 @@ import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MoneyIcon } from '../Icon';
 import { ScaleInView } from '../Animations';
+import { tt } from '../../i18n';
 
 interface DeliverySpeed {
   value: string;
@@ -218,7 +219,7 @@ const PriceCalculation = memo<PriceCalculationProps>(({
 
                 {accountBalance === 0 && (
                   <Text style={{ fontSize: 10, color: '#ef4444', textAlign: 'center', marginTop: 8 }}>
-                    {language === 'zh' ? '未充值' : 'No Balance'}
+                    {tt(language, '未充值', 'No Balance', 'ငွေမဖြည့်ရသေး')}
                   </Text>
                 )}
 

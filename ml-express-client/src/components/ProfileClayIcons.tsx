@@ -239,6 +239,41 @@ export function ClayBox({ size = 44 }: SizeProps) {
   );
 }
 
+/** 立即下单：立体包裹 + 加号，表示新建寄件单。 */
+export function ClayPlaceOrder({ size = 44 }: SizeProps) {
+  const id = gid(useId());
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Defs>
+        <SvgGradient id={`${id}t`} x1="0.2" y1="1" x2="0.8" y2="0">
+          <Stop offset="0" stopColor="#FFE9C4" />
+          <Stop offset="1" stopColor="#F0C078" />
+        </SvgGradient>
+        <SvgGradient id={`${id}f`} x1="0" y1="0" x2="0.2" y2="1">
+          <Stop offset="0" stopColor="#F6D7A8" />
+          <Stop offset="1" stopColor="#D59A4A" />
+        </SvgGradient>
+        <SvgGradient id={`${id}s`} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#C98A3C" />
+          <Stop offset="1" stopColor="#8F5A1E" />
+        </SvgGradient>
+        <SvgGradient id={`${id}p`} x1="0.2" y1="0" x2="0.9" y2="1">
+          <TealStops />
+        </SvgGradient>
+      </Defs>
+      <Ellipse cx="30" cy="56" rx="16" ry="4" fill="#8F5A1E" opacity="0.16" />
+      <Path d="M10 30 L28 20 L46 30 L28 40 Z" fill={`url(#${id}t)`} />
+      <Path d="M10 30 L28 40 L28 54 L10 44 Z" fill={`url(#${id}s)`} />
+      <Path d="M28 40 L46 30 L46 44 L28 54 Z" fill={`url(#${id}f)`} />
+      <Path d="M20 28 L36 28 L36 32 L20 32 Z" fill="#2C98A6" opacity="0.85" />
+      <Path d="M18 26 L24 23 L24 27 L18 30 Z" fill="#FFFFFF" opacity="0.35" />
+      <Circle cx="46" cy="20" r="12" fill={`url(#${id}p)`} />
+      <Path d="M46 14 L46 26 M40 20 L52 20" stroke="#F4FEFF" strokeWidth="3.2" strokeLinecap="round" />
+      <Ellipse cx="42" cy="16" rx="4" ry="2.4" fill="#FFFFFF" opacity="0.35" />
+    </Svg>
+  );
+}
+
 export function ClayScooter({ size = 44 }: SizeProps) {
   const id = gid(useId());
   return (

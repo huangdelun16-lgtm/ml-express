@@ -101,7 +101,7 @@ export default function NotificationCenterScreen({ navigation }: any) {
 
   const renderItem = ({ item }: { item: UserNotification }) => {
     let icon = 'notifications-outline';
-    let color = '#3b82f6';
+    let color = '#2C98A6';
     if (item.type === 'order') { icon = 'cube-outline'; color = '#8b5cf6'; }
     if (item.type === 'promotion') { icon = 'pricetag-outline'; color = '#ec4899'; }
 
@@ -128,7 +128,7 @@ export default function NotificationCenterScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#1e3a8a', '#2563eb']}
+        colors={['#1F7A84', '#2C98A6']}
         style={styles.header}
       >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>

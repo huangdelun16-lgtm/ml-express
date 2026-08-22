@@ -21,12 +21,26 @@ type MerchantPasswordResult = {
 
 const extra = Constants.expoConfig?.extra as { netlifyUrl?: string } | undefined;
 
-const NETLIFY_CANDIDATES = [
-  'https://admin-market-link-express.netlify.app',
-  'https://admin-market-link-express.com',
+function uniqUrls(urls: Array<string | undefined | null>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    const url = String(raw || '').trim().replace(/\/$/, '');
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
+// 缅甸 TLS 会重置 *.netlify.app，优先走已解析的自定义域名。
+const NETLIFY_CANDIDATES = uniqUrls([
+  'https://mlexpress-merchants.com',
   extra?.netlifyUrl,
   process.env.EXPO_PUBLIC_NETLIFY_URL,
-].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
+  'https://admin-market-link-express.com',
+  'https://admin-market-link-express.netlify.app',
+]);
 
 function isCredentialError(message: string): boolean {
   return /密码|店铺代码不存在|不存在|停用|状态异常|中转站|Inventory/i.test(message);

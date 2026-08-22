@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import LoggerService from './LoggerService';
+import { unreadCountsFromRows, type ChatMessage } from './chatMerge';
 
 /** 断网/代理不可达等场景下 Supabase 会抛网络类错误，不应按 ERROR 打日志以免触发 RN LogBox 红屏 */
 function isLikelyNetworkError(err: unknown): boolean {
@@ -14,15 +15,32 @@ function isLikelyNetworkError(err: unknown): boolean {
   );
 }
 
-export interface ChatMessage {
-  id: string;
-  order_id: string;
-  sender_id: string;
-  sender_type: 'customer' | 'rider' | 'merchant' | 'admin';
-  message: string;
-  image_url?: string;
-  is_read: boolean;
-  created_at: string;
+export type { ChatMessage };
+
+export type ChatSubscription = {
+  unsubscribe: () => void;
+};
+
+const DEFAULT_POLL_MS = 5000;
+
+async function fetchOrderMessages(orderId: string): Promise<ChatMessage[]> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    if (isLikelyNetworkError(error)) {
+      LoggerService.debug('获取聊天记录：网络暂不可用', error);
+    } else {
+      LoggerService.error('获取聊天记录失败:', error);
+    }
+    return [];
+  }
 }
 
 export const chatService = {
@@ -56,33 +74,43 @@ export const chatService = {
     }
   },
 
-  /**
-   * 获取订单的消息记录
-   */
-  async getOrderMessages(orderId: string): Promise<ChatMessage[]> {
-    try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: true });
+  getOrderMessages: fetchOrderMessages,
 
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      if (isLikelyNetworkError(error)) {
-        LoggerService.debug('获取聊天记录：网络暂不可用', error);
-      } else {
-        LoggerService.error('获取聊天记录失败:', error);
+  /**
+   * 订阅订单的新消息。
+   * Realtime WS 在缅甸不可达（Netlify /__sb 无法升级 WebSocket），因此同时用 REST 轮询兜底。
+   */
+  subscribeToMessages(
+    orderId: string,
+    onMessage: (message: ChatMessage) => void,
+    options?: { pollIntervalMs?: number },
+  ): ChatSubscription {
+    const seenIds = new Set<string>();
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const pollIntervalMs = options?.pollIntervalMs ?? DEFAULT_POLL_MS;
+
+    const ingest = (msgs: ChatMessage[], emitNew: boolean) => {
+      for (const msg of msgs) {
+        if (!msg?.id || seenIds.has(msg.id)) continue;
+        seenIds.add(msg.id);
+        if (emitNew) onMessage(msg);
       }
-      return [];
-    }
-  },
+    };
 
-  /**
-   * 订阅订单的新消息
-   */
-  subscribeToMessages(orderId: string, onMessage: (message: ChatMessage) => void) {
+    const poll = async (emitNew: boolean) => {
+      if (cancelled) return;
+      const msgs = await fetchOrderMessages(orderId);
+      ingest(msgs, emitNew);
+    };
+
+    void poll(false).then(() => {
+      if (cancelled) return;
+      timer = setInterval(() => {
+        void poll(true);
+      }, pollIntervalMs);
+    });
+
     const channel = supabase
       .channel(`chat-order-${orderId}`)
       .on(
@@ -94,12 +122,21 @@ export const chatService = {
           filter: `order_id=eq.${orderId}`
         },
         (payload) => {
-          onMessage(payload.new as ChatMessage);
+          const msg = payload.new as ChatMessage;
+          if (!msg?.id || seenIds.has(msg.id)) return;
+          seenIds.add(msg.id);
+          onMessage(msg);
         }
       )
       .subscribe();
 
-    return channel;
+    return {
+      unsubscribe() {
+        cancelled = true;
+        if (timer) clearInterval(timer);
+        channel.unsubscribe();
+      },
+    };
   },
 
   /**
@@ -147,5 +184,50 @@ export const chatService = {
       }
       return 0;
     }
-  }
+  },
+
+  async getUnreadCountForOrder(orderId: string, userId: string): Promise<number> {
+    try {
+      const { count, error } = await supabase
+        .from('chat_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('order_id', orderId)
+        .neq('sender_id', userId)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      return count || 0;
+    } catch (error) {
+      if (isLikelyNetworkError(error)) {
+        LoggerService.debug('获取订单未读：网络暂不可用，返回 0', error);
+      } else {
+        LoggerService.error('获取订单未读失败:', error);
+      }
+      return 0;
+    }
+  },
+
+  async getUnreadCountsByOrder(userId: string, orderIds: string[]): Promise<Record<string, number>> {
+    if (!orderIds.length) return {};
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('order_id, is_read')
+        .in('order_id', orderIds)
+        .eq('is_read', false)
+        .neq('sender_id', userId);
+
+      if (error) throw error;
+      return unreadCountsFromRows(data);
+    } catch (error) {
+      if (isLikelyNetworkError(error)) {
+        LoggerService.debug('批量未读：网络暂不可用', error);
+      } else {
+        LoggerService.error('批量未读失败:', error);
+      }
+      return {};
+    }
+  },
 };
+
+export { mergeIncomingMessages } from './chatMerge';

@@ -110,7 +110,7 @@ export default function TutorialModal({ isVisible, onClose }: TutorialModalProps
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#3b82f6" />
+              <ActivityIndicator size="large" color="#2C98A6" />
               <Text style={styles.loadingText}>{t.loading}</Text>
             </View>
           ) : (
@@ -129,7 +129,7 @@ export default function TutorialModal({ isVisible, onClose }: TutorialModalProps
                       activeOpacity={0.7}
                     >
                       <LinearGradient
-                        colors={['#3b82f6', '#2563eb']}
+                        colors={['#2C98A6', '#1E6F7A']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.stepNumberBadge}
@@ -153,7 +153,7 @@ export default function TutorialModal({ isVisible, onClose }: TutorialModalProps
                     onPress={() => setActiveStep(null)}
                     style={styles.backButton}
                   >
-                    <Ionicons name="arrow-back" size={20} color="#3b82f6" />
+                    <Ionicons name="arrow-back" size={20} color="#2C98A6" />
                     <Text style={styles.backButtonText}>{t.back}</Text>
                   </TouchableOpacity>
 
@@ -201,7 +201,7 @@ export default function TutorialModal({ isVisible, onClose }: TutorialModalProps
                 onPress={handleClose}
               >
                 <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
+                  colors={['#2C98A6', '#1E6F7A']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.doneButtonGradient}
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 15,
-    color: '#3b82f6',
+    color: '#2C98A6',
     fontWeight: '700',
     marginLeft: 4,
   },
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 4,
-    shadowColor: '#3b82f6',
+    shadowColor: '#2C98A6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

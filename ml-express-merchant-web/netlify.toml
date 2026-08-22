@@ -38,6 +38,14 @@
   status = 200
   force = true
 
+# 商家 App 登录：缅甸打不通 *.netlify.app，走本站可达域名代理到管理后台 function。
+# 若本站已部署 merchant-password function，Netlify 会优先命中 function。
+[[redirects]]
+  from = "/.netlify/functions/merchant-password"
+  to = "https://admin-market-link-express.netlify.app/.netlify/functions/merchant-password"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
