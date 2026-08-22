@@ -5,7 +5,7 @@ const baseConfig = require('./app.json');
  * 本地开发可用 .env 覆盖；EAS Build 未注入 EXPO_PUBLIC_* 时使用下列生产默认值。
  */
 
-/** Production native builds bake absolute /__sb (Myanmar-reachable). Local expo start keeps env. */
+/** Native / Expo Go always prefer /__sb (Myanmar cannot reach *.supabase.co). */
 const NATIVE_SB_PROXY_URL = 'https://' + 'admin-market-link-express.com' + '/__sb/';
 const SUPABASE_UPSTREAM_URL = 'https://' + 'uopkyuluxnrewvlmutam' + '.supabase.co';
 const DEFAULT_SUPABASE_URL = NATIVE_SB_PROXY_URL;
@@ -19,7 +19,11 @@ function resolveExtraSupabaseUrl(envUrl) {
     process.env.EXPO_PUBLIC_SUPABASE_URL = NATIVE_SB_PROXY_URL;
     return NATIVE_SB_PROXY_URL;
   }
-  return (envUrl || SUPABASE_UPSTREAM_URL).trim();
+  const raw = String(envUrl || DEFAULT_SUPABASE_URL || SUPABASE_UPSTREAM_URL).trim();
+  if (!raw || /supabase\.co/i.test(raw)) {
+    return NATIVE_SB_PROXY_URL;
+  }
+  return raw;
 }
 
 module.exports = ({ config }) => {

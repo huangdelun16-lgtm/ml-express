@@ -1,42 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useFormFieldChain } from '../hooks/useFormFieldChain';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import DestinationPickerField from '../components/DestinationPickerField';
-import InboundDateField from '../components/InboundDateField';
-import { InboundFormField, InboundFormSection } from '../components/InboundFormPrimitives';
-import PackagingPickerField from '../components/PackagingPickerField';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
-import ScanInputBar from '../components/ScanInputBar';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
-import { DimensionSpecField, LockedSuffixField } from '../components/StructuredItemFields';
+import { InboundWizardFooter, InboundWizardHeader, type WizardStep } from '../components/stockIn/InboundWizardChrome';
+import StockInStepCustomer from '../components/stockIn/StockInStepCustomer';
+import StockInStepFee from '../components/stockIn/StockInStepFee';
+import StockInStepScan from '../components/stockIn/StockInStepScan';
 import { useAuth } from '../contexts/AuthContext';
+import { useFormFieldChain } from '../hooks/useFormFieldChain';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { applyStockMovement, getItemByBarcode, getStockInPrefillByCode } from '../services/inventoryService';
 import { feedbackService } from '../services/FeedbackService';
 import type { InventoryItem } from '../types/inventory';
 import { generateUniqueInboundBarcode } from '../utils/inboundBarcode';
-import {
-  formatSpec,
-  formatWeight,
-  parseSpec,
-  parseWeight,
-  sanitizeNumberInput,
-  stockUnitLabel,
-} from '../utils/itemFieldFormat';
-import {
-  inboundDateToIso,
-  todayInMyanmar,
-} from '../utils/stockInDate';
+import { formatSpec, formatWeight, parseSpec, parseWeight } from '../utils/itemFieldFormat';
+import { inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
 import { normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
@@ -45,47 +24,29 @@ import {
   formatCrossBorderFeeHint,
 } from '../utils/crossBorderPricing';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
-import { fmt, resolveAppError, useTranslation } from '../i18n';
+import { resolveAppError, useTranslation } from '../i18n';
 import {
   applyCrossBorderCustomerToForm,
   useCrossBorderCustomerLookup,
 } from '../hooks/useCrossBorderCustomerLookup';
+import { colors, space } from '../theme';
 
 type Route = { params?: { presetBarcode?: string } };
-type Step = 1 | 2 | 3;
 
 type Props = {
   route?: Route;
   navigation: NativeStackNavigationProp<RootStackParamList, 'StockIn'>;
 };
 
-function ScanRefBanner({ code, hint }: { code: string; hint?: string }) {
-  const { t } = useTranslation();
-  const trimmed = code.trim();
-  if (!trimmed) {
-    return (
-      <View style={styles.scanBannerEmpty}>
-        <Text style={styles.scanBannerEmptyText}>{t.stockIn.noBarcodeBanner}</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={styles.scanBanner}>
-      <Text style={styles.scanBannerLabel}>{hint ?? t.stockIn.linkedBarcode}</Text>
-      <Text style={styles.scanBannerValue} selectable>{trimmed}</Text>
-    </View>
-  );
-}
-
 export default function StockInScreen({ route, navigation }: Props) {
   const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
-  const stepLabels: Record<Step, string> = {
+  const stepLabels: Record<WizardStep, string> = {
     1: t.stockIn.step1,
     2: t.stockIn.step2,
     3: t.stockIn.step3,
   };
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<WizardStep>(1);
   const [scan, setScan] = useState('');
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [productName, setProductName] = useState('');
@@ -113,16 +74,19 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [customerLookupHint, setCustomerLookupHint] = useState('');
   const [scanLoading, setScanLoading] = useState(false);
 
-  const applyCustomerRegistry = useCallback((match: Parameters<typeof applyCrossBorderCustomerToForm>[0]) => {
-    applyCrossBorderCustomerToForm(match, {
-      setRecipientName,
-      setRecipientPhone,
-      setDestination: (v) => setDestination(normalizePackDestination(v)),
-    });
-    setCustomerLookupHint(
-      fmt(t.stockIn.customerCodeMatched, { name: match.customer_name, phone: match.phone }),
-    );
-  }, [t]);
+  const applyCustomerRegistry = useCallback(
+    (match: Parameters<typeof applyCrossBorderCustomerToForm>[0]) => {
+      applyCrossBorderCustomerToForm(match, {
+        setRecipientName,
+        setRecipientPhone,
+        setDestination: (v) => setDestination(normalizePackDestination(v)),
+      });
+      setCustomerLookupHint(
+        fmt(t.stockIn.customerCodeMatched, { name: match.customer_name, phone: match.phone }),
+      );
+    },
+    [t, fmt],
+  );
 
   const { lookup: lookupCustomerCode, lookupNow: lookupCustomerCodeNow } =
     useCrossBorderCustomerLookup(applyCustomerRegistry);
@@ -313,8 +277,6 @@ export default function StockInScreen({ route, navigation }: Props) {
     return parts.join(' · ');
   };
 
-  const paymentLabel = payCod ? t.stockIn.cod : payPrepaid ? t.stockIn.prepaid : '';
-
   const submit = async () => {
     if (loading) return;
     if (!destination.trim()) {
@@ -397,11 +359,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   };
 
   const primaryLabel =
-    step === 3
-      ? loading
-        ? t.common.loading
-        : t.stockIn.submit
-      : t.stockIn.next;
+    step === 3 ? (loading ? t.common.loading : t.stockIn.submit) : t.stockIn.next;
   const primaryAction = step === 3 ? () => void submit() : goNext;
 
   return (
@@ -409,21 +367,7 @@ export default function StockInScreen({ route, navigation }: Props) {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>{t.stockIn.title}</Text>
-        <View style={styles.stepRow}>
-          {([1, 2, 3] as Step[]).map((n) => (
-            <View key={n} style={styles.stepItem}>
-              <View style={[styles.stepDot, step >= n && styles.stepDotActive]}>
-                <Text style={[styles.stepDotText, step >= n && styles.stepDotTextActive]}>{n}</Text>
-              </View>
-              <Text style={[styles.stepLabel, step === n && styles.stepLabelActive]}>
-                {stepLabels[n]}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
+      <InboundWizardHeader title={t.stockIn.title} step={step} stepLabels={stepLabels} />
 
       <ScrollView
         style={styles.scroll}
@@ -432,255 +376,109 @@ export default function StockInScreen({ route, navigation }: Props) {
       >
         <OnlineRequiredBanner />
         {step === 1 ? (
-          <InboundFormSection title={t.stockIn.step1Title} accent="#3b82f6">
-            <ScanInputBar
-              value={scan}
-              onChangeText={(text) => {
-                setScan(text);
-                setProductName(text.trim());
-              }}
-              onSubmit={(code) => void resolveBarcode(code)}
-              busy={scanLoading}
-              cameraScan={{
-                title: t.stockIn.step1Label,
-                subtitle: t.trackExpress.cameraSubtitle,
-              }}
-              placeholder={t.stockIn.step1Placeholder}
-            />
-            {lookupHint ? <Text style={styles.lookupHint}>{lookupHint}</Text> : null}
-            {item ? (
-              <Text style={styles.lookupMeta}>
-                {item.name} · {fmt(t.common.stockQty, { qty: item.qty_on_hand })} {stockUnitLabel()}
-              </Text>
-            ) : null}
-
-            <InboundDateField
-              value={inboundDate}
-              onChange={setInboundDate}
-              maximumDate={todayInMyanmar()}
-            />
-          </InboundFormSection>
+          <StockInStepScan
+            scan={scan}
+            inboundDate={inboundDate}
+            scanLoading={scanLoading}
+            lookupHint={lookupHint}
+            item={item}
+            onScanChange={(text) => {
+              setScan(text);
+              setProductName(text.trim());
+            }}
+            onResolveBarcode={(code) => void resolveBarcode(code)}
+            onInboundDateChange={setInboundDate}
+          />
         ) : null}
 
         {step === 2 ? (
-          <>
-            <ScanRefBanner code={scan} hint={t.stockIn.scannedBarcode} />
-            <InboundFormSection title={t.stockIn.customerSection} accent="#0891b2">
-              <InboundFormField
-                label={t.stockIn.customerCode}
-                value={customerCode}
-                onChange={(v) => {
-                  setCustomerCode(v.toUpperCase());
-                  setCustomerLookupHint('');
-                  lookupCustomerCode(v);
-                }}
-                placeholder={t.stockIn.customerCodePlaceholder}
-                autoCapitalize="characters"
-                inputRef={step2Chain.propsFor('code').inputRef}
-                returnKeyType={step2Chain.propsFor('code').returnKeyType}
-                onSubmitEditing={(e) => {
-                  void lookupCustomerCodeNow(customerCode);
-                  step2Chain.propsFor('code').onSubmitEditing?.(e);
-                }}
-                blurOnSubmit={step2Chain.propsFor('code').blurOnSubmit}
-              />
-              {customerLookupHint ? (
-                <Text style={styles.lookupHint}>{customerLookupHint}</Text>
-              ) : (
-                <Text style={styles.customerCodeHint}>{t.stockIn.customerCodeHint}</Text>
-              )}
-              <InboundFormField
-                label={t.stockIn.nameRequired}
-                value={recipientName}
-                onChange={setRecipientName}
-                placeholder={t.stockIn.nameRequired.replace(' *', '')}
-                inputRef={step2Chain.propsFor('name').inputRef}
-                returnKeyType={step2Chain.propsFor('name').returnKeyType}
-                onSubmitEditing={step2Chain.propsFor('name').onSubmitEditing}
-                blurOnSubmit={step2Chain.propsFor('name').blurOnSubmit}
-              />
-              <InboundFormField
-                label={t.stockIn.phone}
-                value={recipientPhone}
-                onChange={setRecipientPhone}
-                placeholder="09xxxxxxxxx"
-                keyboard="phone-pad"
-                inputRef={step2Chain.propsFor('phone').inputRef}
-                returnKeyType={step2Chain.propsFor('phone').returnKeyType}
-                onSubmitEditing={step2Chain.propsFor('phone').onSubmitEditing}
-                blurOnSubmit={step2Chain.propsFor('phone').blurOnSubmit}
-              />
-              <InboundFormField
-                label={t.stockIn.itemNameRequired}
-                value={productName}
-                onChange={setProductName}
-                placeholder={t.stockIn.itemNameRequired.replace(' *', '')}
-                inputRef={step2Chain.propsFor('product').inputRef}
-                returnKeyType={step2Chain.propsFor('product').returnKeyType}
-                onSubmitEditing={step2Chain.propsFor('product').onSubmitEditing}
-                blurOnSubmit={step2Chain.propsFor('product').blurOnSubmit}
-              />
-              <PackagingPickerField value={packaging} onChange={setPackaging} />
-            </InboundFormSection>
-          </>
+          <StockInStepCustomer
+            scan={scan}
+            customerCode={customerCode}
+            customerLookupHint={customerLookupHint}
+            recipientName={recipientName}
+            recipientPhone={recipientPhone}
+            productName={productName}
+            packaging={packaging}
+            chain={{
+              code: step2Chain.propsFor('code'),
+              name: step2Chain.propsFor('name'),
+              phone: step2Chain.propsFor('phone'),
+              product: step2Chain.propsFor('product'),
+            }}
+            onCustomerCodeChange={(v) => {
+              setCustomerCode(v.toUpperCase());
+              setCustomerLookupHint('');
+              lookupCustomerCode(v);
+            }}
+            onCustomerCodeSubmit={() => void lookupCustomerCodeNow(customerCode)}
+            onRecipientNameChange={setRecipientName}
+            onRecipientPhoneChange={setRecipientPhone}
+            onProductNameChange={setProductName}
+            onPackagingChange={setPackaging}
+          />
         ) : null}
 
         {step === 3 ? (
-          <>
-            <ScanRefBanner code={scan} hint={t.stockIn.scannedBarcode} />
-            <InboundFormSection title={t.stockIn.feeSection} accent="#059669">
-              <DestinationPickerField
-                label={t.stockIn.finalDest}
-                hint={t.stockOut.destinationHint}
-                value={destination}
-                onChange={(v) => {
-                  setDestination(v);
-                  setTotalFeeManual(false);
-                }}
-              />
-              <InboundFormField
-                label={t.stockIn.detailAddress}
-                value={detailAddress}
-                onChange={setDetailAddress}
-                placeholder={t.stockIn.detailAddress}
-                multiline
-                inputRef={step3Chain.propsFor('detail', { multiline: true }).inputRef}
-                returnKeyType={step3Chain.propsFor('detail', { multiline: true }).returnKeyType}
-                onSubmitEditing={step3Chain.propsFor('detail', { multiline: true }).onSubmitEditing}
-                blurOnSubmit={step3Chain.propsFor('detail', { multiline: true }).blurOnSubmit}
-              />
-              <DimensionSpecField
-                l={specL}
-                w={specW}
-                h={specH}
-                onChange={({ l, w, h }) => {
-                  setSpecL(l);
-                  setSpecW(w);
-                  setSpecH(h);
-                }}
-                lInput={step3Chain.propsFor('specL')}
-                wInput={step3Chain.propsFor('specW')}
-                hInput={step3Chain.propsFor('specH')}
-              />
-              <LockedSuffixField
-                label={t.stockIn.weightRequired}
-                value={weightN}
-                suffix="Kg"
-                onChange={(v) => {
-                  setWeightN(v);
-                  setTotalFeeManual(false);
-                }}
-                placeholder={t.stockIn.weightRequired.replace(' *', '')}
-                inputRef={step3Chain.propsFor('weight').inputRef}
-                returnKeyType={step3Chain.propsFor('weight').returnKeyType}
-                onSubmitEditing={step3Chain.propsFor('weight').onSubmitEditing}
-                blurOnSubmit={step3Chain.propsFor('weight').blurOnSubmit}
-              />
-              <View style={styles.qtyRow}>
-                <Text style={styles.qtyLabel}>{t.stockIn.qtyRequired}</Text>
-                <View style={styles.qtyControls}>
-                  <Pressable
-                    style={styles.qtyBtn}
-                    onPress={() => setQty(String(Math.max(1, (Number(qty) || 1) - 1)))}
-                    accessibilityRole="button"
-                    accessibilityLabel={t.stockIn.qtyRequired}
-                  >
-                    <Text style={styles.qtyBtnText}>−</Text>
-                  </Pressable>
-                  <TextInput
-                    ref={step3Chain.propsFor('qty').inputRef}
-                    style={styles.qtyInput}
-                    keyboardType="decimal-pad"
-                    value={qty}
-                    onChangeText={setQty}
-                    returnKeyType={step3Chain.propsFor('qty').returnKeyType}
-                    onSubmitEditing={step3Chain.propsFor('qty').onSubmitEditing}
-                    blurOnSubmit={step3Chain.propsFor('qty').blurOnSubmit}
-                    submitBehavior="submit"
-                  />
-                  <Pressable
-                    style={styles.qtyBtn}
-                    onPress={() => setQty(String((Number(qty) || 0) + 1))}
-                    accessibilityRole="button"
-                    accessibilityLabel={t.stockIn.qtyRequired}
-                  >
-                    <Text style={styles.qtyBtnText}>+</Text>
-                  </Pressable>
-                  <Text style={styles.qtyUnit}>{stockUnitLabel()}</Text>
-                </View>
-              </View>
-              <View style={styles.payRow}>
-                <Text style={styles.payLabel}>{t.stockIn.paymentRequired}</Text>
-                <View style={styles.payChecks}>
-                  <Pressable
-                    style={[styles.payCheck, payCod && styles.payCheckOn]}
-                    onPress={toggleCod}
-                  >
-                    <Text style={[styles.payCheckText, payCod && styles.payCheckTextOn]}>{t.stockIn.cod}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.payCheck, payPrepaid && styles.payCheckOn]}
-                    onPress={togglePrepaid}
-                  >
-                    <Text style={[styles.payCheckText, payPrepaid && styles.payCheckTextOn]}>
-                      {t.stockIn.prepaid}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-              <InboundFormField
-                label={t.stockIn.totalFee}
-                value={totalFee}
-                onChange={(v) => {
-                  setTotalFeeManual(true);
-                  setTotalFee(sanitizeNumberInput(v));
-                }}
-                placeholder={t.manualEntry.amount}
-                keyboard="decimal-pad"
-                inputRef={step3Chain.propsFor('totalFee').inputRef}
-                returnKeyType={step3Chain.propsFor('totalFee').returnKeyType}
-                onSubmitEditing={step3Chain.propsFor('totalFee').onSubmitEditing}
-                blurOnSubmit={step3Chain.propsFor('totalFee').blurOnSubmit}
-              />
-              {feeFormulaHint && canAutoTotalFee && !totalFeeManual ? (
-                <Text style={styles.feeHint}>{feeFormulaHint}</Text>
-              ) : null}
-              <InboundFormField
-                label={t.stockIn.noteOptional}
-                value={note}
-                onChange={setNote}
-                placeholder={t.manualEntry.notePlaceholder}
-                multiline
-                inputRef={step3Chain.propsFor('note', { multiline: true }).inputRef}
-                returnKeyType={step3Chain.propsFor('note', { multiline: true }).returnKeyType}
-                onSubmitEditing={step3Chain.propsFor('note', { multiline: true }).onSubmitEditing}
-                blurOnSubmit={step3Chain.propsFor('note', { multiline: true }).blurOnSubmit}
-              />
-            </InboundFormSection>
-          </>
+          <StockInStepFee
+            scan={scan}
+            destination={destination}
+            detailAddress={detailAddress}
+            specL={specL}
+            specW={specW}
+            specH={specH}
+            weightN={weightN}
+            qty={qty}
+            payCod={payCod}
+            payPrepaid={payPrepaid}
+            totalFee={totalFee}
+            feeFormulaHint={feeFormulaHint}
+            canAutoTotalFee={canAutoTotalFee}
+            totalFeeManual={totalFeeManual}
+            note={note}
+            chain={{
+              detail: step3Chain.propsFor('detail', { multiline: true }),
+              specL: step3Chain.propsFor('specL'),
+              specW: step3Chain.propsFor('specW'),
+              specH: step3Chain.propsFor('specH'),
+              weight: step3Chain.propsFor('weight'),
+              qty: step3Chain.propsFor('qty'),
+              totalFee: step3Chain.propsFor('totalFee'),
+              note: step3Chain.propsFor('note', { multiline: true }),
+            }}
+            onDestinationChange={(v) => {
+              setDestination(v);
+              setTotalFeeManual(false);
+            }}
+            onDetailAddressChange={setDetailAddress}
+            onSpecChange={({ l, w, h }) => {
+              setSpecL(l);
+              setSpecW(w);
+              setSpecH(h);
+            }}
+            onWeightChange={(v) => {
+              setWeightN(v);
+              setTotalFeeManual(false);
+            }}
+            onQtyChange={setQty}
+            onToggleCod={toggleCod}
+            onTogglePrepaid={togglePrepaid}
+            onTotalFeeChange={(v) => {
+              setTotalFeeManual(true);
+              setTotalFee(v);
+            }}
+            onNoteChange={setNote}
+          />
         ) : null}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Pressable
-          style={[styles.cancelBtn, loading && styles.nextBtnDisabled]}
-          onPress={handleCancel}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={t.stockIn.cancel}
-        >
-          <Text style={styles.cancelBtnText}>{t.stockIn.cancel}</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.nextBtn, loading && styles.nextBtnDisabled]}
-          onPress={primaryAction}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={primaryLabel}
-        >
-          <Text style={styles.nextBtnText}>{primaryLabel}</Text>
-        </Pressable>
-      </View>
+      <InboundWizardFooter
+        cancelLabel={t.stockIn.cancel}
+        primaryLabel={primaryLabel}
+        loading={loading}
+        onCancel={handleCancel}
+        onPrimary={primaryAction}
+      />
 
       <OrderBarcodeModal
         visible={!!barcodeModalData}
@@ -694,129 +492,7 @@ export default function StockInScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0f172a' },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
-  title: { color: '#f8fafc', fontSize: 22, fontWeight: '900', marginBottom: 12 },
-  stepRow: { flexDirection: 'row', gap: 8 },
-  stepItem: { flex: 1, alignItems: 'center', gap: 4 },
-  stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#334155',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotActive: { backgroundColor: '#059669' },
-  stepDotText: { color: '#94a3b8', fontWeight: '900', fontSize: 13 },
-  stepDotTextActive: { color: '#fff' },
-  stepLabel: { color: '#64748b', fontSize: 10, fontWeight: '700', textAlign: 'center' },
-  stepLabelActive: { color: '#6ee7b7' },
+  root: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
-  content: { padding: 16, paddingBottom: 24 },
-  lookupHint: { color: '#6ee7b7', fontSize: 13, marginTop: 8, fontWeight: '700' },
-  customerCodeHint: { color: '#64748b', fontSize: 12, marginTop: 4, marginBottom: 4, lineHeight: 18 },
-  lookupMeta: { color: '#94a3b8', fontSize: 12, marginTop: 4, lineHeight: 18 },
-  scanBanner: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
-  },
-  scanBannerEmpty: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  scanBannerEmptyText: { color: '#64748b', fontSize: 12 },
-  scanBannerLabel: { color: '#94a3b8', fontSize: 11, fontWeight: '700', marginBottom: 4 },
-  scanBannerValue: {
-    color: '#7dd3fc',
-    fontSize: 15,
-    fontWeight: '900',
-    fontFamily: 'monospace',
-  },
-  qtyRow: { marginBottom: 12 },
-  qtyLabel: { color: '#e2e8f0', fontWeight: '700', marginBottom: 8, fontSize: 13 },
-  qtyControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  qtyBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  qtyBtnText: { color: '#f8fafc', fontSize: 22, fontWeight: '800' },
-  qtyInput: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingVertical: 14,
-    fontSize: 22,
-    fontWeight: '900',
-    textAlign: 'center',
-    color: '#0f172a',
-  },
-  qtyUnit: { color: '#94a3b8', fontWeight: '800', fontSize: 14, minWidth: 36 },
-  payRow: { marginBottom: 12 },
-  payLabel: { color: '#e2e8f0', fontWeight: '700', marginBottom: 8, fontSize: 13 },
-  payChecks: { flexDirection: 'row', gap: 10 },
-  payCheck: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#475569',
-    backgroundColor: '#0f172a',
-  },
-  payCheckOn: {
-    borderColor: '#059669',
-    backgroundColor: 'rgba(5,150,105,0.15)',
-  },
-  payCheckText: { color: '#94a3b8', fontWeight: '800', fontSize: 14 },
-  payCheckTextOn: { color: '#6ee7b7' },
-  feeHint: {
-    color: '#64748b',
-    fontSize: 11,
-    lineHeight: 16,
-    marginBottom: 10,
-    marginTop: -4,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
-    backgroundColor: '#0f172a',
-  },
-  cancelBtn: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#475569',
-  },
-  cancelBtnText: { color: '#94a3b8', fontWeight: '800', fontSize: 15 },
-  nextBtn: {
-    flex: 1.4,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: '#059669',
-  },
-  nextBtnDisabled: { opacity: 0.6 },
-  nextBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  content: { padding: space.lg, paddingBottom: space.xl },
 });

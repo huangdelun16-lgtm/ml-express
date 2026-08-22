@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isAndroidUpdateAvailable, parseAndroidRelease } from './appUpdate';
+import { NATIVE_SB_PROXY_URL } from '../services/nativeSupabaseUrl';
 
 describe('parseAndroidRelease', () => {
   it('parses release manifest object', () => {
@@ -37,6 +38,18 @@ describe('parseAndroidRelease', () => {
   it('returns null for invalid payload', () => {
     expect(parseAndroidRelease(null)).toBeNull();
     expect(parseAndroidRelease({ version: '1.0.0' })).toBeNull();
+  });
+
+  it('rewrites supabase.co APK URLs onto the native proxy', () => {
+    const parsed = parseAndroidRelease({
+      version: '1.9.11',
+      versionCode: 34,
+      apkUrl:
+        'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory.apk',
+    });
+    expect(parsed?.apkUrl).toBe(
+      `${NATIVE_SB_PROXY_URL.replace(/\/$/, '')}/storage/v1/object/public/inventory-releases/ml-inventory.apk`,
+    );
   });
 
   it('compares versionCode for update availability', () => {

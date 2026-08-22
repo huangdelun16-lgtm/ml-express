@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isServiceError } from '../errors/serviceError';
 import {
   assertPackagingExpressMatch,
   filterItemsByExpressCodes,
@@ -19,9 +20,19 @@ describe('packagingExpressMatch', () => {
   });
 
   it('rejects a stale pack that still has old express slips', () => {
-    expect(() =>
-      assertPackagingExpressMatch(['YT763565769523', 'JT550754839392', '46553270243394'], ['774', '883', '1162']),
-    ).toThrow(/774/);
+    try {
+      assertPackagingExpressMatch(
+        ['YT763565769523', 'JT550754839392', '46553270243394'],
+        ['774', '883', '1162'],
+      );
+      throw new Error('expected mismatch');
+    } catch (error) {
+      expect(isServiceError(error)).toBe(true);
+      if (isServiceError(error)) {
+        expect(error.code).toBe('expressMismatch');
+        expect(String(error.params?.returned)).toMatch(/774/);
+      }
+    }
   });
 
   it('keeps only items whose express slip was just submitted', () => {

@@ -29,7 +29,7 @@ export function primeHubTransportFeePaidCache(packBarcode: string, paid: boolean
 }
 
 async function ready(): Promise<void> {
-  if (!(await isCloudReachable())) throw new Error('网络不可用，无法连接 Supabase。请恢复网络后重试。');
+  if (!(await isCloudReachable())) throw svc('syncNetworkFailed');
   await ensureInventoryCloudAuth();
 }
 

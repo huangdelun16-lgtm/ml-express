@@ -224,7 +224,12 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     if (!store) return;
     const validationError = validateBatchSignSelection(selectedItems);
     if (validationError) {
-      feedbackService.notify(t.common.tip, validationError);
+      feedbackService.notify(
+        t.common.tip,
+        validationError === 'batchSignEmpty'
+          ? t.items.batchSignEmpty
+          : t.items.batchSignMixedCustomer,
+      );
       return;
     }
     setSignRequest({
@@ -515,7 +520,7 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
           showTaskSuccess(
             t.common.signSuccess,
             signedCount > 1
-              ? `已签收 ${signedCount} 单（${detail.customer_name?.trim() || detail.recipient_name?.trim() || detail.name}）`
+              ? fmt(t.sign.batchSignedCount, { count: signedCount })
               : fmt(t.common.signMarked, { name: detail.name }),
           );
           void load();

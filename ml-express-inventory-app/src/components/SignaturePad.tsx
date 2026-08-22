@@ -5,11 +5,12 @@ import {
   PanResponder,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import Text from './AppText';
 import Svg, { Path } from 'react-native-svg';
 import type { SignaturePoint, SignatureStroke } from '../types/customerSignReceipt';
+import { useTranslation } from '../i18n';
 
 export const SIGNATURE_PAD_COMPACT_HEIGHT = 160;
 
@@ -205,6 +206,7 @@ type Props = {
 };
 
 export default function SignaturePad({ strokes, onChange }: Props) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [padWidth, setPadWidth] = useState(0);
   const compactHeight = SIGNATURE_PAD_COMPACT_HEIGHT;
@@ -236,9 +238,9 @@ export default function SignaturePad({ strokes, onChange }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.labelRow}>
-        <Text style={styles.label}>收件人签名</Text>
-        <Pressable onPress={clear} hitSlop={8} accessibilityRole="button" accessibilityLabel="清除签名">
-          <Text style={styles.clearBtn}>清除</Text>
+        <Text style={styles.label}>{t.sign.signatureLabel}</Text>
+        <Pressable onPress={clear} hitSlop={8} accessibilityRole="button" accessibilityLabel={t.sign.signatureClearA11y}>
+          <Text style={styles.clearBtn}>{t.sign.signatureClear}</Text>
         </Pressable>
       </View>
 
@@ -247,7 +249,7 @@ export default function SignaturePad({ strokes, onChange }: Props) {
           padHeight={compactHeight}
           strokes={strokes}
           onChange={onChange}
-          hint="请在此手写签名 · 双击背景放大"
+          hint={t.sign.signatureHint}
           onDoubleTapBackground={openExpanded}
         />
       </View>
@@ -256,24 +258,24 @@ export default function SignaturePad({ strokes, onChange }: Props) {
         <View style={styles.expandOverlay}>
           <View style={styles.expandSheet}>
             <View style={styles.expandHeader}>
-              <Text style={styles.expandTitle}>手写签名</Text>
+              <Text style={styles.expandTitle}>{t.sign.signatureExpandTitle}</Text>
               <Pressable onPress={closeExpanded} hitSlop={8}>
-                <Text style={styles.expandDone}>完成</Text>
+                <Text style={styles.expandDone}>{t.common.done}</Text>
               </Pressable>
             </View>
-            <Text style={styles.expandHint}>大签名区更方便签字 · 笔画已平滑显示</Text>
+            <Text style={styles.expandHint}>{t.sign.signatureExpandHint}</Text>
             <PadSurface
               padHeight={EXPANDED_HEIGHT}
               strokes={strokes}
               onChange={onChange}
-              hint="请在此手写签名"
+              hint={t.sign.signatureHintCompact}
             />
             <View style={styles.expandActions}>
               <Pressable style={styles.expandClearBtn} onPress={clear}>
-                <Text style={styles.expandClearText}>清除重签</Text>
+                <Text style={styles.expandClearText}>{t.sign.signatureClearResign}</Text>
               </Pressable>
               <Pressable style={styles.expandConfirmBtn} onPress={closeExpanded}>
-                <Text style={styles.expandConfirmText}>完成签名</Text>
+                <Text style={styles.expandConfirmText}>{t.sign.signatureDone}</Text>
               </Pressable>
             </View>
           </View>

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
-import { applyRealtimeWsFallback, nativeClientHeaders, resolveNativeSupabaseUrl } from './nativeSupabaseUrl';
+import { resolveNativeSupabaseUrl } from './nativeSupabaseUrl';
 
 type SupabaseExtra = {
   supabaseUrl?: string;
@@ -15,6 +15,7 @@ const extra = (Constants.expoConfig?.extra ??
 const configuredUrl = (
   process.env.EXPO_PUBLIC_SUPABASE_URL ??
   extra?.supabaseUrl ??
+  extra?.supabaseProxyUrl ??
   ''
 ).trim();
 const supabaseAnonKey = (
@@ -22,7 +23,15 @@ const supabaseAnonKey = (
   extra?.supabaseAnonKey ??
   ''
 ).trim();
-const supabaseUrl = resolveNativeSupabaseUrl(configuredUrl);
+const constantsAny = Constants as { appOwnership?: string; executionEnvironment?: string };
+const isExpoGo =
+  constantsAny.appOwnership === 'expo' || constantsAny.executionEnvironment === 'storeClient';
+const allowDirect =
+  !isExpoGo && String(process.env.EXPO_PUBLIC_SUPABASE_DIRECT || '').trim() === '1';
+const supabaseUrl = resolveNativeSupabaseUrl(configuredUrl, undefined, {
+  expoGo: isExpoGo,
+  allowDirect,
+});
 
 const PLACEHOLDER_HOSTS = ['YOUR_PROJECT_REF.supabase.co', 'placeholder.supabase.co'];
 const PLACEHOLDER_KEY_PREFIXES = ['your_supabase_anon', 'placeholder-key'];
@@ -76,12 +85,5 @@ export const supabase = createClient(
       persistSession: true,
       detectSessionInUrl: false,
     },
-    ...(nativeClientHeaders()
-      ? {
-          global: { headers: nativeClientHeaders() },
-          realtime: { headers: nativeClientHeaders() },
-        }
-      : {}),
   },
 );
-applyRealtimeWsFallback(supabase);

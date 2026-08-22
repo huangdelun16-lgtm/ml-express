@@ -1,4 +1,5 @@
 import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
+import { svc } from '../errors/serviceError';
 import type { FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 import {
   buildFinanceLedgerEntries,
@@ -32,13 +33,13 @@ function assertRequestedScope(
     !requestedHub ||
     requestedHub !== authenticatedHub
   ) {
-    throw new Error('当前登录站点与财务查询范围不一致，请重新登录。');
+    throw svc('financeScopeMismatch');
   }
   return { store: authenticated, hubCode: requestedHub };
 }
 
-function throwQueryError(label: string, error: { message?: string } | null): void {
-  if (error) throw new Error(`${label}：${error.message || '读取失败'}`);
+function throwQueryError(error: { message?: string } | null): void {
+  if (error) throw svc('financeQueryFailed');
 }
 
 type FinanceQueryPage<T> = {
@@ -47,7 +48,6 @@ type FinanceQueryPage<T> = {
 };
 
 async function fetchAllFinancePages<T>(
-  label: string,
   fetchPage: (from: number, to: number) => PromiseLike<FinanceQueryPage<T>>,
   pageSize = 250,
 ): Promise<T[]> {
@@ -55,12 +55,12 @@ async function fetchAllFinancePages<T>(
   for (let page = 0; page < 100; page += 1) {
     const from = page * pageSize;
     const result = await fetchPage(from, from + pageSize - 1);
-    throwQueryError(label, result.error);
+    throwQueryError(result.error);
     const pageRows = result.data ?? [];
     rows.push(...pageRows);
     if (pageRows.length < pageSize) return rows;
   }
-  throw new Error(`${label}：记录数量超过安全读取上限，请联系管理员。`);
+  throw svc('listTooLarge');
 }
 
 async function loadOrders(packages: FinancePackageRow[]): Promise<FinanceOrderRow[]> {
@@ -76,7 +76,6 @@ async function loadOrders(packages: FinancePackageRow[]): Promise<FinanceOrderRo
   const results = await Promise.all(
     chunks.map((chunk) =>
       fetchAllFinancePages<FinanceOrderRow>(
-        '订单追踪读取失败',
         (from, to) =>
           supabase
             .from('inventory_order_tracking')
@@ -101,7 +100,6 @@ async function loadMovements(itemIds: string[]): Promise<FinanceMovementRow[]> {
   const results = await Promise.all(
     chunks.map((chunk) =>
       fetchAllFinancePages<FinanceMovementRow>(
-        '库存流水读取失败',
         (from, to) =>
           supabase
             .from('inventory_stock_movements')
@@ -150,7 +148,6 @@ async function loadFinanceDataset(
 
   const [items, packages, paidRows, manualEntries] = await Promise.all([
     fetchAllFinancePages<FinanceItemRow>(
-      '订单库存读取失败',
       (from, to) =>
         supabase
           .from('inventory_store_items')
@@ -162,7 +159,6 @@ async function loadFinanceDataset(
           .range(from, to),
     ),
     fetchAllFinancePages<FinancePackageRow>(
-      '包裹追踪读取失败',
       (from, to) =>
         supabase
           .from('inventory_pkg_tracking')
@@ -175,7 +171,6 @@ async function loadFinanceDataset(
           .range(from, to),
     ),
     fetchAllFinancePages<{ pack_barcode: string }>(
-      '车费支付读取失败',
       (from, to) =>
         supabase
           .from('inventory_hub_transport_fee_payments')
@@ -209,7 +204,7 @@ async function loadFinanceDataset(
         .from('inventory_packed_shipments')
         .select('bundle_barcode, note')
         .in('bundle_barcode', chunk);
-      throwQueryError('快递包备注读取失败', error);
+      throwQueryError(error);
       for (const row of data ?? []) {
         const code = safeCode(String((row as { bundle_barcode?: string }).bundle_barcode || ''));
         const note = String((row as { note?: string }).note || '').trim();

@@ -78,6 +78,6 @@ describe('customerBatchSign', () => {
         row({ id: 'a', customer_name: 'Ko Mg' }),
         row({ id: 'b', customer_name: 'Ma Hla' }),
       ]),
-    ).toBe('批量签收只能选择同一客户的订单');
+    ).toBe('batchSignMixedCustomer');
   });
 });

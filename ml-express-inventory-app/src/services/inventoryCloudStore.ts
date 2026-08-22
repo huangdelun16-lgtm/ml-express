@@ -6,6 +6,7 @@ import type {
   StockMovement,
 } from '../types/inventory';
 import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
+import { svc } from '../errors/serviceError';
 import { packDestinationFromBarcode } from '../utils/packageNumber';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
@@ -270,7 +271,7 @@ async function ensureCache(
 }
 
 export async function ensureInventoryCloudReady(): Promise<InventoryStoreSession> {
-  if (!(await isCloudReachable())) throw new Error('网络不可用，无法连接 Supabase。请恢复网络后重试。');
+  if (!(await isCloudReachable())) throw svc('syncNetworkFailed');
   return await ensureInventoryCloudAuth();
 }
 
@@ -440,7 +441,7 @@ export async function createPackAtomic(params: {
   const packedAt = bundleItem.updated_at || params.pack.created_at;
   const updatedLineItems: InventoryItem[] = params.lines.map((line, index) => {
     const item = sourceItems[index];
-    if (!item) throw new Error('打包订单未在缓存中找到，请下拉刷新后重试');
+    if (!item) throw svc('packLineNotInCache');
     return {
       ...item,
       qty_on_hand: Math.max(0, item.qty_on_hand - line.qty),
@@ -474,9 +475,9 @@ export async function createPackAtomic(params: {
   });
   const cloudPack = await fetchCloudPackByBarcode(bundleItem.barcode);
   if (!cloudPack) {
-    throw new Error(
-      `打包已提交但云端未找到快递包 ${bundleItem.barcode.trim().toUpperCase()}，请检查网络后重新打包`,
-    );
+    throw svc('cloudPackNotRegistered', {
+      barcode: bundleItem.barcode.trim().toUpperCase(),
+    });
   }
   return bundleItem;
 }

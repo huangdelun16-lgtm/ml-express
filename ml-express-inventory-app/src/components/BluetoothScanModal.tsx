@@ -29,6 +29,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onConnectionChange?: () => void;
+  onConnected?: (device: ScannedBluetoothDevice) => void;
 };
 
 const SCAN_DURATION_MS = 15000;
@@ -37,7 +38,12 @@ function isNativeBleAvailable(): boolean {
   return Constants.appOwnership !== 'expo';
 }
 
-export default function BluetoothScanModal({ visible, onClose, onConnectionChange }: Props) {
+export default function BluetoothScanModal({
+  visible,
+  onClose,
+  onConnectionChange,
+  onConnected,
+}: Props) {
   const { t, fmt } = useTranslation();
   const [devices, setDevices] = useState<ScannedBluetoothDevice[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -147,6 +153,7 @@ export default function BluetoothScanModal({ visible, onClose, onConnectionChang
         const connected = await connectBluetoothDevice(device.id);
         setConnectedDevice(connected);
         onConnectionChange?.();
+        onConnected?.(connected);
         feedbackService.notify(
           t.settings.scanPrinterTitle,
           fmt(t.settings.scanPrinterConnectedTo, { name: connected.name }),

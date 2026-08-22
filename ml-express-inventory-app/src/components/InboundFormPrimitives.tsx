@@ -1,5 +1,6 @@
 import React, { type Ref } from 'react';
 import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
+import { colors, radius } from '../theme';
 
 export function InboundFormSection({
   title,
@@ -65,7 +66,7 @@ export function InboundFormField({
         onChangeText={onChange}
         editable={editable}
         placeholder={placeholder}
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor={colors.muted}
         keyboardType={keyboard}
         autoCapitalize={autoCapitalize}
         multiline={multiline}
@@ -82,56 +83,56 @@ export const inboundFormStyles = StyleSheet.create({
   section: { marginBottom: 16 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
   sectionDot: { width: 8, height: 8, borderRadius: 4 },
-  sectionTitle: { color: '#64748b', fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
+  sectionTitle: { color: colors.muted2, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
   sectionBody: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
+    backgroundColor: colors.card,
+    borderRadius: radius.xl,
     padding: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
     borderLeftWidth: 3,
   },
   field: { marginBottom: 12 },
-  label: { color: '#e2e8f0', fontWeight: '700', marginBottom: 6, fontSize: 13 },
+  label: { color: colors.textSecondary, fontWeight: '700', marginBottom: 6, fontSize: 13 },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#0f172a',
+    color: colors.inputText,
   },
   inputMulti: { minHeight: 80, textAlignVertical: 'top' },
-  inputReadonly: { backgroundColor: '#e2e8f0', color: '#64748b' },
+  inputReadonly: { backgroundColor: colors.textSecondary, color: colors.muted2 },
   mono: { fontFamily: 'monospace' },
   preview: {
     marginBottom: 10,
     padding: 10,
     borderRadius: 10,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
   },
-  previewTitle: { color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 4 },
-  previewLine: { color: '#cbd5e1', fontSize: 13, fontFamily: 'monospace' },
+  previewTitle: { color: colors.muted2, fontSize: 11, fontWeight: '800', marginBottom: 4 },
+  previewLine: { color: colors.slateSoft, fontSize: 13, fontFamily: 'monospace' },
   barcodeBox: {
     marginTop: 4,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
   },
-  barcodeLabel: { color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 4 },
-  barcodeValue: { color: '#fbbf24', fontSize: 14, fontFamily: 'monospace', fontWeight: '700' },
+  barcodeLabel: { color: colors.muted2, fontSize: 11, fontWeight: '800', marginBottom: 4 },
+  barcodeValue: { color: colors.warning, fontSize: 14, fontFamily: 'monospace', fontWeight: '700' },
   dateBtn: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  dateBtnText: { color: '#0f172a', fontSize: 16, fontWeight: '800' },
-  dateBtnHint: { color: '#64748b', fontSize: 12, marginTop: 4, fontFamily: 'monospace' },
+  dateBtnText: { color: colors.inputText, fontSize: 16, fontWeight: '800' },
+  dateBtnHint: { color: colors.muted2, fontSize: 12, marginTop: 4, fontFamily: 'monospace' },
 });
 
 const styles = inboundFormStyles;

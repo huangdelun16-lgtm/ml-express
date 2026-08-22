@@ -26,7 +26,7 @@ describe('customerSignReceipt', () => {
         pickupType: 'self',
         signatureStrokes: [],
       }),
-    ).toBe('请收件人在签名区手写签名');
+    ).toBe('signNeedSignature');
   });
 
   it('requires proxy phone and name for proxy pickup', () => {
@@ -40,7 +40,7 @@ describe('customerSignReceipt', () => {
           { x: 5, y: 5 }, { x: 6, y: 6 }, { x: 7, y: 7 }, { x: 8, y: 8 },
         ]],
       }),
-    ).toBe('请填写代收人电话');
+    ).toBe('signNeedProxyPhone');
   });
 
   it('serializes and parses signature strokes', () => {
@@ -51,7 +51,7 @@ describe('customerSignReceipt', () => {
   });
 
   it('labels pickup type', () => {
-    expect(pickupTypeLabel('self')).toBe('本人签收');
-    expect(pickupTypeLabel('proxy')).toBe('代收');
+    expect(pickupTypeLabel('self', { self: '本人签收', proxy: '代收' })).toBe('本人签收');
+    expect(pickupTypeLabel('proxy', { self: '本人签收', proxy: '代收' })).toBe('代收');
   });
 });

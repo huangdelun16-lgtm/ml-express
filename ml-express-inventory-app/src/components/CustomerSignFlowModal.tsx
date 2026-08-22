@@ -6,10 +6,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import Text from './AppText';
 import SignaturePad from './SignaturePad';
 import type { InventoryStoreSession } from '../services/authService';
 import { feedbackService } from '../services/FeedbackService';
@@ -21,6 +21,8 @@ import type {
   SignatureStroke,
 } from '../types/customerSignReceipt';
 import { validateCustomerSignReceipt } from '../types/customerSignReceipt';
+import { svc } from '../errors/serviceError';
+import { fmt, formatServiceError, useTranslation } from '../i18n';
 
 export type CustomerSignFlowRequest = {
   itemIds: string[];
@@ -43,6 +45,7 @@ export default function CustomerSignFlowModal({
   onError,
   resolveError,
 }: Props) {
+  const { t } = useTranslation();
   const visible = request != null;
   const itemIds = request?.itemIds ?? [];
   const batchCount = itemIds.length;
@@ -77,7 +80,7 @@ export default function CustomerSignFlowModal({
         const details = await Promise.all(itemIds.map((id) => getItemDetail(id)));
         if (cancelled) return;
         const loaded = details.find(Boolean);
-        if (!loaded) throw new Error('订单不存在或已删除');
+        if (!loaded) throw svc('orderNotFoundOrDeleted');
         setDetail(loaded);
 
         const codItems = details.filter((row) => row?.payment_label === '到付');
@@ -85,20 +88,22 @@ export default function CustomerSignFlowModal({
           const feeLines = codItems
             .map((row, index) => {
               const feeRaw = row?.total_fee?.trim();
-              const feeLine = feeRaw ? `${feeRaw} MMK` : '未登记';
-              const label =
-                batchCount > 1
-                  ? `${index + 1}. ${row?.name ?? '订单'} · ${feeLine}`
-                  : `总费用：${feeLine}`;
-              return label;
+              const feeLine = feeRaw ? `${feeRaw} MMK` : t.hubReceive.feeNotRegistered;
+              return batchCount > 1
+                ? fmt(t.sign.batchFeeLine, {
+                    index: index + 1,
+                    name: row?.name ?? t.sign.orderFallback,
+                    fee: feeLine,
+                  })
+                : fmt(t.sign.totalFeeLine, { fee: feeLine });
             })
             .join('\n');
           Alert.alert(
-            '确认客户付款',
-            `付款方式：到付\n${feeLines}\n\n客户是否已支付完毕？`,
+            t.sign.codAlertTitle,
+            fmt(t.sign.codAlertBody, { feeLines }),
             [
-              { text: '取消', style: 'cancel', onPress: onClose },
-              { text: '已收款，继续签收', onPress: () => setFormReady(true) },
+              { text: t.common.cancel, style: 'cancel', onPress: onClose },
+              { text: t.sign.codPaidContinue, onPress: () => setFormReady(true) },
             ],
           );
         } else {
@@ -106,7 +111,7 @@ export default function CustomerSignFlowModal({
         }
       } catch (e: unknown) {
         if (!cancelled) {
-          onError?.(resolveError?.(e) ?? (e instanceof Error ? e.message : '加载失败'));
+          onError?.(resolveError?.(e) ?? (e instanceof Error ? e.message : t.sign.loadFailed));
           onClose();
         }
       } finally {
@@ -117,7 +122,7 @@ export default function CustomerSignFlowModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, request, itemIds.join(','), batchCount, onClose, onError, resolveError]);
+  }, [visible, request, itemIds.join(','), batchCount, onClose, onError, resolveError, t]);
 
   const submit = async () => {
     if (!request || !detail || submitting || itemIds.length === 0) return;
@@ -133,7 +138,7 @@ export default function CustomerSignFlowModal({
     };
     const validationError = validateCustomerSignReceipt(payload);
     if (validationError) {
-      feedbackService.notify('请完善签收信息', validationError);
+      feedbackService.notify(t.sign.needComplete, formatServiceError(t, validationError));
       return;
     }
 
@@ -146,7 +151,7 @@ export default function CustomerSignFlowModal({
       if (refreshed) onSuccess?.(refreshed, itemIds.length);
       onClose();
     } catch (e: unknown) {
-      onError?.(resolveError?.(e) ?? (e instanceof Error ? e.message : '签收失败'));
+      onError?.(resolveError?.(e) ?? (e instanceof Error ? e.message : t.sign.signFailed));
     } finally {
       setSubmitting(false);
     }
@@ -159,16 +164,14 @@ export default function CustomerSignFlowModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
-          <Text style={styles.title}>签收确认</Text>
-          <Text style={styles.intro}>
-            请登记签收人信息，便于送错包裹或丢失包裹时快速追溯原因。
-          </Text>
+          <Text style={styles.title}>{t.sign.title}</Text>
+          <Text style={styles.intro}>{t.sign.intro}</Text>
 
           {loading || !formReady ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator color="#38bdf8" size="large" />
               <Text style={styles.loadingText}>
-                {loading ? '加载订单…' : '等待付款确认…'}
+                {loading ? t.sign.loadingOrder : t.sign.waitingPayment}
               </Text>
             </View>
           ) : (
@@ -176,19 +179,25 @@ export default function CustomerSignFlowModal({
               {detail ? (
                 <View style={styles.summaryBox}>
                   {batchCount > 1 ? (
-                    <Text style={styles.batchBadge}>批量签收 · 共 {batchCount} 单</Text>
+                    <Text style={styles.batchBadge}>
+                      {fmt(t.sign.batchBadge, { count: batchCount })}
+                    </Text>
                   ) : null}
                   <Text style={styles.summaryTitle}>{detail.name}</Text>
-                  <Text style={styles.summaryMeta}>客户：{customerName}</Text>
+                  <Text style={styles.summaryMeta}>
+                    {fmt(t.sign.customerLine, { name: customerName })}
+                  </Text>
                   {batchCount === 1 ? (
-                    <Text style={styles.summaryMeta}>入库码：{detail.barcode}</Text>
+                    <Text style={styles.summaryMeta}>
+                      {fmt(t.sign.inboundCodeLine, { barcode: detail.barcode })}
+                    </Text>
                   ) : (
-                    <Text style={styles.summaryMeta}>同一客户的多件快递将共用本次签名</Text>
+                    <Text style={styles.summaryMeta}>{t.sign.batchShareHint}</Text>
                   )}
                 </View>
               ) : null}
 
-              <Text style={styles.fieldLabel}>签收方式</Text>
+              <Text style={styles.fieldLabel}>{t.sign.pickupMethod}</Text>
               <View style={styles.choiceRow}>
                 <Pressable
                   style={[styles.choiceBtn, pickupType === 'self' && styles.choiceBtnActive]}
@@ -204,7 +213,7 @@ export default function CustomerSignFlowModal({
                       pickupType === 'self' && styles.choiceBtnTextActive,
                     ]}
                   >
-                    本人签收
+                    {t.sign.pickupSelf}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -217,33 +226,33 @@ export default function CustomerSignFlowModal({
                       pickupType === 'proxy' && styles.choiceBtnTextActive,
                     ]}
                   >
-                    代收
+                    {t.sign.pickupProxy}
                   </Text>
                 </Pressable>
               </View>
 
               {pickupType === 'proxy' ? (
                 <>
-                  <Text style={styles.fieldLabel}>代收人电话</Text>
+                  <Text style={styles.fieldLabel}>{t.sign.proxyPhone}</Text>
                   <TextInput
                     style={styles.input}
                     value={signPhone}
                     onChangeText={setSignPhone}
                     keyboardType="phone-pad"
-                    placeholder="请输入代收人联系电话"
+                    placeholder={t.sign.proxyPhonePlaceholder}
                     placeholderTextColor="#64748b"
                   />
-                  <Text style={styles.fieldLabel}>代收人姓名</Text>
+                  <Text style={styles.fieldLabel}>{t.sign.proxyName}</Text>
                   <TextInput
                     style={styles.input}
                     value={proxyName}
                     onChangeText={setProxyName}
-                    placeholder="请输入代收人姓名"
+                    placeholder={t.sign.proxyNamePlaceholder}
                     placeholderTextColor="#64748b"
                   />
                 </>
               ) : (
-                <Text style={styles.selfHint}>本人签收只需收件人签名，登记电话沿用订单收件人信息。</Text>
+                <Text style={styles.selfHint}>{t.sign.selfHint}</Text>
               )}
 
               <SignaturePad strokes={signatureStrokes} onChange={setSignatureStrokes} />
@@ -252,7 +261,7 @@ export default function CustomerSignFlowModal({
 
           <View style={styles.footer}>
             <Pressable style={styles.btnCancel} onPress={onClose} disabled={submitting}>
-              <Text style={styles.btnCancelText}>取消</Text>
+              <Text style={styles.btnCancelText}>{t.common.cancel}</Text>
             </Pressable>
             <Pressable
               style={[styles.btnConfirm, (!formReady || submitting) && styles.btnDisabled]}
@@ -261,10 +270,10 @@ export default function CustomerSignFlowModal({
             >
               <Text style={styles.btnConfirmText}>
                 {submitting
-                  ? '提交中…'
+                  ? t.sign.submitting
                   : batchCount > 1
-                    ? `确认签收 ${batchCount} 单`
-                    : '确认签收'}
+                    ? fmt(t.sign.confirmSignCount, { count: batchCount })
+                    : t.sign.confirmSign}
               </Text>
             </Pressable>
           </View>

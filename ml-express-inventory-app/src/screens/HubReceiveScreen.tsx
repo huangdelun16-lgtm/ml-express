@@ -1,578 +1,20 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScanInputBar from '../components/ScanInputBar';
 import HubReceiveOrdersModal from '../components/HubReceiveOrdersModal';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
-import { useAuth } from '../contexts/AuthContext';
+import { HubReceiveStatusPanels } from '../components/hubReceive/HubReceiveStatusPanels';
+import { useHubReceiveFlow } from '../hooks/useHubReceiveFlow';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { getPkgStatusLabel, getTransportFeeDisplay, formatOrderNotFoundHint, formatPkgNotFoundHint, resolveAppError, useTranslation } from '../i18n';
-import {
-  deliverHubOrderInboundAtStation,
-  ensurePackHubReceivedAtStation,
-  importInboundPackToLocal,
-  maybeAutoReleaseTransitAfterAllInbound,
-  releaseHubTransitOrders,
-} from '../services/inventoryService';
-import {
-  claimTripFeeAnchorIfUnset,
-  isHubTransportFeePaid,
-  markHubTransportFeePaid,
-  resolveTripGroupKey,
-  resolveTripSiblingBarcodes,
-} from '../services/hubTransportFeeService';
-import { isSupabaseConfigured, getSupabaseConfigHint } from '../services/supabase';
-import { ensureHubReceiveCloudReady } from '../services/hubReceiveGate';
-import { probeCloudConnection } from '../services/cloudConnection';
-import { prefetchInventoryCache } from '../services/inventoryCloudStore';
-import {
-  confirmOrderHubReceived,
-  confirmOrderInPackById,
-  getOrderTrackingByBarcode,
-  getPkgTrackingDetail,
-} from '../services/trackingService';
-import type { PkgTrackingDetail } from '../types/tracking';
-import { isDestinationHubPack, listPendingPackInboundOrders } from '../utils/hubReceivePack';
-import { resolveStoreHubCode } from '../utils/storeZone';
-import { regionDisplayLabel } from '../constants/destinationOptions';
-import { isPackageBarcode } from '../utils/packageNumber';
-import { showTaskSuccess } from '../utils/taskSuccessAlert';
+import { colors, space } from '../theme';
 
-export default function HubReceiveScreen({ route }: NativeStackScreenProps<RootStackParamList, 'HubReceive'>) {
-  const { t, fmt } = useTranslation();
+export default function HubReceiveScreen({
+  route,
+}: NativeStackScreenProps<RootStackParamList, 'HubReceive'>) {
   const openPackBarcode = route.params?.openPackBarcode?.trim().toUpperCase() ?? '';
-  const openedFromRouteRef = useRef('');
-  const { store, hubCode: authHubCode, operatorName } = useAuth();
-  const hubCode = authHubCode ?? (store ? resolveStoreHubCode(store) : '');
-  const operator = operatorName ?? t.common.operator;
-  const [cloudConnected, setCloudConnected] = useState<boolean | null>(null);
-  const [scan, setScan] = useState('');
-  const [activePack, setActivePack] = useState<PkgTrackingDetail | null>(null);
-  const [ordersModalVisible, setOrdersModalVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
-  const [confirmingHubReceive, setConfirmingHubReceive] = useState(false);
-  const [batchInbounding, setBatchInbounding] = useState(false);
-  const [payingTransportFee, setPayingTransportFee] = useState(false);
-  const [transportFeePaid, setTransportFeePaid] = useState(false);
-  const [tripPackCount, setTripPackCount] = useState(1);
-  const [tripFeeAnchorPack, setTripFeeAnchorPack] = useState(true);
-  const [releasingTransit, setReleasingTransit] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [modalSuccess, setModalSuccess] = useState('');
-
-  const refreshTransportFeePaid = useCallback(async (packBarcode: string) => {
-    const packCode = packBarcode.trim().toUpperCase();
-    const siblings = await resolveTripSiblingBarcodes(packCode);
-    const groupKey = await resolveTripGroupKey(packCode);
-    const anchor = claimTripFeeAnchorIfUnset(groupKey, packCode);
-    setTripPackCount(siblings.length);
-    setTripFeeAnchorPack(anchor === packCode);
-    setTransportFeePaid(await isHubTransportFeePaid(packCode));
-  }, []);
-
-  const refreshCloudStatus = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
-      setCloudConnected(false);
-      return;
-    }
-    const conn = await probeCloudConnection();
-    setCloudConnected(conn.authenticated);
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void refreshCloudStatus();
-      if (store && hubCode) {
-        void prefetchInventoryCache(store, hubCode);
-      }
-    }, [refreshCloudStatus, store, hubCode]),
-  );
-
-  const preflightHubReceive = useCallback(async (options?: { forWrite?: boolean }): Promise<boolean> => {
-    const gate = await ensureHubReceiveCloudReady(options);
-    if (!gate.ok) {
-      setError(
-        gate.reason === 'notConfigured'
-          ? getSupabaseConfigHint() || t.hubReceive.supabaseMissing
-          : gate.reason === 'offline' || gate.reason === 'notAuthenticated'
-            ? t.hubReceive.cloudOfflineBlock
-            : t.hubReceive.cloudOfflineBlock,
-      );
-      setCloudConnected(false);
-      return false;
-    }
-    setCloudConnected(true);
-    return true;
-  }, [t]);
-
-  const applyOrderSuccess = useCallback(
-    async (pkg: PkgTrackingDetail, options?: { skipPackImport?: boolean }) => {
-      setActivePack(pkg);
-      void refreshTransportFeePaid(pkg.pack_barcode);
-      if (!options?.skipPackImport && store && pkg.status !== 'in_transit') {
-        try {
-          await importInboundPackToLocal(pkg, store, operator);
-        } catch (e: unknown) {
-          const syncErr = resolveAppError(t, e);
-          setError(fmt(t.hubReceive.orderConfirmedSyncFailed, { err: syncErr }));
-        }
-      }
-      const total = pkg.item_count;
-
-      if (pkg.status === 'split_at_hub') {
-        const released = pkg.orders.filter((o) => o.status === 'released_at_hub').length;
-        setMessage(fmt(t.hubReceive.splitDoneDetail, { count: released }));
-        showTaskSuccess(t.hubReceive.splitDone, t.hubReceive.splitDoneMsg);
-        return;
-      }
-
-      if (pkg.status === 'completed' && store) {
-        setMessage(t.hubReceive.allProcessed);
-        showTaskSuccess(t.hubReceive.receiveDone, t.hubReceive.receiveDoneMsg);
-        return;
-      }
-
-      setMessage(
-        fmt(t.hubReceive.processedProgress, {
-          done: pkg.received_order_count,
-          total,
-        }),
-      );
-    },
-    [store, operator, refreshTransportFeePaid, t, fmt],
-  );
-
-  const finishInboundFlow = useCallback(
-    async (pkg: PkgTrackingDetail) => {
-      if (!store) {
-        await applyOrderSuccess(pkg, { skipPackImport: true });
-        return;
-      }
-
-      if (pkg.status !== 'in_transit') {
-        try {
-          await importInboundPackToLocal(pkg, store, operator);
-        } catch (e: unknown) {
-          const syncErr = resolveAppError(t, e);
-          setError(fmt(t.hubReceive.orderConfirmedSyncFailed, { err: syncErr }));
-        }
-      }
-
-      const refreshed = await getPkgTrackingDetail(pkg.pack_barcode);
-      const latest = refreshed ?? pkg;
-      setActivePack(latest);
-      await applyOrderSuccess(latest, { skipPackImport: true });
-
-      const { releasedCount } = await maybeAutoReleaseTransitAfterAllInbound({
-        packBarcode: latest.pack_barcode,
-        store,
-        hubCode,
-        operator,
-      });
-      if (releasedCount > 0) {
-        const updated = await getPkgTrackingDetail(latest.pack_barcode);
-        if (updated) {
-          setActivePack(updated);
-          setMessage(fmt(t.hubReceive.allInboundReleased, { count: releasedCount }));
-          showTaskSuccess(t.hubReceive.splitDone, t.hubReceive.splitDoneMsg);
-        }
-      }
-    },
-    [applyOrderSuccess, store, hubCode, operator, t, fmt],
-  );
-
-  const ensurePackHubReceived = useCallback(
-    async (packBarcode: string, knownPkg?: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
-      if (!store) throw new Error(t.hubReceive.supabaseMissing);
-      try {
-        return await ensurePackHubReceivedAtStation({
-          packBarcode,
-          store,
-          hubCode,
-          operator,
-          knownPkg,
-        });
-      } catch (e: unknown) {
-        const syncErr = resolveAppError(t, e);
-        setError(fmt(t.hubReceive.packConfirmedSyncFailed, { err: syncErr }));
-        throw e;
-      }
-    },
-    [store, hubCode, operator, t, fmt],
-  );
-
-  const openPackOrdersModal = useCallback(
-    async (detail: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
-      let pkg = detail;
-      if (store && detail.status !== 'in_transit') {
-        try {
-          if (!(await preflightHubReceive())) {
-            setActivePack(detail);
-            setOrdersModalVisible(true);
-            return detail;
-          }
-          pkg = await ensurePackHubReceived(pkg.pack_barcode, pkg);
-        } catch (e: unknown) {
-          setError(resolveAppError(t, e));
-        }
-      }
-      setActivePack(pkg);
-      setOrdersModalVisible(true);
-      setModalSuccess('');
-      void refreshTransportFeePaid(pkg.pack_barcode);
-      return pkg;
-    },
-    [store, ensurePackHubReceived, refreshTransportFeePaid, preflightHubReceive, t],
-  );
-
-  useEffect(() => {
-    if (!openPackBarcode || !store || openedFromRouteRef.current === openPackBarcode) return;
-    openedFromRouteRef.current = openPackBarcode;
-    void (async () => {
-      setError('');
-      setMessage('');
-      if (!(await preflightHubReceive())) return;
-      setLoading(true);
-      try {
-        const detail = await getPkgTrackingDetail(openPackBarcode);
-        if (!detail) {
-          setError(formatPkgNotFoundHint(t, openPackBarcode, hubCode));
-          return;
-        }
-        const opened = await openPackOrdersModal(detail);
-        setMessage(fmt(t.hubReceive.packIdentified, { barcode: opened.pack_barcode, count: opened.item_count }));
-      } catch (e: unknown) {
-        setError(resolveAppError(t, e));
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [openPackBarcode, store, hubCode, openPackOrdersModal, preflightHubReceive, t, fmt]);
-
-  const resolvePackForInbound = useCallback(
-    async (pkg: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
-      if (pkg.status !== 'in_transit') return pkg;
-      setConfirmingHubReceive(true);
-      try {
-        const updated = await ensurePackHubReceived(pkg.pack_barcode, pkg);
-        setActivePack(updated);
-        return updated;
-      } finally {
-        setConfirmingHubReceive(false);
-      }
-    },
-    [ensurePackHubReceived],
-  );
-
-  const inboundSingleOrder = useCallback(
-    async (orderId: string, knownPack?: PkgTrackingDetail | null) => {
-      if (!store) return;
-      const pack = knownPack ?? activePack;
-      if (!pack) return;
-      const knownOrder = pack.orders.find((line) => line.id === orderId);
-      const { order, pkg } = await confirmOrderInPackById(orderId, store, hubCode, {
-        pkg: pack,
-        order: knownOrder,
-      });
-      await deliverHubOrderInboundAtStation({
-        order,
-        pkg,
-        store,
-        hubCode,
-        operator,
-      });
-      await finishInboundFlow(pkg);
-      return pkg;
-    },
-    [store, activePack, hubCode, operator, finishInboundFlow],
-  );
-
-  const handlePackScan = async (code: string) => {
-    if (!store || loading) return;
-    setError('');
-    setMessage('');
-    if (!(await preflightHubReceive())) return;
-    setLoading(true);
-    try {
-      let detail = await getPkgTrackingDetail(code);
-      if (!detail) {
-        setError(formatPkgNotFoundHint(t, code, hubCode));
-        setActivePack(null);
-        setOrdersModalVisible(false);
-        return;
-      }
-
-      const opened = await openPackOrdersModal(detail);
-
-      if (isDestinationHubPack(opened, hubCode)) {
-        setMessage(fmt(t.hubReceive.destPackOpened, { barcode: opened.pack_barcode, count: opened.item_count }));
-      } else if (opened.status === 'hub_received') {
-        setMessage(fmt(t.hubReceive.packOpened, { barcode: opened.pack_barcode, count: opened.item_count }));
-      } else {
-        setMessage(fmt(t.hubReceive.packIdentified, { barcode: opened.pack_barcode, count: opened.item_count }));
-      }
-    } catch (e: unknown) {
-      setError(resolveAppError(t, e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOrderLookupScan = async (code: string) => {
-    if (!store || loading) return;
-    setError('');
-    setMessage('');
-    if (!(await preflightHubReceive())) return;
-    setLoading(true);
-    try {
-      const order = await getOrderTrackingByBarcode(code, hubCode);
-      if (!order) {
-        setError(formatOrderNotFoundHint(t, code, hubCode));
-        setActivePack(null);
-        setOrdersModalVisible(false);
-        return;
-      }
-
-      let detail = await getPkgTrackingDetail(order.pack_barcode);
-      if (!detail) {
-        setError(
-          fmt(t.hubReceive.orderPackMissing, {
-            order: order.order_barcode,
-            pack: order.pack_barcode,
-          }),
-        );
-        setActivePack(null);
-        setOrdersModalVisible(false);
-        return;
-      }
-
-      await openPackOrdersModal(detail);
-      setMessage(
-        fmt(t.hubReceive.orderLookupFound, {
-          order: order.order_barcode,
-          pack: detail.pack_barcode,
-        }),
-      );
-      return;
-    } catch (e: unknown) {
-      setError(resolveAppError(t, e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOrderScan = async (code: string) => {
-    if (!store || loading) return;
-    setError('');
-    if (!(await preflightHubReceive())) return;
-    setLoading(true);
-    try {
-      const { order, pkg } = await confirmOrderHubReceived(code, store, hubCode, activePack ?? undefined);
-      setActivePack(pkg);
-      await deliverHubOrderInboundAtStation({
-        order,
-        pkg,
-        store,
-        hubCode,
-        operator,
-      });
-      showTaskSuccess(
-        t.hubReceive.inboundSuccess,
-        fmt(t.hubReceive.inboundSuccessMsg, { barcode: order.order_barcode }),
-      );
-      await finishInboundFlow(pkg);
-      setScan('');
-    } catch (e: unknown) {
-      setError(resolveAppError(t, e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConfirmPack = async () => {
-    if (!store || !activePack || confirmingHubReceive || loading || confirmingOrderId || batchInbounding) return;
-    if (activePack.status !== 'in_transit') return;
-    setError('');
-    setModalSuccess('');
-    if (!(await preflightHubReceive({ forWrite: true }))) return;
-    setConfirmingHubReceive(true);
-    try {
-      const updated = await ensurePackHubReceived(activePack.pack_barcode, activePack);
-      setActivePack(updated);
-      void refreshTransportFeePaid(updated.pack_barcode);
-      setModalSuccess(t.hubReceive.packConfirmSuccessMsg);
-      showTaskSuccess(
-        t.hubReceive.packConfirmSuccess,
-        fmt(t.hubReceive.packConfirmed, { barcode: updated.pack_barcode }),
-      );
-    } catch (e: unknown) {
-      setError(resolveAppError(t, e));
-    } finally {
-      setConfirmingHubReceive(false);
-    }
-  };
-
-  const handleConfirmOrder = async (orderId: string) => {
-    if (!store || !activePack || confirmingOrderId || batchInbounding || loading || confirmingHubReceive) return;
-    setError('');
-    setModalSuccess('');
-    if (!(await preflightHubReceive({ forWrite: true }))) return;
-    const orderLine = activePack.orders.find((line) => line.id === orderId);
-    const orderBarcode = orderLine?.order_barcode ?? '';
-    setConfirmingOrderId(orderId);
-    try {
-      const pkg = await resolvePackForInbound(activePack);
-      await inboundSingleOrder(orderId, pkg);
-      const successMsg = orderBarcode
-        ? fmt(t.hubReceive.inboundSuccessMsg, { barcode: orderBarcode })
-        : t.hubReceive.inboundSuccess;
-      setModalSuccess(successMsg);
-      showTaskSuccess(t.hubReceive.inboundSuccess, successMsg);
-    } catch (e: unknown) {
-      setError(resolveAppError(t, e));
-    } finally {
-      setConfirmingOrderId(null);
-    }
-  };
-
-  const handleBatchInbound = async () => {
-    if (!store || !activePack || confirmingOrderId || batchInbounding || loading || confirmingHubReceive) return;
-    setError('');
-    setModalSuccess('');
-    if (!(await preflightHubReceive({ forWrite: true }))) return;
-    setBatchInbounding(true);
-    try {
-      const pkg =
-        activePack.status === 'in_transit'
-          ? await resolvePackForInbound(activePack)
-          : activePack;
-      const pendingOrders = listPendingPackInboundOrders(pkg, hubCode);
-      if (pendingOrders.length === 0) {
-        throw new Error(t.hubReceive.batchInboundNothingPending);
-      }
-      let latest = pkg;
-      for (const order of pendingOrders) {
-        const result = await confirmOrderInPackById(order.id, store, hubCode, { pkg: latest, order });
-        latest = result.pkg;
-        await deliverHubOrderInboundAtStation({
-          order: result.order,
-          pkg: result.pkg,
-          store,
-          hubCode,
-          operator,
-        });
-      }
-      await finishInboundFlow(latest);
-      const refreshed = await getPkgTrackingDetail(latest.pack_barcode);
-      if (refreshed) setActivePack(refreshed);
-      const successMsg = fmt(t.hubReceive.batchInboundSuccessMsg, { count: pendingOrders.length });
-      setModalSuccess(successMsg);
-      showTaskSuccess(t.hubReceive.batchInboundSuccess, successMsg);
-    } catch (e: unknown) {
-      setError(resolveAppError(t, e));
-    } finally {
-      setBatchInbounding(false);
-    }
-  };
-
-  const handlePayTransportFee = () => {
-    if (!store || !activePack || payingTransportFee || loading) return;
-    const feeDisplay = getTransportFeeDisplay(t, activePack.transport_fee);
-    const legDest = activePack.leg_destination_code || activePack.destination_code || hubCode;
-
-    Alert.alert(
-      t.common.confirmPayFee,
-      fmt(t.hubReceive.payFeeAlertBody, {
-        barcode: activePack.pack_barcode,
-        origin: activePack.origin_store_code,
-        dest: legDest,
-        fee: feeDisplay,
-      }),
-      [
-        { text: t.common.cancel, style: 'cancel' },
-        {
-          text: t.common.confirmPay,
-          onPress: () => {
-            setPayingTransportFee(true);
-            setError('');
-            void (async () => {
-              try {
-                if (!(await preflightHubReceive())) return;
-                await markHubTransportFeePaid({
-                  packBarcode: activePack.pack_barcode,
-                  fee: activePack.transport_fee,
-                  legDestination: legDest,
-                  originStoreCode: activePack.origin_store_code,
-                  operator,
-                  store,
-                });
-                setTransportFeePaid(true);
-                const paidMsg =
-                  tripPackCount > 1
-                    ? t.hubReceive.tripFeePaidMsg
-                    : fmt(t.hubReceive.feePaidMsg, { barcode: activePack.pack_barcode });
-                setModalSuccess(paidMsg);
-                showTaskSuccess(t.hubReceive.paySuccess, fmt(t.hubReceive.paySuccessMsg, { fee: feeDisplay }));
-                setMessage(paidMsg);
-              } catch (e: unknown) {
-                setError(resolveAppError(t, e));
-              } finally {
-                setPayingTransportFee(false);
-              }
-            })();
-          },
-        },
-      ],
-    );
-  };
-
-  const handleReleaseTransit = async () => {
-    if (!store || !activePack) return;
-    if (!(await preflightHubReceive())) return;
-    setReleasingTransit(true);
-    setError('');
-    try {
-      const { releasedCount } = await releaseHubTransitOrders({
-        packBarcode: activePack.pack_barcode,
-        store,
-        hubCode,
-        operator,
-        allowCompleted: true,
-      });
-      const updated = await getPkgTrackingDetail(activePack.pack_barcode);
-      if (updated) setActivePack(updated);
-      setMessage(fmt(t.hubReceive.manualReleaseDone, { count: releasedCount }));
-    } catch (e: unknown) {
-      setError(resolveAppError(t, e));
-    } finally {
-      setReleasingTransit(false);
-    }
-  };
-
-  const onSubmit = (code: string) => {
-    setScan(code);
-    const trimmed = code.trim().toUpperCase();
-    if (isPackageBarcode(trimmed)) {
-      void handlePackScan(code);
-      return;
-    }
-    if (!activePack || activePack.status === 'in_transit') {
-      void handleOrderLookupScan(code);
-      return;
-    }
-    void handleOrderScan(code);
-  };
+  const flow = useHubReceiveFlow(openPackBarcode);
+  const { t, store } = flow;
 
   if (!store) {
     return (
@@ -585,166 +27,63 @@ export default function HubReceiveScreen({ route }: NativeStackScreenProps<RootS
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <OnlineRequiredBanner />
-      {cloudConnected === false ? (
-        <View style={styles.cloudWarnBox}>
-          <Text style={styles.cloudWarnTitle}>{t.hubReceive.cloudRequiredTitle}</Text>
-          <Text style={styles.cloudWarnText}>{t.hubReceive.cloudRequiredHint}</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.zoneCard}>
-        <Text style={styles.zoneTitle}>
-          {fmt(t.hubReceive.zoneTitle, { hub: hubCode ? regionDisplayLabel(hubCode) : t.common.notSet })}
-        </Text>
-        <Text style={styles.zoneSub}>
-          {store.storeCode} · {store.storeName}
-        </Text>
-        <Text style={styles.zoneHint}>{t.hubReceive.zoneHint}</Text>
-      </View>
-
-      <ScanInputBar
-        value={scan}
-        onChangeText={setScan}
-        onSubmit={onSubmit}
-        busy={loading}
-        cameraScan={{
-          title: t.hubReceive.cameraTitle,
-          subtitle: t.hubReceive.cameraSubtitle,
-        }}
-        placeholder={t.hubReceive.scanPlaceholder}
-        label={t.hubReceive.scanLabel}
-      />
-
-      {loading && !ordersModalVisible ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator color="#38bdf8" />
-        </View>
-      ) : null}
-
-      {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-      {message ? (
-        <View style={styles.okBox}>
-          <Text style={styles.okText}>{message}</Text>
-        </View>
-      ) : null}
-
-      {activePack && !ordersModalVisible ? (
-        <Pressable
-          style={styles.reopenBtn}
-          onPress={() => void openPackOrdersModal(activePack)}
-          accessibilityRole="button"
-          accessibilityLabel={`${activePack.pack_barcode}，${t.common.continueDispatch}`}
-        >
-          <Text style={styles.reopenBtnTitle}>{activePack.pack_barcode}</Text>
-          <Text style={styles.reopenBtnSub}>
-            {getPkgStatusLabel(t, activePack.status)} · {t.common.progress}{' '}
-            {activePack.received_order_count}/{activePack.item_count} · {t.common.continueDispatch}
-          </Text>
-        </Pressable>
-      ) : null}
+      <HubReceiveStatusPanels
+        t={t}
+        fmt={flow.fmt}
+        hubCode={flow.hubCode}
+        store={store}
+        cloudConnected={flow.cloudConnected}
+        loading={flow.loading}
+        ordersModalVisible={flow.ordersModalVisible}
+        error={flow.error}
+        message={flow.message}
+        activePack={flow.activePack}
+        onReopen={(pack) => void flow.openPackOrdersModal(pack)}
+      >
+        <ScanInputBar
+          value={flow.scan}
+          onChangeText={flow.setScan}
+          onSubmit={flow.onSubmit}
+          busy={flow.loading}
+          cameraScan={{
+            title: t.hubReceive.cameraTitle,
+            subtitle: t.hubReceive.cameraSubtitle,
+          }}
+          placeholder={t.hubReceive.scanPlaceholder}
+          label={t.hubReceive.scanLabel}
+        />
+      </HubReceiveStatusPanels>
 
       <HubReceiveOrdersModal
-        visible={ordersModalVisible}
-        pack={activePack}
-        hubCode={hubCode}
+        visible={flow.ordersModalVisible}
+        pack={flow.activePack}
+        hubCode={flow.hubCode}
         store={store}
-        loading={loading}
-        confirmingOrderId={confirmingOrderId}
-        confirmingHubReceive={confirmingHubReceive}
-        batchInbounding={batchInbounding}
-        payingTransportFee={payingTransportFee}
-        transportFeePaid={transportFeePaid}
-        tripPackCount={tripPackCount}
-        tripFeeAnchorPack={tripFeeAnchorPack}
-        releasingTransit={releasingTransit}
-        errorText={ordersModalVisible ? error : undefined}
-        successText={modalSuccess || undefined}
-        onClose={() => {
-          setOrdersModalVisible(false);
-          setModalSuccess('');
-        }}
-        onConfirmPack={() => void handleConfirmPack()}
-        onConfirmOrder={(orderId) => void handleConfirmOrder(orderId)}
-        onBatchInbound={() => void handleBatchInbound()}
-        onPayTransportFee={handlePayTransportFee}
-        onReleaseTransit={() => void handleReleaseTransit()}
+        loading={flow.loading}
+        confirmingOrderId={flow.confirmingOrderId}
+        confirmingHubReceive={flow.confirmingHubReceive}
+        batchInbounding={flow.batchInbounding}
+        payingTransportFee={flow.payingTransportFee}
+        transportFeePaid={flow.transportFeePaid}
+        tripPackCount={flow.tripPackCount}
+        tripFeeAnchorPack={flow.tripFeeAnchorPack}
+        releasingTransit={flow.releasingTransit}
+        errorText={flow.ordersModalVisible ? flow.error : undefined}
+        successText={flow.modalSuccess || undefined}
+        onClose={flow.closeOrdersModal}
+        onConfirmPack={() => void flow.handleConfirmPack()}
+        onConfirmOrder={(orderId) => void flow.handleConfirmOrder(orderId)}
+        onBatchInbound={() => void flow.handleBatchInbound()}
+        onPayTransportFee={flow.handlePayTransportFee}
+        onReleaseTransit={() => void flow.handleReleaseTransit()}
       />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0f172a' },
-  content: { padding: 16, paddingBottom: 32 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' },
-  hint: { color: '#94a3b8' },
-  zoneCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0ea5e9',
-  },
-  zoneTitle: { color: '#7dd3fc', fontSize: 16, fontWeight: '900' },
-  zoneSub: { color: '#94a3b8', fontSize: 13, marginTop: 4 },
-  zoneHint: { color: '#64748b', fontSize: 12, lineHeight: 18, marginTop: 8 },
-  cloudWarnBox: {
-    backgroundColor: 'rgba(245,158,11,0.12)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.45)',
-  },
-  cloudWarnTitle: { color: '#fcd34d', fontWeight: '900', fontSize: 14 },
-  cloudWarnText: { color: '#fde68a', fontSize: 12, lineHeight: 18, marginTop: 6 },
-  operatorWarnBox: {
-    backgroundColor: 'rgba(14,165,233,0.1)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(14,165,233,0.35)',
-  },
-  operatorWarnTitle: { color: '#7dd3fc', fontWeight: '900', fontSize: 14 },
-  operatorWarnText: { color: '#bae6fd', fontSize: 12, lineHeight: 18, marginTop: 6 },
-  loadingBox: { alignItems: 'center', paddingVertical: 12 },
-  errorBox: {
-    backgroundColor: 'rgba(248,113,113,0.12)',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.35)',
-  },
-  errorText: { color: '#fca5a5', fontSize: 13, lineHeight: 20 },
-  okBox: {
-    backgroundColor: 'rgba(34,197,94,0.1)',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(34,197,94,0.3)',
-  },
-  okText: { color: '#86efac', fontSize: 13, lineHeight: 20 },
-  reopenBtn: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginTop: 4,
-  },
-  reopenBtnTitle: {
-    color: '#d8b4fe',
-    fontSize: 15,
-    fontWeight: '900',
-    fontFamily: 'monospace',
-  },
-  reopenBtnSub: { color: '#94a3b8', fontSize: 12, marginTop: 6 },
+  root: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: space.lg, paddingBottom: 32 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+  hint: { color: colors.muted },
 });

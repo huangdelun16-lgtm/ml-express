@@ -148,6 +148,13 @@ export function getTransportFeeDisplay(t: TranslationDict, raw: string | undefin
   return `${n % 1 === 0 ? n : n.toFixed(2)} MMK`;
 }
 
+export function getPaymentLabelDisplay(t: TranslationDict, raw?: string | null): string {
+  const value = String(raw ?? '').trim();
+  if (value === '到付' || /^cod$/i.test(value)) return t.stockIn.cod;
+  if (value === '预付' || /^prepaid$/i.test(value)) return t.stockIn.prepaid;
+  return value;
+}
+
 export const LEDGER_CATEGORY_STYLE: Record<
   FinanceLedgerCategory,
   { icon: string; accent: string; tint: string; pillBg: string }

@@ -159,7 +159,7 @@ export default function CameraScanScreen({ navigation }: { navigation: Nav }) {
           showTaskSuccess(
             t.common.signSuccess,
             signedCount > 1
-              ? `已签收 ${signedCount} 单`
+              ? fmt(t.sign.batchSignedCount, { count: signedCount })
               : fmt(t.common.signMarked, { name: detail.name }),
           );
         }}

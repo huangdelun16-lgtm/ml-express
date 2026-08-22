@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Language } from '../i18n/types';
 import { LANGUAGE_STORAGE_KEY } from '../i18n/types';
+import { setRuntimeLanguage } from '../i18n/runtime';
 
 type LanguageContextValue = {
   language: Language;
@@ -24,6 +25,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       try {
         const saved = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
         if (isLanguage(saved)) {
+          setRuntimeLanguage(saved);
           setLanguageState(saved);
         }
       } finally {
@@ -33,6 +35,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setLanguage = useCallback(async (lang: Language) => {
+    setRuntimeLanguage(lang);
     setLanguageState(lang);
     try {
       await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);

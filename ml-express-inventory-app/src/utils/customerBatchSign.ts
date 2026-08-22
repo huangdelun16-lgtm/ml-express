@@ -32,11 +32,13 @@ export function collectSameCustomerPeers(
   );
 }
 
+export type BatchSignError = 'batchSignEmpty' | 'batchSignMixedCustomer';
+
 export function validateBatchSignSelection(
   selected: InventoryItemListRow[],
-): string | null {
-  if (selected.length === 0) return '请先勾选要签收的订单';
+): BatchSignError | null {
+  if (selected.length === 0) return 'batchSignEmpty';
   const keys = new Set(selected.map(resolveCustomerKey).filter(Boolean));
-  if (keys.size !== 1) return '批量签收只能选择同一客户的订单';
+  if (keys.size !== 1) return 'batchSignMixedCustomer';
   return null;
 }

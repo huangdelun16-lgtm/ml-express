@@ -6,6 +6,7 @@ import { isSupabaseConfigured, supabase } from './supabase';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { generateUuid, toNullableUuid } from '../utils/uuid';
 import { isInventoryOperationLogDuplicateError } from '../utils/inventoryReliability';
+import { chunkIds, fetchAllPages } from '../utils/supabasePager';
 
 export type CloudStoreItemRow = {
   id: string;
@@ -99,20 +100,45 @@ const PACK_LINE_COLUMNS_WITH_EXPRESS = `${PACK_LINE_COLUMNS}, input_barcode`;
 
 async function fetchCloudPackLines(packIds: string[]): Promise<CloudPackLineRow[]> {
   if (packIds.length === 0) return [];
-  const withExpress = await supabase
-    .from('inventory_packed_shipment_items')
-    .select(PACK_LINE_COLUMNS_WITH_EXPRESS)
-    .in('pack_id', packIds);
-  if (!withExpress.error) return (withExpress.data ?? []) as CloudPackLineRow[];
-  if (!/input_barcode/i.test(withExpress.error.message)) {
-    throw new Error(withExpress.error.message);
+  const rows: CloudPackLineRow[] = [];
+  for (const chunk of chunkIds(packIds, 80)) {
+    try {
+      const page = await fetchAllPages<CloudPackLineRow>((from, to) =>
+        supabase
+          .from('inventory_packed_shipment_items')
+          .select(PACK_LINE_COLUMNS_WITH_EXPRESS)
+          .in('pack_id', chunk)
+          .range(from, to),
+      );
+      rows.push(...page);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error ?? '');
+      if (!/input_barcode/i.test(message)) throw error;
+      const fallback = await fetchAllPages<CloudPackLineRow>((from, to) =>
+        supabase
+          .from('inventory_packed_shipment_items')
+          .select(PACK_LINE_COLUMNS)
+          .in('pack_id', chunk)
+          .range(from, to),
+      );
+      rows.push(...fallback);
+    }
   }
-  const fallback = await supabase
-    .from('inventory_packed_shipment_items')
-    .select(PACK_LINE_COLUMNS)
-    .in('pack_id', packIds);
-  if (fallback.error) throw new Error(fallback.error.message);
-  return (fallback.data ?? []) as CloudPackLineRow[];
+  return rows;
+}
+
+function attachPackLines(packs: CloudPackRow[], lines: CloudPackLineRow[]): CloudPackRow[] {
+  const linesByPack = new Map<string, CloudPackLineRow[]>();
+  for (const line of lines) {
+    const packId = String(line.pack_id);
+    const bucket = linesByPack.get(packId) ?? [];
+    bucket.push(line);
+    linesByPack.set(packId, bucket);
+  }
+  return packs.map((pack) => ({
+    ...pack,
+    inventory_packed_shipment_items: linesByPack.get(String(pack.id)) ?? [],
+  }));
 }
 
 type AtomicRpcResult = {
@@ -270,7 +296,7 @@ export async function createCloudPackedShipmentAtomic(params: {
   const bundleRow = asRecord(result.bundle_item);
   const packId = result.pack_id ? String(result.pack_id) : '';
   if (!bundleRow || !packId) {
-    throw new Error('打包 RPC 未返回快递包数据，请检查网络后重试');
+    throw svc('packRpcMissingData');
   }
   return { bundleItem: rowToCloudItem(bundleRow), packId };
 }
@@ -293,15 +319,13 @@ export async function packagingStockInBatchAtomic(params: {
     p_payload: params.payload,
   });
   if (error) {
-    throw new Error(error.message || '多个入库 RPC 失败');
+    throw error.message ? new Error(error.message) : svc('packagingStockInRpcFailed');
   }
   const result = parseRpcJsonResult(data);
   const bundleRow = asRecord(result.bundle_item);
   const packId = result.pack_id ? String(result.pack_id) : '';
   if (!bundleRow || !packId) {
-    throw new Error(
-      '多个入库 RPC 未返回快递包数据。请在 Supabase 执行 migration：20260802120000、20260802130000、20260802140000',
-    );
+    throw svc('packagingStockInRpcMissingPack');
   }
 
   const packRow = asRecord(result.pack);
@@ -388,7 +412,7 @@ export async function loadCloudShipmentsAtomic(params: {
     p_operation_id: params.operationId,
     p_payload: params.payload,
   });
-  if (error) throw new Error(error.message || '装车出库 RPC 失败');
+  if (error) throw error.message ? new Error(error.message) : svc('truckLoadRpcFailed');
   const result = parseRpcJsonResult(data);
   return {
     count: Number(result.count) || 0,
@@ -449,11 +473,10 @@ export async function assertCloudPacksExist(barcodes: string[]): Promise<void> {
     if (!row) missing.push(code);
   }
   if (missing.length === 0) return;
-  throw new Error(
-    missing.length === 1
-      ? `快递包 ${missing[0]} 未在云端登记，无法装车。请返回「快递明细」重新打包该批订单后再试。`
-      : `以下快递包未在云端登记，无法装车：${missing.join('、')}。请重新打包后再装车。`,
-  );
+  if (missing.length === 1) {
+    throw svc('cloudPackNotRegistered', { barcode: missing[0] });
+  }
+  throw svc('cloudPacksNotRegistered', { barcodes: missing.join('、') });
 }
 
 export async function fetchCloudStoreItems(
@@ -464,15 +487,15 @@ export async function fetchCloudStoreItems(
   await ensureInventoryCloudAuth();
   const itemMap = new Map<string, CloudStoreItemRow>();
 
-  // 依赖 RLS（owner / hub 目的地 / 到站 custody），不用 eq(owner_store_code) 避免店码格式不一致漏行
-  const { data, error } = await supabase
-    .from('inventory_store_items')
-    .select(STORE_ITEM_COLUMNS)
-    .order('updated_at', { ascending: false })
-    .limit(800);
-  if (error) throw new Error(error.message);
-  for (const row of data ?? []) {
-    const item = rowToCloudItem(row as Record<string, unknown>);
+  const data = await fetchAllPages<Record<string, unknown>>((from, to) =>
+    supabase
+      .from('inventory_store_items')
+      .select(STORE_ITEM_COLUMNS)
+      .order('updated_at', { ascending: false })
+      .range(from, to),
+  );
+  for (const row of data) {
+    const item = rowToCloudItem(row);
     itemMap.set(item.id, item);
   }
 
@@ -488,13 +511,14 @@ export async function fetchCloudMovementsForItems(itemIds: string[]): Promise<Cl
 
   for (let i = 0; i < uniqueIds.length; i += MOVEMENT_BATCH_SIZE) {
     const batch = uniqueIds.slice(i, i + MOVEMENT_BATCH_SIZE);
-    const { data, error } = await supabase
-      .from('inventory_stock_movements')
-      .select('*')
-      .in('item_id', batch)
-      .order('created_at', { ascending: false })
-      .limit(2000);
-    if (error) throw new Error(error.message);
+    const data = await fetchAllPages<CloudMovementRow>((from, to) =>
+      supabase
+        .from('inventory_stock_movements')
+        .select('*')
+        .in('item_id', batch)
+        .order('created_at', { ascending: false })
+        .range(from, to),
+    );
     rows.push(
       ...(data ?? []).map((row) => ({
         id: String((row as CloudMovementRow).id),
@@ -531,15 +555,16 @@ export async function fetchCloudTodayMovementTotals(): Promise<{ todayIn: number
   if (!isSupabaseConfigured()) return { todayIn: 0, todayOut: 0 };
   const start = new Date();
   start.setHours(0, 0, 0, 0);
-  const { data, error } = await supabase
-    .from('inventory_stock_movements')
-    .select('type, qty')
-    .gte('created_at', start.toISOString())
-    .limit(3000);
-  if (error) throw new Error(error.message);
+  const data = await fetchAllPages<{ type: string; qty: number }>((from, to) =>
+    supabase
+      .from('inventory_stock_movements')
+      .select('type, qty')
+      .gte('created_at', start.toISOString())
+      .range(from, to),
+  );
   let todayIn = 0;
   let todayOut = 0;
-  for (const row of data ?? []) {
+  for (const row of data) {
     const type = String((row as { type: string }).type);
     const qty = Number((row as { qty: number }).qty) || 0;
     if (type === 'in') todayIn += qty;
@@ -559,16 +584,21 @@ export async function fetchCloudHomeOverview(): Promise<{
     return { itemCount: 0, totalQty: 0, lowStockCount: 0, packCount: 0 };
   }
   await ensureInventoryCloudAuth();
-  const [itemsRes, packsRes] = await Promise.all([
-    supabase.from('inventory_store_items').select('qty_on_hand, min_qty').limit(800),
-    supabase.from('inventory_packed_shipments').select('id').limit(200),
+  const [itemRows, packRows] = await Promise.all([
+    fetchAllPages<{ qty_on_hand?: number; min_qty?: number }>((from, to) =>
+      supabase
+        .from('inventory_store_items')
+        .select('qty_on_hand, min_qty')
+        .range(from, to),
+    ),
+    fetchAllPages<{ id: string }>((from, to) =>
+      supabase.from('inventory_packed_shipments').select('id').range(from, to),
+    ),
   ]);
-  if (itemsRes.error) throw new Error(itemsRes.error.message);
-  if (packsRes.error) throw new Error(packsRes.error.message);
   let itemCount = 0;
   let totalQty = 0;
   let lowStockCount = 0;
-  for (const row of itemsRes.data ?? []) {
+  for (const row of itemRows) {
     const qty = Number((row as { qty_on_hand?: number }).qty_on_hand) || 0;
     const minQty = Number((row as { min_qty?: number }).min_qty) || 0;
     itemCount += 1;
@@ -579,7 +609,7 @@ export async function fetchCloudHomeOverview(): Promise<{
     itemCount,
     totalQty,
     lowStockCount,
-    packCount: (packsRes.data ?? []).length,
+    packCount: packRows.length,
   };
 }
 
@@ -597,20 +627,7 @@ export async function fetchCloudRecentPackedShipments(limit = 3): Promise<CloudP
 
   const packIds = packs.map((p) => String((p as { id: string }).id));
   const lines = await fetchCloudPackLines(packIds);
-
-  const linesByPack = new Map<string, CloudPackLineRow[]>();
-  for (const row of lines ?? []) {
-    const line = row as CloudPackLineRow;
-    const packId = String(line.pack_id);
-    const bucket = linesByPack.get(packId) ?? [];
-    bucket.push(line);
-    linesByPack.set(packId, bucket);
-  }
-
-  return packs.map((row) => ({
-    ...(row as CloudPackRow),
-    inventory_packed_shipment_items: linesByPack.get(String((row as { id: string }).id)) ?? [],
-  }));
+  return attachPackLines(packs as CloudPackRow[], lines);
 }
 
 export async function fetchCloudPackedShipments(
@@ -619,30 +636,18 @@ export async function fetchCloudPackedShipments(
 ): Promise<CloudPackRow[]> {
   if (!isSupabaseConfigured()) return [];
   await ensureInventoryCloudAuth();
-  const { data: packs, error: packErr } = await supabase
-    .from('inventory_packed_shipments')
-    .select(PACK_COLUMNS)
-    .order('created_at', { ascending: false })
-    .limit(200);
-  if (packErr) throw new Error(packErr.message);
-  if (!packs?.length) return [];
+  const packs = await fetchAllPages<CloudPackRow>((from, to) =>
+    supabase
+      .from('inventory_packed_shipments')
+      .select(PACK_COLUMNS)
+      .order('created_at', { ascending: false })
+      .range(from, to),
+  );
+  if (!packs.length) return [];
 
-  const packIds = packs.map((p) => String((p as { id: string }).id));
+  const packIds = packs.map((p) => String(p.id));
   const lines = await fetchCloudPackLines(packIds);
-
-  const linesByPack = new Map<string, CloudPackLineRow[]>();
-  for (const row of lines ?? []) {
-    const line = row as CloudPackLineRow;
-    const packId = String(line.pack_id);
-    const bucket = linesByPack.get(packId) ?? [];
-    bucket.push(line);
-    linesByPack.set(packId, bucket);
-  }
-
-  return packs.map((row) => ({
-    ...(row as CloudPackRow),
-    inventory_packed_shipment_items: linesByPack.get(String((row as { id: string }).id)) ?? [],
-  }));
+  return attachPackLines(packs, lines);
 }
 
 export async function upsertCloudStoreItem(

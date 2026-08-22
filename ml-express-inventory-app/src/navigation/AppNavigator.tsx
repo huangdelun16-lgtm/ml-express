@@ -2,6 +2,8 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
 import { useTranslation } from '../i18n';
+import { MYANMAR_FONT_BOLD } from '../utils/myanmarText';
+import { colors } from '../theme';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -23,15 +25,17 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const screenOptions = {
-  headerStyle: { backgroundColor: '#020617' },
-  headerTintColor: '#f8fafc',
-  headerTitleStyle: { fontWeight: '800' as const },
-  contentStyle: { backgroundColor: '#020617' },
-};
-
 export default function AppNavigator() {
   const { t, language } = useTranslation();
+  const screenOptions = {
+    headerStyle: { backgroundColor: colors.bgDeep },
+    headerTintColor: colors.text,
+    headerTitleStyle:
+      language === 'my'
+        ? { fontFamily: MYANMAR_FONT_BOLD, fontWeight: '800' as const }
+        : { fontWeight: '800' as const },
+    contentStyle: { backgroundColor: colors.bgDeep },
+  };
 
   return (
       <Stack.Navigator key={language} screenOptions={screenOptions}>

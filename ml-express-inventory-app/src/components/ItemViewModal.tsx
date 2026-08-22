@@ -4,9 +4,9 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  Text,
   View,
 } from 'react-native';
+import Text from './AppText';
 import {
   InboundInvoiceContent,
   InboundInvoiceFooter,
@@ -87,13 +87,13 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
         {loading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator color="#60a5fa" size="large" />
-            <Text style={styles.loadingText}>加载订单…</Text>
+            <Text style={styles.loadingText}>{t.invoice.loadingOrder}</Text>
           </View>
         ) : !invoiceData ? (
           <View style={styles.centerBox}>
-            <Text style={styles.emptyText}>订单不存在或已删除</Text>
+            <Text style={styles.emptyText}>{t.invoice.orderMissing}</Text>
             <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
-              <Text style={inboundInvoiceStyles.btnCloseText}>关闭</Text>
+              <Text style={inboundInvoiceStyles.btnCloseText}>{t.common.close}</Text>
             </Pressable>
           </View>
         ) : (

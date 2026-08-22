@@ -1,6 +1,7 @@
 import type { InventoryItem, PackedShipment, PackedShipmentItem, StockMovement } from '../types/inventory';
 import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import type { InventoryStoreSession } from './authService';
+import { svc } from '../errors/serviceError';
 import { normalizePackDestination } from '../constants/destinationOptions';
 import { newId, nowIso } from './database';
 import {
@@ -139,7 +140,7 @@ export async function deliverLocalHubOrderToInventory(
 ): Promise<void> {
   const hub = params.hubCode.trim().toUpperCase();
   const orderDest = resolveOrderDestinationCode(params.order);
-  if (orderDest !== hub) throw new Error(`订单目的地 ${orderDest || '?'} 不是本站 ${hub}`);
+  if (orderDest !== hub) throw svc('orderDestNotThisHub', { orderDest: orderDest || '?', hub });
 
   let item = await ops.getItemByBarcode(params.order.order_barcode);
   if (item?.customer_signed_at?.trim()) return;
@@ -447,7 +448,7 @@ export async function deliverHubOrderInboundAtStation(
     await deliverTransitOrderAtHubStation(ops, params);
     return;
   }
-  throw new Error(`无法解析订单 ${params.order.order_barcode} 的目的地`);
+  throw svc('cannotResolveOrderDest', { barcode: params.order.order_barcode });
 }
 
 /** 确认到站后：本站目的地订单自动交付至「快递明细」，无需弹窗逐单点「入库」 */
@@ -463,7 +464,7 @@ export async function autoDeliverLocalHubOrdersOnPackReceived(
 ): Promise<PkgTrackingDetail> {
   const { confirmOrderInPackById, getPkgTrackingDetail } = await import('./trackingService');
   let pkg = params.knownPkg ?? (await getPkgTrackingDetail(params.packBarcode));
-  if (!pkg) throw new Error(`未找到快递包 ${params.packBarcode}`);
+  if (!pkg) throw svc('packNotFound');
 
   const hub = params.hubCode.trim().toUpperCase();
   for (const order of pkg.orders) {

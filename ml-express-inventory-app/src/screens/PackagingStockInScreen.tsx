@@ -17,6 +17,7 @@ import { InboundFormField, InboundFormSection } from '../components/InboundFormP
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import ScanInputBar from '../components/ScanInputBar';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
+import { InboundWizardFooter, InboundWizardHeader, type WizardStep } from '../components/stockIn/InboundWizardChrome';
 import { DimensionSpecField, LockedSuffixField } from '../components/StructuredItemFields';
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -45,13 +46,12 @@ import {
 } from '../utils/crossBorderPricing';
 import { loadStockInContactDraft, saveStockInContactDraft } from '../utils/stockInDraft';
 import { normalizePackageOriginPrefix } from '../utils/packageNumber';
-import { fmt, resolveAppError, useTranslation } from '../i18n';
+import { resolveAppError, useTranslation } from '../i18n';
+import { colors } from '../theme';
 import {
   applyCrossBorderCustomerToForm,
   useCrossBorderCustomerLookup,
 } from '../hooks/useCrossBorderCustomerLookup';
-
-type Step = 1 | 2 | 3;
 
 type PackagingScanLine = {
   id: string;
@@ -82,13 +82,13 @@ function emptyLine(code: string): PackagingScanLine {
 export default function PackagingStockInScreen({ navigation }: Props) {
   const { operatorName, store, hubCode } = useAuth();
   const { t, fmt } = useTranslation();
-  const stepLabels: Record<Step, string> = {
+  const stepLabels: Record<WizardStep, string> = {
     1: t.packagingStockIn.step1,
     2: t.packagingStockIn.step2,
     3: t.packagingStockIn.step3,
   };
 
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<WizardStep>(1);
   const [customerCode, setCustomerCode] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
@@ -444,21 +444,12 @@ export default function PackagingStockInScreen({ navigation }: Props) {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>{t.packagingStockIn.title}</Text>
-        <View style={styles.stepRow}>
-          {([1, 2, 3] as Step[]).map((n) => (
-            <View key={n} style={styles.stepItem}>
-              <View style={[styles.stepDot, step >= n && styles.stepDotActive]}>
-                <Text style={[styles.stepDotText, step >= n && styles.stepDotTextActive]}>{n}</Text>
-              </View>
-              <Text style={[styles.stepLabel, step === n && styles.stepLabelActive]}>
-                {stepLabels[n]}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
+      <InboundWizardHeader
+        title={t.packagingStockIn.title}
+        step={step}
+        stepLabels={stepLabels}
+        accent="amber"
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -660,22 +651,14 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         ) : null}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Pressable
-          style={[styles.cancelBtn, loading && styles.nextBtnDisabled]}
-          onPress={handleCancel}
-          disabled={loading}
-        >
-          <Text style={styles.cancelBtnText}>{t.stockIn.cancel}</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.nextBtn, loading && styles.nextBtnDisabled]}
-          onPress={primaryAction}
-          disabled={loading}
-        >
-          <Text style={styles.nextBtnText}>{primaryLabel}</Text>
-        </Pressable>
-      </View>
+      <InboundWizardFooter
+        cancelLabel={t.stockIn.cancel}
+        primaryLabel={primaryLabel}
+        loading={loading}
+        onCancel={handleCancel}
+        onPrimary={primaryAction}
+        accent="amber"
+      />
 
       <Modal visible={!!editLine} transparent animationType="fade" onRequestClose={() => setEditLine(null)}>
         <Pressable style={styles.modalOverlay} onPress={() => setEditLine(null)}>
@@ -713,24 +696,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0f172a' },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
-  title: { color: '#f8fafc', fontSize: 22, fontWeight: '900', marginBottom: 12 },
-  stepRow: { flexDirection: 'row', gap: 8 },
-  stepItem: { flex: 1, alignItems: 'center', gap: 4 },
-  stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#334155',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotActive: { backgroundColor: '#f59e0b' },
-  stepDotText: { color: '#94a3b8', fontWeight: '900', fontSize: 13 },
-  stepDotTextActive: { color: '#fff' },
-  stepLabel: { color: '#64748b', fontSize: 10, fontWeight: '700', textAlign: 'center' },
-  stepLabelActive: { color: '#fcd34d' },
+  root: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 24 },
   scanHint: { color: '#94a3b8', fontSize: 12, marginTop: 8, lineHeight: 18 },
@@ -790,32 +756,6 @@ const styles = StyleSheet.create({
   },
   grandTotalLabel: { color: '#f8fafc', fontSize: 16, fontWeight: '900' },
   grandTotalValue: { color: '#6ee7b7', fontSize: 22, fontWeight: '900' },
-  footer: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#1e293b',
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#475569',
-    alignItems: 'center',
-  },
-  cancelBtnText: { color: '#cbd5e1', fontWeight: '800' },
-  nextBtn: {
-    flex: 2,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: '#f59e0b',
-    alignItems: 'center',
-  },
-  nextBtnDisabled: { opacity: 0.55 },
-  nextBtnText: { color: '#0f172a', fontWeight: '900', fontSize: 16 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15,23,42,0.78)',

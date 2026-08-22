@@ -1,3 +1,5 @@
+import { rewritePublicStorageUrl } from '../services/nativeSupabaseUrl';
+
 /** Android APK 发布清单解析（纯函数，便于单测） */
 
 export type AndroidReleaseInfo = {
@@ -29,7 +31,12 @@ export function parseAndroidRelease(raw: unknown): AndroidReleaseInfo | null {
   const apkUrl = String(row.apkUrl ?? row.apk_url ?? row.downloadUrl ?? row.download_url ?? '').trim();
   const releaseNotes = String(row.releaseNotes ?? row.release_notes ?? row.notes ?? '').trim();
   if (!version || !Number.isFinite(versionCode) || versionCode <= 0 || !apkUrl) return null;
-  return { version, versionCode: Math.floor(versionCode), apkUrl, releaseNotes };
+  return {
+    version,
+    versionCode: Math.floor(versionCode),
+    apkUrl: rewritePublicStorageUrl(apkUrl),
+    releaseNotes,
+  };
 }
 
 export function isAndroidUpdateAvailable(currentVersionCode: number, latestVersionCode: number): boolean {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Text from './AppText';
 import CopyableCodeRow from './CopyableCodeRow';
 import { SignaturePreview } from './SignaturePad';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
@@ -7,6 +8,7 @@ import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
 import { callPhoneNumber } from '../utils/phoneCall';
 import type { CustomerSignReceipt } from '../types/customerSignReceipt';
 import { pickupTypeLabel } from '../types/customerSignReceipt';
+import { getPaymentLabelDisplay, useTranslation } from '../i18n';
 
 export type InboundInvoiceData = {
   barcode: string;
@@ -67,16 +69,18 @@ export function InboundInvoiceContent({
   /** 包内序号行标签，默认「包内序号」 */
   packItemSeqLabel?: string;
 }) {
+  const { t } = useTranslation();
+  const pickupLabels = { self: t.sign.pickupSelf, proxy: t.sign.pickupProxy };
   return (
     <>
       <View style={styles.invoiceHeader}>
         <Text style={styles.invoiceBrand}>ML EXPRESS</Text>
-        <Text style={styles.invoiceTitle}>订单详情 / INVOICE</Text>
+        <Text style={styles.invoiceTitle}>{t.invoice.title}</Text>
         {data.storeName ? <Text style={styles.invoiceStore}>{data.storeName}</Text> : null}
         <Text style={styles.invoiceDate}>{data.inboundDateLabel}</Text>
         {data.packItemLabel && !isPackagingStockInLineBarcode(data.barcode) ? (
           <View style={styles.packSeqBadge}>
-            <Text style={styles.packSeqLabel}>{packItemSeqLabel ?? '包内序号'}</Text>
+            <Text style={styles.packSeqLabel}>{packItemSeqLabel ?? t.invoice.packItemSeq}</Text>
             <Text style={styles.packSeqValue}>{data.packItemLabel}</Text>
           </View>
         ) : null}
@@ -84,45 +88,52 @@ export function InboundInvoiceContent({
 
       <View style={styles.divider} />
 
-      <InvoiceRow label="客户姓名" value={data.recipientName} />
-      {data.recipientPhone ? <InvoiceRow label="电话" value={data.recipientPhone} /> : null}
-      <InvoiceRow label="商品名称" value={data.productName} />
-      {data.packaging ? <InvoiceRow label="商品包装" value={data.packaging} /> : null}
-      <InvoiceRow label="最终目的地" value={data.destination} />
-      {data.detailAddress ? <InvoiceRow label="详细地址" value={data.detailAddress} /> : null}
-      {data.spec ? <InvoiceRow label="规格" value={data.spec} /> : null}
-      {data.weight ? <InvoiceRow label="重量" value={data.weight} /> : null}
-      <InvoiceRow label="数量" value={`${data.qty} ${stockUnitLabel()}`} />
-      {data.totalFee ? <InvoiceRow label="总费用" value={`${data.totalFee} MMK`} highlight /> : null}
-      {data.paymentLabel ? <InvoiceRow label="付款方式" value={data.paymentLabel} /> : null}
-      {data.note ? <InvoiceRow label="备注" value={data.note} /> : null}
+      <InvoiceRow label={t.invoice.customerName} value={data.recipientName} />
+      {data.recipientPhone ? <InvoiceRow label={t.invoice.phone} value={data.recipientPhone} /> : null}
+      <InvoiceRow label={t.invoice.productName} value={data.productName} />
+      {data.packaging ? <InvoiceRow label={t.invoice.packaging} value={data.packaging} /> : null}
+      <InvoiceRow label={t.invoice.finalDest} value={data.destination} />
+      {data.detailAddress ? <InvoiceRow label={t.invoice.detailAddress} value={data.detailAddress} /> : null}
+      {data.spec ? <InvoiceRow label={t.invoice.spec} value={data.spec} /> : null}
+      {data.weight ? <InvoiceRow label={t.invoice.weight} value={data.weight} /> : null}
+      <InvoiceRow label={t.invoice.qty} value={`${data.qty} ${stockUnitLabel()}`} />
+      {data.totalFee ? (
+        <InvoiceRow label={t.invoice.totalFee} value={`${data.totalFee} MMK`} highlight />
+      ) : null}
+      {data.paymentLabel ? (
+        <InvoiceRow label={t.invoice.payment} value={getPaymentLabelDisplay(t, data.paymentLabel)} />
+      ) : null}
+      {data.note ? <InvoiceRow label={t.invoice.note} value={data.note} /> : null}
 
       {data.signReceipt ? (
         <View style={styles.signReceiptSection}>
-          <Text style={styles.signReceiptTitle}>签收留痕</Text>
+          <Text style={styles.signReceiptTitle}>{t.invoice.signTrace}</Text>
           {data.signReceipt.pickupType === 'proxy' ? (
             <>
-              <InvoiceRow label="代收电话" value={data.signReceipt.signPhone} highlight />
+              <InvoiceRow label={t.invoice.proxyPhone} value={data.signReceipt.signPhone} highlight />
               <InvoiceRow
-                label="代收人"
+                label={t.invoice.proxyName}
                 value={data.signReceipt.proxyName?.trim() || '—'}
               />
             </>
           ) : (
-            <InvoiceRow label="签收方式" value={pickupTypeLabel(data.signReceipt.pickupType)} />
+            <InvoiceRow
+              label={t.invoice.pickupMethod}
+              value={pickupTypeLabel(data.signReceipt.pickupType, pickupLabels)}
+            />
           )}
           {data.signReceipt.signedByOperator ? (
-            <InvoiceRow label="操作员" value={data.signReceipt.signedByOperator} />
+            <InvoiceRow label={t.invoice.operator} value={data.signReceipt.signedByOperator} />
           ) : null}
           {data.signReceipt.signedAt ? (
             <InvoiceRow
-              label="签收时间"
+              label={t.invoice.signedAt}
               value={formatSignTime(data.signReceipt.signedAt)}
             />
           ) : null}
           {data.signReceipt.signatureStrokes.length > 0 ? (
             <View style={styles.signatureBlock}>
-              <Text style={styles.signatureLabel}>收件人签名</Text>
+              <Text style={styles.signatureLabel}>{t.invoice.recipientSignature}</Text>
               <SignaturePreview strokes={data.signReceipt.signatureStrokes} />
             </View>
           ) : null}
@@ -130,7 +141,7 @@ export function InboundInvoiceContent({
       ) : null}
 
       <View style={styles.barcodeBlock}>
-        <Text style={styles.barcodeBlockTitle}>条码信息</Text>
+        <Text style={styles.barcodeBlockTitle}>{t.invoice.barcodeInfo}</Text>
         {copyLabels ? (
           <View style={styles.copyBlock}>
             <CopyableCodeRow
@@ -167,6 +178,7 @@ export function InboundInvoiceFooter({
   onSignDelivered?: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const phone = recipientPhone?.trim() ?? '';
   const showSign = canSignDelivered && onSignDelivered;
 
@@ -177,7 +189,7 @@ export function InboundInvoiceFooter({
           style={inboundInvoiceStyles.btnCall}
           onPress={() => void callPhoneNumber(phone)}
         >
-          <Text style={inboundInvoiceStyles.btnCallText}>📞 呼叫客户</Text>
+          <Text style={inboundInvoiceStyles.btnCallText}>{t.invoice.callCustomer}</Text>
         </Pressable>
       ) : null}
       {showSign ? (
@@ -190,12 +202,12 @@ export function InboundInvoiceFooter({
           disabled={signing}
         >
           <Text style={inboundInvoiceStyles.btnSignText}>
-            {signing ? '签收中…' : '✓ 已签收'}
+            {signing ? t.common.signInProgress : t.common.signedMark}
           </Text>
         </Pressable>
       ) : null}
       <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
-        <Text style={inboundInvoiceStyles.btnCloseText}>关闭</Text>
+        <Text style={inboundInvoiceStyles.btnCloseText}>{t.invoice.close}</Text>
       </Pressable>
     </View>
   );

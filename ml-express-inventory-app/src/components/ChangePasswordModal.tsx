@@ -220,7 +220,15 @@ export default function ChangePasswordModal({ visible, storeCode, onClose, onSuc
                   ))}
                 </View>
                 <Text style={[styles.strengthLabel, { color: strength.color }]}>
-                  {strength.label}
+                  {strength.labelKey === 'empty'
+                    ? t.changePassword.strengthEmpty
+                    : strength.labelKey === 'tooShort'
+                      ? t.changePassword.strengthTooShort
+                      : strength.labelKey === 'fair'
+                        ? t.changePassword.strengthFair
+                        : strength.labelKey === 'good'
+                          ? t.changePassword.strengthGood
+                          : t.changePassword.strengthExcellent}
                 </Text>
               </View>
 

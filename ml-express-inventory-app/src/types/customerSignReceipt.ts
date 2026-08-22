@@ -15,9 +15,19 @@ export type CustomerSignReceipt = CustomerSignReceiptInput & {
   signedAt?: string;
 };
 
-export function pickupTypeLabel(type: CustomerSignPickupType | string | undefined): string {
-  if (type === 'proxy') return '代收';
-  if (type === 'self') return '本人签收';
+export type CustomerSignValidationCode =
+  | 'signNeedPickupType'
+  | 'signNeedProxyPhone'
+  | 'signInvalidPhone'
+  | 'signNeedProxyName'
+  | 'signNeedSignature';
+
+export function pickupTypeLabel(
+  type: CustomerSignPickupType | string | undefined,
+  labels: { self: string; proxy: string },
+): string {
+  if (type === 'proxy') return labels.proxy;
+  if (type === 'self') return labels.self;
   return '';
 }
 
@@ -55,20 +65,22 @@ export function countSignaturePoints(strokes: SignatureStroke[]): number {
   return strokes.reduce((sum, stroke) => sum + stroke.length, 0);
 }
 
-export function validateCustomerSignReceipt(input: CustomerSignReceiptInput): string | null {
+export function validateCustomerSignReceipt(
+  input: CustomerSignReceiptInput,
+): CustomerSignValidationCode | null {
   if (input.pickupType !== 'self' && input.pickupType !== 'proxy') {
-    return '请选择本人签收或代收';
+    return 'signNeedPickupType';
   }
 
   if (input.pickupType === 'proxy') {
     const phone = input.signPhone.trim();
-    if (!phone) return '请填写代收人电话';
-    if (phone.replace(/\D/g, '').length < 6) return '电话格式不正确';
-    if (!input.proxyName?.trim()) return '请填写代收人姓名';
+    if (!phone) return 'signNeedProxyPhone';
+    if (phone.replace(/\D/g, '').length < 6) return 'signInvalidPhone';
+    if (!input.proxyName?.trim()) return 'signNeedProxyName';
   }
 
   if (countSignaturePoints(input.signatureStrokes) < 8) {
-    return '请收件人在签名区手写签名';
+    return 'signNeedSignature';
   }
 
   return null;

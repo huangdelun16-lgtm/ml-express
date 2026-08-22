@@ -232,7 +232,7 @@ export async function applyStockMovement(params: {
   operationId?: string;
 }): Promise<{ item: InventoryItem; movement: StockMovement }> {
   const qty = Math.abs(Number(params.qty));
-  if (!qty) throw new Error('数量必须大于 0');
+  if (!qty) throw svc('qtyMustBePositive');
   let item = await getItemByBarcode(params.barcode);
   if (!item && params.type === 'in' && params.createIfMissing) {
     const createdAt = params.inboundAt || nowIso();
@@ -254,10 +254,10 @@ export async function applyStockMovement(params: {
       updated_at: createdAt,
     };
   }
-  if (!item) throw new Error('未找到该商品');
+  if (!item) throw svc('itemNotFoundByBarcode');
   const before = item.qty_on_hand;
   const after = params.type === 'in' ? before + qty : params.type === 'out' ? before - qty : qty;
-  if (after < 0) throw new Error('库存不足');
+  if (after < 0) throw svc('insufficientStock', { current: before, need: qty });
   const ts = params.inboundAt || nowIso();
   const pendingItem: InventoryItem = {
     ...item,
@@ -304,10 +304,10 @@ export async function createPackedShipment(params: {
   const normalizedLines =
     params.itemLines ??
     (params.itemIds ?? []).map((itemId) => ({ itemId, qty: 1 }));
-  if (normalizedLines.length === 0) throw new Error('选中的订单不可打包');
+  if (normalizedLines.length === 0) throw svc('selectedItemsCannotPack');
   const items = await Promise.all(normalizedLines.map((line) => getItemById(line.itemId)));
   if (items.some((item, i) => !item || item.qty_on_hand < normalizedLines[i].qty)) {
-    throw new Error('选中的订单不可打包');
+    throw svc('selectedItemsCannotPack');
   }
   const ts = nowIso();
   const bundleItem: InventoryItem = {
@@ -376,9 +376,9 @@ export async function submitPackagingStockIn(params: {
   };
   lines: { barcode: string; inputBarcode: string; name: string; qty: number }[];
 }): Promise<{ bundleItem: InventoryItem }> {
-  if (params.lines.length === 0) throw new Error('选中的订单不可打包');
+  if (params.lines.length === 0) throw svc('selectedItemsCannotPack');
   const dest = params.destination.trim().toUpperCase();
-  if (!dest) throw new Error('请选择最终目的地');
+  if (!dest) throw svc('selectDestination');
 
   const storeCode = params.store.storeCode.trim().toUpperCase();
   const hub = resolveStoreHubCode(params.store);
@@ -488,9 +488,9 @@ export async function getPackedShipmentContainingItem(id: string): Promise<Packe
 
 export async function updatePackedShipment(packId: string, params: { bundle_name: string; spec: string; unit: string; weight: string }, actingStore?: InventoryStoreSession): Promise<void> {
   const pack = await getPackedShipmentById(packId);
-  if (!pack) throw new Error('未找到快递包');
+  if (!pack) throw svc('packNotFoundGeneric');
   const bundle = await getItemById(pack.bundle_item_id);
-  if (!bundle) throw new Error('未找到快递包商品');
+  if (!bundle) throw svc('bundleItemNotFound');
   const saved = await cloudUpsertItem({ ...bundle, name: params.bundle_name, spec: params.spec, unit: params.unit, weight: params.weight, updated_at: nowIso() }, actingStore);
   await createPack({ ...pack, bundle_name: saved.name }, pack.items, pack.loaded ? nowIso() : null, actingStore);
 }
@@ -512,9 +512,9 @@ export async function applyTruckLoadOutbound(params: {
     for (const pack of params.packs) {
       const synced = await ensureCloudPackRegistered(pack, params.actingStore);
       if (!synced) {
-        throw new Error(
-          `快递包 ${pack.bundle_barcode.trim().toUpperCase()} 未在云端登记，无法装车。请返回「打包」确认该包存在，或重新打包后再试。`,
-        );
+        throw svc('cloudPackNotRegistered', {
+          barcode: pack.bundle_barcode.trim().toUpperCase(),
+        });
       }
     }
   }
@@ -768,10 +768,10 @@ export async function markCustomerSigned(
   receipt?: CustomerSignReceiptInput,
 ): Promise<void> {
   const item = await getItemById(id);
-  if (!item) throw new Error('未找到订单');
-  if (!receipt) throw new Error('请填写签收人信息');
+  if (!item) throw svc('orderNotFoundOrDeleted');
+  if (!receipt) throw svc('signReceiptRequired');
   const validationError = validateCustomerSignReceipt(receipt);
-  if (validationError) throw new Error(validationError);
+  if (validationError) throw svc(validationError);
 
   await cloudUpsertItem({
     ...item,
@@ -967,7 +967,7 @@ export async function ensurePackHubReceivedAtStation(params: {
   knownPkg?: PkgTrackingDetail;
 }): Promise<PkgTrackingDetail> {
   const code = params.packBarcode.trim().toUpperCase();
-  if (!code) throw new Error('快递包号无效');
+  if (!code) throw svc('invalidPackBarcode');
 
   const inflight = ensurePackHubReceivedInFlight.get(code);
   if (inflight) return inflight;
@@ -977,7 +977,7 @@ export async function ensurePackHubReceivedAtStation(params: {
       await refreshInventoryCloudSession();
     }
     let pkg = params.knownPkg ?? (await getPkgTrackingDetail(code));
-    if (!pkg) throw new Error(`未找到快递包 ${code}`);
+    if (!pkg) throw svc('packNotFound');
 
     if (pkg.status === 'in_transit') {
       pkg = await confirmPkgHubReceived(code, params.store, params.hubCode);

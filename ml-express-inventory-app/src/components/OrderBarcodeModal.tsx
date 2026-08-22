@@ -8,9 +8,10 @@ import {
   View,
 } from 'react-native';
 import LabelBarcodeContent from './LabelBarcodeContent';
+import BluetoothScanModal from './BluetoothScanModal';
 import { useTranslation } from '../i18n';
-import { loadSavedBluetoothDevice } from '../services/bluetoothScanner';
 import { feedbackService } from '../services/FeedbackService';
+import { loadSavedBluetoothDevice } from '../services/bluetoothScanner';
 import { resolvePrintError, runBarcodeLabelPrint } from '../services/labelPrintFlow';
 
 export type OrderBarcodeData = {
@@ -41,33 +42,44 @@ export default function OrderBarcodeModal({
 }: Props) {
   const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   useEffect(() => {
-    if (!visible) setPrinting(false);
+    if (!visible) {
+      setPrinting(false);
+      setPickerVisible(false);
+    }
   }, [visible]);
 
   const finish = () => {
     setPrinting(false);
+    setPickerVisible(false);
     onDone?.();
     onClose();
+  };
+
+  const printNow = async (payload: OrderBarcodeData) => {
+    await runBarcodeLabelPrint(payload);
+    feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
   };
 
   const handlePrint = () => {
     if (printing || !data) return;
     setPrinting(true);
     void (async () => {
+      let openedPicker = false;
       try {
         const saved = await loadSavedBluetoothDevice();
         if (!saved) {
-          feedbackService.notify(t.settings.printFailed, t.settings.scanPrinterNotConfigured);
+          openedPicker = true;
+          setPickerVisible(true);
           return;
         }
-        await runBarcodeLabelPrint(data);
-        feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
+        await printNow(data);
       } catch (error) {
         feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
       } finally {
-        setPrinting(false);
+        if (!openedPicker) setPrinting(false);
       }
     })();
   };
@@ -106,6 +118,26 @@ export default function OrderBarcodeModal({
           </Pressable>
         </View>
       </View>
+
+      <BluetoothScanModal
+        visible={pickerVisible}
+        onClose={() => {
+          setPickerVisible(false);
+          setPrinting(false);
+        }}
+        onConnected={() => {
+          setPickerVisible(false);
+          void (async () => {
+            try {
+              await printNow(data);
+            } catch (error) {
+              feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
+            } finally {
+              setPrinting(false);
+            }
+          })();
+        }}
+      />
     </Modal>
   );
 }

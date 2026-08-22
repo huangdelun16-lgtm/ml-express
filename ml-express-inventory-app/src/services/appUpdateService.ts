@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { Linking } from 'react-native';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { rewritePublicStorageUrl } from './nativeSupabaseUrl';
 import {
   isAndroidUpdateAvailable,
   parseAndroidRelease,
@@ -52,7 +53,7 @@ export async function checkAndroidAppUpdate(): Promise<{
 }
 
 export async function openAndroidApkDownload(url: string): Promise<void> {
-  const apkUrl = url.trim();
+  const apkUrl = rewritePublicStorageUrl(url.trim());
   if (!apkUrl) throw new Error('APK download URL is missing');
   const canOpen = await Linking.canOpenURL(apkUrl);
   if (!canOpen) throw new Error('Cannot open APK download link');

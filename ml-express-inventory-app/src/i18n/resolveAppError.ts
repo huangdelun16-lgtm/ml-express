@@ -46,7 +46,7 @@ export function resolveAppError(t: TranslationDict, error: unknown): string {
     if (isInventoryRlsPolicyError(error.message)) {
       return formatServiceError(t, 'syncRlsBlocked');
     }
-    if (/network|fetch|timeout|failed to fetch|offline/i.test(error.message)) {
+    if (/network|fetch|timeout|failed to fetch|offline|LIST_PAGE_LIMIT/i.test(error.message)) {
       return formatServiceError(t, 'syncNetworkFailed');
     }
     const devHint = __DEV__ ? getSupabaseConfigHint() : '';

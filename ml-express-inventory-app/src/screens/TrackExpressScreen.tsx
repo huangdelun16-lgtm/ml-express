@@ -229,23 +229,29 @@ function TrackResultPanel({
       </Section>
 
       {detail.sign_receipt ? (
-        <Section title="签收留痕">
+        <Section title={t.invoice.signTrace}>
           {detail.sign_receipt.pickupType === 'proxy' ? (
             <>
-              <DetailRow label="代收电话" value={detail.sign_receipt.signPhone} />
-              <DetailRow label="代收人" value={detail.sign_receipt.proxyName} />
+              <DetailRow label={t.invoice.proxyPhone} value={detail.sign_receipt.signPhone} />
+              <DetailRow label={t.invoice.proxyName} value={detail.sign_receipt.proxyName} />
             </>
           ) : (
-            <DetailRow label="签收方式" value={pickupTypeLabel(detail.sign_receipt.pickupType)} />
+            <DetailRow
+              label={t.invoice.pickupMethod}
+              value={pickupTypeLabel(detail.sign_receipt.pickupType, {
+                self: t.sign.pickupSelf,
+                proxy: t.sign.pickupProxy,
+              })}
+            />
           )}
-          <DetailRow label="操作员" value={detail.sign_receipt.signedByOperator} />
+          <DetailRow label={t.invoice.operator} value={detail.sign_receipt.signedByOperator} />
           <DetailRow
-            label="签收时间"
+            label={t.invoice.signedAt}
             value={detail.sign_receipt.signedAt ? formatTime(detail.sign_receipt.signedAt) : ''}
           />
           {detail.sign_receipt.signatureStrokes.length > 0 ? (
             <View style={styles.signatureBox}>
-              <Text style={styles.signatureLabel}>收件人签名</Text>
+              <Text style={styles.signatureLabel}>{t.invoice.recipientSignature}</Text>
               <SignaturePreview strokes={detail.sign_receipt.signatureStrokes} />
             </View>
           ) : null}
@@ -522,7 +528,7 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
           showTaskSuccess(
             t.common.signSuccess,
             signedCount > 1
-              ? `已签收 ${signedCount} 单`
+              ? fmt(t.sign.batchSignedCount, { count: signedCount })
               : fmt(t.common.signMarked, { name: detail.name }),
           );
         }}

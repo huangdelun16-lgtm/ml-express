@@ -32,7 +32,7 @@ async function currentScope(
     !hubCode ||
     hubCode !== authHub
   ) {
-    throw new Error('当前登录站点与手工收支范围不一致，请重新登录。');
+    throw svc('financeScopeMismatch');
   }
   return { store: authenticated, hubCode };
 }
@@ -62,7 +62,7 @@ export async function listCrossBorderManualEntries(
     rows.push(...pageRows);
     if (pageRows.length < pageSize) return rows;
   }
-  throw new Error('手工收支记录数量超过安全读取上限，请联系管理员。');
+  throw svc('listTooLarge');
 }
 
 export async function createCrossBorderManualEntry(

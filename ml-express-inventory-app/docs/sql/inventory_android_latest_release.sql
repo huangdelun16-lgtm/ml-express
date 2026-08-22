@@ -8,7 +8,7 @@ VALUES (
   jsonb_build_object(
     'version', '1.9.7',
     'versionCode', 30,
-    'apkUrl', 'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/inventory-releases/ml-inventory-1.9.7-30.apk',
+    'apkUrl', 'https://admin-market-link-express.com/__sb/storage/v1/object/public/inventory-releases/ml-inventory-1.9.7-30.apk',
     'releaseNotes', '多个入库；标签打印居中；单个/多个入库命名优化'
   ),
   'Inventory App Android 最新 APK 发布信息（versionCode 须大于旧版才会提示更新）',

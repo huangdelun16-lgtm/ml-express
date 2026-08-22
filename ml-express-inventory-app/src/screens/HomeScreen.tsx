@@ -5,10 +5,10 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import Text from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,7 +17,7 @@ import type { PackedShipmentListRow } from '../types/inventory';
 import { packStatusStyle } from '../utils/packDisplayStatus';
 import { LOGIN_LOGO } from '../constants/branding';
 import { regionDisplayLabel } from '../constants/destinationOptions';
-import { getPackStatusLabel, useTranslation } from '../i18n';
+import { getPackStatusLabel, resolveAppError, useTranslation } from '../i18n';
 import { feedbackService } from '../services/FeedbackService';
 
 type Nav = { navigate: (name: string, params?: { presetCode?: string }) => void };
@@ -43,15 +43,20 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
   });
   const [recentPacks, setRecentPacks] = useState<PackedShipmentListRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
-
-    const { stats: nextStats, recentPacks: nextPacks } = await getHomeOverview(scope);
-    setStats(nextStats);
-    setRecentPacks(nextPacks);
-  }, [store, hubCode]);
+    try {
+      const { stats: nextStats, recentPacks: nextPacks } = await getHomeOverview(scope);
+      setStats(nextStats);
+      setRecentPacks(nextPacks);
+      setLoadError('');
+    } catch (error) {
+      setLoadError(resolveAppError(t, error) || t.home.loadFailed);
+    }
+  }, [store, hubCode, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -110,8 +115,11 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
           tintColor="#38bdf8"
           onRefresh={async () => {
             setRefreshing(true);
-            await load();
-            setRefreshing(false);
+            try {
+              await load();
+            } finally {
+              setRefreshing(false);
+            }
           }}
         />
       }
@@ -159,6 +167,20 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
           </View>
         </View>
       </View>
+
+      {loadError ? (
+        <View style={styles.inlineError}>
+          <Text style={styles.errorText}>{loadError}</Text>
+          <Pressable
+            style={styles.retryBtn}
+            onPress={() => void load()}
+            accessibilityRole="button"
+            accessibilityLabel={t.common.retry}
+          >
+            <Text style={styles.retryBtnText}>{t.common.retry}</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.queryCard}>
         <View style={styles.queryHeader}>
@@ -467,6 +489,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(248,113,113,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.28)',
+  },
+  errorText: { color: '#fca5a5', flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  retryBtn: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#f87171',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  retryBtnText: { color: '#fecaca', fontWeight: '800', fontSize: 12 },
   section: { marginBottom: 16 },
   sectionLabel: {
     color: '#64748b',

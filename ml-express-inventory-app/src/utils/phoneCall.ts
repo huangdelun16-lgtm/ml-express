@@ -1,4 +1,5 @@
 import { Linking } from 'react-native';
+import { tRuntime } from '../i18n/runtime';
 import { feedbackService } from '../services/FeedbackService';
 
 /** 拨号：仅保留数字与 + 号 */
@@ -8,8 +9,9 @@ export function normalizePhoneForDial(raw: string): string {
 
 export async function callPhoneNumber(raw: string): Promise<void> {
   const phone = normalizePhoneForDial(raw);
+  const t = tRuntime();
   if (!phone) {
-    feedbackService.notify('提示', '暂无客户电话');
+    feedbackService.notify(t.common.tip, t.common.noPhone);
     return;
   }
 
@@ -17,11 +19,14 @@ export async function callPhoneNumber(raw: string): Promise<void> {
   try {
     const can = await Linking.canOpenURL(url);
     if (!can) {
-      feedbackService.notify('无法拨打', '当前设备不支持拨号');
+      feedbackService.notify(t.common.cannotDialTitle, t.common.cannotDial);
       return;
     }
     await Linking.openURL(url);
   } catch (e: unknown) {
-    feedbackService.notify('拨打失败', e instanceof Error ? e.message : '请重试');
+    feedbackService.notify(
+      t.common.dialFailed,
+      e instanceof Error ? e.message : t.common.retry,
+    );
   }
 }
