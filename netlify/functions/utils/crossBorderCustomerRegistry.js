@@ -12,9 +12,9 @@ function normalizeCustomerPhone(phone) {
   return p;
 }
 
-/** 客户编码：区域 2–6 字母 + YYMMDD + 3 位序号 */
+/** 客户编码：区域 2–6 字母 + YYMMDD + 单日客量 + 3 位推销员序号（旧码无单日客量，共 9 位数字） */
 function looksLikeCustomerCode(value) {
-  return /^[A-Z]{2,6}\d{9}$/.test(String(value || '').trim().toUpperCase());
+  return /^[A-Z]{2,6}\d{9,}$/.test(String(value || '').trim().toUpperCase());
 }
 
 function buildCrossBorderCustomerRegistry(customers) {

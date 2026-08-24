@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 /** Upstream Supabase project (server-side only; browsers use same-origin /__sb). */
 export const SUPABASE_UPSTREAM_HOST = 'uopkyuluxnrewvlmutam.supabase.co';
 
-/** Cloudflare Worker — Realtime WebSocket fallback (Netlify rewrites cannot upgrade WS). */
+/** Cloudflare Worker — kept for native / diagnostics; production Admin must not dial this WS. */
 export const SUPABASE_WORKER_ORIGIN = 'https://ml-supabase-proxy.huangdelun16.workers.dev';
 export const SUPABASE_BROWSER_PROXY_URL = SUPABASE_WORKER_ORIGIN;
 export const SUPABASE_WORKER_HOST = 'ml-supabase-proxy.huangdelun16.workers.dev';
@@ -59,16 +59,22 @@ export function resolveBrowserSupabaseUrl(raw?: string): string {
 }
 
 /**
- * Netlify 200 rewrites proxy HTTP but not WebSocket upgrades.
- * Point Realtime at the Cloudflare Worker while REST/auth stay on /__sb.
+ * Netlify 200 rewrites proxy HTTP but cannot upgrade WebSocket.
+ * Pointing Realtime at `*.workers.dev` TLS-resets in Myanmar (same as supabase.co).
+ * Production Admin therefore keeps REST on `/__sb` and does not dial Realtime WS.
+ * Dashboard / tracking pages poll instead.
  * @see https://answers.netlify.com/t/does-netlify-support-websocket-proxying/11230
  */
+export function isBrowserRealtimeAvailable(): boolean {
+  return !shouldUseSameOriginProxy();
+}
+
 export function applyNetlifyRealtimeFallback(client: SupabaseClient): void {
   if (!shouldUseSameOriginProxy()) return;
   const realtime = client.realtime as {
-    endPoint: string;
-    httpEndpoint: string;
+    disconnect?: () => void;
+    connect?: () => void;
   };
-  realtime.endPoint = SUPABASE_REALTIME_WS_FALLBACK;
-  realtime.httpEndpoint = `${SUPABASE_WORKER_ORIGIN}/realtime/v1`;
+  realtime.disconnect?.();
+  realtime.connect = () => undefined;
 }

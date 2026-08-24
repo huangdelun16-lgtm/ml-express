@@ -25,6 +25,7 @@ function tsplTextLine(
   text: string,
 ): string {
   const { xMul, yMul } = getTextPrintMul(widthDots, heightDots, text);
+  // 字体 "2" = 12×20 点阵，与预览 TSPL_TEXT_* 一致
   return `TEXT ${x},${y},"2",0,${xMul},${yMul},"${escapeTsplText(truncateLabelText(text, 24))}"`;
 }
 

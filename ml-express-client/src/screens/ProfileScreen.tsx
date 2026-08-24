@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LoggerService from './../services/LoggerService';
 import { profileTranslations } from './profile/profileTranslations';
 import { profileStyles as styles, meStyles as me } from './profile/profileStyles';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, ActivityIndicator, Image, Vibration } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Alert, Modal, TextInput, Switch, Dimensions, Linking, ActivityIndicator, Image, Vibration, Animated, Easing } from 'react-native';
 import { Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -45,7 +45,8 @@ import {
   openIosAppStore,
 } from '../services/appUpdateService';
 
-const { width } = Dimensions.get('window');
+const { width, height: WINDOW_H } = Dimensions.get('window');
+const SETTINGS_SHEET_SLIDE = Math.min(WINDOW_H * 0.72, 640);
 
 const MERCHANT_SESSION_KEYS = [
   'currentUser',
@@ -99,6 +100,58 @@ export default function ProfileScreen({ navigation }: any) {
   const [toReviewCount, setToReviewCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
+  const settingsSheetClosing = useRef(false);
+  const settingsSheetY = useRef(new Animated.Value(SETTINGS_SHEET_SLIDE)).current;
+  const settingsOverlayOpacity = useRef(new Animated.Value(0)).current;
+
+  const openSettingsSheet = useCallback(() => {
+    settingsSheetClosing.current = false;
+    settingsSheetY.setValue(SETTINGS_SHEET_SLIDE);
+    settingsOverlayOpacity.setValue(0);
+    setShowSettingsSheet(true);
+  }, [settingsOverlayOpacity, settingsSheetY]);
+
+  const playSettingsSheetIn = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(settingsOverlayOpacity, {
+        toValue: 1,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(settingsSheetY, {
+        toValue: 0,
+        damping: 26,
+        stiffness: 280,
+        mass: 0.86,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [settingsOverlayOpacity, settingsSheetY]);
+
+  const closeSettingsSheet = useCallback((afterClose?: () => void) => {
+    if (!showSettingsSheet || settingsSheetClosing.current) return;
+    settingsSheetClosing.current = true;
+    Animated.parallel([
+      Animated.timing(settingsOverlayOpacity, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(settingsSheetY, {
+        toValue: SETTINGS_SHEET_SLIDE,
+        duration: 240,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      settingsSheetClosing.current = false;
+      if (!finished) return;
+      setShowSettingsSheet(false);
+      afterClose?.();
+    });
+  }, [settingsOverlayOpacity, settingsSheetY, showSettingsSheet]);
 
   // Toast状态
   const [toastVisible, setToastVisible] = useState(false);
@@ -1194,7 +1247,7 @@ export default function ProfileScreen({ navigation }: any) {
           <View style={me.menuDivider} />
           <TouchableOpacity
             style={[me.menuRow, { paddingBottom: 4 }]}
-            onPress={() => setShowSettingsSheet(true)}
+            onPress={openSettingsSheet}
           >
             <View style={me.menuIcon}><ClayGear size={26} /></View>
             <Text style={me.menuLabel}>{t.settings}</Text>
@@ -1228,37 +1281,56 @@ export default function ProfileScreen({ navigation }: any) {
       <Modal
         visible={showSettingsSheet}
         transparent
-        animationType="slide"
-        onRequestClose={() => setShowSettingsSheet(false)}
+        animationType="none"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        onShow={playSettingsSheetIn}
+        onRequestClose={() => closeSettingsSheet()}
       >
-        <View style={me.sheetOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowSettingsSheet(false)} />
-          <View style={[me.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <View style={me.sheetHandle} />
+        <View style={me.sheetRoot}>
+          <Animated.View
+            pointerEvents="none"
+            style={[me.sheetDim, { opacity: settingsOverlayOpacity }]}
+          />
+          <TouchableOpacity
+            style={me.sheetDismissZone}
+            activeOpacity={1}
+            onPress={() => closeSettingsSheet()}
+          />
+          <Animated.View
+            style={[
+              me.sheet,
+              {
+                paddingBottom: Math.max(insets.bottom, 16),
+                transform: [{ translateY: settingsSheetY }],
+              },
+            ]}
+          >
+            <View style={me.sheetHandle} pointerEvents="none" />
             <Text style={me.sheetTitle}>{t.extraSettings}</Text>
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); handleEditProfile(); }}>
+              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleEditProfile)}>
                 <Ionicons name="person-circle-outline" size={22} color="#2C98A6" />
                 <Text style={me.sheetRowText}>{t.editProfile}</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); handleLogin(); }}>
+              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleLogin)}>
                 <Ionicons name="log-in-outline" size={22} color="#2C98A6" />
                 <Text style={me.sheetRowText}>{t.login}</Text>
               </TouchableOpacity>
             )}
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); setShowRechargeModal(true); }}>
+              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(() => setShowRechargeModal(true))}>
                 <Ionicons name="wallet-outline" size={22} color="#2C98A6" />
                 <Text style={me.sheetRowText}>{t.recharge}</Text>
                 <Text style={me.sheetMeta}>{formatMoney(accountBalance)} MMK</Text>
               </TouchableOpacity>
             ) : null}
-            <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); navigation.navigate('NotificationCenter'); }}>
+            <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(() => navigation.navigate('NotificationCenter'))}>
               <Ionicons name="notifications-outline" size={22} color="#2C98A6" />
                 <Text style={me.sheetRowText}>{t.inbox}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); openNotificationSettings(); }}>
+            <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(openNotificationSettings)}>
               <Ionicons name="settings-outline" size={22} color="#2C98A6" />
               <Text style={me.sheetRowText}>{t.notifications}</Text>
             </TouchableOpacity>
@@ -1273,25 +1345,25 @@ export default function ProfileScreen({ navigation }: any) {
               />
             </View>
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); setShowPasswordModal(true); }}>
+              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(() => setShowPasswordModal(true))}>
                 <Ionicons name="lock-closed-outline" size={22} color="#2C98A6" />
                 <Text style={me.sheetRowText}>{t.changePassword}</Text>
               </TouchableOpacity>
             ) : null}
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); handleLogout(); }}>
+              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleLogout)}>
                 <Ionicons name="log-out-outline" size={22} color="#ef4444" />
                 <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.logout}</Text>
               </TouchableOpacity>
             ) : null}
             {!isGuest ? (
-              <TouchableOpacity style={me.sheetRow} onPress={() => { setShowSettingsSheet(false); handleDeleteAccount(); }}>
+              <TouchableOpacity style={me.sheetRow} onPress={() => closeSettingsSheet(handleDeleteAccount)}>
                 <Ionicons name="trash-outline" size={22} color="#ef4444" />
                 <Text style={[me.sheetRowText, { color: '#ef4444' }]}>{t.deleteAccount}</Text>
               </TouchableOpacity>
             ) : null}
             <Text style={me.sheetVer}>v{appVersion}</Text>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 

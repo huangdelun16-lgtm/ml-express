@@ -1,4 +1,6 @@
 import {
+  applyNetlifyRealtimeFallback,
+  isBrowserRealtimeAvailable,
   resolveBrowserSupabaseUrl,
   SUPABASE_BROWSER_PROXY_URL,
   SUPABASE_UPSTREAM_HOST,
@@ -48,5 +50,19 @@ describe('resolveBrowserSupabaseUrl', () => {
     expect(new URL('rest/v1', resolveBrowserSupabaseUrl(UPSTREAM)).href).toBe(
       'https://admin-market-link-express.com/__sb/rest/v1',
     );
+    expect(isBrowserRealtimeAvailable()).toBe(false);
+
+    const realtime = { connect: jest.fn(), disconnect: jest.fn() };
+    applyNetlifyRealtimeFallback({ realtime } as never);
+    expect(realtime.disconnect).toHaveBeenCalled();
+    expect(realtime.connect()).toBeUndefined();
+  });
+
+  it('localhost keeps Realtime available and does not stub the client', () => {
+    expect(isBrowserRealtimeAvailable()).toBe(true);
+    const realtime = { connect: jest.fn(), disconnect: jest.fn() };
+    applyNetlifyRealtimeFallback({ realtime } as never);
+    expect(realtime.disconnect).not.toHaveBeenCalled();
+    expect(realtime.connect).not.toHaveBeenCalled();
   });
 });

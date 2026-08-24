@@ -9,6 +9,11 @@ import { useTranslation } from '../../i18n';
 import { colors, radius, space } from '../../theme';
 import ScanRefBanner from './ScanRefBanner';
 
+/** 入库向导暂不展示；自动计费与写入流水仍保留，订单详情继续显示 */
+const SHOW_TOTAL_FEE_FIELD = false;
+/** 费用页暂不展示详细地址；草稿 / 提交 / 订单详情仍可保留已有值 */
+const SHOW_DETAIL_ADDRESS_FIELD = false;
+
 export default function StockInStepFee({
   scan,
   destination,
@@ -83,17 +88,19 @@ export default function StockInStepFee({
           value={destination}
           onChange={onDestinationChange}
         />
-        <InboundFormField
-          label={t.stockIn.detailAddress}
-          value={detailAddress}
-          onChange={onDetailAddressChange}
-          placeholder={t.stockIn.detailAddress}
-          multiline
-          inputRef={chain.detail.inputRef}
-          returnKeyType={chain.detail.returnKeyType}
-          onSubmitEditing={chain.detail.onSubmitEditing}
-          blurOnSubmit={chain.detail.blurOnSubmit}
-        />
+        {SHOW_DETAIL_ADDRESS_FIELD ? (
+          <InboundFormField
+            label={t.stockIn.detailAddress}
+            value={detailAddress}
+            onChange={onDetailAddressChange}
+            placeholder={t.stockIn.detailAddress}
+            multiline
+            inputRef={chain.detail.inputRef}
+            returnKeyType={chain.detail.returnKeyType}
+            onSubmitEditing={chain.detail.onSubmitEditing}
+            blurOnSubmit={chain.detail.blurOnSubmit}
+          />
+        ) : null}
         <DimensionSpecField
           l={specL}
           w={specW}
@@ -163,19 +170,23 @@ export default function StockInStepFee({
             </Pressable>
           </View>
         </View>
-        <InboundFormField
-          label={t.stockIn.totalFee}
-          value={totalFee}
-          onChange={(v) => onTotalFeeChange(sanitizeNumberInput(v))}
-          placeholder={t.manualEntry.amount}
-          keyboard="decimal-pad"
-          inputRef={chain.totalFee.inputRef}
-          returnKeyType={chain.totalFee.returnKeyType}
-          onSubmitEditing={chain.totalFee.onSubmitEditing}
-          blurOnSubmit={chain.totalFee.blurOnSubmit}
-        />
-        {feeFormulaHint && canAutoTotalFee && !totalFeeManual ? (
-          <Text style={styles.feeHint}>{feeFormulaHint}</Text>
+        {SHOW_TOTAL_FEE_FIELD ? (
+          <>
+            <InboundFormField
+              label={t.stockIn.totalFee}
+              value={totalFee}
+              onChange={(v) => onTotalFeeChange(sanitizeNumberInput(v))}
+              placeholder={t.manualEntry.amount}
+              keyboard="decimal-pad"
+              inputRef={chain.totalFee.inputRef}
+              returnKeyType={chain.totalFee.returnKeyType}
+              onSubmitEditing={chain.totalFee.onSubmitEditing}
+              blurOnSubmit={chain.totalFee.blurOnSubmit}
+            />
+            {feeFormulaHint && canAutoTotalFee && !totalFeeManual ? (
+              <Text style={styles.feeHint}>{feeFormulaHint}</Text>
+            ) : null}
+          </>
         ) : null}
         <InboundFormField
           label={t.stockIn.noteOptional}

@@ -16,7 +16,7 @@ import type { InventoryItem } from '../types/inventory';
 import { generateUniqueInboundBarcode } from '../utils/inboundBarcode';
 import { formatSpec, formatWeight, parseSpec, parseWeight } from '../utils/itemFieldFormat';
 import { inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
-import { normalizePackDestination } from '../constants/destinationOptions';
+import { destinationFromCustomerCode, normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   calculateCrossBorderTotalFee,
@@ -128,11 +128,18 @@ export default function StockInScreen({ route, navigation }: Props) {
     const weightKg = Number(weightN.trim()) || 0;
     const originHub = hubCode ?? (store ? resolveStoreHubCode(store) : '');
     let cancelled = false;
-    void fetchCrossBorderRoutePerKg(originHub, destination).then(
+    void fetchCrossBorderRoutePerKg(originHub, destination, customerCode).then(
       ({ perKg, originCode, destinationCode, usedLegacyFallback }) => {
         if (cancelled) return;
         setFeeFormulaHint(
-          formatCrossBorderFeeHint(originCode, destinationCode, perKg, weightKg, usedLegacyFallback),
+          formatCrossBorderFeeHint(
+            originCode,
+            destinationCode,
+            perKg,
+            weightKg,
+            usedLegacyFallback,
+            customerCode.trim().toUpperCase(),
+          ),
         );
         setTotalFee(String(calculateCrossBorderTotalFee(perKg, weightStr)));
       },
@@ -140,18 +147,27 @@ export default function StockInScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [step, destination, weightStr, weightN, totalFeeManual, canAutoTotalFee, hubCode, store]);
+  }, [step, destination, weightStr, weightN, totalFeeManual, canAutoTotalFee, hubCode, store, customerCode]);
 
   useEffect(() => {
     void loadStockInContactDraft().then((d) => {
       setCustomerCode(d.customerCode);
       setRecipientName(d.recipientName);
       setRecipientPhone(d.recipientPhone);
-      setDestination(normalizePackDestination(d.destination));
+      setDestination(
+        destinationFromCustomerCode(d.customerCode) || normalizePackDestination(d.destination),
+      );
       setDetailAddress(d.detailAddress);
       setPackaging(d.packaging);
     });
   }, []);
+
+  useEffect(() => {
+    const fromCode = destinationFromCustomerCode(customerCode);
+    if (!fromCode) return;
+    setDestination((prev) => (prev === fromCode ? prev : fromCode));
+    setTotalFeeManual(false);
+  }, [customerCode]);
 
   const applyPrefill = (prefill: NonNullable<Awaited<ReturnType<typeof getStockInPrefillByCode>>>) => {
     setItem(prefill.item);
@@ -164,7 +180,9 @@ export default function StockInScreen({ route, navigation }: Props) {
     setPackaging(prefill.packaging);
     setRecipientName(prefill.recipientName);
     setRecipientPhone(prefill.recipientPhone);
-    setDestination(normalizePackDestination(prefill.destination));
+    setDestination(
+      destinationFromCustomerCode(customerCode) || normalizePackDestination(prefill.destination),
+    );
     setDetailAddress(prefill.detailAddress);
     setQty(String(prefill.qty));
     setNote(prefill.note);
@@ -247,9 +265,10 @@ export default function StockInScreen({ route, navigation }: Props) {
         feedbackService.notify(t.common.tip, t.stockIn.alertItemName);
         return;
       }
-      if (!packaging) {
-        feedbackService.notify(t.common.tip, t.itemForm.alertPackaging);
-        return;
+      const fromCode = destinationFromCustomerCode(customerCode);
+      if (fromCode) {
+        setDestination(fromCode);
+        setTotalFeeManual(false);
       }
       setStep(3);
     }

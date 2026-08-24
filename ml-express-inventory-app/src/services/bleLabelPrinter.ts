@@ -12,7 +12,7 @@ import { buildTsplInboundLabel } from './tsplLabelBuilder';
 import type { LabelBarcodeLayoutConfig } from '../constants/labelBarcodeLayout';
 import {
   DEFAULT_LABEL_BARCODE_LAYOUT,
-  mergeAndCenterLabelLayout,
+  resolvePrintLayout,
 } from '../constants/labelBarcodeLayout';
 import type { LabelPaperSpec } from '../constants/labelPaperSpec';
 
@@ -168,11 +168,12 @@ export async function printOrderBarcodeLabel(
     barcode: printCode,
     inboundCode: printCode,
   };
-  const layout = mergeAndCenterLabelLayout(
+  const layout = resolvePrintLayout(
     baseLayout,
     layoutContent,
     paper?.widthMm,
     paper?.heightMm,
+    { lockPositions: Boolean(layoutOverride) },
   );
 
   const payload = buildTsplInboundLabel({

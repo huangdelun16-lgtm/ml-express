@@ -20,6 +20,9 @@ import {
   getBarcodePrintMetrics,
   getEffectiveElementWidthDots,
   getElementDimensions,
+  getTsplElementFrame,
+  resolvePrintLayout,
+  TSPL_TEXT_LINE_HEIGHT_DOTS,
   mmDeltaToLayoutDots,
   mmToLayoutDots,
   normalizeLabelBarcodeLayout,
@@ -381,6 +384,33 @@ describe('buildTsplInboundLabel with layout', () => {
       `BARCODE 24,60,"128",80,0,0,${metrics.narrow},${metrics.wide}`,
     );
     expect(metrics.widthDots).toBeGreaterThan(200);
+  });
+
+  it('preview frames match TSPL TEXT / BARCODE coordinates', () => {
+    const layout = buildDefaultCenteredLayout(SAMPLE_CONTENT, 58, 40);
+    const express = getTsplElementFrame(layout, 'expressNo', SAMPLE_CONTENT, 58);
+    const inbound = getTsplElementFrame(layout, 'inboundCode', SAMPLE_CONTENT, 58);
+    const barcode = getTsplElementFrame(layout, 'barcode', SAMPLE_CONTENT, 58);
+    const payload = buildTsplInboundLabel({
+      barcode: SAMPLE_CONTENT.barcode,
+      sheetKind: 'barcode',
+      layout,
+      extras: { inputBarcode: SAMPLE_CONTENT.expressNo },
+    });
+
+    expect(TSPL_TEXT_LINE_HEIGHT_DOTS).toBe(20);
+    expect(payload).toContain(`TEXT ${express.x},${express.y},"2"`);
+    expect(payload).toContain(`BARCODE ${barcode.x},${barcode.y},"128",${barcode.heightDots},`);
+    expect(payload).toContain(`TEXT ${inbound.x},${inbound.y},"2"`);
+  });
+
+  it('locks preview positions when printing the editor layout', () => {
+    const shifted = moveLabelGroup(DEFAULT_LABEL_BARCODE_LAYOUT, 12, 8, SAMPLE_CONTENT);
+    const locked = resolvePrintLayout(shifted, SAMPLE_CONTENT, 58, 40, { lockPositions: true });
+    const remargined = resolvePrintLayout(shifted, SAMPLE_CONTENT, 58, 40);
+    expect(locked.expressNo.x).toBe(shifted.expressNo.x);
+    expect(locked.barcode.y).toBe(shifted.barcode.y);
+    expect(remargined.barcode.x).not.toBe(shifted.barcode.x);
   });
 
   it('does not print human-readable text under barcode when inbound text is separate', () => {

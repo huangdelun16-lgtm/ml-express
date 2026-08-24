@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { fetchPendingMerchantApplicationCount } from '../services/merchantApplicationService';
 import { useAdminSessionReady } from '../hooks/useAdminSessionReady';
 import { ADMIN_TODOS_REFRESH_EVENT } from '../utils/adminTodoBridge';
+import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
 
 export type AdminTodoCounts = {
   pendingRecharge: number;
@@ -118,29 +119,32 @@ export const AdminTodoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (!sessionReady) return;
 
-    const channel = supabase
-      .channel('admin-dashboard-todos')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'recharge_requests' }, () => {
-        void refresh();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_alerts' }, () => {
-        void refresh();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'packages' }, () => {
-        void refresh();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        void refresh();
-      })
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    if (isBrowserRealtimeAvailable()) {
+      channel = supabase
+        .channel('admin-dashboard-todos')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'recharge_requests' }, () => {
+          void refresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_alerts' }, () => {
+          void refresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'packages' }, () => {
+          void refresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+          void refresh();
+        })
+        .subscribe();
+    }
 
     const fallbackTimer = window.setInterval(() => {
       void refresh();
-    }, 45000);
+    }, isBrowserRealtimeAvailable() ? 45000 : 20000);
 
     return () => {
       window.clearInterval(fallbackTimer);
-      void supabase.removeChannel(channel);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [sessionReady, refresh]);
 

@@ -7,6 +7,9 @@ import { useTranslation } from '../../i18n';
 import { colors } from '../../theme';
 import ScanRefBanner from './ScanRefBanner';
 
+/** 入库向导暂不展示；state / 草稿 / 提交仍保留 */
+const SHOW_PACKAGING_FIELD = false;
+
 export default function StockInStepCustomer({
   scan,
   customerCode,
@@ -99,7 +102,9 @@ export default function StockInStepCustomer({
           onSubmitEditing={chain.product.onSubmitEditing}
           blurOnSubmit={chain.product.blurOnSubmit}
         />
-        <PackagingPickerField value={packaging} onChange={onPackagingChange} />
+        {SHOW_PACKAGING_FIELD ? (
+          <PackagingPickerField value={packaging} onChange={onPackagingChange} />
+        ) : null}
       </InboundFormSection>
     </>
   );

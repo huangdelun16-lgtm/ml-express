@@ -71,6 +71,13 @@ export function getCode128PrintModules(code: string): number {
   return Math.max(1, total - QUIET_ZONE_MODULES * 2);
 }
 
+/** 与打印机 BARCODE "128" 一致的模块序列（不含左右 quiet zone） */
+export function getCode128PrintModuleRuns(code: string): Code128ModuleRun[] {
+  const runs = getCode128ModuleRuns(code);
+  if (runs.length < 3) return runs;
+  return runs.slice(1, -1);
+}
+
 export function buildCode128Svg(
   code: string,
   opts?: { scale?: number; height?: number; includeText?: boolean },

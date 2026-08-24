@@ -37,6 +37,7 @@ export function normalizePackDestination(value: string): PackDestination | '' {
   const upper = value.trim().toUpperCase();
   if (!upper) return '';
   if (upper.startsWith('RUILI')) return 'RUI';
+  if (upper.startsWith('MUSE')) return 'MSE';
   if ((PACK_DESTINATION_OPTIONS as readonly string[]).includes(upper)) {
     return upper as PackDestination;
   }
@@ -45,4 +46,9 @@ export function normalizePackDestination(value: string): PackDestination | '' {
     return prefix as PackDestination;
   }
   return '';
+}
+
+/** 客户编码前缀 → 最终目的地（MDY2608241001 → MDY，RUILI… → RUI） */
+export function destinationFromCustomerCode(customerCode: string): PackDestination | '' {
+  return normalizePackDestination(String(customerCode ?? '').trim());
 }

@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { lookupCrossBorderCustomer, type CrossBorderCustomerLookup } from '../services/crossBorderCustomerService';
-import { normalizePackDestination } from '../constants/destinationOptions';
+import { destinationFromCustomerCode } from '../constants/destinationOptions';
 
 type ApplyLookup = (match: CrossBorderCustomerLookup) => void;
 
@@ -56,7 +56,10 @@ export function applyCrossBorderCustomerToForm(
 ) {
   if (match.customer_name) setters.setRecipientName(match.customer_name);
   if (match.phone) setters.setRecipientPhone(match.phone);
-  if (match.delivery_area_code && setters.setDestination) {
-    setters.setDestination(normalizePackDestination(match.delivery_area_code));
+  if (setters.setDestination) {
+    const dest =
+      destinationFromCustomerCode(match.delivery_area_code) ||
+      destinationFromCustomerCode(match.customer_code);
+    if (dest) setters.setDestination(dest);
   }
 }

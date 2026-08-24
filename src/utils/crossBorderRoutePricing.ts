@@ -37,6 +37,86 @@ const HUB_ALIASES: Record<string, CrossBorderRouteHubCode> = {
 
 export type RouteMatrixValues = Record<string, Record<string, string>>;
 
+export type PricingCustomerOption = {
+  code: string;
+  name: string;
+};
+
+/** 空字符串 = 默认路线价（未单独配置的客户回退用） */
+export const DEFAULT_PRICING_CUSTOMER_SCOPE = '';
+
+export function normalizeCustomerPricingCode(raw: string): string {
+  return String(raw ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+/** 客户编码前缀 / 送货区域 → 计费终点（MDY00000 → MDY，对应 RUILI→MDY 等进入该站的路线） */
+export function destinationHubFromCustomerCode(
+  customerCode: string,
+  deliveryAreaCode?: string,
+): CrossBorderRouteHubCode | '' {
+  const area = normalizeRouteHubCode(deliveryAreaCode ?? '');
+  if (area) return area;
+  const code = normalizeCustomerPricingCode(customerCode);
+  if (!code) return '';
+  if (code.startsWith('RUILI')) return 'RUI';
+  if (code.startsWith('MUSE')) return 'MSE';
+  return normalizeRouteHubCode(code.slice(0, 3));
+}
+
+export function collectPricingCustomerOptions(
+  registered: Array<{ customer_code?: string | null; customer_name?: string | null }>,
+  summaries: Array<{ customerCode?: string | null; customerName?: string | null }>,
+): PricingCustomerOption[] {
+  const names = new Map<string, string>();
+  for (const row of summaries) {
+    const code = normalizeCustomerPricingCode(row.customerCode ?? '');
+    if (!code) continue;
+    if (!names.has(code)) names.set(code, '');
+    const name = String(row.customerName ?? '').trim();
+    if (name && name !== '—') names.set(code, name);
+  }
+  for (const row of registered) {
+    const code = normalizeCustomerPricingCode(row.customer_code ?? '');
+    if (!code) continue;
+    const name = String(row.customer_name ?? '').trim();
+    if (name) names.set(code, name);
+    else if (!names.has(code)) names.set(code, '');
+  }
+  return Array.from(names.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([code, name]) => ({ code, name }));
+}
+
+type ParsedRoutePerKgKey = {
+  customerCode: string;
+  origin: CrossBorderRouteHubCode;
+  dest: CrossBorderRouteHubCode;
+};
+
+export function parseRoutePerKgSettingsKey(settingsKey: string): ParsedRoutePerKgKey | null {
+  const parts = String(settingsKey ?? '').split('.');
+  if (parts[0] !== 'pricing' || parts[1] !== 'cross_border' || parts[parts.length - 1] !== 'per_kg') {
+    return null;
+  }
+  if (parts.length === 6 && parts[2] === 'route') {
+    const origin = normalizeRouteHubCode(parts[3]);
+    const dest = normalizeRouteHubCode(parts[4]);
+    if (!origin || !dest || origin === dest) return null;
+    return { customerCode: '', origin, dest };
+  }
+  if (parts.length === 8 && parts[2] === 'customer' && parts[4] === 'route') {
+    const customerCode = normalizeCustomerPricingCode(parts[3]);
+    const origin = normalizeRouteHubCode(parts[5]);
+    const dest = normalizeRouteHubCode(parts[6]);
+    if (!customerCode || !origin || !dest || origin === dest) return null;
+    return { customerCode, origin, dest };
+  }
+  return null;
+}
+
 export function normalizeRouteHubCode(raw: string): CrossBorderRouteHubCode | '' {
   const upper = String(raw ?? '')
     .trim()
@@ -60,10 +140,15 @@ export function routeHubDisplay(code: string, isEn = false): string {
 export function buildRoutePerKgSettingsKey(
   origin: string,
   destination: string,
+  customerCode?: string | null,
 ): string | null {
   const from = normalizeRouteHubCode(origin);
   const to = normalizeRouteHubCode(destination);
   if (!from || !to || from === to) return null;
+  const customer = normalizeCustomerPricingCode(customerCode ?? '');
+  if (customer) {
+    return `pricing.cross_border.customer.${customer}.route.${from}.${to}.per_kg`;
+  }
   return `pricing.cross_border.route.${from}.${to}.per_kg`;
 }
 
@@ -80,46 +165,64 @@ export function emptyRouteMatrix(): RouteMatrixValues {
   return matrix;
 }
 
-export function mergeRouteMatrixFromDb(incoming: SystemSetting[]): RouteMatrixValues {
+export function mergeRouteMatrixFromDb(
+  incoming: SystemSetting[],
+  customerCode?: string | null,
+): RouteMatrixValues {
   const matrix = emptyRouteMatrix();
+  const scope = normalizeCustomerPricingCode(customerCode ?? '');
   incoming.forEach((setting) => {
-    const parts = setting.settings_key.split('.');
-    if (
-      parts.length !== 6 ||
-      parts[0] !== 'pricing' ||
-      parts[1] !== 'cross_border' ||
-      parts[2] !== 'route' ||
-      parts[5] !== 'per_kg'
-    ) {
-      return;
-    }
-    const origin = normalizeRouteHubCode(parts[3]);
-    const dest = normalizeRouteHubCode(parts[4]);
-    if (!origin || !dest || origin === dest) return;
+    const parsed = parseRoutePerKgSettingsKey(setting.settings_key);
+    if (!parsed) return;
+    if (parsed.customerCode !== scope) return;
     const numeric = parsePricingSettingValue(setting.settings_value);
     if (!Number.isFinite(numeric)) return;
-    matrix[origin][dest] = String(numeric);
+    matrix[parsed.origin][parsed.dest] = String(numeric);
   });
   return matrix;
 }
 
-export function buildRouteMatrixPayload(matrix: RouteMatrixValues): Array<Omit<SystemSetting, 'id'>> {
+export function customerHasRoutePricing(
+  incoming: SystemSetting[],
+  customerCode: string,
+): boolean {
+  const scope = normalizeCustomerPricingCode(customerCode);
+  if (!scope) return false;
+  return incoming.some((setting) => {
+    const parsed = parseRoutePerKgSettingsKey(setting.settings_key);
+    return Boolean(parsed && parsed.customerCode === scope);
+  });
+}
+
+export function buildRouteMatrixPayload(
+  matrix: RouteMatrixValues,
+  customerCode?: string | null,
+  options?: { destinations?: string[] },
+): Array<Omit<SystemSetting, 'id'>> {
   const payload: Array<Omit<SystemSetting, 'id'>> = [];
+  const customer = normalizeCustomerPricingCode(customerCode ?? '');
+  const customerPrefix = customer ? `${customer} · ` : '';
+  const destFilter = new Set(
+    (options?.destinations ?? [])
+      .map((code) => normalizeRouteHubCode(code))
+      .filter((code): code is CrossBorderRouteHubCode => Boolean(code)),
+  );
   for (const origin of CROSS_BORDER_ROUTE_HUBS) {
     for (const dest of CROSS_BORDER_ROUTE_HUBS) {
       if (origin.code === dest.code) continue;
+      if (destFilter.size > 0 && !destFilter.has(dest.code)) continue;
       const raw = matrix[origin.code]?.[dest.code] ?? '';
       const trimmed = String(raw).trim();
       if (!trimmed) continue;
       const numeric = Number(trimmed);
       if (!Number.isFinite(numeric) || numeric < 0) continue;
-      const key = buildRoutePerKgSettingsKey(origin.code, dest.code);
+      const key = buildRoutePerKgSettingsKey(origin.code, dest.code, customer || null);
       if (!key) continue;
       payload.push({
         category: 'pricing',
         settings_key: key,
         settings_value: numeric,
-        description: `${origin.display} → ${dest.display} cross-border per kg (MMK)`,
+        description: `${customerPrefix}${origin.display} → ${dest.display} cross-border per kg (MMK)`,
         updated_by: 'admin-dashboard',
       });
     }

@@ -1372,10 +1372,16 @@ export const meStyles = StyleSheet.create({
   langChipTextOn: {
     color: '#fff',
   },
-  sheetOverlay: {
+  sheetRoot: {
     flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.35)',
     justifyContent: 'flex-end',
+  },
+  sheetDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.4)',
+  },
+  sheetDismissZone: {
+    flex: 1,
   },
   sheet: {
     backgroundColor: '#fff',
@@ -1383,6 +1389,11 @@ export const meStyles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 10,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 16,
   },
   sheetHandle: {
     alignSelf: 'center',

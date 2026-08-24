@@ -37,7 +37,7 @@ import {
   sanitizeNumberInput,
 } from '../utils/itemFieldFormat';
 import { inboundBarcodeTimestampFromPackDate, inboundDateToIso, todayInMyanmar } from '../utils/stockInDate';
-import { normalizePackDestination } from '../constants/destinationOptions';
+import { destinationFromCustomerCode, normalizePackDestination } from '../constants/destinationOptions';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import {
   calculateCrossBorderTotalFee,
@@ -52,6 +52,9 @@ import {
   applyCrossBorderCustomerToForm,
   useCrossBorderCustomerLookup,
 } from '../hooks/useCrossBorderCustomerLookup';
+
+/** 入库向导暂不展示；自动计费与写入流水仍保留，订单详情继续显示 */
+const SHOW_TOTAL_FEE_FIELD = false;
 
 type PackagingScanLine = {
   id: string;
@@ -158,9 +161,18 @@ export default function PackagingStockInScreen({ navigation }: Props) {
       setCustomerCode(d.customerCode);
       setRecipientName(d.recipientName);
       setRecipientPhone(d.recipientPhone);
-      setBatchDestination(normalizePackDestination(d.destination));
+      setBatchDestination(
+        destinationFromCustomerCode(d.customerCode) || normalizePackDestination(d.destination),
+      );
     });
   }, []);
+
+  useEffect(() => {
+    const fromCode = destinationFromCustomerCode(customerCode);
+    if (!fromCode) return;
+    setBatchDestination((prev) => (prev === fromCode ? prev : fromCode));
+    setTotalFeeManual(false);
+  }, [customerCode]);
 
   useEffect(() => {
     if (step !== 3 || totalFeeManual || !canAutoTotalFee) return;
@@ -170,7 +182,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     const weightKg = Number(batchWeightN.trim()) || 0;
     void (async () => {
       const { perKg, originCode, destinationCode, usedLegacyFallback } =
-        await fetchCrossBorderRoutePerKg(originHub, dest);
+        await fetchCrossBorderRoutePerKg(originHub, dest, customerCode);
       if (cancelled) return;
       setFeeFormulaHint(
         formatCrossBorderFeeHint(
@@ -179,6 +191,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
           perKg,
           weightKg,
           usedLegacyFallback,
+          customerCode.trim().toUpperCase(),
         ),
       );
       setTotalFee(String(calculateCrossBorderTotalFee(perKg, batchWeightStr)));
@@ -195,6 +208,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     totalFeeManual,
     hubCode,
     store,
+    customerCode,
   ]);
 
   const addScanCode = async (raw: string) => {
@@ -224,7 +238,10 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         };
         if (prefill.recipientName && !recipientName.trim()) setRecipientName(prefill.recipientName);
         if (prefill.recipientPhone && !recipientPhone.trim()) setRecipientPhone(prefill.recipientPhone);
-        if (prefill.destination && !batchDestination.trim()) {
+        const fromCode = destinationFromCustomerCode(customerCode);
+        if (fromCode) {
+          setBatchDestination(fromCode);
+        } else if (prefill.destination && !batchDestination.trim()) {
           setBatchDestination(normalizePackDestination(prefill.destination));
         }
         const prefillWeight = Number(parseWeight(prefill.weight).n);
@@ -306,6 +323,11 @@ export default function PackagingStockInScreen({ navigation }: Props) {
         feedbackService.notify(t.common.tip, t.packagingStockIn.alertPhone);
         return;
       }
+      const fromCode = destinationFromCustomerCode(customerCode);
+      if (fromCode) {
+        setBatchDestination(fromCode);
+        setTotalFeeManual(false);
+      }
       setStep(2);
       return;
     }
@@ -313,6 +335,11 @@ export default function PackagingStockInScreen({ navigation }: Props) {
       if (lines.length === 0) {
         feedbackService.notify(t.common.tip, t.packagingStockIn.alertScanList);
         return;
+      }
+      const fromCode = destinationFromCustomerCode(customerCode);
+      if (fromCode) {
+        setBatchDestination(fromCode);
+        setTotalFeeManual(false);
       }
       setStep(3);
     }
@@ -620,25 +647,29 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                   </Pressable>
                 </View>
               </View>
-              <InboundFormField
-                label={t.stockIn.totalFee}
-                value={totalFee}
-                onChange={(v) => {
-                  setTotalFeeManual(true);
-                  setTotalFee(sanitizeNumberInput(v));
-                }}
-                keyboard="decimal-pad"
-                placeholder={t.manualEntry.amount}
-              />
-              {feeFormulaHint && canAutoTotalFee && !totalFeeManual ? (
-                <Text style={styles.feeHint}>{feeFormulaHint}</Text>
+              {SHOW_TOTAL_FEE_FIELD ? (
+                <>
+                  <InboundFormField
+                    label={t.stockIn.totalFee}
+                    value={totalFee}
+                    onChange={(v) => {
+                      setTotalFeeManual(true);
+                      setTotalFee(sanitizeNumberInput(v));
+                    }}
+                    keyboard="decimal-pad"
+                    placeholder={t.manualEntry.amount}
+                  />
+                  {feeFormulaHint && canAutoTotalFee && !totalFeeManual ? (
+                    <Text style={styles.feeHint}>{feeFormulaHint}</Text>
+                  ) : null}
+                  <View style={styles.grandTotalRow}>
+                    <Text style={styles.grandTotalLabel}>{t.packagingStockIn.grandTotal}</Text>
+                    <Text style={styles.grandTotalValue}>
+                      {grandTotalFee.toLocaleString()} MMK
+                    </Text>
+                  </View>
+                </>
               ) : null}
-              <View style={styles.grandTotalRow}>
-                <Text style={styles.grandTotalLabel}>{t.packagingStockIn.grandTotal}</Text>
-                <Text style={styles.grandTotalValue}>
-                  {grandTotalFee.toLocaleString()} MMK
-                </Text>
-              </View>
               <InboundFormField
                 label={t.stockIn.noteOptional}
                 value={batchNote}

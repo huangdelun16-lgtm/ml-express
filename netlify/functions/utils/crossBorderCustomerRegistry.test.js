@@ -9,6 +9,7 @@ const { aggregateCustomerSummaries } = require('./inventoryCustomerAggregate');
 
 test('recognizes customer code pattern', () => {
   assert.equal(looksLikeCustomerCode('MDY260802001'), true);
+  assert.equal(looksLikeCustomerCode('MDY2608241001'), true);
   assert.equal(looksLikeCustomerCode('AMT'), false);
 });
 

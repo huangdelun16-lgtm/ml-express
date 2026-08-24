@@ -30,6 +30,7 @@ import {
   type CrossBorderExpenseCategory,
 } from '../services/inventoryConsoleService';
 import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
+import { collectPricingCustomerOptions } from '../utils/crossBorderRoutePricing';
 import { formatSalespersonEmployeeCodeDisplay } from '../utils/crossBorderSalespersons';
 import {
   PACK_DISPLAY_STATUS_LABELS,
@@ -522,6 +523,11 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const pagedRegisteredCustomers = useMemo(
     () => paginateSlice(registeredCustomers, registeredCustomersPage, tablePageSize),
     [registeredCustomers, registeredCustomersPage, tablePageSize],
+  );
+
+  const pricingCustomers = useMemo(
+    () => collectPricingCustomerOptions(registeredCustomers, customerSummaries),
+    [registeredCustomers, customerSummaries],
   );
 
   const pagedPacks = useMemo(
@@ -1355,6 +1361,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
         <CrossBorderPricingModal
           open={showPricingModal}
           onClose={() => setShowPricingModal(false)}
+          customers={pricingCustomers}
         />
       </CblLazyModal>
 
@@ -1394,6 +1401,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
         <CreateCrossBorderCustomerModal
           open={showCreateCustomerModal}
           onClose={() => setShowCreateCustomerModal(false)}
+          existingCustomers={registeredCustomers}
           onCreated={(customer) => {
             setRegisteredCustomers((prev) => [customer, ...prev]);
             setRegisteredCustomersPage(1);

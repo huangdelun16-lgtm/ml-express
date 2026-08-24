@@ -2,7 +2,7 @@
   "expo": {
     "name": "ML Inventory",
     "slug": "ml-express-inventory",
-    "version": "1.9.11",
+    "version": "2.0.0",
     "scheme": "ml-express-inventory",
     "orientation": "default",
     "icon": "./assets/icon.png",

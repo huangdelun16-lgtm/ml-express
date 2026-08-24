@@ -73,11 +73,54 @@ export function normalizeRouteHubCode(raw: string): string {
   return prefix.slice(0, 3);
 }
 
-function buildRoutePerKgSettingsKey(origin: string, destination: string): string | null {
+function buildRoutePerKgSettingsKey(
+  origin: string,
+  destination: string,
+  customerCode?: string,
+): string | null {
   const from = normalizeRouteHubCode(origin);
   const to = normalizeRouteHubCode(destination);
   if (!from || !to || from === to) return null;
+  const customer = String(customerCode ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  if (customer) {
+    return `pricing.cross_border.customer.${customer}.route.${from}.${to}.per_kg`;
+  }
   return `pricing.cross_border.route.${from}.${to}.per_kg`;
+}
+
+export function pickRoutePerKgFromRows(
+  rows: Array<{ settings_key?: string; settings_value?: unknown }>,
+  origin: string,
+  destination: string,
+  customerCode?: string,
+): { perKg: number; usedCustomerRate: boolean } | null {
+  const customerKey = customerCode
+    ? buildRoutePerKgSettingsKey(origin, destination, customerCode)
+    : null;
+  const globalKey = buildRoutePerKgSettingsKey(origin, destination);
+  const byKey = new Map<string, number>();
+  for (const row of rows) {
+    const key = String(row.settings_key ?? '');
+    if (!key) continue;
+    const n = parsePricingValue(row.settings_value);
+    if (Number.isFinite(n)) byKey.set(key, n);
+  }
+  if (customerKey) {
+    const customerVal = byKey.get(customerKey);
+    if (customerVal != null && customerVal > 0) {
+      return { perKg: customerVal, usedCustomerRate: true };
+    }
+  }
+  if (globalKey) {
+    const globalVal = byKey.get(globalKey);
+    if (globalVal != null && globalVal > 0) {
+      return { perKg: globalVal, usedCustomerRate: false };
+    }
+  }
+  return null;
 }
 
 function resolvePricingRegionFromDestination(destination: string): string {
@@ -121,22 +164,32 @@ async function fetchLegacyDestinationBaseFee(destination: string): Promise<numbe
   return baseFee;
 }
 
-/** 拉取「发站 → 终点」路线每公斤单价；无配置时回退旧版终点领区起步价 */
+/** 拉取「发站 → 终点」路线每公斤单价；优先客户专属价，其次默认路线价，再回退旧版终点领区起步价 */
 export async function fetchCrossBorderRoutePerKg(
   originHub: string,
   destination: string,
+  customerCode?: string,
 ): Promise<{
   perKg: number;
   originCode: string;
   destinationCode: string;
   fromCloud: boolean;
   usedLegacyFallback: boolean;
+  usedCustomerRate: boolean;
 }> {
   const originCode = normalizeRouteHubCode(originHub);
   const destinationCode = normalizeRouteHubCode(destination);
-  const routeKey = buildRoutePerKgSettingsKey(originCode, destinationCode);
+  const normalizedCustomer = String(customerCode ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  const customerKey = normalizedCustomer
+    ? buildRoutePerKgSettingsKey(originCode, destinationCode, normalizedCustomer)
+    : null;
+  const globalKey = buildRoutePerKgSettingsKey(originCode, destinationCode);
+  const keys = [customerKey, globalKey].filter((key): key is string => Boolean(key));
 
-  if (!routeKey || !isSupabaseConfigured()) {
+  if (!keys.length || !isSupabaseConfigured()) {
     const legacy = await fetchLegacyDestinationBaseFee(destinationCode);
     return {
       perKg: legacy,
@@ -144,35 +197,27 @@ export async function fetchCrossBorderRoutePerKg(
       destinationCode,
       fromCloud: false,
       usedLegacyFallback: true,
+      usedCustomerRate: false,
     };
   }
 
   const { data, error } = await supabase
     .from('system_settings')
-    .select('settings_value')
-    .eq('settings_key', routeKey)
-    .maybeSingle();
+    .select('settings_key, settings_value')
+    .in('settings_key', keys);
 
-  if (error || !data) {
-    const legacy = await fetchLegacyDestinationBaseFee(destinationCode);
-    return {
-      perKg: legacy,
-      originCode,
-      destinationCode,
-      fromCloud: false,
-      usedLegacyFallback: true,
-    };
-  }
-
-  const perKg = parsePricingValue((data as { settings_value: unknown }).settings_value);
-  if (perKg > 0) {
-    return {
-      perKg,
-      originCode,
-      destinationCode,
-      fromCloud: true,
-      usedLegacyFallback: false,
-    };
+  if (!error && data?.length) {
+    const picked = pickRoutePerKgFromRows(data, originCode, destinationCode, normalizedCustomer);
+    if (picked) {
+      return {
+        perKg: picked.perKg,
+        originCode,
+        destinationCode,
+        fromCloud: true,
+        usedLegacyFallback: false,
+        usedCustomerRate: picked.usedCustomerRate,
+      };
+    }
   }
 
   const legacy = await fetchLegacyDestinationBaseFee(destinationCode);
@@ -180,8 +225,9 @@ export async function fetchCrossBorderRoutePerKg(
     perKg: legacy,
     originCode,
     destinationCode,
-    fromCloud: true,
+    fromCloud: false,
     usedLegacyFallback: true,
+    usedCustomerRate: false,
   };
 }
 
@@ -208,11 +254,13 @@ export function formatCrossBorderFeeHint(
   perKg: number,
   weightKg: number,
   usedLegacyFallback = false,
+  customerCode = '',
 ): string {
   const origin = originCode || '—';
   const dest = destinationCode || '—';
+  const customerPrefix = customerCode ? `${customerCode} · ` : '';
   if (usedLegacyFallback) {
-    return `${dest} 领区兜底起步价 ${perKg} × ${weightKg} kg`;
+    return `${customerPrefix}${dest} 领区兜底起步价 ${perKg} × ${weightKg} kg`;
   }
-  return `${origin} → ${dest} ${perKg} MMK/kg × ${weightKg} kg`;
+  return `${customerPrefix}${origin} → ${dest} ${perKg} MMK/kg × ${weightKg} kg`;
 }

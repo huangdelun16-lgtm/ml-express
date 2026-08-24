@@ -16,6 +16,7 @@ import {
 } from '../utils/packageCodAmount';
 import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 import { feedbackService } from '../services/FeedbackService';
+import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
@@ -235,6 +236,8 @@ const RealTimeTracking: React.FC = () => {
     if (Notification.permission === 'default') {
       Notification.requestPermission();
     }
+
+    if (!isBrowserRealtimeAvailable()) return;
 
     console.log('📡 启动新订单实时监听...');
     const channel = supabase
@@ -665,6 +668,7 @@ const RealTimeTracking: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!isBrowserRealtimeAvailable()) return;
     const channel = supabase
       .channel('admin-realtime-courier-geo')
       .on(
@@ -743,6 +747,7 @@ const RealTimeTracking: React.FC = () => {
   );
 
   useEffect(() => {
+    if (!isBrowserRealtimeAvailable()) return;
     const channel = supabase
       .channel('admin-realtime-courier-locations')
       .on(
@@ -820,6 +825,7 @@ const RealTimeTracking: React.FC = () => {
   }, [loadTrackingSettings]);
 
   useEffect(() => {
+    if (!isBrowserRealtimeAvailable()) return;
     const channel = supabase
       .channel('admin-tracking-settings')
       .on(

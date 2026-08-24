@@ -44,8 +44,9 @@ export const LABEL_ELEMENT_HEIGHT_MM_MIN = 2;
 export const LABEL_ELEMENT_HEIGHT_MM_MAX = 18;
 export const TSPL_BARCODE_NARROW = 3;
 export const TSPL_BARCODE_WIDE = 6;
+/** TSPL 内置字体 "2"：12×20（Xprinter / TSC 手册） */
 export const TSPL_TEXT_CHAR_WIDTH_DOTS = 12;
-export const TSPL_TEXT_LINE_HEIGHT_DOTS = 24;
+export const TSPL_TEXT_LINE_HEIGHT_DOTS = 20;
 export const TSPL_TEXT_MUL_MAX = 10;
 
 export type LabelLayoutAlignH = 'left' | 'center' | 'right';
@@ -1051,6 +1052,36 @@ export function canAdjustGroupTextScale(
     return current < GROUP_TEXT_SCALE_MAX;
   }
   return current > GROUP_TEXT_SCALE_MIN;
+}
+
+export function getTsplElementFrame(
+  layout: LabelBarcodeLayoutConfig,
+  target: 'expressNo' | 'barcode' | 'inboundCode',
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+): { x: number; y: number; widthDots: number; heightDots: number } {
+  const dims = getElementDimensions(layout, target, content, widthMm);
+  const pos = layout[target];
+  return {
+    x: pos.x,
+    y: pos.y,
+    widthDots: dims.widthDots,
+    heightDots: dims.heightDots,
+  };
+}
+
+/** 预览页按所见布局出纸；订单补打按实际条码长度再居中 */
+export function resolvePrintLayout(
+  layout: LabelBarcodeLayoutConfig,
+  content: LabelLayoutContentSizes,
+  widthMm = XPRINTER_P203A.defaultWidthMm,
+  heightMm = XPRINTER_P203A.defaultHeightMm,
+  options?: { lockPositions?: boolean },
+): LabelBarcodeLayoutConfig {
+  if (options?.lockPositions) {
+    return clampLabelBarcodeLayout(layout, widthMm, heightMm);
+  }
+  return mergeAndCenterLabelLayout(layout, content, widthMm, heightMm);
 }
 
 export function getElementSizeLimitsMm(

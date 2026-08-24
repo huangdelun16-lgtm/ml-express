@@ -1,6 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { getCode128ModuleRuns, getCode128TotalModules } from '../utils/barcodeImage';
+import {
+  getCode128ModuleRuns,
+  getCode128PrintModuleRuns,
+  getCode128PrintModules,
+  getCode128TotalModules,
+} from '../utils/barcodeImage';
 
 type Props = {
   code: string;
@@ -10,6 +15,8 @@ type Props = {
   maxWidth?: number;
   /** 在容器内水平居中（用于标签预览弹窗） */
   centered?: boolean;
+  /** false 时与 TSPL BARCODE "128" 一致，不含额外 quiet zone */
+  includeQuietZone?: boolean;
 };
 
 /**
@@ -21,12 +28,17 @@ export default function BarcodeImage({
   showCodeText = true,
   maxWidth = 280,
   centered = false,
+  includeQuietZone = true,
 }: Props) {
   const trimmed = code.trim();
   if (!trimmed) return null;
 
-  const runs = getCode128ModuleRuns(trimmed);
-  const totalModules = getCode128TotalModules(trimmed);
+  const runs = includeQuietZone
+    ? getCode128ModuleRuns(trimmed)
+    : getCode128PrintModuleRuns(trimmed);
+  const totalModules = includeQuietZone
+    ? getCode128TotalModules(trimmed)
+    : getCode128PrintModules(trimmed);
   if (runs.length === 0 || totalModules <= 0) return null;
 
   const modulePx = maxWidth / totalModules;

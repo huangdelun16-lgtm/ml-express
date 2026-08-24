@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
@@ -7,21 +7,29 @@ import {
 } from '../utils/crossBorderHubs';
 import {
   buildCrossBorderCustomerCode,
+  formatApplicationDateCompact,
+  nextDailyCustomerSeq,
+  salespersonNumericSuffix,
   todayIsoDate,
 } from '../utils/crossBorderCustomerCode';
 import { hubForRegionId, formatSalespersonEmployeeCodeDisplay } from '../utils/crossBorderSalespersons';
+import { destinationHubFromCustomerCode, routeHubDisplay } from '../utils/crossBorderRoutePricing';
 import {
   createCrossBorderRegisteredCustomer,
+  fetchCrossBorderRegisteredCustomers,
   fetchCrossBorderSalespersons,
   type CrossBorderRegisteredCustomer,
   type CrossBorderSalesperson,
 } from '../services/inventoryConsoleService';
 import '../styles/crossBorderLogistics.css';
 
+const CrossBorderPricingModal = lazy(() => import('./CrossBorderPricingModal'));
+
 type Props = {
   open: boolean;
   onClose: () => void;
   onCreated: (customer: CrossBorderRegisteredCustomer) => void;
+  existingCustomers?: CrossBorderRegisteredCustomer[];
 };
 
 type FormState = {
@@ -34,7 +42,12 @@ type FormState = {
   application_date: string;
 };
 
-const CreateCrossBorderCustomerModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
+const CreateCrossBorderCustomerModal: React.FC<Props> = ({
+  open,
+  onClose,
+  onCreated,
+  existingCustomers = [],
+}) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
 
@@ -52,14 +65,17 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({ open, onClose, onCrea
     };
   });
   const [salespersons, setSalespersons] = useState<CrossBorderSalesperson[]>([]);
+  const [customersForSeq, setCustomersForSeq] = useState<CrossBorderRegisteredCustomer[]>([]);
   const [loadingSalespersons, setLoadingSalespersons] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCustomerPricing, setShowCustomerPricing] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
     setSubmitting(false);
+    setShowCustomerPricing(false);
     const hub = hubForRegionId('mandalay');
     setRegionId('mandalay');
     setForm({
@@ -79,14 +95,40 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({ open, onClose, onCrea
       .finally(() => setLoadingSalespersons(false));
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    setCustomersForSeq(existingCustomers);
+    fetchCrossBorderRegisteredCustomers()
+      .then(setCustomersForSeq)
+      .catch(() => setCustomersForSeq(existingCustomers));
+  }, [open, existingCustomers]);
+
+  const dailySeq = useMemo(
+    () => nextDailyCustomerSeq(customersForSeq, form.delivery_area_code, form.application_date),
+    [customersForSeq, form.delivery_area_code, form.application_date],
+  );
+
+  const datePart = formatApplicationDateCompact(form.application_date);
+  const salespersonPart = salespersonNumericSuffix(form.salesperson_employee_code);
+
   const customerCode = useMemo(
     () =>
       buildCrossBorderCustomerCode(
         form.delivery_area_code,
         form.application_date,
         form.salesperson_employee_code,
+        dailySeq,
       ),
-    [form.delivery_area_code, form.application_date, form.salesperson_employee_code],
+    [form.delivery_area_code, form.application_date, form.salesperson_employee_code, dailySeq],
+  );
+
+  const pricingDestination = useMemo(
+    () => destinationHubFromCustomerCode(customerCode, form.delivery_area_code),
+    [customerCode, form.delivery_area_code],
+  );
+
+  const canOpenPricing = Boolean(
+    customerCode && pricingDestination && form.salesperson_employee_code.trim(),
   );
 
   if (!open) return null;
@@ -161,15 +203,18 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({ open, onClose, onCrea
         aria-labelledby="cbl-customer-create-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="cbl-pricing-modal__head">
+        <header className="cbl-pricing-modal__head cbl-customer-create-modal__head">
           <div>
+            <p className="cbl-customer-create-modal__kicker">
+              {isEn ? 'Cross-border logistics' : '跨境物流'}
+            </p>
             <h2 id="cbl-customer-create-title" className="cbl-pricing-modal__title">
               {isEn ? 'Add customer' : '添加客户'}
             </h2>
             <p className="cbl-pricing-modal__sub">
               {isEn
-                ? 'Customer code = delivery area + application date (YYMMDD) + salesperson number, e.g. MDY260812005.'
-                : '客户编码 = 送货区域短写 + 申请日期 + 推销员序号，如 MDY260812005。'}
+                ? 'Code = area + date (YYMMDD) + daily count + salesperson no. Example MDY2608241001 = first MDY customer that day, salesperson 001.'
+                : '编码 = 区域 + 申请日期 + 单日客量 + 推销员序号。例如 MDY2608241001 = 曼德勒当日第 1 位客户 + 推销员 001。'}
             </p>
           </div>
           <button
@@ -185,115 +230,190 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({ open, onClose, onCrea
 
         <form className="cbl-customer-create-form" onSubmit={(e) => void handleSubmit(e)}>
           <div className="cbl-customer-create-form__scroll">
-            <label className="cbl-manual-entry-field">
-              <span>{isEn ? 'Customer name' : '客户名称'}</span>
-              <input
-                type="text"
-                value={form.customer_name}
-                onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-                placeholder={isEn ? 'Full name' : '姓名'}
-                required
-              />
-            </label>
+            <section className="cbl-customer-create-section">
+              <h3 className="cbl-customer-create-section__title">
+                {isEn ? 'Basic info' : '基本信息'}
+              </h3>
+              <div className="cbl-customer-create-grid">
+                <label className="cbl-customer-field">
+                  <span className="cbl-customer-field__label">{isEn ? 'Customer name' : '客户名称'}</span>
+                  <input
+                    type="text"
+                    value={form.customer_name}
+                    onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+                    placeholder={isEn ? 'Full name' : '姓名'}
+                    required
+                  />
+                </label>
+                <label className="cbl-customer-field">
+                  <span className="cbl-customer-field__label">{isEn ? 'Phone' : '电话号码'}</span>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    placeholder="09xxxxxxxxx"
+                  />
+                </label>
+              </div>
+              <label className="cbl-customer-field">
+                <span className="cbl-customer-field__label">{isEn ? 'Notes' : '备注'}</span>
+                <textarea
+                  rows={2}
+                  value={form.address_notes}
+                  onChange={(e) => setForm({ ...form, address_notes: e.target.value })}
+                  placeholder={isEn ? 'Street, landmark, etc.' : '街道、地标等详细说明'}
+                />
+              </label>
+            </section>
 
-            <label className="cbl-manual-entry-field">
-              <span>{isEn ? 'Phone' : '电话号码'}</span>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder={isEn ? '09xxxxxxxxx' : '09xxxxxxxxx'}
-              />
-            </label>
-
-            <label className="cbl-manual-entry-field">
-              <span>{isEn ? 'Delivery city' : '送货地址（城市）'}</span>
-              <select value={regionId} onChange={(e) => handleRegionChange(e.target.value)}>
-                {CROSS_BORDER_HUBS.map((hub) => (
-                  <option key={hub.regionId} value={hub.regionId}>
-                    {formatCrossBorderRegionLabel(hub, isEn)}
+            <section className="cbl-customer-create-section">
+              <h3 className="cbl-customer-create-section__title">
+                {isEn ? 'Delivery & salesperson' : '派送与推销'}
+              </h3>
+              <div className="cbl-customer-create-grid">
+                <label className="cbl-customer-field">
+                  <span className="cbl-customer-field__label">{isEn ? 'Delivery city' : '送货城市'}</span>
+                  <select value={regionId} onChange={(e) => handleRegionChange(e.target.value)}>
+                    {CROSS_BORDER_HUBS.map((hub) => (
+                      <option key={hub.regionId} value={hub.regionId}>
+                        {formatCrossBorderRegionLabel(hub, isEn)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="cbl-customer-field">
+                  <span className="cbl-customer-field__label">{isEn ? 'Application date' : '申请日期'}</span>
+                  <input
+                    type="date"
+                    value={form.application_date}
+                    onChange={(e) => setForm({ ...form, application_date: e.target.value })}
+                    required
+                  />
+                </label>
+              </div>
+              <label className="cbl-customer-field">
+                <span className="cbl-customer-field__label">{isEn ? 'Salesperson code' : '推销员编码'}</span>
+                <select
+                  value={form.salesperson_employee_code}
+                  onChange={(e) => setForm({ ...form, salesperson_employee_code: e.target.value })}
+                  required
+                  disabled={loadingSalespersons}
+                >
+                  <option value="">
+                    {loadingSalespersons
+                      ? isEn
+                        ? 'Loading…'
+                        : '加载中…'
+                      : isEn
+                        ? 'Select salesperson'
+                        : '请选择推销员'}
                   </option>
-                ))}
-              </select>
-            </label>
+                  {salespersons.map((row) => (
+                    <option key={row.id} value={row.employee_code}>
+                      {formatSalespersonEmployeeCodeDisplay(row.employee_code)} · {row.name}
+                    </option>
+                  ))}
+                </select>
+                {!loadingSalespersons && salespersons.length === 0 ? (
+                  <small className="cbl-field-hint">
+                    {isEn
+                      ? 'No active salespersons. Add one under Account management first.'
+                      : '暂无在职推销员，请先在「跨境账号管理 → 推销员」中添加。'}
+                  </small>
+                ) : null}
+              </label>
+            </section>
 
-            <label className="cbl-manual-entry-field">
-              <span>{isEn ? 'Notes' : '备注'}</span>
-              <textarea
-                rows={2}
-                value={form.address_notes}
-                onChange={(e) => setForm({ ...form, address_notes: e.target.value })}
-                placeholder={isEn ? 'Street, landmark, etc.' : '街道、地标等详细说明'}
-              />
-            </label>
-
-            <label className="cbl-manual-entry-field">
-              <span>{isEn ? 'Salesperson code' : '推销员编码'}</span>
-              <select
-                value={form.salesperson_employee_code}
-                onChange={(e) => setForm({ ...form, salesperson_employee_code: e.target.value })}
-                required
-                disabled={loadingSalespersons}
-              >
-                <option value="">
-                  {loadingSalespersons
-                    ? isEn
-                      ? 'Loading…'
-                      : '加载中…'
-                    : isEn
-                      ? 'Select salesperson'
-                      : '请选择推销员'}
-                </option>
-                {salespersons.map((row) => (
-                  <option key={row.id} value={row.employee_code}>
-                    {formatSalespersonEmployeeCodeDisplay(row.employee_code)} · {row.name}
-                  </option>
-                ))}
-              </select>
-              {!loadingSalespersons && salespersons.length === 0 ? (
-                <small className="cbl-field-hint">
+            <section className="cbl-customer-create-section cbl-customer-create-section--highlight">
+              <h3 className="cbl-customer-create-section__title">
+                {isEn ? 'Code & pricing' : '编码与定价'}
+              </h3>
+              <div className="cbl-customer-code-card">
+                <span className="cbl-customer-code-card__label">
+                  {isEn ? 'Generated customer code' : '已生成客户编码'}
+                </span>
+                <div className="cbl-customer-code-card__value">{customerCode || '—'}</div>
+                <p className="cbl-customer-code-card__formula">
                   {isEn
-                    ? 'No active salespersons. Add one under Account management first.'
-                    : '暂无在职推销员，请先在「跨境账号管理 → 推销员」中添加。'}
-                </small>
-              ) : null}
-            </label>
-
-            <label className="cbl-manual-entry-field">
-              <span>{isEn ? 'Application date' : '申请日期'}</span>
-              <input
-                type="date"
-                value={form.application_date}
-                onChange={(e) => setForm({ ...form, application_date: e.target.value })}
-                required
-              />
-            </label>
-
-            <label className="cbl-manual-entry-field">
-              <span>{isEn ? 'Customer code' : '客户编码'}</span>
-              <input type="text" value={customerCode || '—'} readOnly className="cbl-input-readonly" />
-              <small className="cbl-field-hint">
-                {isEn
-                  ? `${form.delivery_area_code || '—'} + ${form.application_date.replace(/-/g, '').slice(2) || '—'} + salesperson #`
-                  : `${form.delivery_area_code || '—'} + 申请日期 + 推销员序号`}
-              </small>
-            </label>
+                    ? `${form.delivery_area_code || '—'} + ${datePart || 'YYMMDD'} + daily #${dailySeq || '—'} + salesperson ${
+                        salespersonPart === '000' ? '—' : salespersonPart
+                      }`
+                    : `${form.delivery_area_code || '—'} + ${datePart || '申请日期'} + 单日客量 ${dailySeq || '—'} + 推销员 ${
+                        salespersonPart === '000' ? '—' : salespersonPart
+                      }`}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="cbl-customer-pricing-btn"
+                disabled={!canOpenPricing}
+                onClick={() => setShowCustomerPricing(true)}
+              >
+                <span className="cbl-customer-pricing-btn__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+                    <path
+                      d="M3.5 12.5 12 4h6.5L22 7.5V14l-8.5 8.5-10-10Z"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="16.2" cy="8.2" r="1.4" fill="currentColor" />
+                  </svg>
+                </span>
+                <span className="cbl-customer-pricing-btn__copy">
+                  <strong className="cbl-customer-pricing-btn__title">
+                    {isEn ? 'Customer pricing' : '客户定价'}
+                  </strong>
+                  <span className="cbl-customer-pricing-btn__sub">
+                    {canOpenPricing && pricingDestination
+                      ? isEn
+                        ? `Set inbound rates to ${routeHubDisplay(pricingDestination)} · e.g. RUILI → ${routeHubDisplay(pricingDestination)}`
+                        : `设置进入 ${routeHubDisplay(pricingDestination)} 的路线单价 · 例如 RUILI → ${routeHubDisplay(pricingDestination)}`
+                      : isEn
+                        ? 'Select a salesperson first to unlock pricing'
+                        : '请先选择推销员，生成客户编码后再定价'}
+                  </span>
+                </span>
+                <span className="cbl-customer-pricing-btn__chevron" aria-hidden="true">
+                  →
+                </span>
+              </button>
+            </section>
 
             {error ? (
-              <div className="cbl-pricing-modal__alert cbl-pricing-modal__alert--error">{error}</div>
+              <div className="cbl-pricing-modal__alert cbl-pricing-modal__alert--error cbl-customer-create-alert">
+                {error}
+              </div>
             ) : null}
           </div>
 
-          <footer className="cbl-pricing-modal__foot">
+          <footer className="cbl-pricing-modal__foot cbl-customer-create-modal__foot">
             <button type="button" className="cbl-btn cbl-btn--light" onClick={onClose} disabled={submitting}>
               {isEn ? 'Cancel' : '取消'}
             </button>
-            <button type="submit" className="cbl-btn cbl-btn--primary" disabled={submitting}>
-              {submitting ? (isEn ? 'Saving…' : '保存中…') : isEn ? 'Create' : '创建'}
+            <button
+              type="submit"
+              className="cbl-btn cbl-btn--primary cbl-customer-create-modal__submit"
+              disabled={submitting}
+            >
+              {submitting ? (isEn ? 'Saving…' : '保存中…') : isEn ? 'Create customer' : '创建客户'}
             </button>
           </footer>
         </form>
       </div>
+      {showCustomerPricing ? (
+        <Suspense fallback={null}>
+          <CrossBorderPricingModal
+            open={showCustomerPricing}
+            onClose={() => setShowCustomerPricing(false)}
+            presetCustomerCode={customerCode}
+            presetCustomerName={form.customer_name}
+            lockCustomer
+            focusDestination={pricingDestination}
+            stacked
+          />
+        </Suspense>
+      ) : null}
     </div>,
     document.body,
   );

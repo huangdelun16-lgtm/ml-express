@@ -6,6 +6,7 @@ import {
   getBarcodeDataUriCacheSize,
   getBarcodeImageUrl,
   getCode128ModuleRuns,
+  getCode128PrintModuleRuns,
   getCode128PrintModules,
   getCode128TotalModules,
 } from './barcodeImage';
@@ -36,6 +37,9 @@ describe('local Code128 barcode', () => {
     expect(getCode128PrintModules(code)).toBe(total - 20);
     expect(getCode128PrintModules(code)).toBeGreaterThan(80);
     expect(runs.some((run) => run.black)).toBe(true);
+    const printRuns = getCode128PrintModuleRuns(code);
+    expect(printRuns[0]?.black).toBe(true);
+    expect(printRuns.reduce((sum, run) => sum + run.modules, 0)).toBe(getCode128PrintModules(code));
   });
 
   it('rejects characters unsupported by Code128-B', () => {

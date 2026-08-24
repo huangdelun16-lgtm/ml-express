@@ -7,16 +7,14 @@ import {
 } from 'react-native';
 import BarcodeImage from './BarcodeImage';
 import {
-  getEffectiveElementWidthDots,
   getBarcodePrintMetrics,
-  getElementDimensions,
+  getTsplElementFrame,
   formatGroupTextScale,
   getGroupTextScaleMul,
   getLabelGroupBounds,
   labelHeightDots,
   labelWidthDots,
   moveLabelGroup,
-  TSPL_TEXT_LINE_HEIGHT_DOTS,
   type LabelBarcodeLayoutConfig,
   type LabelLayoutContentSizes,
 } from '../constants/labelBarcodeLayout';
@@ -63,7 +61,7 @@ export default function LabelPrintPreviewEditor({
   };
 
   const barcodeMetrics = getBarcodePrintMetrics(layout, layoutContent, widthMm);
-  const barcodePreviewHeight = Math.max(20, Math.round(barcodeMetrics.height * scale));
+  const barcodePreviewHeight = Math.max(1, Math.round(barcodeMetrics.height * scale));
   const groupBounds = getLabelGroupBounds(layout, layoutContent, widthMm);
   const textScaleMul = getGroupTextScaleMul(layout, layoutContent, widthMm);
 
@@ -143,13 +141,9 @@ export default function LabelPrintPreviewEditor({
     [editable],
   );
 
-  const barcodeWidthDots = getEffectiveElementWidthDots(layout, 'barcode', layoutContent, widthMm);
-
-  const expressDims = getElementDimensions(layout, 'expressNo', layoutContent, widthMm);
-  const inboundDims = getElementDimensions(layout, 'inboundCode', layoutContent, widthMm);
-
-  const expressFontScale = expressDims.heightDots / TSPL_TEXT_LINE_HEIGHT_DOTS;
-  const inboundFontScale = inboundDims.heightDots / TSPL_TEXT_LINE_HEIGHT_DOTS;
+  const expressFrame = getTsplElementFrame(layout, 'expressNo', layoutContent, widthMm);
+  const barcodeFrame = getTsplElementFrame(layout, 'barcode', layoutContent, widthMm);
+  const inboundFrame = getTsplElementFrame(layout, 'inboundCode', layoutContent, widthMm);
 
   const groupReadout =
     `X ${groupBounds.x} · Y ${groupBounds.y} · ` +
@@ -170,17 +164,22 @@ export default function LabelPrintPreviewEditor({
                 pointerEvents="none"
                 style={[
                   styles.contentLayer,
-                  styles.expressLayer,
                   {
-                    left: toPx(layout.barcode.x),
-                    top: toPx(layout.expressNo.y),
-                    width: Math.max(24, toPx(barcodeWidthDots)),
-                    height: Math.max(18, toPx(expressDims.heightDots)),
+                    left: toPx(expressFrame.x),
+                    top: toPx(expressFrame.y),
+                    width: Math.max(1, toPx(expressFrame.widthDots)),
+                    height: Math.max(1, toPx(expressFrame.heightDots)),
                   },
                 ]}
               >
                 <Text
-                  style={[styles.expressText, { fontSize: 11 * expressFontScale }]}
+                  style={[
+                    styles.expressText,
+                    {
+                      fontSize: Math.max(8, toPx(expressFrame.heightDots)),
+                      lineHeight: Math.max(8, toPx(expressFrame.heightDots)),
+                    },
+                  ]}
                   numberOfLines={1}
                 >
                   {express}
@@ -193,19 +192,19 @@ export default function LabelPrintPreviewEditor({
               style={[
                 styles.contentLayer,
                 {
-                  left: toPx(layout.barcode.x),
-                  top: toPx(layout.barcode.y),
-                  width: Math.max(24, toPx(barcodeWidthDots)),
-                  height: barcodePreviewHeight + 4,
+                  left: toPx(barcodeFrame.x),
+                  top: toPx(barcodeFrame.y),
+                  width: Math.max(1, toPx(barcodeFrame.widthDots)),
+                  height: barcodePreviewHeight,
                 },
               ]}
             >
               <BarcodeImage
                 code={barcode}
                 height={barcodePreviewHeight}
-                maxWidth={Math.max(24, toPx(barcodeWidthDots))}
+                maxWidth={Math.max(1, toPx(barcodeFrame.widthDots))}
                 showCodeText={false}
-                centered
+                includeQuietZone={false}
               />
             </View>
 
@@ -213,18 +212,23 @@ export default function LabelPrintPreviewEditor({
               pointerEvents="none"
               style={[
                 styles.contentLayer,
-                styles.inboundLayer,
                 {
-                  left: toPx(layout.barcode.x),
-                  top: toPx(layout.inboundCode.y),
-                  width: Math.max(24, toPx(barcodeWidthDots)),
-                  height: Math.max(18, toPx(inboundDims.heightDots)),
+                  left: toPx(inboundFrame.x),
+                  top: toPx(inboundFrame.y),
+                  width: Math.max(1, toPx(inboundFrame.widthDots)),
+                  height: Math.max(1, toPx(inboundFrame.heightDots)),
                 },
               ]}
             >
               <Text
-                style={[styles.barcodeText, { fontSize: 10 * inboundFontScale }]}
-                numberOfLines={2}
+                style={[
+                  styles.barcodeText,
+                  {
+                    fontSize: Math.max(8, toPx(inboundFrame.heightDots)),
+                    lineHeight: Math.max(8, toPx(inboundFrame.heightDots)),
+                  },
+                ]}
+                numberOfLines={1}
               >
                 {barcode}
               </Text>
@@ -319,11 +323,6 @@ const styles = StyleSheet.create({
   contentLayer: {
     position: 'absolute',
     overflow: 'hidden',
-  },
-  expressLayer: {
-    justifyContent: 'flex-end',
-  },
-  inboundLayer: {
     justifyContent: 'flex-start',
   },
   groupBox: {
@@ -348,20 +347,18 @@ const styles = StyleSheet.create({
   },
   expressText: {
     color: '#0f172a',
-    fontSize: 11,
     fontWeight: '800',
     fontFamily: 'monospace',
-    textAlign: 'center',
-    alignSelf: 'center',
+    textAlign: 'left',
+    includeFontPadding: false,
     width: '100%',
   },
   barcodeText: {
     color: '#0f172a',
-    fontSize: 10,
     fontWeight: '800',
     fontFamily: 'monospace',
-    textAlign: 'center',
-    alignSelf: 'center',
+    textAlign: 'left',
+    includeFontPadding: false,
     width: '100%',
   },
   heightRuler: {

@@ -6,6 +6,7 @@ import { sanitizeHtml, escapeHtml } from '../utils/xssSanitizer';
 import { useLanguage } from '../contexts/LanguageContext';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 import { feedbackService } from '../services/FeedbackService';
+import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
 
 interface DeliveryAlert {
   id: string;
@@ -252,42 +253,48 @@ export default function DeliveryAlerts() {
     loadViolationRecords();
     updateRealTimeStats();
     
-    // 设置实时订阅
-    const subscription = supabase
-      .channel('delivery_alerts_channel')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'delivery_alerts'
-        },
-        (payload) => {
-          loadAlerts(); // 重新加载警报
-          updateRealTimeStats(); // 更新实时统计
-          
-          // 显示新警报通知
-          if (payload.eventType === 'INSERT') {
-            const newAlert = payload.new as DeliveryAlert;
-            showNewAlertNotification(newAlert);
-            
-            // 🚀 新增：触发语音播报
-            const alertTypeZh = getAlertTypeText(newAlert.alert_type);
-            const distanceInfo = newAlert.distance_from_destination 
-              ? `，距离目标点 ${Math.round(newAlert.distance_from_destination)} 米`
-              : '';
-            speakNotification(`发现新配送警报：${newAlert.courier_name}${alertTypeZh}${distanceInfo}。请及时处理。`);
-          }
-        }
-      )
-      .subscribe();
+    let subscription: ReturnType<typeof supabase.channel> | null = null;
+    if (isBrowserRealtimeAvailable()) {
+      subscription = supabase
+        .channel('delivery_alerts_channel')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'delivery_alerts'
+          },
+          (payload) => {
+            loadAlerts();
+            updateRealTimeStats();
 
-    // 设置定时更新统计
-    const statsInterval = setInterval(updateRealTimeStats, 60000); // 每60秒更新一次，优化性能
+            if (payload.eventType === 'INSERT') {
+              const newAlert = payload.new as DeliveryAlert;
+              showNewAlertNotification(newAlert);
+
+              const alertTypeZh = getAlertTypeText(newAlert.alert_type);
+              const distanceInfo = newAlert.distance_from_destination
+                ? `，距离目标点 ${Math.round(newAlert.distance_from_destination)} 米`
+                : '';
+              speakNotification(`发现新配送警报：${newAlert.courier_name}${alertTypeZh}${distanceInfo}。请及时处理。`);
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    const statsInterval = setInterval(updateRealTimeStats, 60000);
+    const pollInterval = isBrowserRealtimeAvailable()
+      ? null
+      : setInterval(() => {
+          loadAlerts();
+          updateRealTimeStats();
+        }, 20000);
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
       clearInterval(statsInterval);
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [filter, severityFilter, searchTerm]);
 

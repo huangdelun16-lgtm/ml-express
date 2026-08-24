@@ -8,6 +8,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { verifyAdminToken } = require('./verify-admin');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
+const { buildCustomerCode } = require('./utils/crossBorderCustomerCode');
 
 const CUSTOMER_SELECT =
   'id, customer_name, phone, delivery_region_id, delivery_area_code, address_notes, salesperson_employee_code, application_date, customer_code, status, created_at, updated_at';
@@ -20,29 +21,6 @@ function parseBody(event) {
   } catch {
     return {};
   }
-}
-
-function formatApplicationDateCompact(isoDate) {
-  const match = String(isoDate ?? '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return '';
-  return `${match[1].slice(-2)}${match[2]}${match[3]}`;
-}
-
-function salespersonNumericSuffix(employeeCode) {
-  const code = String(employeeCode ?? '').trim().toUpperCase();
-  const plain = code.match(/^(\d+)$/);
-  if (plain) return String(Number.parseInt(plain[1], 10)).padStart(3, '0');
-  const legacy = code.match(/^[A-Z]+-(\d+)$/);
-  if (legacy) return String(Number.parseInt(legacy[1], 10)).padStart(3, '0');
-  return '000';
-}
-
-function buildCustomerCode(deliveryAreaCode, applicationDate, salespersonEmployeeCode) {
-  const area = String(deliveryAreaCode ?? '').trim().toUpperCase();
-  const datePart = formatApplicationDateCompact(applicationDate);
-  const suffix = salespersonNumericSuffix(salespersonEmployeeCode);
-  if (!area || !datePart || !suffix) return '';
-  return `${area}${datePart}${suffix}`;
 }
 
 exports.handler = async (event) => {
@@ -111,11 +89,6 @@ exports.handler = async (event) => {
         .trim()
         .toUpperCase();
       const application_date = String(body.application_date || '').trim();
-      const customer_code = buildCustomerCode(
-        delivery_area_code,
-        application_date,
-        salesperson_employee_code,
-      );
 
       if (!customer_name) {
         return {
@@ -145,43 +118,70 @@ exports.handler = async (event) => {
           body: JSON.stringify({ error: '请填写有效申请日期' }),
         };
       }
-      if (!customer_code) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ error: '无法生成客户编码，请检查表单' }),
-        };
-      }
+      const { count, error: countError } = await supabase
+        .from('cross_border_customers')
+        .select('id', { count: 'exact', head: true })
+        .eq('application_date', application_date)
+        .eq('delivery_area_code', delivery_area_code);
+      if (countError) throw countError;
 
       const now = new Date().toISOString();
-      const { data, error } = await supabase
-        .from('cross_border_customers')
-        .insert({
-          customer_name,
-          phone,
-          delivery_region_id,
-          delivery_area_code,
-          address_notes,
-          salesperson_employee_code,
-          application_date,
-          customer_code,
-          status: 'active',
-          updated_at: now,
-        })
-        .select(CUSTOMER_SELECT)
-        .single();
+      let dailySeq = (count ?? 0) + 1;
+      let data = null;
+      let lastCode = '';
 
-      if (error) {
-        if (error.code === '23505') {
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        const customer_code = buildCustomerCode(
+          delivery_area_code,
+          application_date,
+          salesperson_employee_code,
+          dailySeq,
+        );
+        lastCode = customer_code;
+        if (!customer_code) {
           return {
-            statusCode: 409,
+            statusCode: 400,
             headers,
-            body: JSON.stringify({
-              error: `客户编码 ${customer_code} 已存在，请调整申请日期或推销员`,
-            }),
+            body: JSON.stringify({ error: '无法生成客户编码，请检查表单' }),
           };
         }
-        throw error;
+
+        const inserted = await supabase
+          .from('cross_border_customers')
+          .insert({
+            customer_name,
+            phone,
+            delivery_region_id,
+            delivery_area_code,
+            address_notes,
+            salesperson_employee_code,
+            application_date,
+            customer_code,
+            status: 'active',
+            updated_at: now,
+          })
+          .select(CUSTOMER_SELECT)
+          .single();
+
+        if (!inserted.error) {
+          data = inserted.data;
+          break;
+        }
+        if (inserted.error.code === '23505') {
+          dailySeq += 1;
+          continue;
+        }
+        throw inserted.error;
+      }
+
+      if (!data) {
+        return {
+          statusCode: 409,
+          headers,
+          body: JSON.stringify({
+            error: `客户编码 ${lastCode} 已存在，请稍后重试`,
+          }),
+        };
       }
 
       return {

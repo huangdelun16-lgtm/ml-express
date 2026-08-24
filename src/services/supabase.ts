@@ -17,7 +17,7 @@ import { applyNetlifyRealtimeFallback, resolveBrowserSupabaseUrl } from '../util
 export type { Banner, Tutorial, WelcomeScreen };
 export type { ProxyPurchaseRow as ProxyPurchaseWorkspaceRow };
 
-// 浏览器走 Cloudflare Worker 代理（缅甸直连 *.supabase.co 会被掐）。Anon Key 仍来自环境变量。
+// 生产浏览器走同源 /__sb（Netlify 服务端再连 supabase.co）。Anon Key 仍来自环境变量。
 const supabaseUrl = resolveBrowserSupabaseUrl(process.env.REACT_APP_SUPABASE_URL);
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
@@ -33,7 +33,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
-// production browser uses /__sb; realtime WS falls back to Worker
+// production /__sb: do not dial workers.dev Realtime (TLS-reset in Myanmar)
 applyNetlifyRealtimeFallback(supabase);
 
 // 包裹数据类型定义 - 匹配数据库字段名

@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
 
 export interface UseSupabaseRealtimeOptions {
   table: string;
@@ -21,6 +22,7 @@ export const useSupabaseRealtime = (options: UseSupabaseRealtimeOptions) => {
 
   const subscribe = useCallback(() => {
     if (!mountedRef.current) return;
+    if (!isBrowserRealtimeAvailable()) return;
 
     // 创建实时订阅频道
     const channelName = `realtime:${table}${filter ? `:${filter}` : ''}`;
