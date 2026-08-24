@@ -1,6 +1,13 @@
 import * as SecureStore from 'expo-secure-store';
 import { svc } from '../errors/serviceError';
-import { isInventoryCloudAuthError } from '../utils/cloudAuthErrors';
+import {
+  inventoryAccessTokenHasRequiredClaims,
+  interpretInventoryStoreAccess,
+  isInventoryCloudAuthError,
+  isInventoryRlsPolicyError,
+  shouldJoinInventorySessionRefresh,
+  shouldRefreshInventoryAccessToken,
+} from '../utils/cloudAuthErrors';
 import { isCloudReachable, isLikelyNetworkError, withTimeout } from '../utils/networkReachability';
 import {
   getSupabaseAnonKey,
@@ -184,15 +191,37 @@ function sessionFromAuthMetadata(user: {
   };
 }
 
+let lastStoreAllowedAt = 0;
+let lastStoreAllowedId = '';
+const STORE_ALLOWED_TTL_MS = 60_000;
+
 async function validateStoreStillAllowed(storeId: string): Promise<boolean> {
   if (!isSupabaseConfigured()) return true;
+  if (storeId === lastStoreAllowedId && Date.now() - lastStoreAllowedAt < STORE_ALLOWED_TTL_MS) {
+    return true;
+  }
   const { data, error } = await supabase
     .from('delivery_stores')
     .select('store_type, status')
     .eq('id', storeId)
     .maybeSingle();
-  if (error || !data) return false;
-  return data.store_type === TRANSIT_STATION_STORE_TYPE && (!data.status || data.status === 'active');
+  if (error) {
+    if (isInventoryCloudAuthError(error) || isInventoryRlsPolicyError(error)) {
+      throw new InventoryAuthRequiredError('authSessionExpired');
+    }
+    throw new Error(error.message || 'delivery_stores lookup failed');
+  }
+  const access = interpretInventoryStoreAccess(data);
+  if (access === 'unknown') {
+    // RLS 把行藏起来时，不能误报成店铺停用（批量签收会整批失败）
+    throw new InventoryAuthRequiredError('authSessionExpired');
+  }
+  if (access === 'allowed') {
+    lastStoreAllowedAt = Date.now();
+    lastStoreAllowedId = storeId;
+    return true;
+  }
+  return false;
 }
 
 async function signInInventoryAuth(email: string, password: string): Promise<void> {
@@ -200,8 +229,55 @@ async function signInInventoryAuth(email: string, password: string): Promise<voi
   if (error) throw svc('cloudLoginFailed', { detail: error.message });
 }
 
+let refreshInventoryCloudSessionInFlight: Promise<InventoryStoreSession> | null = null;
+let refreshInventoryCloudSessionForce = false;
+
+/** 确认当前会话可用于 REST 写入（JWT 由 supabase fetch 拦截器挂上） */
+export async function bindInventoryCloudSession(): Promise<InventoryStoreSession> {
+  if (!isSupabaseConfigured()) {
+    throw new InventoryAuthRequiredError('supabaseNotConfigured');
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new InventoryAuthRequiredError('authSessionExpired');
+  }
+  return ensureInventoryCloudAuth();
+}
+
 /** 主动刷新 Supabase JWT（写操作前调用，避免 RLS 误报需重新登录） */
-export async function refreshInventoryCloudSession(): Promise<InventoryStoreSession> {
+export async function refreshInventoryCloudSession(options?: {
+  force?: boolean;
+}): Promise<InventoryStoreSession> {
+  const force = Boolean(options?.force);
+  if (
+    shouldJoinInventorySessionRefresh({
+      hasInFlight: Boolean(refreshInventoryCloudSessionInFlight),
+      inFlightIsForce: refreshInventoryCloudSessionForce,
+      requestedForce: force,
+    })
+  ) {
+    return refreshInventoryCloudSessionInFlight as Promise<InventoryStoreSession>;
+  }
+  if (refreshInventoryCloudSessionInFlight) {
+    try {
+      await refreshInventoryCloudSessionInFlight;
+    } catch {
+      // 非强制刷新可能已失败，继续强制刷新
+    }
+  }
+  refreshInventoryCloudSessionForce = force;
+  refreshInventoryCloudSessionInFlight = refreshInventoryCloudSessionOnce({ force }).finally(() => {
+    refreshInventoryCloudSessionInFlight = null;
+    refreshInventoryCloudSessionForce = false;
+  });
+  return refreshInventoryCloudSessionInFlight;
+}
+
+async function refreshInventoryCloudSessionOnce(options?: {
+  force?: boolean;
+}): Promise<InventoryStoreSession> {
   if (!isSupabaseConfigured()) {
     throw new InventoryAuthRequiredError('supabaseNotConfigured');
   }
@@ -213,7 +289,11 @@ export async function refreshInventoryCloudSession(): Promise<InventoryStoreSess
   }
 
   const expiresAtMs = (currentSession.expires_at ?? 0) * 1000;
-  const shouldRefresh = !expiresAtMs || expiresAtMs < Date.now() + 120_000;
+  const shouldRefresh = shouldRefreshInventoryAccessToken({
+    expiresAtMs,
+    hasInventoryClaims: inventoryAccessTokenHasRequiredClaims(currentSession.access_token ?? ''),
+    force: options?.force,
+  });
   if (shouldRefresh) {
     const { data, error } = await supabase.auth.refreshSession();
     if (error || !data.session?.user) {
@@ -238,8 +318,14 @@ export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession>
     throw new InventoryAuthRequiredError();
   }
 
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  const user = userErr ? session.user : userData?.user ?? session.user;
+  const tokenHasClaims = inventoryAccessTokenHasRequiredClaims(session.access_token ?? '');
+  let user = session.user;
+  let userErr: { message?: string } | null = null;
+  if (!tokenHasClaims) {
+    const userResult = await supabase.auth.getUser();
+    userErr = userResult.error;
+    user = userErr ? session.user : userResult.data?.user ?? session.user;
+  }
 
   if (userErr && isInventoryCloudAuthError(userErr)) {
     const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
@@ -262,15 +348,6 @@ export async function ensureInventoryCloudAuth(): Promise<InventoryStoreSession>
   const fromMeta = sessionFromAuthMetadata(user);
   if (!fromMeta?.hubCode || !fromMeta.sessionId) {
     throw new InventoryAuthRequiredError('authJwtMissingHubCode');
-  }
-
-  const { error: probeErr } = await supabase
-    .from('delivery_stores')
-    .select('id')
-    .eq('id', fromMeta.id)
-    .maybeSingle();
-  if (probeErr && isInventoryCloudAuthError(probeErr)) {
-    throw new InventoryAuthRequiredError('authSessionExpired');
   }
 
   const ok = await validateStoreStillAllowed(fromMeta.id);

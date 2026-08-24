@@ -27,6 +27,7 @@ import { getSupabaseConfigHint, isSupabaseConfigured } from '../services/supabas
 import { ensureHubReceiveCloudReady } from '../services/hubReceiveGate';
 import { probeCloudConnection } from '../services/cloudConnection';
 import { prefetchInventoryCache } from '../services/inventoryCloudStore';
+import { refreshInventoryCloudSession } from '../services/authService';
 import {
   confirmOrderHubReceived,
   confirmOrderInPackById,
@@ -34,7 +35,10 @@ import {
   getPkgTrackingDetail,
 } from '../services/trackingService';
 import type { PkgTrackingDetail } from '../types/tracking';
-import { isDestinationHubPack, listPendingPackInboundOrders } from '../utils/hubReceivePack';
+import {
+  isDestinationHubPack,
+  listPendingPackInboundOrders,
+} from '../utils/hubReceivePack';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
@@ -186,21 +190,15 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   const ensurePackHubReceived = useCallback(
     async (packBarcode: string, knownPkg?: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
       if (!store) throw new Error(t.hubReceive.supabaseMissing);
-      try {
-        return await ensurePackHubReceivedAtStation({
-          packBarcode,
-          store,
-          hubCode,
-          operator,
-          knownPkg,
-        });
-      } catch (e: unknown) {
-        const syncErr = resolveAppError(t, e);
-        setError(fmt(t.hubReceive.packConfirmedSyncFailed, { err: syncErr }));
-        throw e;
-      }
+      return ensurePackHubReceivedAtStation({
+        packBarcode,
+        store,
+        hubCode,
+        operator,
+        knownPkg,
+      });
     },
-    [store, hubCode, operator, t, fmt],
+    [store, hubCode, operator, t],
   );
 
   const openPackOrdersModal = useCallback(
@@ -217,6 +215,8 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         } catch (e: unknown) {
           setError(resolveAppError(t, e));
         }
+      } else if (store) {
+        void ensureHubReceiveCloudReady({ forWrite: true });
       }
       setActivePack(pkg);
       setOrdersModalVisible(true);
@@ -400,7 +400,17 @@ export function useHubReceiveFlow(openPackBarcode: string) {
     setConfirmingHubReceive(true);
     try {
       const updated = await ensurePackHubReceived(activePack.pack_barcode, activePack);
-      setActivePack(updated);
+      const shown =
+        updated.status === 'in_transit'
+          ? {
+              ...updated,
+              status: 'hub_received' as const,
+              hub_received_at: updated.hub_received_at || new Date().toISOString(),
+              hub_received_by_store_code: store.storeCode,
+              hub_received_by_store_name: store.storeName,
+            }
+          : updated;
+      setActivePack(shown);
       void refreshTransportFeePaid(updated.pack_barcode);
       setModalSuccess(t.hubReceive.packConfirmSuccessMsg);
       showTaskSuccess(
@@ -408,7 +418,39 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         fmt(t.hubReceive.packConfirmed, { barcode: updated.pack_barcode }),
       );
     } catch (e: unknown) {
-      setError(resolveAppError(t, e));
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const latest = await getPkgTrackingDetail(activePack.pack_barcode).catch(() => null);
+      if (latest && latest.status !== 'in_transit') {
+        setError('');
+        setActivePack(latest);
+        void refreshTransportFeePaid(latest.pack_barcode);
+        setModalSuccess(t.hubReceive.packConfirmSuccessMsg);
+        showTaskSuccess(
+          t.hubReceive.packConfirmSuccess,
+          fmt(t.hubReceive.packConfirmed, { barcode: latest.pack_barcode }),
+        );
+        void ensurePackHubReceived(latest.pack_barcode, latest).catch(() => undefined);
+        return;
+      }
+      try {
+        await refreshInventoryCloudSession({ force: true });
+        const retried = await ensurePackHubReceived(activePack.pack_barcode, latest ?? activePack);
+        if (retried.status === 'in_transit') {
+          setError(resolveAppError(t, e));
+          return;
+        }
+        setError('');
+        setActivePack(retried);
+        void refreshTransportFeePaid(retried.pack_barcode);
+        setModalSuccess(t.hubReceive.packConfirmSuccessMsg);
+        showTaskSuccess(
+          t.hubReceive.packConfirmSuccess,
+          fmt(t.hubReceive.packConfirmed, { barcode: retried.pack_barcode }),
+        );
+        return;
+      } catch {
+        setError(resolveAppError(t, e));
+      }
     } finally {
       setConfirmingHubReceive(false);
     }

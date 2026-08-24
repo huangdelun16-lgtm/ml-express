@@ -48,6 +48,7 @@ import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
 import { parseInboundMovementNote } from '../utils/inboundMovementNote';
+import { preferConfirmedHubReceivePack } from '../utils/hubReceivePack';
 import { findParentPackForItem, resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
 import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
 import type { CustomerSignPickupType, CustomerSignReceiptInput } from '../types/customerSignReceipt';
@@ -63,7 +64,7 @@ import {
   markHubTransitOrdersRepacked,
   pushTruckLoadTracking,
 } from './trackingService';
-import { refreshInventoryCloudSession } from './authService';
+import { bindInventoryCloudSession } from './authService';
 import {
   autoDeliverLocalHubOrdersOnPackReceived as hubAutoDeliverLocal,
   deliverHubOrderInboundAtStation as hubDeliverOrder,
@@ -974,7 +975,7 @@ export async function ensurePackHubReceivedAtStation(params: {
 
   const promise = (async () => {
     if (params.knownPkg?.status === 'in_transit' || !params.knownPkg) {
-      await refreshInventoryCloudSession();
+      await bindInventoryCloudSession();
     }
     let pkg = params.knownPkg ?? (await getPkgTrackingDetail(code));
     if (!pkg) throw svc('packNotFound');
@@ -983,8 +984,18 @@ export async function ensurePackHubReceivedAtStation(params: {
       pkg = await confirmPkgHubReceived(code, params.store, params.hubCode);
     }
 
-    await hubImportPack(hubOps, pkg, params.store, params.operator);
-    return (await getPkgTrackingDetail(code)) ?? pkg;
+    try {
+      await hubImportPack(hubOps, pkg, params.store, params.operator);
+    } catch {
+      // 到站确认已成功时，导入失败不阻断进入入库步骤
+    }
+    let latest: PkgTrackingDetail | null = null;
+    try {
+      latest = await getPkgTrackingDetail(code);
+    } catch {
+      latest = null;
+    }
+    return preferConfirmedHubReceivePack(pkg, latest);
   })().finally(() => {
     ensurePackHubReceivedInFlight.delete(code);
   });

@@ -6,6 +6,7 @@ import {
   countPendingPackInboundOrders,
   isDestinationHubPack,
   listPendingPackInboundOrders,
+  preferConfirmedHubReceivePack,
   resolveHubReceiveStep,
 } from './hubReceivePack';
 
@@ -115,5 +116,27 @@ describe('hubReceivePack', () => {
       { status: 'hub_received', received_order_count: 1 },
     );
     expect(resolveHubReceiveStep(awaitingFee, 'LSO')).toBe(3);
+  });
+
+  it('确认到站后忽略仍显示在途的 GET 结果', () => {
+    const confirmed = pack(
+      [
+        {
+          id: '1',
+          order_barcode: 'LSO260801001',
+          order_name: 'A',
+          destination_code: 'LSO',
+          status: 'in_transit',
+          pack_barcode: 'RUI26LSO20001',
+          qty: 1,
+        },
+      ] as PkgTrackingDetail['orders'],
+      { status: 'hub_received', hub_received_at: '2026-08-25T00:00:00Z' },
+    );
+    const staleFetch = { ...confirmed, status: 'in_transit' as const, hub_received_at: null };
+    const merged = preferConfirmedHubReceivePack(confirmed, staleFetch);
+    expect(merged.status).toBe('hub_received');
+    expect(merged.hub_received_at).toBe('2026-08-25T00:00:00Z');
+    expect(resolveHubReceiveStep(merged, 'LSO')).toBe(2);
   });
 });

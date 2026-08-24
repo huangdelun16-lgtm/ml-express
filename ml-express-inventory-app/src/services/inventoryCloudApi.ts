@@ -2,6 +2,7 @@ import type { InventoryItem, PackedShipment, StockMovement } from '../types/inve
 import { normalizePackDestination } from '../constants/destinationOptions';
 import { svc } from '../errors/serviceError';
 import { ensureInventoryCloudAuth, type InventoryStoreSession } from './authService';
+import { withInventoryCloudWrite } from './cloudWriteGuard';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { generateUuid, toNullableUuid } from '../utils/uuid';
@@ -243,30 +244,32 @@ export async function applyCloudStockMovementAtomic(
   operationId: string,
 ): Promise<CloudStoreItemRow> {
   if (!isSupabaseConfigured()) throw svc('supabaseTrackingNotConfigured');
-  const authStore = await ensureInventoryCloudAuth();
-  const ownedByAuthStore =
-    ownershipKeyFromStoreCode(item.owner_store_code || store.storeCode) ===
-    ownershipKeyFromStoreCode(authStore.storeCode);
-  const { data, error } = await supabase.rpc('inventory_apply_stock_movement', {
-    p_operation_id: operationId,
-    p_item: itemToRpcPayload(item, ownedByAuthStore ? toNullableUuid(authStore.id) : null),
-    p_movement: { ...movement, origin_store_id: toNullableUuid(movement.origin_store_id) },
-  });
-  if (error) {
-    if (isInventoryOperationLogDuplicateError(error)) {
-      const { data: row, error: fetchErr } = await supabase
-        .from('inventory_store_items')
-        .select('*')
-        .eq('barcode', item.barcode.trim())
-        .maybeSingle();
-      if (!fetchErr && row) return rowToCloudItem(row as Record<string, unknown>);
+  return withInventoryCloudWrite(async () => {
+    const authStore = await ensureInventoryCloudAuth();
+    const ownedByAuthStore =
+      ownershipKeyFromStoreCode(item.owner_store_code || store.storeCode) ===
+      ownershipKeyFromStoreCode(authStore.storeCode);
+    const { data, error } = await supabase.rpc('inventory_apply_stock_movement', {
+      p_operation_id: operationId,
+      p_item: itemToRpcPayload(item, ownedByAuthStore ? toNullableUuid(authStore.id) : null),
+      p_movement: { ...movement, origin_store_id: toNullableUuid(movement.origin_store_id) },
+    });
+    if (error) {
+      if (isInventoryOperationLogDuplicateError(error)) {
+        const { data: row, error: fetchErr } = await supabase
+          .from('inventory_store_items')
+          .select('*')
+          .eq('barcode', item.barcode.trim())
+          .maybeSingle();
+        if (!fetchErr && row) return rowToCloudItem(row as Record<string, unknown>);
+      }
+      throw new Error(error.message);
     }
-    throw new Error(error.message);
-  }
-  if (!data) throw svc('syncItemFailed');
-  const result = data as AtomicRpcResult;
-  if (!result.item) throw svc('syncItemFailed');
-  return rowToCloudItem(result.item);
+    if (!data) throw svc('syncItemFailed');
+    const result = data as AtomicRpcResult;
+    if (!result.item) throw svc('syncItemFailed');
+    return rowToCloudItem(result.item);
+  });
 }
 
 /** 商品扣减、流水、包和明细在同一事务中提交。 */
@@ -655,49 +658,51 @@ export async function upsertCloudStoreItem(
   item: InventoryItem,
 ): Promise<string> {
   if (!isSupabaseConfigured()) return item.id;
-  const authStore = await ensureInventoryCloudAuth();
-  const authStoreCode = authStore.storeCode.trim().toUpperCase();
-  const itemOwnerRaw = item.owner_store_code?.trim() || authStoreCode;
-  const ownedByAuthStore =
-    ownershipKeyFromStoreCode(itemOwnerRaw) === ownershipKeyFromStoreCode(authStoreCode);
-  const finalDestRaw = item.final_destination?.trim() ?? '';
-  const finalDestination = normalizePackDestination(finalDestRaw) || finalDestRaw;
+  return withInventoryCloudWrite(async () => {
+    const authStore = await ensureInventoryCloudAuth();
+    const authStoreCode = authStore.storeCode.trim().toUpperCase();
+    const itemOwnerRaw = item.owner_store_code?.trim() || authStoreCode;
+    const ownedByAuthStore =
+      ownershipKeyFromStoreCode(itemOwnerRaw) === ownershipKeyFromStoreCode(authStoreCode);
+    const finalDestRaw = item.final_destination?.trim() ?? '';
+    const finalDestination = normalizePackDestination(finalDestRaw) || finalDestRaw;
 
-  const payload = {
-    barcode: item.barcode.trim(),
-    input_barcode: item.input_barcode?.trim() ?? '',
-    name: item.name.trim(),
-    spec: item.spec?.trim() ?? '',
-    unit: item.unit?.trim() || '1 Pcs',
-    weight: item.weight?.trim() ?? '',
-    qty_on_hand: item.qty_on_hand,
-    min_qty: item.min_qty ?? 0,
-    note: item.note?.trim() ?? '',
-    owner_store_id: ownedByAuthStore ? toNullableUuid(authStore.id) : null,
-    owner_store_code: ownedByAuthStore ? authStore.storeCode : itemOwnerRaw,
-    recipient_name: item.recipient_name?.trim() ?? '',
-    final_destination: finalDestination,
-    hub_arrived_at: toNullableTs(item.hub_arrived_at),
-    customer_signed_at: toNullableTs(item.customer_signed_at),
-    customer_sign_phone: item.customer_sign_phone?.trim() ?? '',
-    customer_sign_pickup_type: item.customer_sign_pickup_type?.trim() ?? '',
-    customer_sign_proxy_name: item.customer_sign_proxy_name?.trim() ?? '',
-    customer_signature_data: item.customer_signature_data?.trim() ?? '',
-    customer_signed_by_operator: item.customer_signed_by_operator?.trim() ?? '',
-    packed_at: toNullableTs(item.packed_at),
-    packed_bundle_barcode: item.packed_bundle_barcode?.trim() ?? '',
-    hub_transit_released_at: toNullableTs(item.hub_transit_released_at),
-    hub_transit_shipped_at: toNullableTs(item.hub_transit_shipped_at),
-    created_at: item.created_at || new Date().toISOString(),
-    updated_at: item.updated_at || new Date().toISOString(),
-  };
-  const { data, error } = await supabase
-    .from('inventory_store_items')
-    .upsert(payload, { onConflict: 'barcode' })
-    .select('id')
-    .single();
-  if (error || !data) throw error?.message ? new Error(error.message) : svc('syncItemFailed');
-  return String((data as { id: string }).id);
+    const payload = {
+      barcode: item.barcode.trim(),
+      input_barcode: item.input_barcode?.trim() ?? '',
+      name: item.name.trim(),
+      spec: item.spec?.trim() ?? '',
+      unit: item.unit?.trim() || '1 Pcs',
+      weight: item.weight?.trim() ?? '',
+      qty_on_hand: item.qty_on_hand,
+      min_qty: item.min_qty ?? 0,
+      note: item.note?.trim() ?? '',
+      owner_store_id: ownedByAuthStore ? toNullableUuid(authStore.id) : null,
+      owner_store_code: ownedByAuthStore ? authStore.storeCode : itemOwnerRaw,
+      recipient_name: item.recipient_name?.trim() ?? '',
+      final_destination: finalDestination,
+      hub_arrived_at: toNullableTs(item.hub_arrived_at),
+      customer_signed_at: toNullableTs(item.customer_signed_at),
+      customer_sign_phone: item.customer_sign_phone?.trim() ?? '',
+      customer_sign_pickup_type: item.customer_sign_pickup_type?.trim() ?? '',
+      customer_sign_proxy_name: item.customer_sign_proxy_name?.trim() ?? '',
+      customer_signature_data: item.customer_signature_data?.trim() ?? '',
+      customer_signed_by_operator: item.customer_signed_by_operator?.trim() ?? '',
+      packed_at: toNullableTs(item.packed_at),
+      packed_bundle_barcode: item.packed_bundle_barcode?.trim() ?? '',
+      hub_transit_released_at: toNullableTs(item.hub_transit_released_at),
+      hub_transit_shipped_at: toNullableTs(item.hub_transit_shipped_at),
+      created_at: item.created_at || new Date().toISOString(),
+      updated_at: item.updated_at || new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from('inventory_store_items')
+      .upsert(payload, { onConflict: 'barcode' })
+      .select('id')
+      .single();
+    if (error || !data) throw error?.message ? new Error(error.message) : svc('syncItemFailed');
+    return String((data as { id: string }).id);
+  });
 }
 
 export async function insertCloudStockMovement(

@@ -13,6 +13,7 @@ import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { extractDestinationCode } from '../utils/inboundBarcode';
 import { resolveOrderDestinationCode } from '../utils/orderDestination';
 import { isPackageBarcode, packDestinationFromBarcode } from '../utils/packageNumber';
+import { preferConfirmedHubReceivePack } from '../utils/hubReceivePack';
 import { toNullableUuid } from '../utils/uuid';
 import { inventoryOperationId, isInventoryOperationLogDuplicateError } from '../utils/inventoryReliability';
 import { withInventoryCloudWrite } from './cloudWriteGuard';
@@ -559,6 +560,23 @@ export async function listOutboundPackagesFromOrigin(
   return result;
 }
 
+function packStatusFromHubReceiveRpc(data: unknown): PkgTrackingStatus | null {
+  let row: unknown = data;
+  if (typeof data === 'string') {
+    try {
+      row = JSON.parse(data) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!row || typeof row !== 'object') return null;
+  const status = String((row as { status?: unknown }).status ?? '').trim();
+  if (status === 'hub_received' || status === 'completed' || status === 'split_at_hub') {
+    return status;
+  }
+  return null;
+}
+
 const confirmHubReceivedInFlight = new Map<string, Promise<PkgTrackingDetail>>();
 
 export async function confirmPkgHubReceived(
@@ -604,26 +622,50 @@ async function confirmPkgHubReceivedOnce(
   if (detail.status === 'cancelled') throw svc('pkgCancelled');
   if (detail.status === 'hub_received') return detail;
 
-  const { error } = await supabase.rpc('inventory_confirm_pkg_hub_received', {
-    p_operation_id: inventoryOperationId('hub-receive', detail.pack_barcode),
-    p_pack_barcode: detail.pack_barcode,
-    p_store_id: toNullableUuid(store.id),
-    p_store_code: store.storeCode,
-    p_store_name: store.storeName,
-    p_hub_code: dest,
-  });
-  if (error) {
+  const confirmedAt = new Date().toISOString();
+  let recoveredFromDuplicate: PkgTrackingDetail | null = null;
+  let rpcStatus: PkgTrackingStatus | null = null;
+  await withInventoryCloudWrite(async () => {
+    const { data, error } = await supabase.rpc('inventory_confirm_pkg_hub_received', {
+      p_operation_id: inventoryOperationId('hub-receive', detail.pack_barcode),
+      p_pack_barcode: detail.pack_barcode,
+      p_store_id: toNullableUuid(store.id),
+      p_store_code: store.storeCode,
+      p_store_name: store.storeName,
+      p_hub_code: dest,
+    });
+    if (!error) {
+      rpcStatus = packStatusFromHubReceiveRpc(data) ?? 'hub_received';
+      return;
+    }
     if (isInventoryOperationLogDuplicateError(error)) {
-      const updated = await getPkgTrackingDetail(detail.pack_barcode);
-      if (updated?.status === 'hub_received' || updated?.status === 'completed' || updated?.status === 'split_at_hub') {
-        return updated;
+      const existing = await getPkgTrackingDetail(detail.pack_barcode);
+      if (
+        existing?.status === 'hub_received' ||
+        existing?.status === 'completed' ||
+        existing?.status === 'split_at_hub'
+      ) {
+        recoveredFromDuplicate = existing;
+        return;
       }
     }
-    throw new Error(error.message);
+    throwTrackingCloudWriteError(error);
+  });
+  const confirmed: PkgTrackingDetail = recoveredFromDuplicate ?? {
+    ...detail,
+    status: rpcStatus ?? 'hub_received',
+    hub_received_at: detail.hub_received_at || confirmedAt,
+    hub_received_by_store_code: store.storeCode,
+    hub_received_by_store_name: store.storeName,
+    updated_at: confirmedAt,
+  };
+  let fetched: PkgTrackingDetail | null = null;
+  try {
+    fetched = await getPkgTrackingDetail(detail.pack_barcode);
+  } catch {
+    fetched = null;
   }
-  const updated = await getPkgTrackingDetail(detail.pack_barcode);
-  if (!updated) throw svc('pkgNotFoundNeedLoad');
-  return updated;
+  return preferConfirmedHubReceivePack(confirmed, fetched);
 }
 
 async function applyOrderHubReceived(

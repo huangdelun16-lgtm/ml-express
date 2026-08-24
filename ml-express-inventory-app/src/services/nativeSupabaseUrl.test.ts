@@ -4,6 +4,7 @@ import {
   nativeClientHeaders,
   resolveNativeSupabaseUrl,
   rewritePublicStorageUrl,
+  shouldAttachInventoryUserJwt,
 } from './nativeSupabaseUrl';
 
 const UPSTREAM = 'https://' + 'uopkyuluxnrewvlmutam' + '.supabase.co';
@@ -72,5 +73,16 @@ describe('rewritePublicStorageUrl', () => {
     expect(rewritePublicStorageUrl('https://example.com/app.apk')).toBe(
       'https://example.com/app.apk',
     );
+  });
+
+  it('attaches shop JWT only to REST and functions', () => {
+    expect(
+      shouldAttachInventoryUserJwt(
+        'https://admin-market-link-express.com/__sb/rest/v1/rpc/inventory_confirm_pkg_hub_received',
+      ),
+    ).toBe(true);
+    expect(
+      shouldAttachInventoryUserJwt('https://admin-market-link-express.com/__sb/auth/v1/token'),
+    ).toBe(false);
   });
 });

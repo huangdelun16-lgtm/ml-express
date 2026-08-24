@@ -1,5 +1,5 @@
 import { probeCloudConnection } from './cloudConnection';
-import { refreshInventoryCloudSession } from './authService';
+import { bindInventoryCloudSession } from './authService';
 import { isCloudReachable } from '../utils/networkReachability';
 import { isSupabaseConfigured } from './supabase';
 
@@ -29,7 +29,7 @@ export async function ensureHubReceiveCloudReady(options?: {
       return { ok: false, reason: 'offline' };
     }
     try {
-      await refreshInventoryCloudSession();
+      await bindInventoryCloudSession();
       lastGateOkAt = Date.now();
       return { ok: true };
     } catch {

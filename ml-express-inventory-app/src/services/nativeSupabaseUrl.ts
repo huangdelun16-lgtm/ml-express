@@ -29,6 +29,13 @@ function isSupabaseCoHost(url: string): boolean {
   return /https?:\/\/[^/\s]*supabase\.co(?=\/|$)/i.test(url);
 }
 
+/** REST / Edge Functions 必须带店铺 JWT；Auth 路由仍由 supabase-js 自行处理 */
+export function shouldAttachInventoryUserJwt(requestUrl: string): boolean {
+  const url = String(requestUrl || '');
+  if (/\/auth\/v1(?:\/|\?|$)/.test(url)) return false;
+  return /\/rest\/v1(?:\/|\?|$)|\/functions\/v1(?:\/|\?|$)/.test(url);
+}
+
 /**
  * Native REST always uses /__sb unless allowDirect is set.
  * Myanmar Wi-Fi TLS-resets *.supabase.co; Expo Go / __DEV__ env often still

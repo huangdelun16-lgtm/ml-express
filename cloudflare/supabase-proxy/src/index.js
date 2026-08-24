@@ -32,6 +32,7 @@ const DROP_RES = new Set([
   'transfer-encoding',
   'nel',
   'report-to',
+  'set-cookie',
 ]);
 
 function isAllowedPath(pathname) {
@@ -103,6 +104,8 @@ export default {
         if (!DROP_RES.has(key.toLowerCase())) outHeaders.set(key, value);
       }
       applyCors(request, outHeaders);
+      outHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      outHeaders.set('Pragma', 'no-cache');
       return new Response(upstream.body, {
         status: upstream.status,
         statusText: upstream.statusText,

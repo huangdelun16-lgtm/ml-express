@@ -49,6 +49,27 @@ export function hasUnreleasedTransitOrders(pack: PkgTrackingDetail, hubCode: str
   );
 }
 
+/** 刚确认到站后，GET 可能仍返回 in_transit（/__sb 代理缓存）；保留 RPC 已确认状态以便进入第 2 步 */
+export function preferConfirmedHubReceivePack(
+  confirmed: PkgTrackingDetail,
+  fetched: PkgTrackingDetail | null | undefined,
+): PkgTrackingDetail {
+  if (!fetched) return confirmed;
+  if (confirmed.status !== 'in_transit' && fetched.status === 'in_transit') {
+    return {
+      ...fetched,
+      status: confirmed.status,
+      hub_received_at: confirmed.hub_received_at ?? fetched.hub_received_at,
+      hub_received_by_store_code:
+        confirmed.hub_received_by_store_code ?? fetched.hub_received_by_store_code,
+      hub_received_by_store_name:
+        confirmed.hub_received_by_store_name ?? fetched.hub_received_by_store_name,
+      updated_at: confirmed.updated_at || fetched.updated_at,
+    };
+  }
+  return fetched;
+}
+
 /** 到站现场 3 步：1 确认到站 → 2 入库/分拨 → 3 支付车费 */
 export type HubReceiveStep = 1 | 2 | 3;
 

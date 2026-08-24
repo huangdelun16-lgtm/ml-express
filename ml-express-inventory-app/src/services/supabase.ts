@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
-import { resolveNativeSupabaseUrl } from './nativeSupabaseUrl';
+import { resolveNativeSupabaseUrl, shouldAttachInventoryUserJwt } from './nativeSupabaseUrl';
 
 type SupabaseExtra = {
   supabaseUrl?: string;
@@ -75,6 +75,29 @@ export function getSupabaseConfigHint(): string {
   return '';
 }
 
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+let readInventoryAccessToken: () => Promise<string | null> = async () => null;
+
+const inventoryFetch: typeof fetch = async (input, init) => {
+  const headers = new Headers(init?.headers);
+  headers.set('Cache-Control', 'no-store');
+  headers.set('Pragma', 'no-cache');
+  if (shouldAttachInventoryUserJwt(requestUrl(input))) {
+    try {
+      const token = await readInventoryAccessToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+    } catch {
+      // keep caller headers
+    }
+  }
+  return fetch(input, { ...init, headers });
+};
+
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-key',
@@ -85,5 +108,18 @@ export const supabase = createClient(
       persistSession: true,
       detectSessionInUrl: false,
     },
+    global: {
+      fetch: inventoryFetch,
+      headers: {
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      },
+    },
   },
 );
+readInventoryAccessToken = async () => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+};
