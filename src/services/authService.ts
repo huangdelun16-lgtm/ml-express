@@ -22,6 +22,13 @@ let lastVerifySuccess: {
   result: VerifyOk;
 } | null = null;
 
+const verifyInflight = new Map<string, Promise<VerifyOk>>();
+
+function shouldWipeAdminSession(error?: string): boolean {
+  if (!error) return true;
+  return /令牌|未找到认证|无效的令牌|已过期|签名|用户不存在|停用/.test(error);
+}
+
 function normalizePermissionKey(permissionId?: string | string[]): string | undefined {
   if (permissionId == null) return undefined;
   const arr = (Array.isArray(permissionId) ? permissionId : [permissionId]).filter(Boolean).sort();
@@ -162,6 +169,11 @@ export async function verifyToken(
       return lastVerifySuccess.result;
     }
 
+    const inflightKey = `${rolesKey}|${permissionKeyVal || ''}`;
+    const pending = verifyInflight.get(inflightKey);
+    if (pending) return pending;
+
+    const run = (async (): Promise<VerifyOk> => {
     const bodyToken = getToken() || undefined;
 
     const permissionIds =
@@ -171,12 +183,11 @@ export async function verifyToken(
           ? permissionId.filter(Boolean)
           : [permissionId];
 
-    const response = await fetch('/.netlify/functions/verify-admin', {
+    const response = await adminAuthenticatedFetch('/.netlify/functions/verify-admin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      credentials: 'include',
       body: JSON.stringify({
         action: 'verify',
         requiredRoles,
@@ -228,13 +239,22 @@ export async function verifyToken(
       }
     } else if (!result.valid) {
       lastVerifySuccess = null;
-      await clearToken();
+      if (shouldWipeAdminSession(result.error)) {
+        await clearToken();
+      }
     }
 
     return result;
+    })();
+
+    verifyInflight.set(inflightKey, run);
+    try {
+      return await run;
+    } finally {
+      if (verifyInflight.get(inflightKey) === run) verifyInflight.delete(inflightKey);
+    }
   } catch (error) {
     logger.error('验证 Token 失败:', error);
-    await clearToken();
     return { valid: false, error: '验证失败' };
   }
 }

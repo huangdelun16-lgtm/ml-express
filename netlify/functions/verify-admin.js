@@ -225,6 +225,7 @@ function generateAdminToken(username, role) {
 
 // 引入 CORS 工具函数
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
+const { getAdminTokenFromEvent } = require('./utils/adminToken');
 
 /**
  * Netlify Function 主处理函数
@@ -266,8 +267,7 @@ exports.handler = async (event, context) => {
         }
       }
       
-      // 使用 Cookie 中的 Token 或请求体中的 Token
-      const tokenToVerify = cookieToken || token;
+      const tokenToVerify = getAdminTokenFromEvent(event) || cookieToken || token;
       
       // 调试日志（仅在开发环境）
       if (process.env.NODE_ENV !== 'production') {
@@ -279,9 +279,9 @@ exports.handler = async (event, context) => {
       if (!tokenToVerify) {
         console.error('验证失败: 未找到 Token。Cookie Header:', cookieHeader);
         return {
-          statusCode: 401,
+          statusCode: 200,
           headers,
-          body: JSON.stringify({ valid: false, error: '未找到认证令牌', debug: process.env.NODE_ENV !== 'production' ? { cookieHeader, hasCookie: !!cookieToken } : undefined })
+          body: JSON.stringify({ valid: false, error: '未找到认证令牌' })
         };
       }
       
@@ -292,14 +292,19 @@ exports.handler = async (event, context) => {
         permIds = [permissionId];
       }
       const result = await verifyAdminToken(tokenToVerify, requiredRoles || [], permIds);
-      
-      // 如果验证失败，清除 Cookie
-      if (!result.valid) {
+
+      // 权限不足只表示打不开某一页，不要清 Cookie（否则控制台 401 后整站被踢出）
+      const wipeSession =
+        !result.valid &&
+        (!result.error ||
+          /令牌|未找到认证|无效的令牌|已过期|签名|用户不存在|停用/.test(String(result.error)));
+      if (wipeSession) {
         headers['Set-Cookie'] = 'admin_auth_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax';
       }
-      
+
+      // 会话探测用 200 + { valid }，避免浏览器把正常「未登录/权限不足」打成 Failed to load resource 401
       return {
-        statusCode: result.valid ? 200 : 401,
+        statusCode: 200,
         headers,
         body: JSON.stringify(result)
       };

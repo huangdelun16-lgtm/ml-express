@@ -29,24 +29,14 @@ code {
   color: #000000 !important;
 }
 
+/* Native <select>：Windows Firefox 不能给 option 加 backdrop-filter / 大 padding，否则下拉行被撑成空白 */
 select {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  color: #2c5282;
-  border: none;
-  backdrop-filter: blur(10px);
-}
-
-select:focus {
-  background-color: rgba(255, 255, 255, 0.15) !important;
-  outline: none;
+  max-width: 100%;
 }
 
 option {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  color: #2c5282;
-  backdrop-filter: blur(10px);
-  padding: 8px;
-  border: none;
+  background-color: #ffffff;
+  color: #0f172a;
 }
 
 /* Modal动画 */

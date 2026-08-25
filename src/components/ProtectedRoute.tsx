@@ -25,6 +25,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const [isChecking, setIsChecking] = useState(true);
   const [error, setError] = useState<string>('');
 
+  const rolesDep = [...requiredRoles].sort().join(',');
   const permissionDep =
     permissionId == null
       ? ''
@@ -35,7 +36,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // 传递 requiredRoles 与 permissionId（可为多项，满足任一）
         const result = await verifyToken(requiredRoles, permissionId);
         
         if (result.valid) {
@@ -55,7 +55,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     };
 
     checkAuthStatus();
-  }, [requiredRoles, permissionDep]);
+    // rolesDep / permissionDep 避免每次渲染新数组触发重复校验（控制台连打 401）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rolesDep, permissionDep]);
 
   // 正在检查权限时显示加载状态
   if (isChecking) {
