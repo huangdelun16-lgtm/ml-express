@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image, FlatList, RefreshControl, Animated, Modal, Vibration, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Image, FlatList, RefreshControl, Animated, Modal, Vibration, Platform, DeviceEventEmitter } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,8 @@ import BackToHomeButton from '../components/BackToHomeButton';
 import { feedbackService } from '../services/FeedbackService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { dialCourierByAssignment } from '../utils/courierPhone';
+import { isCourierUnassigned } from '../services/_shared/dialPhone';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,6 +56,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [trackingCode, setTrackingCode] = useState(route?.params?.orderId || '');
   const [loading, setLoading] = useState(false);
   const [packageData, setPackageData] = useState<Package | null>(null);
+  const packageDataRef = useRef<Package | null>(null);
+  packageDataRef.current = packageData;
   const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([]);
   const [searched, setSearched] = useState(false);
   const [courierId, setCourierId] = useState<string | null>(null);
@@ -86,19 +90,24 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const flatListRef = useRef<FlatList>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const currentUserIdRef = useRef<string | null>(null);
+  currentUserIdRef.current = currentUserId;
+  const [senderType, setSenderType] = useState<'customer' | 'merchant'>('customer');
+  const showChatModalRef = useRef(false);
+  showChatModalRef.current = showChatModal;
 
-  // 🚀 获取当前用户 ID 用于聊天
   useEffect(() => {
     AsyncStorage.getItem('userId').then(id => setCurrentUserId(id));
+    AsyncStorage.getItem('userType').then((type) => {
+      setSenderType(type === 'merchant' ? 'merchant' : 'customer');
+    });
   }, []);
 
-  // 🚀 加载聊天记录并订阅实时更新
   const loadChatMessages = async (orderId: string) => {
     if (!orderId) return;
     const chatMsgs = await chatService.getOrderMessages(orderId);
     setMessages(chatMsgs);
     
-    // 订阅新消息
     if (chatSubscriptionRef.current) {
       chatSubscriptionRef.current.unsubscribe();
     }
@@ -109,8 +118,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
         return [...prev, newMsg];
       });
       
-      // 如果聊天框没打开，且是对方发的消息，增加未读数
-      if (!showChatModal && newMsg.sender_id !== currentUserId) {
+      if (!showChatModalRef.current && newMsg.sender_id !== currentUserIdRef.current) {
         setUnreadCount(prev => prev + 1);
         Vibration.vibrate(100);
       }
@@ -128,7 +136,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       id: 'temp-' + Date.now(),
       order_id: packageData.id,
       sender_id: currentUserId,
-      sender_type: 'customer',
+      sender_type: senderType,
       message: messageText,
       created_at: new Date().toISOString(),
       is_read: false
@@ -139,7 +147,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     const result = await chatService.sendMessage({
       order_id: packageData.id,
       sender_id: currentUserId,
-      sender_type: 'customer',
+      sender_type: senderType,
       message: messageText
     });
     
@@ -153,15 +161,21 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   // 🚀 自动检查未读消息
   useEffect(() => {
     if (!packageData?.id || !currentUserId) return;
-    
+    let cancelled = false;
+
     const checkUnread = async () => {
-      const count = await chatService.getUnreadCount(currentUserId);
-      setUnreadCount(count);
+      const count = await chatService.getUnreadCountForOrder(packageData.id, currentUserId);
+      if (!cancelled && !showChatModalRef.current) setUnreadCount(count);
     };
-    
-    checkUnread();
-    const timer = setInterval(checkUnread, 10000);
-    return () => clearInterval(timer);
+
+    void checkUnread();
+    const timer = setInterval(() => {
+      void checkUnread();
+    }, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [packageData?.id, currentUserId]);
 
   // 🚀 当页面切换订单时重新加载聊天
@@ -226,9 +240,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   }, [isOnline]);
 
   // 加载正在进行的订单
-  const loadInTransitOrders = async () => {
+  const loadInTransitOrders = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     try {
-      if (!refreshing) setLoadingOrders(true);
+      if (!silent && !refreshing) setLoadingOrders(true);
       const userData = await AsyncStorage.getItem('currentUser');
       const user = userData ? JSON.parse(userData) : null;
       if (!user || user.id === 'guest') {
@@ -269,8 +284,10 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     } catch (error) {
       console.error('Failed to load in-transit orders:', error);
     } finally {
-      setLoadingOrders(false);
-      setRefreshing(false);
+      if (!silent) {
+        setLoadingOrders(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -369,6 +386,27 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('order_status_updated', () => {
+      void loadInTransitOrders({ silent: true });
+      const current = packageDataRef.current;
+      if (!current?.id) return;
+      void (async () => {
+        try {
+          const order = await packageService.trackOrder(current.id);
+          if (order) {
+            setPackageData(order);
+            const history = await packageService.getTrackingHistory(order.id);
+            setTrackingHistory(history);
+          }
+        } catch (error) {
+          LoggerService.error('轮询刷新追踪订单失败:', error);
+        }
+      })();
+    });
+    return () => sub.remove();
+  }, []);
 
   // 🚀 计算 ETA (预计到达时间)
   const calculateETA = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -970,6 +1008,29 @@ export default function TrackOrderScreen({ navigation, route }: any) {
                   <Text style={styles.infoLabel}>{t.courier}:</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end', gap: 10 }}>
                     <Text style={[styles.infoValue, isDarkMode && styles.darkText]}>{packageData.courier}</Text>
+                    {!isCourierUnassigned(packageData.courier) ? (
+                      <TouchableOpacity
+                        style={styles.miniChatBtn}
+                        onPress={() => {
+                          void (async () => {
+                            const result = await dialCourierByAssignment(packageData.courier);
+                            if (result === 'unassigned') {
+                              feedbackService.notify(
+                                language === 'zh' ? '提示' : 'Notice',
+                                language === 'zh' ? '尚未分配骑手' : 'No courier assigned',
+                              );
+                            } else if (result === 'no-phone') {
+                              feedbackService.notify(
+                                language === 'zh' ? '提示' : 'Notice',
+                                language === 'zh' ? '未找到骑手电话' : 'Courier phone not found',
+                              );
+                            }
+                          })();
+                        }}
+                      >
+                        <Ionicons name="call" size={18} color="#22c55e" />
+                      </TouchableOpacity>
+                    ) : null}
                     {/* 🚀 聊天入口按钮 */}
                     <TouchableOpacity 
                       style={styles.miniChatBtn}

@@ -15,6 +15,7 @@ import {
   Vibration,
   FlatList,
   Platform,
+  DeviceEventEmitter,
 } from "react-native";
 import { theme } from "../config/theme";
 import { LinearGradient } from "expo-linear-gradient";
@@ -34,6 +35,7 @@ import BackToHomeButton from "../components/BackToHomeButton";
 import { feedbackService } from "../services/FeedbackService";
 import ReceiptPrintPreviewModal from "../components/ReceiptPrintPreviewModal";
 import { type AppLang, getJourneyCopy, getJourneyLabels } from "../utils/orderJourney";
+import { dialCourierByAssignment } from "../utils/courierPhone";
 
 const { width } = Dimensions.get("window");
 
@@ -99,19 +101,29 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const chatSubscriptionRef = useRef<any>(null);
   const flatListRef = useRef<FlatList>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const showChatModalRef = useRef(false);
+  showChatModalRef.current = showChatModal;
+  const customerIdRef = useRef(customerId);
+  customerIdRef.current = customerId;
 
-  // 自动检查未读消息
+  // 自动检查未读消息（按本单；聊天打开时不覆盖角标）
   useEffect(() => {
     if (!orderId || !customerId) return;
+    let cancelled = false;
 
     const checkUnread = async () => {
-      const count = await chatService.getUnreadCount(customerId);
-      setUnreadCount(count);
+      const count = await chatService.getUnreadCountForOrder(orderId, customerId);
+      if (!cancelled && !showChatModalRef.current) setUnreadCount(count);
     };
 
-    checkUnread();
-    const timer = setInterval(checkUnread, 10000); // 10秒检查一次
-    return () => clearInterval(timer);
+    void checkUnread();
+    const timer = setInterval(() => {
+      void checkUnread();
+    }, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [orderId, customerId]);
 
   // 评价相关
@@ -269,6 +281,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       cancelOrder: "取消订单",
       rateOrder: "评价订单",
       contactCourier: "联系配送员",
+      noCourier: "尚未分配骑手",
+      noCourierPhone: "未找到骑手电话",
       confirmCancel: "确认取消订单？",
       cancelSuccess: "订单已取消",
       cancelFailed: "取消失败",
@@ -336,6 +350,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       cancelOrder: "Cancel Order",
       rateOrder: "Rate",
       contactCourier: "Contact Courier",
+      noCourier: "No courier assigned yet",
+      noCourierPhone: "Courier phone not found",
       confirmCancel: "Confirm cancel?",
       cancelSuccess: "Order cancelled",
       cancelFailed: "Cancel failed",
@@ -403,6 +419,8 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       cancelOrder: "ပယ်ဖျက်",
       rateOrder: "အဆင့်သတ်မှတ်",
       contactCourier: "ဆက်သွယ်",
+      noCourier: "ပို့ဆောင်သူ မရှိသေးပါ",
+      noCourierPhone: "ဖုန်းနံပါတ် မတွေ့ပါ",
       confirmCancel: "ပယ်ဖျက်မှာသေချာပါသလား?",
       cancelSuccess: "ပယ်ဖျက်ပြီး",
       cancelFailed: "ပယ်ဖျက်မအောင်မြင်",
@@ -459,8 +477,25 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   useEffect(() => {
     loadData();
 
+    const statusSub = DeviceEventEmitter.addListener("order_status_updated", () => {
+      if (!orderId) return;
+      void (async () => {
+        try {
+          const orderData = await packageService.getOrderById(orderId);
+          if (orderData) {
+            setOrder(orderData);
+          }
+          const history = await packageService.getTrackingHistory(orderId);
+          setTrackingHistory(history);
+        } catch (error) {
+          LoggerService.error("轮询刷新订单详情失败:", error);
+        }
+      })();
+    });
+
     // 清理聊天订阅
     return () => {
+      statusSub.remove();
       if (chatSubscriptionRef.current) {
         chatSubscriptionRef.current.unsubscribe();
       }
@@ -471,25 +506,25 @@ export default function OrderDetailScreen({ route, navigation }: any) {
     const chatMsgs = await chatService.getOrderMessages(orderId);
     setMessages(chatMsgs);
 
-    // 订阅新消息
-    if (!chatSubscriptionRef.current) {
-      chatSubscriptionRef.current = chatService.subscribeToMessages(
-        orderId,
-        (newMsg) => {
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
-          });
-
-          // 如果聊天框没打开，且是对方发的消息，增加未读数
-          if (!showChatModal && newMsg.sender_id !== customerId) {
-            setUnreadCount((prev) => prev + 1);
-            // 可以在这里加一个震动或小提示
-            Vibration.vibrate(100);
-          }
-        },
-      );
+    if (chatSubscriptionRef.current) {
+      chatSubscriptionRef.current.unsubscribe();
+      chatSubscriptionRef.current = null;
     }
+
+    chatSubscriptionRef.current = chatService.subscribeToMessages(
+      orderId,
+      (newMsg) => {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+
+        if (!showChatModalRef.current && newMsg.sender_id !== customerIdRef.current) {
+          setUnreadCount((prev) => prev + 1);
+          Vibration.vibrate(100);
+        }
+      },
+    );
   };
 
   const handleSendMessage = async () => {
@@ -627,13 +662,15 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   };
 
   // 联系配送员
-  const handleContactCourier = () => {
-    if (!order?.courier) {
-      feedbackService.notify("提示", "暂无配送员信息");
+  const handleContactCourier = async () => {
+    const result = await dialCourierByAssignment(order?.courier);
+    if (result === "unassigned") {
+      feedbackService.notify("提示", t.noCourier);
       return;
     }
-    // 这里可以实现拨打电话或发送消息
-    feedbackService.notify("提示", `联系配送员: ${order.courier}`);
+    if (result === "no-phone") {
+      feedbackService.notify("提示", t.noCourierPhone);
+    }
   };
 
   // 拨打电话

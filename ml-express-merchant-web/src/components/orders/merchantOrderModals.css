@@ -438,3 +438,119 @@
   border-radius: 50%;
   animation: merchant-modal-spin 1s linear infinite;
 }
+
+.merchant-chat-panel {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.merchant-chat-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.merchant-chat-panel__title {
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.merchant-chat-panel__sub {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+
+.merchant-chat-panel__call {
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.82rem;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+}
+
+.merchant-chat-panel__call:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.merchant-chat-panel__hint {
+  color: #fbbf24;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.merchant-chat-panel__log {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 0.15rem;
+}
+
+.merchant-chat-panel__empty {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 1.25rem 0.5rem;
+}
+
+.merchant-chat-bubble {
+  align-self: flex-start;
+  max-width: 80%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 14px 14px 14px 4px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.merchant-chat-bubble--mine {
+  align-self: flex-end;
+  background: #2563eb;
+  border-radius: 14px 14px 4px 14px;
+}
+
+.merchant-chat-panel__composer {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.merchant-chat-panel__composer input {
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.merchant-chat-panel__composer button {
+  border: none;
+  border-radius: 12px;
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 800;
+  padding: 0 1rem;
+  cursor: pointer;
+}
+
+.merchant-chat-panel__composer button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

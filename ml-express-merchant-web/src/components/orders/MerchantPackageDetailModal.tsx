@@ -8,6 +8,7 @@ import {
   computePackageOrderTotalMmk,
   parsePackageLineItems,
 } from '../../utils/parsePackageLineItems';
+import MerchantOrderChatPanel from './MerchantOrderChatPanel';
 import './merchantOrderModals.css';
 
 export interface MerchantPackageDetailModalProps {
@@ -27,6 +28,7 @@ export interface MerchantPackageDetailModalProps {
   onAccept: (pkg: any) => void;
   onCancel?: (pkg: any) => void;
   onStartPacking: (pkg: any) => void;
+  merchantUserId?: string | null;
 }
 
 const MerchantPackageDetailModal: React.FC<MerchantPackageDetailModalProps> = ({
@@ -46,6 +48,7 @@ const MerchantPackageDetailModal: React.FC<MerchantPackageDetailModalProps> = ({
   onAccept,
   onCancel,
   onStartPacking,
+  merchantUserId,
 }) => {
   const parsedItems = useMemo(
     () => parsePackageLineItems(pkg?.description, productPriceMap),
@@ -214,6 +217,13 @@ const MerchantPackageDetailModal: React.FC<MerchantPackageDetailModalProps> = ({
               <div style={{ color: 'white', lineHeight: 1.5 }}>{pkg.notes}</div>
             </div>
           ) : null}
+
+          <MerchantOrderChatPanel
+            orderId={pkg.id}
+            userId={merchantUserId}
+            courierName={pkg.courier}
+            language={language}
+          />
         </div>
 
         {isPartnerStore ? (

@@ -4922,6 +4922,7 @@ const ProfilePage: React.FC = () => {
         onClose={packageModals.closePackageDetail}
         onAccept={packageModals.handleAcceptOrder}
         onStartPacking={packageModals.handleStartPacking}
+        merchantUserId={currentUser?.id}
       />
 
       {showPackingListModal && (

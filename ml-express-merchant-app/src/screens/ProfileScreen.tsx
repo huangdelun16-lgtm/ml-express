@@ -19,6 +19,7 @@ import {
   Image,
   Animated,
   PanResponder,
+  DeviceEventEmitter,
 } from "react-native";
 import { Platform } from "react-native";
 import { captureRef } from "react-native-view-shot";
@@ -1068,6 +1069,36 @@ export default function ProfileScreen({ navigation }: any) {
   useEffect(() => {
     loadUserData();
     loadNotificationSettings();
+  }, []);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("order_status_updated", () => {
+      void (async () => {
+        try {
+          const currentUser = await AsyncStorage.getItem("currentUser");
+          if (!currentUser) return;
+          const user = JSON.parse(currentUser);
+          let detectedUserType = user.user_type || "customer";
+          if (
+            detectedUserType === "merchants" ||
+            detectedUserType === "partner"
+          ) {
+            detectedUserType = "merchant";
+          }
+          const stats = await packageService.getOrderStats(
+            user.id,
+            user.email,
+            user.phone,
+            detectedUserType,
+            user.name,
+          );
+          setOrderStats(stats);
+        } catch (error) {
+          LoggerService.error("轮询刷新订单统计失败:", error);
+        }
+      })();
+    });
+    return () => sub.remove();
   }, []);
 
   const loadUserData = async () => {

@@ -3,8 +3,12 @@ import LoggerService from '../services/LoggerService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import * as Speech from 'expo-speech';
-import { Vibration, Platform, Alert, AppState, type AppStateStatus } from 'react-native';
+import { Vibration, Platform, Alert, AppState, DeviceEventEmitter, type AppStateStatus } from 'react-native';
 import * as KeepAwake from 'expo-keep-awake';
+import {
+  fingerprintMerchantInProgressOrders,
+  MERCHANT_IN_PROGRESS_STATUSES,
+} from '../services/_shared/merchantInProgressOrders';
 
 type Language = 'zh' | 'en' | 'my';
 interface AppContextType {
@@ -40,6 +44,9 @@ function stopOrderAlarm(alarmRef: React.MutableRefObject<NodeJS.Timeout | null>)
   Speech.stop();
 }
 
+const IN_PROGRESS_POLL_FG_MS = 12_000;
+const IN_PROGRESS_POLL_BG_MS = 30_000;
+
 export function AppProvider({ children }: AppProviderProps) {
   const [language, setLanguageState] = useState<Language>('zh');
   const [isDarkMode, setIsDarkModeState] = useState(false);
@@ -52,6 +59,8 @@ export function AppProvider({ children }: AppProviderProps) {
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pendingIdsRef = useRef<Set<string>>(new Set());
+  const inProgressReadyRef = useRef(false);
+  const inProgressFingerprintRef = useRef('');
   const [userType, setUserType] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -131,6 +140,46 @@ export function AppProvider({ children }: AppProviderProps) {
       LoggerService.error('刷新待确认订单失败:', error);
     }
   }, [syncPendingIds]);
+
+  const syncInProgressFromServer = useCallback(async () => {
+    try {
+      const currentUserStr = await AsyncStorage.getItem('currentUser');
+      if (!currentUserStr) {
+        inProgressReadyRef.current = false;
+        inProgressFingerprintRef.current = '';
+        return;
+      }
+
+      const user = JSON.parse(currentUserStr);
+      let finalUserType = user.user_type || 'customer';
+      if (finalUserType === 'merchants' || finalUserType === 'partner') {
+        finalUserType = 'merchant';
+      }
+      if (finalUserType !== 'merchant' || !user.id) return;
+
+      const { data, error } = await supabase
+        .from('packages')
+        .select('id,status,courier')
+        .eq('delivery_store_id', user.id)
+        .in('status', [...MERCHANT_IN_PROGRESS_STATUSES])
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error || !data) return;
+
+      const nextFp = fingerprintMerchantInProgressOrders(data);
+      if (!inProgressReadyRef.current) {
+        inProgressReadyRef.current = true;
+        inProgressFingerprintRef.current = nextFp;
+        return;
+      }
+      if (nextFp === inProgressFingerprintRef.current) return;
+      inProgressFingerprintRef.current = nextFp;
+      DeviceEventEmitter.emit('order_status_updated');
+    } catch (error) {
+      LoggerService.error('刷新进行中订单失败:', error);
+    }
+  }, []);
 
   useEffect(() => {
     if (showOrderAlert && pendingOrders.length > 0) {
@@ -228,6 +277,8 @@ export function AppProvider({ children }: AppProviderProps) {
       if (!currentUserStr) {
         setUserId(null);
         setUserType(null);
+        inProgressReadyRef.current = false;
+        inProgressFingerprintRef.current = '';
         return;
       }
 
@@ -331,28 +382,33 @@ export function AppProvider({ children }: AppProviderProps) {
       }
 
       await fetchPendingOrdersFromServer();
+      await syncInProgressFromServer();
     } catch (error) {
       console.warn('建立订单监听失败:', error);
     }
   };
 
-  const startPendingPoll = () => {
-    if (pollIntervalRef.current) return;
+  const startOrderPoll = (ms: number) => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
     pollIntervalRef.current = setInterval(() => {
       void fetchPendingOrdersFromServer();
-    }, 30000);
+      void syncInProgressFromServer();
+    }, ms);
   };
 
   const refreshSession = async () => {
     splashCompleteRef.current = true;
     await setupOrderListener();
-    startPendingPoll();
+    startOrderPoll(IN_PROGRESS_POLL_FG_MS);
   };
 
   const enableRealtimeAfterSplash = async () => {
     splashCompleteRef.current = true;
     await setupOrderListener();
-    startPendingPoll();
+    startOrderPoll(IN_PROGRESS_POLL_FG_MS);
   };
 
   useEffect(() => {
@@ -361,11 +417,21 @@ export function AppProvider({ children }: AppProviderProps) {
     // after WelcomeScreen or Login (interactive session).
 
     const handleAppState = (nextState: AppStateStatus) => {
-      if (nextState !== 'active') return;
-      stopOrderAlarm(alarmIntervalRef);
-      if (!splashCompleteRef.current) return;
-      void fetchPendingOrdersFromServer();
-      void setupOrderListener();
+      if (nextState === 'active') {
+        stopOrderAlarm(alarmIntervalRef);
+        if (!splashCompleteRef.current) return;
+        void fetchPendingOrdersFromServer();
+        void syncInProgressFromServer();
+        void setupOrderListener();
+        startOrderPoll(IN_PROGRESS_POLL_FG_MS);
+        return;
+      }
+      if (
+        (nextState === 'background' || nextState === 'inactive') &&
+        splashCompleteRef.current
+      ) {
+        startOrderPoll(IN_PROGRESS_POLL_BG_MS);
+      }
     };
 
     const appStateSub = AppState.addEventListener('change', handleAppState);
@@ -379,7 +445,7 @@ export function AppProvider({ children }: AppProviderProps) {
         supabase.removeChannel(subscriptionRef.current);
       }
     };
-  }, [addPendingOrder, fetchPendingOrdersFromServer, removePendingOrder]);
+  }, [addPendingOrder, fetchPendingOrdersFromServer, removePendingOrder, syncInProgressFromServer]);
 
   const setLanguage = async (lang: Language) => {
     setLanguageState(lang);

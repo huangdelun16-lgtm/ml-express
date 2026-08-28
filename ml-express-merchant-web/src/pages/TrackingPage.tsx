@@ -5,6 +5,7 @@ import { packageService, merchantService, deliveryStoreService } from "../servic
 import { useLanguage } from "../contexts/LanguageContext";
 import { useMerchantOrdersOptional } from "../contexts/MerchantOrderContext";
 import { MERCHANT_ORDERS_REFRESH } from "../utils/merchantOrderEvents";
+import { useMerchantUnreadCounts } from "../hooks/useMerchantUnreadCounts";
 import {
   filterPackagesByTab,
   getMerchantOrderStatusColor,
@@ -34,6 +35,8 @@ const TrackingPage: React.FC = () => {
   const [productPriceMap, setProductPriceMap] = useState<
     Record<string, number>
   >({});
+  const orderIds = activeOrders.map((o) => o.id);
+  const unreadCounts = useMerchantUnreadCounts(currentUser?.id, orderIds);
 
   const lang = language as MerchantLanguage;
   const currentUserRef = useRef<any>(null);
@@ -301,6 +304,20 @@ const TrackingPage: React.FC = () => {
                       >
                         {formatDisplayStatus(order.status)}
                       </span>
+                      {unreadCounts[order.id] > 0 ? (
+                        <span
+                          style={{
+                            background: "#ef4444",
+                            color: "white",
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                          }}
+                        >
+                          💬 {unreadCounts[order.id]}
+                        </span>
+                      ) : null}
                     </div>
                     <p
                       style={{
@@ -519,6 +536,7 @@ const TrackingPage: React.FC = () => {
         onAccept={packageModals.handleAcceptOrder}
         onCancel={packageModals.handleCancelOrder}
         onStartPacking={packageModals.handleStartPacking}
+        merchantUserId={currentUser?.id}
       />
       <MerchantPackingModal
         open={packageModals.showPackingModal}

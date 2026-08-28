@@ -15,6 +15,8 @@ import { feedbackService } from '../services/FeedbackService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import PackingModal from '../components/PackingModal';
 import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
+import { dialCourierByAssignment } from '../utils/courierPhone';
+import { isCourierUnassigned } from '../services/_shared/dialPhone';
 
 const { width } = Dimensions.get('window');
 
@@ -60,6 +62,19 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [userType, setUserType] = useState<'customer' | 'merchant'>('customer');
+  const customerIdRef = useRef('');
+  const userTypeRef = useRef<'customer' | 'merchant'>('customer');
+  const selectedStatusRef = useRef(selectedStatus);
+  const loadOrdersRef = useRef<
+    (
+      userId: string,
+      type?: 'customer' | 'merchant',
+      options?: { silent?: boolean },
+    ) => Promise<void>
+  >(async () => {});
+  customerIdRef.current = customerId;
+  userTypeRef.current = userType;
+  selectedStatusRef.current = selectedStatus;
   
   // 筛选卡片的位置记录
   const filterCardPositions = useRef<{[key: string]: number}>({});
@@ -238,10 +253,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   useEffect(() => {
     loadCustomerId();
 
-    // 🚀 新增：监听全局状态更新事件
     const statusUpdateSub = DeviceEventEmitter.addListener('order_status_updated', () => {
-      console.log('🔄 收到状态更新事件，刷新订单列表');
-      onRefresh();
+      const id = customerIdRef.current;
+      if (!id) return;
+      void loadOrdersRef.current(id, userTypeRef.current, { silent: true });
     });
 
     return () => {
@@ -306,11 +321,21 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     }
   }, [route?.params?.filterStatus, selectedStatus]);
 
-  // 🚀 新增：实时监听所有订单的消息
+  // 🚀 实时监听所有订单的消息；缅甸无 WS 时 REST 轮询兜底
+  const ordersRef = useRef<Order[]>([]);
+  ordersRef.current = orders;
+
   useEffect(() => {
     if (!customerId) return;
+    let cancelled = false;
 
-    // 订阅聊天消息表
+    const refreshUnread = async () => {
+      const ids = ordersRef.current.map((o) => o.id);
+      if (!ids.length) return;
+      const counts = await chatService.getUnreadCountsByOrder(customerId, ids);
+      if (!cancelled) setUnreadCounts(counts);
+    };
+
     chatSubscriptionRef.current = supabase
       .channel('global-unread-counts')
       .on(
@@ -322,13 +347,11 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         },
         (payload) => {
           const newMsg = payload.new as any;
-          // 如果消息不是我发的，且属于我的某个订单
           if (newMsg.sender_id !== customerId) {
             setUnreadCounts(prev => ({
               ...prev,
               [newMsg.order_id]: (prev[newMsg.order_id] || 0) + 1
             }));
-            // 轻微震动提示
             Vibration.vibrate(100);
           }
         }
@@ -342,7 +365,6 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         },
         (payload) => {
           const updatedMsg = payload.new as any;
-          // 如果消息被标记为已读
           if (updatedMsg.is_read) {
             setUnreadCounts(prev => {
               const currentCount = prev[updatedMsg.order_id] || 0;
@@ -356,7 +378,14 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       )
       .subscribe();
 
+    void refreshUnread();
+    const timer = setInterval(() => {
+      void refreshUnread();
+    }, 12000);
+
     return () => {
+      cancelled = true;
+      clearInterval(timer);
       if (chatSubscriptionRef.current) {
         supabase.removeChannel(chatSubscriptionRef.current);
       }
@@ -401,9 +430,14 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 加载订单
-  const loadOrders = async (userId: string, type: 'customer' | 'merchant' = 'customer') => {
+  const loadOrders = async (
+    userId: string,
+    type: 'customer' | 'merchant' = 'customer',
+    options?: { silent?: boolean },
+  ) => {
+    const silent = options?.silent === true;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       
       // 获取用户信息用于匹配订单
       const userData = await AsyncStorage.getItem('currentUser');
@@ -428,7 +462,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         phone: userPhone || user?.phone
       });
       setOrders(data);
-      filterOrders(data, selectedStatus);
+      filterOrders(data, selectedStatusRef.current);
 
       // 🚀 新增：获取所有订单的未读消息数
       if (data.length > 0) {
@@ -463,9 +497,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     } catch (error: any) {
       errorService.handleError(error, { context: 'MyOrdersScreen.loadOrders' });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+  loadOrdersRef.current = loadOrders;
 
   // 刷新
   const onRefresh = useCallback(async () => {
@@ -561,6 +596,23 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   // 查看详情
   const handleViewDetail = (orderId: string) => {
     navigation.navigate('OrderDetail', { orderId });
+  };
+
+  const handleCallCourier = async (order: Order) => {
+    const result = await dialCourierByAssignment(order.courier);
+    if (result === 'unassigned') {
+      showToast(
+        language === 'zh' ? '尚未分配骑手' : language === 'my' ? 'ပို့ဆောင်သူ မရှိသေးပါ' : 'No courier assigned',
+        'info',
+      );
+      return;
+    }
+    if (result === 'no-phone') {
+      showToast(
+        language === 'zh' ? '未找到骑手电话' : language === 'my' ? 'ဖုန်းနံပါတ် မတွေ့ပါ' : 'Courier phone not found',
+        'warning',
+      );
+    }
   };
 
   // 🚀 新增：评价相关逻辑
@@ -1002,6 +1054,26 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                       <Text style={styles.courierUnreadText}>{language === 'zh' ? '新消息' : 'New Msg'}</Text>
                     </View>
                   )}
+                  {!isCourierUnassigned(order.courier) ? (
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        void handleCallCourier(order);
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        backgroundColor: '#22c55e',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginLeft: 8,
+                      }}
+                    >
+                      <Ionicons name="call" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               )}
 

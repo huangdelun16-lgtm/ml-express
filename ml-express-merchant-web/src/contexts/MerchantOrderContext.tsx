@@ -11,6 +11,11 @@ import { supabase } from '../services/supabase';
 import LoggerService from '../services/LoggerService';
 import { broadcastMerchantOrdersRefresh } from '../utils/merchantOrderEvents';
 import {
+  fingerprintMerchantInProgressOrders,
+  MERCHANT_IN_PROGRESS_STATUSES,
+  type MerchantInProgressRow,
+} from '../services/_shared/merchantInProgressOrders';
+import {
   ensureDesktopNotificationPermission,
   focusMerchantWindow,
   playNewOrderChime,
@@ -45,6 +50,7 @@ const MerchantOrderContext = createContext<MerchantOrderContextValue | undefined
 
 const VOICE_STORAGE_KEY = 'ml-merchant-voice-alert';
 const PENDING_POLL_MS = 10_000;
+const IN_PROGRESS_SELECT = 'id,status,courier';
 const PENDING_SELECT =
   'id,status,delivery_store_id,sender_name,receiver_name,receiver_address,receiver_phone,description,price,created_at,create_time,payment_method,cod_amount';
 
@@ -69,6 +75,8 @@ export function MerchantOrderProvider({
   const lastVoiceAtRef = useRef(0);
   const knownPendingIdsRef = useRef<Set<string>>(new Set());
   const pendingSyncReadyRef = useRef(false);
+  const inProgressReadyRef = useRef(false);
+  const inProgressFingerprintRef = useRef('');
 
   const setIsVoiceEnabled = useCallback((enabled: boolean) => {
     setIsVoiceEnabledState(enabled);
@@ -174,13 +182,48 @@ export function MerchantOrderProvider({
     }
   }, [storeId, applyPendingRows]);
 
+  /** 轻量 REST：骑手取件/送达后 Realtime 常挂，用指纹变化再拉完整列表 */
+  const syncInProgressFromServer = useCallback(async () => {
+    if (!storeId) {
+      inProgressReadyRef.current = false;
+      inProgressFingerprintRef.current = '';
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select(IN_PROGRESS_SELECT)
+        .eq('delivery_store_id', storeId)
+        .in('status', [...MERCHANT_IN_PROGRESS_STATUSES])
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error) throw error;
+      const rows = (data || []) as MerchantInProgressRow[];
+      const nextFp = fingerprintMerchantInProgressOrders(rows);
+      if (!inProgressReadyRef.current) {
+        inProgressReadyRef.current = true;
+        inProgressFingerprintRef.current = nextFp;
+        return;
+      }
+      if (nextFp === inProgressFingerprintRef.current) return;
+      inProgressFingerprintRef.current = nextFp;
+      broadcastMerchantOrdersRefresh();
+    } catch (err) {
+      LoggerService.error('同步进行中订单失败', err);
+    }
+  }, [storeId]);
+
   useEffect(() => {
     if (!storeId) return undefined;
 
     pendingSyncReadyRef.current = false;
     knownPendingIdsRef.current = new Set();
+    inProgressReadyRef.current = false;
+    inProgressFingerprintRef.current = '';
     void ensureDesktopNotificationPermission();
     void syncPendingFromServer();
+    void syncInProgressFromServer();
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -233,6 +276,7 @@ export function MerchantOrderProvider({
         ) {
           LoggerService.warn('商家订单实时通道异常，改为轮询补偿', status, err);
           void syncPendingFromServer();
+          void syncInProgressFromServer();
         }
       });
 
@@ -240,12 +284,14 @@ export function MerchantOrderProvider({
 
     const pollId = window.setInterval(() => {
       void syncPendingFromServer();
+      void syncInProgressFromServer();
     }, PENDING_POLL_MS);
 
     const onVisible = () => {
       if (!document.hidden) {
         stopPendingOrderTitleFlash();
         void syncPendingFromServer();
+        void syncInProgressFromServer();
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -255,12 +301,20 @@ export function MerchantOrderProvider({
       document.removeEventListener('visibilitychange', onVisible);
       pendingSyncReadyRef.current = false;
       knownPendingIdsRef.current = new Set();
+      inProgressReadyRef.current = false;
+      inProgressFingerprintRef.current = '';
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
-  }, [storeId, addPendingOrder, removePendingOrder, syncPendingFromServer]);
+  }, [
+    storeId,
+    addPendingOrder,
+    removePendingOrder,
+    syncPendingFromServer,
+    syncInProgressFromServer,
+  ]);
 
   useEffect(() => {
     if (pendingOrders.length === 0) {
