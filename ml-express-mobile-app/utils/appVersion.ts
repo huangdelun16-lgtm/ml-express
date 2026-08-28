@@ -5,7 +5,7 @@ export function getStaffAppVersion(): string {
   if (fromExpo) return fromExpo;
   const native = String(Constants.nativeApplicationVersion || '').trim();
   if (native) return native;
-  return '2.4.3';
+  return '2.4.4';
 }
 
 export function getStaffBuildLabel(): string {

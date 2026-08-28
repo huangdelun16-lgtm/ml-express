@@ -97,10 +97,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const reviewedRef = useRef(reviewedOrderIds);
   const showReviewModalRef = useRef(showReviewSubmitModal);
   const submittingRef = useRef(isSubmittingReview);
+  const customerIdRef = useRef(customerId);
+  const hasLoadedOnceRef = useRef(false);
+  const loginPromptedRef = useRef(false);
+  const loadCustomerIdRef = useRef<() => Promise<void>>(async () => {});
+  const loadOrdersFnRef = useRef<(userId: string, opts?: { silent?: boolean }) => Promise<void>>(async () => {});
   ordersRef.current = orders;
   reviewedRef.current = reviewedOrderIds;
   showReviewModalRef.current = showReviewSubmitModal;
   submittingRef.current = isSubmittingReview;
+  customerIdRef.current = customerId;
 
   // 🚀 新增：聊天未读数状态
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
@@ -319,14 +325,19 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     { key: '已取消', label: t.cancelled },
   ];
 
-  // 加载用户ID
-  useEffect(() => {
-    loadCustomerId();
+  // 每次进入「我的订单」都重新读登录态并拉单（登录/下单后切 Tab 不会丢单）
+  useFocusEffect(
+    useCallback(() => {
+      void loadCustomerIdRef.current();
+    }, [])
+  );
 
-    // 🚀 新增：监听全局状态更新事件
+  useEffect(() => {
     const statusUpdateSub = DeviceEventEmitter.addListener('order_status_updated', () => {
-      console.log('🔄 收到状态更新事件，刷新订单列表');
-      onRefresh();
+      const id = customerIdRef.current;
+      if (id && id !== 'guest') {
+        void loadOrdersFnRef.current(id, { silent: true });
+      }
     });
 
     return () => {
@@ -344,11 +355,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     }
   }, [route?.params?.filterStatus]);
 
-  // 当订单数据加载完成后，应用初始筛选
+  // 当订单数据加载完成后，应用初始筛选（空列表也要同步，避免残留上一批）
   useEffect(() => {
-    if (orders.length > 0 && selectedStatus) {
-      filterOrders(orders, selectedStatus);
-    }
+    filterOrders(orders, selectedStatus);
   }, [orders, selectedStatus]);
 
   // 当筛选状态改变且从首页跳转来时，自动滚动到对应卡片
@@ -510,14 +519,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
           setOrders([]);
           setFilteredOrders([]);
         } else {
-          loadOrders(user.id);
+          await loadOrders(user.id, { silent: hasLoadedOnceRef.current });
         }
       } else {
-        // 没有用户信息，跳转登录
-        Alert.alert('提示', '请先登录', [
-          { text: '取消', style: 'cancel' },
-          { text: '去登录', onPress: () => navigation.navigate('Login') }
-        ]);
+        if (!loginPromptedRef.current) {
+          loginPromptedRef.current = true;
+          Alert.alert('提示', '请先登录', [
+            { text: '取消', style: 'cancel' },
+            { text: '去登录', onPress: () => navigation.navigate('Login') }
+          ]);
+        }
         setLoading(false);
       }
     } catch (error) {
@@ -527,9 +538,9 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 加载订单
-  const loadOrders = async (userId: string) => {
+  const loadOrders = async (userId: string, opts?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!opts?.silent) setLoading(true);
       
       // 获取用户信息用于匹配订单
       const userData = await AsyncStorage.getItem('currentUser');
@@ -542,6 +553,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         email: userEmail || user?.email,
         phone: userPhone || user?.phone
       });
+      hasLoadedOnceRef.current = true;
       setOrders(data);
       filterOrders(data, selectedStatus);
 
@@ -567,15 +579,18 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     } catch (error: any) {
       errorService.handleError(error, { context: 'MyOrdersScreen.loadOrders' });
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   };
+
+  loadCustomerIdRef.current = loadCustomerId;
+  loadOrdersFnRef.current = loadOrders;
 
   // 刷新
   const onRefresh = useCallback(async () => {
     if (!customerId) return;
     setRefreshing(true);
-    await loadOrders(customerId);
+    await loadOrders(customerId, { silent: true });
     setRefreshing(false);
   }, [customerId]);
 

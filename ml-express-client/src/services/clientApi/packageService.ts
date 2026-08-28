@@ -3,7 +3,148 @@ import LoggerService from '../LoggerService';
 import NotificationService from '../notificationService';
 import { errorService } from '../ErrorService';
 import { retry } from '../../utils/retry';
-import type { Package } from './types';
+import {
+  buildCustomerPhoneOrFilter,
+  mergePackageRows,
+} from '../../utils/customerPackageQuery';
+
+const EMPTY_ORDER_STATS = {
+  total: 0,
+  pending: 0,
+  inTransit: 0,
+  delivered: 0,
+  cancelled: 0,
+  pendingPay: 0,
+  pendingAccept: 0,
+  awaitingDelivery: 0,
+  delivering: 0,
+  afterSale: 0,
+  deliveredIds: [] as string[],
+};
+
+function computeOrderStats(rows: Array<{ id?: string; status?: string }>) {
+  return {
+    total: rows.length,
+    pending: rows.filter((p) => ['待确认', '待取件', '待收款'].includes(p.status || '')).length,
+    inTransit: rows.filter((p) => ['已取件', '配送中'].includes(p.status || '')).length,
+    delivered: rows.filter((p) => p.status === '已送达' || p.status === '已完成').length,
+    cancelled: rows.filter((p) => p.status === '已取消').length,
+    pendingPay: rows.filter((p) => p.status === '待收款').length,
+    pendingAccept: rows.filter((p) => p.status === '待确认').length,
+    awaitingDelivery: rows.filter((p) => ['待确认', '打包中', '待取件'].includes(p.status || '')).length,
+    delivering: rows.filter((p) => ['已取件', '配送中'].includes(p.status || '')).length,
+    afterSale: rows.filter((p) => ['已取消', '异常上报'].includes(p.status || '')).length,
+    deliveredIds: rows.filter((p) => p.status === '已送达' || p.status === '已完成').map((p) => p.id).filter(Boolean) as string[],
+  };
+}
+
+/**
+ * Split matching into parameterized filters. Never put email / description
+ * brackets / phone "+" into a single PostgREST `.or()` string.
+ */
+async function fetchCustomerPackages(opts: {
+  userId: string;
+  email?: string;
+  phone?: string;
+  columns: string;
+  status?: string;
+}): Promise<any[]> {
+  const { userId, email, phone, columns, status } = opts;
+  const applyStatus = (query: any) => {
+    if (status && status !== 'all') return query.eq('status', status);
+    return query;
+  };
+
+  const runSelect = () => applyStatus(supabase.from('packages').select(columns));
+
+  const tasks: Array<Promise<any[]>> = [];
+
+  if (userId) {
+    tasks.push(
+      runSelect()
+        .eq('customer_id', userId)
+        .order('created_at', { ascending: false })
+        .then(({ data, error }: { data: any[] | null; error: any }) => {
+          if (error) {
+            const message = String(error.message || '');
+            if (!(message.includes('customer_id') && message.includes('does not exist'))) {
+              LoggerService.error('按 customer_id 查询订单失败:', error);
+            }
+            return [];
+          }
+          return data || [];
+        })
+        .catch((error: any) => {
+          LoggerService.error('按 customer_id 查询订单失败:', error);
+          return [];
+        }),
+    );
+
+    tasks.push(
+      runSelect()
+        .ilike('description', `%[客户ID: ${userId}]%`)
+        .order('created_at', { ascending: false })
+        .then(({ data, error }: { data: any[] | null; error: any }) => {
+          if (error) {
+            LoggerService.error('按 description 查询订单失败:', error);
+            return [];
+          }
+          return data || [];
+        })
+        .catch((error: any) => {
+          LoggerService.error('按 description 查询订单失败:', error);
+          return [];
+        }),
+    );
+  }
+
+  const emailVal = String(email || '').trim();
+  if (emailVal) {
+    tasks.push(
+      runSelect()
+        .eq('customer_email', emailVal)
+        .order('created_at', { ascending: false })
+        .then(({ data, error }: { data: any[] | null; error: any }) => {
+          if (error) {
+            const message = String(error.message || '');
+            if (!message.includes('customer_email')) {
+              LoggerService.error('按 customer_email 查询订单失败:', error);
+            }
+            return [];
+          }
+          return data || [];
+        })
+        .catch((error: any) => {
+          LoggerService.error('按 customer_email 查询订单失败:', error);
+          return [];
+        }),
+    );
+  }
+
+  const phoneFilter = buildCustomerPhoneOrFilter(phone);
+  if (phoneFilter) {
+    tasks.push(
+      runSelect()
+        .or(phoneFilter)
+        .order('created_at', { ascending: false })
+        .then(({ data, error }: { data: any[] | null; error: any }) => {
+          if (error) {
+            LoggerService.error('按电话查询订单失败:', error);
+            return [];
+          }
+          return data || [];
+        })
+        .catch((error: any) => {
+          LoggerService.error('按电话查询订单失败:', error);
+          return [];
+        }),
+    );
+  }
+
+  if (!tasks.length) return [];
+  const batches = await Promise.all(tasks);
+  return mergePackageRows(batches);
+}
 
 export const packageService = {
   // 创建订单
@@ -198,35 +339,13 @@ export const packageService = {
   // 获取客户最近的订单（userType / storeName 保留兼容，已忽略）
   async getRecentOrders(userId: string, limit: number = 5, email?: string, phone?: string, _userType?: string) {
     try {
-      const runQuery = async (includeCustomerId: boolean) => {
-        let query = supabase
-          .from('packages')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(limit);
-
-        const conditions: string[] = [];
-        if (includeCustomerId) conditions.push(`customer_id.eq.${userId}`);
-        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-        if (email) conditions.push(`customer_email.eq.${email}`);
-        if (phone) conditions.push(`sender_phone.eq.${phone}`);
-        query = query.or(conditions.join(','));
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-        return data || [];
-      };
-
-      try {
-        return await runQuery(true);
-      } catch (error: any) {
-        const message = error?.message || '';
-        if (message.includes('customer_id') && message.includes('does not exist')) {
-          return await runQuery(false);
-        }
-        throw error;
-      }
+      const rows = await fetchCustomerPackages({
+        userId,
+        email,
+        phone,
+        columns: '*',
+      });
+      return rows.slice(0, limit);
     } catch (error) {
       LoggerService.error('获取最近订单失败:', error);
       return [];
@@ -236,68 +355,16 @@ export const packageService = {
   // 获取客户订单统计（userType / storeName 保留兼容，已忽略）
   async getOrderStats(userId: string, email?: string, phone?: string, _userType?: string, _storeName?: string) {
     try {
-      const runQuery = async (includeCustomerId: boolean) => {
-        let query = supabase
-          .from('packages')
-          .select('id, status')
-          .order('created_at', { ascending: false });
-
-        const conditions: string[] = [];
-        if (includeCustomerId) conditions.push(`customer_id.eq.${userId}`);
-        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-        if (email) conditions.push(`customer_email.eq.${email}`);
-        if (phone) conditions.push(`sender_phone.eq.${phone}`);
-        query = query.or(conditions.join(','));
-
-        const { data, error } = await query;
-
-        if (error) {
-          LoggerService.error('获取订单统计失败:', error);
-          throw error;
-        }
-
-        const rows = data || [];
-        const stats = {
-          total: rows.length,
-          pending: rows.filter(p => ['待确认', '待取件', '待收款'].includes(p.status)).length,
-          inTransit: rows.filter(p => ['已取件', '配送中'].includes(p.status)).length,
-          delivered: rows.filter(p => p.status === '已送达' || p.status === '已完成').length,
-          cancelled: rows.filter(p => p.status === '已取消').length,
-          pendingPay: rows.filter(p => p.status === '待收款').length,
-          pendingAccept: rows.filter(p => p.status === '待确认').length,
-          awaitingDelivery: rows.filter(p => ['待确认', '打包中', '待取件'].includes(p.status)).length,
-          delivering: rows.filter(p => ['已取件', '配送中'].includes(p.status)).length,
-          afterSale: rows.filter(p => ['已取消', '异常上报'].includes(p.status)).length,
-          deliveredIds: rows.filter(p => p.status === '已送达' || p.status === '已完成').map(p => p.id),
-        };
-
-        return stats;
-      };
-
-      try {
-        return await runQuery(true);
-      } catch (error: any) {
-        const message = error?.message || '';
-        if (message.includes('customer_id') && message.includes('does not exist')) {
-          return await runQuery(false);
-        }
-        throw error;
-      }
+      const rows = await fetchCustomerPackages({
+        userId,
+        email,
+        phone,
+        columns: 'id, status, created_at',
+      });
+      return computeOrderStats(rows);
     } catch (error) {
       LoggerService.error('获取订单统计失败:', error);
-      return {
-        total: 0,
-        pending: 0,
-        inTransit: 0,
-        delivered: 0,
-        cancelled: 0,
-        pendingPay: 0,
-        pendingAccept: 0,
-        awaitingDelivery: 0,
-        delivering: 0,
-        afterSale: 0,
-        deliveredIds: [] as string[],
-      };
+      return { ...EMPTY_ORDER_STATS, deliveredIds: [] as string[] };
     }
   },
 
@@ -466,51 +533,16 @@ export const packageService = {
     storeName?: string;
   }) {
     try {
-      const runQuery = async (includeCustomerId: boolean) => {
-        let query = supabase
-          .from('packages')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false });
-
-        const conditions: string[] = [];
-        if (includeCustomerId) {
-          conditions.push(`customer_id.eq.${userId}`);
-        }
-        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-        if (options?.email) {
-          conditions.push(`customer_email.eq.${options.email}`);
-        }
-        if (options?.phone) {
-          conditions.push(`sender_phone.eq.${options.phone}`);
-        }
-        query = query.or(conditions.join(','));
-
-        if (options?.status && options.status !== 'all') {
-          query = query.eq('status', options.status);
-        }
-
-        if (options?.limit) {
-          query = query.limit(options.limit);
-        }
-
-        if (options?.offset) {
-          query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
-        }
-
-        const { data, error, count } = await query;
-        if (error) throw error;
-        return { orders: data || [], total: count || 0 };
-      };
-
-      try {
-        return await runQuery(true);
-      } catch (error: any) {
-        const message = error?.message || '';
-        if (message.includes('customer_id') && message.includes('does not exist')) {
-          return await runQuery(false);
-        }
-        throw error;
-      }
+      const rows = await fetchCustomerPackages({
+        userId,
+        email: options?.email,
+        phone: options?.phone,
+        columns: '*',
+        status: options?.status,
+      });
+      const offset = options?.offset || 0;
+      const sliced = options?.limit ? rows.slice(offset, offset + options.limit) : rows.slice(offset);
+      return { orders: sliced, total: rows.length };
     } catch (error) {
       LoggerService.error('获取订单列表失败:', error);
       return { orders: [], total: 0 };
