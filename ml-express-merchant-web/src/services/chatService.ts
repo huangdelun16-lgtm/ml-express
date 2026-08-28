@@ -86,7 +86,7 @@ export const chatService = {
   ): ChatSubscription {
     const seenIds = new Set<string>();
     let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let timer: number | null = null;
     const pollIntervalMs = options?.pollIntervalMs ?? DEFAULT_POLL_MS;
 
     const ingest = (msgs: ChatMessage[], emitNew: boolean) => {

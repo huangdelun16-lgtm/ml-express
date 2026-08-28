@@ -12,7 +12,7 @@ export function useMerchantUnreadCounts(
   const [counts, setCounts] = useState<Record<string, number>>({});
   const idsKey = useMemo(
     () =>
-      [...new Set(orderIds.filter(Boolean))]
+      Array.from(new Set(orderIds.filter(Boolean)))
         .sort()
         .join(','),
     [orderIds],
