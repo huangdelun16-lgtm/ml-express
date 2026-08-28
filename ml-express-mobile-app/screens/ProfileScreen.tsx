@@ -12,9 +12,10 @@ import {
   ActivityIndicator,
   DeviceEventEmitter,
 } from 'react-native';
+import AboutUsModal from '../components/AboutUsModal';
+import { getStaffVersionDisplay } from '../utils/appVersion';
 import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -30,6 +31,7 @@ import {
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 import { locationService, syncCourierLocationToSupabase } from '../services/locationService';
 import { feedbackService } from '../services/feedbackService';
+import { logger } from '../services/LoggerService';
 import * as Location from 'expo-location';
 import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
 import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
@@ -98,6 +100,8 @@ export default function ProfileScreen({ navigation }: any) {
     todayIncome: 0,
     creditScore: 100, // 🚀 新增：信用分
   });
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const appVersionLabel = getStaffVersionDisplay();
 
   useFocusEffect(
     useCallback(() => {
@@ -229,7 +233,7 @@ export default function ProfileScreen({ navigation }: any) {
         DeviceEventEmitter.emit('courier_online_changed', { online: false });
       }
     } catch (e) {
-      console.error(e);
+      logger.warn('在线状态更新失败', e);
       feedbackService.notify(language === 'zh' ? '失败' : 'Failed', language === 'zh' ? '状态更新失败，请重试' : 'Could not update status');
     } finally {
       setTogglingOnline(false);
@@ -302,7 +306,7 @@ export default function ProfileScreen({ navigation }: any) {
         creditScore: prev.creditScore,
       }));
     } catch (error) {
-      console.error('加载统计失败:', error);
+      logger.warn('加载统计失败', error);
     }
   };
 
@@ -389,6 +393,12 @@ export default function ProfileScreen({ navigation }: any) {
       title: language === 'zh' ? '应用设置' : language === 'my' ? 'အက်ပ်ဆက်တင်များ' : 'App Settings', 
       subtitle: language === 'zh' ? '通知、定位等设置' : language === 'my' ? 'အကြောင်းကြားချက်များ၊ တည်နေရာဆက်တင်များ' : 'Notifications, location settings', 
       screen: 'Settings' 
+    },
+    {
+      icon: 'ℹ️',
+      title: t.aboutUs,
+      subtitle: 'MARKET LINK EXPRESS',
+      action: () => setShowAboutModal(true),
     },
     {
       icon: '📍',
@@ -506,6 +516,9 @@ export default function ProfileScreen({ navigation }: any) {
                   </Text>
                 </View>
                 <Text style={styles.userId}>{language === 'zh' ? '账号' : language === 'my' ? 'အကောင့်' : 'ID'}: {currentUser}</Text>
+                <Text style={styles.userVersion}>
+                  {language === 'zh' ? '软件版本' : language === 'my' ? 'ဗားရှင်း' : 'Version'}: {appVersionLabel}
+                </Text>
               </View>
             </View>
           </LinearGradient>
@@ -743,11 +756,17 @@ export default function ProfileScreen({ navigation }: any) {
         {/* 版本信息 */}
         <View style={styles.footer}>
           <Text style={styles.version}>
-            MARKET LINK STAFF v{Constants.expoConfig?.version ?? '2.2.1'}
+            MARKET LINK STAFF {appVersionLabel}
           </Text>
-          <Text style={styles.copyright}>© 2025 Market Link Express</Text>
+          <Text style={styles.copyright}>© {new Date().getFullYear()} Market Link Express</Text>
         </View>
       </ScrollView>
+
+      <AboutUsModal
+        visible={showAboutModal}
+        onClose={() => setShowAboutModal(false)}
+        language={language}
+      />
     </View>
   );
 }
@@ -833,6 +852,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  userVersion: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
   },
   onlineCard: {
     borderRadius: 20,
@@ -1007,9 +1032,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   version: {
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: 12,
-    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 13,
+    fontWeight: '700',
     marginBottom: 4,
   },
   copyright: {

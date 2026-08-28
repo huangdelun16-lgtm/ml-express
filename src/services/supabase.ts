@@ -1649,6 +1649,55 @@ export const notificationService = {
         return false;
       }
 
+      // 骑手端 Expo 推送：tokens 存在 couriers / admin_accounts，不在 users。
+      try {
+        let pushToken: string | null = null;
+        const { data: courierRow } = await supabase
+          .from('couriers')
+          .select('push_token, employee_id')
+          .eq('id', courierId)
+          .maybeSingle();
+        if (courierRow?.push_token) {
+          pushToken = String(courierRow.push_token);
+        } else if (courierRow?.employee_id) {
+          const { data: staffRow } = await supabase
+            .from('admin_accounts')
+            .select('push_token')
+            .eq('employee_id', courierRow.employee_id)
+            .maybeSingle();
+          if (staffRow?.push_token) pushToken = String(staffRow.push_token);
+        }
+        if (!pushToken) {
+          const { data: byName } = await supabase
+            .from('admin_accounts')
+            .select('push_token')
+            .eq('employee_name', courierName)
+            .maybeSingle();
+          if (byName?.push_token) pushToken = String(byName.push_token);
+        }
+        if (pushToken) {
+          const preview = message.replace(/\n+/g, ' ').slice(0, 140);
+          await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: pushToken,
+              sound: 'default',
+              title,
+              body: preview,
+              channelId: 'new-task-channel',
+              priority: 'high',
+              data: { packageId, type: 'new_order' },
+            }),
+          });
+        }
+      } catch (pushErr) {
+        console.warn('Expo 推送发送失败（站内通知已写入）:', pushErr);
+      }
+
       console.log(`✅ 通知已发送给快递员 ${courierName} (${courierId})`);
       return true;
     } catch (err) {

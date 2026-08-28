@@ -24,7 +24,15 @@ const supabaseKey =
   extra?.supabaseAnonKey ||
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   '';
-const supabaseUrl = resolveNativeSupabaseUrl(configuredUrl);
+const constantsAny = Constants as { appOwnership?: string; executionEnvironment?: string };
+const isExpoGo =
+  constantsAny.appOwnership === 'expo' || constantsAny.executionEnvironment === 'storeClient';
+const allowDirect =
+  !isExpoGo && String(process.env.EXPO_PUBLIC_SUPABASE_DIRECT || '').trim() === '1';
+const supabaseUrl = resolveNativeSupabaseUrl(configuredUrl, undefined, {
+  expoGo: isExpoGo,
+  allowDirect,
+});
 const proxyHeaders = nativeClientHeaders();
 
 export const netlifyUrl =

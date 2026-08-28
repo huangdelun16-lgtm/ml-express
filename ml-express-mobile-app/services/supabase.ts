@@ -3,6 +3,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { cacheService } from './cacheService';
 import { detectViolationsAsync } from './detectViolations';
 import { supabase } from './staffApi/supabaseClient';
+import { TERMINAL_EXCLUDED_STATUSES } from '../constants/packageStatus';
 import type {
   Package,
   AuditLog,
@@ -204,6 +205,112 @@ export const packageService = {
     }
     
     return [];
+  },
+
+  /**
+   * 骑手任务列表：只拉当前骑手的包裹，避免全表 select。
+   * 终态在服务端尽量排除，再用客户端状态归一化过滤进行中任务。
+   */
+  async getPackagesForCourier(courierName: string, retryCount = 2): Promise<Package[]> {
+    const name = String(courierName || '').trim();
+    if (!name) return [];
+
+    const cacheKey = `${CACHE_KEYS.PACKAGES}_courier_${name}`;
+    const terminalIn = `(${TERMINAL_EXCLUDED_STATUSES.map((s) => `"${s}"`).join(',')})`;
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt <= retryCount; attempt++) {
+      try {
+        let { data, error } = await supabase
+          .from('packages')
+          .select('*')
+          .eq('courier', name)
+          .not('status', 'in', terminalIn)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          const fallback = await supabase
+            .from('packages')
+            .select('*')
+            .eq('courier', name)
+            .order('created_at', { ascending: false });
+          data = fallback.data;
+          error = fallback.error;
+        }
+
+        if (error) {
+          throw error;
+        }
+
+        const rows = (data || []) as Package[];
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(rows));
+        await AsyncStorage.setItem(CACHE_KEYS.LAST_FETCH, Date.now().toString());
+        return rows;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`按骑手获取包裹尝试 ${attempt + 1} 失败:`, err?.message || err);
+
+        if (attempt < retryCount) {
+          await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 1000));
+        }
+      }
+    }
+
+    try {
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      if (cachedData) {
+        return JSON.parse(cachedData);
+      }
+    } catch {
+      // ignore cache parse errors
+    }
+
+    try {
+      const allCached = await AsyncStorage.getItem(CACHE_KEYS.PACKAGES);
+      if (allCached) {
+        const parsed = JSON.parse(allCached) as Package[];
+        return parsed.filter((pkg) => pkg.courier === name);
+      }
+    } catch {
+      // ignore
+    }
+
+    if (lastError) {
+      console.warn('按骑手获取包裹失败，返回空列表', lastError?.message || lastError);
+    }
+    return [];
+  },
+
+  /** 新单轮询：只取 id/status，避免每次拉完整包裹行 */
+  async listCourierActiveAssignmentIds(
+    courierName: string,
+  ): Promise<{ id: string; status: string }[]> {
+    const name = String(courierName || '').trim();
+    if (!name) return [];
+    const terminalIn = `(${TERMINAL_EXCLUDED_STATUSES.map((s) => `"${s}"`).join(',')})`;
+    try {
+      let { data, error } = await supabase
+        .from('packages')
+        .select('id, status')
+        .eq('courier', name)
+        .not('status', 'in', terminalIn);
+
+      if (error) {
+        const fallback = await supabase
+          .from('packages')
+          .select('id, status')
+          .eq('courier', name);
+        data = fallback.data;
+        error = fallback.error;
+      }
+      if (error || !data) return [];
+      return data.map((row: { id?: string; status?: string }) => ({
+        id: String(row.id || ''),
+        status: String(row.status || ''),
+      })).filter((row) => row.id);
+    } catch {
+      return [];
+    }
   },
 
   async createPackage(packageData: Package): Promise<Package | null> {

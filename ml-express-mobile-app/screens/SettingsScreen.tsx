@@ -24,6 +24,8 @@ import { supabase, adminAccountService } from '../services/supabase';
 import { feedbackService } from '../services/feedbackService';
 import { useApp } from '../contexts/AppContext';
 import { getPushRuntimeSummary } from '../services/notificationService';
+import AboutUsModal from '../components/AboutUsModal';
+import { getStaffVersionDisplay } from '../utils/appVersion';
 
 const { width, height } = Dimensions.get('window');
 
@@ -115,7 +117,11 @@ export default function SettingsScreen({ navigation }: any) {
         setShowHelpModal(true);
         navigation.setParams({ openHelp: false });
       }
-    }, [navigation, route.params?.openHelp]),
+      if (route.params?.openAbout === true) {
+        setShowAboutModal(true);
+        navigation.setParams({ openAbout: false });
+      }
+    }, [navigation, route.params?.openHelp, route.params?.openAbout]),
   );
 
   const loadSettings = async () => {
@@ -319,8 +325,8 @@ export default function SettingsScreen({ navigation }: any) {
         ))}
 
         <View style={styles.footer}>
-          <Text style={styles.versionText}>Market Link Express v1.0.0</Text>
-          <Text style={styles.copyright}>© 2025 ML-Express</Text>
+          <Text style={styles.versionText}>MARKET LINK STAFF {getStaffVersionDisplay()}</Text>
+          <Text style={styles.copyright}>© {new Date().getFullYear()} Market Link Express</Text>
         </View>
       </ScrollView>
 
@@ -465,7 +471,7 @@ export default function SettingsScreen({ navigation }: any) {
             <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
               {[
                 { t: '📦 任务处理', c: '在“我的任务”中查看分配给您的包裹，点击进入详情可进行扫码取件、拍照上传及状态更新。' },
-                { t: '📍 导航功能', c: '「规划路线」可手动点选 P/D 站点排成 A→B→C 顺序；「Google 语音导航」按此顺序导航，到站自动语音播报。' },
+                { t: '📍 导航功能', c: '「规划路线」：点地图加站，列表可上下调整；「最近优先」一键按距离排线（同单先取后送）。「Google 语音导航」按此顺序导航。' },
                 { t: '📸 配送证明', c: '送达包裹时，请点击“上传照片”拍摄配送现场照片，系统将自动记录GPS坐标作为凭证。' },
                 { t: '💰 费用结算', c: '在“配送历史”中可查看未结清的跑腿费和代收款，请定期联系财务进行结算。' },
               ].map((item, i) => (
@@ -482,6 +488,12 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      <AboutUsModal
+        visible={showAboutModal}
+        onClose={() => setShowAboutModal(false)}
+        language={language}
+      />
     </View>
   );
 }
@@ -504,7 +516,7 @@ const styles = StyleSheet.create({
   itemSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '600' },
   glassDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginLeft: 68 },
   footer: { alignItems: 'center', padding: 40 },
-  versionText: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.2)', marginBottom: 4 },
+  versionText: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
   copyright: { fontSize: 11, color: 'rgba(255,255,255,0.1)', fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   glassModal: { width: '100%', backgroundColor: 'rgba(30, 41, 59, 0.98)', borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },

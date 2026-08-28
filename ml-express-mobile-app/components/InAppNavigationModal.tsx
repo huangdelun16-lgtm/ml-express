@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,14 @@ import {
 import { openGoogleMapsDrivingNavigation } from '../utils/googleMapsNavigation';
 import { sequenceLabelForIndex } from '../utils/routeSequenceLabels';
 import { startRouteNavigationSession } from '../services/routeNavigationSession';
+import {
+  distanceFromPoint,
+  fillRemainingNearest,
+  formatShortDistance,
+  isDeliveryStop,
+  isPickupStop,
+  nextNearestStopId,
+} from '../utils/manualRoutePlan';
 
 export type NavStop = {
   id: string;
@@ -69,10 +78,23 @@ export default function InAppNavigationModal({
   const [route, setRoute] = useState<ComputedRoute | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const [stopFilter, setStopFilter] = useState<'all' | 'pickup' | 'delivery'>('all');
   /** Android 自定义 Marker 必须先 tracksViewChanges=true 才能快照渲染 */
   const [markerTracks, setMarkerTracks] = useState(Platform.OS === 'android');
   /** Android Modal 内 MapView 延迟挂载，避免 Marker 空白 */
   const [androidMapMounted, setAndroidMapMounted] = useState(Platform.OS !== 'android');
+  /** 收起导航/派单卡片，露出背后地图 */
+  const [panelsCollapsed, setPanelsCollapsed] = useState(true);
+  const listMaxHeight = Math.min(220, Math.round(Dimensions.get('window').height * 0.26));
+  const mapEdgePadding = useMemo(
+    () => ({
+      top: 72,
+      right: 48,
+      bottom: panelsCollapsed ? 108 : manualPlanning ? 268 : 200,
+      left: 48,
+    }),
+    [panelsCollapsed, manualPlanning],
+  );
 
   const poolStops = manualPlanning ? availableStops : stops;
 
@@ -86,17 +108,20 @@ export default function InAppNavigationModal({
     if (!visible) {
       setOrderedIds([]);
       setRoute(null);
+      setStopFilter('all');
+      setPanelsCollapsed(true);
       if (Platform.OS === 'android') {
         setAndroidMapMounted(false);
       }
       return;
     }
+    setPanelsCollapsed(manualPlanning);
     if (Platform.OS === 'android') {
       const mountTimer = setTimeout(() => setAndroidMapMounted(true), 320);
       return () => clearTimeout(mountTimer);
     }
     refreshAndroidMarkers();
-  }, [visible, refreshAndroidMarkers]);
+  }, [visible, manualPlanning, refreshAndroidMarkers]);
 
   useEffect(() => {
     if (!visible || !androidMapMounted) return;
@@ -123,15 +148,65 @@ export default function InAppNavigationModal({
 
   const toggleStop = useCallback((id: string) => {
     setOrderedIds((prev) => {
-      const idx = prev.indexOf(id);
-      if (idx >= 0) {
-        return prev.filter((x) => x !== id);
-      }
+      if (prev.includes(id)) return prev;
       return [...prev, id];
     });
   }, []);
 
-  const clearOrder = useCallback(() => setOrderedIds([]), []);
+  const removeStop = useCallback((id: string) => {
+    setOrderedIds((prev) => prev.filter((x) => x !== id));
+  }, []);
+
+  const undoLast = useCallback(() => {
+    setOrderedIds((prev) => prev.slice(0, -1));
+  }, []);
+
+  const clearOrder = useCallback(() => {
+    setOrderedIds([]);
+    setStopFilter('all');
+  }, []);
+
+  const moveStop = useCallback((id: string, direction: -1 | 1) => {
+    setOrderedIds((prev) => {
+      const idx = prev.indexOf(id);
+      const nextIdx = idx + direction;
+      if (idx < 0 || nextIdx < 0 || nextIdx >= prev.length) return prev;
+      const next = [...prev];
+      const tmp = next[idx];
+      next[idx] = next[nextIdx];
+      next[nextIdx] = tmp;
+      return next;
+    });
+  }, []);
+
+  const smartFill = useCallback(() => {
+    setOrderedIds((prev) => fillRemainingNearest(origin, prev, poolStops));
+  }, [origin, poolStops]);
+
+  const referencePoint = useMemo(() => {
+    const last = orderedStops[orderedStops.length - 1];
+    if (last) return { latitude: last.latitude, longitude: last.longitude };
+    return origin;
+  }, [orderedStops, origin]);
+
+  const suggestedId = useMemo(
+    () => (manualPlanning ? nextNearestStopId(origin, orderedIds, poolStops) : null),
+    [manualPlanning, origin, orderedIds, poolStops],
+  );
+
+  const remainingStops = useMemo(() => {
+    const selected = new Set(orderedIds);
+    return poolStops
+      .filter((s) => !selected.has(s.id))
+      .filter((s) => {
+        if (stopFilter === 'pickup') return isPickupStop(s);
+        if (stopFilter === 'delivery') return isDeliveryStop(s);
+        return true;
+      })
+      .sort(
+        (a, b) => distanceFromPoint(referencePoint, a) - distanceFromPoint(referencePoint, b),
+      );
+  }, [poolStops, orderedIds, stopFilter, referencePoint]);
 
   const loadRoute = useCallback(async () => {
     if (!visible || !origin || !destinationStop || orderedStops.length === 0) {
@@ -175,11 +250,11 @@ export default function InAppNavigationModal({
     mapRef.current.fitToCoordinates(
       polylineCoords.map((c) => ({ latitude: c.latitude, longitude: c.longitude })),
       {
-        edgePadding: { top: 80, right: 48, bottom: manualPlanning ? 280 : 220, left: 48 },
+        edgePadding: mapEdgePadding,
         animated: true,
       },
     );
-  }, [visible, polylineCoords, manualPlanning]);
+  }, [visible, polylineCoords, mapEdgePadding]);
 
   const etaSeconds = route ? pickRouteEtaSeconds(route) : 0;
 
@@ -230,17 +305,41 @@ export default function InAppNavigationModal({
           : '📍 App တွင် လမ်းညွှန်';
 
   const canStartNav = orderedStops.length > 0;
+  const collapseLabel =
+    language === 'zh' ? '收起看地图' : language === 'en' ? 'Hide panels' : 'မြေပုံကြည့်ရန်';
+  const expandLabel =
+    language === 'zh' ? '展开面板' : language === 'en' ? 'Show panels' : 'ပန်နယ်ဖွင့်';
+  const collapsedSummary = canStartNav
+    ? language === 'zh'
+      ? `${orderedStops.length}/${poolStops.length || orderedStops.length} 站 · ${
+          route ? formatRouteDuration(etaSeconds, language) : '—'
+        }`
+      : `${orderedStops.length}/${poolStops.length || orderedStops.length} · ${
+          route ? formatRouteDuration(etaSeconds, language) : '—'
+        }`
+    : language === 'zh'
+      ? '点地图选站，或展开面板排线'
+      : language === 'en'
+        ? 'Tap map pins, or expand to plan'
+        : 'မြေပုံမှတ်တိုင်ကို နှိပ်ပါ';
 
   const renderStopBadge = (stop: NavStop) => {
     const seq = sequenceMap.get(stop.id);
     const selected = Boolean(seq);
+    const suggested = suggestedId === stop.id && !selected;
     return (
       <View
         collapsable={false}
         renderToHardwareTextureAndroid
         style={[
           styles.stopBadge,
-          selected ? styles.stopBadgeSelected : stop.kind === 'delivery' ? styles.stopBadgeDest : styles.stopBadgeMid,
+          selected
+            ? styles.stopBadgeSelected
+            : suggested
+              ? styles.stopBadgeSuggested
+              : stop.kind === 'delivery'
+                ? styles.stopBadgeDest
+                : styles.stopBadgeMid,
         ]}
       >
         <Text style={styles.stopBadgeText}>{seq || stop.badge || '?'}</Text>
@@ -263,7 +362,22 @@ export default function InAppNavigationModal({
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{title}</Text>
-          <View style={{ width: 40 }} />
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => setPanelsCollapsed((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={
+              panelsCollapsed
+                ? language === 'zh'
+                  ? '展开面板'
+                  : 'Expand panels'
+                : language === 'zh'
+                  ? '收起看地图'
+                  : 'Collapse to see map'
+            }
+          >
+            <Ionicons name={panelsCollapsed ? 'chevron-up' : 'chevron-down'} size={22} color="#fff" />
+          </TouchableOpacity>
         </LinearGradient>
 
         <View style={styles.mapWrap}>
@@ -302,7 +416,7 @@ export default function InAppNavigationModal({
                       ? [{ latitude: origin.latitude, longitude: origin.longitude }, ...fitCoords]
                       : fitCoords,
                     {
-                      edgePadding: { top: 80, right: 48, bottom: manualPlanning ? 280 : 220, left: 48 },
+                      edgePadding: mapEdgePadding,
                       animated: false,
                     },
                   );
@@ -357,14 +471,65 @@ export default function InAppNavigationModal({
           )}
 
           <View style={styles.overlay} pointerEvents="box-none">
+            {panelsCollapsed ? (
+              <View style={styles.collapsedDock}>
+                <TouchableOpacity
+                  style={styles.collapseBtn}
+                  onPress={() => setPanelsCollapsed(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel={expandLabel}
+                >
+                  <Ionicons name="chevron-up" size={16} color="#334155" />
+                  <Text style={styles.collapseBtnText}>{expandLabel}</Text>
+                </TouchableOpacity>
+                <Text style={styles.collapsedMeta} numberOfLines={1}>
+                  {collapsedSummary}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.collapsedNavBtn, !canStartNav && styles.googleNavBtnDisabled]}
+                  onPress={() => void handleGoogleNav()}
+                  disabled={!canStartNav}
+                  accessibilityRole="button"
+                  accessibilityLabel={t?.a11yMapOpenGoogleNav || 'Start Google Maps navigation'}
+                >
+                  <Ionicons name="navigate" size={16} color="#fff" />
+                  <Text style={styles.collapsedNavText}>
+                    {language === 'zh' ? '导航' : language === 'en' ? 'Nav' : 'လမ်းညွှန်'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
             <View style={styles.statsCard}>
+              <View style={styles.panelToolbar}>
+                <Text style={styles.panelToolbarTitle}>
+                  {manualPlanning
+                    ? language === 'zh'
+                      ? '规划操作'
+                      : language === 'en'
+                        ? 'Route tools'
+                        : 'လမ်းကြောင်း'
+                    : language === 'zh'
+                      ? '导航'
+                      : 'Navigation'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.collapseBtn}
+                  onPress={() => setPanelsCollapsed(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={collapseLabel}
+                >
+                  <Ionicons name="chevron-down" size={16} color="#334155" />
+                  <Text style={styles.collapseBtnText}>{collapseLabel}</Text>
+                </TouchableOpacity>
+              </View>
               {manualPlanning ? (
-                <Text style={styles.manualHint}>
+                <Text style={styles.manualHint} numberOfLines={2}>
                   {language === 'zh'
-                    ? '👆 点击 P/D 站点按配送顺序添加（显示为 A→B→C）'
+                    ? '地图点未选站点即可加入；绿圈为建议下一站。已选站点请用列表调整。'
                     : language === 'en'
-                      ? '👆 Tap stops in order (A→B→C)'
-                      : '👆 P/D မှတ်တိုင်များကို အစဉ်လိုက် နှိပ်ပါ'}
+                      ? 'Tap unselected stops to add. Green = suggested next. Reorder in the list.'
+                      : 'မရွေးရသေးသော မှတ်တိုင်ကို နှိပ်ပြီး ထည့်ပါ။ အစိမ်းရောင် = အကြံပြုသည့် နောက်တစ်ခု။'}
                 </Text>
               ) : null}
 
@@ -384,18 +549,78 @@ export default function InAppNavigationModal({
                   </Text>
                   <Text style={styles.statsSub}>
                     📏 {formatRouteDistance(route.distanceMeters, language)}
+                    {manualPlanning
+                      ? language === 'zh'
+                        ? `  · 已选 ${orderedStops.length}/${poolStops.length} 站`
+                        : `  · ${orderedStops.length}/${poolStops.length}`
+                      : ''}
                   </Text>
                 </>
               ) : manualPlanning ? (
                 <Text style={styles.statsSub}>
                   {language === 'zh'
                     ? orderedStops.length === 0
-                      ? '请选择第一站'
-                      : `已选 ${orderedStops.length} 站 · ${orderedStops.map((_, i) => sequenceLabelForIndex(i)).join('→')}`
+                      ? '点地图或列表加第一站，或点「最近优先」一键排线'
+                      : `已选 ${orderedStops.length}/${poolStops.length} 站 · ${orderedStops
+                          .map((_, i) => sequenceLabelForIndex(i))
+                          .join('→')}`
                     : orderedStops.length === 0
-                      ? 'Select first stop'
-                      : `${orderedStops.length} stops · ${orderedStops.map((_, i) => sequenceLabelForIndex(i)).join('→')}`}
+                      ? 'Add first stop, or tap Nearest-first'
+                      : `${orderedStops.length}/${poolStops.length} · ${orderedStops
+                          .map((_, i) => sequenceLabelForIndex(i))
+                          .join('→')}`}
                 </Text>
+              ) : null}
+
+              {manualPlanning ? (
+                <View style={styles.toolRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.toolBtnPrimary,
+                      (poolStops.length === 0 || orderedIds.length >= poolStops.length) && {
+                        opacity: 0.45,
+                      },
+                    ]}
+                    onPress={smartFill}
+                    accessibilityRole="button"
+                    disabled={
+                      poolStops.length === 0 || orderedIds.length >= poolStops.length
+                    }
+                  >
+                    <Ionicons name="flash" size={16} color="#fff" />
+                    <Text style={styles.toolBtnPrimaryText}>
+                      {language === 'zh'
+                        ? orderedIds.length === 0
+                          ? '最近优先'
+                          : '补全未选'
+                        : language === 'en'
+                          ? orderedIds.length === 0
+                            ? 'Nearest first'
+                            : 'Fill rest'
+                          : 'အနီးဆုံး'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.toolBtn}
+                    onPress={undoLast}
+                    disabled={orderedIds.length === 0}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.toolBtnText, orderedIds.length === 0 && styles.toolBtnDisabled]}>
+                      {language === 'zh' ? '撤销' : language === 'en' ? 'Undo' : 'ပြန်ဖြည်'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.toolBtn}
+                    onPress={clearOrder}
+                    disabled={orderedIds.length === 0}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.toolBtnText, orderedIds.length === 0 && styles.toolBtnDisabled]}>
+                      {language === 'zh' ? '重置' : 'Reset'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               ) : null}
 
               <TouchableOpacity
@@ -421,65 +646,165 @@ export default function InAppNavigationModal({
               </TouchableOpacity>
               {canStartNav ? (
                 <Text style={styles.voiceHint}>
-                  {language === 'zh'
-                    ? '🔊 到达各 A/B 站时将自动语音播报'
-                    : '🔊 Voice alert at each stop'}
+                  {orderedStops.length > 10
+                    ? language === 'zh'
+                      ? '⚠️ Google Maps 一次最多约 10 站，将按前段途经点导航'
+                      : '⚠️ Maps may only keep the first ~10 stops'
+                    : language === 'zh'
+                      ? '🔊 到达各站时将自动语音播报'
+                      : '🔊 Voice alert at each stop'}
                 </Text>
               ) : null}
             </View>
 
             {manualPlanning && poolStops.length > 0 ? (
-              <View style={styles.listCard}>
-                <View style={styles.listHeaderRow}>
-                  <Text style={styles.listTitle}>
-                    {language === 'zh' ? '📦 选择站点顺序' : '📦 Tap to order'}
-                  </Text>
-                  {orderedIds.length > 0 ? (
-                    <TouchableOpacity onPress={clearOrder} accessibilityRole="button">
-                      <Text style={styles.resetText}>
-                        {language === 'zh' ? '重置' : 'Reset'}
+              <View style={[styles.listCard, { maxHeight: listMaxHeight }]}>
+                <View style={styles.filterRow}>
+                  {(
+                    [
+                      { key: 'all' as const, zh: '全部', en: 'All', my: 'အားလုံး' },
+                      { key: 'pickup' as const, zh: '取货', en: 'Pickup', my: 'ယူ' },
+                      { key: 'delivery' as const, zh: '送货', en: 'Drop', my: 'ပို့' },
+                    ]
+                  ).map((f) => (
+                    <TouchableOpacity
+                      key={f.key}
+                      style={[styles.filterChip, stopFilter === f.key && styles.filterChipOn]}
+                      onPress={() => setStopFilter(f.key)}
+                    >
+                      <Text style={[styles.filterChipText, stopFilter === f.key && styles.filterChipTextOn]}>
+                        {language === 'zh' ? f.zh : language === 'en' ? f.en : f.my}
                       </Text>
                     </TouchableOpacity>
-                  ) : null}
+                  ))}
+                  <Text style={styles.filterCount}>
+                    {language === 'zh' ? `未选 ${remainingStops.length}` : `${remainingStops.length} left`}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.collapseBtn}
+                    onPress={() => setPanelsCollapsed(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={collapseLabel}
+                  >
+                    <Ionicons name="chevron-down" size={16} color="#334155" />
+                  </TouchableOpacity>
                 </View>
-                <ScrollView style={styles.listScroll}>
-                  {poolStops.map((stop) => {
-                    const seq = sequenceMap.get(stop.id);
-                    const selected = Boolean(seq);
-                    return (
-                      <TouchableOpacity
-                        key={stop.id}
-                        style={[styles.listRow, selected && styles.listRowSelected]}
-                        onPress={() => toggleStop(stop.id)}
-                        accessibilityRole="button"
-                      >
-                        <View
-                          style={[
-                            styles.listNum,
-                            selected ? styles.listNumSelected : styles.listNumIdle,
-                          ]}
-                        >
-                          <Text style={styles.listNumText}>{seq || stop.badge || '?'}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.listName}>
-                            {stop.badge ? `${stop.badge} · ` : ''}
-                            {stop.title}
-                          </Text>
-                          {stop.subtitle ? (
-                            <Text style={styles.listSub} numberOfLines={1}>
-                              {stop.subtitle}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Ionicons
-                          name={selected ? 'checkmark-circle' : 'add-circle-outline'}
-                          size={22}
-                          color={selected ? '#2563eb' : '#94a3b8'}
-                        />
-                      </TouchableOpacity>
-                    );
-                  })}
+                <ScrollView style={{ maxHeight: listMaxHeight - 44 }} nestedScrollEnabled>
+                  {orderedStops.length > 0 ? (
+                    <>
+                      <Text style={styles.sectionLabel}>
+                        {language === 'zh' ? '已选顺序' : language === 'en' ? 'Your order' : 'ရွေးပြီးအစဉ်'}
+                      </Text>
+                      {orderedStops.map((stop, index) => {
+                        const seq = sequenceLabelForIndex(index);
+                        return (
+                          <View key={stop.id} style={[styles.listRow, styles.listRowSelected]}>
+                            <View style={[styles.listNum, styles.listNumSelected]}>
+                              <Text style={styles.listNumText}>{seq}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.listName} numberOfLines={1}>
+                                {stop.badge ? `${stop.badge} · ` : ''}
+                                {stop.title}
+                              </Text>
+                              {stop.subtitle ? (
+                                <Text style={styles.listSub} numberOfLines={1}>
+                                  {stop.subtitle}
+                                </Text>
+                              ) : null}
+                            </View>
+                            <TouchableOpacity
+                              onPress={() => moveStop(stop.id, -1)}
+                              disabled={index === 0}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="chevron-up" size={20} color={index === 0 ? '#cbd5e1' : '#334155'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => moveStop(stop.id, 1)}
+                              disabled={index === orderedStops.length - 1}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons
+                                name="chevron-down"
+                                size={20}
+                                color={index === orderedStops.length - 1 ? '#cbd5e1' : '#334155'}
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => removeStop(stop.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="close-circle" size={20} color="#ef4444" />
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                    </>
+                  ) : null}
+
+                  {remainingStops.length > 0 ? (
+                    <>
+                      <Text style={styles.sectionLabel}>
+                        {language === 'zh'
+                          ? '未选 · 距当前最近在前'
+                          : language === 'en'
+                            ? 'Remaining · nearest first'
+                            : 'မရွေးရသေး'}
+                      </Text>
+                      {remainingStops.map((stop) => {
+                        const suggested = suggestedId === stop.id;
+                        const dist = formatShortDistance(
+                          distanceFromPoint(referencePoint, stop),
+                          language,
+                        );
+                        return (
+                          <TouchableOpacity
+                            key={stop.id}
+                            style={[styles.listRow, suggested && styles.listRowSuggested]}
+                            onPress={() => toggleStop(stop.id)}
+                            accessibilityRole="button"
+                          >
+                            <View
+                              style={[
+                                styles.listNum,
+                                suggested ? styles.listNumSuggested : styles.listNumIdle,
+                              ]}
+                            >
+                              <Text style={styles.listNumText}>{stop.badge || '?'}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.listName} numberOfLines={1}>
+                                {stop.title}
+                                {suggested
+                                  ? language === 'zh'
+                                    ? ' · 建议下一站'
+                                    : ' · next'
+                                  : ''}
+                              </Text>
+                              <Text style={styles.listSub} numberOfLines={1}>
+                                {dist
+                                  ? language === 'zh'
+                                    ? `距${orderedStops.length ? '上一站' : '你'} ${dist}`
+                                    : dist
+                                  : ''}
+                                {stop.subtitle ? ` · ${stop.subtitle}` : ''}
+                              </Text>
+                            </View>
+                            <Ionicons name="add-circle-outline" size={22} color={suggested ? '#16a34a' : '#64748b'} />
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </>
+                  ) : orderedStops.length > 0 && orderedIds.length >= poolStops.length ? (
+                    <Text style={styles.allPicked}>
+                      {language === 'zh' ? '已选完所有站点' : 'All stops added'}
+                    </Text>
+                  ) : remainingStops.length === 0 ? (
+                    <Text style={styles.allPicked}>
+                      {language === 'zh' ? '该筛选下没有未选站点' : 'Nothing left in this filter'}
+                    </Text>
+                  ) : null}
                 </ScrollView>
               </View>
             ) : orderedStops.length === 1 ? (
@@ -492,6 +817,8 @@ export default function InAppNavigationModal({
                 ) : null}
               </View>
             ) : null}
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -515,11 +842,54 @@ const styles = StyleSheet.create({
   mapPaused: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   mapPausedText: { color: '#94a3b8' },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end' },
+  collapsedDock: {
+    marginHorizontal: 12,
+    marginBottom: Platform.OS === 'ios' ? 24 : 14,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  collapsedMeta: { flex: 1, fontSize: 12, fontWeight: '700', color: '#0f172a' },
+  collapsedNavBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#2563eb',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  collapsedNavText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  panelToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  panelToolbarTitle: { fontSize: 13, fontWeight: '800', color: '#0f172a' },
+  collapseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  collapseBtnText: { fontSize: 12, fontWeight: '700', color: '#334155' },
   statsCard: {
     margin: 12,
     backgroundColor: 'rgba(255,255,255,0.96)',
     borderRadius: 16,
-    padding: 14,
+    padding: 12,
     shadowColor: '#000',
     shadowOpacity: 0.12,
     shadowRadius: 8,
@@ -530,23 +900,82 @@ const styles = StyleSheet.create({
   statsTraffic: { fontSize: 14, fontWeight: '600', color: '#dc2626' },
   statsSub: { fontSize: 13, color: '#64748b', marginTop: 4 },
   voiceHint: { fontSize: 11, color: '#64748b', marginTop: 8, textAlign: 'center' },
-  googleNavBtn: { marginTop: 12, borderRadius: 12, overflow: 'hidden' },
+  googleNavBtn: { marginTop: 10, borderRadius: 12, overflow: 'hidden' },
   googleNavBtnDisabled: { opacity: 0.85 },
   googleNavGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   googleNavText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   listCard: {
     marginHorizontal: 12,
     marginBottom: 16,
-    maxHeight: 220,
-    backgroundColor: 'rgba(255,255,255,0.94)',
+    backgroundColor: 'rgba(255,255,255,0.96)',
     borderRadius: 14,
     padding: 12,
+  },
+  toolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  toolBtnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#16a34a',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  toolBtnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  toolBtn: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  toolBtnText: { color: '#334155', fontWeight: '700', fontSize: 13 },
+  toolBtnDisabled: { color: '#94a3b8' },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  filterChip: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  filterChipOn: { backgroundColor: '#1d4ed8' },
+  filterChipText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  filterChipTextOn: { color: '#fff' },
+  filterCount: { marginLeft: 'auto', fontSize: 11, color: '#64748b', fontWeight: '600' },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748b',
+    marginBottom: 6,
+    marginTop: 4,
+    letterSpacing: 0.4,
+  },
+  listRowSuggested: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  listNumSuggested: { backgroundColor: '#16a34a' },
+  allPicked: {
+    textAlign: 'center',
+    color: '#16a34a',
+    fontWeight: '700',
+    paddingVertical: 8,
   },
   listHeaderRow: {
     flexDirection: 'row',
@@ -601,5 +1030,6 @@ const styles = StyleSheet.create({
   stopBadgeMid: { backgroundColor: '#f59e0b' },
   stopBadgeDest: { backgroundColor: '#ef4444' },
   stopBadgeSelected: { backgroundColor: '#2563eb' },
+  stopBadgeSuggested: { backgroundColor: '#16a34a' },
   stopBadgeText: { color: '#fff', fontWeight: '800', fontSize: 12 },
 });

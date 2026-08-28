@@ -6,6 +6,7 @@ import { supabase } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRuntimeChannel, type RuntimeChannel } from '../utils/runtimeEnv';
 import { navigateToPackageDetail } from '../navigation/navigationRef';
+import { announceCourierNewOrder } from './courierNewOrderMonitor';
 
 // 🚩 核心修复：更严格的环境检测
 // SDK 53+ 在 Android Expo Go 中完全禁用了远程推送
@@ -49,6 +50,35 @@ export function getPushRuntimeSummary(): {
     simulator: !Device.isDevice,
     hasNotificationsModule: !!Notifications,
   };
+}
+
+async function resolvePushToken(userId: string): Promise<string | null> {
+  if (!userId) return null;
+  try {
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('push_token')
+      .eq('id', userId)
+      .maybeSingle();
+    if (userRow?.push_token) return String(userRow.push_token);
+
+    const { data: courierRow } = await supabase
+      .from('couriers')
+      .select('push_token')
+      .eq('id', userId)
+      .maybeSingle();
+    if (courierRow?.push_token) return String(courierRow.push_token);
+
+    const { data: staffRow } = await supabase
+      .from('admin_accounts')
+      .select('push_token')
+      .eq('id', userId)
+      .maybeSingle();
+    if (staffRow?.push_token) return String(staffRow.push_token);
+  } catch (e) {
+    console.warn('读取推送令牌失败:', e);
+  }
+  return null;
 }
 
 export const notificationService = {
@@ -114,21 +144,17 @@ export const notificationService = {
    */
   async sendPushNotificationToUser(userId: string, title: string, body: string, data?: any, imageUrl?: string): Promise<boolean> {
     try {
-      // 1. 获取用户的推送令牌
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('push_token')
-        .eq('id', userId)
-        .single();
+      // 1. 获取用户的推送令牌（客户 users → 骑手 couriers / admin_accounts）
+      const token = await resolvePushToken(userId);
 
-      if (error || !userData?.push_token) {
+      if (!token) {
         console.warn(`⚠️ 无法发送推送：找不到用户 ${userId} 的有效令牌`);
         return false;
       }
 
       // 2. 调用 Expo 推送服务 (通常通过后端转发，这里模拟或直接调用)
       const message: any = {
-        to: userData.push_token,
+        to: token,
         sound: 'default',
         title: title,
         body: body,
@@ -276,6 +302,28 @@ export const notificationService = {
     }
   },
 
+  async presentLocalNewOrderNotification(
+    title: string,
+    body: string,
+    packageId: string,
+  ): Promise<void> {
+    if (isExpoGoAndroid || !Notifications) return;
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data: { packageId, type: 'new_order' },
+          sound: 'default',
+          ...(Platform.OS === 'android' ? { channelId: 'new-task-channel' } : {}),
+        },
+        trigger: null,
+      });
+    } catch (e) {
+      console.warn('本地新单通知失败:', e);
+    }
+  },
+
   /**
    * 初始化通知监听器
    */
@@ -285,35 +333,41 @@ export const notificationService = {
     try {
       // 监听通知进入前台
       const notificationListener = Notifications.addNotificationReceivedListener(async (notification: any) => {
-        console.log('🔔 收到前台通知:', notification);
-        
-        // 🚀 新增：自动语音播报“你有新的订单”
-        const title = notification.request.content.title;
-        const data = notification.request.content.data;
+        const title = String(notification?.request?.content?.title || '');
+        const data = notification?.request?.content?.data as Record<string, unknown> | undefined;
+        const pkgId = extractPackageIdFromNotificationData(data);
+        const isNewOrderPush =
+          title.includes('新包裹') ||
+          title.includes('新订单') ||
+          data?.type === 'new_order' ||
+          title.includes('分配');
 
-        if (title?.includes('新包裹') || title?.includes('新订单') || data?.type === 'new_order' || title?.includes('分配')) {
-          try {
-            // 从存储中获取当前语言设置
-            const language = await AsyncStorage.getItem('ml-express-language') || 'zh';
-            
-            // 🚀 强化语音播报内容
-            let speakText = '';
-            if (language === 'my') {
-              speakText = 'သင့်တွင် မြို့တွင်းပို့ဆောင်ရေး အော်ဒါအသစ်တစ်ခုရှိသည်။ ကျေးဇူးပြု၍ အချိန်မီစစ်ဆေးပါ။';
-            } else if (language === 'en') {
-              speakText = 'You have a new local delivery order. Please check it in time.';
-            } else {
-              speakText = '您有新的同城配送订单，请及时查看';
-            }
-            
+        if (!isNewOrderPush && !pkgId) return;
+
+        try {
+          const language = (await AsyncStorage.getItem('ml-express-language')) || 'zh';
+          const speakText =
+            language === 'my'
+              ? 'သင့်တွင် မြို့တွင်းပို့ဆောင်ရေး အော်ဒါအသစ်တစ်ခုရှိသည်။ ကျေးဇူးပြု၍ အချိန်မီစစ်ဆေးပါ။'
+              : language === 'en'
+                ? 'You have a new local delivery order. Please check it in time.'
+                : '您有新的同城配送订单，请及时查看';
+          const speechLang = language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN';
+
+          if (pkgId) {
+            await announceCourierNewOrder(
+              { id: pkgId, status: '待取件' },
+              { playVoice: true, voiceText: speakText, speechLang },
+            );
+          } else {
             Speech.speak(speakText, {
-              language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
+              language: speechLang,
               pitch: 1.0,
-              rate: 0.9, // 稍微放慢语速，更清晰
+              rate: 0.9,
             });
-          } catch (speechError) {
-            console.warn('语音播报失败:', speechError);
           }
+        } catch (speechError) {
+          console.warn('语音播报失败:', speechError);
         }
       });
 

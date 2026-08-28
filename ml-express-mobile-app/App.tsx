@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COURIER_ONLINE_MODE_KEY } from './constants/courierOnline';
-import { ActivityIndicator, View, Text, Platform, Alert, TouchableOpacity, StatusBar } from 'react-native';
+import { ActivityIndicator, View, Text, Platform, Alert, TouchableOpacity, StatusBar, AppState, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,16 +13,14 @@ import { notificationService } from './services/notificationService';
 import { errorService } from './services/errorService';
 import { locationService } from './services/locationService';
 import { packageService, supabase } from './services/supabase';
+import { startCourierAssignmentWatch } from './services/courierNewOrderMonitor';
 import NetInfo from '@react-native-community/netinfo';
-import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { Vibration, DeviceEventEmitter } from 'react-native';
 import {
   readStaffWorkspaceContext,
   STAFF_WORKSPACE_CHANGED_EVENT,
 } from './utils/staffWorkspace';
-import { shouldAlertCourierOnNewAssignment } from './utils/packageStatusNormalize';
 import type { LanguageTexts } from './utils/i18n';
 import LoginScreen from './screens/LoginScreen';
 import {
@@ -314,7 +312,6 @@ const GlobalOrderMonitor = () => {
   const { t, language } = useApp();
   const [courierName, setCourierName] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const announcedOrders = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let checkSessionTimer: NodeJS.Timeout | null = null;
@@ -333,7 +330,6 @@ const GlobalOrderMonitor = () => {
           console.log('👤 [监控器] 检测到骑手登出');
           setCourierName(null);
           setUserId(null);
-          announcedOrders.current.clear();
         }
 
         if (id && localSessionId) {
@@ -385,73 +381,25 @@ const GlobalOrderMonitor = () => {
   useEffect(() => {
     if (!courierName) return;
 
-    console.log('📡 [监控器] 正在启动增强型监听，骑手:', courierName);
+    const speechLang =
+      language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN';
 
-    const channelId = `monitor-orders-${Date.now()}`;
-    const channel = supabase
-      .channel(channelId)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'packages',
-        },
-        async (payload) => {
-          const { eventType, new: newPkgRaw, old: oldPkgRaw } = payload;
-          const newPkg = newPkgRaw as any;
-          const oldPkg = oldPkgRaw as any;
-
-          if (!newPkg || !newPkg.id) return;
-
-          const currentCourierClean = courierName.toLowerCase().trim();
-          const pkgCourierClean = (newPkg.courier || '').toLowerCase().trim();
-          const isMyOrder = pkgCourierClean === currentCourierClean;
-
-          const isNewlyAssigned =
-            eventType === 'UPDATE' &&
-            oldPkg &&
-            (oldPkg.courier || '').toLowerCase().trim() !== pkgCourierClean &&
-            isMyOrder;
-
-          const isNewRecord = eventType === 'INSERT' && isMyOrder;
-
-          if ((isNewRecord || isNewlyAssigned) && !announcedOrders.current.has(newPkg.id)) {
-            if (shouldAlertCourierOnNewAssignment(newPkg.status)) {
-              console.log('🚨 [监控器] 成功捕捉到新任务分配:', newPkg.id);
-              announcedOrders.current.add(newPkg.id);
-
-              Vibration.vibrate([0, 800, 200, 800, 200, 800]);
-
-              DeviceEventEmitter.emit('courier_new_order_assigned', {
-                id: newPkg.id,
-                status: newPkg.status,
-              });
-
-              try {
-                const voiceMsg = t.newOrderVoiceAnnouncement;
-                const speechLang =
-                  language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN';
-
-                Speech.stop();
-                Speech.speak(voiceMsg, {
-                  language: speechLang,
-                  pitch: 1.0,
-                  rate: 0.85,
-                });
-              } catch (err) {
-                console.warn('语音播放失败:', err);
-              }
-            }
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log(`🔌 [监控器] 实时频道状态: ${status}`);
-      });
+    const stop = startCourierAssignmentWatch({
+      courierName,
+      voiceText: t.newOrderVoiceAnnouncement,
+      speechLang,
+      onFreshAssignment: (pkg) => {
+        if (AppState.currentState === 'active') return;
+        void notificationService.presentLocalNewOrderNotification(
+          t.newOrderVoiceAnnouncement,
+          pkg.id,
+          pkg.id,
+        );
+      },
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      stop();
     };
   }, [courierName, t, language]);
 

@@ -9,6 +9,8 @@ LogBox.ignoreLogs([
   'Setting a timer',
   'AsyncStorage has been extracted',
   'Non-serializable values were found in the navigation state',
+  'Network request failed',
+  '加载统计失败',
 ]);
 
 async function getLocalizedStrings() {

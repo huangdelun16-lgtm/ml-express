@@ -107,7 +107,7 @@ function straightLineFallback(
   };
 }
 
-function haversineMeters(a: RouteCoordinate, b: RouteCoordinate): number {
+export function haversineMeters(a: RouteCoordinate, b: RouteCoordinate): number {
   const R = 6371000;
   const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
   const dLng = ((b.longitude - a.longitude) * Math.PI) / 180;

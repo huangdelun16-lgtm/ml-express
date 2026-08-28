@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,28 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
-  Dimensions,
   Platform,
-  Vibration,
+  DeviceEventEmitter,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import * as Speech from 'expo-speech';
-import { packageService, Package, supabase } from '../services/supabase';
+import { useFocusEffect } from '@react-navigation/native';
+import { packageService, Package } from '../services/supabase';
 import { useApp } from '../contexts/AppContext';
+import { feedbackService } from '../services/feedbackService';
+import { logger } from '../services/LoggerService';
+import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 import {
   normalizePackageStatusZh,
   isActiveCourierTaskStatus,
 } from '../utils/packageStatusNormalize';
-
-const { width } = Dimensions.get('window');
+import {
+  dialCourierTaskContact,
+  isMerchantFirstTask,
+  navigateCourierTask,
+} from '../utils/courierTaskQuickActions';
+import { COURIER_NEW_ORDER_EVENT } from '../services/courierNewOrderMonitor';
 
 export default function CourierHomeScreen({ navigation }: any) {
   const { language, t } = useApp();
@@ -31,93 +37,52 @@ export default function CourierHomeScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserName, setCurrentUserName] = useState('');
 
-  useEffect(() => {
-    loadUserInfo();
-    loadMyPackages();
-  }, []);
-
-  // 🚀 新增：实时监听订单分配
-  useEffect(() => {
-    let channel: any = null;
-
-    const setupRealtimeListener = async () => {
-      const userName = await AsyncStorage.getItem('currentUserName') || '';
-      if (!userName) return;
-
-      channel = supabase
-        .channel('home-tasks-updates')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'packages',
-            filter: `courier=eq.${userName}`
-          },
-          (payload) => {
-            if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && (payload.new.status === '已分配' || (payload.old.courier !== payload.new.courier && payload.new.courier === userName)))) {
-              // 1. 震动提醒
-              Vibration.vibrate([0, 500, 200, 500]);
-              
-              // 2. 语音播报
-              try {
-                AsyncStorage.getItem('ml-express-language').then(lang => {
-                  const language = lang || 'zh';
-                  const speakText = language === 'my' ? 'သင့်တွင် အော်ဒါအသစ်တစ်ခုရှိသည်။' : 
-                                   language === 'en' ? 'You have a new order.' : 
-                                   '您有新的订单';
-                  
-                  Speech.speak(speakText, {
-                    language: language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN',
-                    pitch: 1.0,
-                    rate: 1.0,
-                  });
-                });
-              } catch (speechError) {
-                console.warn('实时监听语音播报失败:', speechError);
-              }
-              
-              // 3. 自动刷新
-              loadMyPackages();
-            }
-          }
-        )
-        .subscribe();
-    };
-
-    setupRealtimeListener();
-
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, []);
-
   const loadUserInfo = async () => {
     const userName = await AsyncStorage.getItem('currentUserName') || '骑手';
     setCurrentUserName(userName);
   };
 
-  const loadMyPackages = async () => {
+  const loadMyPackages = useCallback(async (opts?: { showSpinner?: boolean }) => {
+    const showSpinner = opts?.showSpinner === true;
     try {
-      setLoading(true);
-      const currentUser = await AsyncStorage.getItem('currentUserName') || '';
-      const allPackages = await packageService.getAllPackages();
-      
-      const myPackages = allPackages.filter((pkg) => {
-        if (pkg.courier !== currentUser) return false;
+      if (showSpinner) setLoading(true);
+      const currentUser = (await AsyncStorage.getItem('currentUserName')) || '';
+      if (!currentUser) {
+        setPackages([]);
+        return;
+      }
+
+      const courierPackages = await packageService.getPackagesForCourier(currentUser);
+      const myPackages = courierPackages.filter((pkg) => {
         const s = normalizePackageStatusZh(pkg.status);
         return isActiveCourierTaskStatus(s);
       });
-      
+
       setPackages(myPackages);
     } catch (error) {
-      console.error('加载包裹失败:', error);
+      logger.warn('加载包裹失败', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadUserInfo();
+    void loadMyPackages({ showSpinner: true });
+  }, [loadMyPackages]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadMyPackages({ showSpinner: false });
+    }, [loadMyPackages]),
+  );
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(COURIER_NEW_ORDER_EVENT, () => {
+      void loadMyPackages({ showSpinner: false });
+    });
+    return () => sub.remove();
+  }, [loadMyPackages]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -151,21 +116,74 @@ export default function CourierHomeScreen({ navigation }: any) {
     switch (s) {
       case '待取件':
       case '待收款':
-        return language === 'zh' ? '去取件' : 'Pickup';
+        return language === 'zh' ? '去取件' : language === 'my' ? 'ယူရန်' : 'Pickup';
       case '打包中':
       case '待确认':
-        return language === 'zh' ? '等待商家' : 'Wait';
+        return language === 'zh' ? '等待商家' : language === 'my' ? 'ဆိုင်စောင့်' : 'Wait';
       case '已取件':
-        return language === 'zh' ? '去配送' : 'Deliver';
+        return language === 'zh' ? '去配送' : language === 'my' ? 'ပို့ရန်' : 'Deliver';
       case '配送中':
       case '异常上报':
-        return language === 'zh' ? '签收' : 'Complete';
+        return language === 'zh' ? '签收' : language === 'my' ? 'လက်ခံ' : 'Complete';
       default:
         return '';
     }
   };
 
-  const renderPackageItem = ({ item }: { item: Package }) => (
+  const handleQuickCall = (pkg: Package) => {
+    const kind = dialCourierTaskContact(pkg);
+    if (!kind) {
+      feedbackService.notify(
+        language === 'zh' ? '无法拨打' : language === 'en' ? 'Cannot call' : 'ခေါ်၍မရ',
+        language === 'zh'
+          ? '此单没有可用电话'
+          : language === 'en'
+            ? 'No phone number on this order'
+            : 'ဖုန်းနံပါတ်မရှိပါ',
+      );
+    }
+  };
+
+  const handleQuickNav = (pkg: Package) => {
+    const kind = navigateCourierTask(pkg);
+    if (!kind) {
+      feedbackService.notify(
+        language === 'zh' ? '无法导航' : language === 'en' ? 'Cannot navigate' : 'လမ်းညွှန်မရ',
+        language === 'zh'
+          ? '此单没有可用地址或坐标'
+          : language === 'en'
+            ? 'No address or coordinates on this order'
+            : 'လိပ်စာမရှိပါ',
+      );
+    }
+  };
+
+  const renderPackageItem = ({ item }: { item: Package }) => {
+    const merchantFirst = isMerchantFirstTask(item);
+    const callLabel = merchantFirst
+      ? language === 'zh'
+        ? '打商家'
+        : language === 'en'
+          ? 'Shop'
+          : 'ဆိုင်'
+      : language === 'zh'
+        ? '打客户'
+        : language === 'en'
+          ? 'Call'
+          : 'ဖောက်သည်';
+    const navLabel = merchantFirst
+      ? language === 'zh'
+        ? '去取货'
+        : language === 'en'
+          ? 'Pickup'
+          : 'ယူရန်'
+      : language === 'zh'
+        ? '去送货'
+        : language === 'en'
+          ? 'Dropoff'
+          : 'ပို့ရန်';
+
+    return (
     <TouchableOpacity
       activeOpacity={0.9}
       style={styles.packageCardWrapper}
@@ -179,12 +197,11 @@ export default function CourierHomeScreen({ navigation }: any) {
         style={styles.packageGlassCard}
       >
         <View style={styles.cardHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 }}>
             <View style={styles.idBadge}>
               <Text style={styles.packageId}>{item.id}</Text>
             </View>
             
-            {/* 🚀 新增：在顶部显示下单身份 */}
             {(() => {
               const identityMatch = item.description?.match(/\[(?:下单身份|Orderer Identity|Orderer|အော်ဒါတင်သူ အမျိုးအစား|အော်ဒါတင်သူ): (.*?)\]/);
               if (identityMatch && identityMatch[1]) {
@@ -203,21 +220,33 @@ export default function CourierHomeScreen({ navigation }: any) {
             <Text style={styles.statusText}>{item.status}</Text>
           </View>
         </View>
+
+        <DeliveryCountdownBadge
+          pkg={item}
+          language={language === 'zh' ? 'zh' : language === 'en' ? 'en' : 'my'}
+          variant="compact"
+          theme="dark"
+        />
         
         <View style={styles.receiverContainer}>
           <View style={styles.infoRow}>
             <Ionicons name="location" size={18} color="#60a5fa" />
-            <Text style={styles.receiverName}>{item.receiver_name}</Text>
+            <Text style={styles.receiverName}>
+              {merchantFirst ? (item.sender_name || item.receiver_name) : item.receiver_name}
+            </Text>
           </View>
-          <Text style={styles.addressText} numberOfLines={2}>{item.receiver_address}</Text>
+          <Text style={styles.addressText} numberOfLines={2}>
+            {merchantFirst
+              ? item.sender_address || item.receiver_address
+              : item.receiver_address}
+          </Text>
         </View>
 
-        {/* 🚀 新增：首页列表展示余额支付金额 */}
         {(() => {
           const payMatch = item.description?.match(/\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/);
           if (payMatch && payMatch[1]) {
             return (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginLeft: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
                 <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
                   💰 {language === 'zh' ? '余额支付' : language === 'en' ? 'Balance Payment' : 'လက်ကျန်ငွေဖြင့် ပေးချေခြင်း'}: {payMatch[1]} MMK
                 </Text>
@@ -226,6 +255,33 @@ export default function CourierHomeScreen({ navigation }: any) {
           }
           return null;
         })()}
+
+        <View style={styles.quickRow}>
+          <TouchableOpacity
+            style={[styles.quickBtn, styles.quickBtnCall]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleQuickCall(item);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t.a11yCallRecipient}
+          >
+            <Ionicons name="call" size={16} color="#6ee7b7" />
+            <Text style={styles.quickBtnText}>{callLabel}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickBtn, styles.quickBtnNav]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleQuickNav(item);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t.a11yNavigateToAddress}
+          >
+            <Ionicons name="navigate" size={16} color="#93c5fd" />
+            <Text style={styles.quickBtnText}>{navLabel}</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.cardFooter}>
           <View style={styles.tagGroup}>
@@ -257,7 +313,8 @@ export default function CourierHomeScreen({ navigation }: any) {
         </View>
       </LinearGradient>
     </TouchableOpacity>
-  );
+    );
+  };
 
   // 统计
   const todoCount = packages.filter((p) => {
@@ -500,7 +557,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   receiverContainer: {
-    marginBottom: 20,
+    marginTop: 10,
+    marginBottom: 12,
   },
   infoRow: {
     flexDirection: 'row',
@@ -592,6 +650,33 @@ const styles = StyleSheet.create({
   identityText: {
     color: '#fff',
     fontSize: 10,
+    fontWeight: '800',
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  quickBtnCall: {
+    backgroundColor: 'rgba(16, 185, 129, 0.18)',
+    borderColor: 'rgba(110, 231, 183, 0.35)',
+  },
+  quickBtnNav: {
+    backgroundColor: 'rgba(59, 130, 246, 0.18)',
+    borderColor: 'rgba(147, 197, 253, 0.35)',
+  },
+  quickBtnText: {
+    color: '#fff',
+    fontSize: 13,
     fontWeight: '800',
   },
 });
