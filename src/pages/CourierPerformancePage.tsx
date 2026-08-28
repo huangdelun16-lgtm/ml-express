@@ -281,7 +281,7 @@ const CourierPerformancePage: React.FC = () => {
           noSalary: '本时间范围内没有重叠的工资结算周期，可扩大日期范围或在财务管理中核对工资单',
         };
 
-  const thBg = 'rgb(15, 23, 42)';
+  const thBg = '#f8fafc';
 
   const thStyle: React.CSSProperties = {
     padding: isMobile ? '12px 10px' : '14px 16px',
@@ -292,8 +292,8 @@ const CourierPerformancePage: React.FC = () => {
     cursor: 'pointer',
     userSelect: 'none',
     whiteSpace: 'nowrap',
-    color: 'rgba(255,255,255,0.96)',
-    borderBottom: '2px solid rgba(255,255,255,0.2)',
+    color: '#334155',
+    borderBottom: '2px solid #e2e8f0',
     verticalAlign: 'middle',
     textAlign: 'left',
     backgroundColor: thBg,
@@ -311,51 +311,19 @@ const CourierPerformancePage: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 38%, #2c5282 70%, #3b6fb8 100%)',
-        padding: isMobile ? '14px 12px 96px' : '24px 20px 96px',
-        color: '#fff',
-        fontFamily:
-          "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', system-ui, sans-serif",
-        boxSizing: 'border-box',
-        WebkitFontSmoothing: 'antialiased',
-        MozOsxFontSmoothing: 'grayscale',
-      }}
-    >
+    <div className="admin-page">
       <div style={{ maxWidth: 1320, margin: '0 auto' }}>
-        <header
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: 16,
-            marginBottom: 20,
-            flexWrap: 'wrap',
-          }}
-        >
+        <header className="admin-page-head">
           <div>
-            <div style={{ fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.75, marginBottom: 6 }}>
-              ML Express · Admin
-            </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? '1.45rem' : '1.85rem', fontWeight: 800, lineHeight: 1.2 }}>🚴 {t.title}</h1>
-            <p style={{ margin: '10px 0 0', opacity: 0.9, fontSize: isMobile ? 13 : 14, maxWidth: 720, lineHeight: 1.5 }}>{t.subtitle}</p>
-            <p style={{ margin: '8px 0 0', opacity: 0.72, fontSize: 12, maxWidth: 820, lineHeight: 1.45 }}>{t.hint}</p>
+            <h1>🚴 {t.title}</h1>
+            <p>{t.subtitle}</p>
+            <p>{t.hint}</p>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+          <div className="admin-page-actions">
             <button
               type="button"
+              className="admin-shell__btn"
               onClick={() => navigate('/admin/dashboard')}
-              style={{
-                padding: '10px 18px',
-                borderRadius: 12,
-                border: '1px solid rgba(255,255,255,0.35)',
-                background: 'rgba(255,255,255,0.06)',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
             >
               ← {t.back}
             </button>
@@ -423,10 +391,10 @@ const CourierPerformancePage: React.FC = () => {
             <div
               key={label}
               style={{
-                background: 'rgba(255,255,255,0.08)',
-                borderRadius: 16,
+                background: '#fff',
+                borderRadius: 12,
                 padding: isMobile ? '12px 12px' : '14px 16px',
-                border: '1px solid rgba(255,255,255,0.12)',
+                border: '1px solid #e2e8f0',
                 backdropFilter: 'blur(8px)',
               }}
             >
@@ -439,11 +407,11 @@ const CourierPerformancePage: React.FC = () => {
 
         <div
           style={{
-            background: 'rgba(15, 23, 42, 0.45)',
-            borderRadius: 18,
+            background: '#fff',
+            borderRadius: 12,
             padding: isMobile ? 14 : 18,
             marginBottom: 18,
-            border: '1px solid rgba(255,255,255,0.12)',
+            border: '1px solid #e2e8f0',
             display: 'flex',
             flexWrap: 'wrap',
             gap: 12,
@@ -453,16 +421,10 @@ const CourierPerformancePage: React.FC = () => {
           <div>
             <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6, fontWeight: 600 }}>{t.range}</div>
             <select
+              className="admin-select"
               value={preset}
               onChange={(e) => setPreset(e.target.value as DatePreset)}
-              style={{
-                padding: '11px 14px',
-                borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.22)',
-                background: 'rgba(0,0,0,0.28)',
-                color: '#fff',
-                minWidth: 140,
-              }}
+              style={{ minWidth: 140 }}
             >
               <option value="today">今日</option>
               <option value="7d">近 7 天</option>
@@ -487,19 +449,11 @@ const CourierPerformancePage: React.FC = () => {
             </>
           )}
           <input
+            className="admin-input"
             placeholder={t.filterPh}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{
-              flex: 1,
-              minWidth: 200,
-              padding: '12px 16px',
-              borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.22)',
-              background: 'rgba(0,0,0,0.22)',
-              color: '#fff',
-              fontSize: 14,
-            }}
+            style={{ flex: 1, minWidth: 200 }}
           />
           <button
             type="button"
@@ -521,10 +475,10 @@ const CourierPerformancePage: React.FC = () => {
 
         <div
           style={{
-            borderRadius: 18,
+            borderRadius: 12,
             overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(2, 6, 23, 0.35)',
+            border: '1px solid #e2e8f0',
+            background: '#fff',
             position: 'relative',
           }}
         >
@@ -588,8 +542,8 @@ const CourierPerformancePage: React.FC = () => {
                   <tr
                     key={`${r.courierName}-${r.courierId || ''}`}
                     style={{
-                      background: i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)',
-                      borderTop: '1px solid rgba(255,255,255,0.06)',
+                      background: i % 2 === 0 ? '#fff' : '#f8fafc',
+                      borderTop: '1px solid #e2e8f0',
                     }}
                   >
                     <td style={{ padding: isMobile ? '10px 8px' : '12px 14px', fontWeight: 700, fontSize: isMobile ? 13 : 14 }}>
@@ -598,8 +552,8 @@ const CourierPerformancePage: React.FC = () => {
                         <div style={{ fontSize: 11, opacity: 0.65, fontWeight: 500, marginTop: 2 }}>{r.courierId}</div>
                       ) : null}
                     </td>
-                    <td style={{ padding: isMobile ? '10px 8px' : '12px 14px', textAlign: 'right', fontWeight: 700, color: '#6ee7b7' }}>{r.delivered}</td>
-                    <td style={{ padding: isMobile ? '10px 8px' : '12px 14px', textAlign: 'right', fontWeight: 800, color: '#fde68a' }}>
+                    <td style={{ padding: isMobile ? '10px 8px' : '12px 14px', textAlign: 'right', fontWeight: 700, color: '#059669' }}>{r.delivered}</td>
+                    <td style={{ padding: isMobile ? '10px 8px' : '12px 14px', textAlign: 'right', fontWeight: 800, color: '#d97706' }}>
                       {r.delivered + r.inProgress + r.pendingPickup}
                     </td>
                     <td style={{ padding: isMobile ? '10px 8px' : '12px 14px', textAlign: 'right', opacity: 0.92 }}>{r.inProgress}</td>

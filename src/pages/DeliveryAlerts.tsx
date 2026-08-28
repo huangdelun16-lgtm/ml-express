@@ -919,11 +919,7 @@ export default function DeliveryAlerts() {
   const criticalCount = alerts.filter(a => a.severity === 'critical' && a.status === 'pending').length;
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      padding: '24px'
-    }}>
+    <div className="admin-page">
       <div style={{
         maxWidth: '1400px',
         margin: '0 auto'

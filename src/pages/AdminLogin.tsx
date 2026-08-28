@@ -49,9 +49,10 @@ const AdminLogin: React.FC = () => {
     return (
       <div 
         style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px',
           cursor: 'pointer',
           transition: 'opacity 0.3s ease'
         }}
@@ -59,7 +60,6 @@ const AdminLogin: React.FC = () => {
         onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
         onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
       >
-        {/* LOGO图片 */}
         <img 
           src="/logo.png" 
           alt="ML Express Logo"
@@ -69,30 +69,11 @@ const AdminLogin: React.FC = () => {
             objectFit: 'contain'
           }}
         />
-        
-        {/* 公司名称 + 副标题 */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{
-            color: 'white',
-            fontSize: textSize,
-            fontWeight: 'bold',
-            textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
-          }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: 'max-content' }}>
+          <div className="admin-shell__brand-name" style={{ fontSize: textSize, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'visible' }}>
             MARKET LINK EXPRESS
           </div>
-          <div style={{
-            color: 'white',
-            fontSize: typeof textSize === 'string' && textSize.includes('rem') 
-              ? `calc(${textSize} - 0.8rem)` 
-              : typeof textSize === 'number' ? textSize - 8 : '0.7rem',
-            fontWeight: '400',
-            fontStyle: 'italic',
-            letterSpacing: '1px',
-            opacity: 0.9,
-            textAlign: 'right',
-            marginTop: '-2px',
-            textShadow: '1px 1px 2px rgba(0,0,0,0.2)'
-          }}>
+          <div className="admin-shell__brand-sub" style={{ textAlign: 'center', marginTop: 4 }}>
             Delivery Services
           </div>
         </div>
@@ -101,163 +82,40 @@ const AdminLogin: React.FC = () => {
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* 背景装饰 */}
-      <div style={{
-        position: 'absolute',
-        top: '10%',
-        right: '10%',
-        width: '300px',
-        height: '300px',
-        background: 'rgba(192, 192, 192, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(60px)'
-      }}></div>
-      <div style={{
-        position: 'absolute',
-        bottom: '10%',
-        left: '10%',
-        width: '200px',
-        height: '200px',
-        background: 'rgba(192, 192, 192, 0.1)',
-        borderRadius: '50%',
-        filter: 'blur(40px)'
-      }}></div>
-      
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(25px)',
-        borderRadius: '24px',
-        padding: '40px',
-        width: '100%',
-        maxWidth: '420px',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        {/* LOGO */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <Logo size="large" />
+    <div className="admin-login">
+      <div className="admin-login__card">
+        <div className="admin-login__logo" onClick={() => { window.location.href = '/'; }}>
+          <Logo size="medium" />
         </div>
-        
-        <h2 style={{ 
-          color: 'white', 
-          textAlign: 'center', 
-          marginBottom: '40px',
-          fontSize: '1.8rem',
-          fontWeight: '600',
-          letterSpacing: '1px',
-          textShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>
+        <h2 style={{ margin: '0 0 24px', fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', textAlign: 'center' }}>
           后台管理系统
         </h2>
         <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: '24px' }}>
+          <div className="admin-login__field">
+            <label htmlFor="admin-login-user">用户名</label>
             <input
+              id="admin-login-user"
               type="text"
+              autoComplete="username"
               placeholder="用户名"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                fontSize: '1rem',
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s ease',
-                color: '#1a202c',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#4299e1';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.2)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
               required
             />
           </div>
-          <div style={{ marginBottom: '32px' }}>
+          <div className="admin-login__field">
+            <label htmlFor="admin-login-pass">密码</label>
             <input
+              id="admin-login-pass"
               type="password"
+              autoComplete="current-password"
               placeholder="密码"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                fontSize: '1rem',
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s ease',
-                color: '#1a202c',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#4299e1';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(66, 153, 225, 0.2)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
               required
             />
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '16px',
-              borderRadius: '12px',
-              border: 'none',
-              fontSize: '1.1rem',
-              fontWeight: '600',
-              letterSpacing: '1px',
-              background: loading ? 'rgba(192, 192, 192, 0.5)' : 'linear-gradient(135deg, #63b3ed 0%, #4299e1 100%)',
-              color: 'white',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 10px 20px -5px rgba(66, 153, 225, 0.4)',
-              textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-              opacity: loading ? 0.7 : 1
-            }}
-            onMouseOver={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 15px 25px -5px rgba(66, 153, 225, 0.5)';
-                e.currentTarget.style.filter = 'brightness(1.1)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 10px 20px -5px rgba(66, 153, 225, 0.4)';
-                e.currentTarget.style.filter = 'brightness(1)';
-              }
-            }}
-          >
+          <button type="submit" className="admin-login__submit" disabled={loading}>
             {loading ? '登录中...' : '登录'}
           </button>
         </form>
@@ -267,3 +125,4 @@ const AdminLogin: React.FC = () => {
 };
 
 export default AdminLogin;
+

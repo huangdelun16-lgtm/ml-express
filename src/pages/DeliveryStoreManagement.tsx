@@ -1414,82 +1414,31 @@ const DeliveryStoreManagement: React.FC = () => {
 
   return (
     <DeliveryStoreWorkspaceProvider value={deliveryStoreWorkspace}>
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #334155 100%)',
-        padding: '24px',
-        fontFamily: 'Segoe UI, Arial, sans-serif'
-      }}
-    >
+    <div className="admin-page">
       {/* 头部 */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px',
-          color: 'white',
-          flexWrap: isMobile ? 'wrap' : 'nowrap',
-          gap: '15px'
-        }}
-      >
+      <div className="admin-page-head">
         <div>
-          <h1 style={{ margin: 0, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 700 }}>合伙店铺</h1>
-          <p style={{ margin: '6px 0 0 0', opacity: 0.85 }}>
+          <h1>合伙店铺</h1>
+          <p>
             管理 City 配送合伙店铺位置与商品
           </p>
-          <p style={{ margin: '8px 0 0 0', opacity: 0.72, fontSize: '0.88rem', lineHeight: 1.5 }}>
+          <p>
             Inventory 中转站登录账号已独立至「跨境物流」，请在该模块创建与管理。
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end', flexWrap: 'wrap' }}>
+        <div className="admin-page-actions">
           <button
+            type="button"
+            className="admin-shell__btn"
             onClick={() => navigate('/admin/dashboard')}
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.2)',
-              padding: '12px 24px',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              flex: isMobile ? 1 : 'none',
-              transition: 'all 0.3s ease'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
           >
             ← 返回仪表板
           </button>
           <button
+            type="button"
+            className="admin-shell__btn admin-shell__btn--primary"
             onClick={() => navigate('/admin/merchant-applications')}
-            style={{
-              position: 'relative',
-              background:
-                pendingMerchantApplications > 0
-                  ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.35) 0%, rgba(37, 99, 235, 0.28) 100%)'
-                  : 'rgba(59, 130, 246, 0.18)',
-              color: 'white',
-              border:
-                pendingMerchantApplications > 0
-                  ? '1px solid rgba(147, 197, 253, 0.75)'
-                  : '1px solid rgba(96, 165, 250, 0.45)',
-              padding: '12px 24px',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              flex: isMobile ? 1 : 'none',
-              transition: 'all 0.3s ease',
-              boxShadow:
-                pendingMerchantApplications > 0 ? '0 0 0 2px rgba(59, 130, 246, 0.25)' : 'none',
-            }}
+            style={{ position: 'relative' }}
           >
             📋 入驻申请
             {pendingMerchantApplications > 0 && (
@@ -1515,6 +1464,8 @@ const DeliveryStoreManagement: React.FC = () => {
             )}
           </button>
           <button
+            type="button"
+            className={showForm ? 'admin-shell__btn' : 'admin-shell__btn admin-shell__btn--primary'}
             onClick={() => {
               if (showForm) {
                 closeStoreForm();
@@ -1522,30 +1473,7 @@ const DeliveryStoreManagement: React.FC = () => {
                 setShowForm(true);
               }
             }}
-            style={{
-              background: showForm ? 'rgba(245, 101, 101, 0.2)' : 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-              color: 'white',
-              border: showForm ? '1px solid rgba(245, 101, 101, 0.5)' : 'none',
-              padding: '12px 28px',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              boxShadow: showForm ? 'none' : '0 8px 25px rgba(56, 161, 105, 0.4)',
-              flex: isMobile ? 1 : 'none',
-              transition: 'all 0.3s ease'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              if (!showForm) {
-                e.currentTarget.style.boxShadow = '0 12px 30px rgba(56, 161, 105, 0.5)';
-              }
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              if (!showForm) {
-                e.currentTarget.style.boxShadow = '0 8px 25px rgba(56, 161, 105, 0.4)';
-              }
-            }}
+            style={showForm ? undefined : { background: '#389e0d', borderColor: '#389e0d' }}
           >
             {showForm ? (isEditing ? '✕ 取消编辑' : '✕ 取消') : '➕ 新增合伙店铺'}
           </button>
@@ -1572,8 +1500,8 @@ const DeliveryStoreManagement: React.FC = () => {
             border: merchantAppAlertPulse
               ? '1px solid rgba(147, 197, 253, 0.85)'
               : '1px solid rgba(96, 165, 250, 0.45)',
-            color: '#e0f2fe',
-            boxShadow: merchantAppAlertPulse ? '0 0 24px rgba(59, 130, 246, 0.35)' : 'none',
+            color: '#0f172a',
+            boxShadow: merchantAppAlertPulse ? '0 0 24px rgba(59, 130, 246, 0.2)' : 'none',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -1614,28 +1542,18 @@ const DeliveryStoreManagement: React.FC = () => {
             marginBottom: '20px',
             padding: '14px 18px',
             borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.25)',
-            background: errorMessage ? 'rgba(245, 101, 101, 0.2)' : 'rgba(72, 187, 120, 0.2)',
-            color: 'white'
+            background: errorMessage ? '#fff2f0' : '#f6ffed',
+            color: errorMessage ? '#cf1322' : '#389e0d'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{errorMessage || successMessage}</span>
             {errorMessage && errorMessage.includes('加载合伙店铺列表失败') && (
               <button
+                type="button"
                 onClick={() => loadStores(true)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  color: 'white',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                  marginLeft: '12px'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                className="admin-shell__btn"
+                style={{ marginLeft: 12 }}
               >
                 🔄 重试
               </button>
@@ -1649,11 +1567,12 @@ const DeliveryStoreManagement: React.FC = () => {
         {/* 合伙店铺列表 */}
         <div
           style={{
-            background: 'rgba(255, 255, 255, 0.12)',
-            borderRadius: '16px',
+            background: '#fff',
+            borderRadius: '12px',
             padding: isMobile ? '16px' : '24px',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            color: 'white'
+            border: '1px solid #e2e8f0',
+            color: '#0f172a',
+            boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.06)',
           }}
         >
           <h2 style={{
@@ -1713,25 +1632,24 @@ const DeliveryStoreManagement: React.FC = () => {
                   data-store-id={store.id}
                   onClick={() => handleStoreClick(store)}
                   style={{
-                    background: selectedStore?.id === store.id ? 'rgba(66, 153, 225, 0.25)' : 'rgba(255,255,255,0.08)',
-                    border: selectedStore?.id === store.id ? '1px solid rgba(66, 153, 225, 0.5)' : '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: '20px',
-                    padding: '20px',
+                    background: selectedStore?.id === store.id ? '#e6f4ff' : '#f8fafc',
+                    border: selectedStore?.id === store.id ? '1px solid #91caff' : '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '16px 18px',
                     cursor: 'pointer',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.2s ease',
                     boxShadow: `${baseShadow}${pendingInset}`
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-5px)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
                     if (selectedStore?.id !== store.id) {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.12)';
+                      e.currentTarget.style.background = '#f1f5f9';
                     }
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
                     if (selectedStore?.id !== store.id) {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                      e.currentTarget.style.background = '#f8fafc';
                     }
                   }}
                 >
@@ -2013,11 +1931,12 @@ const DeliveryStoreManagement: React.FC = () => {
         {/* 地图显示 */}
         <div
           style={{
-            background: 'rgba(255, 255, 255, 0.12)',
-            borderRadius: '16px',
+            background: '#fff',
+            borderRadius: '12px',
             padding: '24px',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: 'white'
+            border: '1px solid #e2e8f0',
+            color: '#0f172a',
+            boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.06)',
           }}
         >
           <h2 style={{ marginBottom: '20px' }}>合伙店铺分布图</h2>

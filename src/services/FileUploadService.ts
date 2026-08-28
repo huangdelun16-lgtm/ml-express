@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 
 // 文件上传配置
 interface UploadConfig {
@@ -112,7 +113,7 @@ export class FileUploadService {
 
       return {
         success: true,
-        url: urlData.publicUrl,
+        url: rewritePublicStorageUrl(urlData.publicUrl),
         fileName: file.name,
         fileSize: file.size
       };

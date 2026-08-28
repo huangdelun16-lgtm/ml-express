@@ -29,10 +29,10 @@ const FinanceRecordsTab: React.FC = () => {
   return (
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.12)",
+              background: "#ffffff",
               borderRadius: "20px",
               padding: "24px",
-              border: "1px solid rgba(255, 255, 255, 0.18)",
+              border: "1px solid #f8fafc",
               boxShadow: "0 12px 35px rgba(7, 23, 55, 0.45)",
             }}
           >
@@ -55,8 +55,8 @@ const FinanceRecordsTab: React.FC = () => {
                   padding: "12px 16px",
                   borderRadius: "12px",
                   border: "none",
-                  background: "rgba(255, 255, 255, 0.18)",
-                  color: "white",
+                  background: "#f8fafc",
+                  color: "#0f172a",
                 }}
               />
               <select
@@ -65,9 +65,9 @@ const FinanceRecordsTab: React.FC = () => {
                 style={{
                   padding: "12px 16px",
                   borderRadius: "12px",
-                  border: "1px solid rgba(255, 255, 255, 0.25)",
-                  background: "rgba(7, 23, 53, 0.65)",
-                  color: "white",
+                  border: "1px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#0f172a",
                 }}
               >
                 <option value="all" style={{ color: "#000" }}>
@@ -88,9 +88,9 @@ const FinanceRecordsTab: React.FC = () => {
                 style={{
                   padding: "12px 16px",
                   borderRadius: "12px",
-                  border: "1px solid rgba(255, 255, 255, 0.25)",
-                  background: "rgba(7, 23, 53, 0.65)",
-                  color: "white",
+                  border: "1px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#0f172a",
                 }}
               >
                 <option value="all" style={{ color: "#000" }}>
@@ -118,8 +118,8 @@ const FinanceRecordsTab: React.FC = () => {
                     padding: "12px 16px",
                     borderRadius: "12px",
                     border: "none",
-                    background: "rgba(255, 255, 255, 0.18)",
-                    color: "white",
+                    background: "#f8fafc",
+                    color: "#0f172a",
                   }}
                 />
                 <input
@@ -133,8 +133,8 @@ const FinanceRecordsTab: React.FC = () => {
                     padding: "12px 16px",
                     borderRadius: "12px",
                     border: "none",
-                    background: "rgba(255, 255, 255, 0.18)",
-                    color: "white",
+                    background: "#f8fafc",
+                    color: "#0f172a",
                   }}
                 />
               </div>
@@ -144,23 +144,24 @@ const FinanceRecordsTab: React.FC = () => {
             <div
               style={{
                 overflowX: "auto",
-                background: "rgba(8, 32, 64, 0.4)",
+                background: "#f8fafc",
                 borderRadius: "12px",
               }}
             >
               <table
+                className="finance-records-table"
                 style={{
-                  width: "100%",
+                  width: "max-content",
+                  minWidth: "100%",
                   borderCollapse: "collapse",
-                  color: "white",
-                  minWidth: "1200px",
+                  color: "#0f172a",
                 }}
               >
                 <thead>
                   <tr
                     style={{
-                      background: "rgba(8, 32, 64, 0.8)",
-                      borderBottom: "2px solid rgba(255, 255, 255, 0.1)",
+                      background: "#ffffff",
+                      borderBottom: "2px solid #f1f5f9",
                     }}
                   >
                     {[
@@ -183,6 +184,7 @@ const FinanceRecordsTab: React.FC = () => {
                           textAlign: "left",
                           fontWeight: 600,
                           fontSize: "0.95rem",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {header}
@@ -221,7 +223,7 @@ const FinanceRecordsTab: React.FC = () => {
                         </div>
                         <div
                           style={{
-                            color: "rgba(255, 255, 255, 0.7)",
+                            color: "#334155",
                             fontSize: "1.2rem",
                             fontWeight: 500,
                           }}
@@ -231,7 +233,7 @@ const FinanceRecordsTab: React.FC = () => {
                         {currentUserRole !== "admin" && (
                           <div
                             style={{
-                              color: "rgba(255, 255, 255, 0.4)",
+                              color: "#94a3b8",
                               fontSize: "1rem",
                               marginTop: "12px",
                             }}
@@ -246,26 +248,33 @@ const FinanceRecordsTab: React.FC = () => {
                       <tr
                         key={record.id}
                         style={{
-                          borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
+                          borderBottom: "1px solid #e2e8f0",
                           background:
                             index % 2 === 0
-                              ? "rgba(255, 255, 255, 0.02)"
+                              ? "#f8fafc"
                               : "transparent",
                         }}
                       >
-                        <td style={{ padding: "14px", fontSize: "0.85rem" }}>
+                        <td
+                          style={{
+                            padding: "14px",
+                            fontSize: "0.85rem",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {record.id}
                         </td>
-                        <td style={{ padding: "14px" }}>
+                        <td style={{ padding: "14px", whiteSpace: "nowrap" }}>
                           <span
                             style={{
                               display: "inline-block",
-                              padding: "4px 8px",
+                              padding: "4px 10px",
                               borderRadius: "999px",
                               background: `${typeColors[record.record_type]}22`,
                               color: typeColors[record.record_type],
                               fontWeight: 600,
                               fontSize: "0.8rem",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             {record.record_type === "income"
@@ -273,7 +282,13 @@ const FinanceRecordsTab: React.FC = () => {
                               : t.expense}
                           </span>
                         </td>
-                        <td style={{ padding: "14px", fontSize: "0.9rem" }}>
+                        <td
+                          style={{
+                            padding: "14px",
+                            fontSize: "0.9rem",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {record.category}
                         </td>
                         <td
@@ -284,23 +299,31 @@ const FinanceRecordsTab: React.FC = () => {
                                 ? "#4cd137"
                                 : "#ff7979",
                             fontWeight: 600,
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {record.amount?.toLocaleString()}
                         </td>
-                        <td style={{ padding: "14px", fontSize: "0.9rem" }}>
+                        <td
+                          style={{
+                            padding: "14px",
+                            fontSize: "0.9rem",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {record.currency}
                         </td>
-                        <td style={{ padding: "14px" }}>
+                        <td style={{ padding: "14px", whiteSpace: "nowrap" }}>
                           <span
                             style={{
                               display: "inline-block",
-                              padding: "4px 8px",
+                              padding: "4px 10px",
                               borderRadius: "999px",
                               background: `${statusColors[record.status]}22`,
                               color: statusColors[record.status],
                               fontWeight: 600,
                               fontSize: "0.8rem",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             {record.status === "pending"
@@ -314,7 +337,7 @@ const FinanceRecordsTab: React.FC = () => {
                           <div
                             style={{
                               fontSize: "0.85rem",
-                              color: "rgba(255, 255, 255, 0.9)",
+                              color: "#0f172a",
                             }}
                           >
                             {t.orderId}: {record.order_id || "—"}
@@ -322,23 +345,29 @@ const FinanceRecordsTab: React.FC = () => {
                           <div
                             style={{
                               fontSize: "0.8rem",
-                              color: "rgba(255, 255, 255, 0.6)",
+                              color: "#64748b",
                             }}
                           >
                             {t.courierId}: {record.courier_id || "—"}
                           </div>
                         </td>
-                        <td style={{ padding: "14px", fontSize: "0.85rem" }}>
+                        <td
+                          style={{
+                            padding: "14px",
+                            fontSize: "0.85rem",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {record.record_date}
                         </td>
-                        <td style={{ padding: "14px" }}>
+                        <td style={{ padding: "14px", whiteSpace: "nowrap" }}>
                           <div
                             style={{
                               background:
                                 getRecordRegion(record.created_by) === "—"
-                                  ? "rgba(255, 255, 255, 0.05)"
+                                  ? "#f8fafc"
                                   : "#48bb78",
-                              color: "white",
+                              color: "#0f172a",
                               padding: "4px 10px",
                               borderRadius: "8px",
                               fontSize: "0.85rem",
@@ -346,6 +375,7 @@ const FinanceRecordsTab: React.FC = () => {
                               display: "inline-block",
                               minWidth: "45px",
                               textAlign: "center",
+                              whiteSpace: "nowrap",
                               boxShadow:
                                 getRecordRegion(record.created_by) === "—"
                                   ? "none"
@@ -355,11 +385,14 @@ const FinanceRecordsTab: React.FC = () => {
                             {getRecordRegion(record.created_by)}
                           </div>
                         </td>
-                        <td style={{ padding: "14px", maxWidth: "300px" }}>
+                        <td
+                          className="finance-records-notes"
+                          style={{ padding: "14px", maxWidth: "280px" }}
+                        >
                           <div
                             style={{
                               fontSize: "0.85rem",
-                              color: "rgba(255, 255, 255, 0.75)",
+                              color: "#475569",
                             }}
                           >
                             {record.notes || "—"}
@@ -368,7 +401,7 @@ const FinanceRecordsTab: React.FC = () => {
                             <div
                               style={{
                                 fontSize: "0.75rem",
-                                color: "rgba(255, 255, 255, 0.4)",
+                                color: "#94a3b8",
                               }}
                             >
                               {language === "my" ? "ကိုးကား" : "参考"}:{" "}
@@ -376,8 +409,14 @@ const FinanceRecordsTab: React.FC = () => {
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: "14px" }}>
-                          <div style={{ display: "flex", gap: "8px" }}>
+                        <td style={{ padding: "14px", whiteSpace: "nowrap" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              flexWrap: "nowrap",
+                            }}
+                          >
                             <button
                               onClick={() => handleEditRecord(record)}
                               style={{
@@ -388,6 +427,7 @@ const FinanceRecordsTab: React.FC = () => {
                                 color: "#4cd137",
                                 cursor: "pointer",
                                 fontSize: "0.85rem",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {t.edit}
@@ -402,6 +442,7 @@ const FinanceRecordsTab: React.FC = () => {
                                 color: "#ff4757",
                                 cursor: "pointer",
                                 fontSize: "0.85rem",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {t.delete}

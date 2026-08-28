@@ -180,32 +180,23 @@ const RechargeManagement: React.FC = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', // 🚀 优化：使用深邃的暗蓝色背景，更专业
-      padding: isMobile ? '15px' : '40px',
-      color: '#f8fafc',
-      fontFamily: "'Inter', -apple-system, sans-serif"
-    }}>
+    <div className="admin-page" style={{ fontFamily: "'Inter', -apple-system, sans-serif" }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '40px', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ flex: 1, minWidth: '240px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0, fontSize: isMobile ? '1.8rem' : '2.5rem', fontWeight: 800, letterSpacing: '-1px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <span style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '10px', borderRadius: '15px' }}>💳</span>
-                {language === 'zh' ? '充值管理' : 'Recharge Center'}
-              </h1>
+        <div className="admin-page-head" style={{ marginBottom: 20 }}>
+          <div>
+            <h1>
+              💳 {language === 'zh' ? '充值管理' : 'Recharge Center'}
               {statusCounts.pending > 0 && (
                 <span
                   style={{
-                    background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                    marginLeft: 10,
+                    background: '#ff4d4f',
                     color: 'white',
-                    fontSize: '0.8rem',
+                    fontSize: '0.75rem',
                     fontWeight: 800,
-                    padding: '8px 14px',
-                    borderRadius: '999px',
-                    boxShadow: '0 6px 18px rgba(231, 76, 60, 0.35)',
-                    whiteSpace: 'nowrap'
+                    padding: '4px 10px',
+                    borderRadius: 999,
+                    verticalAlign: 'middle',
                   }}
                 >
                   {language === 'zh'
@@ -213,32 +204,17 @@ const RechargeManagement: React.FC = () => {
                     : `${statusCounts.pending} pending`}
                 </span>
               )}
-            </div>
-            <p style={{ margin: '10px 0 0 0', opacity: 0.65, fontSize: '0.95rem' }}>
+            </h1>
+            <p>
               {language === 'zh'
                 ? `共 ${statusCounts.all} 条 · 待审 ${statusCounts.pending} · 已完成 ${statusCounts.completed} · 已取消 ${statusCounts.rejected}`
                 : `Total ${statusCounts.all} · Pending ${statusCounts.pending} · Done ${statusCounts.completed} · Cancelled ${statusCounts.rejected}`}
             </p>
-            <p style={{ margin: '6px 0 0 0', opacity: 0.5, fontSize: '0.9rem' }}>
+            <p>
               {language === 'zh' ? '审核客户充值申请并管理账户余额' : 'Audit recharge requests and manage balances'}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            style={{
-              padding: '12px 24px',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.05)',
-              color: 'white',
-              cursor: 'pointer',
-              fontWeight: '600',
-              backdropFilter: 'blur(10px)',
-              transition: 'all 0.3s ease'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-          >
+          <button type="button" className="admin-shell__btn" onClick={() => navigate('/admin/dashboard')}>
             ← {language === 'zh' ? '返回后台' : 'Back'}
           </button>
         </div>
@@ -256,23 +232,18 @@ const RechargeManagement: React.FC = () => {
             { label: 'VIP 客户数', value: summary.vips, color: '#8b5cf6', icon: '💎', noCurrency: true },
             { label: '总申请单数', value: summary.totalCount, color: '#3b82f6', icon: '📊', noCurrency: true }
           ].map((item, i) => (
-            <div key={i} style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              padding: '20px',
-              borderRadius: '24px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+            <div key={i} className="admin-surface" style={{
+              padding: '16px 18px',
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-              transition: 'transform 0.3s ease'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: '600' }}>{item.label}</span>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>{item.label}</span>
                 <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                <span style={{ fontSize: '1.5rem', fontWeight: '800', color: '#fff' }}>
+                <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>
                   {item.value.toLocaleString()}
                 </span>
                 {!item.noCurrency && <span style={{ fontSize: '0.7rem', color: item.color, fontWeight: 'bold' }}>MMK</span>}
@@ -283,15 +254,12 @@ const RechargeManagement: React.FC = () => {
         </div>
 
         {/* 过滤器 */}
-        <div style={{
-          background: 'rgba(255,255,255,0.03)',
-          padding: '20px',
-          borderRadius: '24px',
-          marginBottom: '30px',
-          border: '1px solid rgba(255,255,255,0.05)',
+        <div className="admin-surface" style={{
+          padding: '16px 18px',
+          marginBottom: '20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px'
+          gap: '16px'
         }}>
           <div style={{
             display: 'flex',
@@ -311,14 +279,13 @@ const RechargeManagement: React.FC = () => {
                     onClick={() => setFilterStatus(s)}
                     style={{
                       padding: '8px 14px',
-                      borderRadius: '10px',
-                      border: active ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.15)',
-                      background: active ? 'rgba(37, 99, 235, 0.4)' : 'rgba(255,255,255,0.06)',
-                      color: 'white',
+                      borderRadius: '8px',
+                      border: active ? '1px solid #1677ff' : '1px solid #e2e8f0',
+                      background: active ? '#e6f4ff' : '#fff',
+                      color: active ? '#0958d9' : '#0f172a',
                       cursor: 'pointer',
                       fontWeight: 600,
                       fontSize: '0.85rem',
-                      transition: 'all 0.2s ease'
                     }}
                   >
                     {filterTabLabel(s)} <span style={{ opacity: 0.8 }}>({count})</span>
@@ -329,19 +296,9 @@ const RechargeManagement: React.FC = () => {
 
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <button
+                type="button"
                 onClick={loadRequests}
-                style={{ 
-                  padding: '10px 20px', 
-                  borderRadius: '12px', 
-                  border: 'none', 
-                  background: 'rgba(16, 185, 129, 0.1)', 
-                  color: '#10b981', 
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'}
+                className="admin-shell__btn"
               >
                 🔄 同步
               </button>
@@ -354,23 +311,16 @@ const RechargeManagement: React.FC = () => {
             gap: '15px', 
             alignItems: 'center',
             paddingTop: '15px',
-            borderTop: '1px solid rgba(255,255,255,0.05)',
+            borderTop: '1px solid #e2e8f0',
             flexWrap: 'wrap'
           }}>
-            <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)' }}>📅 筛选日期:</span>
+            <span style={{ fontSize: '0.9rem', color: '#64748b' }}>📅 筛选日期:</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input 
                 type="date" 
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                style={{
-                  background: 'rgba(0,0,0,0.2)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  padding: '6px 12px',
-                  color: 'white',
-                  fontSize: '0.9rem'
-                }}
+                className="admin-input"
               />
               <button 
                 onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
@@ -407,12 +357,12 @@ const RechargeManagement: React.FC = () => {
         {/* 申请列表 */}
         <div style={{ display: 'grid', gap: '20px' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '100px', opacity: 0.5 }}>
+            <div style={{ textAlign: 'center', padding: '64px 16px', color: '#64748b' }}>
               <div style={{ fontSize: '2rem', marginBottom: '15px' }}>⏳</div>
               {language === 'zh' ? '正在获取数据...' : 'Loading...'}
             </div>
           ) : filteredRequests.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '100px', background: 'rgba(255,255,255,0.02)', borderRadius: '30px', border: '2px dashed rgba(255,255,255,0.05)' }}>
+            <div className="admin-surface" style={{ textAlign: 'center', padding: '64px 16px', borderStyle: 'dashed' }}>
               <div style={{ fontSize: '3rem', marginBottom: '15px', opacity: 0.2 }}>📭</div>
               <p style={{ opacity: 0.5, fontSize: '1.05rem' }}>
                 {requests.length === 0
@@ -424,28 +374,13 @@ const RechargeManagement: React.FC = () => {
             filteredRequests.map(req => {
               const style = getStatusStyle(req.status);
               return (
-                <div key={req.id} style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  borderRadius: '24px',
-                  padding: '25px',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                <div key={req.id} className="admin-surface" style={{
+                  padding: '20px 22px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   flexWrap: 'wrap',
-                  gap: '25px',
-                  transition: 'all 0.3s ease',
-                  cursor: 'default'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                  e.currentTarget.style.transform = 'translateY(-5px)';
-                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                  gap: '20px',
                 }}>
                   <div style={{ flex: 1, minWidth: '300px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
@@ -454,7 +389,7 @@ const RechargeManagement: React.FC = () => {
                       </div>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ fontWeight: '800', fontSize: '1.25rem', color: '#fff' }}>{req.user_name}</div>
+                          <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#0f172a' }}>{req.user_name}</div>
                           {(req.user_balance || 0) > 0 && (
                             <div style={{
                               background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -475,7 +410,7 @@ const RechargeManagement: React.FC = () => {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '15px' }}>
-                      <span style={{ fontSize: '2rem', fontWeight: '900', color: '#fff' }}>{req.amount.toLocaleString()}</span>
+                      <span style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a' }}>{req.amount.toLocaleString()}</span>
                       <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#3b82f6', opacity: 0.8 }}>MMK</span>
                     </div>
 
@@ -484,16 +419,17 @@ const RechargeManagement: React.FC = () => {
                       display: 'grid', 
                       gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
                       gap: '15px', 
-                      background: 'rgba(0,0,0,0.2)', 
+                      background: '#f8fafc', 
                       padding: '15px', 
-                      borderRadius: '16px' 
+                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0'
                     }}>
                       <div>
-                        <div style={{ fontSize: '0.7rem', opacity: 0.4, textTransform: 'uppercase', marginBottom: '4px' }}>Submission Time</div>
-                        <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>{new Date(req.created_at!).toLocaleString()}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Submission Time</div>
+                        <div style={{ fontSize: '0.9rem', color: '#334155' }}>{new Date(req.created_at!).toLocaleString()}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.7rem', opacity: 0.4, textTransform: 'uppercase', marginBottom: '4px' }}>Location</div>
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Location</div>
                         <div style={{ fontSize: '0.9rem', color: '#3b82f6', fontWeight: 'bold' }}>
                           📍 {REGIONS.find(r => r.id === req.register_region)?.name || req.register_region || '曼德勒'}
                         </div>
@@ -501,7 +437,7 @@ const RechargeManagement: React.FC = () => {
                     </div>
 
                     {req.notes && (
-                      <div style={{ fontSize: '0.85rem', marginTop: '15px', color: '#94a3b8', padding: '10px 15px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '0.85rem', marginTop: '15px', color: '#64748b', padding: '10px 15px', background: '#f8fafc', borderRadius: '8px' }}>
                         “ {req.notes} ”
                       </div>
                     )}

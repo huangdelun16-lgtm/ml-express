@@ -78,3 +78,30 @@ export function applyNetlifyRealtimeFallback(client: SupabaseClient): void {
   realtime.disconnect?.();
   realtime.connect = () => undefined;
 }
+
+/** Production Admin Storage proxy; local preview also uses this so Myanmar can load images. */
+export const ADMIN_PUBLIC_SB_PROXY = 'https://admin-market-link-express.com/__sb';
+
+function storageProxyBase(): string {
+  if (isBrowser() && !isLocalDevHost()) {
+    return `${window.location.origin}/__sb`;
+  }
+  return ADMIN_PUBLIC_SB_PROXY;
+}
+
+/**
+ * 缅甸打不开 *.supabase.co。把库里存的公开 Storage 地址改到当前站 /__sb（本地则用生产 Admin 代理）。
+ */
+export function rewritePublicStorageUrl(url: string): string {
+  const raw = String(url || '').trim();
+  if (!raw) return raw;
+  if (/^(blob:|data:|file:|content:)/i.test(raw)) return raw;
+  const proxy = storageProxyBase().replace(/\/$/, '');
+  return raw
+    .replace(/^https?:\/\/uopkyuluxnrewvlmutam\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(/^https?:\/\/[^/]+\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(
+      /^https?:\/\/(?:www\.)?(?:mlexpress-merchants\.com|market-link-express\.com|admin-market-link-express\.com)\/__sb(?=\/|$)/i,
+      proxy,
+    );
+}

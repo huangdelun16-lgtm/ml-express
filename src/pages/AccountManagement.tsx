@@ -5,6 +5,7 @@ import { adminAccountService, AdminAccount } from '../services/supabase';
 import { fileUploadService } from '../services/FileUploadService';
 import { imageCompressionService, CompressionResult } from '../services/ImageCompressionService';
 import { fileValidationService } from '../services/FileValidationService';
+import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 import { BatchProgress, UploadProgress } from '../components/UploadProgress';
 import { useResponsive } from '../hooks/useResponsive';
 import '../styles/adminAccountCreateForm.css';
@@ -643,70 +644,30 @@ const AccountManagement: React.FC = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1a202c 50%, #2d3748 100%)',
-      padding: isMobile ? '16px' : '40px',
-      color: 'white',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    }}>
+    <div className="admin-page">
       <div style={{
         maxWidth: '1400px',
         margin: '0 auto',
       }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '40px',
-          background: 'rgba(255,255,255,0.03)',
-          padding: '24px 32px',
-          borderRadius: '20px',
-          border: '1px solid rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(10px)'
-        }}>
+        <div className="admin-page-head">
           <div>
-            <h1 style={{ fontSize: isMobile ? '1.8rem' : '2.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
-              账号管理 <span style={{ color: '#4299e1', fontSize: '1rem', fontWeight: 500, verticalAlign: 'middle', marginLeft: '12px' }}>Account Management</span>
+            <h1>
+              账号管理 <span className="admin-page-head__en">Account Management</span>
             </h1>
-            <p style={{ margin: '8px 0 0 0', opacity: 0.6, fontSize: '1rem' }}>管理系统管理员、运营经理、操作员及财务人员账号权限</p>
+            <p>管理系统管理员、运营经理、操作员及财务人员账号权限</p>
           </div>
-          <div style={{ display: 'flex', gap: isMobile ? '12px' : '16px' }}>
+          <div className="admin-page-actions">
             <button
+              type="button"
+              className={showForm ? 'admin-shell__btn' : 'admin-shell__btn admin-shell__btn--primary'}
               onClick={() => setShowForm(!showForm)}
-              style={{
-                background: showForm ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3182ce 0%, #2c5282 100%)',
-                color: 'white',
-                border: showForm ? '1px solid rgba(255,255,255,0.2)' : 'none',
-                padding: '12px 28px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 600,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: showForm ? 'none' : '0 10px 20px rgba(49, 130, 206, 0.3)'
-              }}
             >
-              <span>{showForm ? '✕ 取消' : '➕ 创建账号'}</span>
+              {showForm ? '取消' : '+ 创建账号'}
             </button>
             <button
+              type="button"
+              className="admin-shell__btn"
               onClick={() => navigate('/admin/dashboard')}
-              style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.15)',
-                padding: '12px 24px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 500,
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
             >
               返回主页
             </button>
@@ -714,27 +675,13 @@ const AccountManagement: React.FC = () => {
         </div>
 
         {successMessage && (
-          <div style={{
-            background: 'rgba(72, 187, 120, 0.2)',
-            border: '1px solid rgba(72, 187, 120, 0.5)',
-            borderRadius: '8px',
-            padding: '12px',
-            marginBottom: '20px',
-            color: '#68d391'
-          }}>
+          <div className="admin-notice admin-notice--ok">
             {successMessage}
           </div>
         )}
 
         {errorMessage && (
-          <div style={{
-            background: 'rgba(245, 101, 101, 0.2)',
-            border: '1px solid rgba(245, 101, 101, 0.5)',
-            borderRadius: '8px',
-            padding: '12px',
-            marginBottom: '20px',
-            color: '#fc8181'
-          }}>
+          <div className="admin-notice admin-notice--err">
             {errorMessage}
           </div>
         )}
@@ -1506,7 +1453,7 @@ const AccountManagement: React.FC = () => {
               <div style={{ marginTop: '24px', textAlign: 'center', display: 'flex', gap: isMobile ? '12px' : '16px', justifyContent: 'center' }}>
                 <button
                   onClick={() => {
-                    setCvImages(viewingAccount.cv_images || []);
+                    setCvImages((viewingAccount.cv_images || []).map(rewritePublicStorageUrl));
                     setShowCvViewModal(true);
                   }}
                   style={{
@@ -1673,7 +1620,7 @@ const AccountManagement: React.FC = () => {
                         border: '1px solid rgba(255,255,255,0.1)'
                       }}>
                         <img
-                          src={image}
+                          src={rewritePublicStorageUrl(image)}
                           alt={`CV Form ${index + 1}`}
                           style={{
                             width: '100%',
@@ -1683,7 +1630,7 @@ const AccountManagement: React.FC = () => {
                             cursor: 'pointer'
                           }}
                           onClick={() => {
-                            setCvImages([image]);
+                            setCvImages([rewritePublicStorageUrl(image)]);
                             setShowCvViewModal(true);
                           }}
                         />
@@ -1837,7 +1784,7 @@ const AccountManagement: React.FC = () => {
                         CV Form {index + 1}
                       </div>
                       <img
-                        src={image}
+                        src={rewritePublicStorageUrl(image)}
                         alt={`CV Form ${index + 1}`}
                         style={{
                           width: '100%',
@@ -1848,7 +1795,7 @@ const AccountManagement: React.FC = () => {
                           cursor: 'pointer',
                           transition: 'transform 0.2s'
                         }}
-                        onClick={() => window.open(image, '_blank')}
+                        onClick={() => window.open(rewritePublicStorageUrl(image), '_blank')}
                         onMouseEnter={(e) => (e.target as HTMLImageElement).style.transform = 'scale(1.02)'}
                         onMouseLeave={(e) => (e.target as HTMLImageElement).style.transform = 'scale(1)'}
                       />

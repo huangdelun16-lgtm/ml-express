@@ -62,17 +62,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // 正在检查权限时显示加载状态
   if (isChecking) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        color: 'white'
-      }}>
+      <div className="admin-auth-splash">
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔒</div>
-          <div style={{ fontSize: '1.2rem' }}>正在验证权限...</div>
+          <div style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>🔒</div>
+          <div style={{ fontSize: '1rem', color: '#64748b' }}>正在验证权限...</div>
         </div>
       </div>
     );

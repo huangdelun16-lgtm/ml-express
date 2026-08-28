@@ -831,26 +831,8 @@ const CityPackages: React.FC = () => {
               
               {/* 分页控件 */}
               {filteredTotal > itemsPerPage && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: '20px',
-                  padding: '15px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  flexWrap: 'wrap',
-                  gap: '10px'
-                }}>
-                  {/* 左侧：每页显示数量选择 */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    color: 'white',
-                    fontSize: '0.85rem'
-                  }}>
+                <div className="cpkg-pagination">
+                  <div className="cpkg-pagination__size">
                     <span>{language === 'zh' ? '每页显示' : language === 'en' ? 'Items per page' : 'စာမျက်နှာတစ်ခုတွင်'}:</span>
                     <select
                       value={itemsPerPage}
@@ -858,108 +840,39 @@ const CityPackages: React.FC = () => {
                         setItemsPerPage(Number(e.target.value));
                         setCurrentPage(1);
                       }}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '6px',
-                        padding: '6px 10px',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem'
-                      }}
                     >
-                      <option value={5} style={{ background: '#2c5282', color: 'white' }}>5</option>
-                      <option value={10} style={{ background: '#2c5282', color: 'white' }}>10</option>
-                      <option value={20} style={{ background: '#2c5282', color: 'white' }}>20</option>
-                      <option value={50} style={{ background: '#2c5282', color: 'white' }}>50</option>
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
                     </select>
                   </div>
 
-                  {/* 中间：页码信息 */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    color: 'white',
-                    fontSize: '0.85rem'
-                  }}>
-                    <span>
-                      {language === 'zh' 
-                        ? `第 ${currentPage} / ${getTotalPages()} 页，共 ${filteredTotal} 条`
-                        : language === 'en'
+                  <div className="cpkg-pagination__info">
+                    {language === 'zh'
+                      ? `第 ${currentPage} / ${getTotalPages()} 页，共 ${filteredTotal} 条`
+                      : language === 'en'
                         ? `Page ${currentPage} / ${getTotalPages()}, Total ${filteredTotal} items`
-                        : 'စာမျက်နှာ ' + currentPage + ' / ' + getTotalPages() + '၊ စုစုပေါင်း ' + filteredTotal + ' ခု'
-                      }
-                    </span>
+                        : 'စာမျက်နှာ ' + currentPage + ' / ' + getTotalPages() + '၊ စုစုပေါင်း ' + filteredTotal + ' ခု'}
                   </div>
 
-                  {/* 右侧：分页按钮 */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
+                  <div className="cpkg-pagination__controls">
                     <button
+                      type="button"
+                      className="cpkg-page-btn"
                       onClick={() => setCurrentPage(1)}
                       disabled={currentPage === 1}
-                      style={{
-                        background: currentPage === 1 
-                          ? 'rgba(255, 255, 255, 0.1)' 
-                          : 'rgba(255, 255, 255, 0.2)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '0.85rem',
-                        opacity: currentPage === 1 ? 0.5 : 1,
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        if (currentPage !== 1) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (currentPage !== 1) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                        }
-                      }}
                     >
                       {language === 'zh' ? '« 首页' : language === 'en' ? '« First' : '« ပထမဆုံး'}
                     </button>
-                    
                     <button
+                      type="button"
+                      className="cpkg-page-btn"
                       onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                       disabled={currentPage === 1}
-                      style={{
-                        background: currentPage === 1 
-                          ? 'rgba(255, 255, 255, 0.1)' 
-                          : 'rgba(255, 255, 255, 0.2)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '0.85rem',
-                        opacity: currentPage === 1 ? 0.5 : 1,
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        if (currentPage !== 1) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (currentPage !== 1) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                        }
-                      }}
                     >
                       {language === 'zh' ? '‹ 上一页' : language === 'en' ? '‹ Prev' : '‹ ရှေ့သို့'}
                     </button>
-
-                    {/* 页码显示（最多显示5个页码） */}
                     {Array.from({ length: Math.min(5, getTotalPages()) }, (_, i) => {
                       let pageNum: number;
                       if (getTotalPages() <= 5) {
@@ -971,99 +884,30 @@ const CityPackages: React.FC = () => {
                       } else {
                         pageNum = currentPage - 2 + i;
                       }
-                      
                       return (
                         <button
+                          type="button"
                           key={pageNum}
+                          className={`cpkg-page-btn${currentPage === pageNum ? ' cpkg-page-btn--active' : ''}`}
                           onClick={() => setCurrentPage(pageNum)}
-                          style={{
-                            background: currentPage === pageNum
-                              ? 'rgba(52, 152, 219, 0.5)'
-                              : 'rgba(255, 255, 255, 0.2)',
-                            color: 'white',
-                            border: currentPage === pageNum
-                              ? '1px solid rgba(52, 152, 219, 0.8)'
-                              : '1px solid rgba(255, 255, 255, 0.3)',
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
-                            minWidth: '36px',
-                            transition: 'all 0.3s ease',
-                            fontWeight: currentPage === pageNum ? 'bold' : 'normal'
-                          }}
-                          onMouseOver={(e) => {
-                            if (currentPage !== pageNum) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                            }
-                          }}
-                          onMouseOut={(e) => {
-                            if (currentPage !== pageNum) {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                            }
-                          }}
                         >
                           {pageNum}
                         </button>
                       );
                     })}
-
                     <button
+                      type="button"
+                      className="cpkg-page-btn"
                       onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
                       disabled={currentPage === getTotalPages()}
-                      style={{
-                        background: currentPage === getTotalPages()
-                          ? 'rgba(255, 255, 255, 0.1)'
-                          : 'rgba(255, 255, 255, 0.2)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: currentPage === getTotalPages() ? 'not-allowed' : 'pointer',
-                        fontSize: '0.85rem',
-                        opacity: currentPage === getTotalPages() ? 0.5 : 1,
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        if (currentPage !== getTotalPages()) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (currentPage !== getTotalPages()) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                        }
-                      }}
                     >
                       {language === 'zh' ? '下一页 ›' : language === 'en' ? 'Next ›' : 'နောက်သို့ ›'}
                     </button>
-                    
                     <button
+                      type="button"
+                      className="cpkg-page-btn"
                       onClick={() => setCurrentPage(getTotalPages())}
                       disabled={currentPage === getTotalPages()}
-                      style={{
-                        background: currentPage === getTotalPages()
-                          ? 'rgba(255, 255, 255, 0.1)'
-                          : 'rgba(255, 255, 255, 0.2)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        cursor: currentPage === getTotalPages() ? 'not-allowed' : 'pointer',
-                        fontSize: '0.85rem',
-                        opacity: currentPage === getTotalPages() ? 0.5 : 1,
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        if (currentPage !== getTotalPages()) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (currentPage !== getTotalPages()) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                        }
-                      }}
                     >
                       {language === 'zh' ? '末页 »' : language === 'en' ? 'Last »' : 'နောက်ဆုံး »'}
                     </button>

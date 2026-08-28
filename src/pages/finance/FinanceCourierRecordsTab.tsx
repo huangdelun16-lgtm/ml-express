@@ -57,18 +57,18 @@ const FinanceCourierRecordsTab: React.FC = () => {
             {/* 顶部操作栏 */}
             <div
               style={{
-                background: "rgba(255, 255, 255, 0.12)",
+                background: "#ffffff",
                 borderRadius: "16px",
                 padding: isMobile ? "12px" : "20px",
                 marginBottom: "24px",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
+                border: "1px solid #f8fafc",
                 display: "flex",
                 gap: isMobile ? "12px" : "16px",
                 flexWrap: "wrap",
                 alignItems: "center",
               }}
             >
-              <h3 style={{ margin: 0, color: "white", flex: "1 1 auto" }}>
+              <h3 style={{ margin: 0, color: "#0f172a", flex: "1 1 auto" }}>
                 💰 {t.courierFinanceRecords}
               </h3>
 
@@ -79,9 +79,9 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 style={{
                   padding: "10px 16px",
                   borderRadius: "10px",
-                  border: "1px solid rgba(255, 255, 255, 0.25)",
-                  background: "rgba(7, 23, 53, 0.65)",
-                  color: "white",
+                  border: "1px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#0f172a",
                   fontSize: "0.9rem",
                 }}
               >
@@ -122,7 +122,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     background: loading
                       ? "rgba(102, 126, 234, 0.5)"
                       : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "white",
+                    color: "#fff",
                     cursor: loading ? "not-allowed" : "pointer",
                     fontSize: "0.9rem",
                     fontWeight: "600",
@@ -173,7 +173,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       border: "none",
                       background:
                         "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
-                      color: "white",
+                      color: "#fff",
                       cursor: loading ? "not-allowed" : "pointer",
                       fontSize: "0.9rem",
                       fontWeight: "600",
@@ -191,7 +191,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       border: "none",
                       background:
                         "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                      color: "white",
+                      color: "#fff",
                       cursor: loading ? "not-allowed" : "pointer",
                       fontSize: "0.9rem",
                       fontWeight: "600",
@@ -261,7 +261,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       border: "none",
                       background:
                         "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                      color: "white",
+                      color: "#fff",
                       cursor: loading ? "not-allowed" : "pointer",
                       fontSize: "0.9rem",
                       fontWeight: "600",
@@ -277,11 +277,11 @@ const FinanceCourierRecordsTab: React.FC = () => {
             {/* 月份选择器 */}
             <div
               style={{
-                background: "rgba(255, 255, 255, 0.12)",
+                background: "#ffffff",
                 borderRadius: "16px",
                 padding: isMobile ? "12px" : "20px",
                 marginBottom: "24px",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
+                border: "1px solid #f8fafc",
                 display: "flex",
                 gap: "16px",
                 alignItems: "center",
@@ -290,7 +290,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
             >
               <label
                 style={{
-                  color: "white",
+                  color: "#0f172a",
                   fontSize: "0.95rem",
                   fontWeight: "600",
                 }}
@@ -306,9 +306,9 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 style={{
                   padding: "10px 16px",
                   borderRadius: "10px",
-                  border: "1px solid rgba(255, 255, 255, 0.25)",
-                  background: "rgba(7, 23, 53, 0.65)",
-                  color: "white",
+                  border: "1px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#0f172a",
                   fontSize: "0.9rem",
                   cursor: "pointer",
                   minWidth: "180px",
@@ -318,7 +318,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                   <option
                     key={month}
                     value={month}
-                    style={{ background: "#0f1729", color: "white" }}
+                    style={{ background: "#ffffff", color: "#0f172a" }}
                   >
                     {formatMonthDisplay(month)}
                   </option>
@@ -326,7 +326,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
               </select>
               <div
                 style={{
-                  color: "rgba(255, 255, 255, 0.7)",
+                  color: "#334155",
                   fontSize: "0.85rem",
                   marginLeft: "auto",
                 }}
@@ -384,7 +384,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     >
                       <div
                         style={{
-                          color: "#fbbf24",
+                          color: "#d97706",
                           fontSize: isMobile ? "1.5rem" : "2rem",
                           fontWeight: "bold",
                           marginBottom: "8px",
@@ -398,7 +398,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           fontSize: "0.95rem",
                         }}
                       >
@@ -432,7 +432,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           fontSize: "0.95rem",
                         }}
                       >
@@ -470,7 +470,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           fontSize: "0.95rem",
                         }}
                       >
@@ -503,7 +503,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           fontSize: "0.95rem",
                         }}
                       >
@@ -522,18 +522,18 @@ const FinanceCourierRecordsTab: React.FC = () => {
             {/* 工资记录表格 */}
             <div
               style={{
-                background: "rgba(255, 255, 255, 0.12)",
+                background: "#ffffff",
                 borderRadius: "16px",
                 padding: "24px",
                 marginBottom: "24px",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
+                border: "1px solid #f8fafc",
                 overflow: "auto",
               }}
             >
               <h4
                 style={{
                   margin: "0 0 16px 0",
-                  color: "white",
+                  color: "#0f172a",
                   fontSize: "1.1rem",
                 }}
               >
@@ -549,15 +549,15 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 <thead>
                   <tr
                     style={{
-                      background: "rgba(255, 255, 255, 0.1)",
-                      borderBottom: "2px solid rgba(255, 255, 255, 0.2)",
+                      background: "#f1f5f9",
+                      borderBottom: "2px solid #e2e8f0",
                     }}
                   >
                     <th
                       style={{
                         padding: "14px 12px",
                         textAlign: "left",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -606,7 +606,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "left",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -617,7 +617,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "left",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -628,7 +628,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "right",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -639,7 +639,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "right",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -650,7 +650,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "right",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -661,7 +661,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "right",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -672,7 +672,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "center",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -683,7 +683,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "center",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -694,7 +694,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         padding: "14px 12px",
                         textAlign: "center",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         fontWeight: "600",
                       }}
@@ -734,7 +734,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                             style={{
                               padding: "40px",
                               textAlign: "center",
-                              color: "rgba(255, 255, 255, 0.6)",
+                              color: "#64748b",
                               fontSize: "1rem",
                             }}
                           >
@@ -750,18 +750,18 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       <tr
                         key={salary.id}
                         style={{
-                          borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                          borderBottom: "1px solid #e2e8f0",
                           transition: "all 0.2s",
                         }}
                         onMouseOver={(e) =>
                           (e.currentTarget.style.background =
-                            "rgba(255, 255, 255, 0.05)")
+                            "#f8fafc")
                         }
                         onMouseOut={(e) =>
                           (e.currentTarget.style.background = "transparent")
                         }
                       >
-                        <td style={{ padding: "14px 12px", color: "white" }}>
+                        <td style={{ padding: "14px 12px", color: "#0f172a" }}>
                           <input
                             type="checkbox"
                             checked={selectedSalaries.includes(salary.id!)}
@@ -785,7 +785,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         <td
                           style={{
                             padding: "14px 12px",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                             fontWeight: "600",
                           }}
@@ -795,7 +795,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         <td
                           style={{
                             padding: "14px 12px",
-                            color: "rgba(255, 255, 255, 0.8)",
+                            color: "#334155",
                             fontSize: "0.85rem",
                           }}
                         >
@@ -805,7 +805,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "14px 12px",
                             textAlign: "right",
-                            color: "rgba(255, 255, 255, 0.8)",
+                            color: "#334155",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -848,7 +848,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "14px 12px",
                             textAlign: "center",
-                            color: "rgba(255, 255, 255, 0.8)",
+                            color: "#334155",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -873,7 +873,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                       : "rgba(239, 68, 68, 0.2)",
                               color:
                                 salary.status === "pending"
-                                  ? "#fbbf24"
+                                  ? "#d97706"
                                   : salary.status === "approved"
                                     ? "#22c55e"
                                     : salary.status === "paid"
@@ -1070,15 +1070,15 @@ const FinanceCourierRecordsTab: React.FC = () => {
             {/* =============== 原有的统计信息 (保留) =============== */}
             <div
               style={{
-                background: "rgba(255, 255, 255, 0.12)",
+                background: "#ffffff",
                 borderRadius: "20px",
                 padding: "24px",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
+                border: "1px solid #f8fafc",
                 boxShadow: "0 12px 35px rgba(7, 23, 55, 0.45)",
               }}
             >
               <h3
-                style={{ marginTop: 0, color: "white", marginBottom: "20px" }}
+                style={{ marginTop: 0, color: "#0f172a", marginBottom: "20px" }}
               >
                 📊 骑手数据统计
               </h3>
@@ -1087,7 +1087,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
               <div style={{ marginBottom: "24px" }}>
                 <h4
                   style={{
-                    color: "rgba(255, 255, 255, 0.9)",
+                    color: "#0f172a",
                     marginBottom: "12px",
                   }}
                 >
@@ -1123,7 +1123,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.8)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -1150,7 +1150,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.8)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -1177,7 +1177,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.8)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -1204,7 +1204,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.8)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -1218,7 +1218,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
               <div style={{ marginBottom: "24px" }}>
                 <h4
                   style={{
-                    color: "rgba(255, 255, 255, 0.9)",
+                    color: "#0f172a",
                     marginBottom: "12px",
                   }}
                 >
@@ -1254,7 +1254,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.8)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -1281,7 +1281,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.8)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -1295,7 +1295,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
               <div style={{ marginBottom: "24px" }}>
                 <h4
                   style={{
-                    color: "rgba(255, 255, 255, 0.9)",
+                    color: "#0f172a",
                     marginBottom: "12px",
                   }}
                 >
@@ -1331,7 +1331,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.8)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -1358,7 +1358,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.8)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -1372,7 +1372,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
               <div style={{ marginTop: "24px", marginBottom: "24px" }}>
                 <h4
                   style={{
-                    color: "rgba(255, 255, 255, 0.9)",
+                    color: "#0f172a",
                     marginBottom: "12px",
                   }}
                 >
@@ -1380,20 +1380,20 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 </h4>
                 <div
                   style={{
-                    background: "rgba(255, 255, 255, 0.05)",
+                    background: "#f8fafc",
                     borderRadius: "12px",
                     overflow: "hidden",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
-                      <tr style={{ background: "rgba(255, 255, 255, 0.1)" }}>
+                      <tr style={{ background: "#f1f5f9" }}>
                         <th
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1403,7 +1403,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1413,7 +1413,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1423,7 +1423,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1433,7 +1433,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1499,7 +1499,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                 style={{
                                   padding: "24px",
                                   textAlign: "center",
-                                  color: "rgba(255, 255, 255, 0.6)",
+                                  color: "#64748b",
                                 }}
                               >
                                 暂无骑手配送记录
@@ -1516,13 +1516,13 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               key={courierId}
                               style={{
                                 borderBottom:
-                                  "1px solid rgba(255, 255, 255, 0.1)",
+                                  "1px solid #e2e8f0",
                               }}
                             >
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.8)",
+                                  color: "#334155",
                                   fontSize: "0.9rem",
                                   fontWeight: "bold",
                                 }}
@@ -1532,7 +1532,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.8)",
+                                  color: "#334155",
                                   fontSize: "0.9rem",
                                 }}
                               >
@@ -1541,7 +1541,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.8)",
+                                  color: "#334155",
                                   fontSize: "0.9rem",
                                 }}
                               >
@@ -1557,7 +1557,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.8)",
+                                  color: "#334155",
                                   fontSize: "0.9rem",
                                 }}
                               >
@@ -1573,7 +1573,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.8)",
+                                  color: "#334155",
                                   fontSize: "0.9rem",
                                 }}
                               >
@@ -1592,7 +1592,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
               <div style={{ marginTop: "24px" }}>
                 <h4
                   style={{
-                    color: "rgba(255, 255, 255, 0.9)",
+                    color: "#0f172a",
                     marginBottom: "12px",
                   }}
                 >
@@ -1600,20 +1600,20 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 </h4>
                 <div
                   style={{
-                    background: "rgba(255, 255, 255, 0.05)",
+                    background: "#f8fafc",
                     borderRadius: "12px",
                     overflow: "hidden",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
-                      <tr style={{ background: "rgba(255, 255, 255, 0.1)" }}>
+                      <tr style={{ background: "#f1f5f9" }}>
                         <th
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1623,7 +1623,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1633,7 +1633,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1643,7 +1643,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1653,7 +1653,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1663,7 +1663,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1673,7 +1673,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           style={{
                             padding: "12px",
                             textAlign: "left",
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         >
@@ -1715,7 +1715,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                 style={{
                                   padding: "24px",
                                   textAlign: "center",
-                                  color: "rgba(255, 255, 255, 0.6)",
+                                  color: "#64748b",
                                 }}
                               >
                                 所选日期内无配送完成记录
@@ -1748,13 +1748,13 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               key={pkg.id}
                               style={{
                                 borderBottom:
-                                  "1px solid rgba(255, 255, 255, 0.1)",
+                                  "1px solid #e2e8f0",
                               }}
                             >
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "white",
+                                  color: "#0f172a",
                                   fontSize: "0.9rem",
                                   fontWeight: "bold",
                                 }}
@@ -1773,7 +1773,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.85)",
+                                  color: "#0f172a",
                                   fontSize: "0.9rem",
                                 }}
                               >
@@ -1782,7 +1782,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.8)",
+                                  color: "#334155",
                                   fontSize: "0.9rem",
                                 }}
                               >
@@ -1791,7 +1791,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.6)",
+                                  color: "#64748b",
                                   fontSize: "0.9rem",
                                 }}
                               >
@@ -1810,7 +1810,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "rgba(255, 255, 255, 0.5)",
+                                  color: "#64748b",
                                   fontSize: "0.8rem",
                                 }}
                               >
@@ -1851,14 +1851,14 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 <div
                   style={{
                     background:
-                      "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+                      "#ffffff",
                     borderRadius: "20px",
                     padding: "32px",
                     maxWidth: "600px",
                     width: "100%",
                     maxHeight: "80vh",
                     overflow: "auto",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    border: "1px solid #e2e8f0",
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -1871,7 +1871,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     }}
                   >
                     <h2
-                      style={{ margin: 0, color: "white", fontSize: "1.5rem" }}
+                      style={{ margin: 0, color: "#0f172a", fontSize: "1.5rem" }}
                     >
                       💰 工资详情
                     </h2>
@@ -1881,8 +1881,8 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         padding: "8px 16px",
                         borderRadius: "8px",
                         border: "none",
-                        background: "rgba(255, 255, 255, 0.2)",
-                        color: "white",
+                        background: "#e2e8f0",
+                        color: "#0f172a",
                         cursor: "pointer",
                         fontSize: "0.9rem",
                       }}
@@ -1894,7 +1894,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                   {/* 基本信息 */}
                   <div
                     style={{
-                      background: "rgba(255, 255, 255, 0.1)",
+                      background: "#f1f5f9",
                       borderRadius: "12px",
                       padding: isMobile ? "12px" : "20px",
                       marginBottom: "20px",
@@ -1903,7 +1903,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     <h3
                       style={{
                         margin: "0 0 16px 0",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "1.1rem",
                       }}
                     >
@@ -1921,7 +1921,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       <div>
                         <div
                           style={{
-                            color: "rgba(255, 255, 255, 0.7)",
+                            color: "#334155",
                             fontSize: "0.85rem",
                             marginBottom: "4px",
                           }}
@@ -1930,7 +1930,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         </div>
                         <div
                           style={{
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "1rem",
                             fontWeight: "600",
                           }}
@@ -1941,14 +1941,14 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       <div>
                         <div
                           style={{
-                            color: "rgba(255, 255, 255, 0.7)",
+                            color: "#334155",
                             fontSize: "0.85rem",
                             marginBottom: "4px",
                           }}
                         >
                           结算周期
                         </div>
-                        <div style={{ color: "white", fontSize: "0.9rem" }}>
+                        <div style={{ color: "#0f172a", fontSize: "0.9rem" }}>
                           {selectedSalary.period_start_date} ~{" "}
                           {selectedSalary.period_end_date}
                         </div>
@@ -1956,7 +1956,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       <div>
                         <div
                           style={{
-                            color: "rgba(255, 255, 255, 0.7)",
+                            color: "#334155",
                             fontSize: "0.85rem",
                             marginBottom: "4px",
                           }}
@@ -1976,7 +1976,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       <div>
                         <div
                           style={{
-                            color: "rgba(255, 255, 255, 0.7)",
+                            color: "#334155",
                             fontSize: "0.85rem",
                             marginBottom: "4px",
                           }}
@@ -1999,7 +1999,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                   {/* 工资组成 */}
                   <div
                     style={{
-                      background: "rgba(255, 255, 255, 0.1)",
+                      background: "#f1f5f9",
                       borderRadius: "12px",
                       padding: isMobile ? "12px" : "20px",
                     }}
@@ -2007,7 +2007,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     <h3
                       style={{
                         margin: "0 0 16px 0",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "1.1rem",
                       }}
                     >
@@ -2025,13 +2025,13 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           display: "flex",
                           justifyContent: "space-between",
                           padding: "8px 0",
-                          borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                          borderBottom: "1px solid #e2e8f0",
                         }}
                       >
-                        <span style={{ color: "rgba(255, 255, 255, 0.8)" }}>
+                        <span style={{ color: "#334155" }}>
                           基本工资
                         </span>
-                        <span style={{ color: "white", fontWeight: "600" }}>
+                        <span style={{ color: "#0f172a", fontWeight: "600" }}>
                           {selectedSalary.base_salary.toLocaleString()} MMK
                         </span>
                       </div>
@@ -2040,10 +2040,10 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           display: "flex",
                           justifyContent: "space-between",
                           padding: "8px 0",
-                          borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                          borderBottom: "1px solid #e2e8f0",
                         }}
                       >
-                        <span style={{ color: "rgba(255, 255, 255, 0.8)" }}>
+                        <span style={{ color: "#334155" }}>
                           送货费
                         </span>
                         <span style={{ color: "#74b9ff", fontWeight: "600" }}>
@@ -2055,10 +2055,10 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           display: "flex",
                           justifyContent: "space-between",
                           padding: "8px 0",
-                          borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                          borderBottom: "1px solid #e2e8f0",
                         }}
                       >
-                        <span style={{ color: "rgba(255, 255, 255, 0.8)" }}>
+                        <span style={{ color: "#334155" }}>
                           配送奖金
                         </span>
                         <span style={{ color: "#a29bfe", fontWeight: "600" }}>
@@ -2071,10 +2071,10 @@ const FinanceCourierRecordsTab: React.FC = () => {
                             display: "flex",
                             justifyContent: "space-between",
                             padding: "8px 0",
-                            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                            borderBottom: "1px solid #e2e8f0",
                           }}
                         >
-                          <span style={{ color: "rgba(255, 255, 255, 0.8)" }}>
+                          <span style={{ color: "#334155" }}>
                             绩效奖金
                           </span>
                           <span style={{ color: "#55efc4", fontWeight: "600" }}>
@@ -2089,10 +2089,10 @@ const FinanceCourierRecordsTab: React.FC = () => {
                             display: "flex",
                             justifyContent: "space-between",
                             padding: "8px 0",
-                            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                            borderBottom: "1px solid #e2e8f0",
                           }}
                         >
-                          <span style={{ color: "rgba(255, 255, 255, 0.8)" }}>
+                          <span style={{ color: "#334155" }}>
                             扣款
                           </span>
                           <span style={{ color: "#ff7675", fontWeight: "600" }}>
@@ -2107,12 +2107,12 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           justifyContent: "space-between",
                           padding: "12px 0",
                           marginTop: "8px",
-                          borderTop: "2px solid rgba(255, 255, 255, 0.3)",
+                          borderTop: "2px solid #e2e8f0",
                         }}
                       >
                         <span
                           style={{
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "1.1rem",
                             fontWeight: "600",
                           }}
@@ -2157,7 +2157,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 <div
                   style={{
                     background:
-                      "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+                      "#ffffff",
                     borderRadius: "24px",
                     padding: "32px",
                     width: "100%",
@@ -2166,7 +2166,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     display: "flex",
                     flexDirection: "column",
                     boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    border: "1px solid #f1f5f9",
                   }}
                 >
                   <div
@@ -2180,7 +2180,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     <h2
                       style={{
                         margin: 0,
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "1.5rem",
                         fontWeight: 800,
                       }}
@@ -2192,7 +2192,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         background: "transparent",
                         border: "none",
-                        color: "rgba(255,255,255,0.6)",
+                        color: "#64748b",
                         cursor: "pointer",
                         fontSize: "1.5rem",
                       }}
@@ -2207,14 +2207,14 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       justifyContent: "space-between",
                       alignItems: "center",
                       padding: "12px 16px",
-                      background: "rgba(255,255,255,0.05)",
+                      background: "#f8fafc",
                       borderRadius: "12px",
                       marginBottom: "16px",
                     }}
                   >
                     <div
                       style={{
-                        color: "rgba(255,255,255,0.7)",
+                        color: "#334155",
                         fontSize: "0.9rem",
                       }}
                     >
@@ -2238,11 +2238,11 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         }
                       }}
                       style={{
-                        background: "rgba(255,255,255,0.1)",
-                        border: "1px solid rgba(255,255,255,0.2)",
+                        background: "#f1f5f9",
+                        border: "1px solid #e2e8f0",
                         padding: "6px 12px",
                         borderRadius: "8px",
-                        color: "white",
+                        color: "#0f172a",
                         fontSize: "0.85rem",
                         cursor: "pointer",
                       }}
@@ -2267,7 +2267,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         style={{
                           textAlign: "center",
                           padding: "40px",
-                          color: "rgba(255,255,255,0.4)",
+                          color: "#94a3b8",
                         }}
                       >
                         暂无本月待结算的骑手数据
@@ -2309,8 +2309,8 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                   borderRadius: "12px",
                                   background: isSelected
                                     ? "rgba(59, 130, 246, 0.15)"
-                                    : "rgba(255,255,255,0.03)",
-                                  border: `1px solid ${isSelected ? "rgba(59, 130, 246, 0.4)" : "rgba(255,255,255,0.08)"}`,
+                                    : "#f8fafc",
+                                  border: `1px solid ${isSelected ? "rgba(59, 130, 246, 0.4)" : "#f8fafc"}`,
                                   cursor: "pointer",
                                   transition: "all 0.2s",
                                 }}
@@ -2322,7 +2322,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                     borderRadius: "6px",
                                     border: isSelected
                                       ? "none"
-                                      : "2px solid rgba(255,255,255,0.3)",
+                                      : "2px solid #e2e8f0",
                                     background: isSelected
                                       ? "#3b82f6"
                                       : "transparent",
@@ -2334,7 +2334,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                   {isSelected && (
                                     <span
                                       style={{
-                                        color: "white",
+                                        color: "#0f172a",
                                         fontWeight: "bold",
                                       }}
                                     >
@@ -2345,7 +2345,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                 <div style={{ flex: 1 }}>
                                   <div
                                     style={{
-                                      color: "white",
+                                      color: "#0f172a",
                                       fontWeight: 700,
                                       fontSize: "1.05rem",
                                     }}
@@ -2361,7 +2361,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                   >
                                     <span
                                       style={{
-                                        color: "rgba(255,255,255,0.5)",
+                                        color: "#64748b",
                                         fontSize: "0.8rem",
                                       }}
                                     >
@@ -2369,7 +2369,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                     </span>
                                     <span
                                       style={{
-                                        color: "rgba(255,255,255,0.5)",
+                                        color: "#64748b",
                                         fontSize: "0.8rem",
                                       }}
                                     >
@@ -2392,9 +2392,9 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         flex: 1,
                         padding: "14px",
                         borderRadius: "12px",
-                        border: "1px solid rgba(255,255,255,0.2)",
-                        background: "rgba(255,255,255,0.05)",
-                        color: "white",
+                        border: "1px solid #e2e8f0",
+                        background: "#f8fafc",
+                        color: "#0f172a",
                         fontWeight: 700,
                         cursor: "pointer",
                       }}
@@ -2411,9 +2411,12 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         border: "none",
                         background:
                           selectedCouriersForSalary.size === 0
-                            ? "#4a5568"
+                            ? "#e2e8f0"
                             : "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                        color: "#05223b",
+                        color:
+                          selectedCouriersForSalary.size === 0
+                            ? "#94a3b8"
+                            : "#05223b",
                         fontWeight: 800,
                         cursor:
                           selectedCouriersForSalary.size === 0
@@ -2452,19 +2455,19 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 <div
                   style={{
                     background:
-                      "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+                      "#ffffff",
                     borderRadius: "20px",
                     padding: "32px",
                     maxWidth: "500px",
                     width: "100%",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    border: "1px solid #e2e8f0",
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <h2
                     style={{
                       margin: "0 0 24px 0",
-                      color: "white",
+                      color: "#0f172a",
                       fontSize: "1.5rem",
                     }}
                   >
@@ -2476,7 +2479,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         display: "block",
                         marginBottom: "8px",
-                        color: "rgba(255, 255, 255, 0.9)",
+                        color: "#0f172a",
                         fontSize: "0.95rem",
                       }}
                     >
@@ -2494,9 +2497,9 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         width: "100%",
                         padding: "12px",
                         borderRadius: "10px",
-                        border: "1px solid rgba(255, 255, 255, 0.25)",
-                        background: "rgba(7, 23, 53, 0.65)",
-                        color: "white",
+                        border: "1px solid #e2e8f0",
+                        background: "#ffffff",
+                        color: "#0f172a",
                         fontSize: "0.95rem",
                       }}
                     >
@@ -2513,7 +2516,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         display: "block",
                         marginBottom: "8px",
-                        color: "rgba(255, 255, 255, 0.9)",
+                        color: "#0f172a",
                         fontSize: "0.95rem",
                       }}
                     >
@@ -2534,8 +2537,8 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         padding: "12px",
                         borderRadius: "10px",
                         border: "none",
-                        background: "rgba(255, 255, 255, 0.18)",
-                        color: "white",
+                        background: "#f8fafc",
+                        color: "#0f172a",
                         fontSize: "0.95rem",
                       }}
                     />
@@ -2546,7 +2549,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       style={{
                         display: "block",
                         marginBottom: "8px",
-                        color: "rgba(255, 255, 255, 0.9)",
+                        color: "#0f172a",
                         fontSize: "0.95rem",
                       }}
                     >
@@ -2566,8 +2569,8 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         padding: "12px",
                         borderRadius: "10px",
                         border: "none",
-                        background: "rgba(255, 255, 255, 0.18)",
-                        color: "white",
+                        background: "#f8fafc",
+                        color: "#0f172a",
                         fontSize: "0.95rem",
                       }}
                     />
@@ -2580,9 +2583,9 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         flex: 1,
                         padding: "12px",
                         borderRadius: "10px",
-                        border: "1px solid rgba(255, 255, 255, 0.3)",
+                        border: "1px solid #e2e8f0",
                         background: "transparent",
-                        color: "white",
+                        color: "#0f172a",
                         cursor: "pointer",
                         fontSize: "0.95rem",
                         fontWeight: "600",
@@ -2649,7 +2652,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         background: loading
                           ? "rgba(240, 147, 251, 0.5)"
                           : "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                        color: "white",
+                        color: "#fff",
                         cursor: loading ? "not-allowed" : "pointer",
                         fontSize: "0.95rem",
                         fontWeight: "600",

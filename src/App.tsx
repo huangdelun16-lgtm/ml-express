@@ -88,7 +88,7 @@ function App() {
                   path="finance"
                   element={
                     <ProtectedRoute requiredRoles={['admin', 'manager', 'finance']} permissionId="finance">
-                      <Suspense fallback={<div style={{ color: 'white', padding: 40, textAlign: 'center' }}>加载中...</div>}>
+                      <Suspense fallback={<div className="admin-loading">加载中...</div>}>
                         <FinanceManagement />
                       </Suspense>
                     </ProtectedRoute>

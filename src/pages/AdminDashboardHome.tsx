@@ -5,6 +5,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
 import { bannerService, type Banner } from '../services/supabase';
 import { isAbortLikeError } from '../utils/fetchError';
+import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 
 const CAROUSEL_INTERVAL_MS = 6500;
 
@@ -121,7 +122,7 @@ const AdminDashboardHome: React.FC = () => {
   const activeBanner = banners.length > 0 ? banners[carouselIndex % banners.length] : null;
 
   return (
-    <>
+    <div className="admin-home">
       {(pendingRechargeCount > 0 ||
         pendingAssignmentCount > 0 ||
         pendingProductReviewCount > 0 ||
@@ -139,47 +140,25 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
+              className="admin-home-alert admin-home-alert--danger"
               onClick={() => navigate('/admin/recharges')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/recharges');
               }}
-              style={{
-                background: 'rgba(231, 76, 60, 0.14)',
-                backdropFilter: 'blur(14px)',
-                borderRadius: 14,
-                padding: '12px 18px',
-                border: '2px solid #e74c3c',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                animation: 'pulse-alert 2s infinite',
-                boxShadow: '0 6px 22px rgba(231, 76, 60, 0.28)',
-              }}
+              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>💰</span>
                 <div>
-                  <div style={{ color: '#e74c3c', fontWeight: 900, fontSize: '0.98rem' }}>
+                  <div className="admin-home-alert__title">
                     {language === 'zh' ? '待审核充值' : 'Pending Recharges'}
                   </div>
-                  <div style={{ color: 'white', fontSize: '0.8rem', opacity: 0.82 }}>
+                  <div className="admin-home-alert__sub">
                     {language === 'zh' ? '有客户提交了充值凭证' : 'Customers submitted proof'}
                   </div>
                 </div>
               </div>
-              <div
-                style={{
-                  background: '#e74c3c',
-                  color: 'white',
-                  padding: '4px 12px',
-                  borderRadius: 12,
-                  fontWeight: 900,
-                  fontSize: '1.15rem',
-                }}
-              >
-                {pendingRechargeCount}
-              </div>
+              <div className="admin-home-alert__n">{pendingRechargeCount}</div>
             </div>
           )}
 
@@ -187,47 +166,25 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
+              className="admin-home-alert admin-home-alert--info"
               onClick={() => navigate('/admin/tracking')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/tracking');
               }}
-              style={{
-                background: 'rgba(52, 152, 219, 0.14)',
-                backdropFilter: 'blur(14px)',
-                borderRadius: 14,
-                padding: '12px 18px',
-                border: '2px solid #3498db',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                animation: 'pulse-alert 2s infinite',
-                boxShadow: '0 6px 22px rgba(52, 152, 219, 0.28)',
-              }}
+              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>📦</span>
                 <div>
-                  <div style={{ color: '#3498db', fontWeight: 900, fontSize: '0.98rem' }}>
+                  <div className="admin-home-alert__title">
                     {language === 'zh' ? '待分配包裹' : 'Pending Assignment'}
                   </div>
-                  <div style={{ color: 'white', fontSize: '0.8rem', opacity: 0.82 }}>
+                  <div className="admin-home-alert__sub">
                     {language === 'zh' ? '有新订单等待分配骑手' : 'New orders waiting for riders'}
                   </div>
                 </div>
               </div>
-              <div
-                style={{
-                  background: '#3498db',
-                  color: 'white',
-                  padding: '4px 12px',
-                  borderRadius: 12,
-                  fontWeight: 900,
-                  fontSize: '1.15rem',
-                }}
-              >
-                {pendingAssignmentCount}
-              </div>
+              <div className="admin-home-alert__n">{pendingAssignmentCount}</div>
             </div>
           )}
 
@@ -235,35 +192,24 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
+              className="admin-home-alert admin-home-alert--danger"
               onClick={() => navigate('/admin/delivery-alerts')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/delivery-alerts');
               }}
-              style={{
-                background: 'rgba(220, 38, 38, 0.14)',
-                backdropFilter: 'blur(14px)',
-                borderRadius: 14,
-                padding: '12px 18px',
-                border: '2px solid #dc2626',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                animation: 'pulse-alert 2s infinite',
-                boxShadow: '0 6px 22px rgba(220, 38, 38, 0.3)',
-              }}
+              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>🚨</span>
                 <div>
-                  <div style={{ color: '#fecaca', fontWeight: 900, fontSize: '0.98rem' }}>
+                  <div className="admin-home-alert__title">
                     {language === 'zh'
                       ? '待处理配送警报'
                       : language === 'en'
                         ? 'Pending delivery alerts'
                         : 'Pending alerts'}
                   </div>
-                  <div style={{ color: 'white', fontSize: '0.8rem', opacity: 0.85 }}>
+                  <div className="admin-home-alert__sub">
                     {language === 'zh'
                       ? '有新的骑手异常警报需处理'
                       : language === 'en'
@@ -272,18 +218,7 @@ const AdminDashboardHome: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div
-                style={{
-                  background: '#dc2626',
-                  color: 'white',
-                  padding: '4px 12px',
-                  borderRadius: 12,
-                  fontWeight: 900,
-                  fontSize: '1.15rem',
-                }}
-              >
-                {pendingDeliveryAlertsCount}
-              </div>
+              <div className="admin-home-alert__n">{pendingDeliveryAlertsCount}</div>
             </div>
           )}
 
@@ -291,35 +226,24 @@ const AdminDashboardHome: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
+              className="admin-home-alert admin-home-alert--warn"
               onClick={() => navigate('/admin/delivery-stores')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') navigate('/admin/delivery-stores');
               }}
-              style={{
-                background: 'rgba(245, 158, 11, 0.14)',
-                backdropFilter: 'blur(14px)',
-                borderRadius: 14,
-                padding: '12px 18px',
-                border: '2px solid #f59e0b',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                animation: 'pulse-alert 2s infinite',
-                boxShadow: '0 6px 22px rgba(245, 158, 11, 0.3)',
-              }}
+              style={{ animation: 'pulse-alert 2s infinite' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.6rem' }}>🛍️</span>
                 <div>
-                  <div style={{ color: '#fbbf24', fontWeight: 900, fontSize: '0.98rem' }}>
+                  <div className="admin-home-alert__title">
                     {language === 'zh'
                       ? '待审核商品'
                       : language === 'en'
                         ? 'Products to review'
                         : 'စစ်ဆေးရန် ကုန်ပစ္စည်းများ'}
                   </div>
-                  <div style={{ color: 'white', fontSize: '0.8rem', opacity: 0.85 }}>
+                  <div className="admin-home-alert__sub">
                     {language === 'zh'
                       ? '商家提交了新品，请在合伙店铺中处理'
                       : language === 'en'
@@ -328,34 +252,14 @@ const AdminDashboardHome: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div
-                style={{
-                  background: '#f59e0b',
-                  color: 'white',
-                  padding: '4px 12px',
-                  borderRadius: 12,
-                  fontWeight: 900,
-                  fontSize: '1.15rem',
-                }}
-              >
-                {pendingProductReviewCount}
-              </div>
+              <div className="admin-home-alert__n">{pendingProductReviewCount}</div>
             </div>
           )}
         </div>
       )}
 
       {/* 动态待办摘要条 */}
-      <div
-        style={{
-          maxWidth: 920,
-          margin: '0 auto 18px',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 10,
-          justifyContent: 'center',
-        }}
-      >
+      <div className="admin-home-chips" style={{ maxWidth: 920, margin: '0 auto 18px', justifyContent: 'center' }}>
         {[
           {
             n: pendingTotal,
@@ -393,21 +297,8 @@ const AdminDashboardHome: React.FC = () => {
           <button
             key={item.zh}
             type="button"
+            className="admin-home-chip"
             onClick={() => navigate(item.path)}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 999,
-              border: `1px solid ${item.color}55`,
-              background: 'rgba(15, 23, 42, 0.45)',
-              color: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              backdropFilter: 'blur(10px)',
-            }}
           >
             <span style={{ color: item.color }}>
               {language === 'zh' ? item.zh : language === 'en' ? item.en : item.my}
@@ -435,35 +326,11 @@ const AdminDashboardHome: React.FC = () => {
         onMouseLeave={() => setCarouselPaused(false)}
       >
         {bannersLoading ? (
-          <div
-            style={{
-              height: isMobile ? 140 : 200,
-              borderRadius: 20,
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'rgba(255,255,255,0.55)',
-              fontSize: '0.9rem',
-            }}
-          >
+          <div className="admin-home-empty" style={{ height: isMobile ? 140 : 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {language === 'zh' ? '加载广告…' : language === 'en' ? 'Loading…' : 'ဆောင်ရွက်နေ…'}
           </div>
         ) : banners.length === 0 ? (
-          <div
-            style={{
-              borderRadius: 20,
-              padding: isMobile ? '22px 18px' : '28px 26px',
-              background:
-                'linear-gradient(125deg, rgba(59, 130, 246, 0.35) 0%, rgba(15, 23, 42, 0.85) 45%, rgba(99, 102, 241, 0.3) 100%)',
-              backgroundSize: '200% 100%',
-              animation: 'admin-shimmer 8s ease infinite alternate',
-              border: '1px solid rgba(147, 197, 253, 0.25)',
-              textAlign: 'center',
-              color: 'white',
-            }}
-          >
+          <div className="admin-home-empty">
             <div style={{ fontSize: '1.35rem', marginBottom: 8 }}>📢</div>
             <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 6 }}>
               {language === 'zh'
@@ -521,7 +388,7 @@ const AdminDashboardHome: React.FC = () => {
             >
               {activeBanner?.image_url ? (
                 <img
-                  src={activeBanner.image_url}
+                  src={rewritePublicStorageUrl(activeBanner.image_url)}
                   alt=""
                   style={{
                     position: 'absolute',
@@ -684,12 +551,9 @@ const AdminDashboardHome: React.FC = () => {
 
       {/* 快捷入口 */}
       <div
+        className="admin-home-quick"
         style={{
-          maxWidth: 920,
-          margin: '0 auto 20px',
-          display: 'grid',
           gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-          gap: 12,
         }}
       >
         {quickLinks.map((q) => (
@@ -697,24 +561,11 @@ const AdminDashboardHome: React.FC = () => {
             key={q.path}
             type="button"
             onClick={() => navigate(q.path)}
-            style={{
-              padding: '16px 12px',
-              borderRadius: 16,
-              border: '1px solid rgba(255,255,255,0.14)',
-              background: 'rgba(255,255,255,0.08)',
-              backdropFilter: 'blur(12px)',
-              color: 'white',
-              cursor: 'pointer',
-              textAlign: 'center',
-              transition: 'transform 0.15s ease, border-color 0.15s ease',
-            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.borderColor = 'rgba(125,211,252,0.45)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)';
             }}
           >
             <div style={{ fontSize: '1.75rem', marginBottom: 6 }}>{q.icon}</div>
@@ -723,22 +574,11 @@ const AdminDashboardHome: React.FC = () => {
         ))}
       </div>
 
-      <div
-        style={{
-          maxWidth: 640,
-          margin: '0 auto',
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(18px)',
-          borderRadius: 18,
-          padding: isMobile ? '18px 18px' : '22px 24px',
-          border: '1px solid rgba(255, 255, 255, 0.18)',
-          color: 'white',
-        }}
-      >
+      <div className="admin-home-welcome">
         <div style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: 8 }}>
           {language === 'zh' ? '欢迎回来' : language === 'en' ? 'Welcome back' : 'ပြန်လည်ကြိုဆိုပါသည်'}
           {totalPendingHighlight > 0 ? (
-            <span style={{ marginLeft: 10, fontSize: '0.78rem', fontWeight: 600, color: '#fcd34d' }}>
+            <span style={{ marginLeft: 10, fontSize: '0.78rem', fontWeight: 600, color: '#d48806' }}>
               · {language === 'zh' ? `${totalPendingHighlight} 项待处理` : `${totalPendingHighlight} pending`}
             </span>
           ) : null}
@@ -751,7 +591,7 @@ const AdminDashboardHome: React.FC = () => {
               : 'ဘေးဘားနှင့်ကြေညာများကို သုံးပါ။'}
         </p>
       </div>
-    </>
+    </div>
   );
 };
 

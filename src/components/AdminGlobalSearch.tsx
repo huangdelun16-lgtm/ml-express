@@ -9,6 +9,12 @@ const TYPE_LABEL: Record<string, string> = {
   courier: '骑手',
 };
 
+export const ADMIN_SEARCH_EVENT = 'ml-admin-open-search';
+
+export function openAdminGlobalSearch() {
+  window.dispatchEvent(new Event(ADMIN_SEARCH_EVENT));
+}
+
 /**
  * Ctrl/⌘ + K 全局搜索，跳转同城订单 / 用户管理 / 商家管理 等（带 URL 参数）
  */
@@ -54,6 +60,12 @@ const AdminGlobalSearch: React.FC = () => {
   }, [q, open, runSearch]);
 
   useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(ADMIN_SEARCH_EVENT, onOpen);
+    return () => window.removeEventListener(ADMIN_SEARCH_EVENT, onOpen);
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open) {
         setOpen(false);
@@ -77,85 +89,46 @@ const AdminGlobalSearch: React.FC = () => {
 
   return (
     <div
+      className="admin-search"
       role="dialog"
       aria-modal
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 10000,
-        background: 'rgba(8, 20, 40, 0.55)',
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        paddingTop: '12vh',
-        paddingLeft: 16,
-        paddingRight: 16,
-      }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) setOpen(false);
       }}
     >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: 560,
-          background: 'linear-gradient(165deg, #1a365d 0%, #2c5282 100%)',
-          borderRadius: 16,
-          boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          overflow: 'hidden',
-          color: '#fff',
-        }}
-      >
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-          <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 8 }}>全局搜索 · Ctrl / ⌘ + K</div>
+      <div className="admin-search__panel">
+        <div className="admin-search__head">
+          <div className="admin-search__hint">全局搜索 · Ctrl / ⌘ + K</div>
           <input
             ref={inputRef}
+            className="admin-search__input"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="运单号、电话、中转码、店铺名、骑手名…"
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              padding: '12px 14px',
-              borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.2)',
-              background: 'rgba(0,0,0,0.25)',
-              color: '#fff',
-              fontSize: 16,
-              outline: 'none',
-            }}
           />
         </div>
-        <div style={{ maxHeight: '52vh', overflowY: 'auto' }}>
-          {loading && <div style={{ padding: 20, opacity: 0.85 }}>搜索中…</div>}
-          {!loading && q.trim().length >= 2 && !hits.length && <div style={{ padding: 20, opacity: 0.8 }}>无匹配结果</div>}
+        <div className="admin-search__list">
+          {loading && <div className="admin-search__empty">搜索中…</div>}
+          {!loading && q.trim().length >= 2 && !hits.length && (
+            <div className="admin-search__empty">无匹配结果</div>
+          )}
           {hits.map((h) => (
             <button
               key={`${h.type}-${h.id}-${h.path}`}
               type="button"
+              className="admin-search__hit"
               onClick={() => {
                 setOpen(false);
                 navigate(h.path);
               }}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                padding: '12px 16px',
-                border: 'none',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                background: 'transparent',
-                color: '#fff',
-                cursor: 'pointer',
-              }}
             >
-              <div style={{ fontSize: 12, color: '#90cdf4', marginBottom: 4 }}>{TYPE_LABEL[h.type] || h.type}</div>
-              <div style={{ fontWeight: 700 }}>{h.title}</div>
-              {h.subtitle && <div style={{ fontSize: 13, opacity: 0.88, marginTop: 4 }}>{h.subtitle}</div>}
+              <div className="admin-search__type">{TYPE_LABEL[h.type] || h.type}</div>
+              <div className="admin-search__title">{h.title}</div>
+              {h.subtitle && <div className="admin-search__sub">{h.subtitle}</div>}
             </button>
           ))}
         </div>
-        <div style={{ padding: '10px 16px', fontSize: 11, opacity: 0.7, borderTop: '1px solid rgba(255,255,255,0.08)' }}>Esc 关闭</div>
+        <div className="admin-search__foot">Esc 关闭</div>
       </div>
     </div>
   );

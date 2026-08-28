@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
-import { useResponsive } from '../hooks/useResponsive';
 
 /** 与路由权限对齐：无权限则不展示对应待办胶囊 */
 function readTodoAccess(): {
@@ -54,7 +53,6 @@ const AdminTodoBar: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { counts } = useAdminTodo();
-  const { isMobile } = useResponsive();
 
   const access = useMemo(() => readTodoAccess(), [location.pathname]);
 
@@ -123,103 +121,47 @@ const AdminTodoBar: React.FC = () => {
     <button
       type="button"
       onClick={onClick}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: isMobile ? '6px 10px' : '8px 14px',
-        borderRadius: '999px',
-        border: n > 0 ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.25)',
-        background: n > 0 ? `${color}22` : 'rgba(255,255,255,0.08)',
-        color: '#fff',
-        fontSize: isMobile ? '0.75rem' : '0.82rem',
-        fontWeight: 700,
-        cursor: 'pointer',
-        whiteSpace: 'nowrap',
-      }}
+      className={`admin-todo__pill${n > 0 ? ' is-hot' : ''}`}
+      style={n > 0 ? { color } : undefined}
     >
       <span>{label}</span>
-      <span
-        style={{
-          minWidth: '22px',
-          textAlign: 'center',
-          background: n > 0 ? color : 'rgba(255,255,255,0.2)',
-          borderRadius: '8px',
-          padding: '2px 6px',
-          fontSize: '0.8rem',
-        }}
-      >
+      <span className="admin-todo__count" style={n > 0 ? { background: color, color: '#fff' } : undefined}>
         {n}
       </span>
     </button>
   );
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9998,
-        padding: isMobile ? '8px 10px' : '10px 20px',
-        background: 'linear-gradient(180deg, rgba(15, 32, 60, 0.65) 0%, rgba(15, 32, 60, 0.92) 100%)',
-        backdropFilter: 'blur(12px)',
-        borderTop: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: '0 -8px 24px rgba(0,0,0,0.2)',
-      }}
-    >
-      <div
-        style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: isMobile ? '8px' : '10px',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 800, fontSize: '0.85rem' }}>
-            📋 {t.title}
-            {total > 0 ? (
-              <span style={{ marginLeft: '6px', color: '#fbbf24' }}>({total})</span>
-            ) : null}
+    <div className="admin-todo">
+      <div className="admin-todo__inner">
+        <div className="admin-todo__left">
+          <span className="admin-todo__title">
+            {t.title}
+            {total > 0 ? <span className="admin-todo__total">({total})</span> : null}
           </span>
           {access.recharge &&
-            pill(t.recharge, counts.pendingRecharge, () => navigate('/admin/recharges'), '#e74c3c')}
+            pill(t.recharge, counts.pendingRecharge, () => navigate('/admin/recharges'), '#cf1322')}
           {access.assign &&
-            pill(t.assign, counts.pendingAssignment, () => navigate('/admin/tracking'), '#3498db')}
+            pill(t.assign, counts.pendingAssignment, () => navigate('/admin/tracking'), '#1677ff')}
           {access.alerts &&
-            pill(t.alerts, counts.pendingDeliveryAlerts, () => navigate('/admin/delivery-alerts'), '#dc2626')}
+            pill(t.alerts, counts.pendingDeliveryAlerts, () => navigate('/admin/delivery-alerts'), '#cf1322')}
           {access.products &&
-            pill(t.products, counts.pendingProductReview, () => navigate('/admin/delivery-stores'), '#f59e0b')}
+            pill(t.products, counts.pendingProductReview, () => navigate('/admin/delivery-stores'), '#d48806')}
           {access.merchantApps &&
             pill(
               t.merchantApps,
               counts.pendingMerchantApplications,
               () => navigate('/admin/merchant-applications'),
-              '#3b82f6',
+              '#1677ff',
             )}
         </div>
         {access.audit && (
         <button
           type="button"
+          className="admin-todo__audit"
           onClick={() => navigate('/admin/supervision')}
-          style={{
-            padding: isMobile ? '6px 12px' : '8px 16px',
-            borderRadius: '10px',
-            border: '1px solid rgba(167, 139, 250, 0.5)',
-            background: 'rgba(139, 92, 246, 0.25)',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: isMobile ? '0.75rem' : '0.82rem',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
         >
-          📜 {t.audit}
+          {t.audit}
         </button>
         )}
       </div>
@@ -228,3 +170,4 @@ const AdminTodoBar: React.FC = () => {
 };
 
 export default AdminTodoBar;
+

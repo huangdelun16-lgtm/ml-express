@@ -286,48 +286,18 @@ const MerchantReconciliationExportPage: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(160deg, #0f172a 0%, #1e3a5f 40%, #312e81 100%)',
-        padding: isMobile ? '14px 12px 96px' : '24px 20px 96px',
-        color: '#fff',
-        fontFamily:
-          "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif",
-        boxSizing: 'border-box',
-      }}
-    >
+    <div className="admin-page">
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
-        <header
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: 16,
-            marginBottom: 22,
-            flexWrap: 'wrap',
-          }}
-        >
+        <header className="admin-page-head">
           <div>
-            <div style={{ fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.75, marginBottom: 6 }}>
-              ML Express · Admin
-            </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? '1.4rem' : '1.75rem', fontWeight: 800 }}>📋 {t.title}</h1>
-            <p style={{ margin: '10px 0 0', opacity: 0.9, fontSize: isMobile ? 13 : 14, maxWidth: 720, lineHeight: 1.55 }}>{t.subtitle}</p>
-            <p style={{ margin: '8px 0 0', opacity: 0.72, fontSize: 12, maxWidth: 820, lineHeight: 1.5 }}>{t.hint}</p>
+            <h1>📋 {t.title}</h1>
+            <p>{t.subtitle}</p>
+            <p>{t.hint}</p>
           </div>
           <button
             type="button"
+            className="admin-shell__btn"
             onClick={() => navigate('/admin/dashboard')}
-            style={{
-              padding: '10px 18px',
-              borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.35)',
-              background: 'rgba(255,255,255,0.08)',
-              color: '#fff',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
           >
             ← {t.back}
           </button>
@@ -335,10 +305,10 @@ const MerchantReconciliationExportPage: React.FC = () => {
 
         <section
           style={{
-            background: 'rgba(15, 23, 42, 0.5)',
-            borderRadius: 18,
+            background: '#fff',
+            borderRadius: 12,
             padding: isMobile ? 14 : 20,
-            border: '1px solid rgba(255,255,255,0.12)',
+            border: '1px solid #e2e8f0',
             display: 'grid',
             gap: 14,
           }}
@@ -349,14 +319,8 @@ const MerchantReconciliationExportPage: React.FC = () => {
               <select
                 value={preset}
                 onChange={(e) => setPreset(e.target.value as DatePreset)}
-                style={{
-                  padding: '11px 14px',
-                  borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,0.22)',
-                  background: 'rgba(0,0,0,0.35)',
-                  color: '#fff',
-                  minWidth: 140,
-                }}
+                  className="admin-select"
+                  style={{ minWidth: 140 }}
               >
                 <option value="today">{language === 'en' ? 'Today' : '今日'}</option>
                 <option value="7d">{language === 'en' ? 'Last 7 days' : '近 7 天'}</option>
@@ -396,17 +360,10 @@ const MerchantReconciliationExportPage: React.FC = () => {
             <div>
               <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6, fontWeight: 600 }}>{t.store}</div>
               <select
+                className="admin-select"
                 value={storeId}
                 onChange={(e) => setStoreId(e.target.value)}
-                style={{
-                  padding: '11px 14px',
-                  borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,0.22)',
-                  background: 'rgba(0,0,0,0.35)',
-                  color: '#fff',
-                  minWidth: 200,
-                  maxWidth: 320,
-                }}
+                style={{ minWidth: 200, maxWidth: 320 }}
               >
                 <option value="">{t.allStores}</option>
                 {stores.map((s) => (
@@ -420,16 +377,10 @@ const MerchantReconciliationExportPage: React.FC = () => {
             <div>
               <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6, fontWeight: 600 }}>{t.status}</div>
               <select
+                className="admin-select"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                style={{
-                  padding: '11px 14px',
-                  borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,0.22)',
-                  background: 'rgba(0,0,0,0.35)',
-                  color: '#fff',
-                  minWidth: 160,
-                }}
+                style={{ minWidth: 160 }}
               >
                 <option value="all">{t.statusAll}</option>
                 <option value="已送达">{t.statusDelivered}</option>
@@ -476,14 +427,14 @@ const MerchantReconciliationExportPage: React.FC = () => {
           <div
             style={{
               padding: '14px 16px',
-              borderRadius: 14,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 12,
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
               fontSize: 14,
               fontWeight: 700,
             }}
           >
-            {t.count}: <span style={{ color: '#a5b4fc' }}>{filtered.length}</span>
+            {t.count}: <span style={{ color: '#1677ff' }}>{filtered.length}</span>
             {merchantPackages.length !== packages.length ? (
               <span style={{ marginLeft: 12, opacity: 0.75, fontWeight: 500, fontSize: 12 }}>
                 （{language === 'en' ? 'Store-linked in system' : '系统中商家关联单'} {merchantPackages.length}）

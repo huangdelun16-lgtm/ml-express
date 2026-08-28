@@ -219,53 +219,24 @@ const AdminReportsPage: React.FC = () => {
     padding: '8px 12px',
     borderRadius: 10,
     fontSize: 13,
-    border: '1px solid rgba(255,255,255,0.14)',
-    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid #e2e8f0',
+    background: '#fff',
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(155deg, #0f172a 0%, #1e3a5f 40%, #276749 88%, #1a365d 100%)',
-        padding: isMobile ? '14px 12px 96px' : '24px 20px 96px',
-        color: '#fff',
-        fontFamily: "'Segoe UI', 'PingFang SC', system-ui, sans-serif",
-        boxSizing: 'border-box',
-      }}
-    >
+    <div className="admin-page">
       <div style={{ maxWidth: 1320, margin: '0 auto' }}>
-        <header
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: 16,
-            marginBottom: 20,
-            flexWrap: 'wrap',
-          }}
-        >
+        <header className="admin-page-head">
           <div>
-            <div style={{ fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.75, marginBottom: 6 }}>
-              ML Express · Admin
-            </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? '1.45rem' : '1.85rem', fontWeight: 800 }}>📊 {t.title}</h1>
-            <p style={{ margin: '10px 0 0', opacity: 0.92, fontSize: isMobile ? 13 : 14, maxWidth: 760, lineHeight: 1.5 }}>{t.subtitle}</p>
-            <p style={{ margin: '8px 0 0', opacity: 0.72, fontSize: 12, maxWidth: 820, lineHeight: 1.45 }}>{t.hint}</p>
+            <h1>📊 {t.title}</h1>
+            <p>{t.subtitle}</p>
+            <p>{t.hint}</p>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+          <div className="admin-page-actions">
             <button
               type="button"
+              className="admin-shell__btn"
               onClick={() => navigate('/admin/dashboard')}
-              style={{
-                padding: '10px 18px',
-                borderRadius: 12,
-                border: '1px solid rgba(255,255,255,0.35)',
-                background: 'rgba(255,255,255,0.06)',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
             >
               ← {t.back}
             </button>
@@ -307,11 +278,11 @@ const AdminReportsPage: React.FC = () => {
 
         <div
           style={{
-            background: 'rgba(15, 23, 42, 0.45)',
-            borderRadius: 18,
+            background: '#fff',
+            borderRadius: 12,
             padding: isMobile ? 14 : 18,
             marginBottom: 18,
-            border: '1px solid rgba(255,255,255,0.12)',
+            border: '1px solid #e2e8f0',
             display: 'flex',
             flexWrap: 'wrap',
             gap: 14,
@@ -324,7 +295,7 @@ const AdminReportsPage: React.FC = () => {
               style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'rgba(15,23,42,0.22)',
+                background: 'rgba(15,23,42,0.06)',
                 borderRadius: 18,
                 display: 'flex',
                 alignItems: 'center',
@@ -344,16 +315,9 @@ const AdminReportsPage: React.FC = () => {
           <div>
             <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6, fontWeight: 600 }}>{t.preset}</div>
             <select
+              className="admin-select"
               value={preset}
               onChange={(e) => setPreset(e.target.value as DatePreset)}
-              style={{
-                padding: '11px 14px',
-                borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.22)',
-                background: 'rgba(0,0,0,0.28)',
-                color: '#fff',
-                minWidth: 132,
-              }}
             >
               <option value="today">{isEn ? 'Today' : '今日'}</option>
               <option value="7d">{isEn ? 'Last 7 days' : '近 7 天'}</option>
@@ -369,13 +333,7 @@ const AdminReportsPage: React.FC = () => {
                   type="date"
                   value={customStart}
                   onChange={(e) => setCustomStart(e.target.value)}
-                  style={{
-                    padding: 11,
-                    borderRadius: 10,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    background: 'rgba(255,255,255,0.95)',
-                    color: '#1e293b',
-                  }}
+                  className="admin-input"
                 />
               </div>
               <div>
@@ -384,13 +342,7 @@ const AdminReportsPage: React.FC = () => {
                   type="date"
                   value={customEnd}
                   onChange={(e) => setCustomEnd(e.target.value)}
-                  style={{
-                    padding: 11,
-                    borderRadius: 10,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    background: 'rgba(255,255,255,0.95)',
-                    color: '#1e293b',
-                  }}
+                  className="admin-input"
                 />
               </div>
             </>
@@ -398,16 +350,10 @@ const AdminReportsPage: React.FC = () => {
           <div>
             <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6, fontWeight: 600 }}>{t.region}</div>
             <select
+              className="admin-select"
               value={region}
               onChange={(e) => setRegion(e.target.value)}
-              style={{
-                padding: '11px 14px',
-                borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.22)',
-                background: 'rgba(0,0,0,0.28)',
-                color: '#fff',
-                minWidth: 140,
-              }}
+              style={{ minWidth: 140 }}
             >
               {REGIONS.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -454,10 +400,10 @@ const AdminReportsPage: React.FC = () => {
             <div
               key={String(label)}
               style={{
-                background: 'rgba(255,255,255,0.06)',
-                borderRadius: 16,
+                background: '#fff',
+                borderRadius: 12,
                 padding: isMobile ? '12px' : '14px 16px',
-                border: '1px solid rgba(255,255,255,0.12)',
+                border: '1px solid #e2e8f0',
                 boxShadow: `inset 0 0 0 1px ${tint}`,
               }}
             >
@@ -478,24 +424,24 @@ const AdminReportsPage: React.FC = () => {
         >
           <div
             style={{
-              background: 'rgba(2, 6, 23, 0.38)',
-              borderRadius: 18,
+              background: '#fff',
+              borderRadius: 12,
               padding: isMobile ? 16 : 18,
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid #e2e8f0',
             }}
           >
             <div style={{ fontWeight: 800, marginBottom: 12, fontSize: 15 }}>{t.cod} (MMK)</div>
-            <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: '#6ee7b7', letterSpacing: '-0.02em' }}>
+            <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: '#059669', letterSpacing: '-0.02em' }}>
               {Math.round(summary.codTotalMmk).toLocaleString()}
             </div>
             <div style={{ marginTop: 10, fontSize: 12, opacity: 0.72 }}>{isEn ? 'Sum of COD amounts on loaded packages (estimate).' : '基于当前加载运单的 cod_amount 字段求和（估算）。'}</div>
           </div>
           <div
             style={{
-              background: 'rgba(2, 6, 23, 0.38)',
-              borderRadius: 18,
+              background: '#fff',
+              borderRadius: 12,
               padding: isMobile ? 16 : 18,
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid #e2e8f0',
             }}
           >
             <div style={{ fontWeight: 800, marginBottom: 6, fontSize: 15 }}>{t.recharge}</div>
@@ -507,7 +453,7 @@ const AdminReportsPage: React.FC = () => {
                 [recharge.pending, isEn ? 'Wait' : '待审'],
                 [recharge.rejected, isEn ? 'No' : '拒绝'],
               ].map(([n, lab]) => (
-                <div key={String(lab)} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '10px 6px' }}>
+            <div key={String(lab)} style={{ background: '#f8fafc', borderRadius: 12, padding: '10px 6px' }}>
                   <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800 }}>{n as number}</div>
                   <div style={{ fontSize: 10, opacity: 0.78, marginTop: 4 }}>{lab}</div>
                 </div>
@@ -529,10 +475,10 @@ const AdminReportsPage: React.FC = () => {
         >
           <div
             style={{
-              background: 'rgba(15, 23, 42, 0.5)',
-              borderRadius: 18,
+              background: '#fff',
+              borderRadius: 12,
               padding: isMobile ? 16 : 18,
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid #e2e8f0',
             }}
           >
             <div style={{ fontWeight: 800, marginBottom: 14, fontSize: 15 }}>{t.statusTitle}</div>
@@ -545,7 +491,7 @@ const AdminReportsPage: React.FC = () => {
                     <span style={{ fontWeight: 700 }}>{k}</span>
                     <span
                       style={{
-                        background: 'rgba(255,255,255,0.18)',
+                        background: '#f1f5f9',
                         borderRadius: 8,
                         padding: '2px 8px',
                         fontWeight: 800,
@@ -560,10 +506,10 @@ const AdminReportsPage: React.FC = () => {
           </div>
           <div
             style={{
-              background: 'rgba(15, 23, 42, 0.5)',
-              borderRadius: 18,
+              background: '#fff',
+              borderRadius: 12,
               padding: isMobile ? 16 : 18,
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid #e2e8f0',
             }}
           >
             <div style={{ fontWeight: 800, marginBottom: 14, fontSize: 15 }}>{t.regionTitle}</div>
@@ -576,7 +522,7 @@ const AdminReportsPage: React.FC = () => {
                     <span style={{ fontWeight: 700 }}>{regionLabel(k)}</span>
                     <span
                       style={{
-                        background: 'rgba(255,255,255,0.18)',
+                        background: '#f1f5f9',
                         borderRadius: 8,
                         padding: '2px 8px',
                         fontWeight: 800,

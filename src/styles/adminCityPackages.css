@@ -364,10 +364,34 @@
   align-items: center;
   gap: 0.65rem;
   margin-top: 0.85rem;
-  padding: 0.65rem;
+  padding: 0.75rem 0.85rem;
   border-radius: 10px;
-  background: #f8fafc;
+  background: #fff;
   border: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 0.85rem;
+}
+
+.cpkg-pagination__info {
+  color: #475569;
+  font-weight: 600;
+}
+
+.cpkg-pagination__size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+}
+
+.cpkg-pagination__size select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
 .cpkg-pagination__controls {
@@ -382,16 +406,23 @@
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   background: #fff;
-  color: #334155;
-  font-size: 0.74rem;
+  color: #0f172a;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
+  min-width: 36px;
+}
+
+.cpkg-page-btn:hover:not(:disabled):not(.cpkg-page-btn--active) {
+  border-color: #91caff;
+  color: #1677ff;
+  background: #e6f4ff;
 }
 
 .cpkg-page-btn--active {
-  background: #2563eb;
+  background: #1677ff;
   color: #fff;
-  border-color: #2563eb;
+  border-color: #1677ff;
 }
 
 .cpkg-page-btn:disabled {

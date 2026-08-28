@@ -53,11 +53,11 @@ const FinanceCashCollectionTab: React.FC = () => {
             {/* 顶部标题和统计 */}
             <div
               style={{
-                background: "rgba(255, 255, 255, 0.12)",
+                background: "#ffffff",
                 borderRadius: "16px",
                 padding: isMobile ? "16px" : "24px",
                 marginBottom: "24px",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
+                border: "1px solid #f8fafc",
               }}
             >
               <div
@@ -70,7 +70,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                   gap: "10px",
                 }}
               >
-                <h3 style={{ margin: 0, color: "white", fontSize: "1.5rem" }}>
+                <h3 style={{ margin: 0, color: "#0f172a", fontSize: "1.5rem" }}>
                   💵 {t.cashCollection}
                 </h3>
                 <div
@@ -78,10 +78,10 @@ const FinanceCashCollectionTab: React.FC = () => {
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    background: "rgba(0, 0, 0, 0.3)",
+                    background: "#f1f5f9",
                     padding: "4px 8px",
                     borderRadius: "8px",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
                   <button
@@ -93,7 +93,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     style={{
                       background: "transparent",
                       border: "none",
-                      color: "white",
+                      color: "#0f172a",
                       cursor: "pointer",
                       fontSize: "1.2rem",
                       padding: "0 8px",
@@ -116,7 +116,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       borderRadius: "4px",
                       border: "none",
                       background: "transparent",
-                      color: "white",
+                      color: "#0f172a",
                       fontSize: "1rem",
                       cursor: "pointer",
                       fontFamily: "inherit",
@@ -133,7 +133,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     style={{
                       background: "transparent",
                       border: "none",
-                      color: "white",
+                      color: "#0f172a",
                       cursor: "pointer",
                       fontSize: "1.2rem",
                       padding: "0 8px",
@@ -154,10 +154,10 @@ const FinanceCashCollectionTab: React.FC = () => {
                       )
                     }
                     style={{
-                      background: "rgba(255, 255, 255, 0.1)",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                      background: "#f1f5f9",
+                      border: "1px solid #e2e8f0",
                       borderRadius: "4px",
-                      color: "white",
+                      color: "#0f172a",
                       cursor: "pointer",
                       fontSize: "0.85rem",
                       padding: "4px 10px",
@@ -166,11 +166,11 @@ const FinanceCashCollectionTab: React.FC = () => {
                     }}
                     onMouseOver={(e) =>
                       (e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.2)")
+                        "#e2e8f0")
                     }
                     onMouseOut={(e) =>
                       (e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.1)")
+                        "#f1f5f9")
                     }
                   >
                     {t.today}
@@ -182,7 +182,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                 >
                   <span
                     style={{
-                      color: "rgba(255,255,255,0.7)",
+                      color: "#334155",
                       fontSize: "0.9rem",
                       display: "inline-flex",
                       alignItems: "center",
@@ -227,9 +227,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                     style={{
                       padding: "6px 12px",
                       borderRadius: "8px",
-                      border: "1px solid rgba(255, 255, 255, 0.3)",
-                      background: "rgba(0, 0, 0, 0.3)",
-                      color: "white",
+                      border: "1px solid #e2e8f0",
+                      background: "#f1f5f9",
+                      color: "#0f172a",
                       fontSize: "0.9rem",
                       cursor: "pointer",
                     }}
@@ -256,7 +256,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     borderRadius: "10px",
                     background: "rgba(249, 115, 22, 0.2)",
                     border: "1px solid rgba(249, 115, 22, 0.5)",
-                    color: "rgba(255, 255, 255, 0.96)",
+                    color: "#0f172a",
                     fontSize: "0.95rem",
                     lineHeight: 1.5,
                   }}
@@ -277,7 +277,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     borderRadius: "10px",
                     background: "rgba(255, 193, 7, 0.18)",
                     border: "1px solid rgba(255, 193, 7, 0.45)",
-                    color: "rgba(255, 255, 255, 0.96)",
+                    color: "#0f172a",
                     fontSize: "0.95rem",
                     lineHeight: 1.5,
                   }}
@@ -341,7 +341,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "white",
+                          color: "#0f172a",
                           fontSize: "1.5rem",
                           fontWeight: "bold",
                         }}
@@ -350,7 +350,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.65)",
+                          color: "#64748b",
                           fontSize: "0.8rem",
                           marginTop: "6px",
                         }}
@@ -374,7 +374,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     >
                       <div
                         style={{
-                          color: "#93c5fd",
+                          color: "#1677ff",
                           fontSize: "0.9rem",
                           marginBottom: "8px",
                         }}
@@ -385,7 +385,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "white",
+                          color: "#0f172a",
                           fontSize: "1.5rem",
                           fontWeight: "bold",
                         }}
@@ -394,7 +394,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.7)",
+                          color: "#334155",
                           fontSize: "0.85rem",
                           marginTop: "4px",
                         }}
@@ -416,7 +416,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     >
                       <div
                         style={{
-                          color: "#dbeafe",
+                          color: "#334155",
                           fontSize: "0.9rem",
                           marginBottom: "8px",
                         }}
@@ -425,7 +425,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "white",
+                          color: "#0f172a",
                           fontSize: "1.5rem",
                           fontWeight: "bold",
                         }}
@@ -434,7 +434,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.7)",
+                          color: "#334155",
                           fontSize: "0.85rem",
                           marginTop: "4px",
                         }}
@@ -484,11 +484,11 @@ const FinanceCashCollectionTab: React.FC = () => {
                 return (
                   <div
                     style={{
-                      background: "rgba(255, 255, 255, 0.12)",
+                      background: "#ffffff",
                       borderRadius: "16px",
                       padding: "60px 20px",
                       textAlign: "center",
-                      border: "1px solid rgba(255, 255, 255, 0.18)",
+                      border: "1px solid #f8fafc",
                     }}
                   >
                     <div style={{ fontSize: "3rem", marginBottom: "16px" }}>
@@ -496,7 +496,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255, 255, 255, 0.7)",
+                        color: "#334155",
                         fontSize: "1.1rem",
                       }}
                     >
@@ -527,10 +527,10 @@ const FinanceCashCollectionTab: React.FC = () => {
                         key={courier.id}
                         style={{
                           background:
-                            "linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)",
+                            "#ffffff",
                           borderRadius: "20px",
                           padding: isMobile ? "20px" : "24px",
-                          border: "1px solid rgba(255, 255, 255, 0.15)",
+                          border: "1px solid #f1f5f9",
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
@@ -575,7 +575,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                               <h4
                                 style={{
                                   margin: 0,
-                                  color: "white",
+                                  color: "#0f172a",
                                   fontSize: "1.3rem",
                                   fontWeight: 800,
                                 }}
@@ -593,7 +593,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                 <span
                                   style={{
                                     background: "rgba(72, 187, 120, 0.15)",
-                                    color: "#4ade80",
+                                    color: "#16a34a",
                                     padding: "2px 8px",
                                     borderRadius: "6px",
                                     fontSize: "0.8rem",
@@ -605,7 +605,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                 </span>
                                 <span
                                   style={{
-                                    color: "rgba(255,255,255,0.5)",
+                                    color: "#64748b",
                                     fontSize: "0.8rem",
                                     fontWeight: 600,
                                   }}
@@ -625,16 +625,16 @@ const FinanceCashCollectionTab: React.FC = () => {
 
                           <div
                             style={{
-                              background: "rgba(0,0,0,0.2)",
+                              background: "#f8fafc",
                               padding: "12px 16px",
                               borderRadius: "12px",
-                              border: "1px solid rgba(255,255,255,0.05)",
+                              border: "1px solid #f8fafc",
                               display: "inline-block",
                             }}
                           >
                             <div
                               style={{
-                                color: "rgba(255, 255, 255, 0.6)",
+                                color: "#64748b",
                                 fontSize: "0.85rem",
                                 marginBottom: "4px",
                               }}
@@ -645,8 +645,8 @@ const FinanceCashCollectionTab: React.FC = () => {
                               style={{
                                 color:
                                   cashData.total > 0
-                                    ? "#fbbf24"
-                                    : "rgba(255,255,255,0.4)",
+                                    ? "#d97706"
+                                    : "#cbd5e1",
                                 fontSize: "1.2rem",
                                 fontWeight: 800,
                               }}
@@ -721,8 +721,11 @@ const FinanceCashCollectionTab: React.FC = () => {
                               background:
                                 cashData.packages.length > 0
                                   ? "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
-                                  : "rgba(255, 255, 255, 0.1)",
-                              color: "white",
+                                  : "#f1f5f9",
+                              color:
+                                cashData.packages.length > 0
+                                  ? "#fff"
+                                  : "#64748b",
                               border: "none",
                               padding: "12px 32px",
                               borderRadius: "12px",
@@ -791,10 +794,10 @@ const FinanceCashCollectionTab: React.FC = () => {
             <div
               style={{
                 background:
-                  "linear-gradient(145deg, #1a365d 0%, #2c5282 50%, #3182ce 100%)",
+                  "#ffffff",
                 borderRadius: "20px",
                 padding: 0,
-                border: "1px solid rgba(255, 255, 255, 0.15)",
+                border: "1px solid #f1f5f9",
                 boxShadow: "0 25px 50px rgba(0, 0, 0, 0.5)",
                 maxWidth: "900px",
                 width: "100%",
@@ -809,9 +812,9 @@ const FinanceCashCollectionTab: React.FC = () => {
               <div
                 style={{
                   background:
-                    "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)",
+                    "linear-gradient(135deg, #f1f5f9 0%, #f8fafc 100%)",
                   padding: "24px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                  borderBottom: "1px solid #e2e8f0",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
@@ -823,7 +826,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       margin: 0,
                       fontSize: "1.5rem",
                       fontWeight: 700,
-                      color: "white",
+                      color: "#0f172a",
                     }}
                   >
                     💵 {selectedCourier} - 现金收款详情
@@ -832,7 +835,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     style={{
                       margin: "8px 0 0 0",
                       fontSize: "0.9rem",
-                      color: "rgba(255,255,255,0.7)",
+                      color: "#334155",
                     }}
                   >
                     默认日期为上方「当日收款管理」所选日；与下方结清筛选项、商家代收款订单为同一套规则。可改日期以查看其他区间。
@@ -841,7 +844,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                     style={{
                       margin: "10px 0 0 0",
                       fontSize: "0.78rem",
-                      color: "rgba(255,255,255,0.55)",
+                      color: "#64748b",
                       lineHeight: 1.45,
                       maxWidth: "640px",
                     }}
@@ -855,9 +858,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                 <button
                   onClick={() => setShowCashDetailModal(false)}
                   style={{
-                    background: "rgba(255, 255, 255, 0.1)",
-                    color: "white",
-                    border: "1px solid rgba(255,255,255,0.2)",
+                    background: "#f1f5f9",
+                    color: "#0f172a",
+                    border: "1px solid #e2e8f0",
                     padding: "8px 16px",
                     borderRadius: "10px",
                     cursor: "pointer",
@@ -867,11 +870,11 @@ const FinanceCashCollectionTab: React.FC = () => {
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.2)";
+                      "#e2e8f0";
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.1)";
+                      "#f1f5f9";
                   }}
                 >
                   ✕
@@ -889,16 +892,16 @@ const FinanceCashCollectionTab: React.FC = () => {
                 {/* 日期筛选 */}
                 <div
                   style={{
-                    background: "rgba(255, 255, 255, 0.08)",
+                    background: "#f8fafc",
                     borderRadius: "12px",
                     padding: "16px",
                     marginBottom: "20px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
                   <div
                     style={{
-                      color: "white",
+                      color: "#0f172a",
                       fontSize: "0.9rem",
                       marginBottom: "12px",
                       fontWeight: "600",
@@ -926,9 +929,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                       style={{
                         padding: "8px 12px",
                         borderRadius: "8px",
-                        border: "1px solid rgba(255, 255, 255, 0.25)",
-                        background: "rgba(7, 23, 53, 0.65)",
-                        color: "white",
+                        border: "1px solid #e2e8f0",
+                        background: "#ffffff",
+                        color: "#0f172a",
                         fontSize: "0.9rem",
                         minWidth: "120px",
                       }}
@@ -950,13 +953,13 @@ const FinanceCashCollectionTab: React.FC = () => {
                           style={{
                             padding: "8px 12px",
                             borderRadius: "8px",
-                            border: "1px solid rgba(255, 255, 255, 0.25)",
-                            background: "rgba(7, 23, 53, 0.65)",
-                            color: "white",
+                            border: "1px solid #e2e8f0",
+                            background: "#ffffff",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         />
-                        <span style={{ color: "rgba(255, 255, 255, 0.7)" }}>
+                        <span style={{ color: "#334155" }}>
                           至
                         </span>
                         <input
@@ -966,9 +969,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                           style={{
                             padding: "8px 12px",
                             borderRadius: "8px",
-                            border: "1px solid rgba(255, 255, 255, 0.25)",
-                            background: "rgba(7, 23, 53, 0.65)",
-                            color: "white",
+                            border: "1px solid #e2e8f0",
+                            background: "#ffffff",
+                            color: "#0f172a",
                             fontSize: "0.9rem",
                           }}
                         />
@@ -1048,11 +1051,11 @@ const FinanceCashCollectionTab: React.FC = () => {
                     return (
                       <div
                         style={{
-                          background: "rgba(255, 255, 255, 0.08)",
+                          background: "#f8fafc",
                           borderRadius: "12px",
                           padding: "60px 20px",
                           textAlign: "center",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          border: "1px solid #e2e8f0",
                         }}
                       >
                         <div style={{ fontSize: "3rem", marginBottom: "16px" }}>
@@ -1060,7 +1063,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                         </div>
                         <div
                           style={{
-                            color: "rgba(255, 255, 255, 0.7)",
+                            color: "#334155",
                             fontSize: "1.1rem",
                           }}
                         >
@@ -1183,7 +1186,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "1.4rem",
                                 fontWeight: "bold",
                               }}
@@ -1192,7 +1195,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "rgba(255, 255, 255, 0.7)",
+                                color: "#334155",
                                 fontSize: "0.8rem",
                                 marginTop: "4px",
                               }}
@@ -1226,7 +1229,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "1.4rem",
                                 fontWeight: "bold",
                               }}
@@ -1235,7 +1238,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "rgba(255, 255, 255, 0.7)",
+                                color: "#334155",
                                 fontSize: "0.8rem",
                                 marginTop: "4px",
                               }}
@@ -1259,7 +1262,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                           >
                             <div
                               style={{
-                                color: "#bfdbfe",
+                                color: "#1677ff",
                                 fontSize: "0.9rem",
                                 marginBottom: "4px",
                               }}
@@ -1272,7 +1275,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "1.4rem",
                                 fontWeight: "bold",
                               }}
@@ -1281,7 +1284,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "rgba(255, 255, 255, 0.65)",
+                                color: "#64748b",
                                 fontSize: "0.75rem",
                                 marginTop: "6px",
                               }}
@@ -1318,7 +1321,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "1.4rem",
                                 fontWeight: "bold",
                               }}
@@ -1327,7 +1330,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "rgba(255, 255, 255, 0.65)",
+                                color: "#64748b",
                                 fontSize: "0.75rem",
                                 marginTop: "6px",
                               }}
@@ -1364,7 +1367,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "1.4rem",
                                 fontWeight: "bold",
                               }}
@@ -1374,7 +1377,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "rgba(255, 255, 255, 0.65)",
+                                color: "#64748b",
                                 fontSize: "0.75rem",
                                 marginTop: "6px",
                               }}
@@ -1407,7 +1410,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "1.4rem",
                                 fontWeight: "bold",
                               }}
@@ -1416,7 +1419,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </div>
                             <div
                               style={{
-                                color: "rgba(255, 255, 255, 0.65)",
+                                color: "#64748b",
                                 fontSize: "0.75rem",
                                 marginTop: "6px",
                               }}
@@ -1444,8 +1447,8 @@ const FinanceCashCollectionTab: React.FC = () => {
                             style={{
                               background: allSelected
                                 ? "rgba(59, 130, 246, 0.3)"
-                                : "rgba(255, 255, 255, 0.1)",
-                              border: `2px solid ${allSelected ? "#3b82f6" : "rgba(255, 255, 255, 0.3)"}`,
+                                : "#f1f5f9",
+                              border: `2px solid ${allSelected ? "#3b82f6" : "#e2e8f0"}`,
                               borderRadius: "8px",
                               padding: "8px 12px",
                               cursor: "pointer",
@@ -1457,12 +1460,12 @@ const FinanceCashCollectionTab: React.FC = () => {
                             onMouseOver={(e) => {
                               e.currentTarget.style.background = allSelected
                                 ? "rgba(59, 130, 246, 0.4)"
-                                : "rgba(255, 255, 255, 0.15)";
+                                : "#f1f5f9";
                             }}
                             onMouseOut={(e) => {
                               e.currentTarget.style.background = allSelected
                                 ? "rgba(59, 130, 246, 0.3)"
-                                : "rgba(255, 255, 255, 0.1)";
+                                : "#f1f5f9";
                             }}
                           >
                             <span style={{ fontSize: "1.2rem" }}>
@@ -1470,7 +1473,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                             </span>
                             <span
                               style={{
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "0.85rem",
                                 fontWeight: "600",
                               }}
@@ -1487,7 +1490,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                               background:
                                 selectedCashPackages.size > 0
                                   ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                                  : "rgba(255, 255, 255, 0.1)",
+                                  : "#f1f5f9",
                               border: "none",
                               borderRadius: "8px",
                               padding: "8px 16px",
@@ -1525,7 +1528,10 @@ const FinanceCashCollectionTab: React.FC = () => {
                             <span style={{ fontSize: "1rem" }}>✅</span>
                             <span
                               style={{
-                                color: "white",
+                                color:
+                                  selectedCashPackages.size > 0
+                                    ? "#fff"
+                                    : "#64748b",
                                 fontSize: "0.9rem",
                                 fontWeight: "600",
                               }}
@@ -1540,11 +1546,11 @@ const FinanceCashCollectionTab: React.FC = () => {
                       {visiblePackages.length === 0 ? (
                         <div
                           style={{
-                            background: "rgba(255, 255, 255, 0.08)",
+                            background: "#f8fafc",
                             borderRadius: "12px",
                             padding: "60px 20px",
                             textAlign: "center",
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            border: "1px solid #e2e8f0",
                           }}
                         >
                           <div
@@ -1554,7 +1560,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                           </div>
                           <div
                             style={{
-                              color: "rgba(255, 255, 255, 0.7)",
+                              color: "#334155",
                               fontSize: "1.1rem",
                             }}
                           >
@@ -1594,12 +1600,12 @@ const FinanceCashCollectionTab: React.FC = () => {
                                 style={{
                                   background: isSelected
                                     ? "rgba(59, 130, 246, 0.15)"
-                                    : "rgba(255, 255, 255, 0.1)",
+                                    : "#f1f5f9",
                                   borderRadius: "10px",
                                   padding: "16px",
                                   border: isSelected
                                     ? "2px solid #3b82f6"
-                                    : "1px solid rgba(255, 255, 255, 0.15)",
+                                    : "1px solid #f1f5f9",
                                   position: "relative",
                                   transition: "all 0.3s ease",
                                 }}
@@ -1624,7 +1630,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                     width: "20px",
                                     height: "20px",
                                     background: "white",
-                                    border: `2px solid ${isSelected ? "#3b82f6" : "rgba(255, 255, 255, 0.5)"}`,
+                                    border: `2px solid ${isSelected ? "#3b82f6" : "#cbd5e1"}`,
                                     borderRadius: "4px",
                                     cursor: "pointer",
                                     display: "flex",
@@ -1643,7 +1649,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                     e.currentTarget.style.borderColor =
                                       isSelected
                                         ? "#3b82f6"
-                                        : "rgba(255, 255, 255, 0.5)";
+                                        : "#cbd5e1";
                                     e.currentTarget.style.transform =
                                       "scale(1)";
                                   }}
@@ -1673,7 +1679,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                   <div style={{ flex: 1 }}>
                                     <div
                                       style={{
-                                        color: "white",
+                                        color: "#0f172a",
                                         fontWeight: "bold",
                                         fontSize: "0.95rem",
                                         marginBottom: "4px",
@@ -1683,7 +1689,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                     </div>
                                     <div
                                       style={{
-                                        color: "rgba(255, 255, 255, 0.7)",
+                                        color: "#334155",
                                         fontSize: "0.85rem",
                                       }}
                                     >
@@ -1732,7 +1738,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                           <div
                                             style={{
                                         background: "rgba(148, 163, 184, 0.25)",
-                                        color: "#e2e8f0",
+                                        color: "#64748b",
                                         padding: "4px 12px",
                                         borderRadius: "6px",
                                         fontSize: "0.75rem",
@@ -1769,12 +1775,12 @@ const FinanceCashCollectionTab: React.FC = () => {
                                 </div>
                                 <div
                                   style={{
-                                    color: "rgba(255, 255, 255, 0.6)",
+                                    color: "#64748b",
                                     fontSize: "0.8rem",
                                     marginTop: "8px",
                                     paddingTop: "8px",
                                     borderTop:
-                                      "1px solid rgba(255, 255, 255, 0.1)",
+                                      "1px solid #e2e8f0",
                                   }}
                                 >
                                   📍 {pkg.receiver_address}
@@ -1782,7 +1788,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                 {pkg.delivery_time && (
                                   <div
                                     style={{
-                                      color: "rgba(255, 255, 255, 0.5)",
+                                      color: "#64748b",
                                       fontSize: "0.75rem",
                                       marginTop: "4px",
                                     }}
@@ -1793,7 +1799,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                                 {pkg.create_time && (
                                   <div
                                     style={{
-                                      color: "rgba(255, 255, 255, 0.5)",
+                                      color: "#64748b",
                                       fontSize: "0.75rem",
                                       marginTop: "2px",
                                     }}

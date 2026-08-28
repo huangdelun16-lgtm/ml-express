@@ -1884,11 +1884,11 @@ const FinanceManagement: React.FC = () => {
     <div
       onClick={onClick}
       style={{
-        background: "rgba(255, 255, 255, 0.12)",
-        borderRadius: "16px",
+        background: "#fff",
+        borderRadius: "12px",
         padding: "24px",
-        border: "1px solid rgba(255, 255, 255, 0.25)",
-        boxShadow: "0 10px 30px rgba(10, 31, 68, 0.35)",
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.06)",
         position: "relative",
         overflow: "hidden",
         cursor: onClick ? "pointer" : "default",
@@ -1897,13 +1897,13 @@ const FinanceManagement: React.FC = () => {
       onMouseOver={(e) => {
         if (onClick) {
           e.currentTarget.style.transform = "translateY(-5px)";
-          e.currentTarget.style.background = "rgba(255, 255, 255, 0.18)";
+          e.currentTarget.style.background = "#f8fafc";
         }
       }}
       onMouseOut={(e) => {
         if (onClick) {
           e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+          e.currentTarget.style.background = "#ffffff";
         }
       }}
     >
@@ -1921,7 +1921,7 @@ const FinanceManagement: React.FC = () => {
       />
       <h3
         style={{
-          color: "rgba(255, 255, 255, 0.9)",
+          color: "#0f172a",
           fontSize: "1.1rem",
           marginBottom: "12px",
         }}
@@ -1941,7 +1941,7 @@ const FinanceManagement: React.FC = () => {
       </div>
       <div
         style={{
-          color: "rgba(255, 255, 255, 0.65)",
+          color: "#64748b",
           fontSize: "0.9rem",
           margin: 0,
         }}
@@ -2064,39 +2064,19 @@ const FinanceManagement: React.FC = () => {
 
   return (
     <FinanceWorkspaceProvider value={financeWorkspace}>
-    <div
-      style={{
-        minHeight: "100vh",
-        background:
-          "linear-gradient(135deg, #091540 0%, #1a365d 35%, #2c5282 70%, #3a77ad 100%)",
-        padding: "24px",
-        fontFamily: "Segoe UI, sans-serif",
-      }}
-    >
+    <div className="admin-page admin-finance">
       <div
         style={{
           maxWidth: "1280px",
           margin: "0 auto",
-          color: "white",
+          color: "#0f172a",
           position: "relative",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "32px",
-            gap: isMobile ? "12px" : "16px",
-          }}
-        >
+        <div className="admin-page-head">
           <div>
             <h1
               style={{
-                fontSize: "2.4rem",
-                margin: 0,
-                letterSpacing: "1px",
-                textShadow: "0 8px 20px rgba(3, 27, 78, 0.55)",
                 display: "flex",
                 alignItems: "center",
                 gap: "12px",
@@ -2107,7 +2087,7 @@ const FinanceManagement: React.FC = () => {
                 <span
                   style={{
                     background: "#48bb78",
-                    color: "white",
+                    color: "#0f172a",
                     padding: "4px 12px",
                     borderRadius: "8px",
                     fontSize: "0.9rem",
@@ -2119,70 +2099,21 @@ const FinanceManagement: React.FC = () => {
                 </span>
               )}
             </h1>
-            <p
-              style={{
-                margin: "8px 0 0 0",
-                color: "rgba(255, 255, 255, 0.75)",
-              }}
-            >
-              {t.subtitle}
-            </p>
+            <p style={{ margin: "8px 0 0 0" }}>{t.subtitle}</p>
           </div>
-          <div style={{ display: "flex", gap: "12px" }}>
+          <div className="admin-page-actions">
             <button
+              type="button"
+              className="admin-shell__btn"
               onClick={loadRecords}
               disabled={loading}
-              style={{
-                background: loading
-                  ? "rgba(255, 255, 255, 0.1)"
-                  : "rgba(255, 255, 255, 0.12)",
-                color: "white",
-                border: "1px solid rgba(255, 255, 255, 0.35)",
-                padding: "12px 24px",
-                borderRadius: "12px",
-                cursor: loading ? "not-allowed" : "pointer",
-                fontSize: "1rem",
-                transition: "all 0.3s ease",
-                backdropFilter: "blur(10px)",
-                opacity: loading ? 0.6 : 1,
-              }}
-              onMouseOver={(e) => {
-                if (!loading) {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-                  e.currentTarget.style.transform = "translateY(-3px)";
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!loading) {
-                  e.currentTarget.style.background =
-                    "rgba(255, 255, 255, 0.12)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }
-              }}
             >
               {loading ? "🔄 " + t.loadingData : "🔄 " + t.refreshData}
             </button>
             <button
+              type="button"
+              className="admin-shell__btn"
               onClick={() => navigate("/admin/dashboard")}
-              style={{
-                background: "rgba(255, 255, 255, 0.12)",
-                color: "white",
-                border: "1px solid rgba(255, 255, 255, 0.35)",
-                padding: "12px 24px",
-                borderRadius: "12px",
-                cursor: "pointer",
-                fontSize: "1rem",
-                transition: "all 0.3s ease",
-                backdropFilter: "blur(10px)",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-                e.currentTarget.style.transform = "translateY(-3px)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
             >
               ← {t.backToDashboard}
             </button>
@@ -2224,13 +2155,13 @@ const FinanceManagement: React.FC = () => {
                   borderRadius: "12px",
                   border:
                     key === "cash_collection" && showYesterdayCashTabIndicator
-                      ? "1px solid rgba(249, 115, 22, 0.55)"
-                      : "1px solid rgba(255, 255, 255, 0.25)",
+                      ? "1px solid #fb923c"
+                      : "1px solid #e2e8f0",
                   background:
                     activeTab === key
-                      ? "rgba(255, 255, 255, 0.22)"
-                      : "rgba(255, 255, 255, 0.12)",
-                  color: "white",
+                      ? "#e6f4ff"
+                      : "#fff",
+                  color: activeTab === key ? "#0958d9" : "#0f172a",
                   cursor: "pointer",
                   fontSize: "1rem",
                   transition: "all 0.3s ease",
@@ -2301,9 +2232,7 @@ const FinanceManagement: React.FC = () => {
         {activeTab === "overview" && (
           <Suspense
             fallback={
-              <div style={{ color: "white", padding: "40px", textAlign: "center" }}>
-                {t.loadingData}
-              </div>
+              <div className="admin-loading">{t.loadingData}</div>
             }
           >
             <FinanceOverviewTab />
@@ -2313,9 +2242,7 @@ const FinanceManagement: React.FC = () => {
         {activeTab === "records" && (
           <Suspense
             fallback={
-              <div style={{ color: "white", padding: "40px", textAlign: "center" }}>
-                {t.loadingData}
-              </div>
+              <div className="admin-loading">{t.loadingData}</div>
             }
           >
             <FinanceRecordsTab />
@@ -2327,7 +2254,7 @@ const FinanceManagement: React.FC = () => {
             fallback={
               <div
                 style={{
-                  color: "white",
+                  color: "#0f172a",
                   padding: "40px",
                   textAlign: "center",
                 }}
@@ -2349,9 +2276,7 @@ const FinanceManagement: React.FC = () => {
         {activeTab === "package_records" && (
           <Suspense
             fallback={
-              <div style={{ color: "white", padding: "40px", textAlign: "center" }}>
-                {t.loadingData}
-              </div>
+              <div className="admin-loading">{t.loadingData}</div>
             }
           >
             <FinancePackageRecordsTab />
@@ -2367,9 +2292,7 @@ const FinanceManagement: React.FC = () => {
         {activeTab === "courier_records" && !extrasLoading && (
           <Suspense
             fallback={
-              <div style={{ color: "white", padding: "40px", textAlign: "center" }}>
-                {t.loadingData}
-              </div>
+              <div className="admin-loading">{t.loadingData}</div>
             }
           >
             <FinanceCourierRecordsTab />
@@ -2385,9 +2308,7 @@ const FinanceManagement: React.FC = () => {
         {activeTab === "cash_collection" && !extrasLoading && (
           <Suspense
             fallback={
-              <div style={{ color: "white", padding: "40px", textAlign: "center" }}>
-                {t.loadingData}
-              </div>
+              <div className="admin-loading">{t.loadingData}</div>
             }
           >
             <FinanceCashCollectionTab />
@@ -2397,9 +2318,7 @@ const FinanceManagement: React.FC = () => {
         {activeTab === "merchants_collection" && (
           <Suspense
             fallback={
-              <div style={{ color: "white", padding: "40px", textAlign: "center" }}>
-                {t.loadingData}
-              </div>
+              <div className="admin-loading">{t.loadingData}</div>
             }
           >
             <FinanceMerchantsCollectionTab />
@@ -2427,7 +2346,7 @@ const FinanceManagement: React.FC = () => {
         >
           <div
             style={{
-              background: "linear-gradient(135deg, #1a365d 0%, #2c5282 100%)",
+              background: "#ffffff",
               borderRadius: "24px",
               width: "100%",
               maxWidth: "900px",
@@ -2436,14 +2355,14 @@ const FinanceManagement: React.FC = () => {
               display: "flex",
               flexDirection: "column",
               boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              border: "1px solid #f1f5f9",
             }}
           >
             {/* Header */}
             <div
               style={{
                 padding: "24px",
-                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                borderBottom: "1px solid #f1f5f9",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -2453,7 +2372,7 @@ const FinanceManagement: React.FC = () => {
                 style={{
                   margin: 0,
                   fontSize: "1.5rem",
-                  color: "white",
+                  color: "#0f172a",
                   display: "flex",
                   alignItems: "center",
                   gap: "12px",
@@ -2463,7 +2382,7 @@ const FinanceManagement: React.FC = () => {
                 <span
                   style={{
                     fontSize: "0.9rem",
-                    background: "rgba(255,255,255,0.1)",
+                    background: "#f1f5f9",
                     padding: "4px 12px",
                     borderRadius: "20px",
                     opacity: 0.8,
@@ -2482,9 +2401,9 @@ const FinanceManagement: React.FC = () => {
                   setShowPendingOrdersModal(false);
                 }}
                 style={{
-                  background: "rgba(255,255,255,0.1)",
+                  background: "#f1f5f9",
                   border: "none",
-                  color: "white",
+                  color: "#0f172a",
                   fontSize: "1.5rem",
                   cursor: "pointer",
                   width: "40px",
@@ -2496,10 +2415,10 @@ const FinanceManagement: React.FC = () => {
                   transition: "all 0.2s",
                 }}
                 onMouseOver={(e) =>
-                  (e.currentTarget.style.background = "rgba(255,255,255,0.2)")
+                  (e.currentTarget.style.background = "#e2e8f0")
                 }
                 onMouseOut={(e) =>
-                  (e.currentTarget.style.background = "rgba(255,255,255,0.1)")
+                  (e.currentTarget.style.background = "#f1f5f9")
                 }
               >
                 ×
@@ -2510,10 +2429,10 @@ const FinanceManagement: React.FC = () => {
               <div
                 style={{
                   padding: "0 24px 12px",
-                  color: "rgba(255,255,255,0.72)",
+                  color: "#64748b",
                   fontSize: "0.84rem",
                   lineHeight: 1.45,
-                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                  borderBottom: "1px solid #e2e8f0",
                 }}
               >
                 {language === "zh"
@@ -2527,10 +2446,10 @@ const FinanceManagement: React.FC = () => {
               <div
                     style={{
                   padding: "0 24px 12px",
-                  color: "rgba(255,255,255,0.72)",
+                  color: "#64748b",
                   fontSize: "0.84rem",
                   lineHeight: 1.45,
-                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                  borderBottom: "1px solid #e2e8f0",
                 }}
               >
                 {language === "zh"
@@ -2569,9 +2488,9 @@ const FinanceManagement: React.FC = () => {
                       minWidth: 0,
                       padding: "10px 14px",
                       borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      background: "rgba(0,0,0,0.25)",
-                      color: "white",
+                      border: "1px solid #e2e8f0",
+                      background: "#ffffff",
+                      color: "#0f172a",
                       fontSize: "0.95rem",
                     }}
                   />
@@ -2582,14 +2501,14 @@ const FinanceManagement: React.FC = () => {
                     style={{
                       padding: "10px 18px",
                       borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.25)",
+                      border: "1px solid #e2e8f0",
                       background:
                         filteredMerchantCodModalOrders.length === 0
-                          ? "rgba(255,255,255,0.08)"
+                          ? "#f8fafc"
                           : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
                       color:
                         filteredMerchantCodModalOrders.length === 0
-                          ? "rgba(255,255,255,0.4)"
+                          ? "#cbd5e1"
                           : "#05221a",
                       fontWeight: 700,
                       cursor:
@@ -2623,10 +2542,10 @@ const FinanceManagement: React.FC = () => {
                   <div
                     key={pkg.id}
                     style={{
-                      background: "rgba(255,255,255,0.05)",
+                      background: "#f8fafc",
                       borderRadius: "16px",
                       padding: "16px",
-                      border: "1px solid rgba(255,255,255,0.1)",
+                      border: "1px solid #f1f5f9",
                       transition: "transform 0.2s",
                     }}
                   >
@@ -2755,7 +2674,7 @@ const FinanceManagement: React.FC = () => {
                         <span style={{ opacity: 0.6 }}>
                           {language === "zh" ? "店铺" : "Store"}:
                         </span>
-                        <span style={{ color: "white" }}>
+                        <span style={{ color: "#0f172a" }}>
                           {pkg.sender_name}
                         </span>
                       </div>
@@ -2770,7 +2689,7 @@ const FinanceManagement: React.FC = () => {
                         <span style={{ opacity: 0.6 }}>
                           {language === "zh" ? "客户" : "Customer"}:
                         </span>
-                        <span style={{ color: "white" }}>
+                        <span style={{ color: "#0f172a" }}>
                           {pkg.receiver_name}
                         </span>
                       </div>
@@ -2817,7 +2736,7 @@ const FinanceManagement: React.FC = () => {
                           style={{
                             marginTop: "8px",
                             paddingTop: "8px",
-                            borderTop: "1px solid rgba(255,255,255,0.05)",
+                            borderTop: "1px solid #f8fafc",
                             fontSize: "0.8rem",
                             opacity: 0.5,
                             textAlign: "right",
@@ -2844,7 +2763,7 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255,255,255,0.5)",
+                        color: "#64748b",
                         fontSize: "1.1rem",
                       }}
                     >
@@ -2867,7 +2786,7 @@ const FinanceManagement: React.FC = () => {
                     >
                       <div
                         style={{
-                          color: "rgba(255,255,255,0.5)",
+                          color: "#64748b",
                           fontSize: "1.1rem",
                         }}
                       >
@@ -2886,7 +2805,7 @@ const FinanceManagement: React.FC = () => {
             <div
               style={{
                 padding: "20px 24px",
-                borderTop: "1px solid rgba(255,255,255,0.1)",
+                borderTop: "1px solid #f1f5f9",
                 textAlign: "right",
               }}
             >
@@ -2935,7 +2854,7 @@ const FinanceManagement: React.FC = () => {
         >
           <div
             style={{
-              background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)",
+              background: "#ffffff",
               borderRadius: "24px",
               width: "100%",
               maxWidth: "900px",
@@ -2944,7 +2863,7 @@ const FinanceManagement: React.FC = () => {
               display: "flex",
               flexDirection: "column",
               boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              border: "1px solid #f1f5f9",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2952,7 +2871,7 @@ const FinanceManagement: React.FC = () => {
             <div
               style={{
                 padding: "24px",
-                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                borderBottom: "1px solid #f1f5f9",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -2962,7 +2881,7 @@ const FinanceManagement: React.FC = () => {
                 style={{
                   margin: 0,
                   fontSize: "1.5rem",
-                  color: "white",
+                  color: "#0f172a",
                   display: "flex",
                   alignItems: "center",
                   gap: "12px",
@@ -2975,7 +2894,7 @@ const FinanceManagement: React.FC = () => {
                 <span
                   style={{
                     fontSize: "0.9rem",
-                    background: "rgba(255,255,255,0.1)",
+                    background: "#f1f5f9",
                     padding: "4px 12px",
                     borderRadius: "20px",
                     opacity: 0.8,
@@ -2998,9 +2917,9 @@ const FinanceManagement: React.FC = () => {
               <button
                 onClick={() => setShowPlatformPaymentModal(false)}
                 style={{
-                  background: "rgba(255,255,255,0.1)",
+                  background: "#f1f5f9",
                   border: "none",
-                  color: "white",
+                  color: "#0f172a",
                   fontSize: "1.5rem",
                   cursor: "pointer",
                   width: "40px",
@@ -3012,10 +2931,10 @@ const FinanceManagement: React.FC = () => {
                   transition: "all 0.2s",
                 }}
                 onMouseOver={(e) =>
-                  (e.currentTarget.style.background = "rgba(255,255,255,0.2)")
+                  (e.currentTarget.style.background = "#e2e8f0")
                 }
                 onMouseOut={(e) =>
-                  (e.currentTarget.style.background = "rgba(255,255,255,0.1)")
+                  (e.currentTarget.style.background = "#f1f5f9")
                 }
               >
                 ×
@@ -3031,17 +2950,17 @@ const FinanceManagement: React.FC = () => {
                   gap: "12px",
                   marginBottom: "20px",
                   flexWrap: "wrap",
-                  background: "rgba(255, 255, 255, 0.08)",
+                  background: "#f8fafc",
                   padding: "16px",
                   borderRadius: "12px",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  border: "1px solid #e2e8f0",
                 }}
               >
                 <div style={{ flex: 1, minWidth: "200px" }}>
                   <label
                     style={{
                       display: "block",
-                      color: "rgba(255,255,255,0.6)",
+                      color: "#64748b",
                       fontSize: "0.8rem",
                       marginBottom: "6px",
                     }}
@@ -3057,9 +2976,9 @@ const FinanceManagement: React.FC = () => {
                       width: "100%",
                       padding: "8px 12px",
                       borderRadius: "8px",
-                      border: "1px solid rgba(255, 255, 255, 0.25)",
-                      background: "rgba(7, 23, 53, 0.65)",
-                      color: "white",
+                      border: "1px solid #e2e8f0",
+                      background: "#ffffff",
+                      color: "#0f172a",
                       fontSize: "0.9rem",
                     }}
                   >
@@ -3084,7 +3003,7 @@ const FinanceManagement: React.FC = () => {
                   <label
                     style={{
                       display: "block",
-                      color: "rgba(255,255,255,0.6)",
+                      color: "#64748b",
                       fontSize: "0.8rem",
                       marginBottom: "6px",
                     }}
@@ -3100,9 +3019,9 @@ const FinanceManagement: React.FC = () => {
                       width: "100%",
                       padding: "8px 12px",
                       borderRadius: "8px",
-                      border: "1px solid rgba(255, 255, 255, 0.25)",
-                      background: "rgba(7, 23, 53, 0.65)",
-                      color: "white",
+                      border: "1px solid #e2e8f0",
+                      background: "#ffffff",
+                      color: "#0f172a",
                       fontSize: "0.9rem",
                     }}
                   >
@@ -3156,10 +3075,10 @@ const FinanceManagement: React.FC = () => {
                       <div
                         key={pkg.id}
                         style={{
-                          background: "rgba(255,255,255,0.05)",
+                          background: "#f8fafc",
                           borderRadius: "16px",
                           padding: "16px",
-                          border: "1px solid rgba(255,255,255,0.1)",
+                          border: "1px solid #f1f5f9",
                           transition: "transform 0.2s",
                         }}
                       >
@@ -3210,7 +3129,7 @@ const FinanceManagement: React.FC = () => {
                             <span style={{ opacity: 0.6 }}>
                               {language === "zh" ? "客户" : "Customer"}:
                             </span>
-                            <span style={{ color: "white" }}>
+                            <span style={{ color: "#0f172a" }}>
                               {pkg.receiver_name}
                             </span>
                           </div>
@@ -3243,7 +3162,7 @@ const FinanceManagement: React.FC = () => {
                               {language === "zh" ? "跑腿费" : "Delivery Fee"}:
                             </span>
                             <div style={{ textAlign: "right" }}>
-                              <div style={{ color: "white" }}>{pkg.price}</div>
+                              <div style={{ color: "#0f172a" }}>{pkg.price}</div>
                               <div
                                 style={{
                                   fontSize: "0.7rem",
@@ -3268,7 +3187,7 @@ const FinanceManagement: React.FC = () => {
                             style={{
                               marginTop: "8px",
                               paddingTop: "8px",
-                              borderTop: "1px solid rgba(255,255,255,0.05)",
+                              borderTop: "1px solid #f8fafc",
                               fontSize: "0.8rem",
                               opacity: 0.5,
                               textAlign: "right",
@@ -3295,7 +3214,7 @@ const FinanceManagement: React.FC = () => {
                     </div>
                     <div
                       style={{
-                        color: "rgba(255,255,255,0.5)",
+                        color: "#64748b",
                         fontSize: "1.1rem",
                       }}
                     >
@@ -3312,7 +3231,7 @@ const FinanceManagement: React.FC = () => {
             <div
               style={{
                 padding: "20px 24px",
-                borderTop: "1px solid rgba(255,255,255,0.1)",
+                borderTop: "1px solid #f1f5f9",
                 textAlign: "right",
               }}
             >
@@ -3362,11 +3281,11 @@ const FinanceManagement: React.FC = () => {
               maxWidth: 560,
               maxHeight: "min(92vh, 720px)",
               background:
-                "linear-gradient(165deg, rgba(22, 45, 78, 0.98) 0%, rgba(12, 28, 54, 0.99) 100%)",
+                "#ffffff",
               borderRadius: 20,
-              border: "1px solid rgba(120, 180, 255, 0.22)",
+              border: "1px solid #e2e8f0",
               boxShadow:
-                "0 28px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06) inset",
+                "0 28px 60px rgba(0,0,0,0.45), 0 0 0 1px #f8fafc inset",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
@@ -3377,7 +3296,7 @@ const FinanceManagement: React.FC = () => {
               style={{
                 flexShrink: 0,
                 padding: "18px 20px 14px",
-                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                borderBottom: "1px solid #f1f5f9",
                 display: "flex",
                 alignItems: "flex-start",
                 justifyContent: "space-between",
@@ -3389,7 +3308,7 @@ const FinanceManagement: React.FC = () => {
                   id="finance-record-form-title"
                   style={{
                     margin: 0,
-                    color: "#fff",
+                    color: "#0f172a",
                     fontSize: isMobile ? "1.2rem" : "1.35rem",
                     fontWeight: 800,
                     letterSpacing: "0.02em",
@@ -3400,7 +3319,7 @@ const FinanceManagement: React.FC = () => {
                 <p
                   style={{
                     margin: "8px 0 0",
-                    color: "rgba(255,255,255,0.55)",
+                    color: "#64748b",
                     fontSize: "0.85rem",
                     lineHeight: 1.45,
                   }}
@@ -3421,9 +3340,9 @@ const FinanceManagement: React.FC = () => {
                   width: 40,
                   height: 40,
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  background: "rgba(255,255,255,0.06)",
-                  color: "rgba(255,255,255,0.75)",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  color: "#475569",
                   fontSize: "1.35rem",
                   lineHeight: 1,
                   cursor: "pointer",
@@ -3482,13 +3401,13 @@ const FinanceManagement: React.FC = () => {
                             ? v === "income"
                               ? "2px solid rgba(52, 211, 153, 0.9)"
                               : "2px solid rgba(251, 113, 133, 0.95)"
-                            : "1px solid rgba(255,255,255,0.14)",
+                            : "1px solid #e2e8f0",
                           background: on
                             ? v === "income"
                               ? "rgba(16, 185, 129, 0.2)"
                               : "rgba(244, 63, 94, 0.18)"
-                            : "rgba(255,255,255,0.04)",
-                          color: "#fff",
+                            : "#f8fafc",
+                          color: "#0f172a",
                           fontWeight: 700,
                           fontSize: "0.95rem",
                           cursor: "pointer",
@@ -3510,7 +3429,7 @@ const FinanceManagement: React.FC = () => {
                   const lab = {
                     display: "block" as const,
                     marginBottom: "6px",
-                    color: "rgba(255, 255, 255, 0.85)",
+                    color: "#0f172a",
                     fontSize: "0.82rem",
                     fontWeight: 600,
                   };
@@ -3518,18 +3437,18 @@ const FinanceManagement: React.FC = () => {
                     width: "100%",
                     padding: "12px 14px",
                     borderRadius: "10px",
-                    border: "1px solid rgba(255, 255, 255, 0.25)",
-                    background: "rgba(7, 23, 53, 0.65)",
-                    color: "white",
+                    border: "1px solid #e2e8f0",
+                    background: "#ffffff",
+                    color: "#0f172a",
                     fontSize: "0.95rem",
                   };
                   const inp = {
                     width: "100%",
                     padding: "12px 14px",
                     borderRadius: "10px",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255, 255, 255, 0.1)",
-                    color: "white",
+                    border: "1px solid #e2e8f0",
+                    background: "#f1f5f9",
+                    color: "#0f172a",
                     fontSize: "0.95rem",
                   };
                   const secTitle = (text: string) => (
@@ -3539,7 +3458,7 @@ const FinanceManagement: React.FC = () => {
                         fontWeight: 700,
                         letterSpacing: "0.12em",
                         textTransform: "uppercase" as const,
-                        color: "rgba(147, 197, 253, 0.85)",
+                        color: "#64748b",
                         margin: "18px 0 10px",
                       }}
                     >
@@ -3685,7 +3604,7 @@ const FinanceManagement: React.FC = () => {
                                 borderRadius: 10,
                                 border: "1px solid rgba(125, 211, 252, 0.45)",
                                 background: "rgba(56, 189, 248, 0.12)",
-                                color: "#e0f2fe",
+                                color: "#1677ff",
                                 fontWeight: 700,
                                 fontSize: "0.88rem",
                                 cursor: "pointer",
@@ -3896,11 +3815,11 @@ const FinanceManagement: React.FC = () => {
                 style={{
                   flexShrink: 0,
                   padding: "14px 20px 18px",
-                  borderTop: "1px solid rgba(255,255,255,0.1)",
+                  borderTop: "1px solid #f1f5f9",
                   display: "flex",
                   justifyContent: "flex-end",
                   gap: 12,
-                  background: "rgba(0,0,0,0.2)",
+                  background: "#f8fafc",
                 }}
               >
                 <button
@@ -3909,9 +3828,9 @@ const FinanceManagement: React.FC = () => {
                   style={{
                     padding: "12px 22px",
                     borderRadius: 12,
-                    border: "1px solid rgba(255, 255, 255, 0.28)",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    color: "white",
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    color: "#0f172a",
                     cursor: "pointer",
                     fontWeight: 600,
                     fontSize: "0.95rem",

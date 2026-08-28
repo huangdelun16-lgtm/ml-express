@@ -67,7 +67,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
               style={{
                 marginTop: 0,
                 marginBottom: "24px",
-                color: "white",
+                color: "#0f172a",
                 fontSize: "1.8rem",
               }}
             >
@@ -77,11 +77,11 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
             {/* 时间范围选择 */}
             <div
               style={{
-                background: "rgba(255, 255, 255, 0.12)",
+                background: "#ffffff",
                 borderRadius: "16px",
                 padding: isMobile ? "12px" : "20px",
                 marginBottom: "24px",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
+                border: "1px solid #f8fafc",
                 display: "flex",
                 gap: isMobile ? "12px" : "16px",
                 alignItems: "center",
@@ -89,7 +89,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
               }}
             >
               <div
-                style={{ color: "white", fontWeight: "600", fontSize: "1rem" }}
+                style={{ color: "#0f172a", fontWeight: "600", fontSize: "1rem" }}
               >
                 📅 {t.analysisPeriod}：
               </div>
@@ -105,12 +105,12 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                   style={{
                     padding: "10px 20px",
                     borderRadius: "10px",
-                    border: `2px solid ${timePeriod === period.key ? "#4facfe" : "rgba(255, 255, 255, 0.3)"}`,
+                    border: `2px solid ${timePeriod === period.key ? "#4facfe" : "#e2e8f0"}`,
                     background:
                       timePeriod === period.key
                         ? "rgba(79, 172, 254, 0.3)"
-                        : "rgba(255, 255, 255, 0.15)",
-                    color: "white",
+                        : "#f1f5f9",
+                    color: "#0f172a",
                     cursor: "pointer",
                     fontSize: "0.9rem",
                     fontWeight: timePeriod === period.key ? "700" : "500",
@@ -123,14 +123,14 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                   onMouseOver={(e) => {
                     if (timePeriod !== period.key) {
                       e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.25)";
+                        "#e2e8f0";
                     }
                     e.currentTarget.style.transform = "translateY(-2px)";
                   }}
                   onMouseOut={(e) => {
                     if (timePeriod !== period.key) {
                       e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.15)";
+                        "#f1f5f9";
                     }
                     e.currentTarget.style.transform = "translateY(0)";
                   }}
@@ -218,7 +218,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                       >
                         <div
                           style={{
-                            color: "rgba(255, 255, 255, 0.9)",
+                            color: "#0f172a",
                             fontSize: "0.95rem",
                             fontWeight: "500",
                           }}
@@ -255,7 +255,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.65)",
+                          color: "#64748b",
                           fontSize: "0.85rem",
                         }}
                       >
@@ -276,7 +276,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                     >
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           fontSize: "0.95rem",
                           fontWeight: "500",
                           marginBottom: "12px",
@@ -297,7 +297,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.65)",
+                          color: "#64748b",
                           fontSize: "0.85rem",
                         }}
                       >
@@ -318,7 +318,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                     >
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           fontSize: "0.95rem",
                           fontWeight: "500",
                           marginBottom: "12px",
@@ -344,7 +344,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.65)",
+                          color: "#64748b",
                           fontSize: "0.85rem",
                         }}
                       >
@@ -364,7 +364,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                     >
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           fontSize: "0.95rem",
                           fontWeight: "500",
                           marginBottom: "12px",
@@ -388,7 +388,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                       </div>
                       <div
                         style={{
-                          color: "rgba(255, 255, 255, 0.65)",
+                          color: "#64748b",
                           fontSize: "0.85rem",
                         }}
                       >
@@ -410,18 +410,18 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
             {/* 月度趋势分析 */}
             <div
               style={{
-                background: "rgba(255, 255, 255, 0.12)",
+                background: "#ffffff",
                 borderRadius: "20px",
                 padding: "24px",
                 marginBottom: "24px",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
+                border: "1px solid #f8fafc",
                 boxShadow: "0 12px 35px rgba(7, 23, 55, 0.45)",
               }}
             >
               <h4
                 style={{
                   marginTop: 0,
-                  color: "white",
+                  color: "#0f172a",
                   marginBottom: "20px",
                   fontSize: "1.3rem",
                 }}
@@ -502,7 +502,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                       style={{
                         textAlign: "center",
                         padding: "40px",
-                        color: "rgba(255, 255, 255, 0.6)",
+                        color: "#64748b",
                       }}
                     >
                       暂无月度数据
@@ -530,7 +530,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                     <div style={{ marginBottom: "32px" }}>
                       <h5
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           marginBottom: "16px",
                           fontSize: "1.1rem",
                         }}
@@ -544,15 +544,15 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                         >
                           <CartesianGrid
                             strokeDasharray="3 3"
-                            stroke="rgba(255, 255, 255, 0.1)"
+                            stroke="#e2e8f0"
                           />
                           <XAxis
                             dataKey="monthShort"
-                            stroke="rgba(255, 255, 255, 0.7)"
+                            stroke="#64748b"
                             style={{ fontSize: "12px" }}
                           />
                           <YAxis
-                            stroke="rgba(255, 255, 255, 0.7)"
+                            stroke="#64748b"
                             style={{ fontSize: "12px" }}
                             tickFormatter={(value) =>
                               `${(value / 1000).toFixed(0)}K`
@@ -560,10 +560,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "rgba(15, 23, 42, 0.95)",
-                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e2e8f0",
                               borderRadius: "8px",
-                              color: "white",
+                              color: "#0f172a",
                             }}
                             formatter={(value: number) =>
                               `${value.toLocaleString()} MMK`
@@ -571,7 +571,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           />
                           <Legend
                             wrapperStyle={{
-                              color: "rgba(255, 255, 255, 0.9)",
+                              color: "#0f172a",
                               paddingTop: "20px",
                             }}
                           />
@@ -604,7 +604,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                     <div style={{ marginBottom: "32px" }}>
                       <h5
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           marginBottom: "16px",
                           fontSize: "1.1rem",
                         }}
@@ -638,15 +638,15 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           </defs>
                           <CartesianGrid
                             strokeDasharray="3 3"
-                            stroke="rgba(255, 255, 255, 0.1)"
+                            stroke="#e2e8f0"
                           />
                           <XAxis
                             dataKey="monthShort"
-                            stroke="rgba(255, 255, 255, 0.7)"
+                            stroke="#64748b"
                             style={{ fontSize: "12px" }}
                           />
                           <YAxis
-                            stroke="rgba(255, 255, 255, 0.7)"
+                            stroke="#64748b"
                             style={{ fontSize: "12px" }}
                             tickFormatter={(value) =>
                               `${(value / 1000).toFixed(0)}K`
@@ -654,10 +654,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "rgba(15, 23, 42, 0.95)",
-                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e2e8f0",
                               borderRadius: "8px",
-                              color: "white",
+                              color: "#0f172a",
                             }}
                             formatter={(value: number) =>
                               `${value.toLocaleString()} MMK`
@@ -679,7 +679,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                     <div style={{ marginBottom: "32px" }}>
                       <h5
                         style={{
-                          color: "rgba(255, 255, 255, 0.9)",
+                          color: "#0f172a",
                           marginBottom: "16px",
                           fontSize: "1.1rem",
                         }}
@@ -713,15 +713,15 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           </defs>
                           <CartesianGrid
                             strokeDasharray="3 3"
-                            stroke="rgba(255, 255, 255, 0.1)"
+                            stroke="#e2e8f0"
                           />
                           <XAxis
                             dataKey="monthShort"
-                            stroke="rgba(255, 255, 255, 0.7)"
+                            stroke="#64748b"
                             style={{ fontSize: "12px" }}
                           />
                           <YAxis
-                            stroke="rgba(255, 255, 255, 0.7)"
+                            stroke="#64748b"
                             style={{ fontSize: "12px" }}
                             tickFormatter={(value) =>
                               `${(value / 1000).toFixed(0)}K`
@@ -729,10 +729,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "rgba(15, 23, 42, 0.95)",
-                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e2e8f0",
                               borderRadius: "8px",
-                              color: "white",
+                              color: "#0f172a",
                             }}
                             formatter={(value: number) =>
                               `${value.toLocaleString()} MMK`
@@ -809,7 +809,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                         <div style={{ marginBottom: "32px" }}>
                           <h5
                             style={{
-                              color: "rgba(255, 255, 255, 0.9)",
+                              color: "#0f172a",
                               marginBottom: "16px",
                               fontSize: "1.1rem",
                             }}
@@ -828,18 +828,18 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                             >
                               <CartesianGrid
                                 strokeDasharray="3 3"
-                                stroke="rgba(255, 255, 255, 0.1)"
+                                stroke="#e2e8f0"
                               />
                               <XAxis
                                 dataKey="date"
-                                stroke="rgba(255, 255, 255, 0.7)"
+                                stroke="#64748b"
                                 style={{ fontSize: "11px" }}
                                 angle={-45}
                                 textAnchor="end"
                                 height={80}
                               />
                               <YAxis
-                                stroke="rgba(255, 255, 255, 0.7)"
+                                stroke="#64748b"
                                 style={{ fontSize: "12px" }}
                                 tickFormatter={(value) =>
                                   `${(value / 1000).toFixed(0)}K`
@@ -847,10 +847,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               />
                               <Tooltip
                                 contentStyle={{
-                                  backgroundColor: "rgba(15, 23, 42, 0.95)",
-                                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                                  backgroundColor: "#ffffff",
+                                  border: "1px solid #e2e8f0",
                                   borderRadius: "8px",
-                                  color: "white",
+                                  color: "#0f172a",
                                 }}
                                 formatter={(value: number) =>
                                   `${value.toLocaleString()} MMK`
@@ -858,7 +858,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               />
                               <Legend
                                 wrapperStyle={{
-                                  color: "rgba(255, 255, 255, 0.9)",
+                                  color: "#0f172a",
                                   paddingTop: "20px",
                                 }}
                               />
@@ -899,10 +899,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                     {/* 月度详细数据表格 */}
                     <div
                       style={{
-                        background: "rgba(255, 255, 255, 0.05)",
+                        background: "#f8fafc",
                         borderRadius: "12px",
                         overflow: "hidden",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        border: "1px solid #e2e8f0",
                       }}
                     >
                       <table
@@ -910,13 +910,13 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                       >
                         <thead>
                           <tr
-                            style={{ background: "rgba(255, 255, 255, 0.1)" }}
+                            style={{ background: "#f1f5f9" }}
                           >
                             <th
                               style={{
                                 padding: "12px",
                                 textAlign: "left",
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "0.9rem",
                               }}
                             >
@@ -926,7 +926,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               style={{
                                 padding: "12px",
                                 textAlign: "right",
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "0.9rem",
                               }}
                             >
@@ -936,7 +936,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               style={{
                                 padding: "12px",
                                 textAlign: "right",
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "0.9rem",
                               }}
                             >
@@ -946,7 +946,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               style={{
                                 padding: "12px",
                                 textAlign: "right",
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "0.9rem",
                               }}
                             >
@@ -956,7 +956,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               style={{
                                 padding: "12px",
                                 textAlign: "right",
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "0.9rem",
                               }}
                             >
@@ -966,7 +966,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               style={{
                                 padding: "12px",
                                 textAlign: "right",
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "0.9rem",
                               }}
                             >
@@ -976,7 +976,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               style={{
                                 padding: "12px",
                                 textAlign: "right",
-                                color: "white",
+                                color: "#0f172a",
                                 fontSize: "0.9rem",
                               }}
                             >
@@ -994,13 +994,13 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                                 key={month}
                                 style={{
                                   borderBottom:
-                                    "1px solid rgba(255, 255, 255, 0.1)",
+                                    "1px solid #e2e8f0",
                                 }}
                               >
                                 <td
                                   style={{
                                     padding: "12px",
-                                    color: "white",
+                                    color: "#0f172a",
                                     fontSize: "0.9rem",
                                     fontWeight: "600",
                                   }}
@@ -1044,7 +1044,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                                   style={{
                                     padding: "12px",
                                     textAlign: "right",
-                                    color: "rgba(255, 255, 255, 0.8)",
+                                    color: "#334155",
                                     fontSize: "0.9rem",
                                   }}
                                 >
@@ -1096,14 +1096,14 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
               {/* 包裹类型分布 - 饼图 */}
               <div
                 style={{
-                  background: "rgba(255, 255, 255, 0.12)",
+                  background: "#ffffff",
                   borderRadius: "16px",
                   padding: "24px",
-                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                  border: "1px solid #f8fafc",
                 }}
               >
                 <h4
-                  style={{ marginTop: 0, color: "white", marginBottom: "16px" }}
+                  style={{ marginTop: 0, color: "#0f172a", marginBottom: "16px" }}
                 >
                   📦 包裹类型分布
                 </h4>
@@ -1127,7 +1127,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                         style={{
                           textAlign: "center",
                           padding: "40px",
-                          color: "rgba(255, 255, 255, 0.6)",
+                          color: "#64748b",
                         }}
                       >
                         暂无包裹数据
@@ -1179,10 +1179,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           </Pie>
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "rgba(15, 23, 42, 0.95)",
-                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e2e8f0",
                               borderRadius: "8px",
-                              color: "white",
+                              color: "#0f172a",
                             }}
                             formatter={(value: number) => `${value} 个`}
                           />
@@ -1215,7 +1215,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                             />
                             <span
                               style={{
-                                color: "rgba(255, 255, 255, 0.9)",
+                                color: "#0f172a",
                                 fontSize: "0.85rem",
                                 flex: 1,
                               }}
@@ -1224,7 +1224,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                             </span>
                             <span
                               style={{
-                                color: "rgba(255, 255, 255, 0.7)",
+                                color: "#334155",
                                 fontSize: "0.85rem",
                               }}
                             >
@@ -1241,14 +1241,14 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
               {/* 收入分类分布 - 饼图 */}
               <div
                 style={{
-                  background: "rgba(255, 255, 255, 0.12)",
+                  background: "#ffffff",
                   borderRadius: "16px",
                   padding: "24px",
-                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                  border: "1px solid #f8fafc",
                 }}
               >
                 <h4
-                  style={{ marginTop: 0, color: "white", marginBottom: "16px" }}
+                  style={{ marginTop: 0, color: "#0f172a", marginBottom: "16px" }}
                 >
                   💰 收入分类分布
                 </h4>
@@ -1279,7 +1279,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                         style={{
                           textAlign: "center",
                           padding: "40px",
-                          color: "rgba(255, 255, 255, 0.6)",
+                          color: "#64748b",
                         }}
                       >
                         暂无收入数据
@@ -1331,10 +1331,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           </Pie>
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "rgba(15, 23, 42, 0.95)",
-                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e2e8f0",
                               borderRadius: "8px",
-                              color: "white",
+                              color: "#0f172a",
                             }}
                             formatter={(value: number) =>
                               `${value.toLocaleString()} MMK`
@@ -1370,7 +1370,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                             />
                             <span
                               style={{
-                                color: "rgba(255, 255, 255, 0.9)",
+                                color: "#0f172a",
                                 fontSize: "0.85rem",
                                 flex: 1,
                               }}
@@ -1379,7 +1379,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                             </span>
                             <span
                               style={{
-                                color: "rgba(255, 255, 255, 0.7)",
+                                color: "#334155",
                                 fontSize: "0.85rem",
                               }}
                             >
@@ -1397,14 +1397,14 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
               {/* 支出分类分布 - 饼图 */}
               <div
                 style={{
-                  background: "rgba(255, 255, 255, 0.12)",
+                  background: "#ffffff",
                   borderRadius: "16px",
                   padding: "24px",
-                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                  border: "1px solid #f8fafc",
                 }}
               >
                 <h4
-                  style={{ marginTop: 0, color: "white", marginBottom: "16px" }}
+                  style={{ marginTop: 0, color: "#0f172a", marginBottom: "16px" }}
                 >
                   💸 支出分类分布
                 </h4>
@@ -1435,7 +1435,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                         style={{
                           textAlign: "center",
                           padding: "40px",
-                          color: "rgba(255, 255, 255, 0.6)",
+                          color: "#64748b",
                         }}
                       >
                         暂无支出数据
@@ -1489,10 +1489,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           </Pie>
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "rgba(15, 23, 42, 0.95)",
-                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e2e8f0",
                               borderRadius: "8px",
-                              color: "white",
+                              color: "#0f172a",
                             }}
                             formatter={(value: number) =>
                               `${value.toLocaleString()} MMK`
@@ -1528,7 +1528,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                             />
                             <span
                               style={{
-                                color: "rgba(255, 255, 255, 0.9)",
+                                color: "#0f172a",
                                 fontSize: "0.85rem",
                                 flex: 1,
                               }}
@@ -1537,7 +1537,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                             </span>
                             <span
                               style={{
-                                color: "rgba(255, 255, 255, 0.7)",
+                                color: "#334155",
                                 fontSize: "0.85rem",
                               }}
                             >
@@ -1555,14 +1555,14 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
               {/* 骑手效率排名 - 柱状图 */}
               <div
                 style={{
-                  background: "rgba(255, 255, 255, 0.12)",
+                  background: "#ffffff",
                   borderRadius: "16px",
                   padding: "24px",
-                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                  border: "1px solid #f8fafc",
                 }}
               >
                 <h4
-                  style={{ marginTop: 0, color: "white", marginBottom: "16px" }}
+                  style={{ marginTop: 0, color: "#0f172a", marginBottom: "16px" }}
                 >
                   🏆 骑手效率排名 TOP 10
                 </h4>
@@ -1598,7 +1598,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                         style={{
                           textAlign: "center",
                           padding: "40px",
-                          color: "rgba(255, 255, 255, 0.6)",
+                          color: "#64748b",
                         }}
                       >
                         暂无骑手数据
@@ -1628,26 +1628,26 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                         >
                           <CartesianGrid
                             strokeDasharray="3 3"
-                            stroke="rgba(255, 255, 255, 0.1)"
+                            stroke="#e2e8f0"
                           />
                           <XAxis
                             dataKey="name"
-                            stroke="rgba(255, 255, 255, 0.7)"
+                            stroke="#64748b"
                             style={{ fontSize: "11px" }}
                             angle={-45}
                             textAnchor="end"
                             height={80}
                           />
                           <YAxis
-                            stroke="rgba(255, 255, 255, 0.7)"
+                            stroke="#64748b"
                             style={{ fontSize: "12px" }}
                           />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "rgba(15, 23, 42, 0.95)",
-                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e2e8f0",
                               borderRadius: "8px",
-                              color: "white",
+                              color: "#0f172a",
                             }}
                             formatter={(value: number, name: string) => {
                               if (name === "count")
@@ -1662,7 +1662,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                           />
                           <Legend
                             wrapperStyle={{
-                              color: "rgba(255, 255, 255, 0.9)",
+                              color: "#0f172a",
                               paddingTop: "20px",
                             }}
                           />
@@ -1703,7 +1703,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                                 alignItems: "center",
                                 gap: "12px",
                                 padding: "8px",
-                                background: "rgba(255, 255, 255, 0.05)",
+                                background: "#f8fafc",
                                 borderRadius: "8px",
                               }}
                             >
@@ -1715,7 +1715,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                               <div style={{ flex: 1 }}>
                                 <div
                                   style={{
-                                    color: "white",
+                                    color: "#0f172a",
                                     fontSize: "0.85rem",
                                     fontWeight: "600",
                                   }}
@@ -1724,7 +1724,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                                 </div>
                                 <div
                                   style={{
-                                    color: "rgba(255, 255, 255, 0.6)",
+                                    color: "#64748b",
                                     fontSize: "0.75rem",
                                   }}
                                 >

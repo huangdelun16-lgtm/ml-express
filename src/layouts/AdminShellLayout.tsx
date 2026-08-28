@@ -7,6 +7,8 @@ import { useResponsive } from '../hooks/useResponsive';
 import { useAdminTodo } from '../contexts/AdminTodoContext';
 import { feedbackService } from '../services/FeedbackService';
 import AdminFunctionMenu, { type AdminNavCard } from '../components/AdminFunctionMenu';
+import { openAdminGlobalSearch } from '../components/AdminGlobalSearch';
+import { useAdminIdleLock } from '../hooks/useAdminIdleLock';
 
 /** 全屏独立模块：不使用通用后台侧栏/顶栏，由页面自带布局 */
 export const STANDALONE_ADMIN_MODULE_PATHS = [
@@ -35,27 +37,6 @@ const AdminShellLayout: React.FC = () => {
   const lastVoiceBroadcastRef = useRef<number>(0);
   const prevPendingAssignmentCountRef = useRef<number>(0);
   const prevPendingDeliveryAlertsCountRef = useRef<number>(0);
-
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @keyframes pulse-alert {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
-        70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
-      }
-      .admin-shell-nav::-webkit-scrollbar { width: 5px; }
-      .admin-shell-nav::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.22);
-        border-radius: 999px;
-      }
-      .admin-shell-nav::-webkit-scrollbar-track { background: transparent; }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
 
   const speakNotification = (text: string) => {
     if ('speechSynthesis' in window) {
@@ -161,6 +142,7 @@ const AdminShellLayout: React.FC = () => {
   const workRegion = getWorkRegion();
 
   const [showUserEditModal, setShowUserEditModal] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { isMobile } = useResponsive();
   const [userEditFormData, setUserEditFormData] = useState({
@@ -171,9 +153,14 @@ const AdminShellLayout: React.FC = () => {
   });
 
   const handleLogout = async () => {
+    setShowLogoutConfirm(false);
     await clearToken();
     navigate('/admin/login');
   };
+
+  const { warning: idleWarning, staySignedIn } = useAdminIdleLock(true, () => {
+    void handleLogout();
+  });
 
   const handleUserInfoClick = () => {
     setUserEditFormData({
@@ -347,12 +334,12 @@ const AdminShellLayout: React.FC = () => {
   }, [allCardData, hasPermissionOverride, currentUserPermissions, currentUserRole]);
 
   const LogoHeader = () => {
-    const logoSize = isMobile ? '44px' : '52px';
-    const textSize = isMobile ? '0.92rem' : '1.05rem';
-    const subSize = isMobile ? '0.62rem' : '0.68rem';
+    const logoSize = isMobile ? '36px' : '40px';
+    const textSize = isMobile ? '0.88rem' : '0.95rem';
 
     return (
       <div
+        className="admin-shell__logo"
         role="button"
         tabIndex={0}
         onClick={() => navigate('/admin/dashboard')}
@@ -362,54 +349,14 @@ const AdminShellLayout: React.FC = () => {
             navigate('/admin/dashboard');
           }
         }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          minWidth: 0,
-          cursor: 'pointer',
-        }}
         title={language === 'zh' ? '返回首页' : language === 'en' ? 'Home' : 'ပင်မစာမျက်နှာ'}
       >
-        <img
-          src="/logo.png"
-          alt="ML Express Logo"
-          style={{
-            width: logoSize,
-            height: logoSize,
-            objectFit: 'contain',
-            flexShrink: 0,
-          }}
-        />
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <div
-            style={{
-              color: 'white',
-              fontSize: textSize,
-              fontWeight: 'bold',
-              textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-              lineHeight: 1.15,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
+        <img src="/logo.png" alt="ML Express Logo" style={{ width: logoSize, height: logoSize }} />
+        <div className="admin-shell__brand">
+          <div className="admin-shell__brand-name" style={{ fontSize: textSize }}>
             MARKET LINK EXPRESS
           </div>
-          <div
-            style={{
-              color: 'white',
-              fontSize: subSize,
-              fontWeight: 400,
-              fontStyle: 'italic',
-              letterSpacing: '0.5px',
-              opacity: 0.88,
-              textShadow: '0 1px 2px rgba(0,0,0,0.2)',
-              lineHeight: 1.2,
-            }}
-          >
-            Delivery Services
-          </div>
+          <div className="admin-shell__brand-sub">Admin Console</div>
         </div>
       </div>
     );
@@ -420,63 +367,60 @@ const AdminShellLayout: React.FC = () => {
     pathname,
   );
 
+  const roleLabel =
+    currentUserRole === 'admin'
+      ? language === 'zh'
+        ? '系统管理员'
+        : language === 'en'
+          ? 'System Admin'
+          : 'စနစ်စီမံခန့်ခွဲသူ'
+      : currentUserRole === 'manager'
+        ? language === 'zh'
+          ? '经理'
+          : language === 'en'
+            ? 'Manager'
+            : 'မန်နေဂျာ'
+        : currentUserRole === 'operator'
+          ? language === 'zh'
+            ? '操作员'
+            : language === 'en'
+              ? 'Operator'
+              : 'အော်ပရေတာ'
+          : language === 'zh'
+            ? '财务'
+            : language === 'en'
+              ? 'Finance'
+              : 'ဘဏ္ဍာရေး';
+
   if (isStandaloneImportModule) {
-    return <Outlet />;
+    return (
+      <>
+        <Outlet />
+        {idleWarning && (
+          <div className="admin-modal-scrim">
+            <div className="admin-modal">
+              <h2>{language === 'zh' ? '会话即将锁定' : 'Session idle'}</h2>
+              <p className="admin-modal__warn">
+                {language === 'zh'
+                  ? '已闲置超过 20 分钟。再过约 5 分钟将自动退出，避免他人误用账号。'
+                  : 'You have been idle for 20 minutes. You will be signed out in about 5 minutes.'}
+              </p>
+              <div className="admin-modal__actions">
+                <button type="button" className="admin-shell__btn admin-shell__btn--primary" onClick={staySignedIn}>
+                  {language === 'zh' ? '继续工作' : 'Stay signed in'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   return (
-    <div
-      style={{
-        height: '100vh',
-        minHeight: '100vh',
-        maxHeight: '100vh',
-        background:
-          'linear-gradient(to right top, #b0d3e8, #a2c3d6, #93b4c5, #86a4b4, #7895a3, #6c90a3, #618ca3, #5587a4, #498ab6, #428cc9, #468dda, #558cea)',
-        display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          top: '5%',
-          right: '5%',
-          width: '200px',
-          height: '200px',
-          background: 'rgba(192, 192, 192, 0.1)',
-          borderRadius: '50%',
-          filter: 'blur(40px)',
-          pointerEvents: 'none',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '5%',
-          left: '5%',
-          width: '150px',
-          height: '150px',
-          background: 'rgba(192, 192, 192, 0.1)',
-          borderRadius: '50%',
-          filter: 'blur(30px)',
-          pointerEvents: 'none',
-        }}
-      />
-
+    <div className={`admin-shell${isMobile ? ' admin-shell--mobile' : ''}`}>
       {isMobile && mobileNavOpen && (
-        <div
-          role="presentation"
-          onClick={() => setMobileNavOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.45)',
-            zIndex: 150,
-            backdropFilter: 'blur(4px)',
-          }}
-        />
+        <div className="admin-shell__scrim" role="presentation" onClick={() => setMobileNavOpen(false)} />
       )}
 
       <AdminFunctionMenu
@@ -496,122 +440,54 @@ const AdminShellLayout: React.FC = () => {
         onCloseMobile={() => setMobileNavOpen(false)}
       />
 
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          minWidth: 0,
-          minHeight: 0,
-          height: isMobile ? '100vh' : '100%',
-          position: 'relative',
-          zIndex: 1,
-          overflow: 'hidden',
-        }}
-      >
-        <header
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            padding: isMobile ? '10px 12px' : '12px 22px',
-            flexShrink: 0,
-            color: 'white',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            background: 'rgba(255, 255, 255, 0.04)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            position: 'sticky',
-            top: 0,
-            zIndex: 40,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+      <div className={`admin-shell__col${isMobile ? ' admin-shell__col--mobile' : ''}`}>
+        <header className="admin-shell__header">
+          <div className="admin-shell__header-left">
             {isMobile && (
               <button
                 type="button"
+                className="admin-shell__menu-btn"
                 aria-label={language === 'zh' ? '打开菜单' : 'Open menu'}
                 onClick={() => setMobileNavOpen(true)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.12)',
-                  border: '1px solid rgba(255, 255, 255, 0.22)',
-                  color: 'white',
-                  borderRadius: 10,
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  fontSize: '1.1rem',
-                  lineHeight: 1,
-                  flexShrink: 0,
-                }}
               >
                 ☰
               </button>
             )}
             <LogoHeader />
           </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              flexWrap: 'wrap',
-              justifyContent: 'flex-end',
-            }}
-          >
+          <div className="admin-shell__header-right">
             <button
               type="button"
+              className="admin-shell__btn admin-shell__btn--ghost"
+              onClick={() => openAdminGlobalSearch()}
+              title="Ctrl / ⌘ + K"
+            >
+              {language === 'zh' ? '搜索' : 'Search'}
+              {!isMobile && <kbd className="admin-shell__kbd">⌘K</kbd>}
+            </button>
+            <button
+              type="button"
+              className="admin-shell__btn"
               onClick={() => {
                 speakNotification('语音提醒功能已开启');
                 feedbackService.notify(
-                  '✅ 语音播报已激活！\n\n系统现在将自动在后台为您监控新充值申请、待分配订单（实时跟踪）与配送警报。',
+                  '语音播报已激活。系统将监控新充值、待分配订单与配送警报。',
                 );
               }}
-              style={{
-                background: 'rgba(46, 204, 113, 0.2)',
-                color: '#2ecc71',
-                border: '1px solid rgba(46, 204, 113, 0.4)',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                backdropFilter: 'blur(10px)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
             >
-              🔔 {language === 'zh' ? '开启播报' : language === 'en' ? 'Voice' : 'အသံ'}
+              {language === 'zh' ? '播报' : language === 'en' ? 'Voice' : 'အသံ'}
             </button>
-
             <select
+              className="admin-shell__lang"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              style={{
-                background: 'rgba(255, 255, 255, 0.15)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                padding: '8px 10px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                backdropFilter: 'blur(10px)',
-              }}
             >
-              <option value="zh" style={{ color: '#000' }}>
-                中文
-              </option>
-              <option value="en" style={{ color: '#000' }}>
-                English
-              </option>
-              <option value="my" style={{ color: '#000' }}>
-                မြန်မာ
-              </option>
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+              <option value="my">မြန်မာ</option>
             </select>
-
             <div
+              className="admin-shell__user"
               role="button"
               tabIndex={0}
               title={
@@ -628,176 +504,42 @@ const AdminShellLayout: React.FC = () => {
                   handleUserInfoClick();
                 }
               }}
-              style={{
-                textAlign: 'right',
-                background: 'rgba(255, 255, 255, 0.1)',
-                padding: '8px 14px',
-                borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.25)',
-                backdropFilter: 'blur(10px)',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-              }}
             >
-              <div
-                style={{
-                  fontSize: '0.88rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '8px',
-                }}
-              >
-                {workRegion && (
-                  <span
-                    style={{
-                      background: '#48bb78',
-                      color: 'white',
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontWeight: '900',
-                      fontSize: '0.72rem',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    }}
-                  >
-                    {workRegion}
-                  </span>
-                )}
+              <div className="admin-shell__user-row">
+                {workRegion && <span className="admin-shell__region">{workRegion}</span>}
                 <span>{currentUserName}</span>
               </div>
-              <div style={{ fontSize: '0.72rem', opacity: 0.85, marginTop: '2px' }}>
-                {currentUserRole === 'admin' &&
-                  (language === 'zh' ? '系统管理员' : language === 'en' ? 'System Admin' : 'စနစ်စီမံခန့်ခွဲသူ')}
-                {currentUserRole === 'manager' &&
-                  (language === 'zh' ? '经理' : language === 'en' ? 'Manager' : 'မန်နေဂျာ')}
-                {currentUserRole === 'operator' &&
-                  (language === 'zh' ? '操作员' : language === 'en' ? 'Operator' : 'အော်ပရေတာ')}
-                {currentUserRole === 'finance' &&
-                  (language === 'zh' ? '财务' : language === 'en' ? 'Finance' : 'ဘဏ္ဍာရေး')}
-              </div>
+              <div className="admin-shell__role">{roleLabel}</div>
             </div>
-
             <button
               type="button"
-              onClick={handleLogout}
-              style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                padding: '10px 18px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '0.88rem',
-                fontWeight: 600,
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-              }}
+              className="admin-shell__btn admin-shell__btn--danger"
+              onClick={() => setShowLogoutConfirm(true)}
             >
               {language === 'zh' ? (isMobile ? '退出' : '退出登录') : language === 'en' ? 'Logout' : 'ထွက်ရန်'}
             </button>
           </div>
         </header>
 
-        <main
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            WebkitOverflowScrolling: 'touch',
-            padding: isMobile ? '14px 14px 100px' : '22px 28px 100px',
-          }}
-        >
+        <main className={`admin-shell__main${isMobile ? ' admin-shell__main--mobile' : ''}`}>
           <Outlet />
         </main>
       </div>
-
       {showUserEditModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '24px',
-              padding: '40px',
-              width: '90%',
-              maxWidth: '480px',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
-            }}
-          >
-            <h2
-              style={{
-                color: 'white',
-                marginBottom: '30px',
-                textAlign: 'center',
-                fontSize: '1.8rem',
-                fontWeight: 'bold',
-                textShadow: '0 2px 4px rgba(0,0,0,0.2)',
-              }}
-            >
+        <div className="admin-modal-scrim">
+          <div className="admin-modal">
+            <h2>
               {language === 'zh' ? '编辑个人信息' : language === 'en' ? 'Edit Profile' : 'ပရိုဖိုင်တည်းဖြတ်ရန်'}
             </h2>
-
             <form onSubmit={handleUpdateUserInfo}>
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    marginBottom: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    letterSpacing: '0.5px',
-                  }}
-                >
+              <div className="admin-modal__field">
+                <label>
                   {language === 'zh' ? '账号 (不可修改)' : language === 'en' ? 'Username (Read-only)' : 'အသုံးပြုသူအမည်'}
                 </label>
-                <div
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.1)',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    fontSize: '1rem',
-                  }}
-                >
-                  {currentUser}
-                </div>
+                <div className="admin-modal__readonly">{currentUser}</div>
               </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    marginBottom: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    letterSpacing: '0.5px',
-                  }}
-                >
-                  {language === 'zh' ? '员工姓名' : language === 'en' ? 'Employee Name' : 'ဝန်ထမ်းအမည်'}
-                </label>
+              <div className="admin-modal__field">
+                <label>{language === 'zh' ? '员工姓名' : language === 'en' ? 'Employee Name' : 'ဝန်ထမ်းအမည်'}</label>
                 <input
                   type="text"
                   value={userEditFormData.employee_name}
@@ -807,42 +549,13 @@ const AdminShellLayout: React.FC = () => {
                       employee_name: e.target.value,
                     })
                   }
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#4299e1';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  }}
                   required
                 />
               </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    marginBottom: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    letterSpacing: '0.5px',
-                  }}
-                >
+              <div className="admin-modal__field">
+                <label>
                   {language === 'zh' ? '新密码' : language === 'en' ? 'New Password' : 'စကားဝှက်အသစ်'}
-                  <span style={{ fontSize: '0.8rem', opacity: 0.7, fontWeight: 'normal', marginLeft: '8px' }}>
+                  <span style={{ fontWeight: 400, marginLeft: 8 }}>
                     {language === 'zh'
                       ? '(留空则不修改)'
                       : language === 'en'
@@ -859,39 +572,10 @@ const AdminShellLayout: React.FC = () => {
                       password: e.target.value,
                     })
                   }
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#4299e1';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  }}
                 />
               </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    marginBottom: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    letterSpacing: '0.5px',
-                  }}
-                >
+              <div className="admin-modal__field">
+                <label>
                   {language === 'zh' ? '确认新密码' : language === 'en' ? 'Confirm Password' : 'စကားဝှက်အတည်ပြုရန်'}
                 </label>
                 <input
@@ -903,25 +587,6 @@ const AdminShellLayout: React.FC = () => {
                       confirmPassword: e.target.value,
                     })
                   }
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    border: '2px solid rgba(255, 255, 255, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    fontSize: '1rem',
-                    transition: 'all 0.3s ease',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#4299e1';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  }}
                   placeholder={
                     language === 'zh'
                       ? '再次输入新密码'
@@ -931,69 +596,58 @@ const AdminShellLayout: React.FC = () => {
                   }
                 />
               </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '16px',
-                  justifyContent: 'flex-end',
-                }}
-              >
+              <div className="admin-modal__actions">
                 <button
                   type="button"
+                  className="admin-shell__btn"
                   onClick={() => setShowUserEditModal(false)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    padding: '12px 28px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    transition: 'all 0.3s ease',
-                    backdropFilter: 'blur(10px)',
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
                 >
                   {language === 'zh' ? '取消' : language === 'en' ? 'Cancel' : 'ပယ်ဖျက်ရန်'}
                 </button>
-                <button
-                  type="submit"
-                  style={{
-                    background: 'linear-gradient(135deg, #4299e1 0%, #3182ce 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 28px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 15px rgba(66, 153, 225, 0.4)',
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(66, 153, 225, 0.5)';
-                    e.currentTarget.style.filter = 'brightness(1.1)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(66, 153, 225, 0.4)';
-                    e.currentTarget.style.filter = 'brightness(1)';
-                  }}
-                >
+                <button type="submit" className="admin-shell__btn admin-shell__btn--primary">
                   {language === 'zh' ? '保存更改' : language === 'en' ? 'Save Changes' : 'ပြောင်းလဲမှုများသိမ်းဆည်းရန်'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showLogoutConfirm && (
+        <div className="admin-modal-scrim">
+          <div className="admin-modal">
+            <h2>{language === 'zh' ? '确认退出' : 'Sign out?'}</h2>
+            <p className="admin-modal__warn">
+              {language === 'zh'
+                ? '退出后需要重新登录。未保存的表单内容可能丢失。'
+                : 'You will need to sign in again. Unsaved form data may be lost.'}
+            </p>
+            <div className="admin-modal__actions">
+              <button type="button" className="admin-shell__btn" onClick={() => setShowLogoutConfirm(false)}>
+                {language === 'zh' ? '取消' : 'Cancel'}
+              </button>
+              <button type="button" className="admin-shell__btn admin-shell__btn--danger" onClick={() => void handleLogout()}>
+                {language === 'zh' ? '退出登录' : 'Logout'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {idleWarning && (
+        <div className="admin-modal-scrim">
+          <div className="admin-modal">
+            <h2>{language === 'zh' ? '会话即将锁定' : 'Session idle'}</h2>
+            <p className="admin-modal__warn">
+              {language === 'zh'
+                ? '已闲置超过 20 分钟。再过约 5 分钟将自动退出，避免他人误用账号。'
+                : 'You have been idle for 20 minutes. You will be signed out in about 5 minutes.'}
+            </p>
+            <div className="admin-modal__actions">
+              <button type="button" className="admin-shell__btn admin-shell__btn--primary" onClick={staySignedIn}>
+                {language === 'zh' ? '继续工作' : 'Stay signed in'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1008,3 +662,4 @@ const AdminShellLayout: React.FC = () => {
 };
 
 export default AdminShellLayout;
+

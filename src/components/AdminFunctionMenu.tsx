@@ -164,7 +164,6 @@ const AdminFunctionMenu: React.FC<Props> = ({
 }) => {
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(() =>
     !isMobile && readJson<boolean>(COLLAPSE_KEY, false),
   );
@@ -174,18 +173,6 @@ const AdminFunctionMenu: React.FC<Props> = ({
   );
 
   const compact = !isMobile && collapsed;
-
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      .admin-fn-search::placeholder { color: rgba(255,255,255,0.38); }
-      .admin-fn-search:focus { outline: none; border-color: rgba(147, 197, 253, 0.65) !important; }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -260,229 +247,94 @@ const AdminFunctionMenu: React.FC<Props> = ({
     const showAssignBadge = card.id === 'tracking' && badges.pendingAssignment > 0;
     const showAlertBadge = card.id === 'delivery_alerts' && badges.pendingDeliveryAlerts > 0;
     const active = isModulePathActive(pathname, card.id);
-    const hovered = hoveredId === card.id;
     const pinned = pins.includes(card.id);
     const outline = card.id === 'metric_management' || card.id === 'cross_border_logistics';
-    const navBorder = active
-      ? outline
-        ? '1px solid rgba(125, 211, 252, 0.7)'
-        : '1px solid rgba(255, 255, 255, 0.4)'
-      : pulseNav
-        ? `1px solid ${card.id === 'delivery_alerts' ? 'rgba(248, 113, 113, 0.55)' : 'rgba(96, 165, 250, 0.5)'}`
-        : outline
-          ? '1px solid rgba(56, 189, 248, 0.42)'
-          : hovered
-            ? '1px solid rgba(255, 255, 255, 0.22)'
-            : '1px solid rgba(255, 255, 255, 0.08)';
-    const navBg = active
-      ? 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.1) 100%)'
-      : pulseNav
-        ? 'linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)'
-        : hovered
-          ? 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)'
-          : 'transparent';
+    const itemClass = [
+      'admin-fn__item',
+      active ? 'is-active' : '',
+      pulseNav ? 'is-pulse' : '',
+      outline ? 'is-outline' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     return (
-      <div
-        key={card.id}
-        onMouseEnter={() => setHoveredId(card.id)}
-        onMouseLeave={() => setHoveredId(null)}
-        style={{ position: 'relative' }}
-      >
+      <div key={card.id} className="admin-fn__item-wrap">
         <button
           type="button"
+          className={itemClass}
           title={compact ? card.title : undefined}
           aria-label={card.title}
           aria-current={active ? 'page' : undefined}
           onClick={() => go(card.id)}
-          style={{
-            display: 'flex',
-            flexDirection: compact ? 'column' : 'row',
-            alignItems: 'center',
-            justifyContent: compact ? 'center' : 'flex-start',
-            gap: compact ? 4 : 10,
-            width: '100%',
-            minHeight: compact ? 52 : isMobile ? 46 : 40,
-            textAlign: compact ? 'center' : 'left',
-            padding: compact ? '8px 4px' : isMobile ? '9px 10px' : '7px 10px',
-            borderRadius: 11,
-            border: navBorder,
-            background: navBg,
-            color: 'white',
-            cursor: 'pointer',
-            transition: 'background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
-            animation: pulseNav && !active ? 'pulse-alert 2.2s infinite' : undefined,
-            boxSizing: 'border-box',
-            boxShadow: active
-              ? '0 4px 14px rgba(0, 30, 60, 0.2), inset 0 1px 0 rgba(255,255,255,0.14)'
-              : 'none',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
         >
-          {active && (
-            <span
-              aria-hidden
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 7,
-                bottom: 7,
-                width: 3,
-                borderRadius: '0 4px 4px 0',
-                background: 'linear-gradient(180deg, #fbbf24, #3b82f6)',
-              }}
-            />
-          )}
+          {active && <span aria-hidden className="admin-fn__mark" />}
           <span aria-hidden style={{ fontSize: compact ? '1.12rem' : '1.05rem', lineHeight: 1, flexShrink: 0 }}>
             {MODULE_ICONS[card.id] ?? '•'}
           </span>
+          {!compact && <span className="admin-fn__label">{card.title}</span>}
           {!compact && (
-            <span
-              style={{
-                flex: 1,
-                minWidth: 0,
-                fontWeight: active ? 800 : 650,
-                fontSize: isMobile ? '0.9rem' : '0.82rem',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                textAlign: 'left',
-              }}
-            >
-              {card.title}
-            </span>
-          )}
-          {!compact && (
-            <span style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
+            <span className="admin-fn__meta">
               {showRechargeBadge && <CountBadge n={badges.pendingRecharge} tone="red" />}
               {showAssignBadge && <CountBadge n={badges.pendingAssignment} tone="blue" />}
               {showAlertBadge && <CountBadge n={badges.pendingDeliveryAlerts} tone="red" />}
               {showProductBadge && <CountBadge n={badges.pendingProductReview} tone="amber" />}
               {showMerchantAppBadge && <CountBadge n={badges.pendingMerchantApplications} tone="blue" />}
-              {(hovered || pinned) && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  title={pinned ? t('取消置顶', 'Unpin', 'ဖြုတ်ရန်') : t('置顶', 'Pin', 'ပင်ထိုးရန်')}
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                  }}
-                  onClick={(e) => {
+              <span
+                role="button"
+                tabIndex={0}
+                className={`admin-fn__pin${pinned ? ' is-on' : ''}`}
+                title={pinned ? t('取消置顶', 'Unpin', 'ဖြုတ်ရန်') : t('置顶', 'Pin', 'ပင်ထိုးရန်')}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePin(card.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
                     e.stopPropagation();
                     togglePin(card.id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      togglePin(card.id);
-                    }
-                  }}
-                  style={{
-                    color: pinned ? '#fbbf24' : 'rgba(255,255,255,0.35)',
-                    fontSize: '0.72rem',
-                    cursor: 'pointer',
-                    padding: '0 2px',
-                    lineHeight: 1,
-                  }}
-                >
-                  ★
-                </span>
-              )}
+                  }
+                }}
+              >
+                ★
+              </span>
             </span>
           )}
-          {compact && (showRechargeBadge || showAssignBadge || showAlertBadge || showProductBadge || showMerchantAppBadge) && (
-            <span
-              style={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
-                width: 8,
-                height: 8,
-                borderRadius: 99,
-                background: '#f87171',
-                boxShadow: '0 0 0 2px rgba(8,28,52,0.8)',
-              }}
-            />
-          )}
+          {compact &&
+            (showRechargeBadge ||
+              showAssignBadge ||
+              showAlertBadge ||
+              showProductBadge ||
+              showMerchantAppBadge) && <span className="admin-fn__dot" />}
         </button>
       </div>
     );
   };
 
   const sectionLabel = (zh: string, en: string, my: string) => (
-    <div
-      style={{
-        fontSize: '0.62rem',
-        fontWeight: 800,
-        letterSpacing: '0.12em',
-        textTransform: 'uppercase',
-        color: 'rgba(255,255,255,0.42)',
-        padding: '10px 8px 4px',
-      }}
-    >
-      {t(zh, en, my)}
-    </div>
+    <div className="admin-fn__section">{t(zh, en, my)}</div>
   );
 
+  const asideClass = [
+    'admin-fn',
+    compact ? 'admin-fn--compact' : '',
+    isMobile ? 'admin-fn--mobile' : '',
+    isMobile && mobileNavOpen ? 'is-open' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <aside
-      style={{
-        width: isMobile ? 'min(300px, 88vw)' : compact ? 76 : 232,
-        flexShrink: 0,
-        background:
-          'linear-gradient(180deg, rgba(8, 28, 52, 0.82) 0%, rgba(12, 38, 68, 0.66) 48%, rgba(10, 32, 58, 0.76) 100%)',
-        backdropFilter: 'blur(28px) saturate(1.15)',
-        WebkitBackdropFilter: 'blur(28px) saturate(1.15)',
-        borderRight: '1px solid rgba(255, 255, 255, 0.14)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: isMobile ? '12px 10px' : compact ? '12px 8px' : '12px 10px',
-        zIndex: isMobile ? 160 : 1,
-        position: isMobile ? 'fixed' : 'relative',
-        left: isMobile ? 0 : undefined,
-        top: isMobile ? 0 : undefined,
-        bottom: isMobile ? 0 : undefined,
-        height: isMobile ? '100vh' : '100%',
-        alignSelf: isMobile ? undefined : 'stretch',
-        transform: isMobile ? (mobileNavOpen ? 'translateX(0)' : 'translateX(-105%)') : undefined,
-        transition: isMobile
-          ? 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)'
-          : 'width 0.22s ease',
-        boxShadow:
-          isMobile && mobileNavOpen
-            ? '8px 0 40px rgba(0, 0, 0, 0.28)'
-            : 'inset -1px 0 0 rgba(255, 255, 255, 0.06)',
-        maxHeight: isMobile ? '100vh' : undefined,
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: compact ? 'center' : 'space-between',
-          gap: 8,
-          marginBottom: 10,
-          padding: compact ? '2px 0 8px' : '2px 4px 8px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        }}
-      >
+    <aside className={asideClass}>
+      <div className="admin-fn__head">
         {!compact && (
           <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: isMobile ? '0.72rem' : '0.64rem',
-                fontWeight: 800,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: 'rgba(255, 255, 255, 0.88)',
-              }}
-            >
-              {t('功能菜单', 'Modules', 'မီနူး')}
-            </div>
-            <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.42)', marginTop: 3 }}>
+            <div className="admin-fn__eyebrow">{t('功能菜单', 'Modules', 'မီနူး')}</div>
+            <div className="admin-fn__hint">
               {t(`${cards.length} 个模块 · / 搜索`, `${cards.length} modules · /`, `${cards.length} ခု`)}
             </div>
           </div>
@@ -490,23 +342,13 @@ const AdminFunctionMenu: React.FC<Props> = ({
         {!isMobile && (
           <button
             type="button"
+            className="admin-fn__collapse"
             title={compact ? t('展开菜单', 'Expand', 'ချဲ့ရန်') : t('收起为图标', 'Collapse', 'ခေါက်ရန်')}
             onClick={() => {
               const next = !collapsed;
               setCollapsed(next);
               writeJson(COLLAPSE_KEY, next);
               if (next) setQuery('');
-            }}
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.16)',
-              background: 'rgba(255,255,255,0.08)',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '0.78rem',
-              flexShrink: 0,
             }}
           >
             {compact ? '»' : '«'}
@@ -515,50 +357,27 @@ const AdminFunctionMenu: React.FC<Props> = ({
       </div>
 
       {!compact && (
-        <div style={{ marginBottom: 8 }}>
-          <input
-            ref={searchRef}
-            className="admin-fn-search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && filtered[0]) {
-                e.preventDefault();
-                go(filtered[0].id);
-              }
-            }}
-            placeholder={t('搜索模块…', 'Search modules…', 'ရှာဖွေရန်…')}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              padding: '8px 10px',
-              borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.14)',
-              background: 'rgba(0, 0, 0, 0.18)',
-              color: 'white',
-              fontSize: '0.82rem',
-            }}
-          />
-        </div>
+        <input
+          ref={searchRef}
+          className="admin-fn-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && filtered[0]) {
+              e.preventDefault();
+              go(filtered[0].id);
+            }
+          }}
+          placeholder={t('搜索模块…', 'Search modules…', 'ရှာဖွေရန်…')}
+        />
       )}
 
-      <nav
-        className="admin-shell-nav"
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          paddingRight: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: compact ? 5 : 3,
-        }}
-      >
+      <nav className="admin-shell-nav admin-fn__nav">
         {searching ? (
           <>
             {sectionLabel('搜索结果', 'Results', 'ရလဒ်')}
             {filtered.length === 0 ? (
-              <div style={{ padding: '16px 8px', color: 'rgba(255,255,255,0.45)', fontSize: '0.78rem' }}>
+              <div className="admin-fn__empty">
                 {t('没有匹配的模块', 'No matching module', 'မတွေ့ပါ')}
               </div>
             ) : (
@@ -583,25 +402,7 @@ const AdminFunctionMenu: React.FC<Props> = ({
               return (
                 <div key={group.id}>
                   {!compact && (
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(group.id)}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '10px 8px 4px',
-                        color: 'rgba(255,255,255,0.42)',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        letterSpacing: '0.12em',
-                        textTransform: 'uppercase',
-                      }}
-                    >
+                    <button type="button" className="admin-fn__group-btn" onClick={() => toggleGroup(group.id)}>
                       <span>{t(group.zh, group.en, group.my)}</span>
                       <span style={{ opacity: 0.7 }}>{folded ? '+' : '–'}</span>
                     </button>
@@ -618,28 +419,8 @@ const AdminFunctionMenu: React.FC<Props> = ({
 };
 
 function CountBadge({ n, tone }: { n: number; tone: 'red' | 'blue' | 'amber' }) {
-  const bg =
-    tone === 'red'
-      ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-      : tone === 'amber'
-        ? 'linear-gradient(135deg, #fbbf24, #d97706)'
-        : 'linear-gradient(135deg, #38bdf8, #2563eb)';
-  return (
-    <span
-      style={{
-        background: bg,
-        color: 'white',
-        fontSize: '0.58rem',
-        fontWeight: 800,
-        padding: '2px 6px',
-        borderRadius: 999,
-        lineHeight: 1.2,
-        border: '1px solid rgba(255,255,255,0.25)',
-      }}
-    >
-      {n}
-    </span>
-  );
+  return <span className={`admin-fn__badge admin-fn__badge--${tone}`}>{n}</span>;
 }
 
 export default AdminFunctionMenu;
+

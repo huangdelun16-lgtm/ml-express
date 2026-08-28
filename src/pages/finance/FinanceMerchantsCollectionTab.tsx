@@ -36,7 +36,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                 style={{ display: "flex", alignItems: "center", gap: "10px" }}
               >
                 <span
-                  style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9rem" }}
+                  style={{ color: "#334155", fontSize: "0.9rem" }}
                 >
                   {language === "zh"
                     ? "分区域"
@@ -50,9 +50,9 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                   style={{
                     padding: "8px 12px",
                     borderRadius: "10px",
-                    border: "1px solid rgba(255, 255, 255, 0.25)",
-                    background: "rgba(255, 255, 255, 0.12)",
-                    color: "white",
+                    border: "1px solid #e2e8f0",
+                    background: "#ffffff",
+                    color: "#0f172a",
                     cursor: "pointer",
                     fontSize: "0.95rem",
                   }}
@@ -106,7 +106,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                     >
                       <div
                         style={{
-                          color: "rgba(255,255,255,0.8)",
+                          color: "#334155",
                           fontSize: "1rem",
                           fontWeight: 600,
                         }}
@@ -125,10 +125,10 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                           <div
                             key={store.id}
                             style={{
-                              background: "rgba(255, 255, 255, 0.12)",
+                              background: "#ffffff",
                               borderRadius: "20px",
                               padding: "24px",
-                              border: "1px solid rgba(255, 255, 255, 0.18)",
+                              border: "1px solid #f8fafc",
                               boxShadow: "0 12px 35px rgba(7, 23, 55, 0.45)",
                               display: "flex",
                               flexDirection: "column",
@@ -145,7 +145,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                               <h3
                                 style={{
                                   margin: 0,
-                                  color: "white",
+                                  color: "#0f172a",
                                   fontSize: "1.2rem",
                                 }}
                               >
@@ -176,7 +176,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                             {/* 店铺联系信息 - 使用 delivery_stores 表的数据 */}
                             <div
                               style={{
-                                background: "rgba(0,0,0,0.15)",
+                                background: "#f1f5f9",
                                 padding: "12px",
                                 borderRadius: "12px",
                                 display: "flex",
@@ -190,7 +190,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                     display: "flex",
                                     alignItems: "center",
                                     gap: "8px",
-                                    color: "rgba(255,255,255,0.8)",
+                                    color: "#334155",
                                   }}
                                 >
                                   <span style={{ fontSize: "1rem" }}>📞</span>
@@ -205,7 +205,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                     display: "flex",
                                     alignItems: "flex-start",
                                     gap: "8px",
-                                    color: "rgba(255,255,255,0.8)",
+                                    color: "#334155",
                                   }}
                                 >
                                   <span style={{ fontSize: "1rem" }}>📍</span>
@@ -225,11 +225,11 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                     display: "flex",
                                     alignItems: "center",
                                     gap: "8px",
-                                    color: "rgba(255,255,255,0.8)",
+                                    color: "#334155",
                                     marginTop: "4px",
                                     paddingTop: "8px",
                                     borderTop:
-                                      "1px solid rgba(255,255,255,0.1)",
+                                      "1px solid #f1f5f9",
                                   }}
                                 >
                                   <span
@@ -248,7 +248,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                   <span
                                     style={{
                                       fontFamily: "monospace",
-                                      background: "rgba(0,0,0,0.3)",
+                                      background: "#f1f5f9",
                                       padding: "2px 8px",
                                       borderRadius: "6px",
                                       fontWeight: "bold",
@@ -275,29 +275,29 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                   )
                                 }
                                 style={{
-                                  background: "rgba(255, 255, 255, 0.08)",
+                                  background: "#f8fafc",
                                   padding: "12px",
                                   borderRadius: "12px",
                                   cursor: "pointer",
                                   transition: "all 0.2s",
-                                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                                  border: "1px solid #e2e8f0",
                                 }}
                                 onMouseOver={(e) => {
                                   e.currentTarget.style.background =
-                                    "rgba(255, 255, 255, 0.15)";
+                                    "#f1f5f9";
                                   e.currentTarget.style.transform =
                                     "translateY(-2px)";
                                 }}
                                 onMouseOut={(e) => {
                                   e.currentTarget.style.background =
-                                    "rgba(255, 255, 255, 0.08)";
+                                    "#f8fafc";
                                   e.currentTarget.style.transform =
                                     "translateY(0)";
                                 }}
                               >
                                 <div
                                   style={{
-                                    color: "rgba(255,255,255,0.6)",
+                                    color: "#64748b",
                                     fontSize: "0.85rem",
                                     marginBottom: "4px",
                                   }}
@@ -310,7 +310,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                 </div>
                                 <div
                                   style={{
-                                    color: "white",
+                                    color: "#0f172a",
                                     fontSize: "1.1rem",
                                     fontWeight: "bold",
                                   }}
@@ -373,13 +373,13 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
 
                             <div
                               style={{
-                                color: "rgba(255,255,255,0.6)",
+                                color: "#64748b",
                                 fontSize: "0.9rem",
                               }}
                             >
                               {t.unsettledOrders}:{" "}
                               <span
-                                style={{ color: "white", fontWeight: "bold" }}
+                                style={{ color: "#0f172a", fontWeight: "bold" }}
                               >
                                 {store.unclearedCount}
                               </span>{" "}
@@ -389,14 +389,14 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                             {store.lastSettledAt && (
                               <div
                                 style={{
-                                  color: "rgba(255,255,255,0.6)",
+                                  color: "#64748b",
                                   fontSize: "0.9rem",
                                   marginTop: "4px",
                                 }}
                               >
                                 {t.lastSettled}:{" "}
                                 <span
-                                  style={{ color: "white", fontWeight: "500" }}
+                                  style={{ color: "#0f172a", fontWeight: "500" }}
                                 >
                                   {new Date(store.lastSettledAt).toLocaleString(
                                     "zh-CN",
@@ -434,7 +434,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                               >
                                 <span
                                   style={{
-                                    color: "rgba(255,255,255,0.5)",
+                                    color: "#64748b",
                                     fontSize: "0.8rem",
                                     fontWeight: "bold",
                                   }}
@@ -447,7 +447,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                 </span>
                                 <span
                                   style={{
-                                    color: "#60a5fa",
+                                    color: "#2563eb",
                                     fontWeight: "800",
                                     fontSize: "0.9rem",
                                   }}
@@ -478,12 +478,12 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                       marginTop: "4px",
                                       paddingTop: "4px",
                                       borderTop:
-                                        "1px solid rgba(255,255,255,0.05)",
+                                        "1px solid #f8fafc",
                                     }}
                                   >
                                     <span
                                       style={{
-                                        color: "rgba(255,255,255,0.5)",
+                                        color: "#64748b",
                                         fontSize: "0.8rem",
                                         fontWeight: "bold",
                                       }}
@@ -548,7 +548,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                     : "linear-gradient(135deg, #f97316 0%, #ef4444 100%)",
                                   border: "none",
                                   borderRadius: "12px",
-                                  color: "white",
+                                  color: isRegionalUser ? "#94a3b8" : "#fff",
                                   cursor: isRegionalUser
                                     ? "not-allowed"
                                     : "pointer",
@@ -614,10 +614,10 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                   <div
                     key={store.id}
                     style={{
-                      background: "rgba(255, 255, 255, 0.12)",
+                      background: "#ffffff",
                       borderRadius: "20px",
                       padding: "24px",
-                      border: "1px solid rgba(255, 255, 255, 0.18)",
+                      border: "1px solid #f8fafc",
                       boxShadow: "0 12px 35px rgba(7, 23, 55, 0.45)",
                       display: "flex",
                       flexDirection: "column",
@@ -634,7 +634,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                       <h3
                         style={{
                           margin: 0,
-                          color: "white",
+                          color: "#0f172a",
                           fontSize: "1.2rem",
                         }}
                       >
@@ -661,7 +661,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                     {/* 店铺联系信息 - 使用 delivery_stores 表的数据 */}
                     <div
                       style={{
-                        background: "rgba(0,0,0,0.15)",
+                        background: "#f1f5f9",
                         padding: "12px",
                         borderRadius: "12px",
                         display: "flex",
@@ -675,7 +675,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                             display: "flex",
                             alignItems: "center",
                             gap: "8px",
-                            color: "rgba(255,255,255,0.8)",
+                            color: "#334155",
                           }}
                         >
                           <span style={{ fontSize: "1rem" }}>📞</span>
@@ -690,7 +690,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                             display: "flex",
                             alignItems: "flex-start",
                             gap: "8px",
-                            color: "rgba(255,255,255,0.8)",
+                            color: "#334155",
                           }}
                         >
                           <span style={{ fontSize: "1rem" }}>📍</span>
@@ -707,10 +707,10 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                             display: "flex",
                             alignItems: "center",
                             gap: "8px",
-                            color: "rgba(255,255,255,0.8)",
+                            color: "#334155",
                             marginTop: "4px",
                             paddingTop: "8px",
-                            borderTop: "1px solid rgba(255,255,255,0.1)",
+                            borderTop: "1px solid #f1f5f9",
                           }}
                         >
                           <span style={{ fontSize: "0.85rem", opacity: 0.7 }}>
@@ -724,7 +724,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                           <span
                             style={{
                               fontFamily: "monospace",
-                              background: "rgba(0,0,0,0.3)",
+                              background: "#f1f5f9",
                               padding: "2px 8px",
                               borderRadius: "6px",
                               fontWeight: "bold",
@@ -749,27 +749,27 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                           handleMerchantAllSettledOrdersClick(store.store_name)
                         }
                         style={{
-                          background: "rgba(255, 255, 255, 0.08)",
+                          background: "#f8fafc",
                           padding: "12px",
                           borderRadius: "12px",
                           cursor: "pointer",
                           transition: "all 0.2s",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          border: "1px solid #e2e8f0",
                         }}
                         onMouseOver={(e) => {
                           e.currentTarget.style.background =
-                            "rgba(255, 255, 255, 0.15)";
+                            "#f1f5f9";
                           e.currentTarget.style.transform = "translateY(-2px)";
                         }}
                         onMouseOut={(e) => {
                           e.currentTarget.style.background =
-                            "rgba(255, 255, 255, 0.08)";
+                            "#f8fafc";
                           e.currentTarget.style.transform = "translateY(0)";
                         }}
                       >
                         <div
                           style={{
-                            color: "rgba(255,255,255,0.6)",
+                            color: "#64748b",
                             fontSize: "0.85rem",
                             marginBottom: "4px",
                           }}
@@ -782,7 +782,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                         </div>
                         <div
                           style={{
-                            color: "white",
+                            color: "#0f172a",
                             fontSize: "1.1rem",
                             fontWeight: "bold",
                           }}
@@ -841,12 +841,12 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
 
                     <div
                       style={{
-                        color: "rgba(255,255,255,0.6)",
+                        color: "#64748b",
                         fontSize: "0.9rem",
                       }}
                     >
                       {t.unsettledOrders}:{" "}
-                      <span style={{ color: "white", fontWeight: "bold" }}>
+                      <span style={{ color: "#0f172a", fontWeight: "bold" }}>
                         {store.unclearedCount}
                       </span>{" "}
                       {language === "zh" ? "单" : ""}
@@ -855,13 +855,13 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                     {store.lastSettledAt && (
                       <div
                         style={{
-                          color: "rgba(255,255,255,0.6)",
+                          color: "#64748b",
                           fontSize: "0.9rem",
                           marginTop: "4px",
                         }}
                       >
                         {t.lastSettled}:{" "}
-                        <span style={{ color: "white", fontWeight: "500" }}>
+                        <span style={{ color: "#0f172a", fontWeight: "500" }}>
                           {new Date(store.lastSettledAt).toLocaleString(
                             "zh-CN",
                             {
@@ -898,7 +898,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                       >
                         <span
                           style={{
-                            color: "rgba(255,255,255,0.5)",
+                            color: "#64748b",
                             fontSize: "0.8rem",
                             fontWeight: "bold",
                           }}
@@ -911,7 +911,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                         </span>
                         <span
                           style={{
-                            color: "#60a5fa",
+                            color: "#2563eb",
                             fontWeight: "800",
                             fontSize: "0.9rem",
                           }}
@@ -939,12 +939,12 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                               alignItems: "center",
                               marginTop: "4px",
                               paddingTop: "4px",
-                              borderTop: "1px solid rgba(255,255,255,0.05)",
+                              borderTop: "1px solid #f8fafc",
                             }}
                           >
                             <span
                               style={{
-                                color: "rgba(255,255,255,0.5)",
+                                color: "#64748b",
                                 fontSize: "0.8rem",
                                 fontWeight: "bold",
                               }}
@@ -998,10 +998,10 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                           borderRadius: "12px",
                           border: "none",
                           background: isRegionalUser
-                            ? "rgba(255, 255, 255, 0.1)"
+                            ? "#f1f5f9"
                             : "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
                           color: isRegionalUser
-                            ? "rgba(255, 255, 255, 0.4)"
+                            ? "#cbd5e1"
                             : "white",
                           fontWeight: "bold",
                           cursor: isRegionalUser ? "not-allowed" : "pointer",
@@ -1055,7 +1055,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                       gridColumn: "1 / -1",
                       textAlign: "center",
                       padding: "60px",
-                      color: "rgba(255,255,255,0.5)",
+                      color: "#64748b",
                     }}
                   >
                     {language === "zh"

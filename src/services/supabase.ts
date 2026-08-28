@@ -13,7 +13,11 @@ import {
   normalizeCustomerProxyFeeStore,
 } from '../utils/proxyPurchaseExcel';
 import { isAbortLikeError } from '../utils/fetchError';
-import { applyNetlifyRealtimeFallback, resolveBrowserSupabaseUrl } from '../utils/supabaseBrowserUrl';
+import {
+  applyNetlifyRealtimeFallback,
+  resolveBrowserSupabaseUrl,
+  rewritePublicStorageUrl,
+} from '../utils/supabaseBrowserUrl';
 export type { Banner, Tutorial, WelcomeScreen };
 export type { ProxyPurchaseRow as ProxyPurchaseWorkspaceRow };
 
@@ -292,7 +296,13 @@ export const tutorialService = {
         console.error('获取教学列表失败:', error);
         return [];
       }
-      return data || [];
+      return (data || []).map((row) => ({
+        ...row,
+        image_url: row.image_url ? rewritePublicStorageUrl(row.image_url) : row.image_url,
+        image_urls: Array.isArray(row.image_urls)
+          ? row.image_urls.map((url: string) => rewritePublicStorageUrl(url))
+          : row.image_urls,
+      }));
     } catch (err) {
       console.error('获取教学列表异常:', err);
       return [];
@@ -346,7 +356,10 @@ export const welcomeScreenService = {
         console.error('获取欢迎页面列表失败:', error);
         return [];
       }
-      return data || [];
+      return (data || []).map((row) => ({
+        ...row,
+        image_url: row.image_url ? rewritePublicStorageUrl(row.image_url) : row.image_url,
+      }));
     } catch (err) {
       console.error('获取欢迎页面列表异常:', err);
       return [];
@@ -1766,7 +1779,10 @@ export const bannerService = {
         return [];
       }
 
-      return data || [];
+      return (data || []).map((row) => ({
+        ...row,
+        image_url: row.image_url ? rewritePublicStorageUrl(row.image_url) : row.image_url,
+      }));
     } catch (err) {
       if (isAbortLikeError(err)) throw err;
       console.error('获取广告列表异常:', err);
@@ -2405,7 +2421,7 @@ export const productService = {
         .from('product_images')
         .getPublicUrl(fileName);
 
-      return publicUrl;
+      return rewritePublicStorageUrl(publicUrl);
     } catch (err) {
       console.error('上传商品图片失败:', err);
       return null;

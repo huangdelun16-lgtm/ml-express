@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { bannerService, tutorialService, welcomeScreenService, systemSettingsService, Banner, Tutorial, WelcomeScreen } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { feedbackService } from '../services/FeedbackService';
+import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 
 const CLIENT_RECHARGE_QR_SETTING_KEY = 'client.recharge_qr_urls';
 const RECHARGE_QR_TIERS = [10000, 50000, 100000, 300000, 500000, 1000000] as const;
@@ -153,7 +154,7 @@ const BannerManagement: React.FC = () => {
         for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
           const n = Number(k);
           if (Number.isFinite(n) && typeof v === 'string' && v.trim()) {
-            merged[n] = v.trim();
+            merged[n] = rewritePublicStorageUrl(v.trim());
           }
         }
       }
@@ -202,7 +203,7 @@ const BannerManagement: React.FC = () => {
       });
       const result = await response.json();
       if (!response.ok || !result?.url) throw new Error(result?.error || '上传失败');
-      setRechargeQrMap((prev) => ({ ...prev, [amount]: result.url as string }));
+      setRechargeQrMap((prev) => ({ ...prev, [amount]: rewritePublicStorageUrl(result.url as string) }));
     } catch (err) {
       console.error(err);
       feedbackService.notify(err instanceof Error ? err.message : '上传失败');
@@ -229,7 +230,7 @@ const BannerManagement: React.FC = () => {
       const result = await response.json();
       if (!response.ok || !result?.url) throw new Error(result?.error || '上传失败');
 
-      setFormData(prev => ({ ...prev, image_url: result.url }));
+      setFormData(prev => ({ ...prev, image_url: rewritePublicStorageUrl(result.url) }));
     } catch (error) {
       console.error('上传图片异常:', error);
       feedbackService.notify(error instanceof Error ? error.message : '上传失败');
@@ -252,7 +253,7 @@ const BannerManagement: React.FC = () => {
       });
       const result = await response.json();
       if (!response.ok || !result?.url) throw new Error(result?.error || '上传失败');
-      setWelcomeFormData(prev => ({ ...prev, image_url: result.url }));
+      setWelcomeFormData(prev => ({ ...prev, image_url: rewritePublicStorageUrl(result.url) }));
     } catch (error) {
       console.error('上传图片异常:', error);
       feedbackService.notify('上传失败');
@@ -281,7 +282,7 @@ const BannerManagement: React.FC = () => {
 
         const result = await response.json();
         if (response.ok && result?.url) {
-          uploadedUrls.push(result.url);
+          uploadedUrls.push(rewritePublicStorageUrl(result.url));
         }
       }
 
@@ -501,78 +502,69 @@ const BannerManagement: React.FC = () => {
   };
 
   const cardStyle: React.CSSProperties = {
-    background: 'rgba(255, 255, 255, 0.05)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    borderRadius: '24px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    padding: '24px',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-    marginBottom: '24px'
+    background: '#fff',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    padding: '20px',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.06)',
+    marginBottom: '20px'
   };
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: '12px 16px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: '12px',
-    color: 'white',
+    padding: '10px 14px',
+    background: '#fff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    color: '#0f172a',
     fontSize: '0.95rem',
     outline: 'none',
-    transition: 'all 0.3s'
   };
 
   return (
-    <div style={{ padding: isMobile ? '10px' : '40px', background: '#0f172a', minHeight: '100vh', color: 'white' }}>
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: '32px', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button 
+    <div className="admin-page" style={{ color: '#0f172a' }}>
+      <div className="admin-page-head">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            type="button"
+            className="admin-shell__btn"
             onClick={() => navigate('/admin/dashboard')}
-            style={{ 
-              background: 'rgba(255,255,255,0.05)', 
-              border: '1px solid rgba(255,255,255,0.1)', 
-              borderRadius: '12px', 
-              width: '40px', 
-              height: '40px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              cursor: 'pointer',
-              color: 'white',
-              fontSize: '1.2rem'
-            }}
+            style={{ width: 40, height: 40, padding: 0, justifyContent: 'center' }}
           >
             ←
           </button>
-          <h1 style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 800, margin: 0, background: 'linear-gradient(to right, #60a5fa, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            页面管理
-          </h1>
+          <h1 style={{ margin: 0 }}>页面管理</h1>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
+        <div className="admin-page-actions">
+          <button
+            type="button"
+            className={showWelcomeMainModal ? 'admin-shell__btn' : 'admin-shell__btn admin-shell__btn--primary'}
             onClick={() => {
               setShowForm(false);
               setShowTutorialMainModal(false);
               setShowRechargeQRModal(false);
               setShowWelcomeMainModal(!showWelcomeMainModal);
             }}
-            style={{ padding: '12px 24px', borderRadius: '14px', background: showWelcomeMainModal ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #f59e0b, #d97706)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showWelcomeMainModal ? 'none' : '0 4px 12px rgba(245, 158, 11, 0.3)', transition: 'all 0.3s' }}
+            style={showWelcomeMainModal ? undefined : { background: '#d48806', borderColor: '#d48806' }}
           >
             {showWelcomeMainModal ? '取消' : '+ 欢迎页面'}
           </button>
-          <button 
+          <button
+            type="button"
+            className={showTutorialMainModal ? 'admin-shell__btn' : 'admin-shell__btn admin-shell__btn--primary'}
             onClick={() => {
               setShowForm(false);
               setShowWelcomeMainModal(false);
               setShowRechargeQRModal(false);
               setShowTutorialMainModal(!showTutorialMainModal);
             }}
-            style={{ padding: '12px 24px', borderRadius: '14px', background: showTutorialMainModal ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #10b981, #059669)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showTutorialMainModal ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)', transition: 'all 0.3s' }}
+            style={showTutorialMainModal ? undefined : { background: '#389e0d', borderColor: '#389e0d' }}
           >
             {showTutorialMainModal ? '取消' : '+ 使用教学'}
           </button>
-          <button 
+          <button
+            type="button"
+            className={showForm ? 'admin-shell__btn' : 'admin-shell__btn admin-shell__btn--primary'}
             onClick={() => {
               setEditingBanner(null);
               setFormData({
@@ -593,12 +585,12 @@ const BannerManagement: React.FC = () => {
               setShowRechargeQRModal(false);
               setShowForm(!showForm);
             }}
-            style={{ padding: '12px 24px', borderRadius: '14px', background: showForm ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: showForm ? 'none' : '0 4px 12px rgba(37, 99, 235, 0.3)', transition: 'all 0.3s' }}
           >
             {showForm ? '取消' : '新建广告'}
           </button>
           <button
             type="button"
+            className="admin-shell__btn admin-shell__btn--primary"
             onClick={() => {
               setShowForm(false);
               setShowTutorialMainModal(false);
@@ -608,17 +600,7 @@ const BannerManagement: React.FC = () => {
               loadRechargeQrSettings();
               setShowRechargeQRModal(true);
             }}
-            style={{
-              padding: '12px 24px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #059669, #047857)',
-              border: 'none',
-              color: 'white',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(5, 150, 105, 0.35)',
-              transition: 'all 0.3s',
-            }}
+            style={{ background: '#389e0d', borderColor: '#389e0d' }}
           >
             + 余额充值QR
           </button>
@@ -665,12 +647,12 @@ const BannerManagement: React.FC = () => {
                 type="button"
                 onClick={() => !uploading && !rechargeQrSaving && setShowRechargeQRModal(false)}
                 style={{
-                  background: 'rgba(255,255,255,0.1)',
+                  background: '#f1f5f9',
                   border: 'none',
-                  color: 'white',
+                  color: '#0f172a',
                   width: 36,
                   height: 36,
-                  borderRadius: 10,
+                  borderRadius: 8,
                   cursor: 'pointer',
                   fontSize: '1.1rem',
                 }}
@@ -691,14 +673,14 @@ const BannerManagement: React.FC = () => {
                     alignItems: 'center',
                     gap: 12,
                     padding: 12,
-                    background: 'rgba(0,0,0,0.2)',
+                    background: '#f8fafc',
                     borderRadius: 12,
-                    border: '1px solid rgba(255,255,255,0.08)',
+                    border: '1px solid #e2e8f0',
                   }}
                 >
                   <div style={{ minWidth: 100, fontWeight: 800 }}>{amt.toLocaleString()} MMK</div>
                   <img
-                    src={rechargeQrMap[amt] || defaultRechargeQrUrlMap()[amt]}
+                    src={rewritePublicStorageUrl(rechargeQrMap[amt] || defaultRechargeQrUrlMap()[amt])}
                     alt={`qr ${amt}`}
                     style={{ width: 72, height: 72, objectFit: 'contain', background: '#fff', borderRadius: 8 }}
                   />
@@ -882,7 +864,7 @@ const BannerManagement: React.FC = () => {
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b', margin: 0 }}>配置欢迎页面内容</h2>
               <button 
                 onClick={() => setShowWelcomeEditModal(false)}
-                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: 'white', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: '#0f172a', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >✕</button>
             </div>
             
@@ -969,7 +951,7 @@ const BannerManagement: React.FC = () => {
                   {welcomeFormData.image_url && (
                     <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#f59e0b', fontSize: '0.85rem', fontWeight: 700 }}>
                       <span>✅ 图片已就绪</span>
-                      <img src={welcomeFormData.image_url} alt="preview" style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
+                      <img src={rewritePublicStorageUrl(welcomeFormData.image_url)} alt="preview" style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
                     </div>
                   )}
                 </div>
@@ -1003,7 +985,7 @@ const BannerManagement: React.FC = () => {
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button 
                   onClick={() => setShowWelcomeEditModal(false)}
-                  style={{ flex: 1, padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '16px', borderRadius: '12px', background: '#f8fafc', color: '#0f172a', border: '1px solid #e2e8f0', fontWeight: 700, cursor: 'pointer' }}
                 >取消</button>
                 <button 
                   form="welcomeForm"
@@ -1042,7 +1024,7 @@ const BannerManagement: React.FC = () => {
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#10b981', margin: 0 }}>配置教学步骤</h2>
               <button 
                 onClick={() => setShowTutorialEditModal(false)}
-                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: 'white', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: '#0f172a', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >✕</button>
             </div>
             
@@ -1100,7 +1082,7 @@ const BannerManagement: React.FC = () => {
                     <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '12px' }}>
                       {tutorialFormData.image_urls.map((url, idx) => (
                         <div key={idx} style={{ position: 'relative', width: '80px', height: '80px' }}>
-                          <img src={url} alt={`preview-${idx}`} style={{ width: '100%', height: '100%', borderRadius: '10px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                          <img src={rewritePublicStorageUrl(url)} alt={`preview-${idx}`} style={{ width: '100%', height: '100%', borderRadius: '10px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
                           <button 
                             type="button"
                             onClick={() => removeTutorialImage(idx)}
@@ -1147,7 +1129,7 @@ const BannerManagement: React.FC = () => {
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button 
                   onClick={() => setShowTutorialEditModal(false)}
-                  style={{ flex: 1, padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '16px', borderRadius: '12px', background: '#f8fafc', color: '#0f172a', border: '1px solid #e2e8f0', fontWeight: 700, cursor: 'pointer' }}
                 >取消</button>
                 <button 
                   form="tutorialForm"
@@ -1176,19 +1158,19 @@ const BannerManagement: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 350px', gap: '40px' }}>
               <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>标题 (中文)</label>
+                  <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>标题 (中文)</label>
                   <input name="title" value={formData.title} onChange={handleInputChange} placeholder="例如：曼德勒同城快递" style={inputStyle} required />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>标题 (缅文)</label>
+                  <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>标题 (缅文)</label>
                   <input name="burmese_title" value={formData.burmese_title} onChange={handleInputChange} placeholder="例如：မန္တလေးမြို့တွင်း ပို့ဆောင်ရေး" style={inputStyle} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: isMobile ? 'auto' : '1 / span 2' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>子标题 (中文)</label>
+                  <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>子标题 (中文)</label>
                   <input name="subtitle" value={formData.subtitle} onChange={handleInputChange} placeholder="例如：5分钟接单 · 实时定位" style={inputStyle} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>图片 (可选)</label>
+                  <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>图片 (可选)</label>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <input 
                       name="image_url" 
@@ -1225,35 +1207,35 @@ const BannerManagement: React.FC = () => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>跳转链接 (可选)</label>
+                  <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>跳转链接 (可选)</label>
                   <input name="link_url" value={formData.link_url} onChange={handleInputChange} placeholder="https://..." style={inputStyle} />
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>渐变色 (起)</label>
+                    <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>渐变色 (起)</label>
                     <div style={{ position: 'relative' }}>
                       <input type="color" name="bg_color_start" value={formData.bg_color_start} onChange={handleInputChange} style={{ ...inputStyle, height: '45px', padding: '4px', cursor: 'pointer' }} />
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>渐变色 (终)</label>
+                    <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>渐变色 (终)</label>
                     <input type="color" name="bg_color_end" value={formData.bg_color_end} onChange={handleInputChange} style={{ ...inputStyle, height: '45px', padding: '4px', cursor: 'pointer' }} />
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>显示顺序</label>
+                  <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>显示顺序</label>
                   <input type="number" name="display_order" value={formData.display_order} onChange={handleInputChange} style={inputStyle} />
                 </div>
 
-                <div style={{ gridColumn: isMobile ? 'auto' : '1 / span 2', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ gridColumn: isMobile ? 'auto' : '1 / span 2', display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                   <input type="checkbox" id="is_active" name="is_active" checked={formData.is_active} onChange={handleInputChange} style={{ width: '20px', height: '20px', cursor: 'pointer' }} />
                   <label htmlFor="is_active" style={{ cursor: 'pointer', fontWeight: 500 }}>立即启用此广告 (用户可见)</label>
                 </div>
 
                 <div style={{ gridColumn: isMobile ? 'auto' : '1 / span 2', marginTop: '12px' }}>
-                  <button type="submit" style={{ width: '100%', padding: '16px', borderRadius: '16px', background: 'white', color: '#0f172a', border: 'none', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 10px 20px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+                  <button type="submit" className="admin-shell__btn admin-shell__btn--primary" style={{ width: '100%', padding: '14px', justifyContent: 'center', fontSize: '1rem' }} >
                     {editingBanner ? '保存修改' : '确认发布'}
                   </button>
                 </div>
@@ -1262,7 +1244,7 @@ const BannerManagement: React.FC = () => {
               {/* 实时预览区域 */}
               {!isMobile && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>实时预览 (App 效果)</label>
+                  <label style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>实时预览 (App 效果)</label>
                   <div style={{ 
                     width: '100%', 
                     height: '200px', 
@@ -1279,7 +1261,7 @@ const BannerManagement: React.FC = () => {
                       <div style={{ width: '30px', height: '30px', background: 'rgba(255,255,255,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>ML</div>
                       <div style={{ height: '2px', flex: 1, background: 'rgba(255,255,255,0.2)' }} />
                     </div>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'white' }}>{formData.title || '标题展示区'}</h3>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#fff' }}>{formData.title || '标题展示区'}</h3>
                     <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.9)', margin: '4px 0' }}>{formData.subtitle || '子标题展示区'}</p>
                     <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', fontStyle: 'italic', margin: 0 }}>{formData.burmese_title || 'Burmese text here'}</p>
                     
@@ -1319,7 +1301,7 @@ const BannerManagement: React.FC = () => {
               <div key={screen.id} style={{ ...cardStyle, padding: '0', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: '140px', background: `linear-gradient(135deg, ${screen.bg_color_start}, ${screen.bg_color_end})`, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {screen.image_url ? (
-                    <img src={screen.image_url} style={{ width: '60px', height: '60px', objectFit: 'contain' }} alt="welcome" />
+                    <img src={rewritePublicStorageUrl(screen.image_url)} style={{ width: '60px', height: '60px', objectFit: 'contain' }} alt="welcome" />
                   ) : (
                     <span style={{ fontSize: '2rem' }}>👋</span>
                   )}
@@ -1335,7 +1317,7 @@ const BannerManagement: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
                     <span style={{ fontSize: '0.75rem', color: '#f59e0b' }}>倒计时: {screen.countdown}s</span>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => handleWelcomeEdit(screen)} style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '0.8rem', cursor: 'pointer' }}>编辑</button>
+                      <button onClick={() => handleWelcomeEdit(screen)} className="admin-shell__btn" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>编辑</button>
                       <button onClick={() => screen.id && handleWelcomeDelete(screen.id)} style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer' }}>删除</button>
                     </div>
                   </div>
@@ -1360,7 +1342,7 @@ const BannerManagement: React.FC = () => {
                 <div style={{ height: '160px', background: '#1e293b', position: 'relative', overflow: 'hidden' }}>
                   {tutorial.image_urls && tutorial.image_urls.length > 0 ? (
                     <>
-                      <img src={tutorial.image_urls[0]} alt={tutorial.title_zh} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={rewritePublicStorageUrl(tutorial.image_urls[0])} alt={tutorial.title_zh} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       {tutorial.image_urls.length > 1 && (
                         <div style={{ position: 'absolute', bottom: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', color: 'white', fontWeight: 700 }}>
                           +{tutorial.image_urls.length - 1} 张图片
@@ -1368,7 +1350,7 @@ const BannerManagement: React.FC = () => {
                       )}
                     </>
                   ) : tutorial.image_url ? (
-                    <img src={tutorial.image_url} alt={tutorial.title_zh} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={rewritePublicStorageUrl(tutorial.image_url)} alt={tutorial.title_zh} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.1)', fontSize: '3rem' }}>📖</div>
                   )}
@@ -1384,7 +1366,7 @@ const BannerManagement: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
                     <span style={{ fontSize: '0.75rem', color: '#10b981' }}>权重: {tutorial.display_order}</span>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => handleTutorialEdit(tutorial)} style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '0.8rem', cursor: 'pointer' }}>编辑</button>
+                      <button onClick={() => handleTutorialEdit(tutorial)} className="admin-shell__btn" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>编辑</button>
                       <button onClick={() => tutorial.id && handleTutorialDelete(tutorial.id)} style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer' }}>删除</button>
                     </div>
                   </div>
@@ -1421,33 +1403,33 @@ const BannerManagement: React.FC = () => {
                       已停用
                     </div>
                   )}
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'white' }}>{banner.title}</h3>
-                  <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.85)', margin: '4px 0' }}>{banner.subtitle}</p>
-                  <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', margin: 0 }}>{banner.burmese_title}</p>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>{banner.title}</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0' }}>{banner.subtitle}</p>
+                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>{banner.burmese_title}</p>
                 </div>
 
                 <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)' }}>
-                      排序权重: <span style={{ color: 'white', fontWeight: 600 }}>{banner.display_order}</span>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      排序权重: <span style={{ color: '#0f172a', fontWeight: 600 }}>{banner.display_order}</span>
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'right' }}>
                       状态: <span style={{ color: banner.is_active ? '#10b981' : '#ef4444', fontWeight: 600 }}>{banner.is_active ? '正在展示' : '下线'}</span>
                     </div>
                   </div>
 
                   {banner.link_url && (
-                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px' }}>
                       🔗 {banner.link_url}
                     </div>
                   )}
 
-                  <div style={{ marginTop: 'auto', display: 'flex', gap: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <button 
+                  <div style={{ marginTop: 'auto', display: 'flex', gap: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+                    <button
+                      type="button"
                       onClick={() => handleEdit(banner)}
-                      style={{ flex: 1, padding: '10px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      className="admin-shell__btn"
+                      style={{ flex: 1, justifyContent: 'center' }}
                     >
                       编辑配置
                     </button>
