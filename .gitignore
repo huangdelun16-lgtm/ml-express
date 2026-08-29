@@ -33,6 +33,9 @@ cloudflare/**/.wrangler/
 ml-express-client-web/node_modules/
 ml-express-client-web/build/
 
+# CodeGraph local index (SQLite; rebuilt by `codegraph init`)
+.codegraph/
+
 # User-specific files
 .idea/
 .vscode/
