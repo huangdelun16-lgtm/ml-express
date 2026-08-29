@@ -14,6 +14,7 @@ const {
   generateMerchantPassword,
   resolveNextMerchantStoreCode,
 } = require('./utils/merchantApplication');
+const { notifyMerchantCredentials } = require('./utils/notifyMerchantCredentials');
 
 
 const APPLICATION_COLUMNS =
@@ -207,17 +208,33 @@ exports.handler = async (event) => {
           .single();
         if (approveErr) throw approveErr;
 
+        const credentials = {
+          storeCode: store_code,
+          password,
+          storeName: store.store_name,
+        };
+        let notify = {
+          smsSent: false,
+          smsTo: [],
+          emailSent: false,
+          emailTo: null,
+          errors: [],
+        };
+        try {
+          notify = await notifyMerchantCredentials(application, credentials);
+        } catch (notifyErr) {
+          console.error('merchant credentials notify failed:', notifyErr);
+          notify.errors.push(notifyErr.message || '账号通知发送失败');
+        }
+
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
             ok: true,
             application: updated,
-            credentials: {
-              storeCode: store_code,
-              password,
-              storeName: store.store_name,
-            },
+            credentials,
+            notify,
           }),
         };
       }

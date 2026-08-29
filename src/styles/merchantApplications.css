@@ -37,6 +37,12 @@
   align-items: center;
 }
 
+.merchant-apps-poll-hint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
 .merchant-apps-filter {
   border-radius: 8px;
   border: 1px solid #e2e8f0;
@@ -493,6 +499,17 @@
   font-size: 0.88rem;
   font-weight: 800;
   color: #166534;
+}
+
+.merchant-apps-credentials__notify {
+  margin: 0 0 0.7rem;
+  font-size: 0.8rem;
+  color: #166534;
+  line-height: 1.45;
+}
+
+.merchant-apps-credentials__notify--warn {
+  color: #b45309;
 }
 
 .merchant-apps-credentials__grid {

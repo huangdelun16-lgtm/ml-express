@@ -38,6 +38,14 @@ export type MerchantApplicationCredentials = {
   storeName: string;
 };
 
+export type MerchantApplicationNotifyResult = {
+  smsSent: boolean;
+  smsTo: string[];
+  emailSent: boolean;
+  emailTo: string | null;
+  errors: string[];
+};
+
 async function parseJsonResponse(response: Response) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -89,7 +97,11 @@ export async function approveMerchantApplication(input: {
   review_notes?: string;
   password?: string;
   store_code?: string;
-}): Promise<{ application: MerchantApplication; credentials: MerchantApplicationCredentials }> {
+}): Promise<{
+  application: MerchantApplication;
+  credentials: MerchantApplicationCredentials;
+  notify: MerchantApplicationNotifyResult | null;
+}> {
   const response = await adminAuthenticatedFetch('/.netlify/functions/merchant-admin-applications', {
     method: 'POST',
     credentials: 'include',
@@ -100,6 +112,7 @@ export async function approveMerchantApplication(input: {
   return {
     application: payload.application,
     credentials: payload.credentials,
+    notify: payload.notify ?? null,
   };
 }
 

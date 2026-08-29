@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
@@ -8,6 +8,7 @@ import {
   rejectMerchantApplication,
   type MerchantApplication,
   type MerchantApplicationCredentials,
+  type MerchantApplicationNotifyResult,
   type MerchantApplicationStatus,
 } from '../services/merchantApplicationService';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
@@ -118,6 +119,39 @@ const Section: React.FC<SectionProps> = ({ icon, title, children }) => (
   </section>
 );
 
+const POLL_MS = 20_000;
+
+function credentialsNotifyText(notify: MerchantApplicationNotifyResult | null, isEn: boolean) {
+  if (!notify) {
+    return isEn ? 'Share the account with the merchant' : '请复制账号告知商家';
+  }
+  const parts: string[] = [];
+  if (notify.smsSent) {
+    parts.push(
+      isEn
+        ? `SMS sent to ${notify.smsTo.join(', ')}`
+        : `已发短信至 ${notify.smsTo.join('、')}`,
+    );
+  }
+  if (notify.emailSent && notify.emailTo) {
+    parts.push(isEn ? `Email sent to ${notify.emailTo}` : `已发邮件至 ${notify.emailTo}`);
+  }
+  if (parts.length > 0) {
+    if (notify.errors.length > 0) {
+      parts.push(isEn ? 'some messages failed' : '部分发送失败，可再复制告知');
+    }
+    return parts.join(isEn ? ' · ' : '；');
+  }
+  if (notify.errors.length > 0) {
+    return isEn
+      ? 'SMS/email failed — please copy and send manually'
+      : '短信/邮件发送失败，请复制账号线下告知';
+  }
+  return isEn
+    ? 'Messaging not configured — please copy and share manually'
+    : '未配置短信/邮件，请复制账号线下告知';
+}
+
 const MerchantApplicationsPage: React.FC = () => {
   const { language } = useLanguage();
   const isEn = language === 'en';
@@ -134,10 +168,14 @@ const MerchantApplicationsPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [credentials, setCredentials] = useState<MerchantApplicationCredentials | null>(null);
+  const [notifyResult, setNotifyResult] = useState<MerchantApplicationNotifyResult | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 
   const copyLabel = isEn ? 'Copy' : '复制';
+  const submittingRef = useRef(false);
+  const lastPendingCountRef = useRef<number | null>(null);
 
   const showToast = useCallback(
     (message: string) => {
@@ -159,28 +197,69 @@ const MerchantApplicationsPage: React.FC = () => {
     [isEn, showToast],
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const result = await fetchMerchantApplications(filter);
+      if (
+        silent &&
+        lastPendingCountRef.current != null &&
+        result.pendingCount > lastPendingCountRef.current
+      ) {
+        const n = result.pendingCount - lastPendingCountRef.current;
+        showToast(isEn ? `${n} new application(s)` : `有 ${n} 条新入驻申请`);
+      }
+      lastPendingCountRef.current = result.pendingCount;
       setApplications(result.applications);
       setPendingCount(result.pendingCount);
+      setLastUpdatedAt(Date.now());
     } catch (err) {
-      setError(err instanceof Error ? err.message : isEn ? 'Load failed' : '加载失败');
+      if (!silent) {
+        setError(err instanceof Error ? err.message : isEn ? 'Load failed' : '加载失败');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [filter, isEn]);
+  }, [filter, isEn, showToast]);
 
   useEffect(() => {
+    lastPendingCountRef.current = null;
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (submittingRef.current) return;
+      void load({ silent: true });
+    };
+    const timer = window.setInterval(tick, POLL_MS);
+    let visTimer: number | undefined;
+    const onVis = () => {
+      if (document.visibilityState !== 'visible') return;
+      window.clearTimeout(visTimer);
+      visTimer = window.setTimeout(() => {
+        if (!submittingRef.current) void load({ silent: true });
+      }, 150);
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(visTimer);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [load]);
 
   const closeModal = useCallback(() => {
     if (submitting) return;
     setSelected(null);
     setLightboxUrl(null);
+    setCredentials(null);
+    setNotifyResult(null);
   }, [submitting]);
 
   useEffect(() => {
@@ -197,6 +276,7 @@ const MerchantApplicationsPage: React.FC = () => {
 
   const openDetail = async (id: string) => {
     setCredentials(null);
+    setNotifyResult(null);
     setReviewNotes('');
     setCustomPassword('');
     setPreviewStoreCode('');
@@ -219,6 +299,7 @@ const MerchantApplicationsPage: React.FC = () => {
       return;
     }
     setSubmitting(true);
+    submittingRef.current = true;
     setError(null);
     try {
       const result = await approveMerchantApplication({
@@ -229,12 +310,23 @@ const MerchantApplicationsPage: React.FC = () => {
       });
       setSelected(result.application);
       setCredentials(result.credentials);
-      await load();
+      setNotifyResult(result.notify);
+      await load({ silent: true });
       notifyAdminTodosRefresh();
-      showToast(isEn ? 'Approved — account created' : '已通过，账号已开通');
+      const sent = Boolean(result.notify?.smsSent || result.notify?.emailSent);
+      showToast(
+        sent
+          ? isEn
+            ? 'Approved — credentials sent'
+            : '已通过，账号已发给商家'
+          : isEn
+            ? 'Approved — copy credentials'
+            : '已通过，请复制账号告知商家',
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : isEn ? 'Approve failed' : '审核通过失败');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -249,6 +341,7 @@ const MerchantApplicationsPage: React.FC = () => {
     if (!confirmed) return;
 
     setSubmitting(true);
+    submittingRef.current = true;
     setError(null);
     try {
       const updated = await rejectMerchantApplication({
@@ -256,12 +349,13 @@ const MerchantApplicationsPage: React.FC = () => {
         review_notes: reviewNotes.trim() || undefined,
       });
       setSelected(updated);
-      await load();
+      await load({ silent: true });
       notifyAdminTodosRefresh();
       showToast(isEn ? 'Application rejected' : '已拒绝该申请');
     } catch (err) {
       setError(err instanceof Error ? err.message : isEn ? 'Reject failed' : '拒绝失败');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -269,8 +363,8 @@ const MerchantApplicationsPage: React.FC = () => {
   const copyCredentials = () => {
     if (!credentials) return;
     const text = isEn
-      ? `Store: ${credentials.storeName}\nStore code: ${credentials.storeCode}\nPassword: ${credentials.password}`
-      : `店铺：${credentials.storeName}\n店铺代码：${credentials.storeCode}\n登录密码：${credentials.password}`;
+      ? `Store: ${credentials.storeName}\nStore code: ${credentials.storeCode}\nPassword: ${credentials.password}\nLogin: https://mlexpress-merchants.com`
+      : `店铺：${credentials.storeName}\n店铺代码：${credentials.storeCode}\n登录密码：${credentials.password}\n登录：https://mlexpress-merchants.com`;
     void copyText(text);
   };
 
@@ -304,9 +398,19 @@ const MerchantApplicationsPage: React.FC = () => {
             <option value="rejected">{isEn ? 'Rejected' : '已拒绝'}</option>
             <option value="all">{isEn ? 'All' : '全部'}</option>
           </select>
-          <button type="button" className="merchant-apps-btn merchant-apps-btn--ghost" onClick={() => void load()}>
+          <button
+            type="button"
+            className="merchant-apps-btn merchant-apps-btn--ghost"
+            onClick={() => void load({ silent: applications.length > 0 })}
+          >
             {isEn ? 'Refresh' : '刷新'}
           </button>
+          <span className="merchant-apps-poll-hint">
+            {isEn ? 'Auto-refresh every 20s' : '每 20 秒自动刷新'}
+            {lastUpdatedAt
+              ? ` · ${isEn ? 'Updated' : '已更新'} ${new Date(lastUpdatedAt).toLocaleTimeString()}`
+              : ''}
+          </span>
         </div>
       </div>
 
@@ -412,12 +516,27 @@ const MerchantApplicationsPage: React.FC = () => {
                 <div className="merchant-apps-credentials">
                   <div className="merchant-apps-credentials__head">
                     <p className="merchant-apps-credentials__title">
-                      {isEn ? 'Account created — share with merchant' : '账号已开通，请线下告知商家'}
+                      {notifyResult?.smsSent || notifyResult?.emailSent
+                        ? isEn
+                          ? 'Account created and sent to merchant'
+                          : '账号已开通，并已发给商家'
+                        : isEn
+                          ? 'Account created — share with merchant'
+                          : '账号已开通，请告知商家'}
                     </p>
                     <button type="button" className="merchant-apps-btn merchant-apps-btn--success" onClick={copyCredentials}>
                       {isEn ? 'Copy all' : '复制全部'}
                     </button>
                   </div>
+                  <p
+                    className={`merchant-apps-credentials__notify${
+                      notifyResult && !notifyResult.smsSent && !notifyResult.emailSent
+                        ? ' merchant-apps-credentials__notify--warn'
+                        : ''
+                    }`}
+                  >
+                    {credentialsNotifyText(notifyResult, isEn)}
+                  </p>
                   <div className="merchant-apps-credentials__grid">
                     <div className="merchant-apps-cred-box">
                       <div className="merchant-apps-cred-box__label">{isEn ? 'Store code' : '店铺代码'}</div>
