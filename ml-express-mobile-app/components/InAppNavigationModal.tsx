@@ -3,17 +3,17 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
   Platform,
   Dimensions,
+  BackHandler,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MAP_STYLE_LOGISTICS_PRO } from '../utils/mapStyles';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   computeDrivingRoute,
   formatRouteDistance,
@@ -74,6 +74,7 @@ export default function InAppNavigationModal({
   mapFocused = true,
   t,
 }: InAppNavigationModalProps) {
+  const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const [route, setRoute] = useState<ComputedRoute | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -83,8 +84,15 @@ export default function InAppNavigationModal({
   const [markerTracks, setMarkerTracks] = useState(Platform.OS === 'android');
   /** Android Modal 内 MapView 延迟挂载，避免 Marker 空白 */
   const [androidMapMounted, setAndroidMapMounted] = useState(Platform.OS !== 'android');
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  const [mapReady, setMapReady] = useState(false);
+  const [mapFailed, setMapFailed] = useState(false);
+  const [mapEpoch, setMapEpoch] = useState(0);
   /** 收起导航/派单卡片，露出背后地图 */
   const [panelsCollapsed, setPanelsCollapsed] = useState(true);
+  const mapSizeReady = mapSize.width > 20 && mapSize.height > 20;
+  const canMountMap =
+    mapFocused && mapSizeReady && (Platform.OS !== 'android' || androidMapMounted);
   const listMaxHeight = Math.min(220, Math.round(Dimensions.get('window').height * 0.26));
   const mapEdgePadding = useMemo(
     () => ({
@@ -110,18 +118,47 @@ export default function InAppNavigationModal({
       setRoute(null);
       setStopFilter('all');
       setPanelsCollapsed(true);
+      setMapReady(false);
+      setMapFailed(false);
       if (Platform.OS === 'android') {
         setAndroidMapMounted(false);
       }
       return;
     }
     setPanelsCollapsed(manualPlanning);
+    setMapReady(false);
+    setMapFailed(false);
     if (Platform.OS === 'android') {
-      const mountTimer = setTimeout(() => setAndroidMapMounted(true), 320);
+      const mountTimer = setTimeout(() => setAndroidMapMounted(true), 500);
       return () => clearTimeout(mountTimer);
     }
     refreshAndroidMarkers();
   }, [visible, manualPlanning, refreshAndroidMarkers]);
+
+  useEffect(() => {
+    if (!visible || !canMountMap || mapReady) return undefined;
+    const timer = setTimeout(() => setMapFailed(true), 10000);
+    return () => clearTimeout(timer);
+  }, [visible, canMountMap, mapReady, mapEpoch]);
+
+  const retryMap = useCallback(() => {
+    setMapFailed(false);
+    setMapReady(false);
+    setMapEpoch((n) => n + 1);
+    if (Platform.OS === 'android') {
+      setAndroidMapMounted(false);
+      setTimeout(() => setAndroidMapMounted(true), 400);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, onClose]);
 
   useEffect(() => {
     if (!visible || !androidMapMounted) return;
@@ -349,10 +386,14 @@ export default function InAppNavigationModal({
 
   const markerTracksViewChanges = Platform.OS === 'android' ? markerTracks : false;
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
-        <LinearGradient colors={['#0f172a', '#1e293b']} style={styles.header}>
+    <View style={styles.fullscreen} pointerEvents="auto">
+        <LinearGradient
+          colors={['#0f172a', '#1e293b']}
+          style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 8 }]}
+        >
           <TouchableOpacity
             style={styles.closeBtn}
             onPress={onClose}
@@ -380,20 +421,33 @@ export default function InAppNavigationModal({
           </TouchableOpacity>
         </LinearGradient>
 
-        <View style={styles.mapWrap}>
-          {mapFocused && androidMapMounted ? (
+        <View
+          style={styles.mapWrap}
+          collapsable={false}
+          onLayout={(e) => {
+            const { width, height } = e.nativeEvent.layout;
+            if (width > 20 && height > 20) {
+              setMapSize((prev) =>
+                prev.width === Math.round(width) && prev.height === Math.round(height)
+                  ? prev
+                  : { width: Math.round(width), height: Math.round(height) },
+              );
+            }
+          }}
+        >
+          {canMountMap ? (
             <MapView
+              key={`route-map-${mapEpoch}`}
               ref={mapRef}
-              provider={PROVIDER_GOOGLE}
-              style={StyleSheet.absoluteFillObject}
-              customMapStyle={Platform.OS === 'android' ? undefined : MAP_STYLE_LOGISTICS_PRO}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+              style={{ width: mapSize.width, height: mapSize.height }}
               mapType="standard"
               showsTraffic={false}
               showsUserLocation
               showsMyLocationButton={Platform.OS === 'android'}
               pitchEnabled={false}
               rotateEnabled
-              loadingEnabled
+              loadingEnabled={false}
               toolbarEnabled={false}
               initialRegion={{
                 latitude: origin?.latitude || destinationStop?.latitude || poolStops[0]?.latitude || 21.9588,
@@ -402,6 +456,8 @@ export default function InAppNavigationModal({
                 longitudeDelta: 0.06,
               }}
               onMapReady={() => {
+                setMapReady(true);
+                setMapFailed(false);
                 refreshAndroidMarkers();
                 const fitCoords =
                   polylineCoords.length >= 2
@@ -423,6 +479,13 @@ export default function InAppNavigationModal({
                 }
               }}
             >
+              <UrlTile
+                urlTemplate="https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+                maximumZ={19}
+                flipY={false}
+                shouldReplaceMapContent
+                zIndex={-1}
+              />
               {polylineCoords.length >= 2 ? (
                 <Polyline
                   coordinates={polylineCoords}
@@ -464,11 +527,38 @@ export default function InAppNavigationModal({
             </MapView>
           ) : (
             <View style={styles.mapPaused}>
-              <Text style={styles.mapPausedText}>
-                {language === 'zh' ? '地图已暂停' : 'Map paused'}
-              </Text>
+              {mapFocused ? (
+                <ActivityIndicator size="large" color="#0d9488" />
+              ) : (
+                <Text style={styles.mapPausedText}>
+                  {language === 'zh' ? '地图已暂停' : 'Map paused'}
+                </Text>
+              )}
             </View>
           )}
+
+          {canMountMap && !mapReady ? (
+            <View style={styles.mapLoadingOverlay} pointerEvents={mapFailed ? 'auto' : 'none'}>
+              {mapFailed ? (
+                <>
+                  <Text style={styles.mapFailedText}>
+                    {language === 'zh'
+                      ? '地图加载较慢。可点重试，或先用下方列表选站。'
+                      : language === 'en'
+                        ? 'Map is slow to load. Retry, or pick stops from the list.'
+                        : 'မြေပုံ နှေးနေပါသည်။ ထပ်စမ်းပါ သို့မဟုတ် စာရင်းမှ ရွေးပါ။'}
+                  </Text>
+                  <TouchableOpacity style={styles.mapRetryBtn} onPress={retryMap}>
+                    <Text style={styles.mapRetryText}>
+                      {language === 'zh' ? '重试地图' : language === 'en' ? 'Retry map' : 'မြေပုံ ထပ်စမ်း'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <ActivityIndicator size="large" color="#0d9488" />
+              )}
+            </View>
+          ) : null}
 
           <View style={styles.overlay} pointerEvents="box-none">
             {panelsCollapsed ? (
@@ -821,26 +911,51 @@ export default function InAppNavigationModal({
             )}
           </View>
         </View>
-      </View>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  fullscreen: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    elevation: 100,
+    backgroundColor: '#0f172a',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 54 : 16,
     paddingBottom: 14,
     paddingHorizontal: 12,
   },
   closeBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  mapWrap: { flex: 1, position: 'relative' },
+  mapWrap: { flex: 1, position: 'relative', backgroundColor: '#e2e8f0', overflow: 'hidden' },
   mapPaused: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   mapPausedText: { color: '#94a3b8' },
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(226, 232, 240, 0.72)',
+    paddingHorizontal: 28,
+  },
+  mapFailedText: {
+    textAlign: 'center',
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  mapRetryBtn: {
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  mapRetryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end' },
   collapsedDock: {
     marginHorizontal: 12,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { mapScreenStyles as styles } from './map/mapScreenStyles';
 import { useIsFocused } from '@react-navigation/native';
 import {
@@ -224,6 +224,12 @@ export default function MapScreen({ navigation }: any) {
     loadTimes: [] as number[],
     renderTimes: [] as number[]
   });
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: showMapPreview ? { display: 'none', height: 0 } : undefined,
+    });
+  }, [navigation, showMapPreview]);
 
   // 3. 核心功能函数 (useCallback)
   
