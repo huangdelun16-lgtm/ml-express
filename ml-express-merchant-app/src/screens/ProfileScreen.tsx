@@ -39,6 +39,7 @@ import {
   deliveryStoreService,
   rechargeService,
   reviewService,
+  merchantService,
   supabase,
 } from "../services/supabase";
 import BackToHomeButton from "../components/BackToHomeButton";
@@ -49,6 +50,19 @@ import BluetoothScanModal from "../components/BluetoothScanModal";
 import ReceiptPrintPreviewModal from "../components/ReceiptPrintPreviewModal";
 import { getScanPrinterStrings } from "../i18n/scanPrinterStrings";
 import { getActiveBluetoothDevice } from "../services/bluetoothScanner";
+import MerchantExportStatementModal from "../components/MerchantExportStatementModal";
+import MerchantCloseReportModal from "../components/MerchantCloseReportModal";
+import {
+  buildTodayCloseReport,
+  type TodayCloseReport,
+} from "../utils/merchantOpsReport";
+import {
+  exportMerchantStatement,
+  type ExportFormat,
+  type ExportMethod,
+} from "../services/exportMerchantStatement";
+import { batchSettleCodOrders } from "../services/packageBatchService";
+import { toggleSelectedId } from "../utils/merchantBatchSelection";
 
 // 🚀 新增：充值二维码图片资源映射（使用线上URL，避免本地资源编译问题）
 const RECHARGE_QR_BASE_URL = "https://market-link-express.com";
@@ -292,6 +306,8 @@ export default function ProfileScreen({ navigation }: any) {
   const [codOrdersRefreshing, setCodOrdersRefreshing] = useState(false);
   const [codOrdersLoadingMore, setCodOrdersLoadingMore] = useState(false);
   const [codOrdersSearchText, setCodOrdersSearchText] = useState("");
+  const [selectedCodIds, setSelectedCodIds] = useState<Set<string>>(new Set());
+  const [codSettleLoading, setCodSettleLoading] = useState(false);
   const [allCodOrders, setAllCodOrders] = useState<
     Array<{
       orderId: string;
@@ -399,12 +415,56 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
+  const [showCloseReportModal, setShowCloseReportModal] = useState(false);
+  const [closeReportMode, setCloseReportMode] = useState<"view" | "close">("view");
+  const [closeReport, setCloseReport] = useState<TodayCloseReport | null>(null);
+  const [closeReportLoading, setCloseReportLoading] = useState(false);
+
+  const loadCloseReport = async () => {
+    if (!userId) return null;
+    setCloseReportLoading(true);
+    try {
+      const [{ data: orders }, products] = await Promise.all([
+        supabase
+          .from("packages")
+          .select("id,status,created_at,delivery_time,price,cod_amount")
+          .eq("delivery_store_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        merchantService.getStoreProducts(userId),
+      ]);
+      const report = buildTodayCloseReport({
+        orders: orders || [],
+        products,
+      });
+      setCloseReport(report);
+      return report;
+    } catch (error) {
+      LoggerService.error("加载今日关店报表失败:", error);
+      return null;
+    } finally {
+      setCloseReportLoading(false);
+    }
+  };
+
+  const openCloseReport = async (mode: "view" | "close") => {
+    setCloseReportMode(mode);
+    setShowCloseReportModal(true);
+    await loadCloseReport();
+  };
+
   // 🚀 新增：立即打烊
-  const handleCloseImmediately = async () => {
+  const handleCloseImmediately = () => {
+    if (!userId || !storeInfo) return;
+    void openCloseReport("close");
+  };
+
+  const confirmCloseFromReport = async () => {
     if (!userId || !storeInfo) return;
     try {
       setIsSavingStatus(true);
       const result = await deliveryStoreService.updateStoreInfo(userId, {
+        ...businessStatus,
         is_closed_today: true,
         manual_override_status: "closed_manually",
       });
@@ -412,6 +472,7 @@ export default function ProfileScreen({ navigation }: any) {
       if (result.success) {
         setStoreInfo(result.data);
         setBusinessStatus((prev) => ({ ...prev, is_closed_today: true }));
+        setShowCloseReportModal(false);
         showToast(t.serviceSuspended, "success");
       }
     } catch (error) {
@@ -516,6 +577,20 @@ export default function ProfileScreen({ navigation }: any) {
   const [storeReviews, setStoreReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replying, setReplying] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [exportEndDate, setExportEndDate] = useState(() =>
+    new Date().toISOString().split("T")[0],
+  );
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("excel");
+  const [exportMethod, setExportMethod] = useState<ExportMethod>("download");
   const [showVacationModal, setShowVacationModal] = useState(false); // 🚀 新增：休假模态框
   const [vacationDateInput, setVacationDateInput] = useState(""); // 🚀 新增：休假开始日期
   const [vacationEndDateInput, setVacationEndDateInput] = useState(""); // 🚀 新增：休假结束日期
@@ -582,6 +657,123 @@ export default function ProfileScreen({ navigation }: any) {
       LoggerService.error("加载评价失败:", error);
     } finally {
       setLoadingReviews(false);
+    }
+  };
+
+  const handleReplyReview = async (reviewId: string) => {
+    if (!replyText.trim() || replying) return;
+    setReplying(true);
+    try {
+      const result = await reviewService.replyToReview(reviewId, replyText.trim());
+      if (result.success) {
+        feedbackService.notify(
+          language === "zh"
+            ? "回复成功"
+            : language === "en"
+              ? "Reply sent"
+              : "ပြန်လည်ဖြေကြားပြီးပါပြီ",
+        );
+        setReplyText("");
+        setReplyingToId(null);
+        await loadStoreReviews();
+      } else {
+        feedbackService.notify(
+          language === "zh"
+            ? "回复失败"
+            : language === "en"
+              ? "Reply failed"
+              : "ပြန်ကြား၍မရပါ",
+        );
+      }
+    } catch (error) {
+      LoggerService.error("回复失败:", error);
+      feedbackService.notify(
+        language === "zh" ? "回复失败" : "Reply failed",
+      );
+    } finally {
+      setReplying(false);
+    }
+  };
+
+  const openExportModal = () => {
+    const [year, month] = selectedMonth.split("-").map((part) => parseInt(part, 10));
+    const start = `${selectedMonth}-01`;
+    const lastDay = new Date(year || 2026, month || 1, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth =
+      today.getFullYear() === year && today.getMonth() + 1 === month;
+    const end = isCurrentMonth
+      ? today.toISOString().split("T")[0]
+      : `${selectedMonth}-${String(lastDay).padStart(2, "0")}`;
+    setExportStartDate(start);
+    setExportEndDate(end);
+    setShowExportModal(true);
+  };
+
+  const handleExportStatement = async () => {
+    if (!userId || !isMerchantStore) return;
+    if (exportStartDate > exportEndDate) {
+      feedbackService.notify(
+        language === "zh"
+          ? "开始日期不能晚于结束日期"
+          : "Start date cannot be after end date",
+      );
+      return;
+    }
+    if (exportMethod === "email" && !(storeInfo?.email || userEmail)) {
+      feedbackService.notify(
+        language === "zh"
+          ? "请先在店铺资料中绑定邮箱"
+          : "Please add a store email first",
+      );
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const result = await exportMerchantStatement({
+        storeId: userId,
+        storeName: storeInfo?.store_name || userName,
+        email: storeInfo?.email || userEmail,
+        startDate: exportStartDate,
+        endDate: exportEndDate,
+        format: exportFormat,
+        method: exportMethod,
+        language: language as "zh" | "en" | "my",
+      });
+      if (result.noOrders) {
+        feedbackService.notify(
+          language === "zh"
+            ? "所选日期范围内没有订单数据"
+            : "No orders found in the selected date range",
+        );
+        return;
+      }
+      if (!result.ok) {
+        if (result.error === "no_email") {
+          feedbackService.notify(
+            language === "zh" ? "请先绑定店铺邮箱" : "Store email is missing",
+          );
+        } else if (result.error === "share_unavailable") {
+          feedbackService.notify(
+            language === "zh" ? "当前设备不支持分享文件" : "Sharing is not available",
+          );
+        } else {
+          feedbackService.notify(
+            language === "zh" ? "导出失败，请检查网络重试" : "Export failed",
+          );
+        }
+        return;
+      }
+      if (exportMethod === "email") {
+        feedbackService.notify(
+          language === "zh"
+            ? "✅ 对账单已成功发送到您的邮箱"
+            : "✅ Statement has been sent to your email",
+        );
+      }
+      setShowExportModal(false);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -1696,6 +1888,7 @@ export default function ProfileScreen({ navigation }: any) {
         setCodOrdersLoading(true);
         setCodModalSettled(settled);
         setShowCODOrdersModal(true);
+        setSelectedCodIds(new Set());
       }
       setCodOrdersPage(1);
 
@@ -1734,6 +1927,86 @@ export default function ProfileScreen({ navigation }: any) {
       );
       setCodOrders(filtered);
     }
+  };
+
+  const reloadMerchantCodStats = async () => {
+    try {
+      const currentUser = await AsyncStorage.getItem("currentUser");
+      if (!currentUser) return;
+      const user = JSON.parse(currentUser);
+      const storeName =
+        user.name || (await AsyncStorage.getItem("userName")) || undefined;
+      const codStats = await packageService.getMerchantStats(
+        user.id,
+        storeName,
+        selectedMonth,
+      );
+      if (codStats) {
+        setMerchantCODStats((prev) => ({ ...prev, ...codStats }));
+      }
+    } catch (error) {
+      LoggerService.error("刷新代收款统计失败:", error);
+    }
+  };
+
+  const handleSettleCodOrders = (ids: string[]) => {
+    const unique = Array.from(
+      new Set(ids.map((id) => String(id || "").trim()).filter(Boolean)),
+    );
+    if (!unique.length || codSettleLoading) return;
+    Alert.alert(
+      language === "zh" ? "结清代收款" : "Settle COD",
+      language === "zh"
+        ? `确定结清 ${unique.length} 笔？`
+        : `Mark ${unique.length} order(s) as settled?`,
+      [
+        { text: language === "zh" ? "取消" : "Cancel", style: "cancel" },
+        {
+          text: language === "zh" ? "确定" : "OK",
+          onPress: async () => {
+            try {
+              setCodSettleLoading(true);
+              const result = await batchSettleCodOrders(unique);
+              if (result.ok === 0) {
+                showToast(
+                  language === "zh" ? "结清失败" : "Settle failed",
+                  "error",
+                );
+                return;
+              }
+              const settled = new Set(unique);
+              if (result.failed > 0) {
+                await handleViewCODOrders(false, true);
+              } else {
+                setAllCodOrders((prev) =>
+                  prev.filter((order) => !settled.has(order.orderId)),
+                );
+                setCodOrders((prev) =>
+                  prev.filter((order) => !settled.has(order.orderId)),
+                );
+                setCodOrdersTotal((prev) => Math.max(0, prev - result.ok));
+              }
+              setSelectedCodIds(new Set());
+              await reloadMerchantCodStats();
+              showToast(
+                language === "zh"
+                  ? `已结清 ${result.ok} 笔`
+                  : `Settled ${result.ok}`,
+                "success",
+              );
+            } catch (error) {
+              LoggerService.error("批量结清代收款失败:", error);
+              showToast(
+                language === "zh" ? "结清失败" : "Settle failed",
+                "error",
+              );
+            } finally {
+              setCodSettleLoading(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   // 刷新订单列表
@@ -2809,6 +3082,35 @@ export default function ProfileScreen({ navigation }: any) {
               </Text>
             </View>
           )}
+          <TouchableOpacity
+            onPress={openExportModal}
+            activeOpacity={0.85}
+            style={{
+              marginTop: 16,
+              borderRadius: 16,
+              overflow: "hidden",
+            }}
+          >
+            <LinearGradient
+              colors={["#6366f1", "#4f46e5"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                paddingVertical: 13,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "900", fontSize: 15 }}>
+                📊{" "}
+                {language === "zh"
+                  ? "导出对账单"
+                  : language === "en"
+                    ? "Export Statement"
+                    : "စာရင်းချုပ် ထုတ်ရန်"}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -2862,7 +3164,7 @@ export default function ProfileScreen({ navigation }: any) {
 
         <View style={styles.businessActions}>
           {/* 🚀 新增：快捷覆盖按钮 (与 Web 端一致) */}
-          <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
             <TouchableOpacity
               style={[
                 styles.overrideBtn,
@@ -2876,6 +3178,21 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <Text style={[styles.overrideBtnText, { color: "#10b981" }]}>
                 ⏳ {t.extendHour}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.overrideBtn,
+                {
+                  borderColor: "#3b82f6",
+                  backgroundColor: "rgba(59, 130, 246, 0.06)",
+                },
+              ]}
+              onPress={() => void openCloseReport("view")}
+              disabled={isSavingStatus}
+            >
+              <Text style={[styles.overrideBtnText, { color: "#2563eb" }]}>
+                📋 {language === "zh" ? "今日报表" : "Today"}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -2970,7 +3287,13 @@ export default function ProfileScreen({ navigation }: any) {
           {/* 保存按钮 */}
           <TouchableOpacity
             style={styles.businessSaveButton}
-            onPress={() => handleUpdateStoreStatus(businessStatus)}
+            onPress={() => {
+              if (businessStatus.is_closed_today && !storeInfo?.is_closed_today) {
+                void openCloseReport("close");
+                return;
+              }
+              void handleUpdateStoreStatus(businessStatus);
+            }}
             disabled={isSavingStatus}
           >
             <LinearGradient
@@ -4342,7 +4665,11 @@ export default function ProfileScreen({ navigation }: any) {
         visible={showReviewsModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowReviewsModal(false)}
+        onRequestClose={() => {
+          setShowReviewsModal(false);
+          setReplyingToId(null);
+          setReplyText("");
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: "80%", padding: 0 }]}>
@@ -4361,7 +4688,13 @@ export default function ProfileScreen({ navigation }: any) {
               >
                 {language === "zh" ? "评价详情" : "Review Details"}
               </Text>
-              <TouchableOpacity onPress={() => setShowReviewsModal(false)}>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowReviewsModal(false);
+                  setReplyingToId(null);
+                  setReplyText("");
+                }}
+              >
                 <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
@@ -4427,7 +4760,7 @@ export default function ProfileScreen({ navigation }: any) {
                       </View>
                     )}
 
-                    {review.reply_text && (
+                    {review.reply_text ? (
                       <View
                         style={{
                           marginTop: 12,
@@ -4446,11 +4779,116 @@ export default function ProfileScreen({ navigation }: any) {
                             marginBottom: 4,
                           }}
                         >
-                          {language === "zh" ? "商家回复：" : "Merchant Reply:"}
+                          {language === "zh"
+                            ? "商家回复："
+                            : language === "en"
+                              ? "Merchant Reply:"
+                              : "ဆိုင်မှ ပြန်ကြားချက်:"}
                         </Text>
                         <Text style={{ fontSize: 13, color: "#475569" }}>
                           {review.reply_text}
                         </Text>
+                      </View>
+                    ) : (
+                      <View style={{ marginTop: 12 }}>
+                        {replyingToId === review.id ? (
+                          <View>
+                            <TextInput
+                              value={replyText}
+                              onChangeText={setReplyText}
+                              placeholder={
+                                language === "zh"
+                                  ? "输入您的回复内容..."
+                                  : language === "en"
+                                    ? "Type your reply..."
+                                    : "ပြန်ကြားချက် ရိုက်ထည့်ပါ..."
+                              }
+                              placeholderTextColor="#94a3b8"
+                              multiline
+                              style={{
+                                minHeight: 80,
+                                borderWidth: 1,
+                                borderColor: "#e2e8f0",
+                                borderRadius: 12,
+                                padding: 12,
+                                color: "#0f172a",
+                                backgroundColor: "#f8fafc",
+                                textAlignVertical: "top",
+                                fontSize: 14,
+                              }}
+                            />
+                            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setReplyingToId(null);
+                                  setReplyText("");
+                                }}
+                                style={{
+                                  flex: 1,
+                                  paddingVertical: 10,
+                                  borderRadius: 10,
+                                  backgroundColor: "#e2e8f0",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Text style={{ fontWeight: "700", color: "#475569" }}>
+                                  {language === "zh"
+                                    ? "取消"
+                                    : language === "en"
+                                      ? "Cancel"
+                                      : "မလုပ်တော့ပါ"}
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => void handleReplyReview(review.id)}
+                                disabled={replying}
+                                style={{
+                                  flex: 2,
+                                  paddingVertical: 10,
+                                  borderRadius: 10,
+                                  backgroundColor: "#f59e0b",
+                                  alignItems: "center",
+                                  opacity: replying ? 0.7 : 1,
+                                }}
+                              >
+                                <Text style={{ fontWeight: "800", color: "#fff" }}>
+                                  {replying
+                                    ? "…"
+                                    : language === "zh"
+                                      ? "提交回复"
+                                      : language === "en"
+                                        ? "Submit Reply"
+                                        : "ပို့ရန်"}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => {
+                              setReplyingToId(review.id);
+                              setReplyText("");
+                            }}
+                            style={{
+                              alignSelf: "flex-start",
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 10,
+                              backgroundColor: "rgba(251, 191, 36, 0.12)",
+                              borderWidth: 1,
+                              borderColor: "rgba(251, 191, 36, 0.35)",
+                            }}
+                          >
+                            <Text style={{ color: "#d97706", fontWeight: "800", fontSize: 13 }}>
+                              💬{" "}
+                              {language === "zh"
+                                ? "回复评价"
+                                : language === "en"
+                                  ? "Reply"
+                                  : "ပြန်ကြားရန်"}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     )}
                   </View>
@@ -4460,6 +4898,36 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+      <MerchantCloseReportModal
+        visible={showCloseReportModal}
+        language={language}
+        mode={closeReportMode}
+        report={closeReport}
+        loading={closeReportLoading}
+        confirmLoading={isSavingStatus}
+        onClose={() => setShowCloseReportModal(false)}
+        onConfirmClose={() => void confirmCloseFromReport()}
+        onOpenProducts={() => {
+          setShowCloseReportModal(false);
+          navigation.navigate("MerchantProducts", { storeId: userId });
+        }}
+      />
+      <MerchantExportStatementModal
+        open={showExportModal}
+        language={language}
+        isExporting={isExporting}
+        startDate={exportStartDate}
+        endDate={exportEndDate}
+        format={exportFormat}
+        method={exportMethod}
+        recipientEmail={storeInfo?.email || userEmail}
+        onClose={() => setShowExportModal(false)}
+        onStartDateChange={setExportStartDate}
+        onEndDateChange={setExportEndDate}
+        onFormatChange={setExportFormat}
+        onMethodChange={setExportMethod}
+        onExport={() => void handleExportStatement()}
+      />
       <Modal
         visible={showMonthPicker}
         transparent
@@ -4641,7 +5109,10 @@ export default function ProfileScreen({ navigation }: any) {
         visible={showCODOrdersModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowCODOrdersModal(false)}
+        onRequestClose={() => {
+          setShowCODOrdersModal(false);
+          setSelectedCodIds(new Set());
+        }}
       >
         <View
           style={[
@@ -4699,7 +5170,10 @@ export default function ProfileScreen({ navigation }: any) {
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => setShowCODOrdersModal(false)}
+                  onPress={() => {
+                    setShowCODOrdersModal(false);
+                    setSelectedCodIds(new Set());
+                  }}
                   style={{
                     padding: 8,
                     backgroundColor: "rgba(255,255,255,0.2)",
@@ -4790,6 +5264,51 @@ export default function ProfileScreen({ navigation }: any) {
                   </TouchableOpacity>
                 </View>
               )}
+              {codModalSettled === false && !codOrdersLoading && codOrders.length > 0 ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginTop: 12,
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() =>
+                      setSelectedCodIds(
+                        new Set(codOrders.map((order) => order.orderId)),
+                      )
+                    }
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 10,
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                    }}
+                  >
+                    <Text style={{ color: "white", fontWeight: "800" }}>
+                      {language === "zh" ? "全选" : "Select all"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={selectedCodIds.size === 0 || codSettleLoading}
+                    onPress={() => handleSettleCodOrders(Array.from(selectedCodIds))}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 10,
+                      backgroundColor:
+                        selectedCodIds.size === 0 ? "rgba(255,255,255,0.15)" : "#10b981",
+                    }}
+                  >
+                    <Text style={{ color: "white", fontWeight: "800" }}>
+                      {language === "zh"
+                        ? `批量结清 (${selectedCodIds.size})`
+                        : `Settle (${selectedCodIds.size})`}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </LinearGradient>
 
             <View style={{ flex: 1, backgroundColor: "#f8fafc" }}>
@@ -4851,7 +5370,9 @@ export default function ProfileScreen({ navigation }: any) {
                           marginBottom: 12,
                           ...theme.shadows.small,
                           borderLeftWidth: 4,
-                          borderLeftColor: "#3b82f6",
+                          borderLeftColor: selectedCodIds.has(item.orderId)
+                            ? "#10b981"
+                            : "#3b82f6",
                         }}
                       >
                         <View
@@ -4861,6 +5382,30 @@ export default function ProfileScreen({ navigation }: any) {
                             alignItems: "flex-start",
                           }}
                         >
+                          {codModalSettled === false ? (
+                            <TouchableOpacity
+                              onPress={() =>
+                                setSelectedCodIds((prev) =>
+                                  toggleSelectedId(prev, item.orderId),
+                                )
+                              }
+                              style={{ marginRight: 10, marginTop: 4 }}
+                            >
+                              <Ionicons
+                                name={
+                                  selectedCodIds.has(item.orderId)
+                                    ? "checkbox"
+                                    : "square-outline"
+                                }
+                                size={22}
+                                color={
+                                  selectedCodIds.has(item.orderId)
+                                    ? "#10b981"
+                                    : "#94a3b8"
+                                }
+                              />
+                            </TouchableOpacity>
+                          ) : null}
                           <View style={{ flex: 1 }}>
                             <View
                               style={{
@@ -4987,6 +5532,31 @@ export default function ProfileScreen({ navigation }: any) {
                                 MMK
                               </Text>
                             </View>
+                            {codModalSettled === false ? (
+                              <TouchableOpacity
+                                disabled={codSettleLoading}
+                                onPress={() =>
+                                  handleSettleCodOrders([item.orderId])
+                                }
+                                style={{
+                                  marginTop: 10,
+                                  backgroundColor: "#10b981",
+                                  borderRadius: 8,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    color: "white",
+                                    fontWeight: "800",
+                                    fontSize: 12,
+                                  }}
+                                >
+                                  {language === "zh" ? "结清" : "Settle"}
+                                </Text>
+                              </TouchableOpacity>
+                            ) : null}
                           </View>
                         </View>
                       </View>
@@ -6336,7 +6906,8 @@ const styles = StyleSheet.create({
   },
   // 🚀 新增：快捷覆盖按钮与休假计划样式
   overrideBtn: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: 96,
     height: 44,
     borderWidth: 1,
     borderRadius: 12,

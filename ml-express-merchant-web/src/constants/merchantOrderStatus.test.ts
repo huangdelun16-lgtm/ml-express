@@ -1,6 +1,7 @@
 import {
   MERCHANT_ORDER_STATUS,
   computeMerchantOrderStats,
+  filterOrdersBySearch,
   filterPackagesByTab,
   getMerchantOrderStatusLabel,
   getMerchantPaymentMethodText,
@@ -48,5 +49,35 @@ describe('merchantOrderStatus', () => {
     expect(getMerchantPaymentMethodText(undefined, 'zh', { emptyAsDash: true })).toBe(
       '-',
     );
+  });
+
+  it('filterOrdersBySearch matches order id, phones and names', () => {
+    const orders = [
+      {
+        id: 'ML-1001',
+        sender_name: 'Aung',
+        sender_phone: '09-123 456',
+        sender_address: 'Mandalay',
+        receiver_name: 'Thiri',
+        receiver_phone: '0987654321',
+        receiver_address: 'Yangon',
+      },
+      {
+        id: 'ML-2002',
+        sender_name: 'Ko Ko',
+        sender_phone: '0911111111',
+        sender_address: 'Sagaing',
+        receiver_name: 'Mg Mg',
+        receiver_phone: '0922222222',
+        receiver_address: 'Naypyitaw',
+      },
+    ];
+
+    expect(filterOrdersBySearch(orders, '')).toHaveLength(2);
+    expect(filterOrdersBySearch(orders, 'ML-1001').map((o) => o.id)).toEqual(['ML-1001']);
+    expect(filterOrdersBySearch(orders, '09123456').map((o) => o.id)).toEqual(['ML-1001']);
+    expect(filterOrdersBySearch(orders, 'thiri').map((o) => o.id)).toEqual(['ML-1001']);
+    expect(filterOrdersBySearch(orders, 'yangon').map((o) => o.id)).toEqual(['ML-1001']);
+    expect(filterOrdersBySearch(orders, 'zzz')).toHaveLength(0);
   });
 });

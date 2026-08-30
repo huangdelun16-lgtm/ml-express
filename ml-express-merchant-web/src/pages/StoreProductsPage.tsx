@@ -13,6 +13,7 @@ import {
   type MerchantProductFormState,
 } from '../utils/merchantProductForm';
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
+import { collectStockAlerts } from '../utils/merchantOpsReport';
 import '../styles/merchantProductsPage.css';
 import { feedbackService } from '../services/FeedbackService';
 import StorageImg from '../components/StorageImg';
@@ -232,7 +233,15 @@ const StoreProductsPage: React.FC = () => {
     const pending = products.filter(
       (p) => p.listing_status === 'pending' || hasPendingProductUpdate(p),
     ).length;
-    return { total: products.length, onSale, pending };
+    const stockAlerts = collectStockAlerts(products);
+    return {
+      total: products.length,
+      onSale,
+      pending,
+      stockAlerts,
+      outOfStock: stockAlerts.filter((item) => item.level === 'out').length,
+      lowStock: stockAlerts.filter((item) => item.level === 'low').length,
+    };
   }, [products]);
 
   const saleLabel =
@@ -305,9 +314,33 @@ const StoreProductsPage: React.FC = () => {
           </button>
         </div>
       ) : (
+        <>
+        {productStats.outOfStock + productStats.lowStock > 0 ? (
+          <div className="merchant-products-stock-alert" role="status">
+            <strong>
+              {language === 'zh' ? '缺货提醒' : language === 'en' ? 'Stock alerts' : 'လက်ကျန်သတိပေး'}
+            </strong>
+            <span>
+              {language === 'zh'
+                ? `${productStats.outOfStock} 件缺货 · ${productStats.lowStock} 件库存偏低（≤3）`
+                : `${productStats.outOfStock} out of stock · ${productStats.lowStock} low (≤3)`}
+            </span>
+          </div>
+        ) : null}
         <div className="merchant-products-grid">
           {products.map((product) => (
-            <article key={product.id} className="merchant-product-card">
+            <article
+              key={product.id}
+              className={`merchant-product-card${
+                productStats.stockAlerts.some(
+                  (item) => item.productId === product.id && item.level === 'out',
+                )
+                  ? ' is-out-of-stock'
+                  : productStats.stockAlerts.some((item) => item.productId === product.id)
+                    ? ' is-low-stock'
+                    : ''
+              }`}
+            >
               <div className="merchant-product-card__media">
                 <StorageImg
                   src={product.image_url}
@@ -419,6 +452,7 @@ const StoreProductsPage: React.FC = () => {
             </article>
           ))}
         </div>
+        </>
       )}
 
       {showAddEditProductModal && (

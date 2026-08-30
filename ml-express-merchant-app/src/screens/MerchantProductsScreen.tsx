@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,7 @@ import {
   type MerchantProductFormState,
 } from '../utils/merchantProductForm';
 import { formatProductPriceLabel, productHasVariants } from '../utils/productVariants';
+import { collectStockAlerts } from '../utils/merchantOpsReport';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORE_UUID_RE =
@@ -538,14 +539,30 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
     }
   };
 
+  const stockAlerts = useMemo(() => collectStockAlerts(products), [products]);
+  const outOfStockIds = useMemo(
+    () => new Set(stockAlerts.filter((item) => item.level === 'out').map((item) => item.productId)),
+    [stockAlerts],
+  );
+  const lowStockIds = useMemo(
+    () => new Set(stockAlerts.filter((item) => item.level === 'low').map((item) => item.productId)),
+    [stockAlerts],
+  );
+
   const renderProductItem = ({ item }: { item: Product }) => {
     const isSelected = selectedProductIds.has(item.id);
+    const stockTone = outOfStockIds.has(item.id)
+      ? '#fecaca'
+      : lowStockIds.has(item.id)
+        ? '#fde68a'
+        : undefined;
     
     return (
       <TouchableOpacity 
         style={[
           styles.productCard, 
           { width: '100%', flexDirection: 'row', alignItems: 'center' },
+          stockTone ? { backgroundColor: stockTone } : null,
         ]}
         onPress={() => handleOpenEditProduct(item)}
         activeOpacity={0.7}
@@ -649,6 +666,29 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
             contentContainerStyle={[styles.listContent, { paddingBottom: 180 }]}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3b82f6']} />
+            }
+            ListHeaderComponent={
+              stockAlerts.length > 0 ? (
+                <View
+                  style={{
+                    backgroundColor: '#fff7ed',
+                    borderColor: '#fdba74',
+                    borderWidth: 1,
+                    borderRadius: 14,
+                    padding: 12,
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text style={{ fontWeight: '800', color: '#9a3412' }}>
+                    {language === 'zh' ? '缺货提醒' : 'Stock alerts'}
+                  </Text>
+                  <Text style={{ marginTop: 4, color: '#9a3412', fontWeight: '700' }}>
+                    {language === 'zh'
+                      ? `${stockAlerts.filter((a) => a.level === 'out').length} 件缺货 · ${stockAlerts.filter((a) => a.level === 'low').length} 件库存偏低（≤3）`
+                      : `${stockAlerts.filter((a) => a.level === 'out').length} out · ${stockAlerts.filter((a) => a.level === 'low').length} low (≤3)`}
+                  </Text>
+                </View>
+              ) : null
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>

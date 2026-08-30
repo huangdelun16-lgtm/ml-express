@@ -70,9 +70,13 @@ import {
 } from "../constants/merchantOrderStatus";
 import { exportMerchantStatement } from "../services/exportMerchantStatement";
 import { useMerchantPackageModals } from "../hooks/useMerchantPackageModals";
+import { batchSettleCodOrders } from "../services/packageBatchService";
+import { toggleSelectedId } from "../utils/merchantBatchSelection";
 import MerchantPackageDetailModal from "../components/orders/MerchantPackageDetailModal";
 import MerchantPackingModal from "../components/orders/MerchantPackingModal";
 import MerchantExportStatementModal from "../components/profile/MerchantExportStatementModal";
+import MerchantCloseReportModal from "../components/profile/MerchantCloseReportModal";
+import { buildTodayCloseReport } from "../utils/merchantOpsReport";
 import MerchantRechargeModals from "../components/profile/MerchantRechargeModals";
 import MerchantScheduledTimePickerModal from "../components/profile/MerchantScheduledTimePickerModal";
 import MerchantPrinterModal from "../components/profile/MerchantPrinterModal";
@@ -320,6 +324,8 @@ const ProfilePage: React.FC = () => {
   const [codModalKind, setCodModalKind] = useState<
     "settled" | "uncleared" | "all"
   >("all");
+  const [selectedCodIds, setSelectedCodIds] = useState<Set<string>>(new Set());
+  const [codSettleLoading, setCodSettleLoading] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const filteredCodOrders = useMemo(() => {
@@ -464,10 +470,36 @@ const ProfilePage: React.FC = () => {
     await handleUpdateStoreStatus({ operating_hours: newHours });
   };
 
-  const handleCloseImmediately = async () => {
+  const [showCloseReportModal, setShowCloseReportModal] = useState(false);
+  const [closeReportMode, setCloseReportMode] = useState<"view" | "close">(
+    "view",
+  );
+
+  const todayCloseReport = useMemo(
+    () =>
+      buildTodayCloseReport({
+        orders: userPackages,
+        products,
+      }),
+    [userPackages, products],
+  );
+
+  const openCloseReport = (mode: "view" | "close") => {
+    setCloseReportMode(mode);
+    setShowCloseReportModal(true);
+  };
+
+  const handleCloseImmediately = () => {
+    openCloseReport("close");
+  };
+
+  const confirmCloseFromReport = async () => {
+    setShowCloseReportModal(false);
     setBusinessStatus((prev) => ({ ...prev, is_closed_today: true }));
-    // 🚀 立即保存到数据库
-    await handleUpdateStoreStatus({ is_closed_today: true });
+    await handleUpdateStoreStatus({
+      ...businessStatus,
+      is_closed_today: true,
+    });
   };
 
   const handleAddVacationDate = () => {
@@ -2133,6 +2165,7 @@ const ProfilePage: React.FC = () => {
 
       if (userId) {
         setCodOrderSearch("");
+        setSelectedCodIds(new Set());
         const yearLabel = String(new Date().getFullYear());
 
         if (settled === true) {
@@ -2177,6 +2210,54 @@ const ProfilePage: React.FC = () => {
       LoggerService.error("加载代收款订单失败:", error);
       feedbackService.notify("加载订单列表失败");
     }
+  };
+
+  const handleSettleCodOrders = async (ids: string[]) => {
+    const unique = Array.from(
+      new Set(ids.map((id) => String(id || "").trim()).filter(Boolean)),
+    );
+    if (!unique.length || codSettleLoading) return;
+    const confirmMsg =
+      language === "zh"
+        ? `确定结清 ${unique.length} 笔代收款？`
+        : `Mark ${unique.length} COD order(s) as settled?`;
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      setCodSettleLoading(true);
+      const result = await batchSettleCodOrders(unique);
+      if (result.ok === 0) {
+        feedbackService.notify(
+          language === "zh" ? "结清失败，请重试" : "Settle failed",
+        );
+        return;
+      }
+      const settled = new Set(unique);
+      if (result.failed > 0) {
+        await handleViewCODOrders(false);
+      } else {
+        setCodOrders((prev) => prev.filter((order) => !settled.has(order.orderId)));
+      }
+      setSelectedCodIds(new Set());
+      await loadPartnerCODStats();
+      feedbackService.notify(
+        language === "zh"
+          ? `已结清 ${result.ok} 笔${result.failed ? `，失败 ${result.failed} 笔` : ""}`
+          : `Settled ${result.ok}${result.failed ? `, failed ${result.failed}` : ""}`,
+      );
+    } catch (error) {
+      LoggerService.error("批量结清代收款失败:", error);
+      feedbackService.notify(
+        language === "zh" ? "结清失败" : "Settle failed",
+      );
+    } finally {
+      setCodSettleLoading(false);
+    }
+  };
+
+  const closeCodOrdersModal = () => {
+    setShowCODOrdersModal(false);
+    setCodOrderSearch("");
+    setSelectedCodIds(new Set());
   };
 
   // 当包裹列表变化时，重置到第一页
@@ -2664,6 +2745,48 @@ const ProfilePage: React.FC = () => {
           visible={isVisible}
           language={lang}
         />
+
+        {isPartnerStore ? (
+          <button
+            type="button"
+            onClick={() => openCloseReport("view")}
+            style={{
+              width: "100%",
+              margin: "0 0 1rem",
+              padding: "0.95rem 1.1rem",
+              borderRadius: 18,
+              border:
+                todayCloseReport.outOfStockCount + todayCloseReport.lowStockCount > 0
+                  ? "1px solid rgba(251, 191, 36, 0.45)"
+                  : "1px solid rgba(255,255,255,0.1)",
+              background:
+                todayCloseReport.outOfStockCount + todayCloseReport.lowStockCount > 0
+                  ? "rgba(251, 191, 36, 0.12)"
+                  : "rgba(255,255,255,0.05)",
+              color: "#fff",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <span style={{ fontWeight: 800, fontSize: "0.92rem" }}>
+              {language === "zh"
+                ? `今日报表 · 新单 ${todayCloseReport.todayOrderCount} · 未完成 ${todayCloseReport.unfinishedCount}`
+                : `Today · ${todayCloseReport.todayOrderCount} new · ${todayCloseReport.unfinishedCount} open`}
+              {todayCloseReport.outOfStockCount + todayCloseReport.lowStockCount > 0
+                ? language === "zh"
+                  ? ` · 缺货 ${todayCloseReport.outOfStockCount} · 偏低 ${todayCloseReport.lowStockCount}`
+                  : ` · ${todayCloseReport.outOfStockCount} out · ${todayCloseReport.lowStockCount} low`
+                : ""}
+            </span>
+            <span style={{ fontWeight: 800, opacity: 0.7 }}>
+              {language === "zh" ? "查看" : "View"}
+            </span>
+          </button>
+        ) : null}
 
         <div
           className="merchant-profile-account-card"
@@ -3458,6 +3581,31 @@ const ProfilePage: React.FC = () => {
               >
                   {t.pendingAccept}
                 </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void packageModals.handleAcceptMany(
+                      userPackages.filter((pkg) => pkg.status === "待确认"),
+                    );
+                  }}
+                  disabled={packageModals.actionLoading}
+                  style={{
+                    marginTop: "0.85rem",
+                    padding: "8px 14px",
+                    border: "none",
+                    borderRadius: 12,
+                    fontWeight: 800,
+                    fontSize: "0.8rem",
+                    cursor: packageModals.actionLoading
+                      ? "not-allowed"
+                      : "pointer",
+                    color: "#1e293b",
+                    background: "#fbbf24",
+                  }}
+                >
+                  {language === "zh" ? "全部接单" : "Accept all"}
+                </button>
               </div>
             )}
 
@@ -4645,6 +4793,26 @@ const ProfilePage: React.FC = () => {
                         ⏳ {language === "zh" ? "延长1h" : "Ext 1h"}
                       </button>
 
+                      <button
+                        type="button"
+                        onClick={() => openCloseReport("view")}
+                        disabled={isSavingStatus}
+                        style={{
+                          width: "123px",
+                          height: "56px",
+                          background: "rgba(59, 130, 246, 0.12)",
+                          color: "#93c5fd",
+                          border: "1px solid rgba(59, 130, 246, 0.35)",
+                          padding: "4px",
+                          borderRadius: "18px",
+                          fontSize: "0.8rem",
+                          fontWeight: "800",
+                          cursor: isSavingStatus ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        📋 {language === "zh" ? "今日报表" : "Today"}
+                      </button>
+
                       {/* 即刻打烊按钮 */}
                       <button
                         onClick={handleCloseImmediately}
@@ -4688,7 +4856,16 @@ const ProfilePage: React.FC = () => {
 
                       {/* 保存按钮 */}
                       <button
-                        onClick={() => handleUpdateStoreStatus(businessStatus)}
+                        onClick={() => {
+                          if (
+                            businessStatus.is_closed_today &&
+                            !storeInfo?.is_closed_today
+                          ) {
+                            openCloseReport("close");
+                            return;
+                          }
+                          void handleUpdateStoreStatus(businessStatus);
+                        }}
                         disabled={isSavingStatus}
                         style={{
                           width: "123px",
@@ -5255,6 +5432,31 @@ const ProfilePage: React.FC = () => {
                       ? "Pending Accept"
                       : "လက်ခံရန်စောင့်ဆိုင်းနေသည်"}
                 </h2>
+                {userPackages.some((pkg) => pkg.status === "待确认") ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void packageModals.handleAcceptMany(
+                        userPackages.filter((pkg) => pkg.status === "待确认"),
+                      )
+                    }
+                    disabled={packageModals.actionLoading}
+                    style={{
+                      marginLeft: "0.5rem",
+                      padding: "8px 14px",
+                      border: "none",
+                      borderRadius: 12,
+                      fontWeight: 800,
+                      cursor: packageModals.actionLoading
+                        ? "not-allowed"
+                        : "pointer",
+                      color: "#1e293b",
+                      background: "#fbbf24",
+                    }}
+                  >
+                    {language === "zh" ? "全部接单" : "Accept all"}
+                  </button>
+                ) : null}
               </div>
               <button
                 onClick={() => setShowPendingAcceptListModal(false)}
@@ -6095,10 +6297,7 @@ const ProfilePage: React.FC = () => {
                 </h2>
               </div>
               <button
-                onClick={() => {
-                  setShowCODOrdersModal(false);
-                  setCodOrderSearch("");
-                }}
+                onClick={closeCodOrdersModal}
                 style={{
                   background: "rgba(255, 255, 255, 0.1)",
                   border: "none",
@@ -6197,6 +6396,62 @@ const ProfilePage: React.FC = () => {
                     ? `${filteredCodOrders.length} of ${codOrders.length} shown`
                     : `${filteredCodOrders.length} / ${codOrders.length}`}
               </div>
+              {codModalKind === "uncleared" && filteredCodOrders.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.5rem",
+                    alignItems: "center",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedCodIds(
+                        new Set(filteredCodOrders.map((order) => order.orderId)),
+                      )
+                    }
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.16)",
+                      background: "rgba(255,255,255,0.08)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {language === "zh" ? "全选" : "Select all"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleSettleCodOrders(Array.from(selectedCodIds))
+                    }
+                    disabled={selectedCodIds.size === 0 || codSettleLoading}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      border: "none",
+                      background:
+                        selectedCodIds.size === 0
+                          ? "rgba(148,163,184,0.35)"
+                          : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      color: "#fff",
+                      fontWeight: 800,
+                      cursor:
+                        selectedCodIds.size === 0 || codSettleLoading
+                          ? "not-allowed"
+                          : "pointer",
+                    }}
+                  >
+                    {language === "zh"
+                      ? `批量结清 (${selectedCodIds.size})`
+                      : `Settle (${selectedCodIds.size})`}
+                  </button>
+                </div>
+              ) : null}
             </div>
             
             <div style={{ flex: 1, overflowY: "auto", paddingRight: "0.5rem" }}>
@@ -6222,11 +6477,39 @@ const ProfilePage: React.FC = () => {
                       alignItems: "flex-start",
                       padding: "1.25rem",
                       marginBottom: "1rem",
-                      background: "rgba(255, 255, 255, 0.05)",
+                      background: selectedCodIds.has(order.orderId)
+                        ? "rgba(16, 185, 129, 0.12)"
+                        : "rgba(255, 255, 255, 0.05)",
                       borderRadius: "16px",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      border: selectedCodIds.has(order.orderId)
+                        ? "1px solid rgba(52, 211, 153, 0.45)"
+                        : "1px solid rgba(255, 255, 255, 0.1)",
+                      gap: "10px",
                     }}
                   >
+                    {codModalKind === "uncleared" ? (
+                      <input
+                        type="checkbox"
+                        checked={selectedCodIds.has(order.orderId)}
+                        onChange={() =>
+                          setSelectedCodIds((prev) =>
+                            toggleSelectedId(prev, order.orderId),
+                          )
+                        }
+                        aria-label={
+                          language === "zh"
+                            ? `选择 ${order.orderId}`
+                            : `Select ${order.orderId}`
+                        }
+                        style={{
+                          width: 18,
+                          height: 18,
+                          marginTop: 6,
+                          accentColor: "#10b981",
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : null}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
@@ -6298,6 +6581,30 @@ const ProfilePage: React.FC = () => {
                           : "— "}
                         <span style={{ fontSize: "0.8rem" }}>MMK</span>
                       </div>
+                      {codModalKind === "uncleared" ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleSettleCodOrders([order.orderId])
+                          }
+                          disabled={codSettleLoading}
+                          style={{
+                            marginTop: 10,
+                            padding: "6px 10px",
+                            border: "none",
+                            borderRadius: 8,
+                            background: "#10b981",
+                            color: "#fff",
+                            fontWeight: 800,
+                            fontSize: "0.75rem",
+                            cursor: codSettleLoading
+                              ? "not-allowed"
+                              : "pointer",
+                          }}
+                        >
+                          {language === "zh" ? "结清" : "Settle"}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                   );
@@ -6337,10 +6644,7 @@ const ProfilePage: React.FC = () => {
             </div>
 
             <button
-              onClick={() => {
-                setShowCODOrdersModal(false);
-                setCodOrderSearch("");
-              }}
+              onClick={closeCodOrdersModal}
               style={{
                 width: "100%",
                 marginTop: "2rem",
@@ -9177,6 +9481,20 @@ const ProfilePage: React.FC = () => {
         onSaveQR={handleSaveQRCode}
         onFileChange={handleFileChange}
         onConfirmRecharge={handleConfirmRecharge}
+      />
+
+      <MerchantCloseReportModal
+        open={showCloseReportModal}
+        language={lang}
+        mode={closeReportMode}
+        report={todayCloseReport}
+        confirmLoading={isSavingStatus}
+        onClose={() => setShowCloseReportModal(false)}
+        onConfirmClose={() => void confirmCloseFromReport()}
+        onOpenProducts={() => {
+          setShowCloseReportModal(false);
+          navigate("/products");
+        }}
       />
 
       <MerchantExportStatementModal

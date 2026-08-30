@@ -42,6 +42,10 @@ const NETLIFY_CANDIDATES = uniqUrls([
   'https://admin-market-link-express.netlify.app',
 ]);
 
+export function getMerchantNetlifyBases(): string[] {
+  return NETLIFY_CANDIDATES;
+}
+
 function isCredentialError(message: string): boolean {
   return /密码|店铺代码不存在|不存在|停用|状态异常|中转站|Inventory/i.test(message);
 }

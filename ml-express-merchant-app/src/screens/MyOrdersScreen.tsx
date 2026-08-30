@@ -17,6 +17,14 @@ import PackingModal from '../components/PackingModal';
 import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
 import { dialCourierByAssignment } from '../utils/courierPhone';
 import { isCourierUnassigned } from '../services/_shared/dialPhone';
+import { filterOrdersBySearch } from '../utils/filterOrdersBySearch';
+import { printerService } from '../services/PrinterService';
+import { batchAcceptOrders } from '../services/packageBatchService';
+import {
+  pendingConfirmIds,
+  printableIds,
+  toggleSelectedId,
+} from '../utils/merchantBatchSelection';
 
 const { width } = Dimensions.get('window');
 
@@ -58,6 +66,10 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   // 从路由参数中获取筛选状态，默认为'all'
   const [selectedStatus, setSelectedStatus] = useState(route?.params?.filterStatus || 'all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
@@ -153,6 +165,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       cod: '代收款',
       totalAmount: '总金额',
       none: '无',
+      searchPlaceholder: '搜索单号 / 电话 / 姓名',
+      noSearchMatch: '没有匹配的订单',
+      noSearchMatchDesc: '换个单号或电话再试试',
+      batch: '批量',
+      batchDone: '完成',
+      selectPending: '全选待接单',
+      selectPrintable: '全选可打单',
+      batchAccept: '批量接单',
+      batchPrint: '批量打单',
+      selectedCount: '已选',
     },
     en: {
       title: 'My Orders',
@@ -181,6 +203,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       cod: 'COD',
       totalAmount: 'Total',
       none: 'None',
+      searchPlaceholder: 'Search order no. / phone / name',
+      noSearchMatch: 'No matching orders',
+      noSearchMatchDesc: 'Try another order number or phone',
+      batch: 'Batch',
+      batchDone: 'Done',
+      selectPending: 'Select pending',
+      selectPrintable: 'Select printable',
+      batchAccept: 'Accept',
+      batchPrint: 'Print',
+      selectedCount: 'Selected',
     },
     my: {
       title: 'ကျွန်ုပ်၏ အော်ဒါများ',
@@ -209,6 +241,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       cod: 'ငွေကောက်ခံရန်',
       totalAmount: 'စုစုပေါင်း',
       none: 'မရှိ',
+      searchPlaceholder: 'အော်ဒါနံပါတ် / ဖုန်း / အမည်',
+      noSearchMatch: 'ကိုက်ညီသော အော်ဒါမရှိပါ',
+      noSearchMatchDesc: 'အခြားနံပါတ်ဖြင့် ထပ်စမ်းပါ',
+      batch: 'အများ',
+      batchDone: 'ပြီး',
+      selectPending: 'လက်ခံရန်အားလုံး',
+      selectPrintable: 'ပရင့်နိုင်သမျှ',
+      batchAccept: 'လက်ခံ',
+      batchPrint: 'ပရင့်',
+      selectedCount: 'ရွေးပြီး',
       // 包裹类型翻译
       packageTypes: {
         'standard': 'စံပါဆယ်',
@@ -276,10 +318,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
 
   // 当订单数据加载完成后，应用初始筛选
   useEffect(() => {
-    if (orders.length > 0 && selectedStatus) {
-      filterOrders(orders, selectedStatus);
-    }
-  }, [orders, selectedStatus]);
+    filterOrders(orders, selectedStatus, searchQuery);
+  }, [orders, selectedStatus, searchQuery]);
 
   // 打包弹窗：加载店铺商品价格表（与商家端 Web getPackingModalModel 一致；无 delivery_store_id 时回退为当前商家 id）
   useEffect(() => {
@@ -511,12 +551,11 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   }, [customerId, userType]);
 
   // 过滤订单
-  const filterOrders = (orderList: Order[], status: string) => {
-    if (status === 'all') {
-      setFilteredOrders(orderList);
-    } else {
-      setFilteredOrders(orderList.filter(order => order.status === status));
-    }
+  const filterOrders = (orderList: Order[], status: string, query: string = searchQuery) => {
+    const byStatus = status === 'all'
+      ? orderList
+      : orderList.filter(order => order.status === status);
+    setFilteredOrders(filterOrdersBySearch(byStatus, query));
   };
 
   // 居中滚动到指定筛选卡片
@@ -733,6 +772,133 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     }
   };
 
+  const loadBatchPriceMap = async (): Promise<Record<string, number>> => {
+    if (!customerId) return {};
+    try {
+      const products = await merchantService.getStoreProducts(customerId);
+      return products.reduce<Record<string, number>>((acc, product) => {
+        acc[product.name] = product.price;
+        return acc;
+      }, {});
+    } catch {
+      return {};
+    }
+  };
+
+  const printOrdersSequentially = async (orders: Order[]) => {
+    const settings = await printerService.getSettings();
+    if (!settings.enabled) {
+      showToast(
+        language === 'zh'
+          ? '请先在资料页开启打印机'
+          : 'Turn on the printer in Profile first',
+        'warning',
+      );
+      return { ok: 0, failed: orders.length, printerOff: true };
+    }
+    const priceMap = await loadBatchPriceMap();
+    let ok = 0;
+    let failed = 0;
+    for (const order of orders) {
+      try {
+        const printed = await printerService.printReceipt(order, {
+          productPriceMap: priceMap,
+        });
+        if (printed) {
+          ok += 1;
+          if (ok < orders.length) {
+            await new Promise((resolve) => setTimeout(resolve, 400));
+          }
+        } else {
+          failed += 1;
+        }
+      } catch (error) {
+        LoggerService.error('批量打单失败', error);
+        failed += 1;
+      }
+    }
+    return { ok, failed, printerOff: false };
+  };
+
+  const handleBatchAccept = async () => {
+    const pending = filteredOrders.filter(
+      (order) => selectedIds.has(order.id) && order.status === '待确认',
+    );
+    if (!pending.length || batchBusy) return;
+    Alert.alert(
+      language === 'zh' ? '批量接单' : 'Accept orders',
+      language === 'zh'
+        ? `确定接单 ${pending.length} 笔？将改为「打包中」。`
+        : `Accept ${pending.length} orders?`,
+      [
+        { text: language === 'zh' ? '取消' : 'Cancel', style: 'cancel' },
+        {
+          text: language === 'zh' ? '确定' : 'OK',
+          onPress: async () => {
+            try {
+              setBatchBusy(true);
+              showLoading(
+                language === 'zh' ? '正在批量接单...' : 'Accepting...',
+                'package',
+              );
+              const result = await batchAcceptOrders(pending.map((order) => order.id));
+              if (result.ok === 0) {
+                showToast(language === 'zh' ? '批量接单失败' : 'Batch accept failed', 'error');
+                return;
+              }
+              const settings = await printerService.getSettings();
+              if (settings.autoPrint && settings.enabled) {
+                await printOrdersSequentially(pending);
+              }
+              setSelectionMode(false);
+              setSelectedIds(new Set());
+              showToast(
+                language === 'zh'
+                  ? `已接单 ${result.ok} 笔${result.failed ? `，失败 ${result.failed} 笔` : ''}`
+                  : `Accepted ${result.ok}`,
+                'success',
+              );
+              DeviceEventEmitter.emit('order_status_updated');
+              onRefresh();
+            } catch (error) {
+              LoggerService.error('批量接单失败', error);
+              showToast(language === 'zh' ? '批量接单失败' : 'Batch accept failed', 'error');
+            } finally {
+              hideLoading();
+              setBatchBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleBatchPrint = async () => {
+    const printable = filteredOrders.filter(
+      (order) =>
+        selectedIds.has(order.id) &&
+        (order.status === '打包中' ||
+          order.status === '待取件' ||
+          order.status === '待收款'),
+    );
+    if (!printable.length || batchBusy) return;
+    try {
+      setBatchBusy(true);
+      showLoading(language === 'zh' ? '正在打单...' : 'Printing...', 'package');
+      const result = await printOrdersSequentially(printable);
+      if (result.printerOff) return;
+      showToast(
+        language === 'zh'
+          ? `已打印 ${result.ok} 张${result.failed ? `，失败 ${result.failed} 张` : ''}`
+          : `Printed ${result.ok}`,
+        result.failed > 0 ? 'warning' : 'success',
+      );
+    } finally {
+      hideLoading();
+      setBatchBusy(false);
+    }
+  };
+
   // 🚀 新增：商家拒绝
   const handleMerchantDecline = async (orderId: string) => {
     Alert.alert(
@@ -826,6 +992,101 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 16, marginTop: 8 }}>
           {t.all} {orders.length} {language === 'zh' ? '个订单' : language === 'en' ? 'Orders' : 'အော်ဒါ'}
         </Text>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color="rgba(255,255,255,0.7)" />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t.searchPlaceholder}
+            placeholderTextColor="rgba(255,255,255,0.55)"
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+        </View>
+        {userType === 'merchant' ? (
+          <View style={styles.batchBar}>
+            <TouchableOpacity
+              style={styles.batchChip}
+              onPress={() => {
+                if (selectionMode) {
+                  setSelectionMode(false);
+                  setSelectedIds(new Set());
+                } else {
+                  setSelectionMode(true);
+                }
+              }}
+            >
+              <Text style={styles.batchChipText}>
+                {selectionMode ? t.batchDone : t.batch}
+              </Text>
+            </TouchableOpacity>
+            {selectionMode ? (
+              <>
+                <TouchableOpacity
+                  style={styles.batchChip}
+                  onPress={() =>
+                    setSelectedIds(new Set(pendingConfirmIds(filteredOrders)))
+                  }
+                >
+                  <Text style={styles.batchChipText}>{t.selectPending}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.batchChip}
+                  onPress={() =>
+                    setSelectedIds(new Set(printableIds(filteredOrders)))
+                  }
+                >
+                  <Text style={styles.batchChipText}>{t.selectPrintable}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.batchChip, styles.batchChipAccent]}
+                  disabled={
+                    batchBusy ||
+                    pendingConfirmIds(
+                      filteredOrders.filter((order) => selectedIds.has(order.id)),
+                    ).length === 0
+                  }
+                  onPress={() => void handleBatchAccept()}
+                >
+                  <Text style={styles.batchChipText}>
+                    {t.batchAccept} (
+                    {
+                      pendingConfirmIds(
+                        filteredOrders.filter((order) => selectedIds.has(order.id)),
+                      ).length
+                    }
+                    )
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.batchChip, styles.batchChipPrint]}
+                  disabled={
+                    batchBusy ||
+                    printableIds(
+                      filteredOrders.filter((order) => selectedIds.has(order.id)),
+                    ).length === 0
+                  }
+                  onPress={() => void handleBatchPrint()}
+                >
+                  <Text style={styles.batchChipText}>
+                    {t.batchPrint} (
+                    {
+                      printableIds(
+                        filteredOrders.filter((order) => selectedIds.has(order.id)),
+                      ).length
+                    }
+                    )
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.batchCount}>
+                  {t.selectedCount} {selectedIds.size}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       {/* 状态筛选器 */}
@@ -939,8 +1200,13 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         {filteredOrders.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyText}>{t.noOrders}</Text>
-            <Text style={styles.emptyDesc}>{t.noOrdersDesc}</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery.trim() ? t.noSearchMatch : t.noOrders}
+            </Text>
+            <Text style={styles.emptyDesc}>
+              {searchQuery.trim() ? t.noSearchMatchDesc : t.noOrdersDesc}
+            </Text>
+            {!searchQuery.trim() ? (
             <TouchableOpacity
               style={styles.emptyButton}
               onPress={() => navigation.navigate('PlaceOrder')}
@@ -957,6 +1223,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
+            ) : null}
           </View>
         ) : (
           filteredOrders.map((order) => (
@@ -964,9 +1231,16 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               key={order.id}
               style={[
                 styles.orderCard,
-                unreadCounts[order.id] > 0 && styles.unreadOrderCard
+                unreadCounts[order.id] > 0 && styles.unreadOrderCard,
+                selectedIds.has(order.id) && styles.orderCardSelected,
               ]}
-              onPress={() => handleViewDetail(order.id)}
+              onPress={() => {
+                if (selectionMode) {
+                  setSelectedIds((prev) => toggleSelectedId(prev, order.id));
+                  return;
+                }
+                handleViewDetail(order.id);
+              }}
               activeOpacity={0.7}
             >
               {/* 🚀 新增：卡片右上角消息提醒 */}
@@ -977,6 +1251,21 @@ export default function MyOrdersScreen({ navigation, route }: any) {
               )}
               {/* 订单头部 */}
               <View style={styles.orderHeader}>
+                {selectionMode ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      setSelectedIds((prev) => toggleSelectedId(prev, order.id))
+                    }
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={styles.batchCheck}
+                  >
+                    <Ionicons
+                      name={selectedIds.has(order.id) ? 'checkbox' : 'square-outline'}
+                      size={22}
+                      color={selectedIds.has(order.id) ? '#2563eb' : '#94a3b8'}
+                    />
+                  </TouchableOpacity>
+                ) : null}
                 <View style={styles.orderHeaderLeft}>
                   <Text style={styles.orderIdBadge}>#{order.id.slice(-6).toUpperCase()}</Text>
                   <Text style={styles.orderPackageType}>{getPackageTypeTranslation(order.package_type)}</Text>
@@ -1355,6 +1644,64 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  searchInput: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 15,
+    paddingVertical: 4,
+  },
+  batchBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  batchChip: {
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  batchChipAccent: {
+    backgroundColor: '#f59e0b',
+    borderColor: '#f59e0b',
+  },
+  batchChipPrint: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  batchChipText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  batchCount: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  batchCheck: {
+    marginRight: 8,
+  },
+  orderCardSelected: {
+    borderWidth: 2,
+    borderColor: '#2563eb',
   },
   filtersContainer: {
     marginTop: -15,

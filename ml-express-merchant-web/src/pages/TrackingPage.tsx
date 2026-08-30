@@ -7,6 +7,7 @@ import { useMerchantOrdersOptional } from "../contexts/MerchantOrderContext";
 import { MERCHANT_ORDERS_REFRESH } from "../utils/merchantOrderEvents";
 import { useMerchantUnreadCounts } from "../hooks/useMerchantUnreadCounts";
 import {
+  filterOrdersBySearch,
   filterPackagesByTab,
   getMerchantOrderStatusColor,
   getMerchantOrderStatusLabel,
@@ -15,6 +16,11 @@ import {
 } from "../constants/merchantOrderStatus";
 import { useMerchantPackageModals } from "../hooks/useMerchantPackageModals";
 import { buildProductNamePriceMap } from "../utils/parseOrderPackingItems";
+import {
+  pendingConfirmIds,
+  printableIds,
+  toggleSelectedId,
+} from "../utils/merchantBatchSelection";
 import MerchantPackageDetailModal from "../components/orders/MerchantPackageDetailModal";
 import MerchantPackingModal from "../components/orders/MerchantPackingModal";
 
@@ -106,6 +112,9 @@ const TrackingPage: React.FC = () => {
   });
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const packagesPerPage = 5;
 
   const searchParams = new URLSearchParams(location.search);
@@ -124,9 +133,10 @@ const TrackingPage: React.FC = () => {
   }, [navigate, loadActiveOrders]);
 
   useEffect(() => {
-    setFilteredOrders(filterPackagesByTab(activeOrders, statusFilter));
+    const byTab = filterPackagesByTab(activeOrders, statusFilter);
+    setFilteredOrders(filterOrdersBySearch(byTab, searchQuery));
     setCurrentPage(1);
-  }, [activeOrders, statusFilter]);
+  }, [activeOrders, statusFilter, searchQuery]);
 
   useEffect(() => {
     const onRefresh = () => {
@@ -153,6 +163,47 @@ const TrackingPage: React.FC = () => {
   const formatDisplayStatus = (status: string) =>
     getStatusText(status === "待收款" ? "待取件" : status);
 
+  const selectedOrders = filteredOrders.filter((order) =>
+    selectedIds.has(String(order.id)),
+  );
+  const selectedPendingCount = pendingConfirmIds(selectedOrders).length;
+  const selectedPrintableCount = printableIds(selectedOrders).length;
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleCardClick = (order: any) => {
+    if (selectionMode) {
+      setSelectedIds((prev) => toggleSelectedId(prev, String(order.id)));
+      return;
+    }
+    packageModals.handleOrderClick(order);
+  };
+
+  const runBatchAccept = async () => {
+    const result = await packageModals.handleAcceptMany(selectedOrders);
+    if (result.ok > 0) exitSelectionMode();
+  };
+
+  const runBatchPrint = async () => {
+    await packageModals.handlePrintMany(selectedOrders);
+  };
+
+  const batchBtnStyle = (enabled: boolean, bg: string): React.CSSProperties => ({
+    border: "none",
+    borderRadius: 12,
+    padding: "8px 12px",
+    fontWeight: 800,
+    fontSize: "0.82rem",
+    cursor: enabled ? "pointer" : "not-allowed",
+    opacity: enabled ? 1 : 0.4,
+    color: "#fff",
+    background: bg,
+    whiteSpace: "nowrap",
+  });
+
   return (
     <>
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
@@ -161,6 +212,8 @@ const TrackingPage: React.FC = () => {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            gap: "1.25rem",
+            flexWrap: "wrap",
             marginBottom: "2.5rem",
             background: "rgba(255, 255, 255, 0.03)",
             padding: "2rem",
@@ -220,9 +273,164 @@ const TrackingPage: React.FC = () => {
               </p>
             </div>
           </div>
-          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.85rem" }}>
-            {statusFilter.toUpperCase()}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: "0.65rem",
+              minWidth: "min(320px, 100%)",
+              flex: "1 1 240px",
+            }}
+          >
+            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.85rem" }}>
+              {statusFilter.toUpperCase()}
+            </div>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={
+                language === "zh"
+                  ? "搜索单号 / 电话 / 姓名"
+                  : language === "en"
+                    ? "Search order no. / phone / name"
+                    : "အော်ဒါနံပါတ် / ဖုန်း / အမည်"
+              }
+              aria-label={
+                language === "zh" ? "搜索订单" : language === "en" ? "Search orders" : "အော်ဒါရှာရန်"
+              }
+              style={{
+                width: "100%",
+                maxWidth: 320,
+                padding: "10px 14px",
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.16)",
+                background: "rgba(15, 23, 42, 0.45)",
+                color: "#fff",
+                fontSize: "0.92rem",
+                outline: "none",
+              }}
+            />
           </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "0.55rem",
+            marginBottom: "1.25rem",
+            padding: "0.85rem 1rem",
+            borderRadius: 20,
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() =>
+              selectionMode ? exitSelectionMode() : setSelectionMode(true)
+            }
+            style={batchBtnStyle(
+              true,
+              selectionMode
+                ? "rgba(148, 163, 184, 0.35)"
+                : "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+            )}
+          >
+            {selectionMode
+              ? language === "zh"
+                ? "退出批量"
+                : "Done"
+              : language === "zh"
+                ? "批量操作"
+                : "Batch"}
+          </button>
+          {selectionMode ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedIds(new Set(pendingConfirmIds(filteredOrders)))
+                }
+                disabled={pendingConfirmIds(filteredOrders).length === 0}
+                style={batchBtnStyle(
+                  pendingConfirmIds(filteredOrders).length > 0,
+                  "#f59e0b",
+                )}
+              >
+                {language === "zh" ? "全选待接单" : "Select pending"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedIds(new Set(printableIds(filteredOrders)))
+                }
+                disabled={printableIds(filteredOrders).length === 0}
+                style={batchBtnStyle(
+                  printableIds(filteredOrders).length > 0,
+                  "#10b981",
+                )}
+              >
+                {language === "zh" ? "全选可打单" : "Select printable"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void runBatchAccept()}
+                disabled={
+                  selectedPendingCount === 0 || packageModals.actionLoading
+                }
+                style={batchBtnStyle(
+                  selectedPendingCount > 0 && !packageModals.actionLoading,
+                  "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                )}
+              >
+                {language === "zh"
+                  ? `批量接单 (${selectedPendingCount})`
+                  : `Accept (${selectedPendingCount})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => void runBatchPrint()}
+                disabled={
+                  selectedPrintableCount === 0 || packageModals.printLoading
+                }
+                style={batchBtnStyle(
+                  selectedPrintableCount > 0 && !packageModals.printLoading,
+                  "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                )}
+              >
+                {language === "zh"
+                  ? `批量打单 (${selectedPrintableCount})`
+                  : `Print (${selectedPrintableCount})`}
+              </button>
+              <span
+                style={{
+                  color: "rgba(255,255,255,0.45)",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                }}
+              >
+                {language === "zh"
+                  ? `已选 ${selectedIds.size} 笔`
+                  : `${selectedIds.size} selected`}
+              </span>
+            </>
+          ) : (
+            <span
+              style={{
+                color: "rgba(255,255,255,0.4)",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+              }}
+            >
+              {language === "zh"
+                ? "高峰：多选后一次接单或打小票"
+                : "Select multiple orders to accept or print"}
+            </span>
+          )}
         </div>
 
         {initialLoading && activeOrders.length === 0 ? (
@@ -250,29 +458,65 @@ const TrackingPage: React.FC = () => {
               .map((order) => (
                 <div
                   key={order.id}
-                  onClick={() => packageModals.handleOrderClick(order)}
+                  onClick={() => handleCardClick(order)}
                   style={{
-                    background: "rgba(255,255,255,0.05)",
+                    background: selectedIds.has(String(order.id))
+                      ? "rgba(99, 102, 241, 0.16)"
+                      : "rgba(255,255,255,0.05)",
                     borderRadius: "20px",
                     padding: "1.5rem",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    border: selectedIds.has(String(order.id))
+                      ? "1px solid rgba(129, 140, 248, 0.55)"
+                      : "1px solid rgba(255,255,255,0.1)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                     backdropFilter: "blur(10px)",
                     cursor: "pointer",
                     transition: "all 0.3s ease",
+                    gap: "1rem",
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                    e.currentTarget.style.background = selectedIds.has(
+                      String(order.id),
+                    )
+                      ? "rgba(99, 102, 241, 0.22)"
+                      : "rgba(255,255,255,0.1)";
                     e.currentTarget.style.transform = "translateY(-2px)";
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                    e.currentTarget.style.background = selectedIds.has(
+                      String(order.id),
+                    )
+                      ? "rgba(99, 102, 241, 0.16)"
+                      : "rgba(255,255,255,0.05)";
                     e.currentTarget.style.transform = "translateY(0)";
                   }}
                 >
-                  <div>
+                  {selectionMode ? (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(String(order.id))}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() =>
+                        setSelectedIds((prev) =>
+                          toggleSelectedId(prev, String(order.id)),
+                        )
+                      }
+                      aria-label={
+                        language === "zh"
+                          ? `选择订单 ${order.id}`
+                          : `Select ${order.id}`
+                      }
+                      style={{
+                        width: 18,
+                        height: 18,
+                        accentColor: "#6366f1",
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : null}
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
                         display: "flex",
@@ -511,13 +755,23 @@ const TrackingPage: React.FC = () => {
           >
             <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>✨</div>
             <h3 style={{ color: "rgba(255,255,255,0.5)" }}>
-              当前暂无该状态下的订单
+              {searchQuery.trim()
+                ? language === "zh"
+                  ? "没有匹配的订单"
+                  : language === "en"
+                    ? "No matching orders"
+                    : "ကိုက်ညီသော အော်ဒါမရှိပါ"
+                : language === "zh"
+                  ? "当前暂无该状态下的订单"
+                  : language === "en"
+                    ? "No orders in this status"
+                    : "ဤအခြေအနေတွင် အော်ဒါမရှိပါ"}
             </h3>
           </div>
         )}
       </div>
 
-      <style>{` @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .spinner { animation: spin 1s linear infinite; } `}</style>
+      <style>{` @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .spinner { animation: spin 1s linear infinite; } input[type="search"]::placeholder { color: rgba(255,255,255,0.45); } `}</style>
 
       <MerchantPackageDetailModal
         open={packageModals.showPackageDetailModal}

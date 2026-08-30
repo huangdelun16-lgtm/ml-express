@@ -1,0 +1,204 @@
+.merchant-close-report {
+  position: fixed;
+  inset: 0;
+  z-index: 32000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.merchant-close-report__panel {
+  width: min(560px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  padding: 1.5rem 1.6rem 1.35rem;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+
+.merchant-close-report__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.15rem;
+}
+
+.merchant-close-report__head h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.merchant-close-report__head p {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.merchant-close-report__x {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+
+.merchant-close-report__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.merchant-close-report__stat {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.merchant-close-report__stat.is-warn {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.merchant-close-report__stat span,
+.merchant-close-report__money span {
+  display: block;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.merchant-close-report__stat strong,
+.merchant-close-report__money strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.merchant-close-report__money {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+  margin: 0.8rem 0;
+}
+
+.merchant-close-report__money > div {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.merchant-close-report__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.merchant-close-report__pills span {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.merchant-close-report__hint {
+  margin: 0 0 0.9rem;
+  color: #fbbf24;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.merchant-close-report__stock-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.merchant-close-report__stock-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.merchant-close-report__stock-head span,
+.merchant-close-report__empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.merchant-close-report__stock ul {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+}
+
+.merchant-close-report__stock li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.merchant-close-report__stock em.is-out {
+  color: #f87171;
+  font-style: normal;
+}
+
+.merchant-close-report__stock em.is-low {
+  color: #fbbf24;
+  font-style: normal;
+}
+
+.merchant-close-report__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}
+
+.merchant-close-report__actions button {
+  border: none;
+  border-radius: 14px;
+  padding: 11px 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.merchant-close-report__actions .is-ghost {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.merchant-close-report__actions .is-primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.merchant-close-report__actions .is-danger {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: #fff;
+}
+
+.merchant-close-report__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

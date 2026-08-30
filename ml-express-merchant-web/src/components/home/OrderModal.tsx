@@ -24,6 +24,10 @@ import {
 import Logo from '../Logo';
 import StorageImg from '../StorageImg';
 import { feedbackService } from '../../services/FeedbackService';
+import MerchantAddressBookModal, {
+  type AddressBookSide,
+} from '../orders/MerchantAddressBookModal';
+import type { AddressItem } from '../../services/addressService';
 
 /** 创建订单弹窗：统一视觉（与客户端 Web 对齐） */
 const MODAL_OVERLAY: CSSProperties = {
@@ -358,6 +362,29 @@ const OrderModal: React.FC<OrderModalProps> = ({
   };
   const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
+  const [addressBookSide, setAddressBookSide] = useState<AddressBookSide | null>(null);
+
+  const applyAddressBookItem = (item: AddressItem, side: AddressBookSide) => {
+    const loc =
+      item.latitude != null && item.longitude != null
+        ? { lat: Number(item.latitude), lng: Number(item.longitude) }
+        : parseCoordsFromAddress(item.address_text);
+    if (side === 'sender') {
+      setSenderName(item.contact_name || '');
+      setSenderPhone(item.contact_phone || '');
+      setSenderAddressText(item.address_text || '');
+      setSelectedSenderLocation(loc);
+    } else {
+      setReceiverName(item.contact_name || '');
+      setReceiverPhone(item.contact_phone || '');
+      setReceiverAddressText(item.address_text || '');
+      setSelectedReceiverLocation(loc);
+    }
+    setAddressBookSide(null);
+  };
+
+  const addressBookLabel =
+    language === 'en' ? 'Saved address' : language === 'my' ? 'လိပ်စာစာအုပ်' : '常用地址';
   const [showProductSelector, setShowProductSelector] = useState(false); // 🚀 新增：商品选择器显示状态
 
   if (!showOrderForm) return null;
@@ -379,6 +406,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
   ];
 
   return (
+    <>
     <div style={MODAL_OVERLAY}>
       <div style={MODAL_PANEL}>
         <button
@@ -465,7 +493,26 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
           {wizardStep === 0 && (<>
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={BLOCK_TITLE}>{t.order.sender}</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: '0.85rem' }}>
+              <h3 style={{ ...BLOCK_TITLE, marginBottom: 0 }}>{t.order.sender}</h3>
+              <button
+                type="button"
+                onClick={() => setAddressBookSide('sender')}
+                style={{
+                  border: '1px solid rgba(191, 219, 254, 0.7)',
+                  background: 'rgba(239, 246, 255, 0.95)',
+                  color: '#1d4ed8',
+                  borderRadius: 8,
+                  padding: '5px 10px',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                📖 {addressBookLabel}
+              </button>
+            </div>
             <input
               type="text"
               name="senderName"
@@ -590,7 +637,26 @@ const OrderModal: React.FC<OrderModalProps> = ({
           </div>
 
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={BLOCK_TITLE}>{t.order.receiver}</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: '0.85rem' }}>
+              <h3 style={{ ...BLOCK_TITLE, marginBottom: 0 }}>{t.order.receiver}</h3>
+              <button
+                type="button"
+                onClick={() => setAddressBookSide('receiver')}
+                style={{
+                  border: '1px solid rgba(191, 219, 254, 0.7)',
+                  background: 'rgba(239, 246, 255, 0.95)',
+                  color: '#1d4ed8',
+                  borderRadius: 8,
+                  padding: '5px 10px',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                📖 {addressBookLabel}
+              </button>
+            </div>
             <input
               type="text"
               name="receiverName"
@@ -1861,6 +1927,32 @@ const OrderModal: React.FC<OrderModalProps> = ({
         </div>
       )}
     </div>
+    <MerchantAddressBookModal
+      open={addressBookSide !== null}
+      userId={currentUser?.id}
+      language={language}
+      side={addressBookSide || 'sender'}
+      seed={
+        addressBookSide === 'receiver'
+          ? {
+              contact_name: receiverName,
+              contact_phone: receiverPhone,
+              address_text: receiverAddressText,
+              latitude: selectedReceiverLocation?.lat,
+              longitude: selectedReceiverLocation?.lng,
+            }
+          : {
+              contact_name: senderName,
+              contact_phone: senderPhone,
+              address_text: senderAddressText,
+              latitude: selectedSenderLocation?.lat,
+              longitude: selectedSenderLocation?.lng,
+            }
+      }
+      onClose={() => setAddressBookSide(null)}
+      onSelect={(item) => applyAddressBookItem(item, addressBookSide || 'sender')}
+    />
+    </>
   );
 };
 

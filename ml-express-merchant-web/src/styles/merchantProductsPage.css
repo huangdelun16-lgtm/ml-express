@@ -95,6 +95,29 @@
   color: #fde68a;
 }
 
+.merchant-products-stock-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.12);
+  color: #fde68a;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.merchant-product-card.is-out-of-stock {
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.55);
+}
+
+.merchant-product-card.is-low-stock {
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.5);
+}
+
 .merchant-products-btn-primary {
   display: inline-flex;
   align-items: center;
