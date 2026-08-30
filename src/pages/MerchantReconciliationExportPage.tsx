@@ -3,6 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { packageService, deliveryStoreService, Package, DeliveryStore } from '../services/supabase';
+import {
+  buildCodDiffCsvHeader,
+  buildCodDiffCsvRow,
+  filterCodDiffRows,
+  summarizeCodDiff,
+  type CodDiffFilter,
+  type CodLang,
+} from '../utils/codSettlement';
 
 function escapeCsvCell(v: unknown): string {
   const s = v == null ? '' : String(v);
@@ -87,6 +95,7 @@ const MerchantReconciliationExportPage: React.FC = () => {
   const [customEnd, setCustomEnd] = useState('');
   const [storeId, setStoreId] = useState<string>(''); // '' = 全部店铺
   const [statusFilter, setStatusFilter] = useState<string>('all'); // all | 已送达 | exclude_cancel
+  const [codDiffFilter, setCodDiffFilter] = useState<CodDiffFilter>('needs');
   const [stores, setStores] = useState<DeliveryStore[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(false);
@@ -131,6 +140,15 @@ const MerchantReconciliationExportPage: React.FC = () => {
     return list;
   }, [merchantPackages, start, end, storeId, statusFilter]);
 
+  const lang: CodLang = language === 'en' ? 'en' : 'zh';
+
+  const codDiffRows = useMemo(
+    () => filterCodDiffRows(filtered, codDiffFilter),
+    [filtered, codDiffFilter],
+  );
+
+  const codSummary = useMemo(() => summarizeCodDiff(filtered), [filtered]);
+
   const t =
     language === 'en'
       ? {
@@ -148,8 +166,23 @@ const MerchantReconciliationExportPage: React.FC = () => {
           refresh: 'Refresh',
           loading: 'Loading…',
           export: 'Export CSV',
+          exportCod: 'Export COD discrepancies',
           count: 'Rows',
           empty: 'No store-linked orders in this range',
+          emptyCod: 'No COD discrepancy rows in this range',
+          codTitle: 'COD settler / discrepancy',
+          codHint:
+            'Who settled merchant COD (admin vs store) and cash mismatches: rider cleared but merchant still open, or merchant settled while rider cash is still open. Default export is rows that still need reconciling.',
+          codFilter: 'COD discrepancy',
+          needs: 'Needs reconciling',
+          allKinds: 'All classified',
+          unsettled: 'Delivered, COD open',
+          adminSettled: 'Settled by admin',
+          merchantSettled: 'Settled by store',
+          unknownSettled: 'Settled, party unknown',
+          riderPending: 'Rider cleared, merchant open',
+          merchantAhead: 'Merchant settled, rider open',
+          needsCount: 'Need reconciling',
           cols: {
             id: 'order_id',
             storeId: 'store_id',
@@ -192,8 +225,23 @@ const MerchantReconciliationExportPage: React.FC = () => {
           refresh: '刷新',
           loading: '加载中…',
           export: '导出 CSV',
+          exportCod: '导出 COD 差异',
           count: '条数',
           empty: '该条件下没有可导出的商家关联订单',
+          emptyCod: '该条件下没有需对账的 COD 差异',
+          codTitle: 'COD 谁结的 / 差异',
+          codHint:
+            '记录后台还是商家结清了代收款，并标出「骑手已结、商家未结」和「商家已结、骑手未结」。默认导出仍需对账的行，避免两边各结各的后对不上。',
+          codFilter: 'COD 差异',
+          needs: '需对账',
+          allKinds: '全部分类',
+          unsettled: '已送达未结清',
+          adminSettled: '后台已结',
+          merchantSettled: '商家已结',
+          unknownSettled: '已结清但未记录结清方',
+          riderPending: '骑手已结、商家未结',
+          merchantAhead: '商家已结、骑手未结',
+          needsCount: '需对账',
           cols: {
             id: '订单号',
             storeId: '店铺ID',
@@ -282,6 +330,17 @@ const MerchantReconciliationExportPage: React.FC = () => {
       language === 'en'
         ? `ml-merchant-reconciliation-${Date.now()}.csv`
         : `商家对账明细-${Date.now()}.csv`;
+    downloadCsv(fname, [head, ...lines]);
+  };
+
+  const runCodDiffExport = () => {
+    if (!codDiffRows.length) return;
+    const head = toCsvRow(buildCodDiffCsvHeader(lang));
+    const lines = codDiffRows.map((row) => toCsvRow(buildCodDiffCsvRow(row, lang)));
+    const fname =
+      language === 'en'
+        ? `ml-cod-discrepancy-${Date.now()}.csv`
+        : `COD差异对账-${Date.now()}.csv`;
     downloadCsv(fname, [head, ...lines]);
   };
 
@@ -387,6 +446,24 @@ const MerchantReconciliationExportPage: React.FC = () => {
                 <option value="exclude_cancel">{t.statusNoCancel}</option>
               </select>
             </div>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6, fontWeight: 600 }}>{t.codFilter}</div>
+              <select
+                className="admin-select"
+                value={codDiffFilter}
+                onChange={(e) => setCodDiffFilter(e.target.value as CodDiffFilter)}
+                style={{ minWidth: 200 }}
+              >
+                <option value="needs">{t.needs}</option>
+                <option value="all">{t.allKinds}</option>
+                <option value="unsettled">{t.unsettled}</option>
+                <option value="unknown_settled">{t.unknownSettled}</option>
+                <option value="rider_pending_merchant">{t.riderPending}</option>
+                <option value="merchant_ahead_of_rider">{t.merchantAhead}</option>
+                <option value="admin_settled">{t.adminSettled}</option>
+                <option value="merchant_settled">{t.merchantSettled}</option>
+              </select>
+            </div>
             <button
               type="button"
               onClick={() => void load()}
@@ -423,6 +500,26 @@ const MerchantReconciliationExportPage: React.FC = () => {
             >
               ⬇ {t.export}
             </button>
+            <button
+              type="button"
+              onClick={runCodDiffExport}
+              disabled={!codDiffRows.length || loading}
+              style={{
+                padding: '12px 22px',
+                borderRadius: 12,
+                border: 'none',
+                background:
+                  codDiffRows.length && !loading
+                    ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)'
+                    : 'rgba(255,255,255,0.15)',
+                color: '#fff',
+                fontWeight: 800,
+                cursor: codDiffRows.length && !loading ? 'pointer' : 'not-allowed',
+                boxShadow: codDiffRows.length ? '0 4px 14px rgba(217,119,6,0.35)' : 'none',
+              }}
+            >
+              ⬇ {t.exportCod} ({codDiffRows.length})
+            </button>
           </div>
           <div
             style={{
@@ -442,6 +539,48 @@ const MerchantReconciliationExportPage: React.FC = () => {
             ) : null}
             {!filtered.length && !loading ? (
               <div style={{ marginTop: 8, fontWeight: 500, opacity: 0.85, fontSize: 13 }}>{t.empty}</div>
+            ) : null}
+          </div>
+          <div
+            style={{
+              padding: '14px 16px',
+              borderRadius: 12,
+              background: '#fff7ed',
+              border: '1px solid #fed7aa',
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 6 }}>{t.codTitle}</div>
+            <p style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.5, opacity: 0.85, fontWeight: 500 }}>
+              {t.codHint}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {[
+                { key: 'needs', label: t.needsCount, value: codSummary.needs },
+                { key: 'unsettled', label: t.unsettled, value: codSummary.unsettled },
+                { key: 'unknown_settled', label: t.unknownSettled, value: codSummary.unknown_settled },
+                { key: 'rider_pending_merchant', label: t.riderPending, value: codSummary.rider_pending_merchant },
+                { key: 'merchant_ahead_of_rider', label: t.merchantAhead, value: codSummary.merchant_ahead_of_rider },
+                { key: 'admin_settled', label: t.adminSettled, value: codSummary.admin_settled },
+                { key: 'merchant_settled', label: t.merchantSettled, value: codSummary.merchant_settled },
+              ].map((chip) => (
+                <span
+                  key={chip.key}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '6px 10px',
+                    borderRadius: 999,
+                    background: chip.value > 0 ? '#fff' : '#fffbeb',
+                    border: '1px solid #fdba74',
+                    color: chip.value > 0 ? '#9a3412' : '#a8a29e',
+                  }}
+                >
+                  {chip.label} {chip.value}
+                </span>
+              ))}
+            </div>
+            {!codDiffRows.length && !loading && filtered.length ? (
+              <div style={{ marginTop: 10, fontWeight: 500, opacity: 0.85, fontSize: 13 }}>{t.emptyCod}</div>
             ) : null}
           </div>
         </section>

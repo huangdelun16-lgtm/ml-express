@@ -6,7 +6,10 @@ import QRCode from 'qrcode';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { useResponsive } from '../hooks/useResponsive';
 import SecurityVerificationModal from '../components/SecurityVerificationModal';
+import { AssignCourierModal } from '../components/AssignCourierModal';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
+import { assignPackagesToCourier } from '../services/batchAssignService';
+import { filterAssignableByIds, formatBatchAssignMessage } from '../utils/batchAssign';
 import '../styles/adminCityPackages.css';
 import { feedbackService } from '../services/FeedbackService';
 
@@ -98,6 +101,8 @@ const CityPackages: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false); // 🚀 新增：安全验证弹窗
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   
   // 分页功能状态
   const [currentPage, setCurrentPage] = useState(1);
@@ -314,6 +319,51 @@ const CityPackages: React.FC = () => {
       setSelectedPackages(new Set());
     } else {
       setSelectedPackages(new Set(packages.map((pkg) => pkg.id)));
+    }
+  };
+
+  const assignableSelected = filterAssignableByIds(packages, selectedPackages);
+
+  const cityAssignCouriers = couriers
+    .filter((c) => c?.id && (c.name || c.employee_name))
+    .map((c) => ({
+      id: String(c.id),
+      name: String(c.name || c.employee_name),
+      phone: c.phone,
+      status:
+        c.status === 'inactive' || c.status === 'offline'
+          ? 'offline'
+          : c.status === 'busy'
+            ? 'busy'
+            : 'active',
+      latitude: c.last_latitude ?? c.latitude ?? null,
+      longitude: c.last_longitude ?? c.longitude ?? null,
+      currentPackages: 0,
+    }));
+
+  const handleOpenBatchAssign = () => {
+    if (assignableSelected.length === 0) {
+      feedbackService.notify('选中的订单里没有待分配单（待取件/待收款且尚未派骑手）');
+      return;
+    }
+    setShowAssignModal(true);
+  };
+
+  const handleConfirmBatchAssign = async (courier: { id: string; name: string }) => {
+    if (assigning || assignableSelected.length === 0) return;
+    setAssigning(true);
+    try {
+      const result = await assignPackagesToCourier(assignableSelected, courier);
+      feedbackService.notify(formatBatchAssignMessage(result, courier.name));
+      if (result.success === 0) return;
+      setShowAssignModal(false);
+      setSelectedPackages(new Set());
+      await loadPackages();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      feedbackService.notify('❌ 派单失败：' + message);
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -596,9 +646,17 @@ const CityPackages: React.FC = () => {
               </button>
               <button
                 type="button"
+                className="cpkg-btn cpkg-btn--primary"
+                onClick={handleOpenBatchAssign}
+                disabled={assignableSelected.length === 0 || assigning}
+              >
+                {assigning ? '派单中…' : `派单 (${assignableSelected.length})`}
+              </button>
+              <button
+                type="button"
                 className="cpkg-btn cpkg-btn--danger"
                 onClick={handleBatchDelete}
-                disabled={selectedPackages.size === 0}
+                disabled={selectedPackages.size === 0 || assigning}
               >
                 删除 ({selectedPackages.size})
               </button>
@@ -2097,6 +2155,18 @@ const CityPackages: React.FC = () => {
         title="敏感操作验证"
         description={`您正在尝试批量删除 ${selectedPackages.size} 个订单，此操作不可撤销并会影响财务对账。请验证管理员密码以继续。`}
       />
+
+      {showAssignModal && assignableSelected.length > 0 && (
+        <AssignCourierModal
+          packages={assignableSelected}
+          couriers={cityAssignCouriers}
+          busy={assigning}
+          onClose={() => {
+            if (!assigning) setShowAssignModal(false);
+          }}
+          onPick={(courier) => void handleConfirmBatchAssign(courier)}
+        />
+      )}
     </div>
   );
 };

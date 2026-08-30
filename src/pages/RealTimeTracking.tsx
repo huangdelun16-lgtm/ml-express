@@ -3,17 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api';
 import '../styles/adminRealTimeTracking.css';
-import { packageService, Package, supabase, CourierLocation, notificationService, deliveryStoreService, DeliveryStore, adminAccountService, auditLogService, systemSettingsService } from '../services/supabase';
+import { packageService, Package, supabase, CourierLocation, deliveryStoreService, DeliveryStore, adminAccountService, systemSettingsService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Courier, CourierWithLocation, Coordinates } from '../types';
 import { GOOGLE_MAPS_LIBRARIES } from '../constants/googleMaps';
-import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 import {
   isMerchantOrderPackage,
   packageHasCod,
   resolvePackageCodAmount,
 } from '../utils/packageCodAmount';
+import {
+  filterAssignableByIds,
+  formatBatchAssignMessage,
+  isAssignablePackage,
+  pickLeastLoadedCourier,
+  pruneSelectedIds,
+  toggleSelectAllIds,
+  toggleSelectedId,
+} from '../utils/batchAssign';
+import { assignPackagesToCourier } from '../services/batchAssignService';
+import { AssignCourierModal } from '../components/AssignCourierModal';
 import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 import { feedbackService } from '../services/FeedbackService';
 import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
@@ -131,47 +141,6 @@ const RealTimeTracking: React.FC = () => {
   // 角色为系统管理员则不分领区，否则如果检测到了领区前缀，就强制开启领区锁定
   const isRegionalUser = currentUserRole !== 'admin' && currentRegionPrefix !== '';
 
-  // 🚀 辅助函数：计算两个经纬度点之间的距离（公里）
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // 地球半径（公里）
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  // 🚀 辅助函数：根据当前包裹推荐最合适的骑手
-  const getRecommendedCouriers = (pkg: Package) => {
-    if (!pkg.sender_latitude || !pkg.sender_longitude) return couriers.filter(c => c.status !== 'offline');
-
-    return couriers
-      .filter(c => c.status !== 'offline')
-      .filter(c => {
-        const la = c.latitude != null ? Number(c.latitude) : NaN;
-        const lo = c.longitude != null ? Number(c.longitude) : NaN;
-        return Number.isFinite(la) && Number.isFinite(lo);
-      })
-      .map(courier => {
-        const distance = calculateDistance(
-          pkg.sender_latitude || 0,
-          pkg.sender_longitude || 0,
-          courier.latitude || 0,
-          courier.longitude || 0
-        );
-        
-        // 推荐指数计算：距离越近分数越高，包裹越少分数越高
-        // 基础分数 100，每公里扣 5 分，每个包裹扣 10 分
-        const score = 100 - (distance * 5) - ((courier.currentPackages || 0) * 10);
-        
-        return { ...courier, distance, score };
-      })
-      .sort((a, b) => b.score - a.score);
-  };
-
   const [packages, setPackages] = useState<Package[]>([]);
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [couriers, setCouriers] = useState<CourierWithLocation[]>([]);
@@ -181,8 +150,9 @@ const RealTimeTracking: React.FC = () => {
   /** 选中骑手后，地图是否持续中心对准其最新坐标（由实时推送或轮询更新） */
   const [followSelectedCourierOnMap, setFollowSelectedCourierOnMap] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [assignTargets, setAssignTargets] = useState<Package[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedPendingIds, setSelectedPendingIds] = useState<Set<string>>(new Set());
   const [abnormalPackages, setAbnormalPackages] = useState<Package[]>([]); // 🚨 新增：异常包裹状态
   const [abnormalCouriers, setAbnormalCouriers] = useState<CourierWithLocation[]>([]); // 🚨 新增：异常骑手状态
   const [lowBatteryRiders, setLowBatteryRiders] = useState<CourierWithLocation[]>([]); // 🔋 新增：低电量预警骑手
@@ -919,84 +889,47 @@ const RealTimeTracking: React.FC = () => {
     };
   }, [mapThemeSetting]);
 
-  // 自动分配包裹
-  const autoAssignPackage = async (packageData: Package) => {
-    // 找到在线且当前包裹最少的快递员
-    const availableCouriers = couriers
-      .filter(
-        c =>
-          c.status === 'online' ||
-          c.status === 'active' ||
-          c.status === 'busy',
-      )
-      .sort((a, b) => (a.currentPackages || 0) - (b.currentPackages || 0));
-
-    if (availableCouriers.length === 0) {
-      feedbackService.notify('当前没有在线的快递员，请稍后再试');
-      return;
-    }
-
-    const bestCourier = availableCouriers[0];
-    await assignPackageToCourier(packageData, bestCourier);
+  const closeAssignModal = () => {
+    if (isAssigning) return;
+    setShowAssignModal(false);
+    setAssignTargets([]);
   };
 
-  // 手动分配包裹
-  const assignPackageToCourier = async (packageData: Package, courier: Courier) => {
+  const openAssignModal = (targets: Package[]) => {
+    if (targets.length === 0) {
+      feedbackService.notify('请先勾选待分配包裹');
+      return;
+    }
+    setAssignTargets(targets);
+    setShowAssignModal(true);
+  };
+
+  const finishAssignToCourier = async (
+    targets: Package[],
+    courier: { id: string; name: string },
+  ) => {
+    if (isAssigning || targets.length === 0) return;
     setIsAssigning(true);
     try {
-      // 更新包裹状态为"待取件"并分配骑手
-      const success = await packageService.updatePackageStatus(
-        packageData.id,
-        '待取件',  // 分配后状态为待取件，骑手扫码后才变为已取件
-        undefined, // pickupTime - 取件时间由骑手扫码时设置
-        undefined, // deliveryTime
-        courier.name  // courierName
+      const result = await assignPackagesToCourier(targets, courier);
+      feedbackService.notify(formatBatchAssignMessage(result, courier.name));
+      if (result.success === 0) return;
+
+      setShowAssignModal(false);
+      setAssignTargets([]);
+      setSelectedPendingIds(new Set());
+      await loadPackages();
+      setCouriers((prev) =>
+        prev.map((c) =>
+          c.id === courier.id
+            ? { ...c, currentPackages: (c.currentPackages || 0) + result.success }
+            : c,
+        ),
       );
-
-      if (success) {
-        // 🔔 发送通知给快递员
-        const notificationSuccess = await notificationService.sendPackageAssignedNotification(
-          courier.id,
-          courier.name,
-          packageData.id,
-          {
-            sender: packageData.sender_name,
-            receiver: packageData.receiver_name,
-            receiverAddress: packageData.receiver_address,
-            deliverySpeed: packageData.delivery_speed
-          }
-        );
-
-        // 显示明确的成功消息
-        const successMessage = `✅ 分配成功！\n\n📦 包裹：${packageData.id}\n🚚 骑手：${courier.name}\n📲 通知：${notificationSuccess ? '已发送' : '发送失败'}\n\n包裹已从待分配列表移除`;
-        feedbackService.notify(successMessage);
-        
-        setShowAssignModal(false);
-        setSelectedPackage(null);
-        
-        notifyAdminTodosRefresh();
-
-        // 立即重新加载包裹数据
-        await loadPackages();
-        
-        // 验证包裹状态是否已更新
-        await packageService.getPackageById(packageData.id);
-        
-        // 强制刷新页面数据
-        setTimeout(async () => {
-          await loadPackages();
-          await loadCouriers();
-        }, 1000);
-        
-        // 更新快递员的包裹数（实际应该从后端更新）
-        setCouriers(prev => prev.map(c => 
-          c.id === courier.id 
-            ? { ...c, currentPackages: (c.currentPackages || 0) + 1 }
-            : c
-        ));
-      } else {
-        feedbackService.notify('❌ 分配失败！\n\n包裹状态更新失败，请重试');
-      }
+      window.setTimeout(() => {
+        void loadPackages();
+        void loadCouriers();
+      }, 1000);
     } catch (error) {
       console.error('分配包裹失败:', error);
       const errorMessage = error instanceof Error ? error.message : '未知错误';
@@ -1004,6 +937,15 @@ const RealTimeTracking: React.FC = () => {
     } finally {
       setIsAssigning(false);
     }
+  };
+
+  const autoAssignPackage = async (packageData: Package) => {
+    const bestCourier = pickLeastLoadedCourier(couriers);
+    if (!bestCourier) {
+      feedbackService.notify('当前没有在线的快递员，请稍后再试');
+      return;
+    }
+    await finishAssignToCourier([packageData], bestCourier);
   };
 
   const getCourierStatusColor = (status: string) => {
@@ -1079,6 +1021,22 @@ const RealTimeTracking: React.FC = () => {
     () => cityFilteredPackages.filter((p) => p.status === '待取件' || p.status === '待收款'),
     [cityFilteredPackages],
   );
+
+  const assignablePending = useMemo(
+    () => pendingPackages.filter((p) => isAssignablePackage(p)),
+    [pendingPackages],
+  );
+
+  useEffect(() => {
+    setSelectedPendingIds((prev) => {
+      const next = pruneSelectedIds(
+        prev,
+        assignablePending.map((p) => p.id),
+      );
+      if (next.size === prev.size && Array.from(next).every((id) => prev.has(id))) return prev;
+      return next;
+    });
+  }, [assignablePending]);
 
   const assignedPackages = useMemo(
     () => cityFilteredPackages.filter((p) => p.status === '已取件' || p.status === '配送中'),
@@ -1739,6 +1697,42 @@ const RealTimeTracking: React.FC = () => {
 
           <div className="rt-tracking__list">
             <div className="rt-tracking__list-toolbar">
+              {sidebarTab === 'pending' && assignablePending.length > 0 && (
+                <div className="rt-tracking__batch-bar">
+                  <button
+                    type="button"
+                    className="rt-tracking__list-refresh"
+                    disabled={isAssigning}
+                    onClick={() =>
+                      setSelectedPendingIds((prev) =>
+                        toggleSelectAllIds(
+                          prev,
+                          assignablePending.map((p) => p.id),
+                        ),
+                      )
+                    }
+                  >
+                    {assignablePending.every((p) => selectedPendingIds.has(p.id))
+                      ? '取消全选'
+                      : `全选 ${assignablePending.length} 单`}
+                  </button>
+                  <span className="rt-tracking__batch-count">
+                    已选 {selectedPendingIds.size} / {assignablePending.length}
+                  </span>
+                  <button
+                    type="button"
+                    className="rt-tracking__btn rt-tracking__btn--manual rt-tracking__btn--batch"
+                    disabled={isAssigning || selectedPendingIds.size === 0}
+                    onClick={() =>
+                      openAssignModal(
+                        filterAssignableByIds(assignablePending, selectedPendingIds),
+                      )
+                    }
+                  >
+                    {isAssigning ? '派单中…' : `批量派单${selectedPendingIds.size ? ` (${selectedPendingIds.size})` : ''}`}
+                  </button>
+                </div>
+              )}
               <button type="button" className="rt-tracking__list-refresh" onClick={refreshAll}>
                 🔄 刷新列表
               </button>
@@ -1752,18 +1746,30 @@ const RealTimeTracking: React.FC = () => {
                 </div>
               ) : (
                 pendingPackages.map((pkg) => {
-                  const isLocked =
-                    !!pkg.courier && pkg.courier !== '未分配' && pkg.courier !== '待分配';
+                  const canAssign = isAssignablePackage(pkg);
+                  const selected = selectedPendingIds.has(pkg.id);
                   const deliveryOption = adminDeliveryOptionLine(pkg);
                   const deliveryFee = formatTrackingDeliveryFee(pkg.price);
                   return (
                     <article
                       key={pkg.id}
                       className={`rt-tracking__pkg rt-tracking__pkg--pending${
-                        isLocked ? ' rt-tracking__pkg--locked' : ''
-                      }`}
+                        canAssign ? '' : ' rt-tracking__pkg--locked'
+                      }${selected ? ' rt-tracking__pkg--selected' : ''}`}
                     >
                       <div className="rt-tracking__pkg-head">
+                        {canAssign && (
+                          <label className="rt-tracking__pkg-check">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              disabled={isAssigning}
+                              onChange={() =>
+                                setSelectedPendingIds((prev) => toggleSelectedId(prev, pkg.id))
+                              }
+                            />
+                          </label>
+                        )}
                         <span className="rt-tracking__pkg-id">{pkg.id}</span>
                         <div className="rt-tracking__badges">{renderPackageIdentityBadges(pkg)}</div>
                       </div>
@@ -1804,9 +1810,7 @@ const RealTimeTracking: React.FC = () => {
                         {renderPackageCodLine(pkg)}
                       </div>
                       <div className="rt-tracking__pkg-actions">
-                        {isLocked ? (
-                          <div className="rt-tracking__assigned-banner">已分配给 {pkg.courier}</div>
-                        ) : (
+                        {canAssign ? (
                           <>
                             <button
                               type="button"
@@ -1821,14 +1825,14 @@ const RealTimeTracking: React.FC = () => {
                             <button
                               type="button"
                               className="rt-tracking__btn rt-tracking__btn--manual"
-                              onClick={() => {
-                                setSelectedPackage(pkg);
-                                setShowAssignModal(true);
-                              }}
+                              disabled={isAssigning}
+                              onClick={() => openAssignModal([pkg])}
                             >
                               手动分配
                             </button>
                           </>
+                        ) : (
+                          <div className="rt-tracking__assigned-banner">已分配给 {pkg.courier}</div>
                         )}
                       </div>
                     </article>
@@ -1896,147 +1900,14 @@ const RealTimeTracking: React.FC = () => {
         </section>
       </div>
 
-      {/* 手动分配模态框 */}
-      {showAssignModal && selectedPackage && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '15px',
-            padding: '2rem',
-            maxWidth: '600px',
-            width: '90%',
-            maxHeight: '80vh',
-            overflow: 'auto'
-          }}>
-            <h2 style={{ marginTop: 0, color: '#1f2937' }}>
-              选择快递员 - {selectedPackage.id}
-            </h2>
-
-            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f3f4f6', borderRadius: '8px' }}>
-              <p style={{ margin: '0.3rem 0' }}><strong>寄件地址:</strong> {selectedPackage.sender_address}</p>
-              <p style={{ margin: '0.3rem 0' }}><strong>收件地址:</strong> {selectedPackage.receiver_address}</p>
-              {packageHasCod(selectedPackage) && (
-                <p style={{ margin: '0.5rem 0 0', color: '#b45309', fontWeight: 700 }}>
-                  <strong>COD 代收款:</strong> {resolvePackageCodAmount(selectedPackage).toLocaleString()} MMK
-                  {isMerchantOrderPackage(selectedPackage) ? '（商家订单）' : ''}
-                </p>
-              )}
-            </div>
-
-            {getRecommendedCouriers(selectedPackage)
-              .map((courier, index) => (
-                <div
-                  key={courier.id}
-                  style={{
-                    background: index === 0 ? '#eff6ff' : (courier.status === 'online' ? '#f0fdf4' : '#fef3c7'),
-                    border: `2px solid ${index === 0 ? '#3b82f6' : (courier.status === 'online' ? '#86efac' : '#fde68a')}`,
-                    padding: '1rem',
-                    borderRadius: '10px',
-                    marginBottom: '1rem',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    transition: 'transform 0.2s, box-shadow 0.2s'
-                  }}
-                  onClick={() => assignPackageToCourier(selectedPackage, courier)}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  {index === 0 && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '-10px',
-                      left: '20px',
-                      background: '#3b82f6',
-                      color: 'white',
-                      padding: '2px 10px',
-                      borderRadius: '10px',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}>
-                      ✨ 智能推荐 (最近/最闲)
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <h3 style={{ margin: 0 }}>{courier.name}</h3>
-                        <span style={{ 
-                          background: 'rgba(59, 130, 246, 0.1)', 
-                          color: '#3b82f6', 
-                          padding: '0.2rem 0.5rem', 
-                          borderRadius: '12px', 
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
-                          📍 距离: {(courier as any).distance?.toFixed(2)} km
-                        </span>
-                      </div>
-                      <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                        📱 <a href={`tel:${courier.phone}`} onClick={(e) => e.stopPropagation()} style={{ color: '#3b82f6', textDecoration: 'none' }}>{courier.phone}</a>
-                      </p>
-                      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#3b82f6', fontWeight: 'bold' }}>
-                          📦 当前: {courier.currentPackages || 0}
-                        </p>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>
-                          ✅ 总计: {courier.todayDeliveries || 0}
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '8px',
-                      background: getCourierStatusColor(courier.status),
-                      color: 'white',
-                      fontWeight: 'bold',
-                      marginLeft: '1rem',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {getCourierStatusText(courier.status)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-            <button
-              onClick={() => {
-                setShowAssignModal(false);
-                setSelectedPackage(null);
-              }}
-              style={{
-                width: '100%',
-                background: '#6b7280',
-                color: 'white',
-                border: 'none',
-                padding: '1rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                marginTop: '1rem'
-              }}
-            >
-              取消
-            </button>
-          </div>
-        </div>
+      {showAssignModal && assignTargets.length > 0 && (
+        <AssignCourierModal
+          packages={assignTargets}
+          couriers={couriers}
+          busy={isAssigning}
+          onClose={closeAssignModal}
+          onPick={(courier) => void finishAssignToCourier(assignTargets, courier)}
+        />
       )}
 
       {/* 🚨 新增：异常监控警报浮窗 */}

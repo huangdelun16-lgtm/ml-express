@@ -207,7 +207,7 @@ export const ADMIN_PRODUCT_FIELD_LABELS: Record<string, string> = {
   is_available: '上架状态',
 };
 
-const ADMIN_PRODUCT_DIFF_KEYS = Object.keys(ADMIN_PRODUCT_FIELD_LABELS);
+export const ADMIN_PRODUCT_DIFF_KEYS = Object.keys(ADMIN_PRODUCT_FIELD_LABELS);
 
 function adminProductValuesEqual(key: string, a: unknown, b: unknown): boolean {
   if (key === 'detail_image_urls' || key === 'variants') {

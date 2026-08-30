@@ -14,6 +14,12 @@ import {
 } from '../utils/proxyPurchaseExcel';
 import { isAbortLikeError } from '../utils/fetchError';
 import {
+  buildCodSettlePatch,
+  isMissingCodSettledByColumn,
+  stripCodSettledByFields,
+  type CodSettleActorInput,
+} from '../utils/codSettlement';
+import {
   applyNetlifyRealtimeFallback,
   resolveBrowserSupabaseUrl,
   rewritePublicStorageUrl,
@@ -75,14 +81,25 @@ export interface Package {
   sender_code?: string; // 寄件码（客户提交订单后自动生成的二维码）
   transfer_code?: string; // 中转码（包裹在中转站的唯一标识码）
   payment_method?: 'qr' | 'cash' | 'balance'; // 🚀 支付方式：qr=二维码支付，cash=现金支付, balance=余额支付
+  customer_id?: string;
   cod_amount?: number; // 代收款金额
   customer_email?: string; // 客户邮箱
   customer_name?: string; // 客户姓名
+  refund_status?: string;
+  refund_amount?: number;
+  refund_note?: string;
+  refund_at?: string;
+  refund_by?: string;
+  refund_by_name?: string;
   // 费用明细字段
   store_fee?: string | number; // 待付款（店铺填写）
   delivery_fee?: string | number; // 跑腿费（客户下单时系统自动生成的费用）
   cod_settled?: boolean; // 代收款是否已结清
   cod_settled_at?: string; // 代收款结清时间
+  /** 结清方：admin | merchant；历史单可能为空 */
+  cod_settled_by?: string;
+  cod_settled_by_id?: string;
+  cod_settled_by_name?: string;
   rider_settled?: boolean; // 骑手是否已结清
   rider_settled_at?: string; // 骑手结清时间
   /** 下单时的基础起步价快照(MMK)；财务算骑手分成时优先用此值，避免日后改系统起步价追溯旧单 */
@@ -202,6 +219,7 @@ export interface DeliveryStore {
   updated_at?: string;
   balance?: number; // 🚀 新增：账户余额
   vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
+  is_closed_today?: boolean;
   cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
 }
 
@@ -232,6 +250,7 @@ export interface Product {
   sales_count: number;
   listing_status?: 'pending' | 'approved' | 'rejected' | null;
   pending_update?: Record<string, unknown> | null;
+  listing_review_notes?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -489,39 +508,47 @@ const applyCityPackageListFilters = (
 
 // 包裹数据库操作
 export const packageService = {
-  // 结清合伙店铺代收款
-  async settleMerchantCOD(storeId: string, storeName: string) {
+  // 结清合伙店铺代收款（只更新未结清，并记录结清方，避免覆盖商家已结）
+  async settleMerchantCOD(
+    storeId: string,
+    storeName: string,
+    actor?: CodSettleActorInput,
+  ) {
     try {
       const now = new Date().toISOString();
-      
-      // 1. 更新通过 delivery_store_id 匹配的订单
-      // 含 cod_amount 为 0 / null 的订单：结清后商家端「待结清」应全部消失
-      const { error: error1 } = await supabase
-        .from('packages')
-        .update({ 
-          cod_settled: true,
-          cod_settled_at: now
-        })
-        .eq('status', '已送达')
-        .or('cod_settled.is.false,cod_settled.is.null')
-        .eq('delivery_store_id', storeId);
+      const patch = buildCodSettlePatch(
+        {
+          kind: 'admin',
+          id: actor?.id || '',
+          name: actor?.name || '后台',
+        },
+        now,
+      );
 
-      if (error1) throw error1;
+      const apply = async (body: Record<string, unknown>) => {
+        const { error: error1 } = await supabase
+          .from('packages')
+          .update(body)
+          .eq('status', '已送达')
+          .or('cod_settled.is.false,cod_settled.is.null')
+          .eq('delivery_store_id', storeId);
+        if (error1) return error1;
 
-      // 2. 更新通过 sender_name 匹配的订单（兼容旧数据）
-      // 仅更新 delivery_store_id 为空的，避免重复操作（虽然幂等操作也无妨）
-      const { error: error2 } = await supabase
-        .from('packages')
-        .update({ 
-          cod_settled: true,
-          cod_settled_at: now
-        })
-        .eq('status', '已送达')
-        .or('cod_settled.is.false,cod_settled.is.null')
-        .is('delivery_store_id', null) 
-        .eq('sender_name', storeName);
+        const { error: error2 } = await supabase
+          .from('packages')
+          .update(body)
+          .eq('status', '已送达')
+          .or('cod_settled.is.false,cod_settled.is.null')
+          .is('delivery_store_id', null)
+          .eq('sender_name', storeName);
+        return error2;
+      };
 
-      if (error2) throw error2;
+      let error = await apply(patch);
+      if (error && isMissingCodSettledByColumn(error)) {
+        error = await apply(stripCodSettledByFields(patch));
+      }
+      if (error) throw error;
 
       return { success: true };
     } catch (error) {

@@ -316,6 +316,9 @@ const ProfilePage: React.FC = () => {
       codAmount: number;
       deliveryTime?: string;
       deliveryFeeLabel?: string;
+      settledAt?: string;
+      settledBy?: string;
+      settledByName?: string;
     }>
   >([]);
   const [codModalTitle, setCodModalTitle] = useState("");
@@ -2224,15 +2227,25 @@ const ProfilePage: React.FC = () => {
     if (!window.confirm(confirmMsg)) return;
     try {
       setCodSettleLoading(true);
-      const result = await batchSettleCodOrders(unique);
+      const result = await batchSettleCodOrders(unique, {
+        id: currentUser?.id || storeInfo?.id || "",
+        name: storeInfo?.store_name || currentUser?.name || "",
+      });
       if (result.ok === 0) {
         feedbackService.notify(
-          language === "zh" ? "结清失败，请重试" : "Settle failed",
+          result.skipped > 0
+            ? language === "zh"
+              ? "这些单已被结清（可能由后台结清）"
+              : "Already settled (possibly by admin)"
+            : language === "zh"
+              ? "结清失败，请重试"
+              : "Settle failed",
         );
+        if (result.skipped > 0) await handleViewCODOrders(false);
         return;
       }
       const settled = new Set(unique);
-      if (result.failed > 0) {
+      if (result.failed > 0 || result.skipped > 0) {
         await handleViewCODOrders(false);
       } else {
         setCodOrders((prev) => prev.filter((order) => !settled.has(order.orderId)));
@@ -2241,8 +2254,8 @@ const ProfilePage: React.FC = () => {
       await loadPartnerCODStats();
       feedbackService.notify(
         language === "zh"
-          ? `已结清 ${result.ok} 笔${result.failed ? `，失败 ${result.failed} 笔` : ""}`
-          : `Settled ${result.ok}${result.failed ? `, failed ${result.failed}` : ""}`,
+          ? `已结清 ${result.ok} 笔${result.skipped ? `，${result.skipped} 笔已被结清` : ""}${result.failed ? `，失败 ${result.failed} 笔` : ""}`
+          : `Settled ${result.ok}${result.skipped ? `, ${result.skipped} already settled` : ""}${result.failed ? `, failed ${result.failed}` : ""}`,
       );
     } catch (error) {
       LoggerService.error("批量结清代收款失败:", error);
@@ -6546,6 +6559,35 @@ const ProfilePage: React.FC = () => {
                             : "ပြီးမြောက်ချိန်"}
                         : {formatDt(order.deliveryTime)}
                       </div>
+                      {codModalKind === "settled" ? (
+                        <div
+                          style={{
+                            color: "rgba(255, 255, 255, 0.55)",
+                            fontSize: "0.75rem",
+                            marginTop: "4px",
+                          }}
+                        >
+                          {String(order.settledBy || "").toLowerCase() === "admin"
+                            ? language === "zh"
+                              ? "后台已结"
+                              : language === "en"
+                                ? "Settled by admin"
+                                : "အက်ဒမင်မှ ရှင်းပြီး"
+                            : String(order.settledBy || "").toLowerCase() ===
+                                "merchant"
+                              ? language === "zh"
+                                ? "本店已结"
+                                : language === "en"
+                                  ? "Settled by store"
+                                  : "ဆိုင်မှ ရှင်းပြီး"
+                              : language === "zh"
+                                ? "已结清（未记录结清方）"
+                                : language === "en"
+                                  ? "Settled (unknown party)"
+                                  : "ရှင်းပြီး (မသိရှိရ)"}
+                          {order.settledAt ? ` · ${formatDt(order.settledAt)}` : ""}
+                        </div>
+                      ) : null}
                       {order.deliveryFeeLabel ? (
                         <div
                           style={{
@@ -6995,7 +7037,8 @@ const ProfilePage: React.FC = () => {
                       </div>
                       {(product.listing_status === "pending" ||
                         product.listing_status === "rejected" ||
-                        hasPendingProductUpdate(product)) && (
+                        hasPendingProductUpdate(product) ||
+                        !!product.listing_review_notes?.trim()) && (
                         <div
                           style={{
                             marginTop: "0.5rem",
@@ -7019,9 +7062,19 @@ const ProfilePage: React.FC = () => {
                             ? language === "zh"
                               ? "待后台审核"
                               : "Pending approval"
-                            : language === "zh"
+                            : product.listing_status === "rejected"
+                            ? language === "zh"
                               ? "审核未通过"
-                              : "Rejected"}
+                              : "Rejected"
+                            : language === "zh"
+                              ? "修改未通过"
+                              : "Edit rejected"}
+                          {product.listing_review_notes?.trim() ? (
+                            <div style={{ marginTop: 4, fontWeight: 600, lineHeight: 1.4 }}>
+                              {language === "zh" ? "原因：" : "Reason: "}
+                              {product.listing_review_notes.trim()}
+                            </div>
+                          ) : null}
                         </div>
                       )}
                     </div>

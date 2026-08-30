@@ -33,6 +33,8 @@ export interface Product {
   listing_status?: "pending" | "approved" | "rejected" | null;
   /** 已上架商品的编辑待审快照；Admin 通过后合并到主字段 */
   pending_update?: ProductPendingUpdate | null;
+  /** Admin 最近一次审核备注；拒绝时写入，商家端展示 */
+  listing_review_notes?: string | null;
   created_at?: string;
   updated_at?: string;
 }

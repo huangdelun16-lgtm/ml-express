@@ -10,6 +10,9 @@ import AccountManagement from './pages/AccountManagement';
 import BannerManagement from './pages/BannerManagement';
 import DeliveryStoreManagement from './pages/DeliveryStoreManagement';
 import MerchantApplicationsPage from './pages/MerchantApplicationsPage';
+import ProductReviewQueuePage from './pages/ProductReviewQueuePage';
+import MerchantOpsWatchPage from './pages/MerchantOpsWatchPage';
+import AfterSalesDeskPage from './pages/AfterSalesDeskPage';
 import EmployeeSupervision from './pages/EmployeeSupervision';
 import RealTimeTracking from './pages/RealTimeTracking';
 import RechargeManagement from './pages/RechargeManagement';
@@ -155,6 +158,36 @@ function App() {
                   element={
                     <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="merchant_stores">
                       <MerchantApplicationsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="product-reviews"
+                  element={
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager']}
+                      permissionId={['merchant_stores', 'product_reviews']}
+                    >
+                      <ProductReviewQueuePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="merchant-ops"
+                  element={
+                    <ProtectedRoute requiredRoles={['admin', 'manager']} permissionId="merchant_stores">
+                      <MerchantOpsWatchPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="after-sales"
+                  element={
+                    <ProtectedRoute
+                      requiredRoles={['admin', 'manager', 'finance']}
+                      permissionId={['after_sales', 'merchant_stores', 'finance']}
+                    >
+                      <AfterSalesDeskPage />
                     </ProtectedRoute>
                   }
                 />

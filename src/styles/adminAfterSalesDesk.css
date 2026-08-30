@@ -1,0 +1,76 @@
+.asd-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.asd-tab {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: #334155;
+}
+
+.asd-tab.is-active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.asd-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 280px;
+  overflow: auto;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.asd-bubble {
+  max-width: 86%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.asd-bubble--customer {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.asd-bubble--staff {
+  align-self: flex-end;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.asd-reply {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.asd-reply textarea {
+  flex: 1;
+  min-height: 72px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+}
+
+.asd-stars {
+  color: #d97706;
+  font-weight: 800;
+  letter-spacing: 1px;
+}

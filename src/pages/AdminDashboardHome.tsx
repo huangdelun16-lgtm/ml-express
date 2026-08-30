@@ -21,11 +21,16 @@ const AdminDashboardHome: React.FC = () => {
   const pendingAssignmentCount = counts.pendingAssignment;
   const pendingProductReviewCount = counts.pendingProductReview;
   const pendingDeliveryAlertsCount = counts.pendingDeliveryAlerts;
+  const overdueMerchantAcceptCount = counts.overdueMerchantAccept;
+  const afterSalesCount =
+    counts.watchReviews + counts.waitingChats + counts.pendingRefunds;
   const pendingTotal =
     pendingRechargeCount +
     pendingAssignmentCount +
     pendingProductReviewCount +
-    pendingDeliveryAlertsCount;
+    pendingDeliveryAlertsCount +
+    overdueMerchantAcceptCount +
+    afterSalesCount;
 
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannersLoading, setBannersLoading] = useState(true);
@@ -107,10 +112,14 @@ const AdminDashboardHome: React.FC = () => {
     pendingRechargeCount +
     pendingAssignmentCount +
     pendingProductReviewCount +
-    pendingDeliveryAlertsCount;
+    pendingDeliveryAlertsCount +
+    overdueMerchantAcceptCount +
+    afterSalesCount;
 
   const quickLinks: { path: string; icon: string; labelZh: string; labelEn: string; labelMy: string }[] = [
     { path: '/admin/city-packages', icon: '📦', labelZh: '同城订单', labelEn: 'Orders', labelMy: 'အပြင်ဘက်အော်ဒါများ' },
+    { path: '/admin/merchant-ops', icon: '🛎️', labelZh: '商家监管', labelEn: 'Merchant ops', labelMy: 'ဆိုင်စောင့်ကြည့်' },
+    { path: '/admin/after-sales', icon: '🎧', labelZh: '售后跟单', labelEn: 'After-sales', labelMy: 'ရောင်းချပြီး' },
     { path: '/admin/tracking', icon: '🗺️', labelZh: '实时跟踪', labelEn: 'Tracking', labelMy: 'လမ်းကြောင်းခြေရာခံ' },
     { path: '/admin/finance', icon: '💰', labelZh: '财务管理', labelEn: 'Finance', labelMy: 'ဘဏ္ဍာရေး' },
     { path: '/admin/banners', icon: '🖼️', labelZh: '页面与广告', labelEn: 'Banners', labelMy: 'ကြေညာခြင်း' },
@@ -126,7 +135,9 @@ const AdminDashboardHome: React.FC = () => {
       {(pendingRechargeCount > 0 ||
         pendingAssignmentCount > 0 ||
         pendingProductReviewCount > 0 ||
-        pendingDeliveryAlertsCount > 0) && (
+        pendingDeliveryAlertsCount > 0 ||
+        overdueMerchantAcceptCount > 0 ||
+        afterSalesCount > 0) && (
         <div
           style={{
             display: 'flex',
@@ -222,14 +233,76 @@ const AdminDashboardHome: React.FC = () => {
             </div>
           )}
 
+          {overdueMerchantAcceptCount > 0 && (
+            <div
+              role="button"
+              tabIndex={0}
+              className="admin-home-alert admin-home-alert--warn"
+              onClick={() => navigate('/admin/merchant-ops?tab=overdue')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') navigate('/admin/merchant-ops?tab=overdue');
+              }}
+              style={{ animation: 'pulse-alert 2s infinite' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: '1.6rem' }}>🛎️</span>
+                <div>
+                  <div className="admin-home-alert__title">
+                    {language === 'zh'
+                      ? '商家待接单超时'
+                      : language === 'en'
+                        ? 'Merchant accept overdue'
+                        : 'ဆိုင်လက်ခံကျော်'}
+                  </div>
+                  <div className="admin-home-alert__sub">
+                    {language === 'zh'
+                      ? '有店铺的待确认订单已超过 10 分钟，请打开今日商家监管'
+                      : language === 'en'
+                        ? 'Open merchant ops watch for 待确认 older than 10 minutes'
+                        : '၁၀ မိနစ်ကျော် အော်ဒါ'}
+                  </div>
+                </div>
+              </div>
+              <div className="admin-home-alert__n">{overdueMerchantAcceptCount}</div>
+            </div>
+          )}
+
+          {afterSalesCount > 0 && (
+            <div
+              role="button"
+              tabIndex={0}
+              className="admin-home-alert admin-home-alert--warn"
+              onClick={() => navigate('/admin/after-sales')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') navigate('/admin/after-sales');
+              }}
+              style={{ animation: 'pulse-alert 2s infinite' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: '1.6rem' }}>🎧</span>
+                <div>
+                  <div className="admin-home-alert__title">
+                    {language === 'zh' ? '售后待跟' : 'After-sales follow-up'}
+                  </div>
+                  <div className="admin-home-alert__sub">
+                    {language === 'zh'
+                      ? '低分评价、待回复会话或待跟退款'
+                      : 'Low reviews, waiting chats, or pending refunds'}
+                  </div>
+                </div>
+              </div>
+              <div className="admin-home-alert__n">{afterSalesCount}</div>
+            </div>
+          )}
+
           {pendingProductReviewCount > 0 && (
             <div
               role="button"
               tabIndex={0}
               className="admin-home-alert admin-home-alert--warn"
-              onClick={() => navigate('/admin/delivery-stores')}
+              onClick={() => navigate('/admin/product-reviews')}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') navigate('/admin/delivery-stores');
+                if (e.key === 'Enter' || e.key === ' ') navigate('/admin/product-reviews');
               }}
               style={{ animation: 'pulse-alert 2s infinite' }}
             >
@@ -245,9 +318,9 @@ const AdminDashboardHome: React.FC = () => {
                   </div>
                   <div className="admin-home-alert__sub">
                     {language === 'zh'
-                      ? '商家提交了新品，请在合伙店铺中处理'
+                      ? '商家提交了新品或改价，请在商品审核工作台处理'
                       : language === 'en'
-                        ? 'Open Merchants → store product list'
+                        ? 'Open the product review queue'
                         : 'ကုန်သည်မှ ကုန်ပစ္စည်းအသစ်'}
                   </div>
                 </div>
@@ -292,6 +365,30 @@ const AdminDashboardHome: React.FC = () => {
             my: 'သတိပေးချက်များ',
             color: '#fb7185',
             path: '/admin/delivery-alerts',
+          },
+          {
+            n: pendingProductReviewCount,
+            zh: '待审商品',
+            en: 'Products',
+            my: 'ကုန်ပစ္စည်း',
+            color: '#fbbf24',
+            path: '/admin/product-reviews',
+          },
+          {
+            n: overdueMerchantAcceptCount,
+            zh: '接单超时',
+            en: 'Accept SLA',
+            my: 'လက်ခံကျော်',
+            color: '#fb7185',
+            path: '/admin/merchant-ops?tab=overdue',
+          },
+          {
+            n: afterSalesCount,
+            zh: '售后跟单',
+            en: 'After-sales',
+            my: 'ရောင်းချပြီး',
+            color: '#fbbf24',
+            path: '/admin/after-sales',
           },
         ].map((item) => (
           <button

@@ -88,6 +88,10 @@ export interface Package {
   customer_name?: string; // 客户姓名
   cod_settled?: boolean; // 代收款是否已结清
   cod_settled_at?: string; // 代收款结清时间
+  /** 结清方：admin | merchant；历史单可能为空 */
+  cod_settled_by?: string;
+  cod_settled_by_id?: string;
+  cod_settled_by_name?: string;
   pricing_base_fee_mmk?: number | null;
 }
 
@@ -592,45 +596,59 @@ export const packageService = {
       const y = new Date().getFullYear();
       const yStart = new Date(y, 0, 1).toISOString();
       const yEnd = new Date(y, 11, 31, 23, 59, 59, 999).toISOString();
+      const selectWithActor =
+        'id, cod_amount, delivery_time, cod_settled, cod_settled_at, price, cod_settled_by, cod_settled_by_id, cod_settled_by_name';
+      const selectFallback =
+        'id, cod_amount, delivery_time, cod_settled, cod_settled_at, price';
 
-      let q: any;
-      if (settled === true) {
-        q = supabase
-          .from('packages')
-          .select('id, cod_amount, delivery_time, cod_settled, cod_settled_at, price', { count: 'exact' })
-          .in('status', ['已送达', '已完成'])
-          .or(conditions.join(','))
-          .eq('cod_settled', true)
-          .not('cod_settled_at', 'is', null)
-          .gte('cod_settled_at', yStart)
-          .lte('cod_settled_at', yEnd);
-      } else {
-        q = supabase
-          .from('packages')
-          .select('id, cod_amount, delivery_time, cod_settled, cod_settled_at, price', { count: 'exact' })
-          .eq('status', '已送达')
-          .or(conditions.join(','));
-        if (settled === false) {
-          q = q.or('cod_settled.eq.false,cod_settled.is.null');
+      const runQuery = async (selectCols: string) => {
+        let q: any;
+        if (settled === true) {
+          q = supabase
+            .from('packages')
+            .select(selectCols, { count: 'exact' })
+            .in('status', ['已送达', '已完成'])
+            .or(conditions.join(','))
+            .eq('cod_settled', true)
+            .not('cod_settled_at', 'is', null)
+            .gte('cod_settled_at', yStart)
+            .lte('cod_settled_at', yEnd);
+        } else {
+          q = supabase
+            .from('packages')
+            .select(selectCols, { count: 'exact' })
+            .eq('status', '已送达')
+            .or(conditions.join(','));
+          if (settled === false) {
+            q = q.or('cod_settled.eq.false,cod_settled.is.null');
+          }
+          if (month) {
+            const [yr, monthNum] = month.split('-');
+            const startDate = `${yr}-${monthNum}-01`;
+            const endDate = new Date(parseInt(yr), parseInt(monthNum), 0).toISOString().split('T')[0];
+            q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
+          }
         }
-        if (month) {
-          const [yr, monthNum] = month.split('-');
-          const startDate = `${yr}-${monthNum}-01`;
-          const endDate = new Date(parseInt(yr), parseInt(monthNum), 0).toISOString().split('T')[0];
-          q = q.gte('delivery_time', startDate).lte('delivery_time', endDate);
-        }
+
+        const effectivePageSize = settled === true ? Math.max(pageSize, 5000) : pageSize;
+        const from = (page - 1) * effectivePageSize;
+        const to = from + effectivePageSize - 1;
+        return q
+          .order(settled === true ? 'cod_settled_at' : 'delivery_time', {
+            ascending: false,
+          })
+          .range(from, to);
+      };
+
+      let { data, error, count } = await runQuery(selectWithActor);
+      if (error && (
+        error.code === 'PGRST204' ||
+        error.code === '42703' ||
+        String(error.message || '').includes('cod_settled_by')
+      )) {
+        ({ data, error, count } = await runQuery(selectFallback));
       }
 
-      const effectivePageSize = settled === true ? Math.max(pageSize, 5000) : pageSize;
-      const from = (page - 1) * effectivePageSize;
-      const to = from + effectivePageSize - 1;
-
-      const { data, error, count } = await q
-        .order(settled === true ? 'cod_settled_at' : 'delivery_time', {
-          ascending: false,
-        })
-        .range(from, to);
-      
       if (error) throw error;
       
       const orders = (data || []).map((pkg: any) => ({
@@ -638,13 +656,11 @@ export const packageService = {
         codAmount: pkg.cod_amount || 0,
         deliveryTime: pkg.delivery_time,
         deliveryFeeLabel: pkg.price || '',
+        settledAt: pkg.cod_settled_at || '',
+        settledBy: pkg.cod_settled_by || '',
+        settledByName: pkg.cod_settled_by_name || '',
       }));
-      
-      // 为了兼容Web端现有调用，直接返回数组，但也返回total以防未来需要
-      // 注意：Web端目前期望返回 Promise<Array<...>>，所以这里可能需要改Web端代码或者稍微hack一下
-      // 实际上，Web端调用是 const orders = await ...; setCodOrders(orders);
-      // 所以我必须返回数组，或者改Web端。
-      // 为了简单，我让它返回 { orders, total }，然后去改Web端。
+
       return { orders, total: count || 0 };
     } catch (error) {
       LoggerService.error('获取代收款订单列表失败:', error);

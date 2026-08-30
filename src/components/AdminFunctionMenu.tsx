@@ -4,6 +4,9 @@ export const MODULE_ICONS: Record<string, string> = {
   city_packages: '📦',
   users: '👥',
   merchant_stores: '🏪',
+  product_reviews: '🛍️',
+  merchant_ops: '🛎️',
+  after_sales: '🎧',
   finance: '💰',
   tracking: '📍',
   delivery_alerts: '🚨',
@@ -22,6 +25,9 @@ export const MODULE_ROUTES: Record<string, string> = {
   city_packages: '/admin/city-packages',
   users: '/admin/users',
   merchant_stores: '/admin/delivery-stores',
+  product_reviews: '/admin/product-reviews',
+  merchant_ops: '/admin/merchant-ops',
+  after_sales: '/admin/after-sales',
   finance: '/admin/finance',
   tracking: '/admin/tracking',
   settings: '/admin/settings',
@@ -39,7 +45,10 @@ export const MODULE_ROUTES: Record<string, string> = {
 const SEARCH_ALIASES: Record<string, string[]> = {
   city_packages: ['订单', '包裹', 'city', '同城', 'order', 'package'],
   users: ['会员', '用户', 'user', 'customer'],
-  merchant_stores: ['店铺', '商家', '入驻', '商品审核', 'store', 'merchant'],
+  merchant_stores: ['店铺', '商家', '入驻', 'store', 'merchant'],
+  product_reviews: ['商品审核', '待审商品', '上架', 'product', 'review', 'listing'],
+  merchant_ops: ['商家监管', '打烊', '缺货', '待接单', '超时', 'closed', 'stock', 'ops'],
+  after_sales: ['评价', '客服', '会话', '退款', '售后', 'review', 'chat', 'refund'],
   finance: ['财务', '收款', '工资', 'finance', 'cod'],
   tracking: ['跟踪', '分配', '地图', '骑手位置', 'tracking'],
   delivery_alerts: ['警报', '异常', 'alert'],
@@ -66,14 +75,14 @@ const GROUPS: Array<{
     zh: '日常运营',
     en: 'Operations',
     my: 'နေ့စဉ်',
-    ids: ['city_packages', 'tracking', 'delivery_alerts', 'courier_performance'],
+    ids: ['city_packages', 'tracking', 'delivery_alerts', 'after_sales', 'courier_performance'],
   },
   {
     id: 'commerce',
     zh: '商家与用户',
     en: 'Merchants',
     my: 'ဆိုင်နှင့်အသုံးပြုသူ',
-    ids: ['merchant_stores', 'users', 'banners'],
+    ids: ['merchant_stores', 'merchant_ops', 'product_reviews', 'users', 'banners'],
   },
   {
     id: 'money',
@@ -107,6 +116,10 @@ export type AdminMenuBadges = {
   pendingProductReview: number;
   pendingDeliveryAlerts: number;
   pendingMerchantApplications: number;
+  overdueMerchantAccept: number;
+  watchReviews: number;
+  waitingChats: number;
+  pendingRefunds: number;
 };
 
 function readJson<T>(key: string, fallback: T): T {
@@ -239,8 +252,15 @@ const AdminFunctionMenu: React.FC<Props> = ({
   const renderItem = (card: AdminNavCard) => {
     const pulseNav =
       (card.id === 'tracking' && badges.pendingAssignment > 0) ||
-      (card.id === 'delivery_alerts' && badges.pendingDeliveryAlerts > 0);
-    const showProductBadge = card.id === 'merchant_stores' && badges.pendingProductReview > 0;
+      (card.id === 'delivery_alerts' && badges.pendingDeliveryAlerts > 0) ||
+      (card.id === 'merchant_ops' && badges.overdueMerchantAccept > 0) ||
+      (card.id === 'after_sales' &&
+        badges.watchReviews + badges.waitingChats + badges.pendingRefunds > 0);
+    const showProductBadge = card.id === 'product_reviews' && badges.pendingProductReview > 0;
+    const showMerchantOpsBadge = card.id === 'merchant_ops' && badges.overdueMerchantAccept > 0;
+    const showAfterSalesBadge =
+      card.id === 'after_sales' &&
+      badges.watchReviews + badges.waitingChats + badges.pendingRefunds > 0;
     const showMerchantAppBadge =
       card.id === 'merchant_stores' && badges.pendingMerchantApplications > 0;
     const showRechargeBadge = card.id === 'recharges' && badges.pendingRecharge > 0;
@@ -279,6 +299,13 @@ const AdminFunctionMenu: React.FC<Props> = ({
               {showAssignBadge && <CountBadge n={badges.pendingAssignment} tone="blue" />}
               {showAlertBadge && <CountBadge n={badges.pendingDeliveryAlerts} tone="red" />}
               {showProductBadge && <CountBadge n={badges.pendingProductReview} tone="amber" />}
+              {showMerchantOpsBadge && <CountBadge n={badges.overdueMerchantAccept} tone="red" />}
+              {showAfterSalesBadge && (
+                <CountBadge
+                  n={badges.watchReviews + badges.waitingChats + badges.pendingRefunds}
+                  tone="amber"
+                />
+              )}
               {showMerchantAppBadge && <CountBadge n={badges.pendingMerchantApplications} tone="blue" />}
               <span
                 role="button"
@@ -309,6 +336,8 @@ const AdminFunctionMenu: React.FC<Props> = ({
               showAssignBadge ||
               showAlertBadge ||
               showProductBadge ||
+              showMerchantOpsBadge ||
+              showAfterSalesBadge ||
               showMerchantAppBadge) && <span className="admin-fn__dot" />}
         </button>
       </div>

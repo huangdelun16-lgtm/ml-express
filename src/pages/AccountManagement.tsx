@@ -295,6 +295,8 @@ const AccountManagement: React.FC = () => {
     { id: 'city_packages', name: '同城订单', icon: '📦' },
     { id: 'users', name: '用户管理', icon: '👥' },
     { id: 'merchant_stores', name: '商家管理', icon: '🏪' },
+    { id: 'product_reviews', name: '商品审核', icon: '🛍️' },
+    { id: 'after_sales', name: '售后跟单', icon: '🎧' },
     { id: 'finance', name: '财务管理', icon: '💰' },
     { id: 'tracking', name: '实时跟踪', icon: '📍' },
     { id: 'settings', name: '系统设置', icon: '⚙️' },

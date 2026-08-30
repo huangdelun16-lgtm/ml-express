@@ -298,6 +298,9 @@ export default function ProfileScreen({ navigation }: any) {
       codAmount: number;
       deliveryTime?: string;
       deliveryFeeLabel?: string;
+      settledAt?: string;
+      settledBy?: string;
+      settledByName?: string;
     }>
   >([]);
   const [codOrdersPage, setCodOrdersPage] = useState(1);
@@ -314,6 +317,9 @@ export default function ProfileScreen({ navigation }: any) {
       codAmount: number;
       deliveryTime?: string;
       deliveryFeeLabel?: string;
+      settledAt?: string;
+      settledBy?: string;
+      settledByName?: string;
     }>
   >([]);
 
@@ -1966,16 +1972,32 @@ export default function ProfileScreen({ navigation }: any) {
           onPress: async () => {
             try {
               setCodSettleLoading(true);
-              const result = await batchSettleCodOrders(unique);
+              const currentUserRaw = await AsyncStorage.getItem("currentUser");
+              const user = currentUserRaw ? JSON.parse(currentUserRaw) : {};
+              const storeName =
+                user.name ||
+                (await AsyncStorage.getItem("userName")) ||
+                "";
+              const result = await batchSettleCodOrders(unique, {
+                id: user.id || "",
+                name: storeName,
+              });
               if (result.ok === 0) {
                 showToast(
-                  language === "zh" ? "结清失败" : "Settle failed",
-                  "error",
+                  result.skipped > 0
+                    ? language === "zh"
+                      ? "这些单已被结清（可能由后台结清）"
+                      : "Already settled (possibly by admin)"
+                    : language === "zh"
+                      ? "结清失败"
+                      : "Settle failed",
+                  result.skipped > 0 ? "info" : "error",
                 );
+                if (result.skipped > 0) await handleViewCODOrders(false, true);
                 return;
               }
               const settled = new Set(unique);
-              if (result.failed > 0) {
+              if (result.failed > 0 || result.skipped > 0) {
                 await handleViewCODOrders(false, true);
               } else {
                 setAllCodOrders((prev) =>
@@ -1990,8 +2012,8 @@ export default function ProfileScreen({ navigation }: any) {
               await reloadMerchantCodStats();
               showToast(
                 language === "zh"
-                  ? `已结清 ${result.ok} 笔`
-                  : `Settled ${result.ok}`,
+                  ? `已结清 ${result.ok} 笔${result.skipped ? `，${result.skipped} 笔已被结清` : ""}`
+                  : `Settled ${result.ok}${result.skipped ? `, ${result.skipped} already settled` : ""}`,
                 "success",
               );
             } catch (error) {
@@ -5475,6 +5497,32 @@ export default function ProfileScreen({ navigation }: any) {
                                 {formatDate(item.deliveryTime)}
                               </Text>
                             </View>
+                            {codModalSettled === true ? (
+                              <Text
+                                style={{
+                                  color: "#64748b",
+                                  fontSize: 11,
+                                  marginTop: 6,
+                                }}
+                              >
+                                {String(item.settledBy || "").toLowerCase() ===
+                                "admin"
+                                  ? language === "zh"
+                                    ? "后台已结"
+                                    : "Settled by admin"
+                                  : String(item.settledBy || "").toLowerCase() ===
+                                      "merchant"
+                                    ? language === "zh"
+                                      ? "本店已结"
+                                      : "Settled by store"
+                                    : language === "zh"
+                                      ? "已结清（未记录结清方）"
+                                      : "Settled (unknown party)"}
+                                {item.settledAt
+                                  ? ` · ${formatDate(item.settledAt)}`
+                                  : ""}
+                              </Text>
+                            ) : null}
                             {!!item.deliveryFeeLabel && (
                               <Text
                                 style={{

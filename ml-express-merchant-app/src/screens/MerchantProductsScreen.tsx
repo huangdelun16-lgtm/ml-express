@@ -622,6 +622,34 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               />
             </View>
           </View>
+          {(item.listing_status === 'pending' ||
+            item.listing_status === 'rejected' ||
+            hasPendingProductUpdate(item) ||
+            !!item.listing_review_notes?.trim()) && (
+            <Text style={{ marginTop: 6, fontSize: 12, fontWeight: '700', color: item.listing_status === 'rejected' ? '#b91c1c' : '#b45309' }}>
+              {hasPendingProductUpdate(item) && item.listing_status === 'approved'
+                ? language === 'zh'
+                  ? '修改待审核'
+                  : 'Edit pending'
+                : item.listing_status === 'pending'
+                  ? language === 'zh'
+                    ? '待后台审核'
+                    : 'Pending approval'
+                  : item.listing_status === 'rejected'
+                    ? language === 'zh'
+                      ? '审核未通过'
+                      : 'Rejected'
+                    : language === 'zh'
+                      ? '修改未通过'
+                      : 'Edit rejected'}
+            </Text>
+          )}
+          {!!item.listing_review_notes?.trim() && (
+            <Text style={{ marginTop: 4, fontSize: 12, lineHeight: 16, color: '#b91c1c' }}>
+              {language === 'zh' ? '原因：' : 'Reason: '}
+              {item.listing_review_notes.trim()}
+            </Text>
+          )}
         </View>
 
         <View style={styles.productActions}>

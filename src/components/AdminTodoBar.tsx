@@ -10,6 +10,8 @@ function readTodoAccess(): {
   alerts: boolean;
   products: boolean;
   merchantApps: boolean;
+  merchantOps: boolean;
+  afterSales: boolean;
   audit: boolean;
 } {
   const role =
@@ -34,6 +36,14 @@ function readTodoAccess(): {
       role === 'admin' || role === 'manager' || role === 'finance' || hasPerm('delivery_alerts'),
     products: role === 'admin' || role === 'manager' || hasPerm('merchant_stores'),
     merchantApps: role === 'admin' || role === 'manager' || hasPerm('merchant_stores'),
+    merchantOps: role === 'admin' || role === 'manager' || hasPerm('merchant_stores'),
+    afterSales:
+      role === 'admin' ||
+      role === 'manager' ||
+      role === 'finance' ||
+      hasPerm('after_sales') ||
+      hasPerm('merchant_stores') ||
+      hasPerm('finance'),
     audit: role === 'admin' || role === 'manager' || role === 'finance',
   };
 }
@@ -97,6 +107,18 @@ const AdminTodoBar: React.FC = () => {
         : language === 'en'
           ? 'Onboarding'
           : 'လျှောက်လွှာ',
+    merchantOps:
+      language === 'zh'
+        ? '接单超时'
+        : language === 'en'
+          ? 'Accept SLA'
+          : 'လက်ခံကျော်',
+    afterSales:
+      language === 'zh'
+        ? '售后跟单'
+        : language === 'en'
+          ? 'After-sales'
+          : 'ရောင်းချပြီး',
     audit:
       language === 'zh'
         ? '操作审计'
@@ -110,7 +132,11 @@ const AdminTodoBar: React.FC = () => {
     (access.assign ? counts.pendingAssignment : 0) +
     (access.alerts ? counts.pendingDeliveryAlerts : 0) +
     (access.products ? counts.pendingProductReview : 0) +
-    (access.merchantApps ? counts.pendingMerchantApplications : 0);
+    (access.merchantApps ? counts.pendingMerchantApplications : 0) +
+    (access.merchantOps ? counts.overdueMerchantAccept : 0) +
+    (access.afterSales
+      ? counts.watchReviews + counts.waitingChats + counts.pendingRefunds
+      : 0);
 
   const pill = (
     label: string,
@@ -146,13 +172,27 @@ const AdminTodoBar: React.FC = () => {
           {access.alerts &&
             pill(t.alerts, counts.pendingDeliveryAlerts, () => navigate('/admin/delivery-alerts'), '#cf1322')}
           {access.products &&
-            pill(t.products, counts.pendingProductReview, () => navigate('/admin/delivery-stores'), '#d48806')}
+            pill(t.products, counts.pendingProductReview, () => navigate('/admin/product-reviews'), '#d48806')}
           {access.merchantApps &&
             pill(
               t.merchantApps,
               counts.pendingMerchantApplications,
               () => navigate('/admin/merchant-applications'),
               '#1677ff',
+            )}
+          {access.merchantOps &&
+            pill(
+              t.merchantOps,
+              counts.overdueMerchantAccept,
+              () => navigate('/admin/merchant-ops?tab=overdue'),
+              '#c41d7f',
+            )}
+          {access.afterSales &&
+            pill(
+              t.afterSales,
+              counts.watchReviews + counts.waitingChats + counts.pendingRefunds,
+              () => navigate('/admin/after-sales'),
+              '#d48806',
             )}
         </div>
         {access.audit && (

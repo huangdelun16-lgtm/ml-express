@@ -417,7 +417,8 @@ const StoreProductsPage: React.FC = () => {
 
                 {(product.listing_status === 'pending' ||
                   product.listing_status === 'rejected' ||
-                  hasPendingProductUpdate(product)) && (
+                  hasPendingProductUpdate(product) ||
+                  !!product.listing_review_notes?.trim()) && (
                   <div
                     className={`merchant-product-card__status ${
                       hasPendingProductUpdate(product) && product.listing_status === 'approved'
@@ -435,9 +436,19 @@ const StoreProductsPage: React.FC = () => {
                       ? language === 'zh'
                         ? '⏳ 待后台审核'
                         : '⏳ Pending approval'
-                      : language === 'zh'
+                      : product.listing_status === 'rejected'
+                      ? language === 'zh'
                         ? '✕ 审核未通过'
-                        : '✕ Rejected'}
+                        : '✕ Rejected'
+                      : language === 'zh'
+                        ? '✕ 修改未通过'
+                        : '✕ Edit rejected'}
+                    {product.listing_review_notes?.trim() ? (
+                      <div className="merchant-product-card__review-note">
+                        {language === 'zh' ? '原因：' : 'Reason: '}
+                        {product.listing_review_notes.trim()}
+                      </div>
+                    ) : null}
                   </div>
                 )}
 

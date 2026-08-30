@@ -31,6 +31,10 @@ const AdminShellLayout: React.FC = () => {
   const pendingProductReviewCount = counts.pendingProductReview;
   const pendingDeliveryAlertsCount = counts.pendingDeliveryAlerts;
   const pendingMerchantApplicationsCount = counts.pendingMerchantApplications;
+  const overdueMerchantAcceptCount = counts.overdueMerchantAccept;
+  const watchReviewsCount = counts.watchReviews;
+  const waitingChatsCount = counts.waitingChats;
+  const pendingRefundsCount = counts.pendingRefunds;
 
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
   const prevRechargeCountRef = useRef<number>(0);
@@ -242,6 +246,21 @@ const AdminShellLayout: React.FC = () => {
         roles: ['admin', 'manager'],
       },
       {
+        id: 'product_reviews',
+        title: language === 'zh' ? '商品审核' : language === 'en' ? 'Product review' : 'ကုန်ပစ္စည်းစစ်ဆေး',
+        roles: ['admin', 'manager'],
+      },
+      {
+        id: 'merchant_ops',
+        title: language === 'zh' ? '商家监管' : language === 'en' ? 'Merchant ops' : 'ဆိုင်စောင့်ကြည့်',
+        roles: ['admin', 'manager'],
+      },
+      {
+        id: 'after_sales',
+        title: language === 'zh' ? '售后跟单' : language === 'en' ? 'After-sales' : 'ရောင်းချပြီး',
+        roles: ['admin', 'manager', 'finance'],
+      },
+      {
         id: 'finance',
         title: language === 'zh' ? '财务管理' : language === 'en' ? 'Finance Management' : 'ဘဏ္ဍာရေးစီမံခန့်ခွဲမှု',
         roles: ['admin', 'manager', 'finance'],
@@ -325,6 +344,34 @@ const AdminShellLayout: React.FC = () => {
 
   const cardData = useMemo(() => {
     return allCardData.filter((card) => {
+      if (card.id === 'product_reviews') {
+        if (currentUserRole === 'admin') return true;
+        if (hasPermissionOverride && Array.isArray(currentUserPermissions)) {
+          return (
+            currentUserPermissions.includes('product_reviews') ||
+            currentUserPermissions.includes('merchant_stores')
+          );
+        }
+        return card.roles.includes(currentUserRole as 'admin' | 'manager' | 'operator' | 'finance');
+      }
+      if (card.id === 'merchant_ops') {
+        if (currentUserRole === 'admin') return true;
+        if (hasPermissionOverride && Array.isArray(currentUserPermissions)) {
+          return currentUserPermissions.includes('merchant_stores');
+        }
+        return card.roles.includes(currentUserRole as 'admin' | 'manager' | 'operator' | 'finance');
+      }
+      if (card.id === 'after_sales') {
+        if (currentUserRole === 'admin') return true;
+        if (hasPermissionOverride && Array.isArray(currentUserPermissions)) {
+          return (
+            currentUserPermissions.includes('after_sales') ||
+            currentUserPermissions.includes('merchant_stores') ||
+            currentUserPermissions.includes('finance')
+          );
+        }
+        return card.roles.includes(currentUserRole as 'admin' | 'manager' | 'operator' | 'finance');
+      }
       if (hasPermissionOverride && Array.isArray(currentUserPermissions)) {
         if (currentUserRole === 'admin') return true;
         return currentUserPermissions.includes(card.id);
@@ -435,6 +482,10 @@ const AdminShellLayout: React.FC = () => {
           pendingProductReview: pendingProductReviewCount,
           pendingDeliveryAlerts: pendingDeliveryAlertsCount,
           pendingMerchantApplications: pendingMerchantApplicationsCount,
+          overdueMerchantAccept: overdueMerchantAcceptCount,
+          watchReviews: watchReviewsCount,
+          waitingChats: waitingChatsCount,
+          pendingRefunds: pendingRefundsCount,
         }}
         onNavigate={(path) => navigate(path)}
         onCloseMobile={() => setMobileNavOpen(false)}

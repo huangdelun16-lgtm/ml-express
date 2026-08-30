@@ -571,45 +571,56 @@ export const packageService = {
     pageSize: number = 20,
   ) {
     try {
-      let q = supabase
-        .from("packages")
-        .select("id, cod_amount, delivery_time, cod_settled, price", {
-          count: "exact",
-        })
-        .eq("status", "已送达");
-
       const conditions = [`delivery_store_id.eq.${userId}`];
       if (storeName) {
         conditions.push(`sender_name.eq.${storeName}`);
       }
 
-      q = q.or(conditions.join(","));
+      const selectWithActor =
+        "id, cod_amount, delivery_time, cod_settled, cod_settled_at, price, cod_settled_by, cod_settled_by_id, cod_settled_by_name";
+      const selectFallback =
+        "id, cod_amount, delivery_time, cod_settled, price";
 
-      // 如果指定了结算状态
-      if (settled !== undefined) {
-        if (settled) {
-          q = q.eq("cod_settled", true);
-        } else {
-          q = q.or("cod_settled.eq.false,cod_settled.is.null");
+      const runQuery = async (selectCols: string) => {
+        let q = supabase
+          .from("packages")
+          .select(selectCols, {
+            count: "exact",
+          })
+          .eq("status", "已送达")
+          .or(conditions.join(","));
+
+        if (settled !== undefined) {
+          if (settled) {
+            q = q.eq("cod_settled", true);
+          } else {
+            q = q.or("cod_settled.eq.false,cod_settled.is.null");
+          }
         }
+
+        if (month) {
+          const [year, monthNum] = month.split("-");
+          const startDate = `${year}-${monthNum}-01`;
+          const endDate = new Date(parseInt(year), parseInt(monthNum), 0)
+            .toISOString()
+            .split("T")[0];
+          q = q.gte("delivery_time", startDate).lte("delivery_time", endDate);
+        }
+
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        return q.order("delivery_time", { ascending: false }).range(from, to);
+      };
+
+      let { data, error, count } = await runQuery(selectWithActor);
+      if (
+        error &&
+        (error.code === "PGRST204" ||
+          error.code === "42703" ||
+          String(error.message || "").includes("cod_settled_by"))
+      ) {
+        ({ data, error, count } = await runQuery(selectFallback));
       }
-
-      // 如果指定了月份，添加日期过滤
-      if (month) {
-        const [year, monthNum] = month.split("-");
-        const startDate = `${year}-${monthNum}-01`;
-        const endDate = new Date(parseInt(year), parseInt(monthNum), 0)
-          .toISOString()
-          .split("T")[0];
-        q = q.gte("delivery_time", startDate).lte("delivery_time", endDate);
-      }
-
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data, error, count } = await q
-        .order("delivery_time", { ascending: false })
-        .range(from, to);
 
       if (error) throw error;
 
@@ -622,6 +633,9 @@ export const packageService = {
         codAmount: pkg.cod_amount || 0,
         deliveryTime: pkg.delivery_time,
         deliveryFeeLabel: pkg.price || "",
+        settledAt: pkg.cod_settled_at || "",
+        settledBy: pkg.cod_settled_by || "",
+        settledByName: pkg.cod_settled_by_name || "",
       }));
 
       return { orders, total: count || 0 };

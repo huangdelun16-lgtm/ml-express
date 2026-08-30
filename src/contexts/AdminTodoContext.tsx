@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { fetchPendingMerchantApplicationCount } from '../services/merchantApplicationService';
+import { fetchOverdueMerchantAcceptCount } from '../services/merchantOpsWatchService';
+import { fetchAfterSalesTodoCounts } from '../services/afterSalesDeskService';
 import { useAdminSessionReady } from '../hooks/useAdminSessionReady';
 import { ADMIN_TODOS_REFRESH_EVENT } from '../utils/adminTodoBridge';
 import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
@@ -12,6 +14,10 @@ export type AdminTodoCounts = {
   pendingProductReview: number;
   pendingDeliveryAlerts: number;
   pendingMerchantApplications: number;
+  overdueMerchantAccept: number;
+  watchReviews: number;
+  waitingChats: number;
+  pendingRefunds: number;
 };
 
 const emptyCounts: AdminTodoCounts = {
@@ -20,10 +26,14 @@ const emptyCounts: AdminTodoCounts = {
   pendingProductReview: 0,
   pendingDeliveryAlerts: 0,
   pendingMerchantApplications: 0,
+  overdueMerchantAccept: 0,
+  watchReviews: 0,
+  waitingChats: 0,
+  pendingRefunds: 0,
 };
 
 export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
-  const [rechargeRes, alertsRes, assignRes, productsRes, pendingMerchantApplications] = await Promise.all([
+  const [rechargeRes, alertsRes, assignRes, productsRes, pendingMerchantApplications, overdueMerchantAccept, afterSales] = await Promise.all([
     supabase.from('recharge_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('delivery_alerts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase
@@ -36,6 +46,8 @@ export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
       .select('id, listing_status, pending_update', { count: 'exact', head: false })
       .or('listing_status.eq.pending,pending_update.not.is.null'),
     fetchPendingMerchantApplicationCount(),
+    fetchOverdueMerchantAcceptCount(),
+    fetchAfterSalesTodoCounts(),
   ]);
 
   const pendingProductRows = productsRes.data ?? [];
@@ -53,6 +65,10 @@ export async function fetchAdminTodoCounts(): Promise<AdminTodoCounts> {
     pendingAssignment: assignRes.count ?? 0,
     pendingProductReview,
     pendingMerchantApplications,
+    overdueMerchantAccept,
+    watchReviews: afterSales.watchReviews,
+    waitingChats: afterSales.waitingChats,
+    pendingRefunds: afterSales.pendingRefunds,
   };
 }
 

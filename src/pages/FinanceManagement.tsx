@@ -54,6 +54,8 @@ import {
   type FinanceForm,
 } from "./FinanceManagement.helpers";
 import { feedbackService } from "../services/FeedbackService";
+import { getCurrentUser } from "../services/authService";
+import { formatCodSettledByLabel } from "../utils/codSettlement";
 import { FinanceWorkspaceProvider } from "./finance/FinanceWorkspace";
 
 const FinanceAnalyticsTab = lazy(() => import("./finance/FinanceAnalyticsTab"));
@@ -1048,7 +1050,12 @@ const FinanceManagement: React.FC = () => {
 
     try {
       setLoading(true);
-      const result = await packageService.settleMerchantCOD(storeId, storeName);
+      const user = getCurrentUser();
+      const result = await packageService.settleMerchantCOD(storeId, storeName, {
+        kind: "admin",
+        id: user?.username || "",
+        name: user?.name || user?.username || "后台",
+      });
       if (result.success) {
         feedbackService.notify("结清成功！");
         loadRecords(); // 刷新数据
@@ -1598,6 +1605,7 @@ const FinanceManagement: React.FC = () => {
             "平台或余额_MMK",
             "送达时间",
             "结清时间",
+            "结清方",
             "状态",
           ]
         : language === "my"
@@ -1611,6 +1619,7 @@ const FinanceManagement: React.FC = () => {
               "ဘဏ်_MMK",
               "ပို့ဆောင်",
               "ရှင်းချိန်",
+              "ရှင်းသူ",
               "အခြေအနေ",
             ]
           : [
@@ -1623,6 +1632,7 @@ const FinanceManagement: React.FC = () => {
               "Balance_MMK",
               "Delivered",
               "Settled at",
+              "Settled by",
               "Status",
             ];
     const body = list.map((pkg) => {
@@ -1640,6 +1650,12 @@ const FinanceManagement: React.FC = () => {
           pkg.cod_settled_at
             ? new Date(pkg.cod_settled_at).toLocaleString("zh-CN")
             : "",
+        ),
+        escape(
+          formatCodSettledByLabel(
+            pkg,
+            language === "my" ? "my" : language === "en" ? "en" : "zh",
+          ),
         ),
         escape(statusForRow(pkg)),
       ].join(",");
@@ -2538,7 +2554,12 @@ const FinanceManagement: React.FC = () => {
                   gap: "16px",
                 }}
               >
-                {merchantCodModalDisplayOrders.map((pkg) => (
+                {merchantCodModalDisplayOrders.map((pkg) => {
+                  const settlerLabel = formatCodSettledByLabel(
+                    pkg,
+                    language === "my" ? "my" : language === "en" ? "en" : "zh",
+                  );
+                  return (
                   <div
                     key={pkg.id}
                     style={{
@@ -2744,11 +2765,13 @@ const FinanceManagement: React.FC = () => {
                         >
                           {language === "zh" ? "结清时间" : "Settled at"}:{" "}
                           {new Date(pkg.cod_settled_at).toLocaleString("zh-CN")}
+                          {settlerLabel ? ` · ${settlerLabel}` : ""}
                         </div>
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
 
                 {modalOrders.length === 0 && (
                   <div

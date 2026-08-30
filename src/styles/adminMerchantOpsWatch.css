@@ -1,0 +1,119 @@
+.mow-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+}
+
+.mow-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mow-chip strong {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.mow-chip span {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.mow-chip.is-active,
+.mow-chip:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.mow-chip--closed.is-active,
+.mow-chip--closed:hover {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.mow-chip--stock.is-active,
+.mow-chip--stock:hover {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.mow-chip--overdue.is-active,
+.mow-chip--overdue:hover {
+  border-color: #fb7185;
+  background: #fff1f2;
+}
+
+.mow-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mow-flag {
+  display: inline-flex;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.mow-flag--closed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.mow-flag--vacation {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.mow-flag--overdue {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.mow-flag--out {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.mow-flag--low {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.mow-flag--hours {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.mow-detail {
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.mow-detail p {
+  margin: 0.15rem 0;
+}
+
+.mow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mow-row--hot td {
+  background: #fff7ed;
+}

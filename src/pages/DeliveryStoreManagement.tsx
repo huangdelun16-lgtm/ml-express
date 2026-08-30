@@ -20,6 +20,9 @@ import {
   resolveNextStoreCodeForPrefix,
 } from '../utils/merchantStoreCode';
 import { feedbackService } from '../services/FeedbackService';
+import ProductReviewRejectModal from '../components/ProductReviewRejectModal';
+import { applyProductReviewDecision } from '../services/productReviewQueueService';
+import { isValidRejectReason } from '../utils/productReviewDecision';
 
 import {
   ErrorBoundary,
@@ -98,6 +101,7 @@ const DeliveryStoreManagement: React.FC = () => {
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productListingActionId, setProductListingActionId] = useState<string | null>(null);
+  const [rejectTargetProductId, setRejectTargetProductId] = useState<string | null>(null);
   /** 商品列表弹窗：全部 / 待审核 / 已完成(已通过) / 已取消(已拒绝) */
   const [productListFilter, setProductListFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedAdminProductId, setSelectedAdminProductId] = useState<string | null>(null);
@@ -105,6 +109,7 @@ const DeliveryStoreManagement: React.FC = () => {
   const [pendingProductReviewCount, setPendingProductReviewCount] = useState(0);
   const { counts: adminTodoCounts, refresh: refreshAdminTodos } = useAdminTodo();
   const pendingMerchantApplications = adminTodoCounts.pendingMerchantApplications;
+  const overdueMerchantAccept = adminTodoCounts.overdueMerchantAccept;
   const prevMerchantAppsRef = useRef<number | null>(null);
   const [merchantAppAlertPulse, setMerchantAppAlertPulse] = useState(false);
 
@@ -903,71 +908,28 @@ const DeliveryStoreManagement: React.FC = () => {
     return () => clearInterval(t);
   }, [loadPendingProductReviewSummary]);
 
-  const updateProductListingStatus = async (productId: string, listing_status: 'approved' | 'rejected') => {
+  const updateProductListingStatus = async (
+    productId: string,
+    listing_status: 'approved' | 'rejected',
+    notes?: string,
+  ) => {
     if (!viewingStoreId) return;
-    setProductListingActionId(productId);
     const product = storeProducts.find((p) => p.id === productId);
+    if (!product) return;
+    if (listing_status === 'rejected' && !isValidRejectReason(notes)) {
+      setRejectTargetProductId(productId);
+      return;
+    }
+    setProductListingActionId(productId);
     try {
-      const now = new Date().toISOString();
-      if (listing_status === 'approved') {
-        if (
-          product &&
-          normalizeProductListingStatus(product) === 'approved' &&
-          hasPendingProductUpdate(product)
-        ) {
-          const pu = (product.pending_update || {}) as Record<string, unknown>;
-          const mergePayload: Record<string, unknown> = {
-            pending_update: null,
-            listing_status: 'approved',
-            updated_at: now,
-          };
-          for (const key of [
-            'name',
-            'description',
-            'price',
-            'original_price',
-            'variants',
-            'image_url',
-            'detail_image_urls',
-            'stock',
-            'is_available',
-          ] as const) {
-            if (pu[key] !== undefined) mergePayload[key] = pu[key];
-          }
-          const { error } = await supabase.from('products').update(mergePayload).eq('id', productId);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('products')
-            .update({
-              listing_status: 'approved',
-              is_available: true,
-              pending_update: null,
-              updated_at: now,
-            })
-            .eq('id', productId);
-          if (error) throw error;
-        }
-      } else if (
-        product &&
-        normalizeProductListingStatus(product) === 'approved' &&
-        hasPendingProductUpdate(product)
-      ) {
-        const { error } = await supabase
-          .from('products')
-          .update({ pending_update: null, updated_at: now })
-          .eq('id', productId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('products')
-          .update({
-            listing_status: 'rejected',
-            is_available: false,
-            updated_at: now,
-          })
-          .eq('id', productId);
-        if (error) throw error;
+      const result = await applyProductReviewDecision({
+        product,
+        action: listing_status,
+        reason: notes,
+      });
+      if (!result.ok) {
+        feedbackService.notify(result.error || '更新失败，请重试');
+        return;
       }
       const { data, error: reloadError } = await supabase
         .from('products')
@@ -978,6 +940,10 @@ const DeliveryStoreManagement: React.FC = () => {
       setStoreProducts(data || []);
       await loadPendingProductReviewSummary();
       notifyAdminTodosRefresh();
+      feedbackService.notify(
+        listing_status === 'approved' ? '已通过，已通知商家' : '已拒绝，商家可见原因',
+      );
+      setRejectTargetProductId(null);
     } catch (e) {
       console.error('更新商品审核状态失败:', e);
       feedbackService.notify('更新失败，请重试（请确认已在数据库执行 listing_status 迁移）');
@@ -1373,6 +1339,8 @@ const DeliveryStoreManagement: React.FC = () => {
     productListCounts,
     productListFilter,
     productListingActionId,
+    rejectTargetProductId,
+    setRejectTargetProductId,
     qrCodeDataUrl,
     selectedAdminProduct,
     selectedStore,
@@ -1433,6 +1401,62 @@ const DeliveryStoreManagement: React.FC = () => {
             onClick={() => navigate('/admin/dashboard')}
           >
             ← 返回仪表板
+          </button>
+          <button
+            type="button"
+            className="admin-shell__btn admin-shell__btn--primary"
+            onClick={() => navigate('/admin/product-reviews')}
+            style={{ position: 'relative' }}
+          >
+            🛍️ 商品审核
+            {pendingProductReviewCount > 0 && (
+              <span
+                style={{
+                  marginLeft: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '22px',
+                  height: '22px',
+                  padding: '0 6px',
+                  borderRadius: '999px',
+                  background: '#d48806',
+                  color: '#fff',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                }}
+              >
+                {pendingProductReviewCount}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            className="admin-shell__btn"
+            onClick={() => navigate('/admin/merchant-ops')}
+            style={{ position: 'relative' }}
+          >
+            🛎️ 今日监管
+            {overdueMerchantAccept > 0 && (
+              <span
+                style={{
+                  marginLeft: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '22px',
+                  height: '22px',
+                  padding: '0 6px',
+                  borderRadius: '999px',
+                  background: '#e11d48',
+                  color: '#fff',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                }}
+              >
+                {overdueMerchantAccept}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -1591,24 +1615,26 @@ const DeliveryStoreManagement: React.FC = () => {
               </span>
             </span>
             {pendingProductReviewCount > 0 && (
-              <span
+              <button
+                type="button"
                 title={pendingReviewTitleHint || undefined}
+                onClick={() => navigate('/admin/product-reviews')}
                 style={{
                   background: 'rgba(245, 158, 11, 0.22)',
                   border: '1px solid rgba(251, 191, 36, 0.55)',
-                  color: '#fbbf24',
+                  color: '#d48806',
                   fontSize: '0.82rem',
                   fontWeight: 800,
                   padding: '6px 14px',
                   borderRadius: '999px',
                   whiteSpace: 'nowrap',
                   boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)',
-                  cursor: 'help'
+                  cursor: 'pointer'
                 }}
               >
                 待审核 {pendingProductReviewCount} 件
-                <span style={{ fontWeight: 500, opacity: 0.85, marginLeft: '6px', fontSize: '0.75rem' }}>（悬停看各店）</span>
-              </span>
+                <span style={{ fontWeight: 500, opacity: 0.85, marginLeft: '6px', fontSize: '0.75rem' }}>打开工作台</span>
+              </button>
             )}
           </h2>
           {loading ? (
@@ -1675,7 +1701,7 @@ const DeliveryStoreManagement: React.FC = () => {
                           title="直接打开该店商品并切换到「待审核」"
                           onClick={(e) => {
                             e.stopPropagation();
-                            viewStoreProducts(store, 'pending');
+                            navigate(`/admin/product-reviews?store=${store.id}`);
                           }}
                           style={{
                             background: 'rgba(245, 158, 11, 0.25)',
@@ -2237,6 +2263,20 @@ const DeliveryStoreManagement: React.FC = () => {
       </div>
 
       <DeliveryStoreOverlays />
+      <ProductReviewRejectModal
+        open={!!rejectTargetProductId}
+        productLabel={
+          storeProducts.find((p) => p.id === rejectTargetProductId)?.name || '商品'
+        }
+        language={language}
+        submitting={!!productListingActionId}
+        onCancel={() => setRejectTargetProductId(null)}
+        onConfirm={(reason) => {
+          if (rejectTargetProductId) {
+            void updateProductListingStatus(rejectTargetProductId, 'rejected', reason);
+          }
+        }}
+      />
     </div>
     </DeliveryStoreWorkspaceProvider>
   );

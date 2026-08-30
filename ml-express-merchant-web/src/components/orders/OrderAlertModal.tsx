@@ -243,6 +243,24 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
             .eq('id', orderData.customer_id);
         }
       }
+      if (refundAmount > 0) {
+        const now = new Date().toISOString();
+        const { error: refundMarkError } = await supabase
+          .from('packages')
+          .update({
+            refund_status: 'refunded',
+            refund_amount: refundAmount,
+            refund_note: '商家拒单退余额',
+            refund_at: now,
+            refund_by: 'merchant',
+            refund_by_name: orderData.delivery_store_name || orderData.sender_name || '',
+            updated_at: now,
+          })
+          .eq('id', orderData.id);
+        if (refundMarkError) {
+          LoggerService.warn('拒单已完成，退款跟单字段未写入', refundMarkError);
+        }
+      }
       onDeclined(String(orderData.id));
     } catch (err) {
       LoggerService.error('拒单失败', err);

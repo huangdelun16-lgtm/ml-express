@@ -336,6 +336,14 @@
   color: #f87171;
 }
 
+.merchant-product-card__review-note {
+  margin-top: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fecaca;
+}
+
 .merchant-product-card__edit {
   margin-top: auto;
   width: 100%;
