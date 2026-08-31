@@ -21,6 +21,7 @@ import {
   type CrossBorderRegisteredCustomer,
   type UpdateCrossBorderAccountResult,
   type InventoryConsoleData,
+  type InventoryExceptionConsoleRow,
   type InventoryCustomerSummary,
   type InventoryPackRow,
   type InventoryTransitStore,
@@ -32,6 +33,7 @@ import {
 import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
 import { collectPricingCustomerOptions } from '../utils/crossBorderRoutePricing';
 import { formatSalespersonEmployeeCodeDisplay } from '../utils/crossBorderSalespersons';
+import { formatCustomerNotifyDisplay } from '../utils/customerNotifyMethod';
 import {
   PACK_DISPLAY_STATUS_LABELS,
   packDisplayStatusBadgeClass,
@@ -54,6 +56,7 @@ const CreateCrossBorderCustomerModal = lazy(
 const CustomerExpressItemsModal = lazy(() => import('../components/CustomerExpressItemsModal'));
 const StoreFinanceDetailModal = lazy(() => import('../components/StoreFinanceDetailModal'));
 const StationReconciliationModal = lazy(() => import('../components/StationReconciliationModal'));
+const InventoryExceptionPhotosModal = lazy(() => import('../components/InventoryExceptionPhotosModal'));
 
 function CblLazyModal({ open, children }: { open: boolean; children: React.ReactNode }) {
   if (!open) return null;
@@ -207,6 +210,19 @@ function packTransportStatusLabel(pack: InventoryPackRow, isEn: boolean): string
   return pack.status || '—';
 }
 
+function exceptionTypeLabel(type: string, isEn: boolean): string {
+  const map: Record<string, [string, string]> = {
+    damage: ['破损', 'Damage'],
+    shortage: ['短少', 'Shortage'],
+    excess: ['多件', 'Excess'],
+    lost: ['丢失', 'Lost'],
+    wrong_item: ['错件', 'Wrong item'],
+    return_origin: ['退回发站', 'Return to origin'],
+  };
+  const pair = map[type];
+  return pair ? pair[isEn ? 1 : 0] : type;
+}
+
 function packTransportStatusBadgeClass(pack: InventoryPackRow): string {
   if (pack.status === 'cancelled') return 'cbl-badge cbl-badge--gray';
   if (pack.display_status) return packDisplayStatusBadgeClass(pack.display_status);
@@ -232,6 +248,9 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const [financeModalStore, setFinanceModalStore] = useState<InventoryTransitStore | null>(null);
   const [financeModalMode, setFinanceModalMode] = useState<StoreFinanceDetailMode>('ledger');
   const [reconcileModalStore, setReconcileModalStore] = useState<InventoryTransitStore | null>(
+    null,
+  );
+  const [viewingException, setViewingException] = useState<InventoryExceptionConsoleRow | null>(
     null,
   );
   const [customerSummaries, setCustomerSummaries] = useState<InventoryCustomerSummary[]>([]);
@@ -370,6 +389,8 @@ const CrossBorderLogisticsPage: React.FC = () => {
           : (prev?.transitStores ?? overview.transitStores),
         stats: overview.stats,
         transportFeeTotal: overview.transportFeeTotal,
+        openExceptionCount: overview.openExceptionCount ?? 0,
+        openExceptions: overview.openExceptions ?? [],
         recentPacks: packsResult && packsFresh ? packsResult.recentPacks : (prev?.recentPacks ?? []),
         packStatusFilter: packsResult && packsFresh
           ? (packsResult.packStatusFilter ?? filter)
@@ -569,6 +590,11 @@ const CrossBorderLogisticsPage: React.FC = () => {
         value: s.ordersInTransit,
         hint: isEn ? 'Order-level tracking' : '订单级追踪',
       },
+      {
+        label: isEn ? 'Open exceptions' : '未关单异常',
+        value: data.openExceptionCount ?? 0,
+        hint: isEn ? 'Inventory App reports' : '库存 App 现场登记',
+      },
     ];
   }, [data, isEn]);
 
@@ -740,7 +766,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
                   <div className="cbl-stat__hint">{card.hint}</div>
                 </div>
               ))
-            : Array.from({ length: 6 }, (_, i) => (
+            : Array.from({ length: 7 }, (_, i) => (
                 <div key={`cbl-stat-skel-${i}`} className="cbl-stat is-skeleton" aria-hidden>
                   <div className="cbl-stat__label">{'\u00a0'}</div>
                   <div className="cbl-stat__value">{'\u00a0'}</div>
@@ -789,6 +815,56 @@ const CrossBorderLogisticsPage: React.FC = () => {
             </p>
           </section>
         </div>
+
+        <section className="cbl-card">
+          <div className="cbl-card__head">
+            <h2 className="cbl-card__title">{isEn ? 'Open exceptions' : '未关单异常件'}</h2>
+          </div>
+          {(data?.openExceptions ?? []).length === 0 ? (
+            <div className="cbl-empty">
+              {isEn ? 'No open inventory exceptions.' : '暂无未关单异常。'}
+            </div>
+          ) : (
+            <div className="cbl-table-wrap">
+              <table className="cbl-table">
+                <thead>
+                  <tr>
+                    <th>{isEn ? 'Type' : '类型'}</th>
+                    <th>{isEn ? 'Barcode' : '条码'}</th>
+                    <th>{isEn ? 'Station' : '站点'}</th>
+                    <th>{isEn ? 'Note' : '说明'}</th>
+                    <th>{isEn ? 'Reported' : '登记时间'}</th>
+                    <th>{isEn ? 'Photos' : '操作'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.openExceptions ?? []).map((row: InventoryExceptionConsoleRow) => (
+                    <tr key={row.id}>
+                      <td>{exceptionTypeLabel(row.exception_type, isEn)}</td>
+                      <td>
+                        <span className="cbl-code">
+                          {row.express_barcode || row.item_barcode}
+                        </span>
+                      </td>
+                      <td>{row.reported_store_code || row.reported_hub_code}</td>
+                      <td>{row.note}</td>
+                      <td>{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                          onClick={() => setViewingException(row)}
+                        >
+                          {isEn ? 'View' : '查看'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         <section className="cbl-card cbl-card--finance-expense">
           <div className="cbl-card__head">
@@ -1122,6 +1198,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
                           <th>{isEn ? 'Customer code' : '客户编码'}</th>
                           <th>{isEn ? 'Name' : '客户姓名'}</th>
                           <th>{isEn ? 'Phone' : '电话'}</th>
+                          <th>{isEn ? 'Notify' : '通知方式'}</th>
                           <th>{isEn ? 'Delivery city' : '送货城市'}</th>
                           <th>{isEn ? 'Salesperson' : '推销员'}</th>
                           <th>{isEn ? 'Applied' : '申请日期'}</th>
@@ -1136,6 +1213,9 @@ const CrossBorderLogisticsPage: React.FC = () => {
                             </td>
                             <td>{row.customer_name}</td>
                             <td>{row.phone || '—'}</td>
+                            <td>
+                              {formatCustomerNotifyDisplay(row.notify_method, row.notify_account)}
+                            </td>
                             <td>
                               {hubLabel(row.delivery_region_id)}
                               <span className="cbl-dim"> · {row.delivery_area_code}</span>
@@ -1423,6 +1503,16 @@ const CrossBorderLogisticsPage: React.FC = () => {
           open={reconcileModalStore != null}
           onClose={() => setReconcileModalStore(null)}
           store={reconcileModalStore}
+        />
+      </CblLazyModal>
+
+      <CblLazyModal open={viewingException != null}>
+        <InventoryExceptionPhotosModal
+          open={viewingException != null}
+          row={viewingException}
+          isEn={isEn}
+          typeLabel={viewingException ? exceptionTypeLabel(viewingException.exception_type, isEn) : ''}
+          onClose={() => setViewingException(null)}
         />
       </CblLazyModal>
     </div>

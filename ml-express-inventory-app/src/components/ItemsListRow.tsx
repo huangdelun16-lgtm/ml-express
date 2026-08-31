@@ -19,6 +19,8 @@ type Props = {
   selected: boolean;
   selectActive: boolean;
   selectAccent: string;
+  hasOpenException?: boolean;
+  unnotified?: boolean;
   onPress: () => void;
 };
 
@@ -28,6 +30,8 @@ export default function ItemsListRow({
   selected,
   selectActive,
   selectAccent,
+  hasOpenException = false,
+  unnotified = false,
   onPress,
 }: Props) {
   const { t } = useTranslation();
@@ -80,6 +84,20 @@ export default function ItemsListRow({
               </Text>
             ) : null}
             <View style={styles.statusRow}>
+              {hasOpenException ? (
+                <View style={[styles.statusBadge, styles.statusException]}>
+                  <Text style={[styles.statusText, styles.statusExceptionText]}>
+                    {t.exception.openBadge}
+                  </Text>
+                </View>
+              ) : null}
+              {unnotified ? (
+                <View style={[styles.statusBadge, styles.statusUnnotified]}>
+                  <Text style={[styles.statusText, styles.statusUnnotifiedText]}>
+                    {t.arrivalNotify.unnotifiedBadge}
+                  </Text>
+                </View>
+              ) : null}
               <View
                 style={[
                   styles.statusBadge,
@@ -254,6 +272,8 @@ const styles = StyleSheet.create({
   statusSignedDone: { backgroundColor: 'rgba(34,197,94,0.2)' },
   statusPackDone: { backgroundColor: 'rgba(168,85,247,0.15)' },
   statusPackPending: { backgroundColor: 'rgba(100,116,139,0.2)' },
+  statusException: { backgroundColor: 'rgba(245,158,11,0.2)' },
+  statusUnnotified: { backgroundColor: 'rgba(22,163,74,0.18)' },
   statusText: { fontSize: 10, fontWeight: '900' },
   statusInDoneText: { color: '#4ade80' },
   statusInPendingText: { color: '#94a3b8' },
@@ -263,6 +283,8 @@ const styles = StyleSheet.create({
   statusSignedDoneText: { color: '#4ade80' },
   statusPackDoneText: { color: '#c4b5fd' },
   statusPackPendingText: { color: '#94a3b8' },
+  statusExceptionText: { color: '#fbbf24' },
+  statusUnnotifiedText: { color: '#4ade80' },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

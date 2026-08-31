@@ -66,7 +66,7 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
           transition: 'all 0.6s ease-in-out',
-          color: 'white'
+          color: '#1a2b48'
         }}>
           {/* 页面标题 */}
           <div className="client-page-title-wrap" style={{ marginBottom: '3rem' }}>
@@ -420,10 +420,10 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
             textAlign: 'center',
             marginTop: 'var(--spacing-16)',
             padding: 'var(--card-padding-lg)',
-            background: 'rgba(255,255,255,0.1)',
+            background: '#ffffff',
             backdropFilter: 'blur(10px)',
             borderRadius: 'var(--card-radius-lg)',
-            border: 'var(--card-border)',
+            border: '1px solid rgba(26, 43, 72, 0.1)',
             boxShadow: 'var(--shadow-md)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '1rem' }}>
@@ -437,18 +437,12 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
               />
               <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
                 <span style={{
-                  color: 'white',
+                  color: '#1a2b48',
                   fontSize: '1.6rem',
                   fontWeight: '900',
-                  textShadow: '0 4px 8px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.2)',
-                  background: 'linear-gradient(135deg, #ffffff 0%, #e6f2ff 50%, #b3d9ff 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
                   letterSpacing: '1px',
                   whiteSpace: 'nowrap',
-                  fontFamily: "'Montserrat', 'Roboto', sans-serif",
-                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
+                  fontFamily: "'Montserrat', 'Roboto', sans-serif"
                 }}>
                   MARKET LINK <span style={{ 
                     fontSize: '1em', 
@@ -469,8 +463,7 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
                   fontWeight: '600',
                   letterSpacing: '2px',
                   textTransform: 'uppercase',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                  color: '#4a6280',
                   fontFamily: "'Roboto', sans-serif",
                   marginTop: '4px'
                 }}>
@@ -485,19 +478,19 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
                     <span style={{ 
                       width: '16px',
                       height: '1.5px',
-                      background: 'rgba(255, 255, 255, 0.9)',
+                      background: 'rgba(26, 43, 72, 0.35)',
                       display: 'block'
                     }}></span>
                     <span style={{ 
                       width: '24px',
                       height: '1.5px',
-                      background: 'rgba(255, 255, 255, 0.9)',
+                      background: 'rgba(26, 43, 72, 0.35)',
                       display: 'block'
                     }}></span>
                     <span style={{ 
                       width: '32px',
                       height: '1.5px',
-                      background: 'rgba(255, 255, 255, 0.9)',
+                      background: 'rgba(26, 43, 72, 0.35)',
                       display: 'block'
                     }}></span>
                   </span>
@@ -513,19 +506,19 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
                     <span style={{ 
                       width: '16px',
                       height: '1.5px',
-                      background: 'rgba(255, 255, 255, 0.9)',
+                      background: 'rgba(26, 43, 72, 0.35)',
                       display: 'block'
                     }}></span>
                     <span style={{ 
                       width: '24px',
                       height: '1.5px',
-                      background: 'rgba(255, 255, 255, 0.9)',
+                      background: 'rgba(26, 43, 72, 0.35)',
                       display: 'block'
                     }}></span>
                     <span style={{ 
                       width: '32px',
                       height: '1.5px',
-                      background: 'rgba(255, 255, 255, 0.9)',
+                      background: 'rgba(26, 43, 72, 0.35)',
                       display: 'block'
                     }}></span>
                   </span>
@@ -533,14 +526,14 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
               </div>
             </div>
             <p style={{ 
-              color: 'rgba(255,255,255,0.8)',
+              color: '#4a6280',
               fontSize: '0.9rem',
               margin: '0.5rem 0'
             }}>
               &copy; 2024 MARKET LINK EXPRESS. All rights reserved.
             </p>
             <p style={{ 
-              color: 'rgba(255,255,255,0.7)',
+              color: '#6b7c93',
               fontSize: '0.8rem',
               margin: 0
             }}>

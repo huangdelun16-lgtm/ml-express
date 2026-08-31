@@ -40,30 +40,33 @@
   --font-weight-extrabold: 800;
 
   /* ========== 颜色系统 ========== */
-  /* 主色（蓝色渐变） */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #428cc9;
-  --color-primary-600: #468dda;
-  --color-primary-700: #5587a4;
-  --color-primary-800: #1e3a8a;
-  --color-primary-900: #1e40af;
+  /* 主色（对齐会员 App 青绿） */
+  --color-brand: #2c98a6;
+  --color-navy: #1a2b48;
+  --color-page: #e8f4fa;
+  --color-primary-50: #e8f6f8;
+  --color-primary-100: #d7f3f6;
+  --color-primary-200: #b5e4ea;
+  --color-primary-300: #7ec8d2;
+  --color-primary-400: #4aafbb;
+  --color-primary-500: #2c98a6;
+  --color-primary-600: #238089;
+  --color-primary-700: #1e6f7a;
+  --color-primary-800: #185a63;
+  --color-primary-900: #12464d;
 
   /* 文字颜色 */
-  --color-text-primary: #1a202c;
-  --color-text-secondary: #4a5568;
-  --color-text-tertiary: #718096;
+  --color-text-primary: #1a2b48;
+  --color-text-secondary: #5b6b7c;
+  --color-text-tertiary: #8a94a6;
   --color-text-disabled: #a0aec0;
   --color-text-white: #ffffff;
   --color-text-inverse: #ffffff;
 
   /* 背景颜色 */
   --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f7fafc;
-  --color-bg-tertiary: #edf2f7;
+  --color-bg-secondary: #e8f4fa;
+  --color-bg-tertiary: #d7eef5;
   --color-bg-overlay: rgba(0, 0, 0, 0.5);
   --color-bg-overlay-light: rgba(0, 0, 0, 0.3);
 

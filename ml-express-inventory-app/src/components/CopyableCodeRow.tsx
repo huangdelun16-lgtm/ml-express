@@ -11,6 +11,7 @@ type Props = {
   tapHint?: string;
   variant?: 'dark' | 'light';
   monospace?: boolean;
+  compact?: boolean;
 };
 
 export default function CopyableCodeRow({
@@ -20,6 +21,7 @@ export default function CopyableCodeRow({
   tapHint,
   variant = 'dark',
   monospace = true,
+  compact = false,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const trimmed = value.trim();
@@ -35,7 +37,11 @@ export default function CopyableCodeRow({
 
   return (
     <Pressable
-      style={[styles.row, isDark ? styles.rowDark : styles.rowLight]}
+      style={[
+        styles.row,
+        isDark ? styles.rowDark : styles.rowLight,
+        compact && styles.rowCompact,
+      ]}
       onPress={() => void onCopy()}
       accessibilityRole="button"
       accessibilityLabel={`${label} ${trimmed}`}
@@ -56,6 +62,7 @@ export default function CopyableCodeRow({
               styles.value,
               isDark ? styles.valueDark : styles.valueLight,
               monospace && styles.mono,
+              compact && styles.valueCompact,
             ]}
             selectable
             numberOfLines={2}
@@ -67,7 +74,7 @@ export default function CopyableCodeRow({
           {copied ? copiedLabel : '📋'}
         </Text>
       </View>
-      {tapHint && !copied ? (
+      {tapHint && !copied && !compact ? (
         <Text style={[styles.hint, isDark ? styles.hintDark : styles.hintLight]}>{tapHint}</Text>
       ) : null}
     </Pressable>
@@ -81,6 +88,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 8,
     borderWidth: 1,
+  },
+  rowCompact: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 5,
+    borderRadius: 9,
   },
   rowDark: {
     backgroundColor: '#0f172a',
@@ -109,6 +122,7 @@ const styles = StyleSheet.create({
   },
   valueDark: { color: '#e2e8f0' },
   valueLight: { color: '#0f172a' },
+  valueCompact: { fontSize: 13, lineHeight: 18 },
   mono: { fontFamily: 'monospace' },
   packagingValue: {
     fontSize: 15,

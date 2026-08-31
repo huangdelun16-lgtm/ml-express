@@ -26,7 +26,9 @@ export interface InventoryItem {
   /** 列表展示用，同 final_destination */
   destination?: string;
   /** 中转到站收货时间（本站确认后写入） */
-  hub_arrived_at?: string;
+    hub_arrived_at?: string;
+  /** 目的站通知客户取件时间 */
+  arrival_notified_at?: string;
   /** 客户签收时间（目的站交付） */
   customer_signed_at?: string;
   /** 签收登记电话 */

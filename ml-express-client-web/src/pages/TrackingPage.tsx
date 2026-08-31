@@ -454,7 +454,7 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
         transition: 'all 0.6s ease-in-out',
-        color: 'white'
+        color: '#1a2b48'
       }}>
         {/* 页面标题 */}
         <div className="client-page-title-wrap" style={{ marginBottom: '2rem' }}>
@@ -473,12 +473,12 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 🛵 {language === 'zh' ? '未完成订单' : language === 'en' ? 'Ongoing Orders' : 'မပြီးသေးသော အော်ဒါများ'} 
-                <span style={{ fontSize: '0.9rem', opacity: 0.7, fontWeight: '400' }}>({activeOrders.length})</span>
+                <span style={{ fontSize: '0.9rem', color: '#3d5270', fontWeight: '600' }}>({activeOrders.length})</span>
               </h2>
               <button 
                 onClick={loadActiveOrders}
                 disabled={loadingActiveOrders}
-                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
+                style={{ background: '#ffffff', border: '1px solid rgba(26,43,72,0.12)', color: '#1a2b48', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
               >
                 {loadingActiveOrders ? '...' : (language === 'zh' ? '刷新' : 'Refresh')}
               </button>
@@ -494,11 +494,11 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
             }} className="hide-scrollbar">
               {loadingActiveOrders ? (
                 Array(3).fill(0).map((_, i) => (
-                  <div key={i} style={{ minWidth: '280px', height: '100px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  <div key={i} style={{ minWidth: '280px', height: '100px', background: '#ffffff', borderRadius: '20px', border: '1px solid rgba(26,43,72,0.08)' }} />
                 ))
               ) : activeOrders.length === 0 ? (
-                <div style={{ padding: '2rem', textAlign: 'center', width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.2)' }}>
-                  <span style={{ opacity: 0.6 }}>{language === 'zh' ? '暂无进行中的订单' : 'No ongoing orders'}</span>
+                <div style={{ padding: '2rem', textAlign: 'center', width: '100%', background: '#ffffff', borderRadius: '20px', border: '1px dashed rgba(26,43,72,0.2)', color: '#1a2b48', fontWeight: 600 }}>
+                  <span>{language === 'zh' ? '暂无进行中的订单' : 'No ongoing orders'}</span>
                 </div>
               ) : (
                 activeOrders.map((order) => {
@@ -512,29 +512,29 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
                       }}
                       style={{
                         minWidth: '280px',
-                        background: isSelected 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%)' 
-                          : 'rgba(255, 255, 255, 0.1)',
+                        background: isSelected
+                          ? 'linear-gradient(135deg, #e8f6f8 0%, #ffffff 100%)'
+                          : '#ffffff',
                         borderRadius: '20px',
                         padding: '1.25rem',
-                        border: isSelected ? '2px solid #fbbf24' : '1px solid rgba(255, 255, 255, 0.1)',
+                        border: isSelected ? '2px solid #2c98a6' : '1px solid rgba(26, 43, 72, 0.1)',
                         cursor: 'pointer',
                         transition: 'all 0.3s ease',
-                        boxShadow: isSelected ? '0 10px 25px rgba(251, 191, 36, 0.2)' : 'none'
+                        boxShadow: isSelected ? '0 10px 25px rgba(44, 152, 166, 0.16)' : '0 8px 20px rgba(26, 43, 72, 0.06)'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ color: isSelected ? '#fbbf24' : 'white', fontWeight: '800', fontFamily: 'monospace' }}>
+                        <span style={{ color: isSelected ? '#1e7a86' : '#1a2b48', fontWeight: '800', fontFamily: 'monospace' }}>
                           #{order.id.slice(-8).toUpperCase()}
                         </span>
                         <div style={{ background: getStatusColor(order.status), color: 'white', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold' }}>
                           {order.status}
                         </div>
                       </div>
-                      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '8px' }}>
+                      <div style={{ color: '#3d5270', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '8px' }}>
                         📍 {order.receiver_address}
                       </div>
-                      <div style={{ color: isSelected ? '#60a5fa' : 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: '700' }}>
+                      <div style={{ color: isSelected ? '#1e7a86' : '#6b7c93', fontSize: '0.75rem', fontWeight: '700' }}>
                         {isSelected ? '👀 ' + (language === 'zh' ? '正在追踪' : 'Tracking') : (language === 'zh' ? '点击立即追踪 ➔' : 'Tap to track ➔')}
                       </div>
                     </div>
@@ -581,6 +581,7 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
                   textAlign: 'left',
                   transition: 'all var(--transition-base)',
                   background: 'white',
+                  color: '#1a2b48',
                   fontFamily: 'var(--font-family-base)'
                 }}
                 onFocus={(e) => {

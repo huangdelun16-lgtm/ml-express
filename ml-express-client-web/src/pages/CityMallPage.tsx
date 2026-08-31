@@ -338,7 +338,7 @@ const CityMallPage: React.FC = () => {
       return statusA.isOpen ? -1 : 1; // 营业中的排前面
     });
 
-  const storeIconBackdrop = 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)';
+  const storeIconBackdrop = 'linear-gradient(135deg, #2c98a6 0%, #1e6f7a 100%)';
 
   return (
     <ClientInteriorShell ambient="mall">
@@ -393,7 +393,7 @@ const CityMallPage: React.FC = () => {
             />
           </div>
           {searchingProducts && (
-            <div style={{ color: 'rgba(226,232,240,0.92)', marginTop: '10px', fontSize: '0.9rem', textAlign: 'center' }}>
+            <div style={{ color: '#8a94a6', marginTop: '10px', fontSize: '0.9rem', textAlign: 'center' }}>
               正在搜索商品...
             </div>
           )}
@@ -428,7 +428,7 @@ const CityMallPage: React.FC = () => {
               style={{
                 minWidth: '450px',
                 height: '180px',
-                background: `linear-gradient(135deg, ${banner.bg_color_start || '#3b82f6'} 0%, ${banner.bg_color_end || '#1e40af'} 100%)`,
+                background: `linear-gradient(135deg, ${banner.bg_color_start || '#2c98a6'} 0%, ${banner.bg_color_end || '#2c98a6'} 100%)`,
                 borderRadius: '24px',
                 padding: '1.5rem',
                 display: 'flex',
@@ -495,19 +495,19 @@ const CityMallPage: React.FC = () => {
                     width: '64px', 
                     height: '64px', 
                     borderRadius: '20px',
-                    background: isActive ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                    background: isActive ? '#2c98a6' : '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '1.8rem',
                     transition: 'all 0.3s ease',
-                    boxShadow: isActive ? '0 10px 20px rgba(59, 130, 246, 0.3)' : 'none',
-                    border: '1px solid rgba(255,255,255,0.2)'
+                    boxShadow: isActive ? '0 10px 20px rgba(44, 152, 166, 0.28)' : 'none',
+                    border: isActive ? '1px solid #2c98a6' : '1px solid #e2e8f0'
                   }}>
                     {getStoreIcon(cat.id === '全部' ? 'default' : cat.id)}
                   </div>
                   <span style={{ 
-                    color: isActive ? 'white' : 'rgba(255,255,255,0.7)', 
+                    color: isActive ? 'white' : '#1a2b48', 
                     fontWeight: isActive ? '900' : '600',
                     fontSize: '0.9rem'
                   }}>
@@ -544,7 +544,7 @@ const CityMallPage: React.FC = () => {
             gap: '0.8rem',
             padding: '0.6rem 1.2rem', 
             fontWeight: '900', 
-            color: 'white', 
+            color: '#1a2b48', 
             whiteSpace: 'nowrap',
             marginRight: '1.5rem',
             fontSize: '1rem',
@@ -578,11 +578,11 @@ const CityMallPage: React.FC = () => {
                     style={{
                       padding: '0.7rem 1.8rem',
                       border: '1px solid',
-                      borderColor: isActive ? 'transparent' : 'rgba(255, 255, 255, 0.2)',
+                      borderColor: isActive ? 'transparent' : 'rgba(26, 43, 72, 0.12)',
                       background: isActive 
-                        ? 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)' 
-                        : 'rgba(255, 255, 255, 0.1)',
-                      color: 'white',
+                        ? 'linear-gradient(135deg, #2c98a6 0%, #1e6f7a 100%)' 
+                        : '#ffffff',
+                      color: isActive ? '#ffffff' : '#1a2b48',
                       fontWeight: isActive ? '900' : '700',
                       borderRadius: '18px',
                       cursor: 'pointer',
@@ -590,20 +590,20 @@ const CityMallPage: React.FC = () => {
                       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                       fontSize: '0.95rem',
                       boxShadow: isActive 
-                        ? '0 8px 20px rgba(30, 64, 175, 0.4)' 
-                        : '0 4px 12px rgba(0,0,0,0.05)',
+                        ? '0 8px 20px rgba(44, 152, 166, 0.28)' 
+                        : '0 4px 12px rgba(26,43,72,0.06)',
                       transform: isActive ? 'scale(1.05)' : 'scale(1)',
                     }}
                     onMouseOver={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                        e.currentTarget.style.background = '#e8f6f8';
+                        e.currentTarget.style.borderColor = 'rgba(44, 152, 166, 0.35)';
                       }
                     }}
                     onMouseOut={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.background = '#ffffff';
+                        e.currentTarget.style.borderColor = 'rgba(26, 43, 72, 0.12)';
                       }
                     }}
                   >
@@ -625,13 +625,13 @@ const CityMallPage: React.FC = () => {
               style={{
                 padding: '0.65rem 1.4rem',
                 borderRadius: '999px',
-                border: searchMode === 'stores' ? 'none' : '1px solid rgba(255,255,255,0.35)',
-                background: searchMode === 'stores' ? 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)' : 'rgba(255,255,255,0.12)',
-                color: 'white',
+                border: searchMode === 'stores' ? 'none' : '1px solid rgba(26,43,72,0.12)',
+                background: searchMode === 'stores' ? 'linear-gradient(135deg, #2c98a6 0%, #1e6f7a 100%)' : '#ffffff',
+                color: searchMode === 'stores' ? '#ffffff' : '#1a2b48',
                 fontWeight: 900,
                 cursor: 'pointer',
                 fontSize: '0.95rem',
-                boxShadow: searchMode === 'stores' ? '0 8px 20px rgba(30, 64, 175, 0.35)' : 'none',
+                boxShadow: searchMode === 'stores' ? '0 8px 20px rgba(44, 152, 166, 0.28)' : 'none',
               }}
             >
               {uiT.storesTab}
@@ -645,13 +645,13 @@ const CityMallPage: React.FC = () => {
               style={{
                 padding: '0.65rem 1.4rem',
                 borderRadius: '999px',
-                border: searchMode === 'products' ? 'none' : '1px solid rgba(255,255,255,0.35)',
-                background: searchMode === 'products' ? 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)' : 'rgba(255,255,255,0.12)',
-                color: 'white',
+                border: searchMode === 'products' ? 'none' : '1px solid rgba(26,43,72,0.12)',
+                background: searchMode === 'products' ? 'linear-gradient(135deg, #2c98a6 0%, #1e6f7a 100%)' : '#ffffff',
+                color: searchMode === 'products' ? '#ffffff' : '#1a2b48',
                 fontWeight: 900,
                 cursor: 'pointer',
                 fontSize: '0.95rem',
-                boxShadow: searchMode === 'products' ? '0 8px 20px rgba(30, 64, 175, 0.35)' : 'none',
+                boxShadow: searchMode === 'products' ? '0 8px 20px rgba(44, 152, 166, 0.28)' : 'none',
               }}
             >
               {uiT.productsTab}
@@ -670,7 +670,7 @@ const CityMallPage: React.FC = () => {
             {nearbyStores.length > 0 && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h2 style={{ color: '#1a2b48', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px' }}>
                     🔥 {uiT.nearbyPopular}
                   </h2>
                 </div>
@@ -681,10 +681,10 @@ const CityMallPage: React.FC = () => {
                       onClick={() => navigate(`/mall/${store.id}`)}
                       style={{ 
                         minWidth: '220px', 
-                        background: 'rgba(255,255,255,0.1)', 
+                        background: '#ffffff', 
                         borderRadius: '24px', 
                         padding: '1.5rem', 
-                        border: '1px solid rgba(255,255,255,0.15)',
+                        border: '1px solid rgba(26,43,72,0.08)',
                         cursor: 'pointer',
                         transition: 'all 0.3s ease'
                       }}
@@ -693,7 +693,7 @@ const CityMallPage: React.FC = () => {
                       <div style={{ fontSize: '2.5rem', marginBottom: '1rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
                         {getStoreIcon(store.store_type)}
                       </div>
-                      <h4 style={{ color: 'white', fontSize: '1.1rem', margin: '0 0 8px 0', fontWeight: '800' }}>{store.store_name}</h4>
+                      <h4 style={{ color: '#1a2b48', fontSize: '1.1rem', margin: '0 0 8px 0', fontWeight: '800' }}>{store.store_name}</h4>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '0.9rem' }}>⭐ {storeReviewStats[store.id]?.average || '5.0'}</span>
                         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>{getStoreTypeLabel(store.store_type)}</span>
@@ -708,7 +708,7 @@ const CityMallPage: React.FC = () => {
             {recommendedStores.length > 0 && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h2 style={{ color: '#1a2b48', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px' }}>
                     ✨ {uiT.guessYouLike}
                   </h2>
                 </div>
@@ -719,10 +719,10 @@ const CityMallPage: React.FC = () => {
                       onClick={() => navigate(`/mall/${store.id}`)}
                       style={{ 
                         minWidth: '220px', 
-                        background: 'rgba(255,255,255,0.1)', 
+                        background: '#ffffff', 
                         borderRadius: '24px', 
                         padding: '1.5rem', 
-                        border: '1px solid rgba(255,255,255,0.15)',
+                        border: '1px solid rgba(26,43,72,0.08)',
                         cursor: 'pointer',
                         transition: 'all 0.3s ease'
                       }}
@@ -731,7 +731,7 @@ const CityMallPage: React.FC = () => {
                       <div style={{ fontSize: '2.5rem', marginBottom: '1rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
                         {getStoreIcon(store.store_type)}
                       </div>
-                      <h4 style={{ color: 'white', fontSize: '1.1rem', margin: '0 0 8px 0', fontWeight: '800' }}>{store.store_name}</h4>
+                      <h4 style={{ color: '#1a2b48', fontSize: '1.1rem', margin: '0 0 8px 0', fontWeight: '800' }}>{store.store_name}</h4>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '0.9rem' }}>⭐ {storeReviewStats[store.id]?.average || '5.0'}</span>
                         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>{getStoreTypeLabel(store.store_type)}</span>
@@ -748,7 +748,7 @@ const CityMallPage: React.FC = () => {
               .h-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
             `}</style>
 
-            <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px', marginTop: '1rem' }}>
+            <h2 style={{ color: '#1a2b48', fontSize: '1.8rem', fontWeight: '950', display: 'flex', alignItems: 'center', gap: '12px', marginTop: '1rem' }}>
               🏪 {uiT.allMerchants}
             </h2>
           </div>
@@ -760,12 +760,12 @@ const CityMallPage: React.FC = () => {
               width: '50px', 
               height: '50px', 
               border: '5px solid rgba(255,255,255,0.3)', 
-              borderTop: '5px solid #1e40af', 
+              borderTop: '5px solid #2c98a6', 
               borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1.5rem'
             }}></div>
-            <p style={{ color: 'white', fontSize: '1.2rem', fontWeight: 'bold' }}>{t.mall.loading}</p>
+            <p style={{ color: '#1a2b48', fontSize: '1.2rem', fontWeight: 'bold' }}>{t.mall.loading}</p>
           </div>
         ) : (
           <div>
@@ -809,7 +809,7 @@ const CityMallPage: React.FC = () => {
                         <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: '1.4', height: '2.8rem', overflow: 'hidden' }}>{product.description}</p>
                         <div style={{ marginTop: '1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '1.3rem', fontWeight: '900', color: '#1e40af' }}>
+                            <span style={{ fontSize: '1.3rem', fontWeight: '900', color: '#2c98a6' }}>
                               {formatProductPriceLabel(product, langKey)}
                             </span>
                             {!hasVariants && product.original_price && product.original_price > product.price && (
@@ -834,7 +834,7 @@ const CityMallPage: React.FC = () => {
                       <div style={{ 
                         marginTop: 'auto', 
                         padding: '0.8rem', 
-                        background: storeStatus.isOpen ? '#1e40af' : '#94a3b8', 
+                        background: storeStatus.isOpen ? '#2c98a6' : '#94a3b8', 
                         color: 'white', 
                         textAlign: 'center', 
                         borderRadius: '12px',
@@ -921,7 +921,7 @@ const CityMallPage: React.FC = () => {
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
                             <span style={{ 
                               background: '#eff6ff', 
-                              color: '#1e40af', 
+                              color: '#2c98a6', 
                               fontSize: '0.8rem', 
                               padding: '0.3rem 0.8rem', 
                               borderRadius: '10px', 
@@ -988,7 +988,7 @@ const CityMallPage: React.FC = () => {
                         <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
                           <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📞</span>
                           <span style={{ fontWeight: '600' }}>{t.mall.contact}:</span>
-                          <span style={{ marginLeft: 'auto', color: '#1e40af', fontWeight: '800' }}>{store.phone}</span>
+                          <span style={{ marginLeft: 'auto', color: '#2c98a6', fontWeight: '800' }}>{store.phone}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', color: '#475569', fontSize: '1rem' }}>
                           <span style={{ fontSize: '1.2rem', marginRight: '1rem' }}>📍</span>
@@ -1007,7 +1007,7 @@ const CityMallPage: React.FC = () => {
                         textAlign: 'right', 
                         marginTop: 'auto', 
                         fontWeight: '900', 
-                        color: status.isOpen ? '#1e40af' : '#94a3b8',
+                        color: status.isOpen ? '#2c98a6' : '#94a3b8',
                         fontSize: '1.2rem',
                         display: 'flex',
                         alignItems: 'center',
@@ -1033,16 +1033,15 @@ const CityMallPage: React.FC = () => {
           <div style={{ 
             textAlign: 'center', 
             padding: '10rem 0', 
-            color: 'white',
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
+            color: '#1a2b48',
+            background: '#ffffff',
             borderRadius: '40px',
-            border: '2px dashed rgba(255, 255, 255, 0.3)'
+            border: '2px dashed rgba(26, 43, 72, 0.16)'
           }}>
             <div style={{ fontSize: '7rem', marginBottom: '1.5rem', opacity: 0.8 }}>
               {searchMode === 'stores' ? '🏢' : '📦'}
             </div>
-            <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: '900' }}>
+            <h3 style={{ fontSize: '1.8rem', color: '#1a2b48', fontWeight: '900' }}>
               {searchMode === 'stores' ? uiT.noStores : uiT.noProducts}
             </h3>
             <p style={{ marginTop: '0.8rem', fontSize: '1.1rem', opacity: 0.9 }}>
@@ -1086,7 +1085,7 @@ const CityMallPage: React.FC = () => {
           >
             {/* 页眉 */}
             <div style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+              background: 'linear-gradient(135deg, #2c98a6 0%, #1e6f7a 100%)',
               padding: '2.5rem 2rem',
               textAlign: 'center',
               position: 'relative'
@@ -1139,7 +1138,7 @@ const CityMallPage: React.FC = () => {
             <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
               {loadingReviews ? (
                 <div style={{ textAlign: 'center', padding: '3rem' }}>
-                  <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid #f1f5f9', borderTop: '4px solid #3b82f6', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }}></div>
+                  <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid #f1f5f9', borderTop: '4px solid #2c98a6', borderRadius: '50%', margin: '0 auto', animation: 'spin 1s linear infinite' }}></div>
                 </div>
               ) : currentStoreReviews.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -1169,8 +1168,8 @@ const CityMallPage: React.FC = () => {
                       )}
 
                       {review.reply_text && (
-                        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '14px', borderLeft: '4px solid #3b82f6', marginTop: '0.5rem' }}>
-                          <div style={{ color: '#3b82f6', fontSize: '0.8rem', fontWeight: '800', marginBottom: '4px' }}>
+                        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '14px', borderLeft: '4px solid #2c98a6', marginTop: '0.5rem' }}>
+                          <div style={{ color: '#2c98a6', fontSize: '0.8rem', fontWeight: '800', marginBottom: '4px' }}>
                             {language === 'zh' ? '商家回复' : 'Merchant Reply'}
                           </div>
                           <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>{review.reply_text}</p>

@@ -137,7 +137,7 @@ export default function InventoryPrivacyPage() {
         style={{
           opacity: isVisible ? 1 : 0,
           transition: 'opacity 0.5s ease',
-          color: 'white',
+          color: '#1a2b48',
           maxWidth: 820,
           margin: '0 auto',
           padding: '2rem 0.5rem 4rem',
@@ -158,8 +158,8 @@ export default function InventoryPrivacyPage() {
             <article
               key={section.heading}
               style={{
-                background: 'rgba(255,255,255,0.12)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                background: '#ffffff',
+                border: '1px solid rgba(26, 43, 72, 0.1)',
                 borderRadius: 16,
                 padding: '1.25rem 1.5rem',
               }}
@@ -173,10 +173,10 @@ export default function InventoryPrivacyPage() {
         </div>
 
         <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <Link to="/support" style={{ color: '#7dd3fc', fontWeight: 700, textDecoration: 'none' }}>
+          <Link to="/support" style={{ color: '#1e7a86', fontWeight: 700, textDecoration: 'none' }}>
             {t.supportLink} →
           </Link>
-          <Link to="/" style={{ color: '#e2e8f0', fontWeight: 600, textDecoration: 'none' }}>
+          <Link to="/" style={{ color: '#4a6280', fontWeight: 600, textDecoration: 'none' }}>
             {t.homeLink}
           </Link>
         </div>

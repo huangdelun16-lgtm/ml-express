@@ -25,6 +25,7 @@ export type CloudStoreItemRow = {
   recipient_name: string;
   final_destination: string;
   hub_arrived_at: string | null;
+  arrival_notified_at: string | null;
   customer_signed_at: string | null;
   customer_sign_phone: string;
   customer_sign_pickup_type: string;
@@ -91,7 +92,19 @@ export type CloudPackRow = {
 };
 
 const STORE_ITEM_COLUMNS =
-  'id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, min_qty, note, owner_store_id, owner_store_code, recipient_name, final_destination, hub_arrived_at, customer_signed_at, customer_sign_phone, customer_sign_pickup_type, customer_sign_proxy_name, customer_signature_data, customer_signed_by_operator, packed_at, packed_bundle_barcode, hub_transit_released_at, hub_transit_shipped_at, created_at, updated_at';
+  'id, barcode, input_barcode, name, spec, unit, weight, qty_on_hand, min_qty, note, owner_store_id, owner_store_code, recipient_name, final_destination, hub_arrived_at, arrival_notified_at, customer_signed_at, customer_sign_phone, customer_sign_pickup_type, customer_sign_proxy_name, customer_signature_data, customer_signed_by_operator, packed_at, packed_bundle_barcode, hub_transit_released_at, hub_transit_shipped_at, created_at, updated_at';
+const STORE_ITEM_COLUMNS_WITHOUT_ARRIVAL_NOTIFY = STORE_ITEM_COLUMNS.replace(
+  ', arrival_notified_at',
+  '',
+);
+
+export function isMissingArrivalNotifiedColumnError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String((error as { message?: string } | null)?.message ?? error ?? '');
+  return /arrival_notified_at/i.test(message);
+}
 
 const PACK_COLUMNS =
   'id, bundle_item_id, bundle_barcode, bundle_name, operator, note, owner_store_id, owner_store_code, transport_fee, truck_leg_destination, loaded_at, created_at, updated_at';
@@ -199,6 +212,7 @@ function rowToCloudItem(row: Record<string, unknown>): CloudStoreItemRow {
     recipient_name: String(row.recipient_name ?? ''),
     final_destination: String(row.final_destination ?? ''),
     hub_arrived_at: row.hub_arrived_at ? String(row.hub_arrived_at) : null,
+    arrival_notified_at: row.arrival_notified_at ? String(row.arrival_notified_at) : null,
     customer_signed_at: row.customer_signed_at ? String(row.customer_signed_at) : null,
     customer_sign_phone: String(row.customer_sign_phone ?? ''),
     customer_sign_pickup_type: String(row.customer_sign_pickup_type ?? ''),
@@ -224,6 +238,7 @@ function itemToRpcPayload(item: InventoryItem, ownerStoreId?: string | null): Re
     owner_store_id: ownerStoreId ?? null,
     owner_store_code: item.owner_store_code?.trim() ?? '',
     hub_arrived_at: toNullableTs(item.hub_arrived_at),
+    arrival_notified_at: toNullableTs(item.arrival_notified_at),
     customer_signed_at: toNullableTs(item.customer_signed_at),
     customer_sign_phone: item.customer_sign_phone?.trim() ?? '',
     customer_sign_pickup_type: item.customer_sign_pickup_type?.trim() ?? '',
@@ -490,13 +505,25 @@ export async function fetchCloudStoreItems(
   await ensureInventoryCloudAuth();
   const itemMap = new Map<string, CloudStoreItemRow>();
 
-  const data = await fetchAllPages<Record<string, unknown>>((from, to) =>
-    supabase
-      .from('inventory_store_items')
-      .select(STORE_ITEM_COLUMNS)
-      .order('updated_at', { ascending: false })
-      .range(from, to),
-  );
+  let data: Record<string, unknown>[];
+  try {
+    data = await fetchAllPages<Record<string, unknown>>((from, to) =>
+      supabase
+        .from('inventory_store_items')
+        .select(STORE_ITEM_COLUMNS as '*')
+        .order('updated_at', { ascending: false })
+        .range(from, to),
+    );
+  } catch (error) {
+    if (!isMissingArrivalNotifiedColumnError(error)) throw error;
+    data = await fetchAllPages<Record<string, unknown>>((from, to) =>
+      supabase
+        .from('inventory_store_items')
+        .select(STORE_ITEM_COLUMNS_WITHOUT_ARRIVAL_NOTIFY as '*')
+        .order('updated_at', { ascending: false })
+        .range(from, to),
+    );
+  }
   for (const row of data) {
     const item = rowToCloudItem(row);
     itemMap.set(item.id, item);
@@ -682,6 +709,7 @@ export async function upsertCloudStoreItem(
       recipient_name: item.recipient_name?.trim() ?? '',
       final_destination: finalDestination,
       hub_arrived_at: toNullableTs(item.hub_arrived_at),
+      arrival_notified_at: toNullableTs(item.arrival_notified_at),
       customer_signed_at: toNullableTs(item.customer_signed_at),
       customer_sign_phone: item.customer_sign_phone?.trim() ?? '',
       customer_sign_pickup_type: item.customer_sign_pickup_type?.trim() ?? '',
@@ -695,11 +723,16 @@ export async function upsertCloudStoreItem(
       created_at: item.created_at || new Date().toISOString(),
       updated_at: item.updated_at || new Date().toISOString(),
     };
-    const { data, error } = await supabase
-      .from('inventory_store_items')
-      .upsert(payload, { onConflict: 'barcode' })
-      .select('id')
-      .single();
+    const upsertPayload = async (row: Record<string, unknown>) =>
+      supabase.from('inventory_store_items').upsert(row, { onConflict: 'barcode' }).select('id').single();
+
+    let { data, error } = await upsertPayload(payload);
+    if (error && isMissingArrivalNotifiedColumnError(error)) {
+      const { arrival_notified_at: _dropped, ...withoutNotify } = payload;
+      const retried = await upsertPayload(withoutNotify);
+      data = retried.data;
+      error = retried.error;
+    }
     if (error || !data) throw error?.message ? new Error(error.message) : svc('syncItemFailed');
     return String((data as { id: string }).id);
   });

@@ -17,6 +17,8 @@ type Props = {
   onEdit: () => void;
   onPrint?: () => void;
   onSignDelivered?: () => void;
+  onNotifyCustomer?: () => void;
+  onReportException?: () => void;
   canEdit?: boolean;
   canSignDelivered?: boolean;
 };
@@ -30,6 +32,8 @@ export default function ItemActionModal({
   onEdit,
   onPrint,
   onSignDelivered,
+  onNotifyCustomer,
+  onReportException,
   canEdit = true,
   canSignDelivered = false,
 }: Props) {
@@ -71,6 +75,7 @@ export default function ItemActionModal({
                 copiedLabel={t.common.copied}
                 tapHint={t.common.tapToCopy}
                 variant="dark"
+                compact
               />
               <CopyableCodeRow
                 label={t.items.inbound}
@@ -78,6 +83,7 @@ export default function ItemActionModal({
                 copiedLabel={t.common.copied}
                 tapHint={t.common.tapToCopy}
                 variant="dark"
+                compact
               />
             </View>
           ) : (
@@ -87,44 +93,53 @@ export default function ItemActionModal({
               copiedLabel={t.common.copied}
               tapHint={t.common.tapToCopy}
               variant="dark"
+              compact
             />
           )}
 
-          <View style={styles.btnRow}>
-            <Pressable style={[styles.btnView, canEdit ? styles.btnHalf : styles.btnFull]} onPress={onView}>
-              <Text style={styles.btnViewText}>{t.common.show}</Text>
+          <View style={styles.actionGrid}>
+            <Pressable style={[styles.chip, styles.chipView]} onPress={onView}>
+              <Text style={styles.chipText}>{t.common.show}</Text>
             </Pressable>
             {canEdit ? (
               <Pressable
-                style={[styles.btnEdit, isPack && styles.btnEditPack, styles.btnHalf]}
+                style={[styles.chip, styles.chipEdit, isPack && styles.chipEditPack]}
                 onPress={onEdit}
               >
-                <Text style={[styles.btnEditText, isPack && styles.btnEditTextPack]}>
+                <Text style={[styles.chipText, styles.chipTextMuted, isPack && styles.chipTextPack]}>
                   {t.itemForm.editTitle}
                 </Text>
+              </Pressable>
+            ) : null}
+
+            {showSign && onNotifyCustomer ? (
+              <Pressable style={[styles.chip, styles.chipNotify]} onPress={onNotifyCustomer}>
+                <Text style={styles.chipText}>{t.arrivalNotify.notifyCustomer}</Text>
+              </Pressable>
+            ) : null}
+
+            {showSign ? (
+              <Pressable style={[styles.chip, styles.chipSign]} onPress={onSignDelivered}>
+                <Text style={styles.chipText}>{t.common.signedMark}</Text>
+              </Pressable>
+            ) : null}
+
+            {onPrint ? (
+              <Pressable style={[styles.chip, styles.chipPrint]} onPress={onPrint}>
+                <Text style={styles.chipText}>{t.itemForm.printLabel}</Text>
+              </Pressable>
+            ) : null}
+
+            {!isPack && onReportException ? (
+              <Pressable style={[styles.chip, styles.chipException]} onPress={onReportException}>
+                <Text style={styles.chipText}>{t.exception.report}</Text>
               </Pressable>
             ) : null}
           </View>
 
           {!canEdit && !isPack ? (
-            <View style={styles.readonlyHint}>
-              <Text style={styles.readonlyHintText}>{t.items.cannotEditBody}</Text>
-            </View>
+            <Text style={styles.readonlyHint}>{t.items.cannotEditBody}</Text>
           ) : null}
-
-          <View style={styles.actionStack}>
-            {showSign ? (
-              <Pressable style={styles.btnSign} onPress={onSignDelivered}>
-                <Text style={styles.btnSignText}>{t.common.signedMark}</Text>
-              </Pressable>
-            ) : null}
-
-            {onPrint ? (
-              <Pressable style={styles.btnPrint} onPress={onPrint}>
-                <Text style={styles.btnPrintText}>{t.itemForm.printLabel}</Text>
-              </Pressable>
-            ) : null}
-          </View>
 
           <Pressable style={styles.btnCancel} onPress={onClose}>
             <Text style={styles.btnCancelText}>{t.common.close}</Text>
@@ -143,11 +158,11 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: '#1e293b',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 30,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 18,
     borderWidth: 1,
     borderColor: '#334155',
     overflow: 'hidden',
@@ -177,70 +192,47 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   packDest: { color: '#38bdf8', fontSize: 12, fontWeight: '700' },
-  title: { color: '#f8fafc', fontSize: 18, fontWeight: '900' },
-  barcode: {
-    color: '#c4b5fd',
-    fontSize: 14,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    marginTop: 6,
-    marginBottom: 16,
-  },
-  subtitle: { color: '#94a3b8', fontSize: 13, marginTop: 4, marginBottom: 10 },
-  codeBlock: { marginBottom: 8 },
-  btnRow: {
+  title: { color: '#f8fafc', fontSize: 16, fontWeight: '900' },
+  subtitle: { color: '#94a3b8', fontSize: 12, marginTop: 2, marginBottom: 8 },
+  codeBlock: { marginBottom: 6 },
+  actionGrid: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
   },
-  btnHalf: { flex: 1 },
-  btnFull: { flex: 1 },
-  btnView: {
-    backgroundColor: '#2563eb',
-    borderRadius: 14,
-    paddingVertical: 15,
+  chip: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    minHeight: 34,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  btnViewText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  btnEdit: {
+  chipText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  chipTextMuted: { color: '#e2e8f0' },
+  chipTextPack: { color: '#e9d5ff' },
+  chipView: { backgroundColor: '#2563eb' },
+  chipEdit: {
     backgroundColor: '#0f172a',
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#475569',
   },
-  btnEditPack: { borderColor: '#a855f7' },
-  btnEditText: { color: '#e2e8f0', fontWeight: '800', fontSize: 16 },
-  btnEditTextPack: { color: '#e9d5ff' },
+  chipEditPack: { borderColor: '#a855f7' },
+  chipNotify: { backgroundColor: '#16a34a' },
+  chipSign: { backgroundColor: '#059669' },
+  chipPrint: { backgroundColor: '#0284c7' },
+  chipException: { backgroundColor: '#b45309' },
   readonlyHint: {
-    backgroundColor: '#0f172a',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: '#475569',
-    marginBottom: 10,
+    color: '#94a3b8',
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 2,
   },
-  readonlyHintText: { color: '#94a3b8', fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  actionStack: {
-    gap: 10,
-    marginBottom: 10,
-  },
-  btnSign: {
-    backgroundColor: '#059669',
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  btnSignText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  btnPrint: {
-    backgroundColor: '#0284c7',
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  btnPrintText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  btnCancel: { paddingVertical: 10, alignItems: 'center' },
-  btnCancelText: { color: '#64748b', fontWeight: '700', fontSize: 15 },
+  btnCancel: { paddingVertical: 8, alignItems: 'center' },
+  btnCancelText: { color: '#64748b', fontWeight: '700', fontSize: 13 },
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -51,7 +51,7 @@ import {
   saveLabelPrinterSettings,
   type LabelPrinterSettings,
 } from '../services/labelLayoutStorage';
-import { resolvePrintError, runBarcodeLabelPrint } from '../services/labelPrintFlow';
+import { resolvePrintError, printBarcodeLabelOrPick } from '../services/labelPrintFlow';
 import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 
 const MAX_COPIES = 9;
@@ -88,7 +88,6 @@ export default function PrintPreviewScreen() {
   const { t } = useTranslation();
   const [connectedPrinter, setConnectedPrinter] = useState<ScannedBluetoothDevice | null>(null);
   const [scanVisible, setScanVisible] = useState(false);
-  const pendingPrintRef = useRef(false);
   const [copies, setCopies] = useState(1);
   const [printing, setPrinting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -304,17 +303,14 @@ export default function PrintPreviewScreen() {
 
   const handlePrint = () => {
     if (printing) return;
-    if (!connectedPrinter) {
-      pendingPrintRef.current = true;
-      setScanVisible(true);
-      return;
-    }
-
     setPrinting(true);
     void (async () => {
       try {
-        await runBarcodeLabelPrint(previewSample, copies, layout, paper);
-        feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
+        const printed = await printBarcodeLabelOrPick(previewSample, copies, layout, paper);
+        if (printed) {
+          await refreshPrinter();
+          feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
+        }
       } catch (error) {
         feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
       } finally {
@@ -512,27 +508,10 @@ export default function PrintPreviewScreen() {
 
       <BluetoothScanModal
         visible={scanVisible}
-        onClose={() => {
-          pendingPrintRef.current = false;
-          setScanVisible(false);
-        }}
+        onClose={() => setScanVisible(false)}
         onConnected={() => {
-          const shouldPrint = pendingPrintRef.current;
-          pendingPrintRef.current = false;
           setScanVisible(false);
-          void (async () => {
-            await refreshPrinter();
-            if (!shouldPrint || printing) return;
-            setPrinting(true);
-            try {
-              await runBarcodeLabelPrint(previewSample, copies, layout, paper);
-              feedbackService.notify(t.settings.printSentTitle, t.settings.printSentBody);
-            } catch (error) {
-              feedbackService.notify(t.settings.printFailed, resolvePrintError(t, error));
-            } finally {
-              setPrinting(false);
-            }
-          })();
+          void refreshPrinter();
         }}
         onConnectionChange={() => {
           void refreshPrinter();

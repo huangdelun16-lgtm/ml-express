@@ -44,7 +44,7 @@ const TermsOfServicePage: React.FC = () => {
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
         transition: 'all 0.6s ease-in-out',
-        color: 'white',
+        color: '#1a2b48',
         maxWidth: '1000px',
         margin: '0 auto'
       }}>
@@ -52,17 +52,16 @@ const TermsOfServicePage: React.FC = () => {
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <h1 style={{
             fontSize: window.innerWidth < 768 ? '2.5rem' : '3.5rem',
-            color: 'white',
+            color: '#1a2b48',
             marginBottom: '1rem',
             fontWeight: '800',
-            textShadow: '2px 2px 8px rgba(0,0,0,0.3)',
             letterSpacing: '-1px'
           }}>
             {t.title}
           </h1>
           <p style={{
             fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
-            color: 'rgba(255,255,255,0.9)',
+            color: '#4a6280',
             maxWidth: '600px',
             margin: '0 auto',
             lineHeight: '1.6',
@@ -72,7 +71,7 @@ const TermsOfServicePage: React.FC = () => {
           </p>
           <p style={{
             fontSize: '0.9rem',
-            color: 'rgba(255,255,255,0.7)',
+            color: '#6b7c93',
             marginTop: '1rem'
           }}>
             {t.lastUpdated}
@@ -141,12 +140,12 @@ const TermsOfServicePage: React.FC = () => {
         <div style={{
           textAlign: 'center',
           padding: '2rem',
-          background: 'rgba(255,255,255,0.1)',
+          background: '#ffffff',
           backdropFilter: 'blur(10px)',
           borderRadius: '24px',
-          border: '1px solid rgba(255,255,255,0.2)'
+          border: '1px solid rgba(26, 43, 72, 0.1)'
         }}>
-          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', margin: 0 }}>
+          <p style={{ color: '#4a6280', fontSize: '0.9rem', margin: 0 }}>
             © 2024 MARKET LINK EXPRESS. All rights reserved.
           </p>
         </div>

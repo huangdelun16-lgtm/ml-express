@@ -11,7 +11,34 @@ const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { buildCustomerCode } = require('./utils/crossBorderCustomerCode');
 
 const CUSTOMER_SELECT =
+  'id, customer_name, phone, delivery_region_id, delivery_area_code, address_notes, salesperson_employee_code, application_date, customer_code, status, notify_method, notify_account, created_at, updated_at';
+const CUSTOMER_SELECT_WITHOUT_ACCOUNT =
+  'id, customer_name, phone, delivery_region_id, delivery_area_code, address_notes, salesperson_employee_code, application_date, customer_code, status, notify_method, created_at, updated_at';
+const CUSTOMER_SELECT_WITHOUT_NOTIFY =
   'id, customer_name, phone, delivery_region_id, delivery_area_code, address_notes, salesperson_employee_code, application_date, customer_code, status, created_at, updated_at';
+
+function normalizeNotifyMethod(raw) {
+  const value = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+  if (value === 'whatsapp' || value === 'wa') return 'whatsapp';
+  if (value === 'telegram' || value === 'tg') return 'telegram';
+  if (value === 'message' || value === 'sms' || value === 'text') return 'message';
+  if (value === 'phone' || value === 'phonecall' || value === 'call' || value === 'tel') return 'phone';
+  if (value === 'wechat' || value === 'weixin') return 'wechat';
+  return 'whatsapp';
+}
+
+function isMissingNotifyMethodColumn(error) {
+  const message = String(error?.message || error || '');
+  return /notify_method/i.test(message);
+}
+
+function isMissingNotifyAccountColumn(error) {
+  const message = String(error?.message || error || '');
+  return /notify_account/i.test(message);
+}
 
 
 function parseBody(event) {
@@ -65,16 +92,30 @@ exports.handler = async (event) => {
 
   try {
     if (event.httpMethod === 'GET') {
-      const { data, error } = await supabase
+      let query = await supabase
         .from('cross_border_customers')
         .select(CUSTOMER_SELECT)
         .order('application_date', { ascending: false })
         .order('created_at', { ascending: false });
-      if (error) throw error;
+      if (query.error && isMissingNotifyAccountColumn(query.error)) {
+        query = await supabase
+          .from('cross_border_customers')
+          .select(CUSTOMER_SELECT_WITHOUT_ACCOUNT)
+          .order('application_date', { ascending: false })
+          .order('created_at', { ascending: false });
+      }
+      if (query.error && isMissingNotifyMethodColumn(query.error)) {
+        query = await supabase
+          .from('cross_border_customers')
+          .select(CUSTOMER_SELECT_WITHOUT_NOTIFY)
+          .order('application_date', { ascending: false })
+          .order('created_at', { ascending: false });
+      }
+      if (query.error) throw query.error;
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ ok: true, customers: data ?? [] }),
+        body: JSON.stringify({ ok: true, customers: query.data ?? [] }),
       };
     }
 
@@ -89,6 +130,8 @@ exports.handler = async (event) => {
         .trim()
         .toUpperCase();
       const application_date = String(body.application_date || '').trim();
+      const notify_method = normalizeNotifyMethod(body.notify_method);
+      const notify_account = String(body.notify_account || '').trim();
 
       if (!customer_name) {
         return {
@@ -146,9 +189,7 @@ exports.handler = async (event) => {
           };
         }
 
-        const inserted = await supabase
-          .from('cross_border_customers')
-          .insert({
+        const payload = {
             customer_name,
             phone,
             delivery_region_id,
@@ -157,11 +198,33 @@ exports.handler = async (event) => {
             salesperson_employee_code,
             application_date,
             customer_code,
+            notify_method,
+            notify_account,
             status: 'active',
             updated_at: now,
-          })
+          };
+        let inserted = await supabase
+          .from('cross_border_customers')
+          .insert(payload)
           .select(CUSTOMER_SELECT)
           .single();
+        if (inserted.error && isMissingNotifyAccountColumn(inserted.error)) {
+          const { notify_account: _droppedAccount, ...withoutAccount } = payload;
+          inserted = await supabase
+            .from('cross_border_customers')
+            .insert(withoutAccount)
+            .select(CUSTOMER_SELECT_WITHOUT_ACCOUNT)
+            .single();
+        }
+        if (inserted.error && isMissingNotifyMethodColumn(inserted.error)) {
+          const { notify_method: _droppedMethod, notify_account: _droppedAccount, ...withoutNotify } =
+            payload;
+          inserted = await supabase
+            .from('cross_border_customers')
+            .insert(withoutNotify)
+            .select(CUSTOMER_SELECT_WITHOUT_NOTIFY)
+            .single();
+        }
 
         if (!inserted.error) {
           data = inserted.data;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from '../../i18n';
 import { regionDisplayLabel } from '../../constants/destinationOptions';
 import { colors, radius, space } from '../../theme';
@@ -8,6 +8,7 @@ import {
   formatMmkWithUnit,
   type FinanceTabKey,
 } from '../../utils/crossBorderFinanceTabs';
+import AppText from '../AppText';
 
 type Summary = {
   collectedTotal: number;
@@ -19,32 +20,36 @@ type Summary = {
   manualExpenseTotal: number;
 };
 
-function SummaryBar({
+type MetricTone = 'in' | 'out' | 'neutral';
+
+function toneColor(tone: MetricTone): string {
+  if (tone === 'in') return colors.financeGreen;
+  if (tone === 'out') return colors.danger;
+  return colors.slateSoft;
+}
+
+function MetricTile({
   label,
   value,
   prefix,
-  accent,
-  icon,
-  tint,
+  tone,
 }: {
   label: string;
   value: string;
   prefix?: string;
-  accent: string;
-  icon: string;
-  tint: string;
+  tone: MetricTone;
 }) {
+  const color = toneColor(tone);
   return (
-    <View style={[styles.statBar, { borderColor: accent, backgroundColor: tint }]}>
-      <View style={[styles.statBarIconWrap, { backgroundColor: `${accent}22` }]}>
-        <Text style={styles.statBarIcon}>{icon}</Text>
+    <View style={styles.metricCell}>
+      <View style={[styles.metricCard, { borderLeftColor: color }]}>
+        <AppText style={styles.metricLabel} numberOfLines={2} myanmarWeight="semibold">
+          {label}
+        </AppText>
+        <AppText style={[styles.metricValue, { color }]} numberOfLines={1} myanmarWeight="bold">
+          {`${prefix ?? ''}${value} MMK`}
+        </AppText>
       </View>
-      <Text style={styles.statBarLabel}>{label}</Text>
-      <Text style={[styles.statBarValue, { color: accent }]} numberOfLines={1}>
-        {prefix}
-        {value}
-        <Text style={styles.statBarUnit}> MMK</Text>
-      </Text>
     </View>
   );
 }
@@ -62,6 +67,8 @@ export default function FinanceSummaryHero({
   loading,
   displayedLength,
   onAddManual,
+  onExport,
+  exporting,
   onTabChange,
   onRetry,
 }: {
@@ -77,113 +84,131 @@ export default function FinanceSummaryHero({
   loading: boolean;
   displayedLength: number;
   onAddManual: () => void;
+  onExport: () => void;
+  exporting?: boolean;
   onTabChange: (next: FinanceTabKey) => void;
   onRetry: () => void;
 }) {
   const { t, fmt } = useTranslation();
+  const positive = netBalance >= 0;
 
   return (
     <View style={styles.headerBlock}>
       <View style={styles.heroCard}>
-        <View style={styles.heroGlow} />
-        <View style={styles.heroTop}>
+        <View style={styles.heroMeta}>
           <View style={styles.heroTitleBlock}>
-            <Text style={styles.heroLabel}>{t.crossBorderFinance.title}</Text>
-            <Text style={styles.heroHub}>
+            <AppText style={styles.heroEyebrow} myanmarWeight="semibold">
               {fmt(t.crossBorderFinance.heroHub, {
                 name: operatorName,
                 hub: regionDisplayLabel(hubCode),
               })}
-            </Text>
+            </AppText>
           </View>
-          <View style={styles.heroActions}>
-            <Pressable style={styles.addManualBtn} onPress={onAddManual}>
-              <Text style={styles.addManualBtnText}>{t.crossBorderFinance.addManual}</Text>
-            </Pressable>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>
-                {fmt(t.common.recordsCount, { count: displayedCount })}
-              </Text>
-            </View>
+          <View style={styles.countChip}>
+            <AppText style={styles.countChipText} myanmarWeight="bold">
+              {fmt(t.common.recordsCount, { count: displayedCount })}
+            </AppText>
           </View>
         </View>
 
-        <View style={styles.netRow}>
-          <Text style={styles.netLabel}>{t.crossBorderFinance.balance}</Text>
-          <Text
-            style={[styles.netValue, netBalance >= 0 ? styles.netPositive : styles.netNegative]}
+        <AppText style={styles.netLabel} myanmarWeight="semibold">
+          {t.crossBorderFinance.balance}
+        </AppText>
+        <AppText
+          style={[styles.netValue, positive ? styles.netPositive : styles.netNegative]}
+          myanmarWeight="bold"
+        >
+          {positive ? '+' : '−'}
+          {formatMmkWithUnit(Math.abs(netBalance))}
+        </AppText>
+        <AppText style={styles.netHint} myanmarWeight="regular">
+          {t.crossBorderFinance.balanceFormula}
+        </AppText>
+
+        <View style={styles.actionRow}>
+          <Pressable
+            style={({ pressed }) => [styles.addManualBtn, pressed && styles.btnPressed]}
+            onPress={onAddManual}
           >
-            {netBalance >= 0 ? '+' : '−'}
-            {formatMmkWithUnit(Math.abs(netBalance))}
-          </Text>
-          <Text style={styles.netHint}>{t.crossBorderFinance.balanceFormula}</Text>
+            <AppText style={styles.addManualBtnText} myanmarWeight="bold">
+              {t.crossBorderFinance.addManual}
+            </AppText>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.exportBtn,
+              exporting && styles.exportBtnDisabled,
+              pressed && !exporting && styles.btnPressed,
+            ]}
+            onPress={onExport}
+            disabled={Boolean(exporting)}
+          >
+            {exporting ? (
+              <ActivityIndicator color={colors.slateSoft} size="small" />
+            ) : (
+              <AppText style={styles.exportBtnText} myanmarWeight="bold">
+                {t.crossBorderFinance.exportCsv}
+              </AppText>
+            )}
+          </Pressable>
         </View>
 
-        <View style={styles.statsStack}>
-          <SummaryBar
+        <View style={styles.metricsGrid}>
+          <MetricTile
             label={t.crossBorderFinance.collected}
             value={formatMmk(summary.collectedTotal)}
             prefix="+"
-            accent={colors.financeBlue}
-            icon="✓"
-            tint="rgba(96,165,250,0.08)"
+            tone="in"
           />
-          <SummaryBar
+          <MetricTile
             label={t.crossBorderFinance.transportUnpaid}
             value={formatMmk(summary.transportUnpaidTotal)}
             prefix="−"
-            accent={colors.danger}
-            icon="🚚"
-            tint="rgba(248,113,113,0.08)"
+            tone="out"
           />
-          <SummaryBar
+          <MetricTile
             label={t.crossBorderFinance.transportPaid}
             value={formatMmk(summary.transportPaidTotal)}
-            accent={colors.purpleSoft}
-            icon="✅"
-            tint="rgba(167,139,250,0.1)"
+            tone="neutral"
           />
-          <SummaryBar
+          <MetricTile
             label={t.crossBorderFinance.pendingInflow}
             value={formatMmk(summary.pendingInflowTotal)}
             prefix="+"
-            accent={colors.financeGreen}
-            icon="💵"
-            tint="rgba(52,211,153,0.08)"
+            tone="in"
           />
-        </View>
-
-        <View style={styles.statsStack}>
-          <SummaryBar
+          <MetricTile
             label={t.crossBorderFinance.manualIncome}
             value={formatMmk(summary.manualIncomeTotal)}
             prefix="+"
-            accent={colors.financeGreen}
-            icon="📈"
-            tint="rgba(52,211,153,0.08)"
+            tone="in"
           />
-          <SummaryBar
+          <MetricTile
             label={t.crossBorderFinance.manualExpense}
             value={formatMmk(summary.manualExpenseTotal)}
             prefix="−"
-            accent={colors.danger}
-            icon="📉"
-            tint="rgba(248,113,113,0.08)"
+            tone="out"
           />
         </View>
 
         {summary.agencyPayableTotal > 0 ? (
-          <Text style={styles.agencyHint}>
-            {fmt(t.crossBorderFinance.agencyHint, {
-              amount: formatMmkWithUnit(summary.agencyPayableTotal),
-            })}
-          </Text>
+          <View style={styles.agencyBar}>
+            <View style={styles.agencyTick} />
+            <AppText style={styles.agencyHint} myanmarWeight="semibold">
+              {fmt(t.crossBorderFinance.agencyHint, {
+                amount: formatMmkWithUnit(summary.agencyPayableTotal),
+              })}
+            </AppText>
+          </View>
         ) : null}
-        <Text style={styles.syncHint}>{t.crossBorderFinance.syncHint}</Text>
+        <AppText style={styles.syncHint} myanmarWeight="regular">
+          {t.crossBorderFinance.syncHint}
+        </AppText>
       </View>
 
       <ScrollView
         horizontal
+        nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabScroll}
       >
@@ -193,13 +218,27 @@ export default function FinanceSummaryHero({
           return (
             <Pressable
               key={tabItem.key}
-              style={[styles.tab, active && styles.tabOn]}
+              style={({ pressed }) => [
+                styles.tab,
+                active && styles.tabOn,
+                pressed && styles.btnPressed,
+              ]}
               onPress={() => onTabChange(tabItem.key)}
             >
-              <Text style={[styles.tabText, active && styles.tabTextOn]}>{tabItem.label}</Text>
+              <AppText
+                style={[styles.tabText, active && styles.tabTextOn]}
+                myanmarWeight="bold"
+              >
+                {tabItem.label}
+              </AppText>
               {count > 0 ? (
                 <View style={[styles.tabCount, active && styles.tabCountOn]}>
-                  <Text style={[styles.tabCountText, active && styles.tabCountTextOn]}>{count}</Text>
+                  <AppText
+                    style={[styles.tabCountText, active && styles.tabCountTextOn]}
+                    myanmarWeight="bold"
+                  >
+                    {count}
+                  </AppText>
                 </View>
               ) : null}
             </Pressable>
@@ -208,162 +247,223 @@ export default function FinanceSummaryHero({
       </ScrollView>
 
       {error ? (
-        <Pressable style={styles.errorBanner} onPress={onRetry}>
-          <Text style={styles.errorBannerText}>{error}</Text>
-          <Text style={styles.errorRetry}>{t.common.retry}</Text>
+        <Pressable
+          style={({ pressed }) => [styles.errorBanner, pressed && styles.btnPressed]}
+          onPress={onRetry}
+        >
+          <AppText style={styles.errorBannerText} myanmarWeight="semibold">
+            {error}
+          </AppText>
+          <AppText style={styles.errorRetry} myanmarWeight="bold">
+            {t.common.retry}
+          </AppText>
         </Pressable>
       ) : null}
 
       {!loading && displayedLength > 0 ? (
-        <Text style={styles.sectionTitle}>
+        <AppText style={styles.sectionTitle} myanmarWeight="bold">
           {tabs.find((tabItem) => tabItem.key === tab)?.label} · {displayedLength}
-        </Text>
+        </AppText>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerBlock: { paddingTop: 4 },
+  headerBlock: { paddingTop: 2 },
   heroCard: {
     backgroundColor: colors.card,
-    borderRadius: radius.xxl,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  heroGlow: {
-    position: 'absolute',
-    top: -40,
-    right: -20,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(124,58,237,0.15)',
-  },
-  heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 14,
-    gap: 10,
-  },
-  heroTitleBlock: { flex: 1, minWidth: 0 },
-  heroActions: { alignItems: 'flex-end', gap: 8 },
-  addManualBtn: {
-    backgroundColor: colors.purple,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(167,139,250,0.5)',
-  },
-  addManualBtnText: { color: colors.white, fontSize: 12, fontWeight: '900' },
-  heroLabel: { color: colors.text, fontSize: 20, fontWeight: '900' },
-  heroHub: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: 4 },
-  heroBadge: {
-    backgroundColor: 'rgba(124,58,237,0.25)',
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(167,139,250,0.35)',
-  },
-  heroBadgeText: { color: colors.purpleMuted, fontSize: 12, fontWeight: '800' },
-  netRow: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.lg,
-    padding: 14,
+    borderRadius: radius.xl,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  netLabel: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  netValue: { fontSize: 26, fontWeight: '900', marginTop: 4 },
-  netPositive: { color: colors.warning },
-  netNegative: { color: colors.danger },
-  netHint: { color: colors.muted2, fontSize: 11, marginTop: 6, fontWeight: '600' },
-  statsStack: { gap: 8, marginBottom: 8 },
-  statBar: {
+  heroMeta: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: 10,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    marginBottom: 14,
   },
-  statBarIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  heroTitleBlock: { flex: 1, minWidth: 0 },
+  heroEyebrow: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    lineHeight: 18,
+  },
+  countChip: {
+    backgroundColor: 'rgba(148,163,184,0.12)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  countChipText: { color: colors.slateSoft, fontSize: 11, fontWeight: '700' },
+  netLabel: {
+    color: colors.muted2,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  netValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 2,
+    letterSpacing: -0.4,
+    fontVariant: ['tabular-nums'],
+  },
+  netPositive: { color: colors.financeGreen },
+  netNegative: { color: colors.danger },
+  netHint: {
+    color: colors.muted2,
+    fontSize: 11,
+    marginTop: 6,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 14 },
+  btnPressed: { opacity: 0.82 },
+  addManualBtn: {
+    flex: 1,
+    backgroundColor: colors.purple,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    minHeight: 42,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statBarIcon: { fontSize: 16 },
-  statBarLabel: {
+  addManualBtnText: { color: colors.white, fontSize: 13, fontWeight: '800' },
+  exportBtn: {
     flex: 1,
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '700',
+    backgroundColor: colors.bg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
   },
-  statBarValue: { fontSize: 16, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  statBarUnit: { fontSize: 11, fontWeight: '700', color: colors.muted2 },
-  agencyHint: {
-    color: colors.warning,
+  exportBtnDisabled: { opacity: 0.55 },
+  exportBtnText: { color: colors.slateSoft, fontSize: 13, fontWeight: '800' },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -4,
+  },
+  metricCell: {
+    width: '50%',
+    padding: 4,
+  },
+  metricCard: {
+    minHeight: 64,
+    backgroundColor: colors.bg,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingLeft: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 3,
+  },
+  metricLabel: {
+    color: colors.muted,
     fontSize: 11,
-    marginTop: 6,
+    fontWeight: '600',
+    lineHeight: 15,
+    marginBottom: 4,
+  },
+  metricValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  agencyBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.28)',
+  },
+  agencyTick: {
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: colors.warning,
+    alignSelf: 'stretch',
+    minHeight: 16,
+  },
+  agencyHint: {
+    flex: 1,
+    color: colors.amberSoft,
+    fontSize: 11,
     fontWeight: '600',
     lineHeight: 16,
   },
   syncHint: {
     color: colors.muted2,
     fontSize: 10,
-    marginTop: 8,
-    fontWeight: '600',
+    marginTop: 10,
+    fontWeight: '500',
+    lineHeight: 14,
   },
-  tabScroll: { gap: 8, paddingBottom: 8 },
+  tabScroll: { gap: 8, paddingBottom: 10, paddingTop: 2 },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
+    paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: radius.pill,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tabOn: { backgroundColor: colors.purple, borderColor: colors.purple },
-  tabText: { color: colors.muted, fontSize: 13, fontWeight: '800' },
-  tabTextOn: { color: colors.white },
+  tabOn: {
+    backgroundColor: colors.borderMuted,
+    borderColor: colors.slateSoft,
+  },
+  tabText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
+  tabTextOn: { color: colors.text },
   tabCount: {
-    backgroundColor: 'rgba(148,163,184,0.2)',
+    backgroundColor: 'rgba(148,163,184,0.18)',
     borderRadius: radius.pill,
     paddingHorizontal: 6,
     paddingVertical: 1,
+    minWidth: 18,
+    alignItems: 'center',
   },
-  tabCountOn: { backgroundColor: 'rgba(255,255,255,0.22)' },
-  tabCountText: { color: colors.muted, fontSize: 11, fontWeight: '900' },
-  tabCountTextOn: { color: colors.white },
+  tabCountOn: { backgroundColor: 'rgba(15,23,42,0.45)' },
+  tabCountText: { color: colors.muted, fontSize: 11, fontWeight: '800' },
+  tabCountTextOn: { color: colors.text },
   sectionTitle: {
     color: colors.muted2,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
     marginBottom: 10,
     marginTop: 2,
   },
   errorBanner: {
-    backgroundColor: 'rgba(248,113,113,0.12)',
-    borderColor: 'rgba(248,113,113,0.5)',
+    backgroundColor: 'rgba(248,113,113,0.1)',
+    borderColor: 'rgba(248,113,113,0.4)',
     borderWidth: 1,
     borderRadius: radius.md,
     padding: space.md,
     marginBottom: 10,
   },
-  errorBannerText: { color: '#fecaca', fontSize: 12, fontWeight: '700', lineHeight: 17 },
-  errorRetry: { color: colors.danger, fontSize: 12, fontWeight: '900', marginTop: 5 },
+  errorBannerText: { color: '#fecaca', fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  errorRetry: { color: colors.danger, fontSize: 12, fontWeight: '800', marginTop: 5 },
 });

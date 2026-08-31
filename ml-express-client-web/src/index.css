@@ -13,6 +13,8 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  background: #e8f4fa;
+  color: #1a2b48;
 }
 
 #root {

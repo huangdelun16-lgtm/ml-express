@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import ExceptionReportModal from '../components/ExceptionReportModal';
+import ArrivalNotifySheet from '../components/ArrivalNotifySheet';
 import ScanInputBar from '../components/ScanInputBar';
 import HubReceiveOrdersModal from '../components/HubReceiveOrdersModal';
 import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import { HubReceiveStatusPanels } from '../components/hubReceive/HubReceiveStatusPanels';
 import { useHubReceiveFlow } from '../hooks/useHubReceiveFlow';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import type { ExceptionReportTarget } from '../types/inventoryException';
+import { exceptionTargetFromHubOrder } from '../utils/inventoryException';
 import { colors, space } from '../theme';
 
 export default function HubReceiveScreen({
@@ -15,6 +19,7 @@ export default function HubReceiveScreen({
   const openPackBarcode = route.params?.openPackBarcode?.trim().toUpperCase() ?? '';
   const flow = useHubReceiveFlow(openPackBarcode);
   const { t, store } = flow;
+  const [exceptionTarget, setExceptionTarget] = useState<ExceptionReportTarget | null>(null);
 
   if (!store) {
     return (
@@ -76,6 +81,18 @@ export default function HubReceiveScreen({
         onBatchInbound={() => void flow.handleBatchInbound()}
         onPayTransportFee={flow.handlePayTransportFee}
         onReleaseTransit={() => void flow.handleReleaseTransit()}
+        onReportException={(line) => setExceptionTarget(exceptionTargetFromHubOrder(line))}
+        onNotifyCustomer={(line) => flow.queueArrivalNotify([line])}
+      />
+      <ArrivalNotifySheet
+        visible={flow.notifyQueue.length > 0}
+        targets={flow.notifyQueue}
+        onClose={flow.dismissNotifyQueue}
+      />
+      <ExceptionReportModal
+        visible={!!exceptionTarget}
+        target={exceptionTarget}
+        onClose={() => setExceptionTarget(null)}
       />
     </ScrollView>
   );

@@ -18,14 +18,16 @@
       "bundleIdentifier": "com.mlexpress.inventory",
       "buildNumber": "35",
       "infoPlist": {
-        "NSCameraUsageDescription": "ML Inventory uses the camera to scan barcodes on packages and inventory labels at transit stations.",
+        "NSCameraUsageDescription": "ML Inventory uses the camera to scan barcodes and photograph damaged or exception packages at transit stations.",
+        "NSPhotoLibraryUsageDescription": "ML Inventory uses the photo library to attach exception evidence photos.",
         "NSBluetoothAlwaysUsageDescription": "ML Inventory uses Bluetooth to scan nearby devices such as label printers.",
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": ["whatsapp", "sms", "tel"]
       }
     },
     "android": {
@@ -50,7 +52,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow ML Inventory to use the camera to scan barcodes on packages and inventory labels."
+          "cameraPermission": "Allow ML Inventory to use the camera to scan barcodes and photograph exception packages."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow ML Inventory to attach exception evidence photos from the photo library.",
+          "cameraPermission": "Allow ML Inventory to photograph damaged or exception packages."
         }
       ],
       "@react-native-community/datetimepicker",

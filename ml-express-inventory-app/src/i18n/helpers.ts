@@ -202,3 +202,20 @@ export const LEDGER_CATEGORY_STYLE: Record<
     pillBg: 'rgba(148,163,184,0.15)',
   },
 };
+
+export function getExceptionTypeLabel(t: TranslationDict, type: string): string {
+  if (type === 'damage') return t.exception.typeDamage;
+  if (type === 'shortage') return t.exception.typeShortage;
+  if (type === 'excess') return t.exception.typeExcess;
+  if (type === 'lost') return t.exception.typeLost;
+  if (type === 'wrong_item') return t.exception.typeWrongItem;
+  if (type === 'return_origin') return t.exception.typeReturnOrigin;
+  return type;
+}
+
+export function getExceptionStatusLabel(t: TranslationDict, status: string): string {
+  if (status === 'open') return t.exception.statusOpen;
+  if (status === 'resolved') return t.exception.statusResolved;
+  if (status === 'cancelled') return t.exception.statusCancelled;
+  return status;
+}

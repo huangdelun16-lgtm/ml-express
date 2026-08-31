@@ -20,7 +20,8 @@ import { filterLikelyBlePrinters } from '../utils/blePrinterDeviceFilter';
 import {
   connectBluetoothDevice,
   disconnectBluetoothDevice,
-  getActiveBluetoothDevice,
+  getLiveConnectedBluetoothDevice,
+  loadSavedBluetoothDevice,
   requestBluetoothScanPermissions,
   startBluetoothScan,
 } from '../services/bluetoothScanner';
@@ -49,6 +50,7 @@ export default function BluetoothScanModal({
   const [scanning, setScanning] = useState(false);
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [connectedDevice, setConnectedDevice] = useState<ScannedBluetoothDevice | null>(null);
+  const [savedDevice, setSavedDevice] = useState<ScannedBluetoothDevice | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const stopScanRef = useRef<(() => void) | null>(null);
 
@@ -61,7 +63,8 @@ export default function BluetoothScanModal({
       return;
     }
 
-    void getActiveBluetoothDevice().then(setConnectedDevice);
+    void getLiveConnectedBluetoothDevice().then(setConnectedDevice);
+    void loadSavedBluetoothDevice().then(setSavedDevice);
 
     if (!isNativeBleAvailable()) return;
 
@@ -79,6 +82,10 @@ export default function BluetoothScanModal({
         const stop = await startBluetoothScan((found) => {
           if (cancelled) return;
           setDevices((prev) => mergeScannedDevices(prev, filterLikelyBlePrinters(found)));
+        }, (error) => {
+          if (cancelled) return;
+          setScanning(false);
+          feedbackService.notify(t.settings.scanPrinterTitle, resolveScanError(t, error));
         });
         stopScanRef.current = stop;
       } catch (error) {
@@ -120,6 +127,9 @@ export default function BluetoothScanModal({
         if (!granted) throw new Error('BLUETOOTH_PERMISSION_DENIED');
         const stop = await startBluetoothScan((found) => {
           setDevices((prev) => mergeScannedDevices(prev, filterLikelyBlePrinters(found)));
+        }, (error) => {
+          setScanning(false);
+          feedbackService.notify(t.settings.scanPrinterTitle, resolveScanError(t, error));
         });
         stopScanRef.current = stop;
         setTimeout(() => {
@@ -152,6 +162,7 @@ export default function BluetoothScanModal({
       try {
         const connected = await connectBluetoothDevice(device.id);
         setConnectedDevice(connected);
+        setSavedDevice(connected);
         onConnectionChange?.();
         onConnected?.(connected);
         feedbackService.notify(
@@ -177,6 +188,7 @@ export default function BluetoothScanModal({
       try {
         await disconnectBluetoothDevice();
         setConnectedDevice(null);
+        setSavedDevice(null);
         onConnectionChange?.();
       } catch (error) {
         feedbackService.notify(t.settings.scanPrinterConnectFailed, resolveScanError(t, error));
@@ -188,11 +200,17 @@ export default function BluetoothScanModal({
 
   const visibleDevices = useMemo(() => {
     const filtered = filterLikelyBlePrinters(devices);
-    if (connectedDevice && !filtered.some((device) => device.id === connectedDevice.id)) {
-      return [connectedDevice, ...filtered];
+    const extras = [connectedDevice, savedDevice].filter(
+      (device): device is ScannedBluetoothDevice => Boolean(device?.id),
+    );
+    let list = filtered;
+    for (const extra of extras) {
+      if (!list.some((device) => device.id === extra.id)) {
+        list = [extra, ...list];
+      }
     }
-    return filtered;
-  }, [devices, connectedDevice]);
+    return list;
+  }, [devices, connectedDevice, savedDevice]);
 
   if (!visible) return null;
 
@@ -222,6 +240,12 @@ export default function BluetoothScanModal({
                     </Text>
                   </Pressable>
                 </View>
+              ) : savedDevice ? (
+                <View style={styles.savedBanner}>
+                  <Text style={styles.savedText}>
+                    {fmt(t.settings.scanPrinterSelectedTo, { name: savedDevice.name })}
+                  </Text>
+                </View>
               ) : (
                 <Text style={styles.tapHint}>{t.settings.scanPrinterTapToConnect}</Text>
               )}
@@ -242,6 +266,7 @@ export default function BluetoothScanModal({
               <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
                 {visibleDevices.map((device) => {
                   const isConnected = connectedDevice?.id === device.id;
+                  const isSaved = !isConnected && savedDevice?.id === device.id;
                   const isConnecting = connectingId === device.id;
 
                   return (
@@ -261,6 +286,8 @@ export default function BluetoothScanModal({
                         </Text>
                         {isConnected ? (
                           <Text style={styles.itemBadge}>{t.settings.scanPrinterConnected}</Text>
+                        ) : isSaved ? (
+                          <Text style={styles.itemBadgeSaved}>{t.settings.scanPrinterSaved}</Text>
                         ) : isConnecting ? (
                           <Text style={styles.itemBadgeBusy}>{t.settings.scanPrinterConnecting}</Text>
                         ) : null}
@@ -302,8 +329,11 @@ export default function BluetoothScanModal({
 
 function resolveScanError(t: TranslationDict, error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error ?? '');
-  if (msg === 'BLUETOOTH_OFF') return t.settings.scanPrinterBluetoothOff;
+  if (msg === 'BLUETOOTH_OFF' || msg === 'BLUETOOTH_READY_TIMEOUT') {
+    return t.settings.scanPrinterBluetoothOff;
+  }
   if (msg === 'BLUETOOTH_PERMISSION_DENIED') return t.settings.scanPrinterPermissionDenied;
+  if (msg === 'BLE_PRINTER_NOT_FOUND') return t.settings.scanPrinterConnectFailed;
   if (/timeout|timed out|connect/i.test(msg)) return t.settings.scanPrinterConnectFailed;
   return msg || t.settings.scanPrinterFailed;
 }
@@ -353,6 +383,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   connectedText: { color: '#6ee7b7', fontWeight: '800', fontSize: 13, textAlign: 'center' },
+  savedBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.35)',
+  },
+  savedText: { color: '#fbbf24', fontWeight: '800', fontSize: 13, textAlign: 'center' },
   disconnectBtn: {
     borderRadius: 10,
     paddingVertical: 10,
@@ -405,6 +444,7 @@ const styles = StyleSheet.create({
   },
   itemName: { color: '#f8fafc', fontWeight: '800', fontSize: 15, flex: 1 },
   itemBadge: { color: '#34d399', fontWeight: '900', fontSize: 11 },
+  itemBadgeSaved: { color: '#fbbf24', fontWeight: '900', fontSize: 11 },
   itemBadgeBusy: { color: '#38bdf8', fontWeight: '900', fontSize: 11 },
   itemMeta: { color: '#64748b', fontSize: 11, fontFamily: 'monospace' },
   actions: { marginBottom: 10 },

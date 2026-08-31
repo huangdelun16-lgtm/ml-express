@@ -65,7 +65,7 @@ const PrivacyPolicyPage: React.FC = () => {
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
         transition: 'all 0.6s ease-in-out',
-        color: 'white',
+        color: '#1a2b48',
         maxWidth: '1000px',
         margin: '0 auto'
       }}>
@@ -73,17 +73,16 @@ const PrivacyPolicyPage: React.FC = () => {
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <h1 style={{
             fontSize: window.innerWidth < 768 ? '2.5rem' : '3.5rem',
-            color: 'white',
+            color: '#1a2b48',
             marginBottom: '1rem',
             fontWeight: '800',
-            textShadow: '2px 2px 8px rgba(0,0,0,0.3)',
             letterSpacing: '-1px'
           }}>
             {t.title}
           </h1>
           <p style={{
             fontSize: window.innerWidth < 768 ? '1rem' : '1.2rem',
-            color: 'rgba(255,255,255,0.9)',
+            color: '#4a6280',
             maxWidth: '600px',
             margin: '0 auto',
             lineHeight: '1.6',
@@ -93,7 +92,7 @@ const PrivacyPolicyPage: React.FC = () => {
           </p>
           <p style={{
             fontSize: '0.9rem',
-            color: 'rgba(255,255,255,0.7)',
+            color: '#6b7c93',
             marginTop: '1rem'
           }}>
             {t.lastUpdated}
@@ -183,10 +182,10 @@ const PrivacyPolicyPage: React.FC = () => {
         <div style={{
           textAlign: 'center',
           padding: 'var(--card-padding-lg)',
-          background: 'rgba(255,255,255,0.1)',
+          background: '#ffffff',
           backdropFilter: 'blur(10px)',
           borderRadius: 'var(--card-radius-lg)',
-          border: 'var(--card-border)',
+          border: '1px solid rgba(26, 43, 72, 0.1)',
           boxShadow: 'var(--shadow-md)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '1rem' }}>
@@ -200,37 +199,30 @@ const PrivacyPolicyPage: React.FC = () => {
             />
             <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
               <span style={{ 
-                color: 'white',
+                color: '#1a2b48',
                 fontSize: '1.6rem',
                 fontWeight: '800',
-                textShadow: '3px 3px 6px rgba(0,0,0,0.4)',
-                background: 'linear-gradient(45deg, #ffffff, #f0f8ff, #e6f3ff)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
                 letterSpacing: '-1px',
                 whiteSpace: 'nowrap'
               }}>
                 MARKET LINK <span style={{ fontSize: '0.6em', fontStyle: 'italic', fontWeight: '400' }}>EXPRESS</span>
               </span>
               <span style={{
-                color: 'white',
+                color: '#4a6280',
                 fontSize: '0.6rem',
                 fontStyle: 'italic',
                 fontWeight: '400',
                 letterSpacing: '1px',
-                opacity: 0.9,
                 marginTop: '-2px',
                 textAlign: 'right',
-                paddingRight: '4px',
-                textShadow: '1px 1px 2px rgba(0,0,0,0.2)'
+                paddingRight: '4px'
               }}>
                 Delivery Services
               </span>
             </div>
           </div>
           <p style={{ 
-            color: 'rgba(255,255,255,0.8)',
+            color: '#4a6280',
             fontSize: '0.9rem',
             margin: '0.5rem 0'
           }}>

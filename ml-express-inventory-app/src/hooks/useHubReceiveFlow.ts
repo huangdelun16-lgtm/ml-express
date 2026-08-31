@@ -34,11 +34,12 @@ import {
   getOrderTrackingByBarcode,
   getPkgTrackingDetail,
 } from '../services/trackingService';
-import type { PkgTrackingDetail } from '../types/tracking';
+import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
 import {
   isDestinationHubPack,
   listPendingPackInboundOrders,
 } from '../utils/hubReceivePack';
+import { collectArrivalNotifyTargets, type ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { resolveStoreHubCode } from '../utils/storeZone';
 import { isPackageBarcode } from '../utils/packageNumber';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
@@ -65,6 +66,23 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [modalSuccess, setModalSuccess] = useState('');
+  const [notifyQueue, setNotifyQueue] = useState<ArrivalNotifyTarget[]>([]);
+
+  const queueArrivalNotify = useCallback(
+    (orders: OrderTrackingRecord[]) => {
+      if (!hubCode) return;
+      const targets = collectArrivalNotifyTargets(orders, hubCode).map((row) => ({
+        ...row,
+        storeName: store?.storeName,
+      }));
+      if (targets.length > 0) setNotifyQueue(targets);
+    },
+    [hubCode, store?.storeName],
+  );
+
+  const dismissNotifyQueue = useCallback(() => {
+    setNotifyQueue([]);
+  }, []);
 
   const refreshTransportFeePaid = useCallback(async (packBarcode: string) => {
     const packCode = packBarcode.trim().toUpperCase();
@@ -284,9 +302,10 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         operator,
       });
       await finishInboundFlow(pkg);
+      queueArrivalNotify([order]);
       return pkg;
     },
-    [store, activePack, hubCode, operator, finishInboundFlow],
+    [store, activePack, hubCode, operator, finishInboundFlow, queueArrivalNotify],
   );
 
   const handlePackScan = async (code: string) => {
@@ -383,6 +402,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         fmt(t.hubReceive.inboundSuccessMsg, { barcode: order.order_barcode }),
       );
       await finishInboundFlow(pkg);
+      queueArrivalNotify([order]);
       setScan('');
     } catch (e: unknown) {
       setError(resolveAppError(t, e));
@@ -512,6 +532,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
       const successMsg = fmt(t.hubReceive.batchInboundSuccessMsg, { count: pendingOrders.length });
       setModalSuccess(successMsg);
       showTaskSuccess(t.hubReceive.batchInboundSuccess, successMsg);
+      queueArrivalNotify(pendingOrders);
     } catch (e: unknown) {
       setError(resolveAppError(t, e));
     } finally {
@@ -642,5 +663,8 @@ export function useHubReceiveFlow(openPackBarcode: string) {
     handlePayTransportFee,
     handleReleaseTransit,
     closeOrdersModal,
+    notifyQueue,
+    dismissNotifyQueue,
+    queueArrivalNotify,
   };
 }

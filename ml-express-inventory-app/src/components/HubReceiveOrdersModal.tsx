@@ -56,6 +56,8 @@ type Props = {
   onBatchInbound: () => void;
   onPayTransportFee: () => void;
   onReleaseTransit: () => void;
+  onReportException?: (line: PkgTrackingDetail['orders'][number]) => void;
+  onNotifyCustomer?: (line: PkgTrackingDetail['orders'][number]) => void;
 };
 
 export default function HubReceiveOrdersModal({
@@ -80,6 +82,8 @@ export default function HubReceiveOrdersModal({
   onBatchInbound,
   onPayTransportFee,
   onReleaseTransit,
+  onReportException,
+  onNotifyCustomer,
 }: Props) {
   const { t, fmt } = useTranslation();
   const { height: windowHeight } = useWindowDimensions();
@@ -199,6 +203,11 @@ export default function HubReceiveOrdersModal({
                 packConfirmed &&
                 line.status === 'in_transit' &&
                 isLocal;
+              const canNotify =
+                Boolean(onNotifyCustomer) &&
+                isLocal &&
+                isDone &&
+                Boolean(line.recipient_phone?.trim());
               const isConfirming = confirmingOrderId === line.id;
 
               return (
@@ -252,21 +261,39 @@ export default function HubReceiveOrdersModal({
                       </Text>
                     </View>
                   </View>
-                  {canInbound ? (
-                    <Pressable
-                      style={[styles.inboundBtn, (isConfirming || actionBusy) && styles.btnBusy]}
-                      onPress={() => onConfirmOrder(line.id)}
-                      disabled={isConfirming || actionBusy}
-                    >
-                      <Text style={styles.inboundBtnText}>
-                        {isConfirming ? '…' : t.hubReceive.modalInbound}
-                      </Text>
-                    </Pressable>
-                  ) : isDone ? (
-                    <View style={styles.doneMark}>
-                      <Text style={styles.doneMarkText}>✓</Text>
-                    </View>
-                  ) : null}
+                  <View style={styles.orderActions}>
+                    {onReportException ? (
+                      <Pressable
+                        style={styles.exceptionBtn}
+                        onPress={() => onReportException(line)}
+                      >
+                        <Text style={styles.exceptionBtnText}>{t.exception.openBadge}</Text>
+                      </Pressable>
+                    ) : null}
+                    {canNotify ? (
+                      <Pressable
+                        style={styles.notifyBtn}
+                        onPress={() => onNotifyCustomer?.(line)}
+                      >
+                        <Text style={styles.notifyBtnText}>{t.arrivalNotify.notify}</Text>
+                      </Pressable>
+                    ) : null}
+                    {canInbound ? (
+                      <Pressable
+                        style={[styles.inboundBtn, (isConfirming || actionBusy) && styles.btnBusy]}
+                        onPress={() => onConfirmOrder(line.id)}
+                        disabled={isConfirming || actionBusy}
+                      >
+                        <Text style={styles.inboundBtnText}>
+                          {isConfirming ? '…' : t.hubReceive.modalInbound}
+                        </Text>
+                      </Pressable>
+                    ) : isDone ? (
+                      <View style={styles.doneMark}>
+                        <Text style={styles.doneMarkText}>✓</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
               );
             })}
@@ -617,6 +644,25 @@ const styles = StyleSheet.create({
   },
   orderStatus: { color: '#fb923c', fontSize: 10, fontWeight: '800' },
   orderStatusDone: { color: '#4ade80' },
+  orderActions: { gap: 6, alignItems: 'stretch' },
+  exceptionBtn: {
+    backgroundColor: '#b45309',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minWidth: 52,
+    alignItems: 'center',
+  },
+  exceptionBtnText: { color: '#fff', fontWeight: '900', fontSize: 11 },
+  notifyBtn: {
+    backgroundColor: '#16a34a',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minWidth: 52,
+    alignItems: 'center',
+  },
+  notifyBtnText: { color: '#fff', fontWeight: '900', fontSize: 11 },
   inboundBtn: {
     backgroundColor: '#059669',
     borderRadius: 8,

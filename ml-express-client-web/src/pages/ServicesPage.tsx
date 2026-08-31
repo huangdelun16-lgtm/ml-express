@@ -79,7 +79,7 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ embedInLanding }) => {
         transition: fromHomeScroll
           ? 'opacity 0.88s cubic-bezier(0.22, 1, 0.36, 1), transform 0.88s cubic-bezier(0.22, 1, 0.36, 1)'
           : 'all 0.6s ease-in-out',
-        color: 'white'
+        color: '#1a2b48'
       }}>
         {/* 页面标题 */}
         <div className="client-page-title-wrap" style={{ marginTop: '2rem', marginBottom: '3.5rem' }}>

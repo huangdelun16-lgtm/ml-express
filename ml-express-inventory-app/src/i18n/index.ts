@@ -24,7 +24,7 @@ export function getPackStatusLabel(
   return translations[language].packStatus[status];
 }
 
-export { formatTimeAgo, getEditDeniedMessage, getItemCustomerProfileEditDeniedMessage, getLedgerAmountDisplay, getLedgerCategoryLabel, getOrderStatusLabel, getPaymentLabelDisplay, getPkgStatusLabel, getTransportFeeDisplay, formatOrderNotFoundHint, formatPkgNotFoundHint, LEDGER_CATEGORY_STYLE } from './helpers';
+export { formatTimeAgo, getEditDeniedMessage, getExceptionStatusLabel, getExceptionTypeLabel, getItemCustomerProfileEditDeniedMessage, getLedgerAmountDisplay, getLedgerCategoryLabel, getOrderStatusLabel, getPaymentLabelDisplay, getPkgStatusLabel, getTransportFeeDisplay, formatOrderNotFoundHint, formatPkgNotFoundHint, LEDGER_CATEGORY_STYLE } from './helpers';
 
 export { resolveAppError, formatServiceError } from './resolveAppError';
 

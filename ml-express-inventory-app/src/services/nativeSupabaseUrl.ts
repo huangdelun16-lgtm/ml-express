@@ -29,11 +29,11 @@ function isSupabaseCoHost(url: string): boolean {
   return /https?:\/\/[^/\s]*supabase\.co(?=\/|$)/i.test(url);
 }
 
-/** REST / Edge Functions 必须带店铺 JWT；Auth 路由仍由 supabase-js 自行处理 */
+/** REST / Edge Functions / Storage 必须带店铺 JWT；Auth 路由仍由 supabase-js 自行处理 */
 export function shouldAttachInventoryUserJwt(requestUrl: string): boolean {
   const url = String(requestUrl || '');
   if (/\/auth\/v1(?:\/|\?|$)/.test(url)) return false;
-  return /\/rest\/v1(?:\/|\?|$)|\/functions\/v1(?:\/|\?|$)/.test(url);
+  return /\/rest\/v1(?:\/|\?|$)|\/functions\/v1(?:\/|\?|$)|\/storage\/v1(?:\/|\?|$)/.test(url);
 }
 
 /**

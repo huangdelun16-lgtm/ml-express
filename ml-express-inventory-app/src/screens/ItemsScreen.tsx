@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import ExceptionReportModal from '../components/ExceptionReportModal';
+import ArrivalNotifySheet from '../components/ArrivalNotifySheet';
 import ItemActionModal from '../components/ItemActionModal';
 import ItemViewModal from '../components/ItemViewModal';
 import ItemsListRow from '../components/ItemsListRow';
@@ -48,11 +50,17 @@ import { isExpressPackItem } from '../utils/packItem';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { showTaskSuccess } from '../utils/taskSuccessAlert';
 import { feedbackService } from '../services/FeedbackService';
+import { listOpenExceptionBarcodes } from '../services/inventoryExceptionService';
+import type { ExceptionReportTarget } from '../types/inventoryException';
+import { exceptionTargetFromItem } from '../utils/inventoryException';
+import { needsArrivalNotify } from '../utils/arrivalNotify';
+import type { ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { resolveAppError, useTranslation, getItemCustomerProfileEditDeniedMessage } from '../i18n';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Nav = {
   navigate: (name: keyof RootStackParamList, params?: object) => void;
+  setParams: (params: { initialMode?: 'pack' | 'sign' }) => void;
 };
 
 type ItemsRoute = RouteProp<RootStackParamList, 'Items'>;
@@ -68,13 +76,19 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [listMode, setListMode] = useState<ItemsListMode>('normal');
+  const [listMode, setListMode] = useState<ItemsListMode>(() => {
+    const mode = route.params?.initialMode;
+    return mode === 'pack' || mode === 'sign' ? mode : 'normal';
+  });
   const [filterRegion, setFilterRegion] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [packModalVisible, setPackModalVisible] = useState(false);
   const [actionItem, setActionItem] = useState<InventoryItemListRow | null>(null);
   const [actionCanEdit, setActionCanEdit] = useState(false);
   const [viewItemId, setViewItemId] = useState<string | null>(null);
+  const [exceptionTarget, setExceptionTarget] = useState<ExceptionReportTarget | null>(null);
+  const [notifyTargets, setNotifyTargets] = useState<ArrivalNotifyTarget[]>([]);
+  const [openExceptionCodes, setOpenExceptionCodes] = useState<Set<string>>(new Set());
   const [orderBarcodeRequireDone, setOrderBarcodeRequireDone] = useState(false);
   const [signRequest, setSignRequest] = useState<CustomerSignFlowRequest | null>(null);
   const [packSuccessInfo, setPackSuccessInfo] = useState<{
@@ -90,6 +104,13 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    const mode = route.params?.initialMode;
+    if (mode !== 'pack' && mode !== 'sign') return;
+    setListMode(mode);
+    navigation.setParams({ initialMode: undefined });
+  }, [route.params?.initialMode, navigation]);
 
   const load = useCallback(async (force = false) => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
@@ -118,6 +139,9 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
   useFocusEffect(
     useCallback(() => {
       void load();
+      void listOpenExceptionBarcodes()
+        .then(setOpenExceptionCodes)
+        .catch(() => setOpenExceptionCodes(new Set()));
     }, [load]),
   );
 
@@ -424,6 +448,11 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
             selected={selectedIds.has(item.id)}
             selectActive={selectActive}
             selectAccent={selectAccent}
+            hasOpenException={
+              openExceptionCodes.has(item.barcode.trim().toUpperCase())
+              || openExceptionCodes.has((item.input_barcode || '').trim().toUpperCase())
+            }
+            unnotified={!!store && needsArrivalNotify(store, item)}
             onPress={() => {
               if (selectActive) toggleSelect(item.id);
               else setActionItem(item);
@@ -475,6 +504,24 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
               }
             : undefined
         }
+        onNotifyCustomer={
+          actionItem && store && !isExpressPackItem(actionItem) && canMarkCustomerSigned(store, actionItem)
+            ? () => {
+                const item = actionItem;
+                setActionItem(null);
+                setNotifyTargets([
+                  {
+                    barcode: item.barcode,
+                    expressBarcode: item.input_barcode,
+                    recipientName: item.recipient_name?.trim() || item.customer_name?.trim() || '',
+                    recipientPhone: '',
+                    hubCode: hubCode ?? store.hubCode ?? '',
+                    storeName: store.storeName,
+                  },
+                ]);
+              }
+            : undefined
+        }
         onPrint={
           actionItem
             ? () => {
@@ -485,6 +532,33 @@ export default function ItemsScreen({ navigation }: { navigation: Nav }) {
               }
             : undefined
         }
+        onReportException={
+          actionItem && !isExpressPackItem(actionItem)
+            ? () => {
+                const item = actionItem;
+                setActionItem(null);
+                setExceptionTarget(exceptionTargetFromItem(item));
+              }
+            : undefined
+        }
+      />
+
+      <ExceptionReportModal
+        visible={!!exceptionTarget}
+        target={exceptionTarget}
+        onClose={() => setExceptionTarget(null)}
+        onSubmitted={() => {
+          void listOpenExceptionBarcodes()
+            .then(setOpenExceptionCodes)
+            .catch(() => undefined);
+        }}
+      />
+
+      <ArrivalNotifySheet
+        visible={notifyTargets.length > 0}
+        targets={notifyTargets}
+        onClose={() => setNotifyTargets([])}
+        onNotified={() => void load()}
       />
 
       <ItemViewModal

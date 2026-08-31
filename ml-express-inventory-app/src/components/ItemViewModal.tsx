@@ -7,15 +7,23 @@ import {
   View,
 } from 'react-native';
 import Text from './AppText';
+import ExceptionReportModal from './ExceptionReportModal';
+import ArrivalNotifySheet from './ArrivalNotifySheet';
 import {
   InboundInvoiceContent,
   InboundInvoiceFooter,
   inboundInvoiceStyles,
   type InboundInvoiceData,
 } from './InboundInvoiceView';
-import { useTranslation } from '../i18n';
+import { useAuth } from '../contexts/AuthContext';
+import { getExceptionTypeLabel, useTranslation, fmt } from '../i18n';
 import { getItemDetail } from '../services/inventoryService';
+import { listInventoryExceptions } from '../services/inventoryExceptionService';
+import type { InventoryExceptionRecord } from '../types/inventoryException';
 import type { InventoryItemDetail } from '../types/inventory';
+import { exceptionTargetFromItem } from '../utils/inventoryException';
+import { canMarkCustomerSigned } from '../utils/customerSign';
+import type { ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
 
 type Props = {
@@ -55,17 +63,34 @@ function mapDetailToInvoice(detail: InventoryItemDetail): InboundInvoiceData {
 
 export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Props) {
   const { t } = useTranslation();
+  const { store } = useAuth();
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exceptions, setExceptions] = useState<InventoryExceptionRecord[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [notifyTarget, setNotifyTarget] = useState<ArrivalNotifyTarget | null>(null);
 
   const invoiceData = useMemo(
     () => (detail ? mapDetailToInvoice(detail) : null),
     [detail],
   );
 
+  const loadExceptions = (barcode?: string) => {
+    if (!barcode) {
+      setExceptions([]);
+      return;
+    }
+    void listInventoryExceptions({ itemBarcode: barcode, limit: 20 })
+      .then(setExceptions)
+      .catch(() => setExceptions([]));
+  };
+
   useEffect(() => {
     if (!visible || !itemId) {
       setDetail(null);
+      setExceptions([]);
+      setReportOpen(false);
+      setNotifyTarget(null);
       return;
     }
     let cancelled = false;
@@ -74,6 +99,7 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
       if (!cancelled) {
         setDetail(d);
         setLoading(false);
+        if (d?.barcode) loadExceptions(d.barcode);
       }
     });
     return () => {
@@ -113,15 +139,66 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
                   inbound: t.items.inbound,
                 }}
               />
+              {exceptions.length > 0 ? (
+                <View style={styles.exceptionBox}>
+                  <Text style={styles.exceptionTitle}>{t.exception.existing}</Text>
+                  {exceptions.map((row) => (
+                    <Text key={row.id} style={styles.exceptionLine}>
+                      {getExceptionTypeLabel(t, row.exception_type)}
+                      {row.status === 'open' ? ` · ${t.exception.statusOpen}` : ` · ${t.exception.statusResolved}`}
+                      {row.qty_expected != null && row.qty_actual != null
+                        ? ` · ${fmt(t.exception.qtyLine, {
+                            expected: row.qty_expected,
+                            actual: row.qty_actual,
+                          })}`
+                        : ''}
+                      {` · ${row.note}`}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
             </ScrollView>
 
             <InboundInvoiceFooter
               recipientPhone={invoiceData.recipientPhone}
               onClose={onClose}
+              onNotifyCustomer={
+                store && detail && canMarkCustomerSigned(store, detail)
+                  ? () =>
+                      setNotifyTarget({
+                        barcode: detail.barcode,
+                        expressBarcode: detail.input_barcode,
+                        recipientName:
+                          detail.recipient_name?.trim() || detail.customer_name?.trim() || '',
+                        recipientPhone: detail.recipient_phone?.trim() || '',
+                        hubCode: store.hubCode ?? '',
+                        storeName: store.storeName,
+                      })
+                  : undefined
+              }
+              onReportException={store && detail ? () => setReportOpen(true) : undefined}
             />
           </View>
         )}
       </View>
+      <ExceptionReportModal
+        visible={reportOpen && !!detail}
+        target={detail ? exceptionTargetFromItem(detail) : null}
+        onClose={() => setReportOpen(false)}
+        onSubmitted={() => loadExceptions(detail?.barcode)}
+      />
+      <ArrivalNotifySheet
+        visible={!!notifyTarget}
+        targets={notifyTarget ? [notifyTarget] : []}
+        onClose={() => setNotifyTarget(null)}
+        onNotified={() => {
+          if (itemId) {
+            void getItemDetail(itemId).then((d) => {
+              if (d) setDetail(d);
+            });
+          }
+        }}
+      />
     </Modal>
   );
 }
@@ -136,4 +213,15 @@ const styles = {
   },
   loadingText: { color: '#94a3b8', fontSize: 14, marginTop: 12 },
   emptyText: { color: '#e2e8f0', fontSize: 15, fontWeight: '700' as const, marginBottom: 8 },
+  exceptionBox: {
+    marginTop: 16,
+    backgroundColor: '#fff7ed',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    gap: 6,
+  },
+  exceptionTitle: { color: '#9a3412', fontSize: 13, fontWeight: '900' as const },
+  exceptionLine: { color: '#7c2d12', fontSize: 12, lineHeight: 18 },
 };

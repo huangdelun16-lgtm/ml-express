@@ -6,6 +6,8 @@ export type CrossBorderCustomerLookup = {
   phone: string;
   delivery_area_code: string;
   delivery_region_id?: string;
+  notify_method?: string;
+  notify_account?: string;
 };
 
 function parseLookupRow(data: unknown): CrossBorderCustomerLookup | null {
@@ -19,6 +21,8 @@ function parseLookupRow(data: unknown): CrossBorderCustomerLookup | null {
     phone: String(row.phone ?? '').trim(),
     delivery_area_code: String(row.delivery_area_code ?? '').trim().toUpperCase(),
     delivery_region_id: String(row.delivery_region_id ?? '').trim() || undefined,
+    notify_method: String(row.notify_method ?? '').trim() || undefined,
+    notify_account: String(row.notify_account ?? '').trim() || undefined,
   };
 }
 

@@ -26,7 +26,7 @@ function RouteFallback() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'rgba(226, 232, 240, 0.9)',
+        color: '#5b6b7c',
         fontSize: '1rem',
         fontWeight: 600,
       }}
@@ -60,8 +60,8 @@ class ErrorBoundary extends React.Component<
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(168deg, #0b1220 0%, #132337 40%, #1e3a5f 75%, #0f172a 100%)',
-          color: 'white',
+          background: 'linear-gradient(165deg, #c5eaf4 0%, #e8f4fa 46%, #ffffff 100%)',
+          color: '#1a2b48',
           padding: '2rem',
           textAlign: 'center'
         }}>
@@ -73,15 +73,14 @@ class ErrorBoundary extends React.Component<
           <button
             onClick={() => window.location.reload()}
             style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
+              background: '#2c98a6',
+              color: '#ffffff',
+              border: 'none',
               padding: '1rem 2rem',
-              borderRadius: '8px',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontSize: '1rem',
               fontWeight: '600',
-              backdropFilter: 'blur(10px)'
             }}
           >
             刷新页面

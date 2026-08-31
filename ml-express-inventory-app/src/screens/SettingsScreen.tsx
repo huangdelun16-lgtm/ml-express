@@ -26,7 +26,7 @@ import {
   checkAndroidAppUpdate,
   openAndroidApkDownload,
 } from '../services/appUpdateService';
-import { getActiveBluetoothDevice } from '../services/bluetoothScanner';
+import { getLiveConnectedBluetoothDevice, loadSavedBluetoothDevice } from '../services/bluetoothScanner';
 import { feedbackService } from '../services/FeedbackService';
 import type { ScannedBluetoothDevice } from '../utils/bluetoothDeviceMerge';
 
@@ -103,6 +103,7 @@ export default function SettingsScreen() {
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [bluetoothScanVisible, setBluetoothScanVisible] = useState(false);
   const [connectedBluetooth, setConnectedBluetooth] = useState<ScannedBluetoothDevice | null>(null);
+  const [savedBluetooth, setSavedBluetooth] = useState<ScannedBluetoothDevice | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<
     'checking' | 'online' | 'offline'
   >('checking');
@@ -111,6 +112,15 @@ export default function SettingsScreen() {
   const hub = store ? resolveStoreHubCode(store) : hubCode ?? '';
   const appVersion = Constants.expoConfig?.version ?? '1.9.3';
   const buildVersion = Constants.nativeBuildVersion ?? '22';
+
+  const refreshPrinterStatus = useCallback(async () => {
+    const [live, saved] = await Promise.all([
+      getLiveConnectedBluetoothDevice(),
+      loadSavedBluetoothDevice(),
+    ]);
+    setConnectedBluetooth(live);
+    setSavedBluetooth(saved);
+  }, []);
 
   const checkConnection = useCallback(async () => {
     setConnectionStatus('checking');
@@ -121,8 +131,8 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       void checkConnection();
-      void getActiveBluetoothDevice().then(setConnectedBluetooth);
-    }, [checkConnection]),
+      void refreshPrinterStatus();
+    }, [checkConnection, refreshPrinterStatus]),
   );
 
   const handleLogout = () => {
@@ -256,13 +266,25 @@ export default function SettingsScreen() {
         icon="📡"
         title={t.settings.scanPrinterTitle}
         accent="#38bdf8"
-        badge={connectedBluetooth ? t.settings.scanPrinterConnected : undefined}
+        badge={
+          connectedBluetooth
+            ? t.settings.scanPrinterConnected
+            : savedBluetooth
+              ? t.settings.scanPrinterSelected
+              : undefined
+        }
       >
         <Text style={styles.hintText}>{t.settings.scanPrinterHint}</Text>
         {connectedBluetooth ? (
           <View style={styles.connectedRow}>
             <Text style={styles.connectedPrinterText}>
               {fmt(t.settings.scanPrinterConnectedTo, { name: connectedBluetooth.name })}
+            </Text>
+          </View>
+        ) : savedBluetooth ? (
+          <View style={styles.connectedRow}>
+            <Text style={styles.selectedPrinterText}>
+              {fmt(t.settings.scanPrinterSelectedTo, { name: savedBluetooth.name })}
             </Text>
           </View>
         ) : null}
@@ -329,7 +351,7 @@ export default function SettingsScreen() {
         visible={bluetoothScanVisible}
         onClose={() => setBluetoothScanVisible(false)}
         onConnectionChange={() => {
-          void getActiveBluetoothDevice().then(setConnectedBluetooth);
+          void refreshPrinterStatus();
         }}
       />
     </ScrollView>
@@ -448,6 +470,12 @@ const styles = StyleSheet.create({
   },
   connectedPrinterText: {
     color: '#6ee7b7',
+    fontSize: 13,
+    fontWeight: '800',
+    flex: 1,
+  },
+  selectedPrinterText: {
+    color: '#fbbf24',
     fontSize: 13,
     fontWeight: '800',
     flex: 1,

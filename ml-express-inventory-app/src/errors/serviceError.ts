@@ -111,6 +111,17 @@ export type ServiceErrorCode =
   | 'signInvalidPhone'
   | 'signNeedProxyName'
   | 'signNeedSignature'
+  | 'exceptionTypeRequired'
+  | 'exceptionNoteRequired'
+  | 'exceptionPhotoRequired'
+  | 'exceptionPhotoLimit'
+  | 'exceptionQtyInvalid'
+  | 'exceptionCreateFailed'
+  | 'exceptionResolveFailed'
+  | 'exceptionPhotoUploadFailed'
+  | 'exceptionNotFound'
+  | 'exceptionAlreadyClosed'
+  | 'exceptionCameraDenied'
   | 'unknown';
 
 export class ServiceError extends Error {

@@ -153,7 +153,7 @@ export default function SupportPage() {
           opacity: isVisible ? 1 : 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
           transition: 'all 0.5s ease',
-          color: 'white',
+          color: '#1a2b48',
           maxWidth: 820,
           margin: '0 auto',
           padding: '2rem 0.5rem 4rem',
@@ -177,8 +177,8 @@ export default function SupportPage() {
             <article
               key={section.heading}
               style={{
-                background: 'rgba(255,255,255,0.12)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                background: '#ffffff',
+                border: '1px solid rgba(26, 43, 72, 0.1)',
                 borderRadius: 16,
                 padding: '1.25rem 1.5rem',
                 backdropFilter: 'blur(8px)',
@@ -187,7 +187,7 @@ export default function SupportPage() {
               <h2 style={{ margin: '0 0 0.65rem', fontSize: '1.1rem', fontWeight: 700 }}>
                 {section.heading}
               </h2>
-              <p style={{ margin: 0, lineHeight: 1.65, opacity: 0.95 }}>{section.body}</p>
+              <p style={{ margin: 0, lineHeight: 1.65, color: '#3d5270', fontWeight: 500 }}>{section.body}</p>
               {'items' in section && section.items ? (
                 <ul style={{ margin: '0.75rem 0 0', paddingLeft: '1.25rem', lineHeight: 1.8 }}>
                   {section.items.map((item) => (
@@ -202,20 +202,20 @@ export default function SupportPage() {
         <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
           <Link
             to="/ml-inventory/privacy"
-            style={{ color: '#c4b5fd', fontWeight: 700, textDecoration: 'none' }}
+            style={{ color: '#1e7a86', fontWeight: 700, textDecoration: 'none' }}
           >
             {t.privacyLink} →
           </Link>
           <Link
             to="/"
             state={{ landingScrollTo: 'landing-contact' }}
-            style={{ color: '#7dd3fc', fontWeight: 700, textDecoration: 'none' }}
+            style={{ color: '#2c98a6', fontWeight: 700, textDecoration: 'none' }}
           >
             {t.contactLink} →
           </Link>
           <Link
             to="/"
-            style={{ color: '#e2e8f0', fontWeight: 600, textDecoration: 'none' }}
+            style={{ color: '#4a6280', fontWeight: 600, textDecoration: 'none' }}
           >
             {t.homeLink}
           </Link>

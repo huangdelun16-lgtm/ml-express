@@ -29,7 +29,7 @@ function LandingEmbedFallback() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'rgba(248, 250, 252, 0.55)',
+        color: '#8a94a6',
         fontWeight: 600,
         fontSize: '1rem',
       }}
@@ -2219,9 +2219,6 @@ const HomePage: React.FC = () => {
         lineHeight: 'var(--line-height-normal)',
       }}
     >
-      <div className="home-landing__ambient" aria-hidden>
-        <DeliveryAmbientBackground variant="landing" />
-      </div>
       <div className="home-landing__content">
       <NavigationBar
         variant="landing"
@@ -2244,6 +2241,7 @@ const HomePage: React.FC = () => {
         id="home"
         className={`home-hero home-landing-snap-section${isVisible ? ' home-hero--visible' : ''}`}
       >
+        <DeliveryAmbientBackground variant="landing" />
         <div className="home-hero__glow home-hero__glow--a" aria-hidden />
         <div className="home-hero__glow home-hero__glow--b" aria-hidden />
         <div className="home-hero__inner">

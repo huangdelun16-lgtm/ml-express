@@ -1,46 +1,40 @@
 import React from 'react';
-import ParticleBackground from './ParticleBackground';
+import '../../styles/clientInterior.css';
 
 export type DeliveryAmbientVariant = 'default' | 'mall' | 'cart' | 'landing';
 
 type Props = {
   variant?: DeliveryAmbientVariant;
-  /** 嵌在首页 landing 区块内：粒子更少、更淡 */
+  /** 嵌在首页 landing 区块内：不重复叠骑手 */
   embedded?: boolean;
 };
 
-const COUNT: Record<DeliveryAmbientVariant, number> = {
-  landing: 110,
-  default: 90,
-  mall: 88,
-  cart: 80,
-};
-
 /**
- * 客户端 Web 动态背景入口：科技感粒子连线（Express × Link）。
- * 实现见 ParticleBackground.tsx。
+ * 静态骑手氛围层，叠在内容下方，不挡点击。
  */
 const DeliveryAmbientBackground: React.FC<Props> = ({
   variant = 'default',
   embedded = false,
-}) => (
-  <div
-    aria-hidden
-    style={{
-      position: 'absolute',
-      inset: 0,
-      zIndex: 0,
-      pointerEvents: 'none',
-      overflow: 'hidden',
-    }}
-  >
-    <ParticleBackground
-      particleCount={embedded ? 56 : COUNT[variant]}
-      maxDistance={embedded ? 100 : variant === 'landing' ? 128 : 120}
-      speed={embedded ? 0.32 : 0.45}
-      background="transparent"
-    />
-  </div>
-);
+}) => {
+  const mods = [
+    `client-rider-ambient--${variant}`,
+    embedded ? 'client-rider-ambient--embedded' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div className={`client-rider-ambient ${mods}`} aria-hidden>
+      <img
+        className="client-rider-ambient__img"
+        src="/brand-rider-3d.png"
+        alt=""
+        width={748}
+        height={900}
+        decoding="async"
+      />
+    </div>
+  );
+};
 
 export default DeliveryAmbientBackground;

@@ -75,10 +75,20 @@ describe('rewritePublicStorageUrl', () => {
     );
   });
 
-  it('attaches shop JWT only to REST and functions', () => {
+  it('attaches shop JWT to REST, functions and storage', () => {
     expect(
       shouldAttachInventoryUserJwt(
         'https://admin-market-link-express.com/__sb/rest/v1/rpc/inventory_confirm_pkg_hub_received',
+      ),
+    ).toBe(true);
+    expect(
+      shouldAttachInventoryUserJwt(
+        'https://admin-market-link-express.com/__sb/functions/v1/inventory-store-login',
+      ),
+    ).toBe(true);
+    expect(
+      shouldAttachInventoryUserJwt(
+        'https://admin-market-link-express.com/__sb/storage/v1/object/inventory-exceptions/store/a.jpg',
       ),
     ).toBe(true);
     expect(

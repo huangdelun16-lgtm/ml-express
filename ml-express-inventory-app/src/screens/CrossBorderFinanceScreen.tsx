@@ -3,25 +3,40 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import { resolveAppError, useTranslation } from '../i18n';
-import { listCrossBorderFinance } from '../services/financeLedgerService';
+import {
+  getCrossBorderCategoryLabel,
+  getLedgerAmountDisplay,
+  resolveAppError,
+  useTranslation,
+} from '../i18n';
 import { deleteCrossBorderManualEntry } from '../services/crossBorderManualEntryService';
+import { feedbackService } from '../services/FeedbackService';
+import { listCrossBorderFinance } from '../services/financeLedgerService';
+import { shareFinanceCsvFile } from '../services/shareFinanceCsv';
 import type { FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
+import AppText from '../components/AppText';
 import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
 import FinanceLedgerRow from '../components/finance/FinanceLedgerRow';
 import FinanceSummaryHero from '../components/finance/FinanceSummaryHero';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, space } from '../theme';
+import { regionDisplayLabel } from '../constants/destinationOptions';
 import { filterByTab, type FinanceTabKey } from '../utils/crossBorderFinanceTabs';
+import {
+  buildFinanceExportCsv,
+  buildFinanceExportFilename,
+  financeExportLabelsFromT,
+  formatFinanceExportDateTime,
+} from '../utils/financeLedgerExport';
 
 type FinanceRoute = RouteProp<RootStackParamList, 'CrossBorderFinance'>;
 
@@ -45,6 +60,7 @@ export default function CrossBorderFinanceScreen() {
   const [manualModalVisible, setManualModalVisible] = useState(false);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const tabs = useMemo(
     (): { key: FinanceTabKey; label: string }[] => [
@@ -162,11 +178,56 @@ export default function CrossBorderFinanceScreen() {
     [entries, currentKey],
   );
 
+  const onExportCsv = useCallback(async () => {
+    if (exporting) return;
+    if (displayed.length === 0) {
+      feedbackService.warning(t.crossBorderFinance.exportEmpty);
+      return;
+    }
+    if (!store || !hubCode) return;
+    setExporting(true);
+    try {
+      const csv = buildFinanceExportCsv({
+        entries: displayed,
+        summary,
+        netBalance,
+        meta: {
+          hub: regionDisplayLabel(hubCode),
+          store: store.storeCode,
+          tab: tabs.find((item) => item.key === tab)?.label ?? tab,
+          exportedAt: formatFinanceExportDateTime(new Date().toISOString()),
+        },
+        labels: financeExportLabelsFromT(t),
+        categoryLabel: (entry) => getCrossBorderCategoryLabel(t, entry.category),
+        amountDisplay: (entry) => getLedgerAmountDisplay(t, entry),
+      });
+      const filename = buildFinanceExportFilename({ hub: hubCode, tab, at: new Date() });
+      const method = await shareFinanceCsvFile({
+        csv,
+        filename,
+        dialogTitle: t.crossBorderFinance.exportCsv,
+      });
+      if (method === 'copied') {
+        feedbackService.success(t.crossBorderFinance.exportCopied);
+      }
+    } catch {
+      feedbackService.error(t.crossBorderFinance.exportFailed);
+    } finally {
+      setExporting(false);
+    }
+  }, [displayed, exporting, hubCode, netBalance, store, summary, t, tab, tabs]);
+
   if (!store || !hubCode) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyIcon}>🔐</Text>
-        <Text style={styles.emptyTitle}>{t.common.loginStoreFirst}</Text>
+        <View style={styles.emptyMark}>
+          <View style={styles.emptyMarkLine} />
+          <View style={[styles.emptyMarkLine, styles.emptyMarkLineMid]} />
+          <View style={[styles.emptyMarkLine, styles.emptyMarkLineShort]} />
+        </View>
+        <AppText style={styles.emptyTitle} myanmarWeight="bold">
+          {t.common.loginStoreFirst}
+        </AppText>
       </View>
     );
   }
@@ -175,8 +236,10 @@ export default function CrossBorderFinanceScreen() {
     <View style={styles.root}>
       {loading && entries.length === 0 ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.purpleSoft} size="large" />
-          <Text style={styles.loadingText}>{t.crossBorderFinance.loading}</Text>
+          <ActivityIndicator color={colors.slateSoft} size="large" />
+          <AppText style={styles.loadingText} myanmarWeight="semibold">
+            {t.crossBorderFinance.loading}
+          </AppText>
         </View>
       ) : (
         <FlatList
@@ -197,6 +260,8 @@ export default function CrossBorderFinanceScreen() {
               loading={loading}
               displayedLength={displayed.length}
               onAddManual={() => setManualModalVisible(true)}
+              onExport={() => void onExportCsv()}
+              exporting={exporting}
               onTabChange={setTab}
               onRetry={() => void load()}
             />
@@ -204,9 +269,27 @@ export default function CrossBorderFinanceScreen() {
           ListEmptyComponent={
             !loading ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyIcon}>📭</Text>
-                <Text style={styles.emptyTitle}>{t.crossBorderFinance.emptyTitle}</Text>
-                <Text style={styles.emptyHint}>{t.crossBorderFinance.emptyHint}</Text>
+                <View style={styles.emptyMark}>
+                  <View style={styles.emptyMarkLine} />
+                  <View style={[styles.emptyMarkLine, styles.emptyMarkLineMid]} />
+                  <View style={[styles.emptyMarkLine, styles.emptyMarkLineShort]} />
+                </View>
+                <AppText style={styles.emptyTitle} myanmarWeight="bold">
+                  {t.crossBorderFinance.emptyTitle}
+                </AppText>
+                <AppText style={styles.emptyHint} myanmarWeight="regular">
+                  {t.crossBorderFinance.emptyHint}
+                </AppText>
+                {tab === 'all' || tab === 'manual' ? (
+                  <Pressable
+                    style={({ pressed }) => [styles.emptyCta, pressed && styles.emptyCtaPressed]}
+                    onPress={() => setManualModalVisible(true)}
+                  >
+                    <AppText style={styles.emptyCtaText} myanmarWeight="bold">
+                      {t.crossBorderFinance.addManual}
+                    </AppText>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null
           }
@@ -214,8 +297,8 @@ export default function CrossBorderFinanceScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.purpleSoft}
-              colors={[colors.purple]}
+              tintColor={colors.slateSoft}
+              colors={[colors.accent]}
             />
           }
           renderItem={({ item }) => (
@@ -245,8 +328,36 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   loadingText: { color: colors.muted, marginTop: 14, fontSize: 14, fontWeight: '600' },
   list: { paddingHorizontal: space.lg, paddingBottom: 32 },
-  emptyBox: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: space.xl },
-  emptyIcon: { fontSize: 40, marginBottom: space.md },
+  emptyBox: {
+    alignItems: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: space.lg,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptyMark: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginBottom: space.md,
+    paddingHorizontal: 10,
+  },
+  emptyMarkLine: {
+    height: 2,
+    width: '100%',
+    borderRadius: 1,
+    backgroundColor: colors.borderMuted,
+  },
+  emptyMarkLineMid: { width: '72%' },
+  emptyMarkLineShort: { width: '46%' },
   emptyTitle: { color: colors.textSecondary, fontSize: 16, fontWeight: '800' },
   emptyHint: {
     color: colors.muted2,
@@ -254,6 +365,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
-    fontWeight: '600',
+    fontWeight: '500',
   },
+  emptyCta: {
+    marginTop: 16,
+    backgroundColor: colors.purple,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyCtaPressed: { opacity: 0.85 },
+  emptyCtaText: { color: colors.white, fontSize: 13, fontWeight: '800' },
 });

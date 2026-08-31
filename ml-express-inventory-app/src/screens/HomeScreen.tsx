@@ -8,19 +8,28 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Text from '../components/AppText';
+import HomeTodoQueue from '../components/HomeTodoQueue';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { getHomeOverview } from '../services/inventoryService';
+import { fetchHomeTodoCounts } from '../services/homeTodoService';
 import type { PackedShipmentListRow } from '../types/inventory';
 import { packStatusStyle } from '../utils/packDisplayStatus';
+import {
+  buildHomeTodoQueue,
+  emptyHomeTodoCounts,
+  type HomeTodoItem,
+} from '../utils/homeTodoQueue';
 import { LOGIN_LOGO } from '../constants/branding';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { getPackStatusLabel, resolveAppError, useTranslation } from '../i18n';
 import { feedbackService } from '../services/FeedbackService';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
-type Nav = { navigate: (name: string, params?: { presetCode?: string }) => void };
+type HomeProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 const PRIMARY_STAT_KEYS = [
   { key: 'itemCount' as const, labelKey: 'statSku' as const },
@@ -29,7 +38,7 @@ const PRIMARY_STAT_KEYS = [
   { key: 'todayIn' as const, labelKey: 'statTodayIn' as const },
 ] as const;
 
-export default function HomeScreen({ navigation }: { navigation: Nav }) {
+export default function HomeScreen({ navigation }: HomeProps) {
   const insets = useSafeAreaInsets();
   const { operatorName, storeCode, hubCode, store, logout } = useAuth();
   const { t, fmt, language } = useTranslation();
@@ -42,19 +51,32 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     packCount: 0,
   });
   const [recentPacks, setRecentPacks] = useState<PackedShipmentListRow[]>([]);
+  const [todoItems, setTodoItems] = useState<HomeTodoItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     const scope = store && hubCode ? { store, hubCode } : undefined;
-    try {
-      const { stats: nextStats, recentPacks: nextPacks } = await getHomeOverview(scope);
-      setStats(nextStats);
-      setRecentPacks(nextPacks);
+    const todoPromise =
+      store && hubCode
+        ? fetchHomeTodoCounts({ store, hubCode })
+        : Promise.resolve(emptyHomeTodoCounts());
+    const [overviewResult, todoResult] = await Promise.allSettled([
+      getHomeOverview(scope),
+      todoPromise,
+    ]);
+    if (overviewResult.status === 'fulfilled') {
+      setStats(overviewResult.value.stats);
+      setRecentPacks(overviewResult.value.recentPacks);
       setLoadError('');
-    } catch (error) {
-      setLoadError(resolveAppError(t, error) || t.home.loadFailed);
+    } else {
+      setLoadError(resolveAppError(t, overviewResult.reason) || t.home.loadFailed);
+    }
+    if (todoResult.status === 'fulfilled') {
+      setTodoItems(buildHomeTodoQueue(todoResult.value));
+    } else {
+      setTodoItems([]);
     }
   }, [store, hubCode, t]);
 
@@ -77,6 +99,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     { title: t.home.tilePkg, icon: '📦', screen: 'Pkg', color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
     { title: t.home.tileStockOut, icon: '🚚', screen: 'StockOut', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
     { title: t.home.tileHubReceive, icon: '✅', screen: 'HubReceive', color: '#14b8a6', bg: 'rgba(20,184,166,0.12)' },
+    { title: t.home.tileExceptions, icon: '⚠️', screen: 'Exceptions', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
     { title: t.home.tileShipmentTrack, icon: '🛰️', screen: 'ShipmentTrack', color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)' },
     { title: t.home.tileMovements, icon: '📜', screen: 'Movements', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
     { title: t.home.tileFinance, icon: '🌏', screen: 'CrossBorderFinance', color: '#38bdf8', bg: 'rgba(56,189,248,0.12)' },
@@ -87,7 +110,7 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
     ['StockIn', 'PackagingStockIn', 'Items', 'Pkg', 'StockOut'].includes(tile.screen),
   );
   const inboundTiles = tiles.filter((tile) =>
-    ['HubReceive', 'CrossBorderFinance'].includes(tile.screen),
+    ['HubReceive', 'Exceptions', 'CrossBorderFinance'].includes(tile.screen),
   );
   const moreTiles = tiles.filter((tile) =>
     ['ShipmentTrack', 'Movements', 'CameraScan', 'Settings'].includes(tile.screen),
@@ -241,6 +264,18 @@ export default function HomeScreen({ navigation }: { navigation: Nav }) {
           </View>
         ) : null}
 
+        <HomeTodoQueue
+          t={t}
+          items={todoItems}
+          onOpen={(item) => {
+            if (item.screen === 'Items') {
+              navigation.navigate('Items', { initialMode: item.itemsMode });
+              return;
+            }
+            navigation.navigate(item.screen);
+          }}
+        />
+
         <Pressable
           style={styles.pkgCard}
           onPress={() => navigation.navigate('Pkg')}
@@ -315,7 +350,7 @@ function TileGrid({
   navigation,
 }: {
   tiles: { title: string; icon: string; screen: string; bg: string }[];
-  navigation: Nav;
+  navigation: HomeProps['navigation'];
 }) {
   return (
     <View style={styles.grid}>
@@ -323,7 +358,7 @@ function TileGrid({
         <Pressable
           key={tile.screen}
           style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
-          onPress={() => navigation.navigate(tile.screen)}
+          onPress={() => navigation.navigate(tile.screen as keyof RootStackParamList)}
         >
           <View style={[styles.tileIconWrap, { backgroundColor: tile.bg }]}>
             <Text style={styles.tileIcon}>{tile.icon}</Text>

@@ -1794,28 +1794,30 @@ const ProfilePage: React.FC = () => {
     return language === 'zh' ? '未知' : language === 'en' ? 'Unknown' : 'မသိရှိရ';
   };
 
-  // 获取支付方式颜色
-  const getPaymentMethodColor = (paymentMethod?: string) => {
-    if (paymentMethod === 'qr') {
-      return 'rgba(34, 197, 94, 0.3)'; // 绿色
-    } else if (paymentMethod === 'cash') {
-      return 'rgba(251, 191, 36, 0.3)'; // 黄色
-    } else if (paymentMethod === 'balance') {
-      return 'rgba(59, 130, 246, 0.3)'; // 蓝色
-    }
-    return 'rgba(156, 163, 175, 0.3)'; // 灰色
-  };
-
   // 获取支付方式边框颜色
   const getPaymentMethodBorderColor = (paymentMethod?: string) => {
     if (paymentMethod === 'qr') {
-      return 'rgba(34, 197, 94, 0.5)';
+      return 'rgba(22, 101, 52, 0.22)';
     } else if (paymentMethod === 'cash') {
-      return 'rgba(251, 191, 36, 0.5)';
+      return 'rgba(146, 64, 14, 0.2)';
     } else if (paymentMethod === 'balance') {
-      return 'rgba(59, 130, 246, 0.5)';
+      return 'rgba(30, 64, 175, 0.2)';
     }
-    return 'rgba(156, 163, 175, 0.5)';
+    return 'rgba(51, 65, 85, 0.18)';
+  };
+
+  const getPaymentMethodTextColor = (paymentMethod?: string) => {
+    if (paymentMethod === 'qr') return '#166534';
+    if (paymentMethod === 'cash') return '#92400e';
+    if (paymentMethod === 'balance') return '#1e40af';
+    return '#334155';
+  };
+
+  const getPaymentMethodFill = (paymentMethod?: string) => {
+    if (paymentMethod === 'qr') return '#dcfce7';
+    if (paymentMethod === 'cash') return '#fef3c7';
+    if (paymentMethod === 'balance') return '#dbeafe';
+    return '#e2e8f0';
   };
 
   // 计算订单统计
@@ -2029,7 +2031,7 @@ const ProfilePage: React.FC = () => {
         </div>
 
         {/* 用户信息卡片 - 参考客户端app样式 */}
-        <div style={{
+        <div className="client-readable-card" style={{
           background: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(12px)',
           borderRadius: '20px',
@@ -2073,7 +2075,7 @@ const ProfilePage: React.FC = () => {
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
-                  <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: '700' }}>
+                  <div style={{ color: '#1a2b48', fontSize: '1.4rem', fontWeight: '700' }}>
                     {currentUser.name || '-'}
                   </div>
                   <div style={{
@@ -2117,6 +2119,7 @@ const ProfilePage: React.FC = () => {
                   {currentUser && (
                     <button
                       onClick={handleOpenEditProfile}
+                      className="client-ghost-btn"
                       style={{
                         background: 'rgba(255, 255, 255, 0.1)',
                         border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -2161,7 +2164,7 @@ const ProfilePage: React.FC = () => {
                     }}>
                       <span style={{ fontSize: '1.2rem' }}>💰</span>
                       <div>
-                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>
+                        <div style={{ color: '#8a6a1a', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>
                           {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}
                         </div>
                         <div style={{ color: '#fbbf24', fontSize: '1.1rem', fontWeight: '900' }}>
@@ -2202,6 +2205,7 @@ const ProfilePage: React.FC = () => {
                 {currentUser && (
                   <button
                     onClick={handleOpenEditProfile}
+                    className="client-ghost-btn"
                     style={{
                       background: 'rgba(59, 130, 246, 0.1)',
                       color: 'white',
@@ -2241,6 +2245,7 @@ const ProfilePage: React.FC = () => {
                 {isPartnerStore && (
                   <button
                     onClick={() => setShowPasswordModal(true)}
+                    className="client-ghost-btn"
                     style={{
                       background: 'rgba(255, 255, 255, 0.1)',
                       color: 'white',
@@ -2280,6 +2285,7 @@ const ProfilePage: React.FC = () => {
                 {isPartnerStore && (
                   <button
                     onClick={() => setShowProductsModal(true)}
+                    className="client-ghost-btn"
                     style={{
                       background: 'rgba(16, 185, 129, 0.1)',
                       color: 'white',
@@ -2427,13 +2433,13 @@ const ProfilePage: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                     <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📧</span>
-                    <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '1rem', fontWeight: '500' }}>
+                    <span style={{ color: '#1a2b48', fontSize: '1rem', fontWeight: '600' }}>
                       {currentUser.email || '未绑定邮箱'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                     <span style={{ fontSize: '1.1rem', opacity: 0.9 }}>📞</span>
-                    <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '1rem', fontWeight: '500' }}>
+                    <span style={{ color: '#1a2b48', fontSize: '1rem', fontWeight: '600' }}>
                       {currentUser.phone || '未绑定电话'}
                     </span>
                   </div>
@@ -2477,10 +2483,10 @@ const ProfilePage: React.FC = () => {
             }}
             >
               <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>📦</div>
-              <div style={{ color: 'white', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
+              <div style={{ color: '#1d4ed8', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
                 {orderStats.total}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              <div style={{ color: '#3d5270', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {t.totalOrders}
               </div>
             </div>
@@ -2576,10 +2582,10 @@ const ProfilePage: React.FC = () => {
             }}
             >
               <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>⏳</div>
-              <div style={{ color: 'white', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
+              <div style={{ color: '#b45309', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
                 {orderStats.pendingPickup}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              <div style={{ color: '#3d5270', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {t.pendingPickup}
               </div>
             </div>
@@ -2605,10 +2611,10 @@ const ProfilePage: React.FC = () => {
             }}
             >
               <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>🚚</div>
-              <div style={{ color: 'white', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
+              <div style={{ color: '#6d28d9', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
                 {orderStats.inTransit}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              <div style={{ color: '#3d5270', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {t.inTransit}
               </div>
             </div>
@@ -2634,10 +2640,10 @@ const ProfilePage: React.FC = () => {
             }}
             >
               <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>✅</div>
-              <div style={{ color: 'white', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
+              <div style={{ color: '#047857', fontSize: '2.2rem', fontWeight: '900', marginBottom: '0.25rem', letterSpacing: '-1px' }}>
                 {orderStats.completed}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              <div style={{ color: '#3d5270', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {t.completed}
               </div>
             </div>
@@ -3361,10 +3367,10 @@ const ProfilePage: React.FC = () => {
                 }}>
                   <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.1)', width: '48px', height: '48px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🗓️</div>
                   <div>
-                    <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    <label style={{ color: '#6b7c93', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
                       {t.accountDate}
                     </label>
-                    <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '700' }}>
+                    <div style={{ color: '#1a2b48', fontSize: '1.1rem', fontWeight: '700' }}>
                       {currentUser.created_at 
                         ? new Date(currentUser.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : language === 'en' ? 'en-US' : 'my-MM', {
                             year: 'numeric',
@@ -3386,10 +3392,10 @@ const ProfilePage: React.FC = () => {
                 }}>
                   <div style={{ fontSize: '1.8rem', background: 'rgba(255,255,255,0.1)', width: '48px', height: '48px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📍</div>
                   <div>
-                    <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    <label style={{ color: '#6b7c93', fontSize: '0.8rem', fontWeight: '700', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
                       {t.address}
                     </label>
-                    <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '700' }}>
+                    <div style={{ color: '#1a2b48', fontSize: '1.1rem', fontWeight: '700' }}>
                       {currentUser.address || '-'}
                     </div>
                   </div>
@@ -3400,7 +3406,7 @@ const ProfilePage: React.FC = () => {
         </div>
 
         {/* 包裹列表 */}
-        <div style={{
+        <div className="client-readable-card" style={{
           background: 'rgba(255, 255, 255, 0.15)',
           backdropFilter: 'blur(20px)',
           borderRadius: '20px',
@@ -3411,220 +3417,99 @@ const ProfilePage: React.FC = () => {
           transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
           transition: 'all 0.6s ease 0.4s'
         }}>
-          <h2 id="packages-section" style={{
-            color: 'white',
-            fontSize: '1.5rem',
-            marginBottom: '1.5rem',
-            borderBottom: '2px solid rgba(255,255,255,0.3)',
-            paddingBottom: '0.5rem'
-          }}>
+          <h2 id="packages-section" className="client-pkg-list__title">
             {t.packages}
           </h2>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: 'white' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+            <div className="client-pkg-list__empty">
+              <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>⏳</div>
               <div>{language === 'zh' ? '加载中...' : language === 'en' ? 'Loading...' : 'ဖွင့်နေသည်...'}</div>
             </div>
           ) : userPackages.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: 'white' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📦</div>
-              <div style={{ fontSize: '1.2rem' }}>{t.noPackages}</div>
+            <div className="client-pkg-list__empty">
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📦</div>
+              <div>{t.noPackages}</div>
             </div>
           ) : (
             <>
-              <div style={{
-                display: 'grid',
-                gap: '1rem'
-              }}>
+              <div className="client-pkg-stack">
                 {userPackages
                   .slice((currentPage - 1) * packagesPerPage, currentPage * packagesPerPage)
                   .map((pkg: any) => (
-                <div
-                  key={pkg.id}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    padding: '1.5rem',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  {/* 顶部：订单号、创建时间、价格、包裹类型 - 一行显示 */}
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '1rem',
-                    alignItems: 'center',
-                    marginBottom: '1rem',
-                    paddingBottom: '1rem',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
-                  }}>
-                    {/* 订单号 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
-                        {t.packageId}:
-                      </span>
-                      <span style={{ color: 'white', fontSize: '0.95rem', fontWeight: 'bold' }}>
-                        {pkg.id}
-                      </span>
+                <div key={pkg.id} className="client-pkg-card">
+                  <div className="client-pkg-meta">
+                    <div className="client-pkg-meta__item">
+                      <span className="client-pkg-meta__label">{t.packageId}</span>
+                      <span className="client-pkg-meta__value client-pkg-meta__value--mono">{pkg.id}</span>
                     </div>
-
-                    {/* 分隔符 */}
-                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>|</span>
-
-                    {/* 创建时间 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
-                        {t.createTime}:
-                      </span>
-                      <span style={{ color: 'white', fontSize: '0.95rem' }}>
-                        {pkg.create_time || pkg.created_at || '-'}
-                      </span>
+                    <div className="client-pkg-meta__item">
+                      <span className="client-pkg-meta__label">{t.createTime}</span>
+                      <span className="client-pkg-meta__value">{pkg.create_time || pkg.created_at || '-'}</span>
                     </div>
-
-                    {/* 分隔符 */}
-                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>|</span>
-
-                    {/* 价格 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
-                        {t.price}:
-                      </span>
-                      <span style={{ color: 'white', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                    <div className="client-pkg-meta__item">
+                      <span className="client-pkg-meta__label">{t.price}</span>
+                      <span className="client-pkg-meta__value">
                         {pkg.price ? `${pkg.price.replace('MMK', '').trim()} MMK` : '-'}
                       </span>
                     </div>
-
-                    {/* 分隔符 */}
-                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>|</span>
-
-                    {/* 包裹类型 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
-                        {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}:
+                    <div className="client-pkg-meta__item">
+                      <span className="client-pkg-meta__label">
+                        {language === 'zh' ? '包裹类型' : language === 'en' ? 'Package Type' : 'ပက်ကေ့ဂျ်အမျိုးအစား'}
                       </span>
-                      <span style={{ color: 'white', fontSize: '0.95rem' }}>
-                        {pkg.package_type || '-'}
-                      </span>
+                      <span className="client-pkg-meta__value">{pkg.package_type || '-'}</span>
                     </div>
                   </div>
 
-                  {/* 状态和支付方式按钮 */}
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    marginBottom: '1rem'
-                  }}>
-                    {/* 状态按钮 */}
-                    <div style={{
-                      background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status),
-                      color: 'white',
-                      padding: '0.4rem 0.9rem',
-                      borderRadius: '20px',
-                      fontSize: '0.85rem',
-                      fontWeight: 'bold',
-                      whiteSpace: 'nowrap'
-                    }}>
+                  <div className="client-pkg-tags">
+                    <div
+                      className="client-pkg-tag client-pkg-tag--status"
+                      style={{ background: getStatusColor(pkg.status === '待收款' ? '待取件' : pkg.status) }}
+                    >
                       {pkg.status === '待收款' ? getStatusText(pkg.status) : pkg.status}
                     </div>
-                    
-                    {/* 支付方式按钮 */}
                     {pkg.payment_method && (
-                      <div style={{
-                        background: getPaymentMethodColor(pkg.payment_method),
-                        color: 'white',
-                        border: `1px solid ${getPaymentMethodBorderColor(pkg.payment_method)}`,
-                        padding: '0.4rem 0.9rem',
-                        borderRadius: '20px',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        whiteSpace: 'nowrap'
-                      }}>
+                      <div
+                        className="client-pkg-tag client-pkg-tag--pay"
+                        style={{
+                          background: getPaymentMethodFill(pkg.payment_method),
+                          color: getPaymentMethodTextColor(pkg.payment_method),
+                          borderColor: getPaymentMethodBorderColor(pkg.payment_method),
+                        }}
+                      >
                         {getPaymentMethodText(pkg.payment_method)}
                       </div>
                     )}
-
-                    {/* 🚀 新增：商品费用 - 仅限 VIP/普通账号显示 */}
                     {!isPartnerStore && (() => {
                       const itemMatch = pkg.description?.match(/\[(?:商品费用（仅余额支付）|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)): (.*?) MMK\]/);
                       if (itemMatch && itemMatch[1]) {
                         return (
-                          <div style={{
-                            background: 'rgba(251, 191, 36, 0.2)',
-                            color: '#fbbf24',
-                            border: '1px solid rgba(251, 191, 36, 0.3)',
-                            padding: '0.4rem 0.9rem',
-                            borderRadius: '20px',
-                            fontSize: '0.85rem',
-                            fontWeight: 'bold',
-                            whiteSpace: 'nowrap'
-                          }}>
+                          <div
+                            className="client-pkg-tag client-pkg-tag--pay"
+                            style={{ background: '#fef3c7', color: '#92400e', borderColor: 'rgba(146, 64, 14, 0.2)' }}
+                          >
                             🛍️ {language === 'zh' ? '商品费用' : language === 'en' ? 'Item Cost' : 'ကုန်ပစ္စည်းဖိုး'}: {itemMatch[1]} MMK ({language === 'zh' ? '余额支付' : language === 'en' ? 'Balance' : 'လက်ကျန်ငွေ'})
                           </div>
                         );
                       }
                       return null;
                     })()}
-
-                    {/* 🚀 修正：代收款 - 仅限商家账号显示 */}
                     {isPartnerStore && pkg.cod_amount > 0 ? (
-                      <div style={{
-                        background: 'rgba(239, 68, 68, 0.2)',
-                        color: '#fca5a5',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        padding: '0.4rem 0.9rem',
-                        borderRadius: '20px',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        whiteSpace: 'nowrap'
-                      }}>
+                      <div
+                        className="client-pkg-tag client-pkg-tag--pay"
+                        style={{ background: '#fee2e2', color: '#991b1b', borderColor: 'rgba(153, 27, 27, 0.18)' }}
+                      >
                         💰 {t.cod}: {pkg.cod_amount.toLocaleString()} MMK
                       </div>
                     ) : null}
                   </div>
 
-                  <div style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    justifyContent: 'center',
-                    marginTop: '1rem'
-                  }}>
+                  <div className="client-pkg-actions">
                     <button
+                      className="client-pkg-btn client-pkg-btn--detail"
                       onClick={() => {
                         setSelectedPackage(pkg);
                         setShowPackageDetailModal(true);
-                      }}
-                      style={{
-                        background: 'rgba(59, 130, 246, 0.25)',
-                        color: 'white',
-                        border: '1px solid rgba(59, 130, 246, 0.4)',
-                        padding: '0.5rem 1.5rem',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        fontWeight: 'bold',
-                        transition: 'all 0.3s ease',
-                        flex: 1,
-                        maxWidth: '150px'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.4)';
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)';
-                        e.currentTarget.style.transform = 'translateY(0)';
                       }}
                     >
                       {t.viewDetails}
@@ -3633,112 +3518,35 @@ const ProfilePage: React.FC = () => {
                     {!isPartnerStore && (
                       <button
                         type="button"
+                        className="client-pkg-btn client-pkg-btn--pickup"
                         onClick={() => void showPickupCode(pkg)}
-                        style={{
-                          background: 'rgba(16, 185, 129, 0.25)',
-                          color: 'white',
-                          border: '1px solid rgba(16, 185, 129, 0.45)',
-                          padding: '0.5rem 1.5rem',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: 'bold',
-                          flex: 1,
-                          maxWidth: '150px'
-                        }}
                       >
                         📱 {t.pickupCode}
                       </button>
                     )}
 
-                    {/* 🚀 新增：评价订单按钮 - 仅限已完成/已送达订单 且 未评价过 */}
                     {!isPartnerStore && (pkg.status === '已送达' || pkg.status === '已完成') && !reviewedOrderIds.has(pkg.id) && (
                       <button
+                        className="client-pkg-btn client-pkg-btn--rate"
                         onClick={() => handleOpenReviewModal(pkg)}
-                        style={{
-                          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '0.5rem 1.5rem',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: 'bold',
-                          transition: 'all 0.3s ease',
-                          flex: 1,
-                          maxWidth: '150px',
-                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 6px 15px rgba(245, 158, 11, 0.4)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
-                        }}
                       >
                         ⭐ {language === 'zh' ? '评价订单' : language === 'en' ? 'Rate Order' : 'မှတ်ချက်ပေးရန်'}
                       </button>
                     )}
 
-                    {/* 🚀 新增：打包中状态显示“开始打包”按钮 */}
                     {isPartnerStore && pkg.status === '打包中' && (
                       <button
+                        className="client-pkg-btn client-pkg-btn--pack"
                         onClick={() => handleStartPacking(pkg)}
-                        style={{
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '0.5rem 1.5rem',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: '900',
-                          transition: 'all 0.3s ease',
-                          flex: 1,
-                          maxWidth: '150px',
-                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 6px 15px rgba(16, 185, 129, 0.4)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-                        }}
                       >
                         📦 {language === 'zh' ? '开始打包' : language === 'en' ? 'Start Packing' : 'ထုပ်ပိုးရန်စတင်ပါ'}
                       </button>
                     )}
 
-                    {/* 🚀 新增：中转站重新发货按钮 */}
                     {isPartnerStore && storeInfo?.store_type === 'transit_station' && pkg.status === '已送达' && pkg.description?.includes('[异常转送中转站]') && (
                       <button
+                        className="client-pkg-btn client-pkg-btn--reship"
                         onClick={() => handleReshipOrder(pkg)}
-                        style={{
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '0.5rem 1.5rem',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: '900',
-                          transition: 'all 0.3s ease',
-                          flex: 1,
-                          maxWidth: '150px',
-                          boxShadow: '0 4px 12px rgba(217, 119, 6, 0.3)'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 6px 15px rgba(217, 119, 6, 0.4)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(217, 119, 6, 0.3)';
-                        }}
                       >
                         🚀 {language === 'zh' ? '重新发货' : language === 'en' ? 'Re-ship' : 'ပြန်လည်ပို့ဆောင်ပါ'}
                       </button>
@@ -3750,120 +3558,34 @@ const ProfilePage: React.FC = () => {
 
               {/* 分页控件 */}
               {userPackages.length > packagesPerPage && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  marginTop: '2rem',
-                  flexWrap: 'wrap'
-                }}>
+                <div className="client-pkg-pager">
                   <button
+                    className="client-pkg-pager__btn"
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    style={{
-                      background: currentPage === 1 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '8px',
-                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold',
-                      transition: 'all 0.3s ease',
-                      opacity: currentPage === 1 ? 0.5 : 1
-                    }}
-                    onMouseOver={(e) => {
-                      if (currentPage !== 1) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.7)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (currentPage !== 1) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
-                      }
-                    }}
                   >
                     {language === 'zh' ? '上一页' : language === 'en' ? 'Previous' : 'ယခင်စာမျက်နှာ'}
                   </button>
-
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    justifyContent: 'center'
-                  }}>
-                    {Array.from({ length: Math.ceil(userPackages.length / packagesPerPage) }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        style={{
-                          background: currentPage === page ? 'rgba(59, 130, 246, 0.7)' : 'rgba(255, 255, 255, 0.1)',
-                          color: 'white',
-                          border: `1px solid ${currentPage === page ? 'rgba(59, 130, 246, 0.9)' : 'rgba(255, 255, 255, 0.3)'}`,
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: currentPage === page ? 'bold' : 'normal',
-                          transition: 'all 0.3s ease',
-                          minWidth: '40px'
-                        }}
-                        onMouseOver={(e) => {
-                          if (currentPage !== page) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (currentPage !== page) {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                          }
-                        }}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-
+                  {Array.from({ length: Math.ceil(userPackages.length / packagesPerPage) }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      className={`client-pkg-pager__btn${currentPage === page ? ' client-pkg-pager__btn--active' : ''}`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  ))}
                   <button
+                    className="client-pkg-pager__btn"
                     onClick={() => setCurrentPage(prev => Math.min(Math.ceil(userPackages.length / packagesPerPage), prev + 1))}
                     disabled={currentPage === Math.ceil(userPackages.length / packagesPerPage)}
-                    style={{
-                      background: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(59, 130, 246, 0.5)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '8px',
-                      cursor: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 'not-allowed' : 'pointer',
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold',
-                      transition: 'all 0.3s ease',
-                      opacity: currentPage === Math.ceil(userPackages.length / packagesPerPage) ? 0.5 : 1
-                    }}
-                    onMouseOver={(e) => {
-                      if (currentPage !== Math.ceil(userPackages.length / packagesPerPage)) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.7)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (currentPage !== Math.ceil(userPackages.length / packagesPerPage)) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.5)';
-                      }
-                    }}
                   >
                     {language === 'zh' ? '下一页' : language === 'en' ? 'Next' : 'နောက်စာမျက်နှာ'}
                   </button>
                 </div>
               )}
 
-              {/* 显示当前页信息 */}
-              <div style={{
-                textAlign: 'center',
-                marginTop: '1rem',
-                color: 'rgba(255, 255, 255, 0.8)',
-                fontSize: '0.9rem'
-              }}>
+              <div className="client-pkg-pager__hint">
                 {language === 'zh' 
                   ? `显示第 ${(currentPage - 1) * packagesPerPage + 1}-${Math.min(currentPage * packagesPerPage, userPackages.length)} 条，共 ${userPackages.length} 条`
                   : language === 'en'

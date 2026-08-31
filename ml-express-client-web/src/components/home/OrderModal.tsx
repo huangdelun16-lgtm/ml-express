@@ -10,6 +10,7 @@ import {
   type OrderWizardStepIndex,
 } from './orderModalWizard';
 import { feedbackService } from '../../services/FeedbackService';
+import '../../styles/clientInterior.css';
 
 /** 创建订单弹窗：与商家端 Web 统一视觉 */
 const MODAL_OVERLAY: CSSProperties = {
@@ -20,7 +21,7 @@ const MODAL_OVERLAY: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: 'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
-  background: 'rgba(15, 23, 42, 0.78)',
+  background: 'rgba(26, 43, 72, 0.32)',
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
 };
@@ -40,10 +41,9 @@ const MODAL_PANEL: CSSProperties = {
   boxSizing: 'border-box',
   padding: 0,
   borderRadius: 20,
-  background: 'linear-gradient(180deg, #0f172a 0%, #1e3a8a 38%, #334155 100%)',
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  boxShadow:
-    '0 25px 50px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.06) inset, 0 1px 0 rgba(255,255,255,0.08) inset',
+  background: 'linear-gradient(180deg, #ffffff 0%, #f4fafc 100%)',
+  border: '1px solid rgba(26, 43, 72, 0.1)',
+  boxShadow: '0 24px 60px rgba(26, 43, 72, 0.18)',
 };
 
 const MODAL_CHROME: CSSProperties = {
@@ -51,7 +51,7 @@ const MODAL_CHROME: CSSProperties = {
   position: 'relative',
   padding: 'clamp(1rem, 3vw, 1.35rem) clamp(1.1rem, 3.5vw, 1.5rem) 0.75rem',
   paddingRight: 'clamp(2.75rem, 6vw, 3.25rem)',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+  borderBottom: '1px solid rgba(26, 43, 72, 0.08)',
 };
 
 const MODAL_CLOSE_BTN: CSSProperties = {
@@ -61,9 +61,9 @@ const MODAL_CLOSE_BTN: CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: 10,
-  border: '1px solid rgba(255, 255, 255, 0.28)',
-  background: 'rgba(15, 23, 42, 0.55)',
-  color: '#f8fafc',
+  border: '1px solid rgba(26, 43, 72, 0.12)',
+  background: '#f1f5f9',
+  color: '#1a2b48',
   fontSize: '1.35rem',
   lineHeight: 1,
   cursor: 'pointer',
@@ -106,18 +106,16 @@ const WIZARD_BOTTOM_BAR: CSSProperties = {
   flexShrink: 0,
   marginTop: 0,
   padding: '1rem clamp(1.1rem, 3.5vw, 1.5rem) max(1rem, env(safe-area-inset-bottom, 0px))',
-  borderTop: '1px solid rgba(255, 255, 255, 0.12)',
-  background: 'linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.88) 28%, rgba(15, 23, 42, 0.98) 100%)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
+  borderTop: '1px solid rgba(26, 43, 72, 0.08)',
+  background: '#ffffff',
 };
 
 const WIZARD_BTN_BACK: CSSProperties = {
   padding: '10px 14px',
   borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.2)',
-  background: 'rgba(15,23,42,0.35)',
-  color: '#e2e8f0',
+  border: '1px solid rgba(26, 43, 72, 0.14)',
+  background: '#f1f5f9',
+  color: '#1a2b48',
   fontWeight: 700,
   fontSize: '0.88rem',
   cursor: 'pointer',
@@ -139,9 +137,9 @@ const WIZARD_BTN_NEXT: CSSProperties = {
 const WIZARD_BTN_CANCEL: CSSProperties = {
   padding: '10px 14px',
   borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.2)',
-  background: 'rgba(255,255,255,0.1)',
-  color: 'rgba(248,250,252,0.95)',
+  border: '1px solid rgba(26, 43, 72, 0.14)',
+  background: '#f8fafc',
+  color: '#3d5270',
   fontWeight: 700,
   cursor: 'pointer',
   whiteSpace: 'nowrap',
@@ -151,26 +149,25 @@ const WIZARD_BTN_SUBMIT: CSSProperties = {
   padding: '10px 16px',
   borderRadius: 10,
   border: 'none',
-  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+  background: 'linear-gradient(135deg, #2c98a6 0%, #1e7a86 100%)',
   color: 'white',
   fontWeight: 800,
   cursor: 'pointer',
   whiteSpace: 'nowrap',
-  boxShadow: '0 6px 18px rgba(37, 99, 235, 0.4)',
+  boxShadow: '0 6px 18px rgba(44, 152, 166, 0.32)',
 };
 
 const MODAL_HEADING: CSSProperties = {
-  color: '#f8fafc',
+  color: '#1a2b48',
   textAlign: 'center',
   margin: '0 0 0.5rem 0',
   fontSize: 'clamp(1.2rem, 3.8vw, 1.4rem)',
   fontWeight: 800,
   letterSpacing: '0.02em',
-  textShadow: '0 1px 2px rgba(0,0,0,0.35)',
 };
 
 const SECTION_HEADING: CSSProperties = {
-  color: 'rgba(248, 250, 252, 0.92)',
+  color: '#3d5270',
   fontSize: '0.78rem',
   fontWeight: 700,
   letterSpacing: '0.08em',
@@ -179,7 +176,7 @@ const SECTION_HEADING: CSSProperties = {
 };
 
 const BLOCK_TITLE: CSSProperties = {
-  color: 'rgba(248, 250, 252, 0.96)',
+  color: '#1a2b48',
   fontSize: '1rem',
   fontWeight: 700,
   marginBottom: '0.85rem',
@@ -187,13 +184,10 @@ const BLOCK_TITLE: CSSProperties = {
 };
 
 const PRICE_ESTIMATE_CARD: CSSProperties = {
-  background: 'rgba(15, 23, 42, 0.55)',
+  background: '#f0f9fb',
   borderRadius: 14,
   padding: '1rem 1.05rem',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.2) inset',
+  border: '1px solid rgba(44, 152, 166, 0.16)',
 };
 
 const FORM_ACTIONS_ROW: CSSProperties = {
@@ -464,7 +458,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
 
   return (
     <div style={MODAL_OVERLAY}>
-      <div style={MODAL_PANEL}>
+      <div className="client-order-modal" style={MODAL_PANEL}>
         <div style={MODAL_CHROME}>
           <button
             type="button"
@@ -484,7 +478,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
             style={{
               textAlign: 'center',
               margin: '0 0 0.65rem',
-              color: 'rgba(255, 255, 255, 0.88)',
+              color: '#4a6280',
               fontSize: '0.92rem',
             }}
           >
@@ -522,13 +516,12 @@ const OrderModal: React.FC<OrderModalProps> = ({
               </div>
             ) : (
               <div style={{ 
-                background: 'rgba(255, 255, 255, 0.2)', 
-                color: 'white', 
+                background: '#e8f6f8', 
+                color: '#1a6b75', 
                 padding: '6px 16px', 
                 borderRadius: '20px', 
                 fontSize: '0.85rem', 
                 fontWeight: '700',
-                backdropFilter: 'blur(5px)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
@@ -1077,7 +1070,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '0.9rem' }}>
                       🛍️ {language === 'zh' ? '商品费用（仅余额支付）' : language === 'en' ? 'Item Cost (Balance Only)' : 'ကုန်ပစ္စည်းဖိုး (လက်ကျန်ငွေဖြင့်သာ)'}
                     </span>
-                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
+                    <span style={{ color: '#8a6a1a', fontSize: '0.75rem' }}>
                       {language === 'zh' ? '该金额将从账户余额中预扣' : language === 'en' ? 'Deducted from balance' : 'လက်ကျန်ငွေမှ နုတ်ယူမည်'}
                     </span>
                   </div>
@@ -1089,16 +1082,16 @@ const OrderModal: React.FC<OrderModalProps> = ({
                 {/* 🚀 新增：此处也显示一次实时余额 */}
                 <div style={{ 
                   padding: '0.75rem 1rem', 
-                  background: 'rgba(0,0,0,0.2)', 
+                  background: '#eef6f8', 
                   borderRadius: '10px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#3d5270', fontSize: '0.85rem' }}>
                     💰 {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}:
                   </span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                  <span style={{ color: '#1a2b48', fontWeight: 'bold', fontSize: '0.9rem' }}>
                     {currentUser?.balance?.toLocaleString() || 0} MMK
                   </span>
                 </div>
@@ -1225,7 +1218,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       width: '44px',
                       height: '24px',
                       borderRadius: '12px',
-                      backgroundColor: hasCOD ? '#10b981' : 'rgba(255,255,255,0.2)',
+                      backgroundColor: hasCOD ? '#10b981' : '#cbd5e1',
                       position: 'relative',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease'
@@ -1330,7 +1323,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
             
             <div style={PRICE_ESTIMATE_CARD}>
               {!isCalculated ? (
-                <div style={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.8)' }}>
+                <div style={{ textAlign: 'center', color: '#4a6280' }}>
                   <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
                     📊 {language === 'zh' ? '填写地址、包裹与配送选项后将自动显示费用' :
                         language === 'en' ? 'Fee updates automatically when address, package and delivery are set' :
@@ -1345,7 +1338,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
               ) : (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                    <span style={{ color: '#3d5270' }}>
                       {language === 'zh' ? '配送距离' : language === 'en' ? 'Delivery Distance' : 'ပို့ဆောင်အကွာအဝေး'}:
                     </span>
                     <span style={{ color: '#10b981', fontWeight: '600' }}>
@@ -1354,7 +1347,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                   </div>
                   {/* 基础费用始终显示 */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                    <span style={{ color: '#3d5270' }}>
                       {language === 'zh' ? '基础费用' : language === 'en' ? 'Base Fee' : 'အခြေခံအခကြေး'}:
                     </span>
                     <span style={{ color: '#3b82f6', fontWeight: '600' }}>
@@ -1366,7 +1359,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                   {selectedPackageType !== t.ui.waySide && (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                        <span style={{ color: '#3d5270' }}>
                           {language === 'zh' ? '距离费用' : language === 'en' ? 'Distance Fee' : 'အကွာအဝေးအခ'}:
                         </span>
                         <span style={{ color: '#8b5cf6', fontWeight: '600' }}>
@@ -1374,7 +1367,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                        <span style={{ color: '#3d5270' }}>
                           {language === 'zh' ? '超重费' : language === 'en' ? 'Overweight Fee' : 'အလေးချိန်ပိုအခ'}:
                         </span>
                         <span style={{ color: '#ef4444', fontWeight: '600' }}>
@@ -1389,7 +1382,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       {/* 超规费 - 仅超规件显示 */}
                       {(selectedPackageType === t.ui.oversizedPackageDetail || selectedPackageType === '超规件（45x60x15cm）以上') && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          <span style={{ color: '#3d5270' }}>
                             {language === 'zh' ? '超规费' : language === 'en' ? 'Oversize Fee' : 'အရွယ်အစားပိုအခ'}:
                           </span>
                           <span style={{ color: '#f97316', fontWeight: '600' }}>
@@ -1401,7 +1394,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       {/* 易碎品费 - 仅易碎品显示 */}
                       {(selectedPackageType === t.ui.fragile || selectedPackageType === '易碎品') && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          <span style={{ color: '#3d5270' }}>
                             {language === 'zh' ? '易碎品费' : language === 'en' ? 'Fragile Fee' : 'ပျက်စီးလွယ်သောအခ'}:
                           </span>
                           <span style={{ color: '#f97316', fontWeight: '600' }}>
@@ -1413,7 +1406,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                       {/* 食品饮料费 - 仅食品饮料显示 */}
                       {(selectedPackageType === t.ui.foodDrinks || selectedPackageType === '食品和饮料') && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                          <span style={{ color: '#3d5270' }}>
                             {language === 'zh' ? '食品饮料费' : language === 'en' ? 'Food & Drinks Fee' : 'အစားအသောက်အခ'}:
                           </span>
                           <span style={{ color: '#f97316', fontWeight: '600' }}>
@@ -1422,7 +1415,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
                         </div>
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                        <span style={{ color: '#3d5270' }}>
                           {language === 'zh' ? '配送速度费用' : language === 'en' ? 'Delivery Speed Fee' : 'ပို့ဆောင်မြန်နှုန်းအခ'}:
                         </span>
                         <span style={{ color: '#06b6d4', fontWeight: '600' }}>
@@ -1440,15 +1433,15 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     </>
                   )}
                   <div style={{ 
-                    borderTop: '1px solid rgba(255, 255, 255, 0.2)', 
+                    borderTop: '1px solid rgba(26, 43, 72, 0.1)', 
                     paddingTop: '0.5rem', 
                     marginTop: '0.5rem', 
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                      <span style={{ color: '#1a2b48', fontWeight: 'bold', fontSize: '1.1rem' }}>
                         🚚 {language === 'zh' ? '跑腿费' : language === 'en' ? 'Delivery Fee' : 'ပို့ဆောင်ခ'}
                       </span>
-                      <span style={{ color: 'white', fontWeight: '950', fontSize: '1.4rem' }}>
+                      <span style={{ color: '#1a2b48', fontWeight: '950', fontSize: '1.4rem' }}>
                         {Math.round(calculatedPriceDetail).toLocaleString()} MMK
                       </span>
                     </div>
@@ -1461,7 +1454,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
               💳 {language === 'zh' ? '跑腿费支付方式' : language === 'en' ? 'Pay delivery fee with' : 'ပို့ဆောင်ခ ပေးချေမှု'}
             </h3>
             <div style={PRICE_ESTIMATE_CARD}>
-              <p style={{ margin: '0 0 0.75rem', color: 'rgba(255,255,255,0.85)', fontSize: '0.88rem' }}>
+              <p style={{ margin: '0 0 0.75rem', color: '#4a6280', fontSize: '0.88rem' }}>
                 {language === 'zh'
                   ? '请选择余额或现金支付跑腿费，确认后再点右上角「提交订单」。'
                   : language === 'en'
@@ -1499,19 +1492,19 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     fontSize: '0.85rem',
                     fontWeight: '800',
                     border: '2px solid',
-                    borderColor: paymentMethod === 'balance' ? '#fbbf24' : 'rgba(255,255,255,0.15)',
+                    borderColor: paymentMethod === 'balance' ? '#fbbf24' : 'rgba(26, 43, 72, 0.12)',
                     background:
                       paymentMethod === 'balance'
                         ? 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)'
                         : canPayCourierFeeByBalance
-                          ? 'rgba(255,255,255,0.05)'
-                          : 'rgba(255,255,255,0.06)',
+                          ? '#ffffff'
+                          : '#f1f5f9',
                     color:
                       paymentMethod === 'balance'
                         ? '#1e293b'
                         : canPayCourierFeeByBalance
-                          ? 'white'
-                          : 'rgba(255,255,255,0.4)',
+                          ? '#1a2b48'
+                          : '#94a3b8',
                     cursor: canPayCourierFeeByBalance ? 'pointer' : 'not-allowed',
                     opacity: canPayCourierFeeByBalance ? 1 : 0.65,
                     transition: 'all 0.3s ease',
@@ -1533,9 +1526,9 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     fontSize: '0.85rem',
                     fontWeight: '800',
                     border: '2px solid',
-                    borderColor: paymentMethod === 'cash' ? '#10b981' : 'rgba(255,255,255,0.15)',
-                    background: paymentMethod === 'cash' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(255,255,255,0.05)',
-                    color: 'white',
+                    borderColor: paymentMethod === 'cash' ? '#10b981' : 'rgba(26, 43, 72, 0.12)',
+                    background: paymentMethod === 'cash' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                    color: paymentMethod === 'cash' ? 'white' : '#1a2b48',
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
                     boxShadow: paymentMethod === 'cash' ? '0 4px 15px rgba(16, 185, 129, 0.3)' : 'none',
@@ -1552,16 +1545,16 @@ const OrderModal: React.FC<OrderModalProps> = ({
                     justifyContent: 'space-between',
                     marginTop: '0.5rem',
                     padding: '0.75rem',
-                    background: 'rgba(0,0,0,0.2)',
+                    background: '#eef6f8',
                     borderRadius: '10px',
                   }}
                 >
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
+                  <span style={{ color: '#3d5270', fontSize: '0.9rem' }}>
                     💰 {language === 'zh' ? '账户余额' : language === 'en' ? 'Account Balance' : 'လက်ကျန်ငွေ'}:
                   </span>
                   <span
                     style={{
-                      color: balanceAfterCart >= 0 ? '#4ade80' : '#f87171',
+                      color: balanceAfterCart >= 0 ? '#047857' : '#b91c1c',
                       fontWeight: 'bold',
                     }}
                   >
@@ -1590,7 +1583,7 @@ const OrderModal: React.FC<OrderModalProps> = ({
             </button>
             <span
               style={{
-                color: 'rgba(255,255,255,0.75)',
+                color: '#4a6280',
                 fontSize: '0.75rem',
                 fontWeight: 800,
                 letterSpacing: '0.06em',

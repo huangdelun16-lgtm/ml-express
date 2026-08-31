@@ -363,10 +363,51 @@ function paginateCrossBorderFinance(crossBorderFinance, page, pageSize) {
   };
 }
 
+function mapExceptionPhotos(row) {
+  const nested = Array.isArray(row.inventory_exception_photos)
+    ? row.inventory_exception_photos
+    : Array.isArray(row.photos)
+      ? row.photos
+      : [];
+  const photos = nested
+    .slice()
+    .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+    .map((photo) => ({
+      id: photo.id,
+      public_url: photo.public_url,
+      storage_path: photo.storage_path || null,
+    }))
+    .filter((photo) => photo.public_url);
+  const { inventory_exception_photos: _ignored, ...rest } = row;
+  return { ...rest, photos };
+}
+
+async function loadOpenExceptions(supabase, warnings) {
+  const { data, error, count } = await supabase
+    .from('inventory_exceptions')
+    .select(
+      'id, item_barcode, express_barcode, pack_barcode, exception_type, status, note, qty_expected, qty_actual, reported_store_code, reported_hub_code, reported_operator, created_at, inventory_exception_photos(id, public_url, storage_path, created_at)',
+      { count: 'exact' },
+    )
+    .eq('status', 'open')
+    .order('created_at', { ascending: false })
+    .limit(40);
+  if (error) {
+    warnings.push('inventory_exceptions 未就绪或查询失败');
+    return { openExceptionCount: 0, openExceptions: [] };
+  }
+  const openExceptions = (data || []).map(mapExceptionPhotos);
+  return {
+    openExceptionCount: count ?? openExceptions.length,
+    openExceptions,
+  };
+}
+
 async function handleOverview(supabase, warnings) {
-  const [storesList, snapshot] = await Promise.all([
+  const [storesList, snapshot, exceptions] = await Promise.all([
     loadTransitStores(supabase),
     loadOverviewSnapshot(supabase),
+    loadOpenExceptions(supabase, warnings),
   ]);
   return {
     ok: true,
@@ -375,6 +416,8 @@ async function handleOverview(supabase, warnings) {
     transitStores: storesList,
     stats: snapshot.stats,
     transportFeeTotal: snapshot.transportFeeTotal,
+    openExceptionCount: exceptions.openExceptionCount,
+    openExceptions: exceptions.openExceptions,
     warnings,
   };
 }
@@ -417,10 +460,12 @@ async function handleAll(supabase, packStatus, warnings, financePagination) {
     { financeByStoreCode, crossBorderFinance, warnings: financeWarnings },
     snapshot,
     recentPacks,
+    exceptions,
   ] = await Promise.all([
     aggregateFinanceForTransitStores(supabase, storesList),
     loadOverviewSnapshot(supabase),
     loadRecentPacks(supabase, packStatus, warnings),
+    loadOpenExceptions(supabase, warnings),
   ]);
   warnings.push(...financeWarnings);
   return {
@@ -431,6 +476,8 @@ async function handleAll(supabase, packStatus, warnings, financePagination) {
     stats: snapshot.stats,
     recentPacks,
     transportFeeTotal: snapshot.transportFeeTotal,
+    openExceptionCount: exceptions.openExceptionCount,
+    openExceptions: exceptions.openExceptions,
     crossBorderFinance: paginateCrossBorderFinance(
       crossBorderFinance,
       financePagination.page,

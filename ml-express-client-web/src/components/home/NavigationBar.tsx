@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Logo from '../Logo';
 import { useLanguage } from '../../contexts/LanguageContext';
+import '../../styles/clientNav.css';
 
 interface NavigationBarProps {
   language: string;
@@ -105,104 +106,38 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           flexWrap: window.innerWidth < 640 ? 'wrap' : 'nowrap',
           rowGap: '0.4rem'
         }}>
-          <button 
+          <button
             type="button"
-            onClick={() => handleNavigation('/')} 
-            style={{ 
-              color: 'white', 
-              textDecoration: 'none',
-              fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-              fontWeight: 'var(--font-weight-medium)',
-              textAlign: 'center',
-              padding: 'var(--spacing-2) var(--spacing-3)',
-              borderRadius: 'var(--radius-md)',
-              transition: 'all var(--transition-fast)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              lineHeight: 'var(--line-height-normal)',
-              display: 'inline-block'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.color = 'white';
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
+            className="client-nav__link"
+            onClick={() => handleNavigation('/')}
+            style={{ fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)' }}
           >
             {t.nav.home}
           </button>
-          <button onClick={() => handleNavigation('/services')} style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-            fontWeight: 'var(--font-weight-medium)',
-            textAlign: 'center',
-            padding: 'var(--spacing-2) var(--spacing-3)',
-            borderRadius: 'var(--radius-md)',
-            transition: 'all var(--transition-fast)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            lineHeight: 'var(--line-height-normal)'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.color = 'white';
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-          >{t.nav.services}</button>
-          <button onClick={() => handleNavigation('/tracking')} style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-            fontWeight: 'var(--font-weight-medium)',
-            textAlign: 'center',
-            padding: 'var(--spacing-2) var(--spacing-3)',
-            borderRadius: 'var(--radius-md)',
-            transition: 'all var(--transition-fast)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            lineHeight: 'var(--line-height-normal)'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.color = 'white';
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-          >{t.nav.tracking}</button>
-          <button onClick={() => handleNavigation('/contact')} style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)',
-            fontWeight: 'var(--font-weight-medium)',
-            textAlign: 'center',
-            padding: 'var(--spacing-2) var(--spacing-3)',
-            borderRadius: 'var(--radius-md)',
-            transition: 'all var(--transition-fast)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            lineHeight: 'var(--line-height-normal)'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.color = 'white';
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-          >{t.nav.contact}</button>
+          <button
+            type="button"
+            className="client-nav__link"
+            onClick={() => handleNavigation('/services')}
+            style={{ fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)' }}
+          >
+            {t.nav.services}
+          </button>
+          <button
+            type="button"
+            className="client-nav__link"
+            onClick={() => handleNavigation('/tracking')}
+            style={{ fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)' }}
+          >
+            {t.nav.tracking}
+          </button>
+          <button
+            type="button"
+            className="client-nav__link"
+            onClick={() => handleNavigation('/contact')}
+            style={{ fontSize: window.innerWidth < 768 ? 'var(--font-size-sm)' : 'var(--font-size-base)' }}
+          >
+            {t.nav.contact}
+          </button>
         </div>
 
         <div style={{
@@ -224,53 +159,16 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
                   <>
                     <button
                       type="button"
+                      className="client-nav__user"
                       onClick={() => {
                         setShowLanguageDropdown(false);
                         setUserMenuOpen((o) => !o);
                       }}
                       aria-expanded={userMenuOpen}
                       aria-haspopup="menu"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        padding: '0.2rem 0.45rem 0.2rem 0.2rem',
-                        borderRadius: '999px',
-                        border: '1px solid rgba(255, 255, 255, 0.22)',
-                        background: 'rgba(15, 23, 42, 0.45)',
-                        backdropFilter: 'blur(12px)',
-                        color: 'white',
-                        cursor: 'pointer',
-                        minHeight: '36px',
-                        maxWidth: `min(100%, ${nameMaxW + 52}px)`,
-                        transition: 'border-color 0.2s, background 0.2s',
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.35)';
-                        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.62)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)';
-                        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.45)';
-                      }}
+                      style={{ maxWidth: `min(100%, ${nameMaxW + 52}px)` }}
                     >
-                      <span
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.78rem',
-                          fontWeight: 800,
-                          flexShrink: 0,
-                          background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
-                          color: 'white',
-                          boxShadow: '0 1px 8px rgba(0,0,0,0.25)',
-                        }}
-                        aria-hidden
-                      >
+                      <span className="client-nav__avatar" aria-hidden>
                         {initial}
                       </span>
                       <span
@@ -293,47 +191,14 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
                       </span>
                     </button>
                     {userMenuOpen && (
-                      <div
-                        role="menu"
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          right: 0,
-                          marginTop: 6,
-                          minWidth: 168,
-                          background: 'rgba(15, 23, 42, 0.96)',
-                          backdropFilter: 'blur(12px)',
-                          border: '1px solid rgba(255, 255, 255, 0.14)',
-                          borderRadius: 10,
-                          padding: 4,
-                          zIndex: 1000,
-                          boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-                        }}
-                      >
+                      <div className="client-nav__menu" role="menu">
                         <button
                           type="button"
                           role="menuitem"
+                          className="client-nav__menu-item"
                           onClick={() => {
                             setUserMenuOpen(false);
                             navigate('/profile');
-                          }}
-                          style={{
-                            width: '100%',
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'white',
-                            padding: '0.5rem 0.65rem',
-                            borderRadius: 8,
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            fontSize: '0.82rem',
-                            fontWeight: 600,
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'transparent';
                           }}
                         >
                           {language === 'zh' ? '我的账户' : language === 'en' ? 'My Account' : 'ကျွန်ုပ်၏အကောင့်'}
@@ -341,27 +206,10 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
                         <button
                           type="button"
                           role="menuitem"
+                          className="client-nav__menu-item client-nav__menu-item--danger"
                           onClick={() => {
                             setUserMenuOpen(false);
                             onLogout();
-                          }}
-                          style={{
-                            width: '100%',
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'rgba(252, 165, 165, 0.98)',
-                            padding: '0.5rem 0.65rem',
-                            borderRadius: 8,
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            fontSize: '0.82rem',
-                            fontWeight: 600,
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = 'rgba(248, 113, 113, 0.12)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'transparent';
                           }}
                         >
                           {language === 'zh' ? '退出登录' : language === 'en' ? 'Log out' : 'ထွက်ရန်'}
@@ -380,60 +228,22 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
             }}>
               {/* 注册按钮 */}
               <button
+                type="button"
+                className="client-nav__register"
                 onClick={() => {
-                  console.log('Register button clicked');
                   onShowRegisterModal(false);
                 }}
-                style={{
-                  background: 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.6rem 1.2rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem',
-                  fontWeight: 'bold',
-                  boxShadow: '0 4px 15px rgba(72, 187, 120, 0.3)',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(72, 187, 120, 0.5)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(72, 187, 120, 0.3)';
-                }}
+                style={{ fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem' }}
               >
                 {language === 'zh' ? '注册' : language === 'en' ? 'Register' : 'အကောင့်ဖွင့်ရန်'}
               </button>
-              
-              {/* 登录按钮 */}
               <button
+                type="button"
+                className="client-nav__login"
                 onClick={() => {
-                  console.log('Login button clicked');
                   onShowRegisterModal(true);
                 }}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: '2px solid rgba(255, 255, 255, 0.5)',
-                  padding: '0.6rem 1.2rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem',
-                  fontWeight: 'bold',
-                  backdropFilter: 'blur(10px)',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                }}
+                style={{ fontSize: window.innerWidth < 768 ? '0.85rem' : '1rem' }}
               >
                 {language === 'zh' ? '登录' : language === 'en' ? 'Login' : 'ဝင်ရန်'}
               </button>
@@ -444,82 +254,32 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           <div style={{ position: 'relative' }} data-language-dropdown>
             <button
               type="button"
+              className="client-nav__lang"
               onClick={() => {
                 setUserMenuOpen(false);
                 setShowLanguageDropdown(!showLanguageDropdown);
               }}
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.3)',
-                padding: '0.35rem 0.6rem',
-                borderRadius: '5px',
-                fontWeight: '600',
-                fontSize: window.innerWidth < 768 ? '0.75rem' : '0.85rem',
-                backdropFilter: 'blur(10px)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                minWidth: '90px',
-                justifyContent: 'space-between'
-              }}
+              style={{ fontSize: window.innerWidth < 768 ? '0.75rem' : '0.85rem' }}
             >
               <span>{language === 'zh' ? '中文' : language === 'en' ? 'English' : 'မြန်မာ'}</span>
               <span style={{ fontSize: '0.7rem' }}>▼</span>
             </button>
-            
             {showLanguageDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                background: 'rgba(0,0,0,0.85)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '5px',
-                marginTop: '2px',
-                zIndex: 1000,
-                overflow: 'hidden',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-              }}>
+              <div className="client-nav__lang-menu">
                 {[
                   { value: 'zh', label: '中文' },
                   { value: 'en', label: 'English' },
                   { value: 'my', label: 'မြန်မာ' }
-                ].map((option: any) => (
+                ].map((option) => (
                   <button
                     key={option.value}
+                    type="button"
+                    className={`client-nav__lang-item${language === option.value ? ' client-nav__lang-item--active' : ''}`}
                     onClick={() => {
-                      console.log('Language changed to:', option.value);
                       onLanguageChange(option.value);
                       setShowLanguageDropdown(false);
                     }}
-                    style={{
-                      width: '100%',
-                      background: language === option.value ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
-                      color: 'white',
-                      border: 'none',
-                      padding: '0.4rem 0.5rem',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      fontSize: window.innerWidth < 768 ? '0.75rem' : '0.85rem',
-                      transition: 'all 0.2s ease',
-                      fontWeight: language === option.value ? '600' : '400'
-                    }}
-                    onMouseOver={(e) => {
-                      if (language !== option.value) {
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (language !== option.value) {
-                        e.currentTarget.style.background = 'transparent';
-                      } else {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)';
-                      }
-                    }}
+                    style={{ fontSize: window.innerWidth < 768 ? '0.75rem' : '0.85rem' }}
                   >
                     {option.label}
                   </button>
@@ -541,7 +301,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           zIndex: 9999,
           pointerEvents: 'auto',
           background: 'transparent',
-          color: 'white',
+          color: '#1a2b48',
           padding: 0,
           marginBottom: 0,
           display: 'flex',
@@ -563,7 +323,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         zIndex: 9999,
         pointerEvents: 'auto',
         background: 'transparent',
-        color: 'white',
+        color: '#1a2b48',
         padding: 0,
         marginBottom: window.innerWidth < 768 ? '24px' : '40px',
         display: 'flex',

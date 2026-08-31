@@ -170,17 +170,22 @@ export function InboundInvoiceFooter({
   signing,
   canSignDelivered,
   onSignDelivered,
+  onNotifyCustomer,
+  onReportException,
   onClose,
 }: {
   recipientPhone?: string;
   signing?: boolean;
   canSignDelivered?: boolean;
   onSignDelivered?: () => void;
+  onNotifyCustomer?: () => void;
+  onReportException?: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const phone = recipientPhone?.trim() ?? '';
   const showSign = canSignDelivered && onSignDelivered;
+  const showNotify = Boolean(onNotifyCustomer);
 
   return (
     <View style={inboundInvoiceStyles.footer}>
@@ -190,6 +195,11 @@ export function InboundInvoiceFooter({
           onPress={() => void callPhoneNumber(phone)}
         >
           <Text style={inboundInvoiceStyles.btnCallText}>{t.invoice.callCustomer}</Text>
+        </Pressable>
+      ) : null}
+      {showNotify ? (
+        <Pressable style={inboundInvoiceStyles.btnNotify} onPress={onNotifyCustomer}>
+          <Text style={inboundInvoiceStyles.btnNotifyText}>{t.arrivalNotify.notifyCustomer}</Text>
         </Pressable>
       ) : null}
       {showSign ? (
@@ -204,6 +214,11 @@ export function InboundInvoiceFooter({
           <Text style={inboundInvoiceStyles.btnSignText}>
             {signing ? t.common.signInProgress : t.common.signedMark}
           </Text>
+        </Pressable>
+      ) : null}
+      {onReportException ? (
+        <Pressable style={inboundInvoiceStyles.btnException} onPress={onReportException}>
+          <Text style={inboundInvoiceStyles.btnExceptionText}>{t.exception.report}</Text>
         </Pressable>
       ) : null}
       <Pressable style={inboundInvoiceStyles.btnClose} onPress={onClose}>
@@ -335,6 +350,13 @@ export const inboundInvoiceStyles = StyleSheet.create({
     alignItems: 'center',
   },
   btnCallText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  btnNotify: {
+    backgroundColor: '#16a34a',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  btnNotifyText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnPrint: {
     backgroundColor: '#2563eb',
     borderRadius: 14,
@@ -350,6 +372,13 @@ export const inboundInvoiceStyles = StyleSheet.create({
     alignItems: 'center',
   },
   btnSignText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  btnException: {
+    backgroundColor: '#b45309',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  btnExceptionText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   btnClose: {
     backgroundColor: '#1e293b',
     borderRadius: 14,

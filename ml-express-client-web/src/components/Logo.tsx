@@ -41,27 +41,18 @@ const Logo: React.FC<LogoProps> = ({
       {/* 公司名称 - 双色标题 + 副标题 */}
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
         <span style={{
-          color: 'white',
+          color: '#1a2b48',
           fontSize: size === 'small' ? '1.6rem' : size === 'large' ? '4rem' : '2.2rem',
           fontWeight: '900',
-          textShadow: '0 4px 8px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.2)',
-          background: 'linear-gradient(135deg, #ffffff 0%, #e6f2ff 50%, #b3d9ff 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
           letterSpacing: '1px',
           whiteSpace: 'nowrap',
           fontFamily: "'Montserrat', 'Roboto', sans-serif",
-          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
         }}>
           MARKET LINK <span style={{ 
             fontSize: '1em', 
             fontStyle: 'italic', 
             fontWeight: '900',
-            background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
+            color: '#2c98a6',
             marginLeft: '4px'
           }}>EXPRESS</span>
         </span>
@@ -73,8 +64,7 @@ const Logo: React.FC<LogoProps> = ({
           fontWeight: '600',
           letterSpacing: size === 'small' ? '2px' : '4px',
           textTransform: 'uppercase',
-          color: 'rgba(255, 255, 255, 0.9)',
-          textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          color: '#8a94a6',
           fontFamily: "'Roboto', sans-serif",
           marginTop: '4px',
           marginLeft: size === 'small' ? '0' : size === 'large' ? '0' : '0'
@@ -90,19 +80,19 @@ const Logo: React.FC<LogoProps> = ({
             <span style={{ 
               width: size === 'small' ? '16px' : size === 'large' ? '40px' : '24px',
               height: '1.5px',
-              background: 'rgba(255, 255, 255, 0.9)',
+              background: '#8a94a6',
               display: 'block'
             }}></span>
             <span style={{ 
               width: size === 'small' ? '24px' : size === 'large' ? '60px' : '36px',
               height: '1.5px',
-              background: 'rgba(255, 255, 255, 0.9)',
+              background: '#8a94a6',
               display: 'block'
             }}></span>
             <span style={{ 
               width: size === 'small' ? '32px' : size === 'large' ? '80px' : '48px',
               height: '1.5px',
-              background: 'rgba(255, 255, 255, 0.9)',
+              background: '#8a94a6',
               display: 'block'
             }}></span>
           </span>
@@ -118,19 +108,19 @@ const Logo: React.FC<LogoProps> = ({
             <span style={{ 
               width: size === 'small' ? '16px' : size === 'large' ? '40px' : '24px',
               height: '1.5px',
-              background: 'rgba(255, 255, 255, 0.9)',
+              background: '#8a94a6',
               display: 'block'
             }}></span>
             <span style={{ 
               width: size === 'small' ? '24px' : size === 'large' ? '60px' : '36px',
               height: '1.5px',
-              background: 'rgba(255, 255, 255, 0.9)',
+              background: '#8a94a6',
               display: 'block'
             }}></span>
             <span style={{ 
               width: size === 'small' ? '32px' : size === 'large' ? '80px' : '48px',
               height: '1.5px',
-              background: 'rgba(255, 255, 255, 0.9)',
+              background: '#8a94a6',
               display: 'block'
             }}></span>
           </span>

@@ -21,6 +21,14 @@ import {
   type CrossBorderRegisteredCustomer,
   type CrossBorderSalesperson,
 } from '../services/inventoryConsoleService';
+import CustomerNotifyMethodSelect from './CustomerNotifyMethodSelect';
+import {
+  CUSTOMER_NOTIFY_METHOD_LABELS,
+  DEFAULT_CUSTOMER_NOTIFY_METHOD,
+  customerNotifyAccountLabel,
+  customerNotifyAccountPlaceholder,
+  type CustomerNotifyMethod,
+} from '../utils/customerNotifyMethod';
 import '../styles/crossBorderLogistics.css';
 
 const CrossBorderPricingModal = lazy(() => import('./CrossBorderPricingModal'));
@@ -40,6 +48,8 @@ type FormState = {
   address_notes: string;
   salesperson_employee_code: string;
   application_date: string;
+  notify_method: CustomerNotifyMethod;
+  notify_account: string;
 };
 
 const CreateCrossBorderCustomerModal: React.FC<Props> = ({
@@ -62,6 +72,8 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
       address_notes: '',
       salesperson_employee_code: '',
       application_date: todayIsoDate(),
+      notify_method: DEFAULT_CUSTOMER_NOTIFY_METHOD,
+      notify_account: '',
     };
   });
   const [salespersons, setSalespersons] = useState<CrossBorderSalesperson[]>([]);
@@ -86,6 +98,8 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
       address_notes: '',
       salesperson_employee_code: '',
       application_date: todayIsoDate(),
+      notify_method: DEFAULT_CUSTOMER_NOTIFY_METHOD,
+      notify_account: '',
     });
 
     setLoadingSalespersons(true);
@@ -178,6 +192,8 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
         salesperson_employee_code: form.salesperson_employee_code.trim(),
         application_date: form.application_date,
         customer_code: customerCode,
+        notify_method: form.notify_method,
+        notify_account: form.notify_account.trim(),
       });
       onCreated(created);
       onClose();
@@ -252,6 +268,30 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
                     placeholder="09xxxxxxxxx"
+                  />
+                </label>
+              </div>
+              <div className="cbl-notify-row">
+                <CustomerNotifyMethodSelect
+                  value={form.notify_method}
+                  onChange={(notify_method) => setForm({ ...form, notify_method })}
+                  disabled={submitting}
+                  isEn={isEn}
+                />
+                <label className="cbl-customer-field">
+                  <span className="cbl-customer-field__label">{customerNotifyAccountLabel(isEn)}</span>
+                  <input
+                    type="text"
+                    value={form.notify_account}
+                    onChange={(e) => setForm({ ...form, notify_account: e.target.value })}
+                    placeholder={customerNotifyAccountPlaceholder(form.notify_method, isEn)}
+                    autoComplete="off"
+                    disabled={submitting}
+                    aria-label={
+                      isEn
+                        ? `${CUSTOMER_NOTIFY_METHOD_LABELS[form.notify_method]} account`
+                        : `${CUSTOMER_NOTIFY_METHOD_LABELS[form.notify_method]}账号`
+                    }
                   />
                 </label>
               </div>

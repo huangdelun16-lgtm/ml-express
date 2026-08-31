@@ -1,4 +1,5 @@
 import { adminAuthenticatedFetch } from './authService';
+import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 
 export type FinanceOriginAttributionGroup = {
   originKey: string;
@@ -170,6 +171,29 @@ export type InventoryCustomerExpressItem = {
   updatedAt: string;
 };
 
+export type InventoryExceptionConsolePhoto = {
+  id: string;
+  public_url: string;
+  storage_path?: string | null;
+};
+
+export type InventoryExceptionConsoleRow = {
+  id: string;
+  item_barcode: string;
+  express_barcode: string | null;
+  pack_barcode: string | null;
+  exception_type: string;
+  status: string;
+  note: string;
+  qty_expected: number | null;
+  qty_actual: number | null;
+  reported_store_code: string;
+  reported_hub_code: string;
+  reported_operator: string;
+  created_at: string;
+  photos?: InventoryExceptionConsolePhoto[];
+};
+
 export type InventoryConsoleData = {
   ok: boolean;
   at: string;
@@ -178,6 +202,8 @@ export type InventoryConsoleData = {
   recentPacks: InventoryPackRow[];
   packStatusFilter: string;
   transportFeeTotal?: number;
+  openExceptionCount?: number;
+  openExceptions?: InventoryExceptionConsoleRow[];
   crossBorderFinance?: CrossBorderFinance;
   warnings?: string[];
 };
@@ -327,7 +353,10 @@ export async function fetchInventoryConsoleData(
     throw new Error(payload.error || `加载失败 (${response.status})`);
   }
 
-  return payload as InventoryConsoleData;
+  return {
+    ...payload,
+    openExceptions: mapConsoleExceptionRows(payload.openExceptions),
+  } as InventoryConsoleData;
 }
 
 type ConsoleSectionResponse = InventoryConsoleData & {
@@ -359,10 +388,24 @@ async function fetchInventoryConsoleSection(
   return payload as ConsoleSectionResponse;
 }
 
+function mapConsoleExceptionRows(
+  rows?: InventoryExceptionConsoleRow[],
+): InventoryExceptionConsoleRow[] {
+  return (rows ?? []).map((row) => ({
+    ...row,
+    photos: (row.photos ?? []).map((photo) => ({
+      ...photo,
+      public_url: rewritePublicStorageUrl(photo.public_url),
+    })),
+  }));
+}
+
 export async function fetchInventoryConsoleOverview(): Promise<{
   transitStores: InventoryTransitStore[];
   stats: InventoryConsoleStats;
   transportFeeTotal?: number;
+  openExceptionCount?: number;
+  openExceptions?: InventoryExceptionConsoleRow[];
   warnings?: string[];
 }> {
   const payload = await fetchInventoryConsoleSection('overview');
@@ -370,6 +413,8 @@ export async function fetchInventoryConsoleOverview(): Promise<{
     transitStores: payload.transitStores ?? [],
     stats: payload.stats!,
     transportFeeTotal: payload.transportFeeTotal,
+    openExceptionCount: payload.openExceptionCount ?? 0,
+    openExceptions: mapConsoleExceptionRows(payload.openExceptions),
     warnings: payload.warnings,
   };
 }
@@ -779,6 +824,8 @@ export type CrossBorderRegisteredCustomer = {
   application_date: string;
   customer_code: string;
   status: 'active' | 'inactive';
+  notify_method?: string;
+  notify_account?: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -792,6 +839,8 @@ export type CrossBorderRegisteredCustomerDraft = {
   salesperson_employee_code: string;
   application_date: string;
   customer_code: string;
+  notify_method?: string;
+  notify_account?: string;
 };
 
 export async function fetchCrossBorderRegisteredCustomers(): Promise<

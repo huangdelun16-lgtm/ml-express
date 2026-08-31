@@ -483,9 +483,8 @@ const StoreProductsPage: React.FC = () => {
       <div
         style={{
           padding: '1rem 2rem 0',
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(10px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          background: 'transparent',
+          borderBottom: '1px solid rgba(26, 43, 72, 0.08)',
           paddingBottom: '3rem',
         }}
       >
@@ -499,7 +498,7 @@ const StoreProductsPage: React.FC = () => {
           }}
         />
 
-        <div style={{ maxWidth: '1200px', margin: '2rem auto 0', color: 'white' }}>
+        <div style={{ maxWidth: '1200px', margin: '2rem auto 0', color: '#1a2b48' }}>
           <div
             style={{
               display: 'flex',
@@ -513,9 +512,9 @@ const StoreProductsPage: React.FC = () => {
               <button
                 onClick={() => navigate('/mall')}
                 style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  color: 'white',
+                  background: '#ffffff',
+                  border: '1px solid rgba(26, 43, 72, 0.12)',
+                  color: '#1a2b48',
                   padding: '0.6rem 1.2rem',
                   borderRadius: '12px',
                   cursor: 'pointer',
@@ -693,7 +692,7 @@ const StoreProductsPage: React.FC = () => {
             <div>
               <p
                 style={{
-                  color: 'rgba(255,255,255,0.85)',
+                  color: '#4a6280',
                   fontSize: '0.9rem',
                   marginBottom: '1rem',
                   fontWeight: 600,
@@ -957,7 +956,7 @@ const StoreProductsPage: React.FC = () => {
                   }}
                 >
                   <div style={{ fontSize: '6rem', marginBottom: '1.5rem', opacity: 0.8 }}>🧺</div>
-                  <h3 style={{ fontSize: '1.8rem', color: 'white', fontWeight: 900 }}>{t.store.noProducts}</h3>
+                  <h3 style={{ fontSize: '1.8rem', color: '#1a2b48', fontWeight: 900 }}>{t.store.noProducts}</h3>
                 </div>
               )}
             </div>

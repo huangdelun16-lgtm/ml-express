@@ -1,5 +1,4 @@
 import type { InventoryStoreSession } from '../services/authService';
-import type { InventoryItem, InventoryItemListRow } from '../types/inventory';
 import { svc, type ServiceError } from '../errors/serviceError';
 import { resolveStoreHubCode } from './storeZone';
 import {
@@ -11,9 +10,24 @@ import {
 } from './storeOwnership';
 import { isPackageBarcode } from './packageNumber';
 
-type SignableItem = InventoryItem | InventoryItemListRow;
+export type CustomerSignItemRef = {
+  barcode: string;
+  hub_arrived_at?: string | null;
+  customer_signed_at?: string | null;
+  final_destination?: string | null;
+  destination?: string | null;
+  owner_store_code?: string | null;
+};
 
-function resolveItemDestinationKey(item: SignableItem): string {
+function ownerKeyRef(item: CustomerSignItemRef) {
+  return {
+    barcode: item.barcode,
+    destination: item.destination ?? undefined,
+    owner_store_code: item.owner_store_code ?? undefined,
+  };
+}
+
+function resolveItemDestinationKey(item: CustomerSignItemRef): string {
   const raw = (item.final_destination || item.destination || '').trim();
   if (!raw) return '';
   return normalizeOwnerKey(raw);
@@ -26,7 +40,7 @@ function resolveHubKeyForStore(store: InventoryStoreSession): string {
 /** 目的站是否可对当前订单执行客户签收 */
 export function canMarkCustomerSigned(
   store: InventoryStoreSession,
-  item: SignableItem,
+  item: CustomerSignItemRef,
 ): boolean {
   if (isPackageBarcode(item.barcode)) return false;
   if (!item.hub_arrived_at?.trim()) return false;
@@ -34,7 +48,7 @@ export function canMarkCustomerSigned(
 
   if (isAdminStore(store)) return true;
 
-  const originKey = resolveOwnerKeyForListItem(item);
+  const originKey = resolveOwnerKeyForListItem(ownerKeyRef(item));
   const currentKey = ownershipKeyFromStoreCode(store.storeCode);
 
   // 木姐 MUSE 账号不可签收本站发出订单，须在目的站签收
@@ -49,7 +63,7 @@ export function canMarkCustomerSigned(
 
 export function customerSignDeniedError(
   store: InventoryStoreSession,
-  item: SignableItem,
+  item: CustomerSignItemRef,
 ): ServiceError {
   if (isPackageBarcode(item.barcode)) {
     return svc('signDeniedPkg');
@@ -61,7 +75,7 @@ export function customerSignDeniedError(
     return svc('signDeniedAlready');
   }
 
-  const originKey = resolveOwnerKeyForListItem(item);
+  const originKey = resolveOwnerKeyForListItem(ownerKeyRef(item));
   const currentKey = ownershipKeyFromStoreCode(store.storeCode);
   if (currentKey === 'MUSE' && originKey === 'MUSE') {
     return svc('signDeniedMuseOrigin');
@@ -82,7 +96,7 @@ export function customerSignDeniedError(
 /** @deprecated Use customerSignDeniedError + resolveAppError in UI */
 export function customerSignDeniedMessage(
   store: InventoryStoreSession,
-  item: SignableItem,
+  item: CustomerSignItemRef,
 ): string {
   return customerSignDeniedError(store, item).message;
 }

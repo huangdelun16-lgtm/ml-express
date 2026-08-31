@@ -10,7 +10,7 @@ export type RootStackParamList = {
   StockIn: { presetBarcode?: string } | undefined;
   PackagingStockIn: undefined;
   StockOut: { presetBarcode?: string } | undefined;
-  Items: undefined;
+  Items: { initialMode?: 'pack' | 'sign' } | undefined;
   ItemForm: { itemId?: string } | undefined;
   Movements: undefined;
   CrossBorderFinance: { initialTab?: 'transport' | 'pending' | 'agency' | 'manual' | 'all' } | undefined;
@@ -21,6 +21,7 @@ export type RootStackParamList = {
   TrackExpress: { presetCode?: string } | undefined;
   HubReceive: { openPackBarcode?: string } | undefined;
   ShipmentTrack: undefined;
+  Exceptions: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -52,6 +53,7 @@ export default function AppNavigator() {
       />
       <Stack.Screen name="StockOut" getComponent={() => require('../screens/StockOutScreen').default} options={{ title: t.nav.stockOut }} />
       <Stack.Screen name="HubReceive" getComponent={() => require('../screens/HubReceiveScreen').default} options={{ title: t.nav.hubReceive }} />
+      <Stack.Screen name="Exceptions" getComponent={() => require('../screens/ExceptionsScreen').default} options={{ title: t.nav.exceptions }} />
       <Stack.Screen name="ShipmentTrack" getComponent={() => require('../screens/ShipmentTrackScreen').default} options={{ title: t.nav.shipmentTrack }} />
       <Stack.Screen name="Items" getComponent={() => require('../screens/ItemsScreen').default} options={{ title: t.nav.items }} />
       <Stack.Screen name="Pkg" getComponent={() => require('../screens/PkgScreen').default} options={{ title: t.nav.pkg }} />
