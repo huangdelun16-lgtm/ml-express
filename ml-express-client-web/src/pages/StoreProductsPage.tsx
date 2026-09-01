@@ -21,6 +21,8 @@ import {
 } from '../utils/productVariants';
 import { myanmarTextCss } from '../utils/myanmarText';
 import { feedbackService } from '../services/FeedbackService';
+import { storeAvatarSrc } from '../utils/storeAvatar';
+import StorageImg from '../components/StorageImg';
 
 const PIECE_REMARK_LABELS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
@@ -480,25 +482,24 @@ const StoreProductsPage: React.FC = () => {
   return (
     <ClientInteriorShell ambient="mall">
     <div>
+      <NavigationBar
+        variant="landing"
+        language={language}
+        onLanguageChange={setLanguage}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onShowRegisterModal={(isLoginMode) => {
+          navigate('/', { state: { showModal: true, isLoginMode } });
+        }}
+      />
       <div
         style={{
-          padding: '1rem 2rem 0',
+          padding: '0 2rem 3rem',
           background: 'transparent',
           borderBottom: '1px solid rgba(26, 43, 72, 0.08)',
-          paddingBottom: '3rem',
         }}
       >
-        <NavigationBar
-          language={language}
-          onLanguageChange={setLanguage}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          onShowRegisterModal={(isLoginMode) => {
-            navigate('/', { state: { showModal: true, isLoginMode } });
-          }}
-        />
-
-        <div style={{ maxWidth: '1200px', margin: '2rem auto 0', color: '#1a2b48' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', color: '#1a2b48' }}>
           <div
             style={{
               display: 'flex',
@@ -543,9 +544,18 @@ const StoreProductsPage: React.FC = () => {
                       alignItems: 'center',
                       fontSize: '2.5rem',
                       boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                      overflow: 'hidden',
                     }}
                   >
-                    🏪
+                    {storeAvatarSrc(store.avatar_url, store.updated_at) ? (
+                      <img
+                        src={storeAvatarSrc(store.avatar_url, store.updated_at)}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      '🏪'
+                    )}
                   </div>
                   <div>
                     <h1 style={{ fontSize: '2.5rem', fontWeight: '900', textShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
@@ -763,9 +773,11 @@ const StoreProductsPage: React.FC = () => {
                       }}
                     >
                       <div style={{ aspectRatio: '1', background: '#f8fafc', position: 'relative' }}>
-                        {product.image_url && !product.image_url.startsWith('file://') ? (
-                          <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                        ) : (
+                        <StorageImg
+                          src={product.image_url}
+                          alt={product.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          fallback={
                           <div
                             style={{
                               width: '100%',
@@ -779,7 +791,8 @@ const StoreProductsPage: React.FC = () => {
                           >
                             📦
                           </div>
-                        )}
+                          }
+                        />
                         {!available && (
                           <div
                             style={{
@@ -1073,13 +1086,16 @@ const StoreProductsPage: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ position: 'relative', height: 220, background: '#f1f5f9', flexShrink: 0 }}>
-              {selectedProductDetail.image_url && !selectedProductDetail.image_url.startsWith('file://') ? (
-                <img src={selectedProductDetail.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              ) : (
+              <StorageImg
+                src={selectedProductDetail.image_url}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                fallback={
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>
                   📦
                 </div>
-              )}
+                }
+              />
               <button
                 type="button"
                 onClick={() => {
@@ -1294,7 +1310,7 @@ const StoreProductsPage: React.FC = () => {
                     }}
                   >
                     {selectedProductDetail.detail_image_urls!.map((url, idx) => (
-                      <img
+                      <StorageImg
                         key={`${url}-${idx}`}
                         src={url}
                         alt=""

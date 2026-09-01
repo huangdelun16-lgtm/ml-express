@@ -86,6 +86,8 @@ export interface DeliveryStore {
   updated_at?: string;
   vacation_dates?: string[];
   cod_settlement_day?: "7" | "10" | "15" | "30";
+  avatar_url?: string | null;
+  packing_sla_minutes?: number | null;
 }
 
 export interface Package {
@@ -121,4 +123,5 @@ export interface Package {
   cod_amount?: number;
   delivery_store_id?: string;
   pricing_base_fee_mmk?: number | null;
+  packing_started_at?: string | null;
 }

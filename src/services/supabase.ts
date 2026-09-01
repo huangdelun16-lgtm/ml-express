@@ -221,6 +221,8 @@ export interface DeliveryStore {
   vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
   is_closed_today?: boolean;
   cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
+  avatar_url?: string | null;
+  packing_sla_minutes?: number | null;
 }
 
 export type ProductVariant = {
@@ -2334,6 +2336,7 @@ export const deliveryStoreService = {
         region: storeData.region || null,
         created_by: storeData.created_by || null,
         cod_settlement_day: storeData.cod_settlement_day || '7',
+        packing_sla_minutes: storeData.packing_sla_minutes || 12,
         current_load: 0,
         status: 'active' as const,
         mall_visible: true,

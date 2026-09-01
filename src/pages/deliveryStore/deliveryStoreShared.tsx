@@ -31,6 +31,8 @@ export const OPERATING_HOURS_PRESETS = [
   { label: '10:00 - 20:00', value: '10:00 - 20:00' },
 ];
 
+export const PACKING_SLA_MINUTE_PRESETS = [8, 12, 15, 20, 30];
+
 const normalizeOperatingTime = (value: string): string => {
   const trimmed = (value || '').trim();
   const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);

@@ -29,7 +29,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as Speech from "expo-speech";
 import { Vibration } from "react-native";
-import { pickImageFromLibrary, ensureSaveToLibraryPermission } from "../utils/mediaAccess";
+import { pickImageFromLibrary, takePhotoWithCamera, ensureSaveToLibraryPermission } from "../utils/mediaAccess";
+import { STORE_AVATAR_UPDATED, storeAvatarDisplayUri } from "../utils/storeAvatar";
 import * as MediaLibrary from "expo-media-library";
 import { useApp } from "../contexts/AppContext";
 import { useLoading } from "../contexts/LoadingContext";
@@ -377,6 +378,9 @@ export default function ProfileScreen({ navigation }: any) {
 
   // 🚀 新增：商家店铺信息和营业状态
   const [storeInfo, setStoreInfo] = useState<any>(null);
+  const [avatarUri, setAvatarUri] = useState<string>("");
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [businessStatus, setBusinessStatus] = useState({
     is_closed_today: false,
     operating_hours: "09:00 - 21:00",
@@ -849,6 +853,15 @@ export default function ProfileScreen({ navigation }: any) {
       updateSuccess: "资料更新成功",
       updateFailed: "资料更新失败",
       pleaseLogin: "请先登录",
+      changeAvatar: "更换头像",
+      changeAvatarHint: "选择一张新的店铺头像，同城商场会同步显示",
+      chooseFromAlbum: "从相册选择",
+      takePhoto: "拍照",
+      removeAvatar: "移除头像",
+      avatarUpdated: "头像已更新",
+      avatarUpdateFailed: "头像更新失败",
+      cameraPermission: "需要相机权限才能拍照",
+      galleryPermissionAvatar: "需要相册权限才能选择头像",
       // 关于我们相关翻译
       aboutApp: "关于应用",
       appDescription:
@@ -996,6 +1009,15 @@ export default function ProfileScreen({ navigation }: any) {
       updateSuccess: "Profile updated successfully",
       updateFailed: "Failed to update profile",
       pleaseLogin: "Please login first",
+      changeAvatar: "Change avatar",
+      changeAvatarHint: "Pick a new store photo. It will also show in City Mall.",
+      chooseFromAlbum: "Choose from album",
+      takePhoto: "Take photo",
+      removeAvatar: "Remove avatar",
+      avatarUpdated: "Avatar updated",
+      avatarUpdateFailed: "Failed to update avatar",
+      cameraPermission: "Camera permission is required to take a photo",
+      galleryPermissionAvatar: "Photo library permission is required to choose an avatar",
       comingSoon: "Coming Soon",
       // About Us translations
       aboutApp: "About App",
@@ -1144,6 +1166,15 @@ export default function ProfileScreen({ navigation }: any) {
       updateSuccess: "အချက်အလက်ပြင်ဆင်ပြီးပါပြီ",
       updateFailed: "အချက်အလက်ပြင်ဆင်မှုမအောင်မြင်ပါ",
       pleaseLogin: "ကျေးဇူးပြု၍အရင်လော့ဂ်အင်ဝင်ပါ",
+      changeAvatar: "ပုံပြောင်းရန်",
+      changeAvatarHint: "ဆိုင်ပုံအသစ်ရွေးပါ။ City Mall တွင်လည်း ပြောင်းပါမည်။",
+      chooseFromAlbum: "အယ်လ်ဘမ်မှရွေးရန်",
+      takePhoto: "ဓာတ်ပုံရိုက်ရန်",
+      removeAvatar: "ပုံဖယ်ရှားရန်",
+      avatarUpdated: "ပုံပြောင်းပြီးပါပြီ",
+      avatarUpdateFailed: "ပုံပြောင်း၍မရပါ",
+      cameraPermission: "ဓာတ်ပုံရိုက်ရန် ကင်မရာခွင့်ပြုချက် လိုအပ်သည်",
+      galleryPermissionAvatar: "ပုံရွေးရန် အယ်လ်ဘမ်ခွင့်ပြုချက် လိုအပ်သည်",
       comingSoon: "မကြာမီလာမည်",
       // အကြောင်းအရာဆက်တင်များ
       aboutApp: "အက်ပ်အကြောင်း",
@@ -1412,6 +1443,8 @@ export default function ProfileScreen({ navigation }: any) {
             const store = await deliveryStoreService.getStoreById(storeId);
             if (store) {
               setStoreInfo(store);
+              setAvatarUri(store.avatar_url || "");
+              setAvatarFailed(false);
               setBusinessStatus({
                 is_closed_today: store.is_closed_today || false,
                 operating_hours: store.operating_hours || "09:00 - 21:00",
@@ -2573,6 +2606,139 @@ export default function ProfileScreen({ navigation }: any) {
     });
   };
 
+  const storeIdForAvatar = storeInfo?.id || userId;
+  const displayedAvatarUri = storeAvatarDisplayUri(
+    avatarUri,
+    storeInfo?.updated_at,
+  );
+
+  const persistStoreAvatarLocal = async (url: string | null) => {
+    try {
+      const currentUserStr = await AsyncStorage.getItem("currentUser");
+      if (!currentUserStr) return;
+      const localUser = JSON.parse(currentUserStr);
+      await AsyncStorage.setItem(
+        "currentUser",
+        JSON.stringify({ ...localUser, avatar_url: url || "" }),
+      );
+    } catch (error) {
+      LoggerService.warn("缓存店铺头像失败:", error);
+    }
+  };
+
+  const applyStoreAvatarFromPicker = async (uri: string) => {
+    if (!storeIdForAvatar || isGuest) return;
+    setAvatarUri(uri);
+    setAvatarFailed(false);
+    setUploadingAvatar(true);
+    try {
+      const uploaded = await deliveryStoreService.uploadStoreAvatar(
+        storeIdForAvatar,
+        uri,
+      );
+      if (!uploaded) {
+        showToast(t.avatarUpdateFailed, "error");
+        return;
+      }
+      const stamped = `${uploaded}${uploaded.includes("?") ? "&" : "?"}v=${Date.now()}`;
+      setAvatarUri(stamped);
+      const saved = await deliveryStoreService.updateStoreInfo(storeIdForAvatar, {
+        avatar_url: uploaded,
+      });
+      if (saved.success && saved.data) {
+        setStoreInfo(saved.data);
+        setAvatarUri(saved.data.avatar_url || uploaded);
+      } else if (saved.error?.code !== "NO_AVATAR_COLUMN") {
+        LoggerService.warn("保存店铺头像地址失败:", saved.error);
+      }
+      await persistStoreAvatarLocal(uploaded);
+      DeviceEventEmitter.emit(STORE_AVATAR_UPDATED, {
+        url: uploaded,
+        updatedAt: saved.success ? saved.data?.updated_at : new Date().toISOString(),
+      });
+      showToast(t.avatarUpdated, "success");
+    } catch (error) {
+      LoggerService.error("更换店铺头像失败:", error);
+      showToast(t.avatarUpdateFailed, "error");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveStoreAvatar = async () => {
+    if (!storeIdForAvatar || isGuest) return;
+    setAvatarUri("");
+    setAvatarFailed(false);
+    await persistStoreAvatarLocal(null);
+    await deliveryStoreService.removeStoreAvatar(storeIdForAvatar);
+    setStoreInfo((prev: any) => (prev ? { ...prev, avatar_url: "" } : prev));
+    DeviceEventEmitter.emit(STORE_AVATAR_UPDATED, { url: "", updatedAt: "" });
+    showToast(t.avatarUpdated, "success");
+  };
+
+  const pickAvatarOptions = {
+    mediaTypes: ["images"] as ["images"],
+    allowsEditing: true,
+    aspect: [1, 1] as [number, number],
+    quality: 0.7,
+  };
+
+  const handleChangeAvatar = () => {
+    if (isGuest) {
+      showToast(t.pleaseLogin, "warning");
+      return;
+    }
+    const buttons: {
+      text: string;
+      style?: "cancel" | "destructive";
+      onPress?: () => void;
+    }[] = [
+      {
+        text: t.chooseFromAlbum,
+        onPress: async () => {
+          try {
+            const result = await pickImageFromLibrary(pickAvatarOptions);
+            if (result.canceled && result.assets === null) {
+              Alert.alert(t.changeAvatar, t.galleryPermissionAvatar);
+              return;
+            }
+            const uri = result.assets?.[0]?.uri;
+            if (!result.canceled && uri) await applyStoreAvatarFromPicker(uri);
+          } catch (error) {
+            LoggerService.error("选择店铺头像失败:", error);
+            showToast(t.avatarUpdateFailed, "error");
+          }
+        },
+      },
+      {
+        text: t.takePhoto,
+        onPress: async () => {
+          try {
+            const result = await takePhotoWithCamera(pickAvatarOptions);
+            if (result.canceled && result.assets === null) {
+              Alert.alert(t.changeAvatar, t.cameraPermission);
+              return;
+            }
+            const uri = result.assets?.[0]?.uri;
+            if (!result.canceled && uri) await applyStoreAvatarFromPicker(uri);
+          } catch (error) {
+            LoggerService.error("拍摄店铺头像失败:", error);
+            showToast(t.avatarUpdateFailed, "error");
+          }
+        },
+      },
+    ];
+    if (avatarUri) {
+      buttons.push({
+        text: t.removeAvatar,
+        style: "destructive",
+        onPress: () => void handleRemoveStoreAvatar(),
+      });
+    }
+    buttons.push({ text: t.cancel, style: "cancel" });
+    Alert.alert(t.changeAvatar, t.changeAvatarHint, buttons);
+  };
+
   const renderUserCard = () => (
     <LinearGradient
       colors={theme.colors.gradients.blue}
@@ -2581,13 +2747,34 @@ export default function ProfileScreen({ navigation }: any) {
       style={styles.userCard}
     >
       <View style={styles.userHeaderRow}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {userName.charAt(0).toUpperCase()}
-            </Text>
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={handleChangeAvatar}
+          activeOpacity={0.85}
+          disabled={uploadingAvatar}
+        >
+          <View style={[styles.avatar, { overflow: "hidden" }]}>
+            {displayedAvatarUri && !avatarFailed ? (
+              <Image
+                source={{ uri: displayedAvatarUri }}
+                style={styles.avatarImage}
+                onError={() => setAvatarFailed(true)}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {userName.charAt(0).toUpperCase()}
+              </Text>
+            )}
+            {uploadingAvatar ? (
+              <View style={styles.avatarBusy}>
+                <ActivityIndicator color="#fff" />
+              </View>
+            ) : null}
           </View>
-        </View>
+          <View style={styles.avatarCamBadge}>
+            <Ionicons name="camera" size={12} color="#0284c7" />
+          </View>
+        </TouchableOpacity>
 
         <View style={styles.userInfo}>
           <View style={styles.userNameRow}>
@@ -6153,6 +6340,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginRight: theme.spacing.l,
+    position: "relative",
   },
   avatar: {
     width: 70,
@@ -6163,6 +6351,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderColor: theme.colors.white,
+  },
+  avatarImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+  },
+  avatarBusy: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarCamBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.white,
+    justifyContent: "center",
+    alignItems: "center",
   },
   avatarText: {
     fontSize: 32,

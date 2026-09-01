@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import LoggerService from "../services/LoggerService";
 import { useNavigate, useLocation } from "react-router-dom";
 import { packageService, merchantService, deliveryStoreService } from "../services/supabase";
@@ -16,6 +16,13 @@ import {
 } from "../constants/merchantOrderStatus";
 import { useMerchantPackageModals } from "../hooks/useMerchantPackageModals";
 import { buildProductNamePriceMap } from "../utils/parseOrderPackingItems";
+import { PackingSlaBadge } from "../components/orders/PackingSlaBadge";
+import {
+  computePackingCountdown,
+  isPackingStatus,
+  sortByPackingSla,
+  withStorePackingSla,
+} from "../services/_shared/packingCountdown";
 import {
   pendingConfirmIds,
   printableIds,
@@ -105,7 +112,17 @@ const TrackingPage: React.FC = () => {
     },
     onPackageStatusChange: (packageId, status) => {
       setActiveOrders((prev) =>
-        prev.map((p) => (p.id === packageId ? { ...p, status } : p)),
+        prev.map((p) =>
+          p.id === packageId
+            ? {
+                ...p,
+                status,
+                ...(isPackingStatus(status) && !p.packing_started_at
+                  ? { packing_started_at: new Date().toISOString() }
+                  : {}),
+              }
+            : p,
+        ),
       );
     },
     removePendingOrder: (id) => merchantOrdersCtx?.removePendingOrder(id),
@@ -115,6 +132,7 @@ const TrackingPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [nowTick, setNowTick] = useState(() => new Date());
   const packagesPerPage = 5;
 
   const searchParams = new URLSearchParams(location.search);
@@ -137,6 +155,13 @@ const TrackingPage: React.FC = () => {
     setFilteredOrders(filterOrdersBySearch(byTab, searchQuery));
     setCurrentPage(1);
   }, [activeOrders, statusFilter, searchQuery]);
+
+  useEffect(() => {
+    const hasPacking = activeOrders.some((order) => isPackingStatus(order.status));
+    if (!hasPacking) return;
+    const id = window.setInterval(() => setNowTick(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, [activeOrders]);
 
   useEffect(() => {
     const onRefresh = () => {
@@ -163,6 +188,16 @@ const TrackingPage: React.FC = () => {
   const formatDisplayStatus = (status: string) =>
     getStatusText(status === "待收款" ? "待取件" : status);
 
+  const packingSlaMinutes = storeInfo?.packing_sla_minutes ?? currentUser?.packing_sla_minutes;
+
+  const visibleOrders = useMemo(
+    () =>
+      sortByPackingSla(
+        filteredOrders.map((order) => withStorePackingSla(order, packingSlaMinutes)),
+        nowTick,
+      ),
+    [filteredOrders, nowTick, packingSlaMinutes],
+  );
   const selectedOrders = filteredOrders.filter((order) =>
     selectedIds.has(String(order.id)),
   );
@@ -450,22 +485,32 @@ const TrackingPage: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: "grid", gap: "1.5rem" }}>
-            {filteredOrders
+            {visibleOrders
               .slice(
                 (currentPage - 1) * packagesPerPage,
                 currentPage * packagesPerPage,
               )
-              .map((order) => (
+              .map((order) => {
+                const packingSla = computePackingCountdown(
+                  withStorePackingSla(order, packingSlaMinutes),
+                  nowTick,
+                );
+                const packingOverdue = packingSla.phase === "overdue";
+                return (
                 <div
                   key={order.id}
                   onClick={() => handleCardClick(order)}
                   style={{
-                    background: selectedIds.has(String(order.id))
+                    background: packingOverdue
+                      ? "rgba(239, 68, 68, 0.18)"
+                      : selectedIds.has(String(order.id))
                       ? "rgba(99, 102, 241, 0.16)"
                       : "rgba(255,255,255,0.05)",
                     borderRadius: "20px",
                     padding: "1.5rem",
-                    border: selectedIds.has(String(order.id))
+                    border: packingOverdue
+                      ? "2px solid #ef4444"
+                      : selectedIds.has(String(order.id))
                       ? "1px solid rgba(129, 140, 248, 0.55)"
                       : "1px solid rgba(255,255,255,0.1)",
                     display: "flex",
@@ -477,17 +522,17 @@ const TrackingPage: React.FC = () => {
                     gap: "1rem",
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.background = selectedIds.has(
-                      String(order.id),
-                    )
+                    e.currentTarget.style.background = packingOverdue
+                      ? "rgba(239, 68, 68, 0.26)"
+                      : selectedIds.has(String(order.id))
                       ? "rgba(99, 102, 241, 0.22)"
                       : "rgba(255,255,255,0.1)";
                     e.currentTarget.style.transform = "translateY(-2px)";
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.background = selectedIds.has(
-                      String(order.id),
-                    )
+                    e.currentTarget.style.background = packingOverdue
+                      ? "rgba(239, 68, 68, 0.18)"
+                      : selectedIds.has(String(order.id))
                       ? "rgba(99, 102, 241, 0.16)"
                       : "rgba(255,255,255,0.05)";
                     e.currentTarget.style.transform = "translateY(0)";
@@ -581,6 +626,13 @@ const TrackingPage: React.FC = () => {
                     >
                       地址: {order.receiver_address}
                     </p>
+                    <PackingSlaBadge
+                      order={order}
+                      language={lang}
+                      variant="dark"
+                      now={nowTick}
+                      slaMinutes={packingSlaMinutes}
+                    />
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <p
@@ -605,7 +657,8 @@ const TrackingPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-              ))}
+              );
+              })}
           </div>
         )}
 
@@ -802,6 +855,7 @@ const TrackingPage: React.FC = () => {
         actionLoading={packageModals.actionLoading}
         printLoading={packageModals.printLoading}
         canComplete={packageModals.isPackingCompleteEnabled}
+        slaMinutes={packingSlaMinutes}
         onClose={packageModals.closePackingModal}
         onToggleItem={packageModals.togglePackingItem}
         onPrint={packageModals.handlePackingPrint}

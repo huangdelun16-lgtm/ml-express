@@ -3,6 +3,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useMerchantOrdersOptional } from "../../contexts/MerchantOrderContext";
 import { MERCHANT_ORDER_STATUS } from "../../constants/merchantOrderStatus";
+import { deliveryStoreService } from "../../services/supabase";
+import StorageImg from "../StorageImg";
+import {
+  STORE_AVATAR_UPDATED_EVENT,
+  storeAvatarSrc,
+} from "../../utils/storeAvatar";
 
 const Sidebar: React.FC<{
   currentUser: any;
@@ -16,6 +22,10 @@ const Sidebar: React.FC<{
   const pendingBadge = merchantOrders?.pendingCount ?? 0;
   const [isAccountExpanded, setIsAccountExpanded] = useState(false);
   const [isOrdersExpanded, setIsOrdersExpanded] = useState(false);
+  const [storeAvatarUrl, setStoreAvatarUrl] = useState(
+    String(currentUser?.avatar_url || ""),
+  );
+  const [storeAvatarUpdatedAt, setStoreAvatarUpdatedAt] = useState("");
 
   // 🚀 自动根据路径展开菜单
   useEffect(() => {
@@ -26,6 +36,29 @@ const Sidebar: React.FC<{
       setIsOrdersExpanded(true);
     }
   }, [location.pathname]);
+
+  useEffect(() => {
+    setStoreAvatarUrl(String(currentUser?.avatar_url || ""));
+  }, [currentUser?.avatar_url]);
+
+  useEffect(() => {
+    const storeId = currentUser?.store_id || currentUser?.id;
+    if (!storeId) return;
+    void deliveryStoreService.getStoreById(storeId).then((store) => {
+      if (store?.avatar_url) {
+        setStoreAvatarUrl(store.avatar_url);
+        setStoreAvatarUpdatedAt(store.updated_at || "");
+      }
+    });
+    const onUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ url?: string; updatedAt?: string }>)
+        .detail;
+      setStoreAvatarUrl(detail?.url || "");
+      setStoreAvatarUpdatedAt(detail?.updatedAt || "");
+    };
+    window.addEventListener(STORE_AVATAR_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(STORE_AVATAR_UPDATED_EVENT, onUpdated);
+  }, [currentUser?.id, currentUser?.store_id]);
 
   const mainMenuItems = [
     {
@@ -428,7 +461,14 @@ const Sidebar: React.FC<{
         </div>
 
         <div style={userCardStyle}>
-          <div style={avatarStyle}>{currentUser?.name?.charAt(0)}</div>
+          <div style={{ ...avatarStyle, overflow: "hidden", padding: 0 }}>
+            <StorageImg
+              src={storeAvatarSrc(storeAvatarUrl, storeAvatarUpdatedAt)}
+              alt=""
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              fallback={<span>{currentUser?.name?.charAt(0)}</span>}
+            />
+          </div>
           <div style={{ flex: 1, overflow: "hidden" }}>
             <div style={userNameStyle}>{currentUser?.name}</div>
             <div style={userRoleStyle}>Store Admin</div>

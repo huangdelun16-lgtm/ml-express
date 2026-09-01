@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Image,
   Alert,
   ActivityIndicator,
   Modal,
@@ -44,6 +43,7 @@ import {
   productHasVariants,
 } from '../utils/productVariants';
 import { remoteImageUri } from '../services/clientApi/nativeSupabaseUrl';
+import ProxiedImage from '../components/ProxiedImage';
 
 const { width, height: WINDOW_HEIGHT } = Dimensions.get('window');
 /** 商品详情弹窗固定高度，否则内层 flex:1 在 RN 中会塌陷，只显示图片不显示备注区 */
@@ -68,42 +68,6 @@ function padLineRemarks(arr: string[], length: number): string[] {
   const next = arr.slice(0, length);
   while (next.length < length) next.push('');
   return next;
-}
-
-function StoreRemoteImage({
-  uri,
-  style,
-  resizeMode = 'cover',
-  iconSize = 28,
-  fallback,
-}: {
-  uri?: string | null;
-  style: object;
-  resizeMode?: 'cover' | 'contain';
-  iconSize?: number;
-  fallback?: React.ReactNode;
-}) {
-  const src = remoteImageUri(uri);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    setFailed(false);
-  }, [src]);
-  if (!src || failed) {
-    if (fallback) return <>{fallback}</>;
-    return (
-      <View style={[style, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f1f5f9' }]}>
-        <Ionicons name="image-outline" size={iconSize} color="#cbd5e1" />
-      </View>
-    );
-  }
-  return (
-    <Image
-      source={{ uri: src }}
-      style={style}
-      resizeMode={resizeMode}
-      onError={() => setFailed(true)}
-    />
-  );
 }
 
 export default function MerchantProductsScreen({ route, navigation }: any) {
@@ -340,6 +304,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
   const monthlySales = products.reduce((sum, item) => sum + (item.sales_count || 0), 0);
   const ratingLabel = (reviewStats.average > 0 ? reviewStats.average : 4.9).toFixed(1);
   const coverUri = products.map((p) => remoteImageUri(p.image_url)).find(Boolean);
+  const storePhotoUri = remoteImageUri(store?.avatar_url) || coverUri;
   const displayStoreName = store?.store_name || storeName || currentT.title;
   const storeInitial = (displayStoreName || '店').trim().charAt(0);
   const distanceLabel = currentT.distanceCity;
@@ -556,7 +521,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
         activeOpacity={0.85}
       >
         <View style={styles.productImageWrap}>
-          <StoreRemoteImage uri={item.image_url} style={styles.productImage} iconSize={32} />
+          <ProxiedImage uri={item.image_url} style={styles.productImage} iconSize={32} />
           {!item.is_available && (
             <View style={styles.unavailableOverlay}>
               <Text style={styles.unavailableText}>{currentT.unavailable}</Text>
@@ -619,7 +584,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
           ListHeaderComponent={
             <View style={{ width }}>
               <View style={styles.coverWrap}>
-                <StoreRemoteImage
+                <ProxiedImage
                   uri={coverUri}
                   style={styles.coverImage}
                   fallback={<LinearGradient colors={['#3AA4B0', TEAL, '#1F7A86']} style={styles.coverImage} />}
@@ -640,8 +605,8 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
 
               <View style={styles.logoRow}>
                 <View style={styles.storeLogo}>
-                  <StoreRemoteImage
-                    uri={coverUri}
+                  <ProxiedImage
+                    uri={storePhotoUri}
                     style={styles.storeLogoImage}
                     iconSize={22}
                     fallback={<Text style={styles.storeLogoText}>{storeInitial}</Text>}
@@ -761,7 +726,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
               bounces
             >
               <View style={styles.detailHero}>
-                <StoreRemoteImage
+                <ProxiedImage
                   uri={selectedProductDetail?.image_url}
                   style={styles.detailHeroImage}
                   resizeMode="contain"
@@ -946,7 +911,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                       const src = remoteImageUri(url);
                       if (!src) return null;
                       return (
-                        <StoreRemoteImage
+                        <ProxiedImage
                           key={`${src}-${idx}`}
                           uri={src}
                           style={styles.detailScrollingImage}

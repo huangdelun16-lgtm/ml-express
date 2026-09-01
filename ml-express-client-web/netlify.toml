@@ -70,6 +70,14 @@
     Pragma = "no-cache"
     Expires = "0"
 
+# 必须写在 /* 之后：Netlify 后匹配规则覆盖前者。Storage 图若 no-store，
+# 缅甸每次进商场都重拉代理，稍抖就是白块。App 同城商场也走本站 /__sb。
+[[headers]]
+  for = "/__sb/storage/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
+    Access-Control-Allow-Origin = "*"
+
 # 环境变量
 # 注意：敏感信息（如 Supabase 密钥）应在 Netlify Dashboard 中配置
 # Dashboard 中的环境变量优先级高于此文件中的配置

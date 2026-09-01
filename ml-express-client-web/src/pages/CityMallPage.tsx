@@ -10,6 +10,45 @@ import { formatProductPriceLabel, productHasVariants } from '../utils/productVar
 import { CITY_MALL_CATEGORIES, getMerchantStoreTypeLabel } from '../services/_shared/merchantStoreTypes';
 import type { StoreTypeLang } from '../services/_shared/merchantStoreTypes';
 import { feedbackService } from '../services/FeedbackService';
+import { storeAvatarSrc } from '../utils/storeAvatar';
+import StorageImg from '../components/StorageImg';
+
+function StoreAvatarThumb({
+  store,
+  size,
+  radius,
+  fallback,
+  style,
+}: {
+  store: DeliveryStore;
+  size: number;
+  radius?: number;
+  fallback: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  const src = storeAvatarSrc(store.avatar_url, store.updated_at);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+  if (src && !failed) {
+    return (
+      <img
+        src={src}
+        alt=""
+        style={{
+          width: size,
+          height: size,
+          borderRadius: radius,
+          objectFit: 'cover',
+          ...style,
+        }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return <>{fallback}</>;
+}
 
 const CityMallPage: React.FC = () => {
   const navigate = useNavigate();
@@ -690,8 +729,13 @@ const CityMallPage: React.FC = () => {
                       }}
                       className="h-card"
                     >
-                      <div style={{ fontSize: '2.5rem', marginBottom: '1rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
-                        {getStoreIcon(store.store_type)}
+                      <div style={{ fontSize: '2.5rem', marginBottom: '1rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', overflow: 'hidden' }}>
+                        <StoreAvatarThumb
+                          store={store}
+                          size={60}
+                          radius={16}
+                          fallback={getStoreIcon(store.store_type)}
+                        />
                       </div>
                       <h4 style={{ color: '#1a2b48', fontSize: '1.1rem', margin: '0 0 8px 0', fontWeight: '800' }}>{store.store_name}</h4>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -728,8 +772,13 @@ const CityMallPage: React.FC = () => {
                       }}
                       className="h-card"
                     >
-                      <div style={{ fontSize: '2.5rem', marginBottom: '1rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
-                        {getStoreIcon(store.store_type)}
+                      <div style={{ fontSize: '2.5rem', marginBottom: '1rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', overflow: 'hidden' }}>
+                        <StoreAvatarThumb
+                          store={store}
+                          size={60}
+                          radius={16}
+                          fallback={getStoreIcon(store.store_type)}
+                        />
                       </div>
                       <h4 style={{ color: '#1a2b48', fontSize: '1.1rem', margin: '0 0 8px 0', fontWeight: '800' }}>{store.store_name}</h4>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -799,10 +848,15 @@ const CityMallPage: React.FC = () => {
                       onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-8px)'}
                       onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                     >
-                      <img 
-                        src={product.image_url || 'https://via.placeholder.com/150'} 
-                        alt={product.name} 
+                      <StorageImg
+                        src={product.image_url}
+                        alt={product.name}
                         style={{ width: '100%', aspectRatio: '1', borderRadius: '16px', objectFit: 'contain', background: '#f8fafc' }}
+                        fallback={
+                          <div style={{ width: '100%', aspectRatio: '1', borderRadius: '16px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.4rem' }}>
+                            📦
+                          </div>
+                        }
                       />
                       <div style={{ flex: 1 }}>
                         <h3 style={{ fontSize: '1.2rem', fontWeight: '900', color: '#0f172a', marginBottom: '0.4rem' }}>{product.name}</h3>
@@ -906,9 +960,15 @@ const CityMallPage: React.FC = () => {
                           marginRight: '1.5rem',
                           boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
                           color: 'white',
+                          overflow: 'hidden',
                           filter: status.isOpen ? 'none' : 'grayscale(1)' // 休息中图标变灰
                         }}>
-                          {getStoreIcon(store.store_type)}
+                          <StoreAvatarThumb
+                            store={store}
+                            size={80}
+                            radius={24}
+                            fallback={getStoreIcon(store.store_type)}
+                          />
                         </div>
                         <div style={{ flex: 1 }}>
                           <h3 style={{ 

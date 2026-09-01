@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { applyNetlifyRealtimeFallback, resolveBrowserSupabaseUrl } from '../utils/supabaseBrowserUrl';
+import { applyNetlifyRealtimeFallback, resolveBrowserSupabaseUrl, publicStorageUrl, rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 import { PACKAGE_STATUS } from '../constants/packageStatus';
 import LoggerService from './LoggerService';
 import { buildPricingSettings, pricingFieldToCamel } from './_shared/pricing';
@@ -103,6 +103,7 @@ export interface DeliveryStore {
   updated_at?: string;
   vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
   cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
+  avatar_url?: string | null;
 }
 
 // 商品接口
@@ -963,6 +964,18 @@ export const deliveryStoreService = {
   }
 };
 
+function withPublicProductImages<T extends { image_url?: string; detail_image_urls?: string[] }>(row: T): T {
+  return {
+    ...row,
+    image_url: row.image_url ? publicStorageUrl(row.image_url) || row.image_url : row.image_url,
+    detail_image_urls: Array.isArray(row.detail_image_urls)
+      ? row.detail_image_urls
+          .map((url) => publicStorageUrl(url) || url)
+          .filter((url) => Boolean(url))
+      : row.detail_image_urls,
+  };
+}
+
 // 商家服务
 export const merchantService = {
   // 获取商店全部商品（商家后台：含待审核）
@@ -994,7 +1007,7 @@ export const merchantService = {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map((row) => withPublicProductImages(row as Product));
     } catch (error) {
       LoggerService.error('获取公开商店商品失败:', error);
       return [];
@@ -1112,7 +1125,7 @@ export const merchantService = {
         if (store.mall_visible === false) return false;
         return store.store_type !== 'transit_station';
       });
-      return rows.slice(0, 20);
+      return rows.slice(0, 20).map((row) => withPublicProductImages(row));
     } catch (error: any) {
       LoggerService.error('搜索商品失败:', error?.message || '未知错误');
       return [];
@@ -1139,7 +1152,7 @@ export const merchantService = {
         .from('product_images')
         .getPublicUrl(fileName);
 
-      return publicUrl;
+      return rewritePublicStorageUrl(publicUrl);
     } catch (error: any) {
       LoggerService.error('上传商品图片失败:', error?.message || '未知错误');
       return null;

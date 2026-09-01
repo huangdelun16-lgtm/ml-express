@@ -14,6 +14,7 @@ import {
 } from '../../utils/parseOrderPackingItems';
 import './OrderAlertModal.css';
 import { feedbackService } from '../../services/FeedbackService';
+import { packingAcceptFields } from '../../services/_shared/packingCountdown';
 
 type Lang = 'zh' | 'en' | 'my';
 
@@ -185,7 +186,12 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
     if (isProcessing || orderData.status !== '待确认') return;
     setIsProcessing(true);
     try {
-      const ok = await packageService.updatePackageStatus(String(orderData.id), '打包中');
+      const packingFields = packingAcceptFields();
+      const ok = await packageService.updatePackageStatus(
+        String(orderData.id),
+        packingFields.status,
+        { packing_started_at: packingFields.packing_started_at },
+      );
       if (!ok) throw new Error('update failed');
       try {
         await printMerchantReceipt(orderData, language, productPriceMap);

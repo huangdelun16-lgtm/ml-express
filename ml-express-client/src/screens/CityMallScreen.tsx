@@ -12,6 +12,8 @@ import { formatProductPriceLabel, productHasVariants } from '../utils/productVar
 import { CITY_MALL_CATEGORIES, getMerchantStoreTypeLabel } from '../services/_shared/merchantStoreTypes';
 import type { StoreTypeLang } from '../services/_shared/merchantStoreTypes';
 import { remoteImageUri } from '../services/clientApi/nativeSupabaseUrl';
+import { storeAvatarDisplayUri } from '../utils/storeAvatar';
+import ProxiedImage from '../components/ProxiedImage';
 
 const { width } = Dimensions.get('window');
 const TEAL = '#2C98A6';
@@ -93,6 +95,7 @@ const StoreCard = React.memo(({ item, status, language, t, productMatches, stats
         : t.closedNow;
   const iconGradient = STORE_TYPE_GRADIENT[item.store_type] || DEFAULT_STORE_GRADIENT;
   const rating = stats?.average > 0 ? stats.average : 4.9;
+  const avatarUri = storeAvatarDisplayUri(item.avatar_url, item.updated_at);
 
   return (
     <TouchableOpacity
@@ -101,10 +104,22 @@ const StoreCard = React.memo(({ item, status, language, t, productMatches, stats
       activeOpacity={status.isOpen ? 0.86 : 1}
     >
       <View style={styles.storeHeader}>
-        <LinearGradient colors={status.isOpen ? iconGradient : ['#94a3b8', '#64748b']} style={styles.storeLogo}>
-          <Text style={[styles.storeIcon, !status.isOpen && { opacity: 0.55 }]}>
-            {getStoreIcon(item.store_type)}
-          </Text>
+        <LinearGradient colors={status.isOpen ? iconGradient : ['#94a3b8', '#64748b']} style={[styles.storeLogo, { overflow: 'hidden' }]}>
+          {avatarUri ? (
+            <ProxiedImage
+              uri={avatarUri}
+              style={styles.storeLogoImage}
+              fallback={
+                <Text style={[styles.storeIcon, !status.isOpen && { opacity: 0.55 }]}>
+                  {getStoreIcon(item.store_type)}
+                </Text>
+              }
+            />
+          ) : (
+            <Text style={[styles.storeIcon, !status.isOpen && { opacity: 0.55 }]}>
+              {getStoreIcon(item.store_type)}
+            </Text>
+          )}
         </LinearGradient>
 
         <View style={styles.storeMainInfo}>
@@ -168,26 +183,11 @@ const ProductCard = React.memo(({ item, t, onVisit, onAddToCart, language }: any
   const store = item.delivery_stores;
   const storeStatus = store ? checkStoreOpenStatus(store as any) : { isOpen: true };
   const langKey = language === 'zh' ? 'zh' : language === 'my' ? 'my' : 'en';
-  const [imgFailed, setImgFailed] = useState(false);
-  const imageUri = remoteImageUri(item.image_url);
-  useEffect(() => {
-    setImgFailed(false);
-  }, [imageUri]);
-  
+
   return (
     <TouchableOpacity style={styles.productCard} onPress={() => onVisit(item, store)} activeOpacity={0.86}>
       <View style={styles.productMain}>
-        {imageUri && !imgFailed ? (
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.productImage}
-            onError={() => setImgFailed(true)}
-          />
-        ) : (
-          <View style={[styles.productImage, { justifyContent: 'center', alignItems: 'center' }]}>
-            <Ionicons name="image-outline" size={22} color="#cbd5e1" />
-          </View>
-        )}
+        <ProxiedImage uri={item.image_url} style={styles.productImage} iconSize={22} />
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
           <Text style={styles.productPrice}>{formatProductPriceLabel(item, langKey)}</Text>
@@ -754,7 +754,7 @@ export default function CityMallScreen({ navigation }: any) {
                       <View style={styles.bannerTag}><Text style={styles.bannerTagText}>Partner 🤝</Text></View>
                     </View>
                     {remoteImageUri(item.image_url) ? (
-                      <Image source={{ uri: remoteImageUri(item.image_url) }} style={styles.bannerImage} />
+                      <ProxiedImage uri={item.image_url} style={styles.bannerImage} />
                     ) : null}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -773,6 +773,7 @@ export default function CityMallScreen({ navigation }: any) {
               {recommendedStores.map(store => {
                 const status = checkStoreOpenStatus(store);
                 const stats = storeReviewStats[store.id];
+                const recAvatarUri = storeAvatarDisplayUri(store.avatar_url, store.updated_at);
                 return (
                   <TouchableOpacity
                     key={store.id}
@@ -780,7 +781,11 @@ export default function CityMallScreen({ navigation }: any) {
                     onPress={() => handleStoreVisit(store, status)}
                   >
                     <View style={styles.hStoreIconContainer}>
-                      <Text style={styles.hStoreIcon}>{getStoreIcon(store.store_type)}</Text>
+                      {recAvatarUri ? (
+                        <ProxiedImage uri={recAvatarUri} style={styles.hStoreAvatar} />
+                      ) : (
+                        <Text style={styles.hStoreIcon}>{getStoreIcon(store.store_type)}</Text>
+                      )}
                       {!status.isOpen && <View style={styles.hStoreClosedOverlay}><Text style={styles.hStoreClosedText}>{t.closedNow}</Text></View>}
                     </View>
                     <Text style={styles.hStoreName} numberOfLines={1}>{store.store_name}</Text>
@@ -1280,6 +1285,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  storeLogoImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
   storeIcon: {
     fontSize: 26,
   },
@@ -1429,6 +1439,11 @@ const styles = StyleSheet.create({
   },
   hStoreIcon: {
     fontSize: 32,
+  },
+  hStoreAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
   },
   hStoreClosedOverlay: {
     ...StyleSheet.absoluteFillObject,

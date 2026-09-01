@@ -74,6 +74,13 @@ import { batchSettleCodOrders } from "../services/packageBatchService";
 import { toggleSelectedId } from "../utils/merchantBatchSelection";
 import MerchantPackageDetailModal from "../components/orders/MerchantPackageDetailModal";
 import MerchantPackingModal from "../components/orders/MerchantPackingModal";
+import { PackingSlaBadge } from "../components/orders/PackingSlaBadge";
+import {
+  computePackingCountdown,
+  isPackingStatus,
+  sortByPackingSla,
+  withStorePackingSla,
+} from "../services/_shared/packingCountdown";
 import MerchantExportStatementModal from "../components/profile/MerchantExportStatementModal";
 import MerchantCloseReportModal from "../components/profile/MerchantCloseReportModal";
 import { buildTodayCloseReport } from "../utils/merchantOpsReport";
@@ -82,6 +89,10 @@ import MerchantScheduledTimePickerModal from "../components/profile/MerchantSche
 import MerchantPrinterModal from "../components/profile/MerchantPrinterModal";
 import "../styles/merchantProfilePage.css";
 import "../components/orders/merchantOrderModals.css";
+import {
+  STORE_AVATAR_UPDATED_EVENT,
+  storeAvatarSrc,
+} from "../utils/storeAvatar";
 
 const GOOGLE_MAPS_LIBRARIES: ("places")[] = ["places"];
 
@@ -105,6 +116,8 @@ const ProfilePage: React.FC = () => {
     string | null
   >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [userPackages, setUserPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -528,6 +541,70 @@ const ProfilePage: React.FC = () => {
   };
 
   // 🚀 新增：编辑资料逻辑
+  const storeIdForAvatar = storeInfo?.id || currentUser?.store_id || currentUser?.id;
+  const packingSlaMinutes = storeInfo?.packing_sla_minutes ?? currentUser?.packing_sla_minutes;
+
+  const broadcastStoreAvatar = (url: string, updatedAt?: string) => {
+    const merged = { ...currentUser, avatar_url: url };
+    setCurrentUser(merged);
+    localStorage.setItem("ml-express-customer", JSON.stringify(merged));
+    window.dispatchEvent(
+      new CustomEvent(STORE_AVATAR_UPDATED_EVENT, {
+        detail: { url, updatedAt: updatedAt || new Date().toISOString() },
+      }),
+    );
+  };
+
+  const applyStoreAvatarFile = async (file: File) => {
+    if (!storeIdForAvatar) return;
+    setUploadingAvatar(true);
+    try {
+      const prepared = await autoPrepareProductImageForUpload(file);
+      const uploaded = await deliveryStoreService.uploadStoreAvatar(
+        storeIdForAvatar,
+        prepared || file,
+      );
+      if (!uploaded) {
+        feedbackService.notify(
+          language === "zh"
+            ? "头像更新失败"
+            : language === "my"
+              ? "ပုံပြောင်း၍မရပါ"
+              : "Failed to update avatar",
+        );
+        return;
+      }
+      const saved = await deliveryStoreService.updateStoreInfo(storeIdForAvatar, {
+        avatar_url: uploaded,
+      });
+      if (saved.success && saved.data) {
+        setStoreInfo(saved.data);
+      } else {
+        setStoreInfo((prev: any) =>
+          prev ? { ...prev, avatar_url: uploaded } : prev,
+        );
+      }
+      broadcastStoreAvatar(
+        uploaded,
+        saved.success ? saved.data?.updated_at : undefined,
+      );
+      feedbackService.notify(
+        language === "zh"
+          ? "头像已更新"
+          : language === "my"
+            ? "ပုံပြောင်းပြီးပါပြီ"
+            : "Avatar updated",
+      );
+    } catch (error) {
+      LoggerService.error("更换店铺头像失败:", error);
+      feedbackService.notify(
+        language === "zh" ? "头像更新失败" : "Failed to update avatar",
+      );
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleOpenEditProfile = () => {
     if (isPartnerStore && storeInfo) {
       setEditProfileForm({
@@ -1133,7 +1210,17 @@ const ProfilePage: React.FC = () => {
     onRefresh: loadUserPackages,
     onPackageStatusChange: (packageId, status) => {
       setUserPackages((prev) =>
-        prev.map((p) => (p.id === packageId ? { ...p, status } : p)),
+        prev.map((p) =>
+          p.id === packageId
+            ? {
+                ...p,
+                status,
+                ...(isPackingStatus(status) && !p.packing_started_at
+                  ? { packing_started_at: new Date().toISOString() }
+                  : {}),
+              }
+            : p,
+        ),
       );
     },
     removePendingOrder: (id) => merchantOrdersCtx?.removePendingOrder(id),
@@ -2846,7 +2933,19 @@ const ProfilePage: React.FC = () => {
                     flexWrap: "wrap",
                   }}
                 >
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (uploadingAvatar) return;
+                      avatarInputRef.current?.click();
+                    }}
+                    title={
+                      language === "zh"
+                        ? "更换头像"
+                        : language === "my"
+                          ? "ပုံပြောင်းရန်"
+                          : "Change avatar"
+                    }
                     style={{
                       width: "56px",
                       height: "56px",
@@ -2862,12 +2961,60 @@ const ProfilePage: React.FC = () => {
                       fontWeight: "700",
                       color: "#0284c7",
                       flexShrink: 0,
+                      padding: 0,
+                      cursor: uploadingAvatar ? "wait" : "pointer",
+                      position: "relative",
+                      overflow: "hidden",
                     }}
                   >
-                    {currentUser.name
-                      ? currentUser.name.charAt(0).toUpperCase()
-                      : "U"}
-                  </div>
+                    <StorageImg
+                      src={storeAvatarSrc(
+                        storeInfo?.avatar_url || currentUser?.avatar_url,
+                        storeInfo?.updated_at,
+                      )}
+                      alt=""
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                      fallback={
+                        <span>
+                          {currentUser.name
+                            ? currentUser.name.charAt(0).toUpperCase()
+                            : "U"}
+                        </span>
+                      }
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 2,
+                        bottom: 2,
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        background: "#fff",
+                        color: "#0284c7",
+                        fontSize: 11,
+                        lineHeight: "18px",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+                      }}
+                    >
+                      ✎
+                    </span>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void applyStoreAvatarFile(file);
+                      }}
+                    />
+                  </button>
                   <div
                     style={{
                       color: "white",
@@ -5212,19 +5359,27 @@ const ProfilePage: React.FC = () => {
             </div>
             
             <div style={{ overflowY: "auto", flex: 1, paddingRight: "0.5rem" }}>
-              {userPackages.filter((pkg) => pkg.status === "打包中").length >
-              0 ? (
-                userPackages
-                  .filter((pkg) => pkg.status === "打包中")
-                  .map((pkg: any) => (
+              {userPackages.filter((pkg) => pkg.status === "打包中").length > 0 ? (
+                sortByPackingSla(
+                  userPackages
+                    .filter((pkg) => pkg.status === "打包中")
+                    .map((pkg) => withStorePackingSla(pkg, packingSlaMinutes)),
+                ).map((pkg: any) => {
+                  const packingOverdue =
+                    computePackingCountdown(pkg).phase === "overdue";
+                  return (
                   <div
                     key={pkg.id}
                     style={{
                         padding: "1.5rem",
                         marginBottom: "1rem",
-                        background: "rgba(255, 255, 255, 0.05)",
+                        background: packingOverdue
+                          ? "rgba(239, 68, 68, 0.2)"
+                          : "rgba(255, 255, 255, 0.05)",
                         borderRadius: "24px",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        border: packingOverdue
+                          ? "2px solid #ef4444"
+                          : "1px solid rgba(255, 255, 255, 0.1)",
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
@@ -5274,6 +5429,12 @@ const ProfilePage: React.FC = () => {
                           </div>
                         )}
                       </div>
+                    <PackingSlaBadge
+                      order={pkg}
+                      language={language as MerchantLanguage}
+                      variant="dark"
+                      slaMinutes={packingSlaMinutes}
+                    />
                     </div>
                     <button
                       onClick={() => {
@@ -5309,7 +5470,8 @@ const ProfilePage: React.FC = () => {
                             : "ထုပ်ပိုးရန်စတင်ပါ"}
                     </button>
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <div style={{ padding: "4rem 2rem", textAlign: "center" }}>
                   <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>
@@ -9512,6 +9674,7 @@ const ProfilePage: React.FC = () => {
         actionLoading={packageModals.actionLoading}
         printLoading={packageModals.printLoading}
         canComplete={packageModals.isPackingCompleteEnabled}
+        slaMinutes={packingSlaMinutes}
         onClose={packageModals.closePackingModal}
         onToggleItem={packageModals.togglePackingItem}
         onPrint={packageModals.handlePackingPrint}

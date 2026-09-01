@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Alert, ActivityIndicator, DeviceEventEmitter, Image, Vibration, Animated, Modal, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pickImageFromLibrary } from '../utils/mediaAccess';
-import { packageService, supabase, reviewService, merchantService } from '../services/supabase';
+import { packageService, supabase, reviewService, merchantService, deliveryStoreService } from '../services/supabase';
 import { chatService } from '../services/chatService';
 import LoggerService from '../services/LoggerService';
 import { useApp } from '../contexts/AppContext';
@@ -14,12 +14,19 @@ import { errorService } from '../services/ErrorService';
 import { feedbackService } from '../services/FeedbackService';
 import { OrderSkeleton } from '../components/SkeletonLoader';
 import PackingModal from '../components/PackingModal';
+import { PackingSlaBadge } from '../components/PackingSlaBadge';
+import {
+  computePackingCountdown,
+  isPackingStatus,
+  sortByPackingSla,
+  withStorePackingSla,
+} from '../services/_shared/packingCountdown';
 import { type AppLang, getOrderListJourneyHint } from '../utils/orderJourney';
 import { dialCourierByAssignment } from '../utils/courierPhone';
 import { isCourierUnassigned } from '../services/_shared/dialPhone';
 import { filterOrdersBySearch } from '../utils/filterOrdersBySearch';
 import { printerService } from '../services/PrinterService';
-import { batchAcceptOrders } from '../services/packageBatchService';
+import { batchAcceptOrders, acceptOrderToPacking } from '../services/packageBatchService';
 import {
   pendingConfirmIds,
   printableIds,
@@ -57,12 +64,15 @@ interface Order {
   payment_status?: string;
   delivery_store_id?: string;
   notes?: string;
+  packing_started_at?: string | null;
+  updated_at?: string;
 }
 
 export default function MyOrdersScreen({ navigation, route }: any) {
   const { language } = useApp();
   const { showLoading, hideLoading } = useLoading();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [packingSlaMinutes, setPackingSlaMinutes] = useState<number | null>(null);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   // 从路由参数中获取筛选状态，默认为'all'
   const [selectedStatus, setSelectedStatus] = useState(route?.params?.filterStatus || 'all');
@@ -70,6 +80,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchBusy, setBatchBusy] = useState(false);
+  const [nowTick, setNowTick] = useState(() => new Date());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState('');
@@ -321,6 +332,13 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     filterOrders(orders, selectedStatus, searchQuery);
   }, [orders, selectedStatus, searchQuery]);
 
+  useEffect(() => {
+    const hasPacking = orders.some((order) => isPackingStatus(order.status));
+    if (!hasPacking) return;
+    const id = setInterval(() => setNowTick(new Date()), 1000);
+    return () => clearInterval(id);
+  }, [orders]);
+
   // 打包弹窗：加载店铺商品价格表（与商家端 Web getPackingModalModel 一致；无 delivery_store_id 时回退为当前商家 id）
   useEffect(() => {
     let cancelled = false;
@@ -446,6 +464,15 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         const detectedUserType = storedUserType || user.user_type || 'customer';
         const finalUserType = detectedUserType === 'merchant' ? 'merchant' : 'customer';
         setUserType(finalUserType);
+        if (finalUserType === 'merchant' && user.id) {
+          deliveryStoreService.getStoreById(user.id).then((store) => {
+            if (store?.packing_sla_minutes) {
+              setPackingSlaMinutes(Number(store.packing_sla_minutes));
+            } else if (user.packing_sla_minutes) {
+              setPackingSlaMinutes(Number(user.packing_sla_minutes));
+            }
+          }).catch(() => {});
+        }
         
         // 如果是访客，不加载订单
         if (isGuest === 'true' || user.id === 'guest') {
@@ -557,6 +584,15 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       : orderList.filter(order => order.status === status);
     setFilteredOrders(filterOrdersBySearch(byStatus, query));
   };
+
+  const visibleOrders = useMemo(
+    () =>
+      sortByPackingSla(
+        filteredOrders.map((order) => withStorePackingSla(order, packingSlaMinutes)),
+        nowTick,
+      ),
+    [filteredOrders, nowTick, packingSlaMinutes],
+  );
 
   // 居中滚动到指定筛选卡片
   const scrollToFilter = (status: string) => {
@@ -754,14 +790,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   const handleMerchantAccept = async (orderId: string, paymentMethod: string) => {
     try {
       showLoading(language === 'zh' ? '正在接单...' : 'Accepting...', 'package');
-      const newStatus = '打包中'; // 🚀 改为打包中
-      
-      const { error } = await supabase
-        .from('packages')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', orderId);
-
-      if (error) throw error;
+      const ok = await acceptOrderToPacking(orderId);
+      if (!ok) throw new Error('accept failed');
       
       showToast(language === 'zh' ? '接单成功，请打包' : 'Accepted, please pack', 'success');
       onRefresh();
@@ -1226,13 +1256,17 @@ export default function MyOrdersScreen({ navigation, route }: any) {
             ) : null}
           </View>
         ) : (
-          filteredOrders.map((order) => (
+          visibleOrders.map((order) => {
+            const packingOverdue =
+              computePackingCountdown(withStorePackingSla(order, packingSlaMinutes), nowTick).phase === 'overdue';
+            return (
             <TouchableOpacity
               key={order.id}
               style={[
                 styles.orderCard,
                 unreadCounts[order.id] > 0 && styles.unreadOrderCard,
                 selectedIds.has(order.id) && styles.orderCardSelected,
+                packingOverdue && styles.packingOverdueCard,
               ]}
               onPress={() => {
                 if (selectionMode) {
@@ -1284,6 +1318,14 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   </Text>
                 );
               })()}
+              <PackingSlaBadge
+                order={order}
+                language={
+                  language === 'en' ? 'en' : language === 'my' ? 'my' : 'zh'
+                }
+                now={nowTick}
+                slaMinutes={packingSlaMinutes}
+              />
 
               {/* 寄件人信息 */}
               <View style={styles.orderInfo}>
@@ -1446,7 +1488,8 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                 </View>
               )}
             </TouchableOpacity>
-          ))
+          );
+          })
         )}
 
         <View style={{ height: 20 }} />
@@ -1458,6 +1501,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
         orderData={packingOrderData}
         productPriceMap={packingProductPriceMap}
         language={language}
+        slaMinutes={packingSlaMinutes}
         onClose={() => {
           setShowPackingModal(false);
           setPackingOrderData(null);
@@ -1857,6 +1901,11 @@ const styles = StyleSheet.create({
     borderColor: '#3b82f6',
     borderWidth: 2,
     backgroundColor: '#f0f7ff',
+  },
+  packingOverdueCard: {
+    borderColor: '#ef4444',
+    borderWidth: 2,
+    backgroundColor: '#fef2f2',
   },
   cardUnreadBadge: {
     position: 'absolute',

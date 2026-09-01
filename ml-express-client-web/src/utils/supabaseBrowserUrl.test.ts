@@ -1,5 +1,7 @@
 import {
+  publicStorageUrl,
   resolveBrowserSupabaseUrl,
+  rewritePublicStorageUrl,
   SUPABASE_BROWSER_PROXY_URL,
   SUPABASE_UPSTREAM_HOST,
 } from './supabaseBrowserUrl';
@@ -23,9 +25,13 @@ describe('resolveBrowserSupabaseUrl', () => {
     expect(resolveBrowserSupabaseUrl('https://sb.example.com')).toBe('https://sb.example.com');
   });
 
-  it('empty falls back to upstream supabase.co (jsdom / local)', () => {
+  it('empty string falls back to upstream supabase.co (jsdom / local)', () => {
     expect(resolveBrowserSupabaseUrl('')).toBe(UPSTREAM);
-    expect(resolveBrowserSupabaseUrl(undefined)).toBe(UPSTREAM);
+  });
+
+  it('undefined uses REACT_APP_SUPABASE_URL when the env is set', () => {
+    const envUrl = String(process.env.REACT_APP_SUPABASE_URL || '').trim().replace(/\/$/, '');
+    expect(resolveBrowserSupabaseUrl(undefined)).toBe(envUrl || UPSTREAM);
   });
 
   it('mocked production admin host returns same-origin /__sb', () => {
@@ -48,5 +54,28 @@ describe('resolveBrowserSupabaseUrl', () => {
     expect(new URL('rest/v1', resolveBrowserSupabaseUrl(UPSTREAM)).href).toBe(
       'https://admin-market-link-express.com/__sb/rest/v1',
     );
+  });
+});
+
+describe('publicStorageUrl', () => {
+  it('rewrites supabase.co product images onto the public /__sb proxy', () => {
+    expect(
+      publicStorageUrl(
+        `${UPSTREAM}/storage/v1/object/public/product_images/a.jpg`,
+      ),
+    ).toBe('https://market-link-express.com/__sb/storage/v1/object/public/product_images/a.jpg');
+  });
+
+  it('builds a proxy URL from a storage object path', () => {
+    expect(publicStorageUrl('84e7/a.jpg')).toBe(
+      'https://market-link-express.com/__sb/storage/v1/object/public/product_images/84e7/a.jpg',
+    );
+  });
+
+  it('leaves blob and data URLs untouched', () => {
+    expect(publicStorageUrl('blob:https://market-link-express.com/1')).toBe(
+      'blob:https://market-link-express.com/1',
+    );
+    expect(rewritePublicStorageUrl('data:image/png;base64,xx')).toBe('data:image/png;base64,xx');
   });
 });

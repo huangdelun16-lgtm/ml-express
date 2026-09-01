@@ -111,4 +111,13 @@ describe('remoteImageUri', () => {
     expect(remoteImageUri('file:///tmp/x.jpg')).toBeUndefined();
     expect(remoteImageUri('')).toBeUndefined();
   });
+
+  it('builds a proxy URL from a storage object path', () => {
+    expect(remoteImageUri('84e7/x.jpg')).toBe(
+      'https://market-link-express.com/__sb/storage/v1/object/public/product_images/84e7/x.jpg',
+    );
+    expect(remoteImageUri('product_images/84e7/x.jpg')).toBe(
+      'https://market-link-express.com/__sb/storage/v1/object/public/product_images/84e7/x.jpg',
+    );
+  });
 });

@@ -11,6 +11,8 @@ import {
   STORE_TYPES,
   REGIONS,
   OPERATING_HOURS_PRESETS,
+  PACKING_SLA_MINUTE_PRESETS,
+  DEFAULT_OPERATING_HOURS,
   parseOperatingHours,
   getOperatingDurationLabel,
   normalizeProductListingStatus,
@@ -33,6 +35,7 @@ const DeliveryStoreOverlays: React.FC = () => {
     adminProductFileInputRef,
     adminProductForm,
     applyOperatingHoursPreset,
+    applyPackingSlaPreset,
     closeStoreForm,
     confirmMapSelection,
     currentStorageStore,
@@ -299,6 +302,44 @@ const DeliveryStoreOverlays: React.FC = () => {
                           </div>
                         );
                       })()}
+                    </div>
+                    <div className="store-form-field store-form-field--hours">
+                      <label>商家时限 <span>*</span></label>
+                      <div className="store-form-hours">
+                        <div className="store-form-hours__pickers">
+                          <div className="store-form-hours__picker">
+                            <span className="store-form-hours__picker-label">打包分钟</span>
+                            <input
+                              type="number"
+                              name="packing_sla_minutes"
+                              min={1}
+                              max={180}
+                              step={1}
+                              value={formData.packing_sla_minutes}
+                              onChange={handleInputChange}
+                              required
+                            />
+                          </div>
+                          <span className="store-form-hours__duration">
+                            接单后 {formData.packing_sla_minutes || 12} 分钟内完成打包
+                          </span>
+                        </div>
+                        <div className="store-form-hours__presets" role="group" aria-label="常用商家时限">
+                          {PACKING_SLA_MINUTE_PRESETS.map((minutes) => (
+                            <button
+                              key={minutes}
+                              type="button"
+                              className={`store-form-hours__preset ${Number(formData.packing_sla_minutes) === minutes ? 'is-active' : ''}`}
+                              onClick={() => applyPackingSlaPreset(minutes)}
+                            >
+                              {minutes} 分钟
+                            </button>
+                          ))}
+                        </div>
+                        <p className="store-form-hours__hint">
+                          系统留给这家店的打包时间。每家店可以不同，商家端接单后按此时限倒计时。
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </section>

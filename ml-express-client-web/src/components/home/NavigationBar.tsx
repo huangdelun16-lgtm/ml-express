@@ -10,7 +10,7 @@ interface NavigationBarProps {
   currentUser: any;
   onLogout: () => void;
   onShowRegisterModal: (isLoginMode: boolean) => void;
-  /** 首页专用：毛玻璃悬浮导航条 */
+  /** 首页 / 内页统一：白色悬浮胶囊导航。传 default 则无白底（极少用）。 */
   variant?: 'default' | 'landing';
 }
 
@@ -20,7 +20,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   currentUser,
   onLogout,
   onShowRegisterModal,
-  variant = 'default'
+  variant = 'landing'
 }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();

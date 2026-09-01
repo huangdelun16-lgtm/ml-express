@@ -124,6 +124,22 @@ export const mapScreenStyles = StyleSheet.create({
     borderWidth: 2,
     backgroundColor: '#f0fdf4'
   },
+  approachingPickupCard: {
+    borderColor: '#f59e0b',
+    borderWidth: 2,
+    backgroundColor: '#fffbeb',
+  },
+  approachingDeliveryCard: {
+    borderColor: '#3b82f6',
+    borderWidth: 2,
+    backgroundColor: '#eff6ff',
+  },
+  approachingPickupChip: {
+    backgroundColor: '#fef3c7',
+  },
+  approachingDeliveryChip: {
+    backgroundColor: '#dbeafe',
+  },
   packageInfo: { gap: 12 },
   cardHeader: {
     flexDirection: 'row',

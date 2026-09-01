@@ -4,6 +4,7 @@ import { useCart, getCartItemLineKey } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import NavigationBar from '../components/home/NavigationBar';
 import ClientInteriorShell from '../components/layout/ClientInteriorShell';
+import StorageImg from '../components/StorageImg';
 
 const CartPage: React.FC = () => {
   const navigate = useNavigate();
@@ -181,7 +182,21 @@ const CartPage: React.FC = () => {
                         }}
                       >
                         {item.image_url && !item.image_url.startsWith('file://') ? (
-                          <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          <StorageImg src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} fallback={
+                          <div
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              fontSize: '1.8rem',
+                              background: 'rgba(56, 189, 248, 0.12)',
+                            }}
+                          >
+                            📦
+                          </div>
+                          } />
                         ) : (
                           <div
                             style={{

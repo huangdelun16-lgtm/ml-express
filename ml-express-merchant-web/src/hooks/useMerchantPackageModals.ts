@@ -9,6 +9,7 @@ import { printMerchantReceipt } from '../utils/printMerchantReceipt';
 import { loadPrinterSettings } from '../services/printerSettings';
 import { feedbackService } from '../services/FeedbackService';
 import { isBatchPrintableStatus } from '../utils/merchantBatchSelection';
+import { packingAcceptFields } from '../services/_shared/packingCountdown';
 
 interface UseMerchantPackageModalsOptions {
   language: MerchantLanguage;
@@ -88,9 +89,11 @@ export function useMerchantPackageModals({
           );
           return;
         }
+        const packingFields = packingAcceptFields();
         const success = await packageService.updatePackageStatus(
           pkgToAccept.id,
-          MERCHANT_ORDER_STATUS.PACKING,
+          packingFields.status,
+          { packing_started_at: packingFields.packing_started_at },
         );
         if (success) {
           const printerSettings = loadPrinterSettings();
@@ -118,7 +121,11 @@ export function useMerchantPackageModals({
           );
           onPackageStatusChange?.(pkgToAccept.id, MERCHANT_ORDER_STATUS.PACKING);
           if (!targetPkg) {
-            setSelectedPackage({ ...pkgToAccept, status: MERCHANT_ORDER_STATUS.PACKING });
+            setSelectedPackage({
+              ...pkgToAccept,
+              status: MERCHANT_ORDER_STATUS.PACKING,
+              packing_started_at: packingFields.packing_started_at,
+            });
           }
           onRefresh?.();
         }

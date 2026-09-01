@@ -31,6 +31,7 @@ import {
 } from "../services/supabase";
 import { theme } from "../config/theme";
 import { analytics } from "../services/AnalyticsService";
+import { STORE_AVATAR_UPDATED, storeAvatarDisplayUri } from "../utils/storeAvatar";
 
 const { width } = Dimensions.get("window");
 
@@ -168,15 +169,30 @@ export default function HomeScreen({ navigation }: any) {
     const silent = opts?.silent === true;
     try {
       if (!silent) setLoading(true);
-      const userId = await AsyncStorage.getItem("userId");
+      const [userId, cachedName] = await Promise.all([
+        AsyncStorage.getItem("userId"),
+        AsyncStorage.getItem("userName"),
+      ]);
       if (!userId) {
         navigation.replace("Login");
         return;
       }
 
-      // 获取店铺详细信息
+      if (cachedName) {
+        setMerchantInfo((prev: any) =>
+          prev?.store_name ? prev : { ...prev, id: userId, store_name: cachedName },
+        );
+      }
+
+      // 获取店铺详细信息（SELECT * 若被 avatar_url 列权限拦住会降级，仍可能为 null）
       const store = await deliveryStoreService.getStoreById(userId);
-      setMerchantInfo(store);
+      setMerchantInfo(
+        store
+          ? { ...store, store_name: store.store_name || cachedName }
+          : cachedName
+            ? { id: userId, store_name: cachedName }
+            : null,
+      );
 
       // 获取订单统计 (针对商家)
       const email = await AsyncStorage.getItem("userEmail");
@@ -220,10 +236,27 @@ export default function HomeScreen({ navigation }: any) {
 
   /** 接单/拒单后全局会 emit，经营概况状态卡片即时对齐数据库 */
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener("order_status_updated", () => {
+    const orderSub = DeviceEventEmitter.addListener("order_status_updated", () => {
       loadData({ silent: true });
     });
-    return () => sub.remove();
+    const avatarSub = DeviceEventEmitter.addListener(
+      STORE_AVATAR_UPDATED,
+      (payload?: { url?: string; updatedAt?: string }) => {
+        setMerchantInfo((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                avatar_url: payload?.url || "",
+                updated_at: payload?.updatedAt || prev.updated_at,
+              }
+            : prev,
+        );
+      },
+    );
+    return () => {
+      orderSub.remove();
+      avatarSub.remove();
+    };
   }, [loadData]);
 
   const onRefresh = async () => {
@@ -231,6 +264,11 @@ export default function HomeScreen({ navigation }: any) {
     await loadData();
     setRefreshing(false);
   };
+
+  const homeAvatarUri = storeAvatarDisplayUri(
+    merchantInfo?.avatar_url,
+    merchantInfo?.updated_at,
+  );
 
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 100],
@@ -250,14 +288,21 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.headerContent}>
           <View style={styles.profileRow}>
             <View style={styles.avatarContainer}>
-              <Text style={styles.avatarText}>
-                {merchantInfo?.store_name?.charAt(0) || "M"}
-              </Text>
+              {homeAvatarUri ? (
+                <Image
+                  source={{ uri: homeAvatarUri }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {merchantInfo?.store_name?.charAt(0) || "M"}
+                </Text>
+              )}
             </View>
             <View style={styles.nameContainer}>
               <Text style={styles.welcomeText}>{currentT.welcome}</Text>
               <Text style={styles.storeName}>
-                {merchantInfo?.store_name || "Loading..."}
+                {merchantInfo?.store_name || (loading ? "Loading..." : "—")}
               </Text>
             </View>
             <TouchableOpacity
@@ -614,6 +659,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.2)",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
   avatarText: {
     fontSize: 24,

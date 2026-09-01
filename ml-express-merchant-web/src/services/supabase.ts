@@ -26,6 +26,7 @@ import type {
   RechargeRequest,
 } from './_shared/domainTypes';
 import { createBannerService, createTutorialService } from './_shared/services';
+import { isMissingPackingStartedAtColumn } from './_shared/packingCountdown';
 export type { Banner, Tutorial, ProductCategory, StoreReview, RechargeRequest };
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
@@ -93,6 +94,7 @@ export interface Package {
   cod_settled_by_id?: string;
   cod_settled_by_name?: string;
   pricing_base_fee_mmk?: number | null;
+  packing_started_at?: string | null;
 }
 
 // 广告横幅接口
@@ -117,6 +119,8 @@ export interface DeliveryStore {
   updated_at?: string;
   vacation_dates?: string[]; // 🚀 新增：休假日期列表 (YYYY-MM-DD)
   cod_settlement_day?: '7' | '10' | '15' | '30'; // 🚀 新增：COD 结清日
+  avatar_url?: string | null;
+  packing_sla_minutes?: number | null;
 }
 
 // 商品接口
@@ -671,15 +675,19 @@ export const packageService = {
   // 🚀 新增：更新包裹状态
   async updatePackageStatus(packageId: string, status: string, additionalData: any = {}): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('packages')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString(),
-          ...additionalData
-        })
-        .eq('id', packageId);
-
+      const body: Record<string, unknown> = {
+        status,
+        updated_at: new Date().toISOString(),
+        ...additionalData,
+      };
+      const { error } = await supabase.from('packages').update(body).eq('id', packageId);
+      if (error && isMissingPackingStartedAtColumn(error) && additionalData?.packing_started_at) {
+        const retry = { ...body };
+        delete retry.packing_started_at;
+        const second = await supabase.from('packages').update(retry).eq('id', packageId);
+        if (second.error) throw second.error;
+        return true;
+      }
       if (error) throw error;
       return true;
     } catch (err) {
@@ -1056,6 +1064,24 @@ export const pendingOrderService = {
   }
 };
 
+const DELIVERY_STORE_SELECT_WITHOUT_AVATAR =
+  'id, store_name, store_code, address, latitude, longitude, phone, email, manager_name, manager_phone, store_type, status, operating_hours, service_area_radius, capacity, current_load, facilities, notes, created_by, created_at, updated_at, region, is_closed_today, current_session_id, cod_settlement_day, vacation_dates, mall_visible, packing_sla_minutes';
+
+function isDeliveryStoreColumnDenied(error: any): boolean {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`;
+  return /42501|permission denied|avatar_url/i.test(text);
+}
+
+async function queryDeliveryStores<T>(
+  run: (columns: string) => PromiseLike<{ data: T; error: any }>,
+): Promise<{ data: T; error: any }> {
+  const first = await run('*');
+  if (first.error && isDeliveryStoreColumnDenied(first.error)) {
+    return run(DELIVERY_STORE_SELECT_WITHOUT_AVATAR);
+  }
+  return first;
+}
+
 function isCityMallVisibleStore(store: Record<string, unknown>): boolean {
   if (store.mall_visible === false) return false;
   if (store.store_type === 'transit_station') return false;
@@ -1070,19 +1096,23 @@ function isCityMallVisibleStore(store: Record<string, unknown>): boolean {
 export const deliveryStoreService = {
   async getActiveStores() {
     try {
-      let { data, error } = await supabase
-        .from('delivery_stores')
-        .select('*')
-        .eq('status', 'active')
-        .eq('mall_visible', true)
-        .order('store_name', { ascending: true });
-      if (error?.message?.includes('mall_visible')) {
-        const fallback = await supabase
+      let { data, error } = await queryDeliveryStores((columns) =>
+        supabase
           .from('delivery_stores')
-          .select('*')
+          .select(columns as '*')
           .eq('status', 'active')
-          .neq('store_type', 'transit_station')
-          .order('store_name', { ascending: true });
+          .eq('mall_visible', true)
+          .order('store_name', { ascending: true }),
+      );
+      if (error?.message?.includes('mall_visible')) {
+        const fallback = await queryDeliveryStores((columns) =>
+          supabase
+            .from('delivery_stores')
+            .select(columns as '*')
+            .eq('status', 'active')
+            .neq('store_type', 'transit_station')
+            .order('store_name', { ascending: true }),
+        );
         data = fallback.data;
         error = fallback.error;
       }
@@ -1097,14 +1127,23 @@ export const deliveryStoreService = {
 
   async getStoreById(storeId: string) {
     try {
-      const { data, error } = await supabase
-        .from('delivery_stores')
-        .select('*')
-        .eq('id', storeId)
-        .single();
+      const { data, error } = await queryDeliveryStores((columns) =>
+        supabase.from('delivery_stores').select(columns as '*').eq('id', storeId).maybeSingle(),
+      );
 
       if (error) throw error;
-      return data as DeliveryStore;
+      const store = data as DeliveryStore | null;
+      if (store && !('avatar_url' in store)) {
+        const avatar = await supabase
+          .from('delivery_stores')
+          .select('avatar_url')
+          .eq('id', storeId)
+          .maybeSingle();
+        if (avatar.data?.avatar_url) {
+          return { ...store, avatar_url: avatar.data.avatar_url };
+        }
+      }
+      return store;
     } catch (error) {
       LoggerService.error('获取店铺详情失败:', error);
       return null;
@@ -1121,6 +1160,7 @@ export const deliveryStoreService = {
       'is_closed_today',
       'vacation_dates',
       'password',
+      'avatar_url',
     ] as const;
 
     const payload: Record<string, unknown> = {
@@ -1141,11 +1181,9 @@ export const deliveryStoreService = {
     }
 
     const runUpdate = async (body: Record<string, unknown>) => {
-      const { data, error } = await supabase
-        .from('delivery_stores')
-        .update(body)
-        .eq('id', storeId)
-        .select('*');
+      const { data, error } = await queryDeliveryStores((columns) =>
+        supabase.from('delivery_stores').update(body).eq('id', storeId).select(columns as '*'),
+      );
 
       if (error) throw error;
       if (!data?.length) {
@@ -1159,6 +1197,13 @@ export const deliveryStoreService = {
       return { success: true, data };
     } catch (error: any) {
       const message = String(error?.message || error?.details || '');
+      if (payload.avatar_url !== undefined && /avatar_url|PGRST204|schema cache|permission denied|42501/i.test(message)) {
+        return {
+          success: false,
+          error: { ...error, code: 'NO_AVATAR_COLUMN' },
+        };
+      }
+
       const missingOptionalColumn =
         message.includes('is_closed_today') ||
         message.includes('vacation_dates') ||
@@ -1172,6 +1217,7 @@ export const deliveryStoreService = {
         const fallback = { ...payload };
         delete fallback.is_closed_today;
         delete fallback.vacation_dates;
+        delete fallback.avatar_url;
         try {
           const data = await runUpdate(fallback);
           LoggerService.warn(
@@ -1187,7 +1233,45 @@ export const deliveryStoreService = {
       LoggerService.error('更新商店信息失败:', error);
       return { success: false, error };
     }
-  }
+  },
+
+  async uploadStoreAvatar(storeId: string, file: File): Promise<string | null> {
+    if (!storeId || !file) return null;
+    const fileName = `${storeId}/avatar.jpg`;
+    const buckets = ['product_images', 'review_images'] as const;
+    let lastError: unknown = null;
+
+    for (const bucket of buckets) {
+      const { error } = await supabase.storage.from(bucket).upload(fileName, file, {
+        contentType: file.type || 'image/jpeg',
+        cacheControl: '60',
+        upsert: true,
+      });
+      if (error) {
+        lastError = error;
+        LoggerService.warn(`店铺头像上传到 ${bucket}/${fileName} 失败:`, error);
+        continue;
+      }
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(fileName);
+      return rewritePublicStorageUrl(publicUrl);
+    }
+
+    LoggerService.error('上传店铺头像失败:', lastError);
+    return null;
+  },
+
+  async removeStoreAvatar(storeId: string): Promise<void> {
+    await this.updateStoreInfo(storeId, { avatar_url: '' });
+    for (const bucket of ['product_images', 'review_images'] as const) {
+      try {
+        await supabase.storage.from(bucket).remove([`${storeId}/avatar.jpg`]);
+      } catch (err) {
+        LoggerService.warn(`删除 ${bucket} 店铺头像失败:`, err);
+      }
+    }
+  },
 };
 
 // 商家服务

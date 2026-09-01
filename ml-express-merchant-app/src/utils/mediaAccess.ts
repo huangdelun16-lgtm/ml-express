@@ -18,6 +18,17 @@ export async function pickImageFromLibrary(
   return ImagePicker.launchImageLibraryAsync(options);
 }
 
+/** 拍照：先申请相机权限。 */
+export async function takePhotoWithCamera(
+  options: ImagePicker.ImagePickerOptions,
+): Promise<ImagePicker.ImagePickerResult> {
+  const { status } = await ImagePicker.requestCameraPermissionsAsync();
+  if (status !== 'granted') {
+    return { canceled: true, assets: null };
+  }
+  return ImagePicker.launchCameraAsync(options);
+}
+
 /** 保存图片到相册：Android 13+ 仅需 MediaStore 写入；旧版/iOS 请求 writeOnly 权限。 */
 export async function ensureSaveToLibraryPermission(): Promise<boolean> {
   if (Platform.OS === 'android' && Number(Platform.Version) >= 33) {

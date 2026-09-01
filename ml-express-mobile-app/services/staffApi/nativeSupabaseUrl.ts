@@ -89,3 +89,26 @@ export function applyRealtimeWsFallback(
 ): void {
   return;
 }
+
+/** Rewrite stored supabase.co public Storage URLs onto the native /__sb proxy. */
+export function rewritePublicStorageUrl(url: string): string {
+  const raw = String(url || '').trim();
+  if (!raw) return raw;
+  if (raw.startsWith('file://') || raw.startsWith('content://')) return raw;
+  const proxy = NATIVE_SB_PROXY_URL.replace(/\/$/, '');
+  return raw
+    .replace(/^https?:\/\/uopkyuluxnrewvlmutam\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(/^https?:\/\/[^/]+\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(
+      /^https?:\/\/(?:www\.)?(?:mlexpress-merchants\.com|market-link-express\.com|admin-market-link-express\.com)\/__sb(?=\/|$)/i,
+      proxy,
+    );
+}
+
+export function remoteImageUri(url?: string | null): string | undefined {
+  const rewritten = rewritePublicStorageUrl(String(url || '').trim());
+  if (!rewritten) return undefined;
+  if (rewritten.startsWith('file://') || rewritten.startsWith('content://')) return rewritten;
+  if (!/^https?:\/\//i.test(rewritten)) return undefined;
+  return rewritten;
+}

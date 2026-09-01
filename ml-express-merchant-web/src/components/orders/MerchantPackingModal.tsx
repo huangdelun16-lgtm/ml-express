@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { getPackingModalModel } from '../../utils/parseOrderPackingItems';
 import type { MerchantLanguage } from '../../constants/merchantOrderStatus';
 import './merchantOrderModals.css';
+import { PackingSlaBadge } from './PackingSlaBadge';
+import { computePackingCountdown, withStorePackingSla } from '../../services/_shared/packingCountdown';
 
 type PackingModalModel = ReturnType<typeof getPackingModalModel>;
 
@@ -15,6 +17,7 @@ export interface MerchantPackingModalProps {
   actionLoading: boolean;
   printLoading?: boolean;
   canComplete: boolean;
+  slaMinutes?: number | null;
   onClose: () => void;
   onToggleItem: (itemId: string) => void;
   onPrint: () => void;
@@ -103,14 +106,24 @@ const MerchantPackingModal: React.FC<MerchantPackingModalProps> = ({
   actionLoading,
   printLoading = false,
   canComplete,
+  slaMinutes,
   onClose,
   onToggleItem,
   onPrint,
   onComplete,
 }) => {
   const copy = useMemo(() => getCopy(language), [language]);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, [open]);
 
   if (!open || !order) return null;
+
+  const packingOverdue = computePackingCountdown(withStorePackingSla(order, slaMinutes), now).phase === 'overdue';
 
   const displayTotal =
     model?.summaryTotal ?? model?.computedLineSum ?? null;
@@ -118,7 +131,9 @@ const MerchantPackingModal: React.FC<MerchantPackingModalProps> = ({
   return (
     <div className="merchant-modal-overlay merchant-packing-overlay" onClick={onClose}>
       <div className="merchant-packing-panel" onClick={(e) => e.stopPropagation()}>
-        <header className="merchant-packing-header">
+        <header
+          className={`merchant-packing-header${packingOverdue ? ' merchant-packing-header--overdue' : ''}`}
+        >
           <button
             type="button"
             className="merchant-packing-header__close"
@@ -135,6 +150,9 @@ const MerchantPackingModal: React.FC<MerchantPackingModalProps> = ({
           <p className="merchant-packing-header__id">
             {packageIdLabel}: {order.id}
           </p>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <PackingSlaBadge order={order} language={language} variant="dark" now={now} slaMinutes={slaMinutes} />
+          </div>
         </header>
 
         <div className="merchant-packing-body">

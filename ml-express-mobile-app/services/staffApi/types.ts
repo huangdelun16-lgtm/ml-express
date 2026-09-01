@@ -59,6 +59,7 @@ export interface AdminAccount {
   last_login?: string;
   /** 员工所属领区，用于骑手端拉取对应计费规则 */
   region?: string;
+  avatar_url?: string | null;
 }
 
 export interface AuditLog {
@@ -94,6 +95,7 @@ export interface Courier {
     latitude: number;
     longitude: number;
   };
+  avatar_url?: string | null;
 }
 
 // 路线优化结果

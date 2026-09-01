@@ -20,7 +20,7 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPAB
 const TRANSIT_STATION = 'transit_station';
 
 const STORE_SELECT =
-  'id,store_code,store_name,email,phone,address,status,store_type,created_at,region,password,password_hash';
+  'id,store_code,store_name,email,phone,address,status,store_type,created_at,region,password,password_hash,packing_sla_minutes,avatar_url';
 
 function isBcrypt(value) {
   const s = String(value || '');

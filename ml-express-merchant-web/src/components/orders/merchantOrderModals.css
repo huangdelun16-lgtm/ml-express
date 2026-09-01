@@ -49,6 +49,10 @@
   text-align: center;
 }
 
+.merchant-packing-header--overdue {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+}
+
 .merchant-packing-header__close {
   position: absolute;
   top: 0.85rem;

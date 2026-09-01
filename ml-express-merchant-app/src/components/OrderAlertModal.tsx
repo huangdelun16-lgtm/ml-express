@@ -28,6 +28,7 @@ import {
 } from '../utils/orderToMerchantReceipt';
 import { buildReceiptItemDisplays } from '../utils/receiptItemFormat';
 import { feedbackService } from '../services/FeedbackService';
+import { acceptOrderToPacking } from '../services/packageBatchService';
 
 const { width } = Dimensions.get('window');
 const FOOTER_SPACE = 120;
@@ -241,13 +242,8 @@ export const OrderAlertModal = ({
     if (!orderData || isProcessing) return;
     beginProcessing();
     try {
-      const newStatus = '打包中';
-      const { error } = await supabase
-        .from('packages')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', orderData.id);
-
-      if (error) throw error;
+      const ok = await acceptOrderToPacking(String(orderData.id));
+      if (!ok) throw new Error('update failed');
       onStatusUpdate?.();
       onAccepted?.(orderData);
       endProcessing();

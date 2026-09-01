@@ -36,9 +36,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
   normalizePackageStatusZh,
-  isMerchantGeofenceStatus,
   isPickupFlowStatus,
+  isMerchantGeofenceStatus,
+  isDeliveryActionStatus,
 } from '../utils/packageStatusNormalize';
+import {
+  approachingStopKey,
+  pickApproachingStop,
+  type ApproachingStop,
+} from '../utils/approachingStop';
+import * as Speech from 'expo-speech';
 import { COURIER_ONLINE_MODE_KEY } from '../constants/courierOnline';
 import { syncCourierLocationToSupabase } from '../services/locationService';
 import { checkRouteArrivalAtLocation } from '../services/routeNavigationSession';
@@ -195,6 +202,7 @@ export default function MapScreen({ navigation }: any) {
   /** 全局配单事件：地图页内横幅（与 App 内语音/震动同源，避免重复订阅 packages 表） */
   const [mapNewOrderBannerId, setMapNewOrderBannerId] = useState<string | null>(null);
   const mapBannerDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [approachingHint, setApproachingHint] = useState<ApproachingStop | null>(null);
 
   // 🚀 坐标平滑处理状态
   const [smoothCoords, setSmoothCoords] = useState<{lat: number, lng: number} | null>(null);
@@ -346,6 +354,13 @@ export default function MapScreen({ navigation }: any) {
     );
   }, [currentDeliveringPackageId, packages]);
 
+  const hasNearbyStopWatch = useMemo(() => {
+    return packages.some((p) => {
+      const s = resolvePackageStatus(p, statusOverrides[p.id]);
+      return isMerchantGeofenceStatus(s) || isDeliveryActionStatus(s);
+    });
+  }, [packages, resolvePackageStatus, statusOverrides]);
+
   const buildLocationConfig = useCallback(() => {
     // 省电：离屏/后台不跑前台高精度；后台任务按模式降频。避免 BestForNavigation。
     const offScreen = isBackground || !isFocused;
@@ -365,11 +380,11 @@ export default function MapScreen({ navigation }: any) {
         mode: 'background' as const,
       };
     }
-    if (hasInTransitOrders) {
+    if (hasInTransitOrders || hasNearbyStopWatch) {
       return {
         accuracy: Location.Accuracy.High,
-        timeInterval: 12000,
-        distanceInterval: 20,
+        timeInterval: 8000,
+        distanceInterval: 15,
         mode: 'active' as const,
       };
     }
@@ -379,7 +394,7 @@ export default function MapScreen({ navigation }: any) {
       distanceInterval: 100,
       mode: 'idle' as const,
     };
-  }, [hasInTransitOrders, isBackground, isFocused]);
+  }, [hasInTransitOrders, hasNearbyStopWatch, isBackground, isFocused]);
 
   const cleanupMemory = useCallback(() => {
     coordinatesCache.current = {};
@@ -894,8 +909,57 @@ export default function MapScreen({ navigation }: any) {
   }, [stopForegroundWatch]);
 
   const lastUiLocationUpdateRef = useRef(0);
-  const optimizedPackagesRef = useRef<PackageWithExtras[]>([]);
-  optimizedPackagesRef.current = optimizedPackagesWithCoords;
+  const packagesRef = useRef<PackageWithExtras[]>([]);
+  packagesRef.current = packages;
+  const approachingKeyRef = useRef('');
+
+  useEffect(() => {
+    const lat = Number(location?.latitude);
+    const lng = Number(location?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setApproachingHint(null);
+      approachingKeyRef.current = '';
+      return;
+    }
+
+    const pkgs = packagesRef.current.map((p) => ({
+      ...p,
+      status: resolvePackageStatus(p, statusOverrides[p.id]),
+    }));
+    const next = pickApproachingStop(pkgs, lat, lng);
+    const key = approachingStopKey(next);
+    setApproachingHint(next);
+
+    if (!key) {
+      approachingKeyRef.current = '';
+      return;
+    }
+    if (showCameraModal) return;
+    if (key === approachingKeyRef.current || !next) return;
+
+    approachingKeyRef.current = key;
+    Vibration.vibrate(400);
+    const speechLang = language === 'my' ? 'my-MM' : language === 'en' ? 'en-US' : 'zh-CN';
+    const meters = Math.max(1, Math.round(next.distanceMeters));
+    const msg =
+      next.kind === 'pickup'
+        ? language === 'zh'
+          ? `可以取件，${next.title}，约${meters}米`
+          : language === 'en'
+            ? `Ready to pick up ${next.title}, about ${meters} meters`
+            : `ပစ္စည်းယူနိုင်ပါပြီ၊ ${next.title}၊ ${meters} မီတာ`
+        : language === 'zh'
+          ? `可以送件，${next.title}，约${meters}米`
+          : language === 'en'
+            ? `Ready to deliver ${next.title}, about ${meters} meters`
+            : `ပို့ဆောင်နိုင်ပါပြီ၊ ${next.title}၊ ${meters} မီတာ`;
+    try {
+      Speech.stop();
+      Speech.speak(msg, { language: speechLang });
+    } catch {
+      /* ignore TTS errors */
+    }
+  }, [language, location, packages, resolvePackageStatus, showCameraModal, statusOverrides]);
 
   const startLocationTracking = useCallback(async () => {
     try {
@@ -1009,23 +1073,6 @@ export default function MapScreen({ navigation }: any) {
             lastUiLocationUpdateRef.current = now;
             setSmoothCoords({ lat: latitude, lng: longitude });
             setLocation({ latitude, longitude });
-          }
-
-          const pkgs = optimizedPackagesRef.current;
-          if (pkgs.length > 0) {
-            pkgs.forEach((pkg) => {
-              if (isMerchantGeofenceStatus(normalizePackageStatusZh(pkg.status))) {
-                const dist = calculateDistanceKm(
-                  latitude,
-                  longitude,
-                  pkg.coords?.lat || 0,
-                  pkg.coords?.lng || 0,
-                );
-                if (dist <= 0.1) {
-                  Vibration.vibrate(400);
-                }
-              }
-            });
           }
 
           let shouldUpdate = false;
@@ -1448,6 +1495,7 @@ export default function MapScreen({ navigation }: any) {
   const renderPackageItem = useCallback(({ item, index }: { item: PackageWithExtras; index: number }) => {
     const isCurrent = currentDeliveringPackageId === item.id;
     const effectiveStatus = resolvePackageStatus(item, statusOverrides[item.id]);
+    const isApproaching = approachingHint?.packageId === item.id;
     const orderer = getOrdererIdentityDisplay({
       description: item.description,
       delivery_store_id: item.delivery_store_id,
@@ -1460,7 +1508,9 @@ export default function MapScreen({ navigation }: any) {
         activeOpacity={0.7}
         style={[
           styles.packageCard,
-          isCurrent && styles.currentDeliveringCard
+          isCurrent && styles.currentDeliveringCard,
+          isApproaching && approachingHint?.kind === 'pickup' && styles.approachingPickupCard,
+          isApproaching && approachingHint?.kind === 'delivery' && styles.approachingDeliveryCard,
         ]}
         onPress={() => navigation.navigate('PackageDetail', { package: item, coords: item.coords })}
         accessibilityRole="button"
@@ -1498,16 +1548,43 @@ export default function MapScreen({ navigation }: any) {
                 </View>
               )}
             </View>
-            <View style={[styles.deliveringBadge, { backgroundColor: getStatusColor(effectiveStatus) + '20' }]}>
-              <Ionicons 
-                name={effectiveStatus === '异常上报' ? "warning" : "bicycle"} 
-                size={12} 
-                color={getStatusColor(effectiveStatus)} 
-              />
-              <Text style={[styles.deliveringText, { color: getStatusColor(effectiveStatus) }]}>
-                {getStatusDisplayText(effectiveStatus)}
-              </Text>
-            </View>
+            {isApproaching ? (
+              <View
+                style={[
+                  styles.deliveringBadge,
+                  approachingHint?.kind === 'pickup'
+                    ? styles.approachingPickupChip
+                    : styles.approachingDeliveryChip,
+                ]}
+              >
+                <Ionicons
+                  name={approachingHint?.kind === 'pickup' ? 'cube' : 'flag'}
+                  size={12}
+                  color={approachingHint?.kind === 'pickup' ? '#b45309' : '#1d4ed8'}
+                />
+                <Text
+                  style={[
+                    styles.deliveringText,
+                    { color: approachingHint?.kind === 'pickup' ? '#b45309' : '#1d4ed8' },
+                  ]}
+                >
+                  {approachingHint?.kind === 'pickup'
+                    ? t.mapApproachingPickupTitle
+                    : t.mapApproachingDeliveryTitle}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.deliveringBadge, { backgroundColor: getStatusColor(effectiveStatus) + '20' }]}>
+                <Ionicons
+                  name={effectiveStatus === '异常上报' ? 'warning' : 'bicycle'}
+                  size={12}
+                  color={getStatusColor(effectiveStatus)}
+                />
+                <Text style={[styles.deliveringText, { color: getStatusColor(effectiveStatus) }]}>
+                  {getStatusDisplayText(effectiveStatus)}
+                </Text>
+              </View>
+            )}
           </View>
 
           <DeliveryCountdownBadge
@@ -1732,7 +1809,7 @@ export default function MapScreen({ navigation }: any) {
         </View>
       </TouchableOpacity>
     );
-  }, [currentDeliveringPackageId, navigation, startDelivering, finishDelivering, handleManualPickup, getMarkerIcon, getStatusColor, statusOverrides, language, resolvePackageStatus, t]);
+  }, [currentDeliveringPackageId, navigation, startDelivering, finishDelivering, handleManualPickup, getMarkerIcon, getStatusColor, statusOverrides, language, resolvePackageStatus, t, approachingHint]);
 
   // 7. 初始化效果
   useEffect(() => {
@@ -1792,8 +1869,15 @@ export default function MapScreen({ navigation }: any) {
         return p.delivery_speed === speedFilter;
       });
     }
+    if (approachingHint?.packageId) {
+      const id = approachingHint.packageId;
+      const hit = filtered.find((p) => p.id === id);
+      if (hit) {
+        filtered = [hit, ...filtered.filter((p) => p.id !== id)];
+      }
+    }
     return filtered;
-  }, [packages, searchQuery, statusFilter, speedFilter, completedPackageIds]);
+  }, [packages, searchQuery, statusFilter, speedFilter, completedPackageIds, approachingHint]);
 
   return (
     <View style={styles.container}>
@@ -1847,6 +1931,56 @@ export default function MapScreen({ navigation }: any) {
               accessibilityLabel={t.mapNewOrderBannerClose}
             >
               <Ionicons name="close" size={22} color="rgba(255,255,255,0.9)" />
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+      )}
+
+      {approachingHint && (
+        <View style={styles.newOrderBannerWrap} accessibilityRole="alert">
+          <LinearGradient
+            colors={
+              approachingHint.kind === 'pickup'
+                ? ['#f59e0b', '#d97706']
+                : ['#3b82f6', '#1d4ed8']
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.newOrderBannerInner}
+          >
+            <Ionicons
+              name={approachingHint.kind === 'pickup' ? 'cube' : 'flag'}
+              size={22}
+              color="#fff"
+            />
+            <View style={styles.newOrderBannerTextCol}>
+              <Text style={styles.newOrderBannerTitle}>
+                {approachingHint.kind === 'pickup'
+                  ? t.mapApproachingPickupTitle
+                  : t.mapApproachingDeliveryTitle}
+              </Text>
+              <Text style={styles.newOrderBannerId}>
+                #{approachingHint.packageId.slice(-6).toUpperCase()} · {approachingHint.title} ·{' '}
+                {t.mapApproachingMeters.replace(
+                  '{n}',
+                  String(Math.max(1, Math.round(approachingHint.distanceMeters))),
+                )}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.newOrderBannerBtn}
+              onPress={() => {
+                const pkg = packagesRef.current.find((p) => p.id === approachingHint.packageId);
+                navigation.navigate('PackageDetail', {
+                  packageId: approachingHint.packageId,
+                  package: pkg,
+                  coords: pkg?.coords,
+                });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t.mapNewOrderBannerViewDetail}
+            >
+              <Text style={styles.newOrderBannerBtnText}>{t.mapNewOrderBannerViewDetail}</Text>
             </TouchableOpacity>
           </LinearGradient>
         </View>
@@ -1929,7 +2063,8 @@ export default function MapScreen({ navigation }: any) {
           <FlatList
               data={filteredPackages} 
             renderItem={renderPackageItem}
-              keyExtractor={p => p.id} 
+              keyExtractor={p => p.id}
+              extraData={approachingHint}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} 
             />
           )

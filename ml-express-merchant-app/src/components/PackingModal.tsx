@@ -11,6 +11,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../config/theme';
 import { getPackingModalModel } from '../utils/parseOrderPackingItems';
+import { PackingSlaBadge } from './PackingSlaBadge';
+import { computePackingCountdown, withStorePackingSla } from '../services/_shared/packingCountdown';
 
 interface PackingModalProps {
   visible: boolean;
@@ -18,6 +20,7 @@ interface PackingModalProps {
   /** 与商家端 Web ProfilePage 一致：店铺商品名 -> 单价 */
   productPriceMap: Record<string, number>;
   language: 'zh' | 'en' | 'my';
+  slaMinutes?: number | null;
   onComplete: () => void;
   onClose: () => void;
 }
@@ -82,6 +85,7 @@ export default function PackingModal({
   orderData,
   productPriceMap,
   language,
+  slaMinutes,
   onComplete,
   onClose,
 }: PackingModalProps) {
@@ -95,12 +99,19 @@ export default function PackingModal({
   );
 
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     if (visible) {
       setCheckedItems({});
     }
   }, [visible, orderData?.id]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, [visible]);
 
   const toggleItem = (itemId: string) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -114,12 +125,17 @@ export default function PackingModal({
           (_row, index) => !checkedItems[`item-${index}`],
         ));
 
+  const packingOverdue = computePackingCountdown(withStorePackingSla(orderData || {}, slaMinutes), now).phase === 'overdue';
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
         <View style={styles.card}>
-          <LinearGradient colors={['#10b981', '#059669']} style={styles.header}>
+          <LinearGradient
+            colors={packingOverdue ? ['#ef4444', '#b91c1c'] : ['#10b981', '#059669']}
+            style={styles.header}
+          >
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
@@ -128,6 +144,11 @@ export default function PackingModal({
             <Text style={styles.packageIdText}>
               {t.packageId}: {orderData?.id ?? '—'}
             </Text>
+            {orderData ? (
+              <View style={{ marginTop: 8, alignItems: 'center' }}>
+                <PackingSlaBadge order={orderData} language={language} now={now} slaMinutes={slaMinutes} />
+              </View>
+            ) : null}
           </LinearGradient>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>

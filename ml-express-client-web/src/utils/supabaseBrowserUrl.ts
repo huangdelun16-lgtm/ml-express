@@ -72,3 +72,38 @@ export function applyNetlifyRealtimeFallback(client: SupabaseClient): void {
   realtime.endPoint = SUPABASE_REALTIME_WS_FALLBACK;
   realtime.httpEndpoint = `${SUPABASE_WORKER_ORIGIN}/realtime/v1`;
 }
+
+const CLIENT_PUBLIC_SB_PROXY = "https://market-link-express.com/__sb";
+
+function storageProxyBase(): string {
+  if (isBrowser() && !isLocalDevHost()) {
+    return `${window.location.origin}/__sb`;
+  }
+  return CLIENT_PUBLIC_SB_PROXY;
+}
+
+/** Myanmar cannot reach *.supabase.co. Rewrite stored public Storage URLs onto /__sb. */
+export function rewritePublicStorageUrl(url: string): string {
+  const raw = String(url || "").trim();
+  if (!raw) return raw;
+  if (/^(blob:|data:|file:|content:)/i.test(raw)) return raw;
+  const proxy = storageProxyBase().replace(/\/$/, "");
+  return raw
+    .replace(/^https?:\/\/uopkyuluxnrewvlmutam\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(/^https?:\/\/[^/]+\.supabase\.co(?=\/|$)/i, proxy)
+    .replace(
+      /^https?:\/\/(?:www\.)?(?:mlexpress-merchants\.com|market-link-express\.com|admin-market-link-express\.com)\/__sb(?=\/|$)/i,
+      proxy,
+    );
+}
+
+export function publicStorageUrl(url?: string | null): string | undefined {
+  const raw = String(url || "").trim();
+  if (!raw || /^(file:|content:)/i.test(raw)) return undefined;
+  if (/^(blob:|data:)/i.test(raw)) return raw;
+  if (/^https?:\/\//i.test(raw)) return rewritePublicStorageUrl(raw);
+  const path = raw.replace(/^\/+/, "").replace(/^product_images\//, "");
+  return rewritePublicStorageUrl(
+    `${CLIENT_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/${path}`,
+  );
+}

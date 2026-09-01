@@ -1,5 +1,9 @@
 import { supabase } from './merchantApi/supabaseClient';
 import LoggerService from './LoggerService';
+import {
+  isMissingPackingStartedAtColumn,
+  packingAcceptFields,
+} from './_shared/packingCountdown';
 
 const CHUNK = 40;
 
@@ -40,14 +44,25 @@ async function updatePackagesByIds(
   let failed = 0;
   for (let i = 0; i < unique.length; i += CHUNK) {
     const part = unique.slice(i, i + CHUNK);
-    const { data, error } = await supabase
-      .from('packages')
-      .update({
-        ...patch,
-        updated_at: new Date().toISOString(),
-      })
-      .in('id', part)
-      .select('id');
+    const body = {
+      ...patch,
+      updated_at: new Date().toISOString(),
+    };
+    let { data, error } = await supabase.from('packages').update(body).in('id', part).select('id');
+    if (error && isMissingPackingStartedAtColumn(error) && 'packing_started_at' in patch) {
+      const retryPatch = { ...patch };
+      delete retryPatch.packing_started_at;
+      const retry = await supabase
+        .from('packages')
+        .update({
+          ...retryPatch,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', part)
+        .select('id');
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) {
       LoggerService.error('批量更新订单失败:', error);
       failed += part.length;
@@ -116,7 +131,12 @@ async function updateUnsettledCodByIds(
 }
 
 export function batchAcceptOrders(ids: string[]) {
-  return updatePackagesByIds(ids, { status: '打包中' });
+  return updatePackagesByIds(ids, packingAcceptFields());
+}
+
+export async function acceptOrderToPacking(id: string): Promise<boolean> {
+  const { ok } = await batchAcceptOrders([id]);
+  return ok > 0;
 }
 
 /** 只更新未结清；已由后台结清的单不会被后写覆盖 */

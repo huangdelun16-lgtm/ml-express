@@ -166,3 +166,32 @@
   color: #1e6f7a;
   font-weight: 600;
 }
+
+/* 与首页一致的白色胶囊顶栏（不依赖 .home-landing 的 CSS 变量） */
+.home-nav-wrap--landing {
+  position: sticky;
+  top: var(--hl-page-pad, var(--ci-pad, 0.75rem));
+  z-index: 9999;
+  margin-bottom: clamp(1rem, 3vw, 1.75rem);
+}
+
+.home-nav--landing {
+  margin: 0 auto;
+  max-width: min(1120px, 100%);
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(26, 43, 72, 0.08);
+  border-radius: 999px;
+  padding: 0.5rem 1rem 0.5rem 1.25rem !important;
+  box-shadow: 0 10px 28px rgba(26, 43, 72, 0.08);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  color: #1a2b48;
+}
+
+@media (max-width: 1023px) {
+  .home-nav--landing {
+    border-radius: 1.25rem;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+}

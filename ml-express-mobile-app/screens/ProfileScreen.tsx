@@ -11,6 +11,8 @@ import {
   Switch,
   ActivityIndicator,
   DeviceEventEmitter,
+  Image,
+  Platform,
 } from 'react-native';
 import AboutUsModal from '../components/AboutUsModal';
 import { getStaffVersionDisplay } from '../utils/appVersion';
@@ -35,6 +37,13 @@ import { logger } from '../services/LoggerService';
 import * as Location from 'expo-location';
 import { hasAcceptedLocationDisclosure } from '../utils/locationDisclosureStorage';
 import { requestForegroundPermissionsIfDisclosed } from '../utils/locationPermissionGate';
+import * as ImagePicker from 'expo-image-picker';
+import {
+  fetchStaffAvatarUrl,
+  saveStaffAvatarUrl,
+  staffAvatarDisplayUri,
+  uploadStaffAvatar,
+} from '../services/staffAvatarService';
 import {
   canAccessCourierManagement,
   canAccessFinanceManagement,
@@ -101,6 +110,10 @@ export default function ProfileScreen({ navigation }: any) {
     creditScore: 100, // 🚀 新增：信用分
   });
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [avatarUri, setAvatarUri] = useState('');
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [accountId, setAccountId] = useState('');
   const appVersionLabel = getStaffVersionDisplay();
 
   useFocusEffect(
@@ -120,8 +133,18 @@ export default function ProfileScreen({ navigation }: any) {
     setCurrentUserRole(ctx.role);
     setCurrentUserPosition(ctx.position);
     setWorkspaceMode(ctx.mode);
+    const userId = (await AsyncStorage.getItem('currentUserId')) || '';
+    setAccountId(userId);
     setCourierId(ctx.courierId);
     setCourierOnline(onlinePref !== 'false');
+    const remoteAvatar = await fetchStaffAvatarUrl({
+      accountId: userId,
+      courierId: ctx.courierId,
+    });
+    if (remoteAvatar) {
+      setAvatarUri(remoteAvatar);
+      setAvatarFailed(false);
+    }
   };
 
   const isRider = canUseCourierWorkspace(currentUserPosition, courierId);
@@ -469,6 +492,95 @@ export default function ProfileScreen({ navigation }: any) {
     screen: string;
   }>;
 
+  const displayedAvatarUri = staffAvatarDisplayUri(avatarUri);
+  const avatarOwnerId = courierId || accountId;
+
+  const applyAvatarFromPicker = async (uri: string) => {
+    if (!avatarOwnerId) return;
+    setAvatarUri(uri);
+    setAvatarFailed(false);
+    setUploadingAvatar(true);
+    try {
+      const uploaded = await uploadStaffAvatar(uri, avatarOwnerId);
+      if (!uploaded) {
+        feedbackService.notify(t.changeAvatar, t.avatarUpdateFailed);
+        return;
+      }
+      setAvatarUri(`${uploaded}${uploaded.includes('?') ? '&' : '?'}v=${Date.now()}`);
+      const saved = await saveStaffAvatarUrl({
+        accountId: accountId || undefined,
+        courierId,
+        url: uploaded,
+      });
+      if (!saved.success && saved.missingColumn) {
+        feedbackService.notify(
+          language === 'zh'
+            ? '头像已上传，请先同步数据库列 avatar_url'
+            : 'Photo uploaded. Apply the avatar_url migration first.',
+          t.error,
+        );
+        return;
+      }
+      feedbackService.success(t.avatarUpdated);
+    } catch (error) {
+      logger.error('更换骑手头像失败:', error);
+      feedbackService.notify(t.changeAvatar, t.avatarUpdateFailed);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const pickAvatarOptions = {
+    mediaTypes: ['images'] as ['images'],
+    allowsEditing: true,
+    aspect: [1, 1] as [number, number],
+    quality: 0.7,
+  };
+
+  const handleChangeAvatar = () => {
+    Alert.alert(t.changeAvatar, t.changeAvatarHint, [
+      {
+        text: t.chooseFromAlbum,
+        onPress: async () => {
+          try {
+            if (Platform.OS !== 'android') {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert(t.changeAvatar, t.galleryPermissionAvatar);
+                return;
+              }
+            }
+            const result = await ImagePicker.launchImageLibraryAsync(pickAvatarOptions);
+            const uri = result.assets?.[0]?.uri;
+            if (!result.canceled && uri) await applyAvatarFromPicker(uri);
+          } catch (error) {
+            logger.error('选择骑手头像失败:', error);
+            feedbackService.notify(t.changeAvatar, t.avatarUpdateFailed);
+          }
+        },
+      },
+      {
+        text: t.takePhoto,
+        onPress: async () => {
+          try {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert(t.changeAvatar, t.cameraPermission);
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync(pickAvatarOptions);
+            const uri = result.assets?.[0]?.uri;
+            if (!result.canceled && uri) await applyAvatarFromPicker(uri);
+          } catch (error) {
+            logger.error('拍摄骑手头像失败:', error);
+            feedbackService.notify(t.changeAvatar, t.avatarUpdateFailed);
+          }
+        },
+      },
+      { text: t.cancel, style: 'cancel' },
+    ]);
+  };
+
   const courierQuickItems = menuItems.filter((item) => {
     if (workspaceMode === 'admin' && !isRider) {
       // 纯管理账号：隐藏配送历史/统计，保留设置与帮助
@@ -500,11 +612,34 @@ export default function ProfileScreen({ navigation }: any) {
             style={styles.glassCard}
           >
             <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {currentUserName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              <TouchableOpacity
+                style={styles.avatarTap}
+                onPress={handleChangeAvatar}
+                activeOpacity={0.85}
+                disabled={uploadingAvatar}
+              >
+                <View style={[styles.avatar, { overflow: 'hidden' }]}>
+                  {displayedAvatarUri && !avatarFailed ? (
+                    <Image
+                      source={{ uri: displayedAvatarUri }}
+                      style={styles.avatarImage}
+                      onError={() => setAvatarFailed(true)}
+                    />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {currentUserName.charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                  {uploadingAvatar ? (
+                    <View style={styles.avatarBusy}>
+                      <ActivityIndicator color="#fff" />
+                    </View>
+                  ) : null}
+                </View>
+                <View style={styles.avatarCamBadge}>
+                  <Ionicons name="camera" size={12} color="#1e3a8a" />
+                </View>
+              </TouchableOpacity>
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{currentUserName}</Text>
                 <View style={styles.roleBadge}>
@@ -810,6 +945,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  avatarTap: {
+    position: 'relative',
+  },
   avatar: {
     width: 70,
     height: 70,
@@ -819,6 +957,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  avatarImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+  },
+  avatarBusy: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarCamBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarText: {
     fontSize: 32,

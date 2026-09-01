@@ -185,6 +185,17 @@ export interface LanguageTexts {
   mapNewOrderBannerTitle: string;
   mapNewOrderBannerViewDetail: string;
   mapNewOrderBannerClose: string;
+  mapApproachingPickupTitle: string;
+  mapApproachingDeliveryTitle: string;
+  mapApproachingMeters: string;
+  changeAvatar: string;
+  changeAvatarHint: string;
+  chooseFromAlbum: string;
+  takePhoto: string;
+  avatarUpdated: string;
+  avatarUpdateFailed: string;
+  cameraPermission: string;
+  galleryPermissionAvatar: string;
 
   // 财务管理（管理端）
   financeManagementTitle: string;
@@ -457,6 +468,17 @@ export const translations: { [key: string]: LanguageTexts } = {
     mapNewOrderBannerTitle: '新订单已指派',
     mapNewOrderBannerViewDetail: '查看详情',
     mapNewOrderBannerClose: '关闭',
+    mapApproachingPickupTitle: '可以取件',
+    mapApproachingDeliveryTitle: '可以送件',
+    mapApproachingMeters: '{n} 米',
+    changeAvatar: '更换头像',
+    changeAvatarHint: '选择一张新的骑手头像',
+    chooseFromAlbum: '从相册选择',
+    takePhoto: '拍照',
+    avatarUpdated: '头像已更新',
+    avatarUpdateFailed: '头像更新失败',
+    cameraPermission: '需要相机权限才能拍照',
+    galleryPermissionAvatar: '需要相册权限才能选择头像',
 
     financeManagementTitle: '财务管理',
     financeTabOverview: '概览',
@@ -725,6 +747,17 @@ export const translations: { [key: string]: LanguageTexts } = {
     mapNewOrderBannerTitle: 'New order assigned',
     mapNewOrderBannerViewDetail: 'View details',
     mapNewOrderBannerClose: 'Dismiss',
+    mapApproachingPickupTitle: 'Ready to pick up',
+    mapApproachingDeliveryTitle: 'Ready to deliver',
+    mapApproachingMeters: '{n} m',
+    changeAvatar: 'Change avatar',
+    changeAvatarHint: 'Pick a new rider photo',
+    chooseFromAlbum: 'Choose from album',
+    takePhoto: 'Take photo',
+    avatarUpdated: 'Avatar updated',
+    avatarUpdateFailed: 'Failed to update avatar',
+    cameraPermission: 'Camera permission is required',
+    galleryPermissionAvatar: 'Photo library permission is required',
 
     financeManagementTitle: 'Finance',
     financeTabOverview: 'Overview',
@@ -993,6 +1026,17 @@ export const translations: { [key: string]: LanguageTexts } = {
     mapNewOrderBannerTitle: 'အော်ဒါအသစ်တာဝန်ပေးပြီး',
     mapNewOrderBannerViewDetail: 'အသေးစိတ်ကြည့်ရန်',
     mapNewOrderBannerClose: 'ပိတ်မည်',
+    mapApproachingPickupTitle: 'ပစ္စည်းယူနိုင်ပါပြီ',
+    mapApproachingDeliveryTitle: 'ပို့ဆောင်နိုင်ပါပြီ',
+    mapApproachingMeters: '{n} မီတာ',
+    changeAvatar: 'ပုံပြောင်းရန်',
+    changeAvatarHint: 'စီးနင်းသူပုံအသစ်ရွေးပါ',
+    chooseFromAlbum: 'အယ်လ်ဘမ်မှရွေးရန်',
+    takePhoto: 'ဓာတ်ပုံရိုက်ရန်',
+    avatarUpdated: 'ပုံပြောင်းပြီးပါပြီ',
+    avatarUpdateFailed: 'ပုံပြောင်း၍မရပါ',
+    cameraPermission: 'ကင်မရာခွင့်ပြုချက် လိုအပ်သည်',
+    galleryPermissionAvatar: 'အယ်လ်ဘမ်ခွင့်ပြုချက် လိုအပ်သည်',
 
     financeManagementTitle: 'ဘဏ္ဍာရေးစီမံခန့်ခွဲခြင်း',
     financeTabOverview: 'ခြုံငုံသုံးသပ်',

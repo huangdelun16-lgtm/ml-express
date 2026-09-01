@@ -5,6 +5,7 @@ import MerchantLayout from './components/layout/MerchantLayout';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { supabase } from './services/supabase';
 import { isTransitStationStore } from './services/_shared/merchantLoginGuard';
+import { STORE_AVATAR_UPDATED_EVENT } from './utils/storeAvatar';
 import './App.css';
 import { GlobalToast } from './components/GlobalToast';
 
@@ -99,6 +100,15 @@ function App() {
     };
 
     void restoreSession();
+  }, []);
+
+  useEffect(() => {
+    const onUpdated = (event: Event) => {
+      const url = (event as CustomEvent<{ url?: string }>).detail?.url || '';
+      setCurrentUser((prev: any) => (prev ? { ...prev, avatar_url: url } : prev));
+    };
+    window.addEventListener(STORE_AVATAR_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(STORE_AVATAR_UPDATED_EVENT, onUpdated);
   }, []);
 
   const handleLogout = () => {

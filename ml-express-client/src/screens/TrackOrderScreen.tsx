@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import LoggerService from '../services/LoggerService';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, RefreshControl, Animated, Alert, Linking, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, RefreshControl, Animated, Alert, Linking, BackHandler, Platform } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, AnimatedRegion } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +22,7 @@ import { feedbackService } from '../services/FeedbackService';
 import { common } from '../i18n';
 import { getTrackOrderCopy } from './trackOrder/trackOrderCopy';
 import { styles, ui, TEAL, NAVY } from './trackOrder/trackOrderStyles';
-import { calculateEtaMinutes, formatHm, formatTrackDate, toCourierLatLng } from './trackOrder/trackOrderUtils';
+import { calculateEtaMinutes, collectTrackingCoordinates, formatHm, formatTrackDate, sameLatLng, toCourierLatLng } from './trackOrder/trackOrderUtils';
 import CourierChatModal from '../components/orderChat/CourierChatModal';
 import DeliveryProofSection from '../components/trackOrder/DeliveryProofSection';
 import { useOrderChat } from '../hooks/useOrderChat';
@@ -89,12 +89,16 @@ export default function TrackOrderScreen({ navigation, route }: any) {
   const [isOnline, setIsOnline] = useState(true);
   const [mapError, setMapError] = useState(false);
   const [mapMounted, setMapMounted] = useState(false);
-  const lastFitAtRef = useRef(0);
-  const hasFittedOnceRef = useRef(false);
+  const lastFittedOrderIdRef = useRef<string | null>(null);
   const [inTransitOrders, setInTransitOrders] = useState<Package[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const mapRef = useRef<MapView>(null);
+  const mapReadyRef = useRef(false);
+  const packageDataRef = useRef(packageData);
+  const riderLocationRef = useRef(riderLocation);
+  packageDataRef.current = packageData;
+  riderLocationRef.current = riderLocation;
   const { isDarkMode } = useApp(); // 🚀 获取主题状态
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -301,7 +305,8 @@ export default function TrackOrderScreen({ navigation, route }: any) {
       setMapMounted(true);
       return () => {
         setMapMounted(false);
-        hasFittedOnceRef.current = false;
+        lastFittedOrderIdRef.current = null;
+        mapReadyRef.current = false;
       };
     }, [])
   );
@@ -315,6 +320,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     const isTrackingActive = packageData && activeTrackingStatuses.includes(packageData.status);
 
     const applyLoc = (newLoc: { latitude: number; longitude: number }) => {
+      if (sameLatLng(riderLocationRef.current, newLoc)) return;
       setRiderLocation(newLoc);
       if (packageData?.receiver_latitude && packageData?.receiver_longitude) {
         setEstimatedTime(calculateEtaMinutes(
@@ -342,7 +348,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
           .single()
           .then(({ data }) => {
             const loc = toCourierLatLng(data);
-            if (!loc) return;
+            if (!loc || sameLatLng(riderLocationRef.current, loc)) return;
             setRiderLocation(loc);
             (riderAnimatedLocation as any).setValue({ ...loc, latitudeDelta: 0, longitudeDelta: 0 });
             if (packageData?.receiver_latitude && packageData?.receiver_longitude) {
@@ -382,42 +388,45 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     };
   }, [packageData?.status, packageData?.receiver_latitude, packageData?.receiver_longitude, courierId, isOnline, mapMounted]);
 
-  // 地图视野：首次立即适配，之后最多每 4 秒跟随一次，避免每次 Realtime 都重绘视野
-  useEffect(() => {
-    if (!mapMounted || !mapRef.current || !packageData) return;
-
-    const now = Date.now();
-    const shouldFit = !hasFittedOnceRef.current || now - lastFitAtRef.current >= 4000;
-    if (!shouldFit) return;
-
-    const coordinates = [];
-    if (packageData.sender_latitude && packageData.sender_longitude) {
-      coordinates.push({ latitude: Number(packageData.sender_latitude), longitude: Number(packageData.sender_longitude) });
-    }
-    if (packageData.receiver_latitude && packageData.receiver_longitude) {
-      coordinates.push({ latitude: Number(packageData.receiver_latitude), longitude: Number(packageData.receiver_longitude) });
-    }
-    if (riderLocation) {
-      coordinates.push({ latitude: Number(riderLocation.latitude), longitude: Number(riderLocation.longitude) });
-    }
-    if (coordinates.length === 0) return;
-
-    lastFitAtRef.current = now;
-    hasFittedOnceRef.current = true;
-
+  const fitTrackingCamera = useCallback((animated: boolean) => {
+    const map = mapRef.current;
+    const coordinates = collectTrackingCoordinates(packageDataRef.current, riderLocationRef.current);
+    if (!map || coordinates.length === 0) return;
     if (coordinates.length >= 2) {
-      mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-        animated: true,
+      map.fitToCoordinates(coordinates, {
+        edgePadding: { top: 72, right: 36, bottom: 88, left: 36 },
+        animated,
       });
-    } else {
-      mapRef.current.animateToRegion({
-        ...coordinates[0],
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }, 1000);
+      return;
     }
-  }, [packageData, riderLocation, mapMounted]);
+    map.animateToRegion(
+      {
+        ...coordinates[0],
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      },
+      animated ? 400 : 0,
+    );
+  }, []);
+
+  const scheduleFitForOrder = useCallback((orderId?: string | null) => {
+    if (!orderId || lastFittedOrderIdRef.current === orderId) return undefined;
+    lastFittedOrderIdRef.current = orderId;
+    const timer = setTimeout(() => fitTrackingCamera(false), 280);
+    return () => clearTimeout(timer);
+  }, [fitTrackingCamera]);
+
+  const handleMapReady = useCallback(() => {
+    mapReadyRef.current = true;
+    setMapError(false);
+    lastFittedOrderIdRef.current = null;
+    scheduleFitForOrder(packageDataRef.current?.id);
+  }, [scheduleFitForOrder]);
+
+  useEffect(() => {
+    if (!mapReadyRef.current) return undefined;
+    return scheduleFitForOrder(packageData?.id);
+  }, [packageData?.id, scheduleFitForOrder]);
 
   const t = getTrackOrderCopy(language);
 
@@ -554,7 +563,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
     />
   );
 
-  if (packageData && !loading) {
+  if (packageData) {
     const showMap = ['待取件', '已取件', '打包中', '配送中', '待收款', '异常上报'].includes(packageData.status);
     const idx = timelineIndex(packageData.status);
     const journey = getJourneyCopy(packageData.status, language as 'zh' | 'en' | 'my');
@@ -578,16 +587,22 @@ export default function TrackOrderScreen({ navigation, route }: any) {
 
     return (
       <View style={ui.page}>
-        <View style={ui.hero}>
-          {showMap && mapMounted && isOnline && !mapError ? (
+        <View style={ui.hero} collapsable={false}>
+          {showMap && mapMounted && !mapError ? (
             <MapView
               ref={mapRef}
-              provider={PROVIDER_GOOGLE}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
               style={StyleSheet.absoluteFill}
-              onMapReady={() => setMapError(false)}
+              mapType="standard"
+              loadingEnabled
+              moveOnMarkerPress={false}
+              toolbarEnabled={false}
+              pitchEnabled={false}
+              rotateEnabled={false}
+              onMapReady={handleMapReady}
               initialRegion={{
-                latitude: riderLocation?.latitude || packageData.sender_latitude || 16.8661,
-                longitude: riderLocation?.longitude || packageData.sender_longitude || 96.1951,
+                latitude: Number(packageData.sender_latitude) || 16.8661,
+                longitude: Number(packageData.sender_longitude) || 96.1951,
                 latitudeDelta: 0.05,
                 longitudeDelta: 0.05,
               }}
@@ -759,7 +774,7 @@ export default function TrackOrderScreen({ navigation, route }: any) {
             <Text style={[styles.ongoingTitle, isDarkMode && styles.darkText]}>🛵 {t.ongoingOrders} ({inTransitOrders.length})</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 10, paddingHorizontal: 4 }}>
               {inTransitOrders.map((order) => {
-                const isSelected = packageData?.id === order.id;
+                const isSelected = trackingCode === order.id;
                 return (
                   <TouchableOpacity
                     key={order.id}

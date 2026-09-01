@@ -23,6 +23,7 @@ import { feedbackService } from '../services/FeedbackService';
 import ProductReviewRejectModal from '../components/ProductReviewRejectModal';
 import { applyProductReviewDecision } from '../services/productReviewQueueService';
 import { isValidRejectReason } from '../utils/productReviewDecision';
+import { normalizeStorePackingSlaMinutes } from '../services/_shared/packingCountdown';
 
 import {
   ErrorBoundary,
@@ -366,7 +367,8 @@ const DeliveryStoreManagement: React.FC = () => {
     notes: '',
     password: '', // 合伙店铺登录密码
     region: 'mandalay',
-    cod_settlement_day: '7' as '7' | '10' | '15' | '30'
+    cod_settlement_day: '7' as '7' | '10' | '15' | '30',
+    packing_sla_minutes: 12,
   });
 
   // 生成店长收件码二维码
@@ -694,7 +696,8 @@ const DeliveryStoreManagement: React.FC = () => {
       notes: store.notes || '',
       password: store.password || '',
       region: store.region || 'mandalay',
-      cod_settlement_day: store.cod_settlement_day || '7'
+      cod_settlement_day: store.cod_settlement_day || '7',
+      packing_sla_minutes: store.packing_sla_minutes || 12,
     });
     resetAdminProductForm();
     setShowForm(true);
@@ -1040,6 +1043,10 @@ const DeliveryStoreManagement: React.FC = () => {
     setFormData(prev => ({ ...prev, operating_hours: value }));
   };
 
+  const applyPackingSlaPreset = (minutes: number) => {
+    setFormData(prev => ({ ...prev, packing_sla_minutes: minutes }));
+  };
+
   const handleFacilityChange = (facility: string) => {
     setFormData(prev => ({
       ...prev,
@@ -1127,9 +1134,12 @@ const DeliveryStoreManagement: React.FC = () => {
         }
 
         const { latitude, longitude, service_area_radius, capacity, ...restFormData } = formData;
+        const packing_sla_minutes =
+          normalizeStorePackingSlaMinutes(formData.packing_sla_minutes) ?? 12;
 
         const result = await deliveryStoreService.updateStore(editingStore.id!, {
           ...restFormData,
+          packing_sla_minutes,
           latitude: lat,
           longitude: lng,
           service_area_radius: Number(service_area_radius),
@@ -1158,9 +1168,12 @@ const DeliveryStoreManagement: React.FC = () => {
         const store_code = isStoreCodeTaken(formData.store_code, allStores)
           ? suggestStoreCode(formData.region)
           : formData.store_code.trim().toUpperCase();
+        const packing_sla_minutes =
+          normalizeStorePackingSlaMinutes(formData.packing_sla_minutes) ?? 12;
 
         const result = await deliveryStoreService.createStore({
           ...restFormData,
+          packing_sla_minutes,
           store_code,
           latitude: lat,
           longitude: lng,
@@ -1259,7 +1272,8 @@ const DeliveryStoreManagement: React.FC = () => {
       notes: '',
       password: '',
       region: 'mandalay',
-      cod_settlement_day: '7'
+      cod_settlement_day: '7',
+      packing_sla_minutes: 12,
     });
   };
 
@@ -1296,6 +1310,7 @@ const DeliveryStoreManagement: React.FC = () => {
     adminProductFileInputRef,
     adminProductForm,
     applyOperatingHoursPreset,
+    applyPackingSlaPreset,
     closeStoreForm,
     confirmMapSelection,
     currentStorageStore,

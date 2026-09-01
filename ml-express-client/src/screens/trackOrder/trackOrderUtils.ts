@@ -44,3 +44,33 @@ export function toCourierLatLng(row: { latitude?: unknown; longitude?: unknown }
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return { latitude, longitude };
 }
+
+/** ~8m — skip GPS jitter so the map does not re-render every poll */
+export function sameLatLng(
+  a: CourierLatLng | null | undefined,
+  b: CourierLatLng | null | undefined,
+  epsilon = 0.00008,
+): boolean {
+  if (!a || !b) return false;
+  return Math.abs(a.latitude - b.latitude) < epsilon && Math.abs(a.longitude - b.longitude) < epsilon;
+}
+
+export function collectTrackingCoordinates(order: {
+  sender_latitude?: number | string | null;
+  sender_longitude?: number | string | null;
+  receiver_latitude?: number | string | null;
+  receiver_longitude?: number | string | null;
+} | null | undefined, rider?: CourierLatLng | null): CourierLatLng[] {
+  const points: CourierLatLng[] = [];
+  const push = (lat?: number | string | null, lng?: number | string | null) => {
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    if (latitude === 0 && longitude === 0) return;
+    points.push({ latitude, longitude });
+  };
+  push(order?.sender_latitude, order?.sender_longitude);
+  push(order?.receiver_latitude, order?.receiver_longitude);
+  if (rider) push(rider.latitude, rider.longitude);
+  return points;
+}

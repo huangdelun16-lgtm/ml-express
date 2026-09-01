@@ -293,6 +293,8 @@ export interface DeliveryStore extends BaseEntity {
   capacity?: number;
   status: StoreStatus;
   cod_settlement_day?: '7' | '10' | '15' | '30';
+  avatar_url?: string | null;
+  packing_sla_minutes?: number | null;
 }
 
 // ==================== 通知相关 ====================
