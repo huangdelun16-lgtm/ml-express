@@ -85,9 +85,10 @@ export default function CustomerNotifyMethodSelect({
         aria-expanded={open}
         aria-controls={listId}
         disabled={disabled}
+        title={CUSTOMER_NOTIFY_METHOD_LABELS[value]}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <span>{CUSTOMER_NOTIFY_METHOD_LABELS[value]}</span>
+        <span className="cbl-notify-select__value">{CUSTOMER_NOTIFY_METHOD_LABELS[value]}</span>
         <span className="cbl-notify-select__chevron" aria-hidden="true">
           {open ? '▴' : '▾'}
         </span>

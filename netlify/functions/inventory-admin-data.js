@@ -14,6 +14,7 @@ const { verifyAdminToken } = require('./verify-admin');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { aggregateFinanceForTransitStores } = require('./utils/inventoryFinanceAggregate');
+const { parseFinancePeriodQuery } = require('./utils/yangonFinancePeriod');
 const { buildTripFeeGroupMap } = require('./utils/tripTransportFee');
 const {
   PACK_DISPLAY_LABEL,
@@ -343,9 +344,21 @@ function parseFinancePagination(query) {
   };
 }
 
-function paginateCrossBorderFinance(crossBorderFinance, page, pageSize) {
+function paginateCrossBorderFinance(crossBorderFinance, page, pageSize, exportAll) {
   const allEntries = crossBorderFinance?.entries || [];
   const totalItems = crossBorderFinance?.summary?.entryCount ?? allEntries.length;
+  if (exportAll) {
+    return {
+      summary: crossBorderFinance.summary,
+      entries: allEntries,
+      pagination: {
+        page: 1,
+        pageSize: allEntries.length || totalItems || 1,
+        totalItems,
+        totalPages: 1,
+      },
+    };
+  }
   const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 10));
   const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
   const safePage = Math.min(Math.max(1, Number(page) || 1), totalPages);
@@ -422,10 +435,10 @@ async function handleOverview(supabase, warnings) {
   };
 }
 
-async function handleFinance(supabase, warnings, financePagination) {
+async function handleFinance(supabase, warnings, financePagination, financeScope) {
   const storesList = await loadTransitStores(supabase);
-  const { financeByStoreCode, crossBorderFinance, warnings: financeWarnings } =
-    await aggregateFinanceForTransitStores(supabase, storesList);
+  const { financeByStoreCode, crossBorderFinance, warnings: financeWarnings, period } =
+    await aggregateFinanceForTransitStores(supabase, storesList, financeScope);
   warnings.push(...financeWarnings);
   return {
     ok: true,
@@ -436,7 +449,9 @@ async function handleFinance(supabase, warnings, financePagination) {
       crossBorderFinance,
       financePagination.page,
       financePagination.pageSize,
+      financeScope.exportAll,
     ),
+    period,
     warnings,
   };
 }
@@ -454,15 +469,15 @@ async function handlePacks(supabase, packStatus, warnings) {
 }
 
 /** 兼容旧版：一次返回全部（较慢） */
-async function handleAll(supabase, packStatus, warnings, financePagination) {
+async function handleAll(supabase, packStatus, warnings, financePagination, financeScope) {
   const storesList = await loadTransitStores(supabase);
   const [
-    { financeByStoreCode, crossBorderFinance, warnings: financeWarnings },
+    { financeByStoreCode, crossBorderFinance, warnings: financeWarnings, period },
     snapshot,
     recentPacks,
     exceptions,
   ] = await Promise.all([
-    aggregateFinanceForTransitStores(supabase, storesList),
+    aggregateFinanceForTransitStores(supabase, storesList, financeScope),
     loadOverviewSnapshot(supabase),
     loadRecentPacks(supabase, packStatus, warnings),
     loadOpenExceptions(supabase, warnings),
@@ -482,7 +497,9 @@ async function handleAll(supabase, packStatus, warnings, financePagination) {
       crossBorderFinance,
       financePagination.page,
       financePagination.pageSize,
+      financeScope.exportAll,
     ),
+    period,
     packStatusFilter: packStatus,
     warnings,
   };
@@ -539,16 +556,17 @@ exports.handler = async (event) => {
   const packStatus = (event.queryStringParameters?.packStatus || 'active').toLowerCase();
   const section = String(event.queryStringParameters?.section || 'overview').toLowerCase();
   const financePagination = parseFinancePagination(event.queryStringParameters);
+  const financeScope = parseFinancePeriodQuery(event.queryStringParameters || {});
   const warnings = [];
 
   try {
     let body;
     if (section === 'finance') {
-      body = await handleFinance(supabase, warnings, financePagination);
+      body = await handleFinance(supabase, warnings, financePagination, financeScope);
     } else if (section === 'packs') {
       body = await handlePacks(supabase, packStatus, warnings);
     } else if (section === 'all') {
-      body = await handleAll(supabase, packStatus, warnings, financePagination);
+      body = await handleAll(supabase, packStatus, warnings, financePagination, financeScope);
     } else {
       body = await handleOverview(supabase, warnings);
     }

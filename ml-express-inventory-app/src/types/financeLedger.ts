@@ -5,6 +5,7 @@ export type FinanceLedgerCategory =
   | 'transport_cost'
   | 'manual_income'
   | 'manual_expense'
+  | 'agency_remit'
   | 'stock_op';
 
 export interface FinanceLedgerEntry {
@@ -25,6 +26,8 @@ export interface FinanceLedgerEntry {
   transportDirection?: 'inbound' | 'outbound';
   /** cross_border_manual_entries 主键；仅手工收支行存在 */
   manualEntryId?: string;
+  remittanceId?: string;
+  remitDirection?: 'in' | 'out';
   deletable?: boolean;
 }
 
@@ -42,6 +45,8 @@ export interface FinanceLedgerSummary {
   pendingInflowTotal: number;
   /** 代收应转给发站（对账单明细，不计入待支付车费） */
   agencyPayableTotal: number;
+  /** 已汇给发站 */
+  agencyRemittedTotal: number;
   manualIncomeTotal: number;
   manualExpenseTotal: number;
 }

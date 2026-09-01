@@ -7,6 +7,7 @@ const { verifyAdminToken } = require('./verify-admin');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { fetchStoreFinanceDetail } = require('./utils/inventoryFinanceAggregate');
+const { parseFinancePeriodQuery } = require('./utils/yangonFinancePeriod');
 
 
 exports.handler = async (event) => {
@@ -67,7 +68,10 @@ exports.handler = async (event) => {
   });
 
   try {
-    const result = await fetchStoreFinanceDetail(supabase, storeCode);
+    const scope = parseFinancePeriodQuery(event.queryStringParameters || {});
+    const result = await fetchStoreFinanceDetail(supabase, storeCode, {
+      range: scope.range,
+    });
     if (result.error) {
       return {
         statusCode: result.error === '未找到该中转站' ? 404 : 400,

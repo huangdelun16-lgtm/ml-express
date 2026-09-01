@@ -10,11 +10,16 @@ import {
   type FinanceMovementRow,
   type FinanceOrderRow,
   type FinancePackageRow,
+  type FinanceRemittanceRow,
 } from '../utils/financeLedgerAggregate';
 import { normalizeDestinationCode } from '../utils/destinationCode';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
 import { listCrossBorderManualEntries } from './crossBorderManualEntryService';
 import { supabase } from './supabase';
+import {
+  filterEntriesForFinancePeriod,
+  type FinancePeriodRange,
+} from '../utils/yangonFinancePeriod';
 
 function safeCode(value: string): string {
   return value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
@@ -119,6 +124,37 @@ async function loadMovements(itemIds: string[]): Promise<FinanceMovementRow[]> {
   );
 }
 
+async function loadAgencyRemittances(
+  store: InventoryStoreSession,
+  hubCode: string,
+): Promise<FinanceRemittanceRow[]> {
+  const storeCode = safeCode(store.storeCode);
+  const hub = safeCode(hubCode);
+  const ownerKey = safeCode(ownershipKeyFromStoreCode(storeCode));
+  const orFilter = [
+    `from_store_id.eq.${store.id}`,
+    `from_store_code.eq.${storeCode}`,
+    hub ? `to_origin_key.eq.${hub}` : '',
+    ownerKey ? `to_origin_key.eq.${ownerKey}` : '',
+    `to_store_code.eq.${storeCode}`,
+  ]
+    .filter(Boolean)
+    .join(',');
+  const { data, error } = await supabase
+    .from('inventory_agency_remittances')
+    .select(
+      'id, from_store_id, from_store_code, from_hub_code, to_origin_key, to_store_code, amount, remitted_at, note, created_at',
+    )
+    .or(orFilter)
+    .order('remitted_at', { ascending: false })
+    .limit(2000);
+  if (error) {
+    if (/does not exist|schema cache/i.test(error.message || '')) return [];
+    throwQueryError(error);
+  }
+  return (data ?? []) as FinanceRemittanceRow[];
+}
+
 async function loadFinanceDataset(
   store: InventoryStoreSession,
   hubCode: string,
@@ -146,7 +182,7 @@ async function loadFinanceDataset(
     .filter(Boolean)
     .join(',');
 
-  const [items, packages, paidRows, manualEntries] = await Promise.all([
+  const [items, packages, paidRows, manualEntries, remittances] = await Promise.all([
     fetchAllFinancePages<FinanceItemRow>(
       (from, to) =>
         supabase
@@ -180,6 +216,7 @@ async function loadFinanceDataset(
           .range(from, to),
     ),
     listCrossBorderManualEntries(store, hubCode),
+    loadAgencyRemittances(store, hubCode),
   ]);
   const itemIds = items.map((item) => item.id).filter(Boolean);
   const movements = await loadMovements(itemIds);
@@ -220,6 +257,7 @@ async function loadFinanceDataset(
     orders,
     paidTransportBarcodes,
     manualEntries,
+    remittances,
     packNotesByBarcode,
   };
 }
@@ -228,6 +266,7 @@ async function loadFinanceDataset(
 export async function listFinanceLedger(
   requestedStore: InventoryStoreSession,
   requestedHubCode: string,
+  period?: FinancePeriodRange | null,
 ): Promise<FinanceLedgerResult> {
   const authenticated = await ensureInventoryCloudAuth();
   const { store, hubCode } = assertRequestedScope(
@@ -236,11 +275,14 @@ export async function listFinanceLedger(
     requestedHubCode,
   );
   const dataset = await loadFinanceDataset(store, hubCode);
-  const entries: FinanceLedgerEntry[] = buildFinanceLedgerEntries(
+  let entries: FinanceLedgerEntry[] = buildFinanceLedgerEntries(
     store.storeCode,
     hubCode,
     dataset,
   );
+  if (period) {
+    entries = filterEntriesForFinancePeriod(entries, period);
+  }
   return {
     entries,
     summary: buildFinanceLedgerSummary(entries, store.storeCode, hubCode),
@@ -250,8 +292,9 @@ export async function listFinanceLedger(
 export async function listCrossBorderFinance(
   store: InventoryStoreSession,
   hubCode: string,
+  period?: FinancePeriodRange | null,
 ): Promise<FinanceLedgerResult> {
-  const result = await listFinanceLedger(store, hubCode);
+  const result = await listFinanceLedger(store, hubCode, period);
   const entries = filterCrossBorderFinanceEntries(result.entries);
   return {
     entries,

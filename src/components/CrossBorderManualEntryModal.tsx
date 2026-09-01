@@ -10,6 +10,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
+  stores: Array<{ store_code: string; store_name: string }>;
 };
 
 function todayIsoDate(): string {
@@ -18,7 +19,7 @@ function todayIsoDate(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
+const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved, stores }) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
 
@@ -27,6 +28,7 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved }
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
+  const [storeCode, setStoreCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,9 +39,10 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved }
     setAmount('');
     setCategory('');
     setNote('');
+    setStoreCode(stores[0]?.store_code || '');
     setError(null);
     setSubmitting(false);
-  }, [open]);
+  }, [open, stores]);
 
   if (!open) return null;
 
@@ -54,6 +57,10 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved }
       setError(isEn ? 'Select a date.' : '请选择日期。');
       return;
     }
+    if (!storeCode.trim()) {
+      setError(isEn ? 'Select a station.' : '请选择中转站。');
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -64,6 +71,7 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved }
         amount: Math.round(numeric),
         category: category.trim(),
         note: note.trim(),
+        store_code: storeCode.trim(),
       });
       onSaved();
       onClose();
@@ -127,6 +135,18 @@ const CrossBorderManualEntryModal: React.FC<Props> = ({ open, onClose, onSaved }
               {isEn ? 'Income' : '收入'}
             </button>
           </div>
+
+          <label className="cbl-manual-entry-field">
+            <span>{isEn ? 'Station' : '中转站'}</span>
+            <select value={storeCode} onChange={(e) => setStoreCode(e.target.value)} required>
+              <option value="">{isEn ? 'Select station' : '请选择中转站'}</option>
+              {stores.map((store) => (
+                <option key={store.store_code} value={store.store_code}>
+                  {store.store_code} · {store.store_name}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <label className="cbl-manual-entry-field">
             <span>{isEn ? 'Date' : '日期'}</span>

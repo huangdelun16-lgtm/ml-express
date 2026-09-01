@@ -8,12 +8,14 @@ export type StationReconciliationSummary = {
   transportPaidTotal: number;
   pendingInflowTotal: number;
   agencyPayableTotal: number;
+  agencyRemittedTotal?: number;
 };
 
 /** 跨境财务页汇总（与中转站流水页规则不同） */
 export type CrossBorderFinanceSummary = StationReconciliationSummary & {
   manualIncomeTotal: number;
   manualExpenseTotal: number;
+  agencyRemittedTotal: number;
 };
 
 function classifyLedgerEntry(
@@ -133,6 +135,7 @@ export function buildCrossBorderFinanceSummary(
 
   let manualIncome = 0;
   let manualExpense = 0;
+  let agencyRemitted = 0;
 
   for (const entry of entries) {
     if (entry.category === 'manual_income') {
@@ -141,6 +144,12 @@ export function buildCrossBorderFinanceSummary(
     }
     if (entry.category === 'manual_expense') {
       manualExpense += entry.amount ?? 0;
+      continue;
+    }
+    if (entry.category === 'agency_remit') {
+      if (entry.remitDirection === 'out') {
+        agencyRemitted += entry.amount ?? 0;
+      }
       continue;
     }
 
@@ -181,6 +190,7 @@ export function buildCrossBorderFinanceSummary(
     transportPaidTotal: round(buckets.transport_in_paid),
     pendingInflowTotal: round(buckets.dest_pending_agency),
     agencyPayableTotal: round(buckets.dest_agency_collected),
+    agencyRemittedTotal: round(agencyRemitted),
     manualIncomeTotal: round(manualIncome),
     manualExpenseTotal: round(manualExpense),
   };

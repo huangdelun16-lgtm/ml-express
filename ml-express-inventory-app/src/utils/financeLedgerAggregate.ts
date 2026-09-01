@@ -15,6 +15,7 @@ import {
   isTripTransportFeePaid,
   tripTransportGroupKey,
 } from './tripTransportFee';
+import { yangonNoonIsoFromYmd } from './yangonFinancePeriod';
 
 export type FinanceItemRow = {
   id: string;
@@ -73,6 +74,21 @@ export type FinanceManualRow = {
   note?: string | null;
   created_by?: string | null;
   created_at?: string | null;
+  store_code?: string | null;
+  hub_code?: string | null;
+};
+
+export type FinanceRemittanceRow = {
+  id: string;
+  from_store_id?: string | null;
+  from_store_code?: string | null;
+  from_hub_code?: string | null;
+  to_origin_key: string;
+  to_store_code?: string | null;
+  amount: number | string;
+  remitted_at?: string | null;
+  note?: string | null;
+  created_at?: string | null;
 };
 
 export type FinanceDataset = {
@@ -82,6 +98,7 @@ export type FinanceDataset = {
   orders: FinanceOrderRow[];
   paidTransportBarcodes: Set<string>;
   manualEntries: FinanceManualRow[];
+  remittances?: FinanceRemittanceRow[];
   /** 快递包 note（多个入库总费用写在包备注上） */
   packNotesByBarcode?: Record<string, string>;
 };
@@ -251,10 +268,37 @@ function manualEntry(row: FinanceManualRow): FinanceLedgerEntry {
     subtitle: [category, note].filter(Boolean).join(' · ') || '—',
     amount,
     amountDisplay: `${income ? '+' : '−'}${formatMmk(amount)}`,
-    occurredAt: String(row.created_at || `${row.entry_date}T12:00:00.000Z`),
+    occurredAt:
+      yangonNoonIsoFromYmd(String(row.entry_date || '')) ||
+      String(row.created_at || `${row.entry_date}T12:00:00.000Z`),
     barcode: '',
     itemName: category || (income ? '其它收入' : '其它支出'),
     deletable: true,
+  };
+}
+
+function remittanceEntry(row: FinanceRemittanceRow, storeCode: string): FinanceLedgerEntry {
+  const fromCode = String(row.from_store_code || '').trim().toUpperCase();
+  const isPayer = fromCode === String(storeCode || '').trim().toUpperCase();
+  const amount = Math.round(parseFinanceAmount(row.amount));
+  const originKey = String(row.to_origin_key || '').trim().toUpperCase();
+  const note = String(row.note || '').trim();
+  return {
+    id: `remit:${row.id}:${isPayer ? 'out' : 'in'}`,
+    remittanceId: row.id,
+    category: 'agency_remit',
+    remitDirection: isPayer ? 'out' : 'in',
+    title: isPayer ? '已汇给发站' : '收到代转汇款',
+    subtitle: [originKey, note].filter(Boolean).join(' · ') || '—',
+    amount,
+    amountDisplay: `${isPayer ? '−' : '+'}${formatMmk(amount)}`,
+    occurredAt:
+      yangonNoonIsoFromYmd(String(row.remitted_at || '')) || String(row.created_at || ''),
+    barcode: '',
+    itemName: originKey || '代转',
+    originKey,
+    originLabel: originKey,
+    paid: true,
   };
 }
 
@@ -464,6 +508,9 @@ export function buildFinanceLedgerEntries(
 
   entries.push(...dataset.manualEntries.map(manualEntry));
   entries.push(
+    ...(dataset.remittances ?? []).map((row) => remittanceEntry(row, storeCode)),
+  );
+  entries.push(
     ...dataset.movements
       .filter((row) => !String(row.note || '').includes('装车出库'))
       .map(stockEntry),
@@ -505,6 +552,8 @@ export function buildFinanceLedgerSummary(
     transportUnpaidTotal: station.transportUnpaidTotal,
     pendingInflowTotal: station.pendingInflowTotal,
     agencyPayableTotal: station.agencyPayableTotal,
+    agencyRemittedTotal:
+      'agencyRemittedTotal' in station ? Number(station.agencyRemittedTotal) || 0 : 0,
     manualIncomeTotal:
       'manualIncomeTotal' in station ? Number(station.manualIncomeTotal) || 0 : 0,
     manualExpenseTotal:

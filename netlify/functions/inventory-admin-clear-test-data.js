@@ -27,7 +27,10 @@ async function wipeTable(supabase, table, idColumn = 'id') {
     .from(table)
     .delete({ count: 'exact' })
     .not(idColumn, 'is', null);
-  if (error) throw error;
+  if (error) {
+    if (/does not exist|schema cache/i.test(String(error.message || ''))) return 0;
+    throw error;
+  }
   return count ?? 0;
 }
 
@@ -120,6 +123,8 @@ exports.handler = async (event) => {
       stockMovements: 0,
       storeItems: 0,
       crossBorderManualEntries: 0,
+      stationSettlements: 0,
+      agencyRemittances: 0,
     };
 
     deleted.orderTracking = await wipeTable(supabase, 'inventory_order_tracking');
@@ -137,6 +142,8 @@ exports.handler = async (event) => {
       supabase,
       'cross_border_manual_entries',
     );
+    deleted.stationSettlements = await wipeTable(supabase, 'inventory_station_settlements');
+    deleted.agencyRemittances = await wipeTable(supabase, 'inventory_agency_remittances');
 
     const clearedAt = new Date().toISOString();
     const { error: settingsErr } = await supabase.from('system_settings').upsert(

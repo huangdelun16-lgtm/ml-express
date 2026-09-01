@@ -229,13 +229,13 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
             </h2>
             <p className="cbl-pricing-modal__sub">
               {isEn
-                ? 'Code = area + date (YYMMDD) + daily count + salesperson no. Example MDY2608241001 = first MDY customer that day, salesperson 001.'
-                : '编码 = 区域 + 申请日期 + 单日客量 + 推销员序号。例如 MDY2608241001 = 曼德勒当日第 1 位客户 + 推销员 001。'}
+                ? 'Name, notify account, and delivery city. The customer code builds as you fill the form.'
+                : '填写姓名、通知账号和送货城市。客户编码会随表单自动生成。'}
             </p>
           </div>
           <button
             type="button"
-            className="cbl-pricing-modal__close"
+            className="cbl-pricing-modal__close cbl-customer-create-modal__close"
             onClick={onClose}
             aria-label={isEn ? 'Close' : '关闭'}
             disabled={submitting}
@@ -246,7 +246,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
 
         <form className="cbl-customer-create-form" onSubmit={(e) => void handleSubmit(e)}>
           <div className="cbl-customer-create-form__scroll">
-            <section className="cbl-customer-create-section">
+            <section className="cbl-customer-create-panel">
               <h3 className="cbl-customer-create-section__title">
                 {isEn ? 'Basic info' : '基本信息'}
               </h3>
@@ -304,9 +304,9 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
                   placeholder={isEn ? 'Street, landmark, etc.' : '街道、地标等详细说明'}
                 />
               </label>
-            </section>
 
-            <section className="cbl-customer-create-section">
+              <div className="cbl-customer-create-panel__rule" role="separator" />
+
               <h3 className="cbl-customer-create-section__title">
                 {isEn ? 'Delivery & salesperson' : '派送与推销'}
               </h3>
@@ -373,15 +373,18 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
                   {isEn ? 'Generated customer code' : '已生成客户编码'}
                 </span>
                 <div className="cbl-customer-code-card__value">{customerCode || '—'}</div>
-                <p className="cbl-customer-code-card__formula">
-                  {isEn
-                    ? `${form.delivery_area_code || '—'} + ${datePart || 'YYMMDD'} + daily #${dailySeq || '—'} + salesperson ${
-                        salespersonPart === '000' ? '—' : salespersonPart
-                      }`
-                    : `${form.delivery_area_code || '—'} + ${datePart || '申请日期'} + 单日客量 ${dailySeq || '—'} + 推销员 ${
-                        salespersonPart === '000' ? '—' : salespersonPart
-                      }`}
-                </p>
+                <div className="cbl-customer-code-card__parts">
+                  <span className="cbl-customer-code-card__part">
+                    {form.delivery_area_code || '—'}
+                  </span>
+                  <span className="cbl-customer-code-card__part">
+                    {datePart || (isEn ? 'YYMMDD' : '日期')}
+                  </span>
+                  <span className="cbl-customer-code-card__part">#{dailySeq || '—'}</span>
+                  <span className="cbl-customer-code-card__part">
+                    {salespersonPart === '000' ? '—' : salespersonPart}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
@@ -390,7 +393,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
                 onClick={() => setShowCustomerPricing(true)}
               >
                 <span className="cbl-customer-pricing-btn__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
                     <path
                       d="M3.5 12.5 12 4h6.5L22 7.5V14l-8.5 8.5-10-10Z"
                       stroke="currentColor"

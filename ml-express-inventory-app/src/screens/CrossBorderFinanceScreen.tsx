@@ -21,8 +21,16 @@ import { deleteCrossBorderManualEntry } from '../services/crossBorderManualEntry
 import { feedbackService } from '../services/FeedbackService';
 import { listCrossBorderFinance } from '../services/financeLedgerService';
 import { shareFinanceCsvFile } from '../services/shareFinanceCsv';
+import {
+  fetchStationSettlement,
+  isPeriodReadOnly,
+  submitStationSettlement,
+  type StationSettlementRow,
+} from '../services/settlementService';
+import { createAgencyRemittance } from '../services/agencyRemittanceService';
 import type { FinanceLedgerEntry, FinanceLedgerResult } from '../types/financeLedger';
 import { ownershipKeyFromStoreCode } from '../utils/storeOwnership';
+import { resolveFinancePeriod } from '../utils/yangonFinancePeriod';
 import AppText from '../components/AppText';
 import CrossBorderManualEntryModal from '../components/CrossBorderManualEntryModal';
 import FinanceLedgerRow from '../components/finance/FinanceLedgerRow';
@@ -41,7 +49,7 @@ import {
 type FinanceRoute = RouteProp<RootStackParamList, 'CrossBorderFinance'>;
 
 export default function CrossBorderFinanceScreen() {
-  const { t } = useTranslation();
+  const { t, fmt } = useTranslation();
   const route = useRoute<FinanceRoute>();
   const { store, hubCode, operatorName } = useAuth();
   const [tab, setTab] = useState<FinanceTabKey>('all');
@@ -54,9 +62,13 @@ export default function CrossBorderFinanceScreen() {
     transportPaidTotal: 0,
     pendingInflowTotal: 0,
     agencyPayableTotal: 0,
+    agencyRemittedTotal: 0,
     manualIncomeTotal: 0,
     manualExpenseTotal: 0,
   });
+  const [periodKind, setPeriodKind] = useState<'all' | 'day' | 'month'>('all');
+  const [settlement, setSettlement] = useState<StationSettlementRow | null>(null);
+  const [submittingClose, setSubmittingClose] = useState(false);
   const [manualModalVisible, setManualModalVisible] = useState(false);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState('');
@@ -88,6 +100,7 @@ export default function CrossBorderFinanceScreen() {
       transportPaidTotal: result.summary.transportPaidTotal,
       pendingInflowTotal: result.summary.pendingInflowTotal,
       agencyPayableTotal: result.summary.agencyPayableTotal,
+      agencyRemittedTotal: result.summary.agencyRemittedTotal ?? 0,
       manualIncomeTotal: result.summary.manualIncomeTotal ?? 0,
       manualExpenseTotal: result.summary.manualExpenseTotal ?? 0,
     });
@@ -103,8 +116,16 @@ export default function CrossBorderFinanceScreen() {
 
       try {
         setError('');
-        const result = await listCrossBorderFinance(store, hubCode);
+        const range =
+          periodKind === 'all' ? null : resolveFinancePeriod(periodKind);
+        const result = await listCrossBorderFinance(store, hubCode, range);
         applyFinanceResult(result);
+        if (range && (periodKind === 'day' || periodKind === 'month')) {
+          const row = await fetchStationSettlement(store, hubCode, periodKind, range);
+          setSettlement(row);
+        } else {
+          setSettlement(null);
+        }
       } catch (e: unknown) {
         setError(resolveAppError(t, e));
       } finally {
@@ -112,7 +133,7 @@ export default function CrossBorderFinanceScreen() {
         setRefreshing(false);
       }
     },
-    [store, hubCode, applyFinanceResult, t],
+    [store, hubCode, applyFinanceResult, t, periodKind],
   );
 
   const confirmDelete = useCallback(
@@ -156,6 +177,107 @@ export default function CrossBorderFinanceScreen() {
   const displayed = useMemo(
     () => filterByTab(entries, tab, currentKey),
     [entries, tab, currentKey],
+  );
+
+  const periodLocked = isPeriodReadOnly(settlement);
+
+  const agencyOutstanding = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of entries) {
+      const originKey = String(entry.originKey || '').trim();
+      if (entry.category === 'agency_remit' && entry.remitDirection === 'out') {
+        map.set(originKey, (map.get(originKey) || 0) - (entry.amount || 0));
+        continue;
+      }
+      if (!originKey || originKey === currentKey) continue;
+      if (entry.category !== 'order_collected' && entry.category !== 'order_prepaid') continue;
+      map.set(originKey, (map.get(originKey) || 0) + (entry.amount || 0));
+    }
+    return [...map.entries()]
+      .filter(([, amount]) => amount > 0)
+      .map(([key, amount]) => ({ key, amount }));
+  }, [entries, currentKey]);
+
+  const onSubmitClose = useCallback(() => {
+    if (!store || !hubCode || (periodKind !== 'day' && periodKind !== 'month') || submittingClose) {
+      return;
+    }
+    setSubmittingClose(true);
+    void submitStationSettlement({
+      store,
+      hubCode,
+      kind: periodKind,
+      operatorName: operatorName ?? '',
+      summary: {
+        codPendingTotal: summary.pendingInflowTotal,
+        collectedTotal: summary.collectedTotal,
+        transportCostTotal: summary.transportUnpaidTotal,
+        transportPaidTotal: summary.transportPaidTotal,
+        transportUnpaidTotal: summary.transportUnpaidTotal,
+        pendingInflowTotal: summary.pendingInflowTotal,
+        agencyPayableTotal: summary.agencyPayableTotal,
+        agencyRemittedTotal: summary.agencyRemittedTotal ?? 0,
+        manualIncomeTotal: summary.manualIncomeTotal,
+        manualExpenseTotal: summary.manualExpenseTotal,
+      },
+      entries,
+    })
+      .then(() => {
+        feedbackService.success(t.crossBorderFinance.settlementSubmitOk);
+        return load();
+      })
+      .catch((e: unknown) => setError(resolveAppError(t, e)))
+      .finally(() => setSubmittingClose(false));
+  }, [
+    store,
+    hubCode,
+    periodKind,
+    submittingClose,
+    operatorName,
+    summary,
+    entries,
+    t,
+    load,
+  ]);
+
+  const onRemit = useCallback(
+    (originKey: string, remaining: number) => {
+      if (!store || !hubCode || periodLocked) return;
+      const run = (raw: string) => {
+        const amount = Math.round(Number(String(raw).replace(/[^\d.]/g, '')) || 0);
+        if (amount <= 0) {
+          setError(t.serviceErrors.remitAmountInvalid);
+          return;
+        }
+        void createAgencyRemittance({
+          store,
+          hubCode,
+          toOriginKey: originKey,
+          amount,
+          createdBy: `${store.storeCode} · ${operatorName || t.common.operator}`,
+        })
+          .then(() => load())
+          .catch((e: unknown) => setError(resolveAppError(t, e)));
+      };
+      if (typeof Alert.prompt === 'function') {
+        Alert.prompt(
+          t.crossBorderFinance.remitToOrigin,
+          originKey,
+          [
+            { text: t.common.cancel, style: 'cancel' },
+            { text: t.crossBorderFinance.remitConfirm, onPress: (value?: string) => run(value || '') },
+          ],
+          'plain-text',
+          String(remaining),
+        );
+        return;
+      }
+      Alert.alert(t.crossBorderFinance.remitToOrigin, `${originKey} · ${remaining} MMK`, [
+        { text: t.common.cancel, style: 'cancel' },
+        { text: t.crossBorderFinance.remitConfirm, onPress: () => run(String(remaining)) },
+      ]);
+    },
+    [store, hubCode, periodLocked, operatorName, t, load],
   );
 
   const netBalance = useMemo(
@@ -247,24 +369,96 @@ export default function CrossBorderFinanceScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ListHeaderComponent={
-            <FinanceSummaryHero
-              operatorName={operatorName ?? t.common.thisStation}
-              hubCode={hubCode}
-              displayedCount={displayed.length}
-              netBalance={netBalance}
-              summary={summary}
-              tabs={tabs}
-              tab={tab}
-              tabCounts={tabCounts}
-              error={error}
-              loading={loading}
-              displayedLength={displayed.length}
-              onAddManual={() => setManualModalVisible(true)}
-              onExport={() => void onExportCsv()}
-              exporting={exporting}
-              onTabChange={setTab}
-              onRetry={() => void load()}
-            />
+            <View>
+              <View style={styles.periodRow}>
+                {(['all', 'day', 'month'] as const).map((kind) => (
+                  <Pressable
+                    key={kind}
+                    style={[styles.periodChip, periodKind === kind && styles.periodChipOn]}
+                    onPress={() => setPeriodKind(kind)}
+                  >
+                    <AppText
+                      style={[styles.periodChipText, periodKind === kind && styles.periodChipTextOn]}
+                      myanmarWeight="bold"
+                    >
+                      {kind === 'all'
+                        ? t.crossBorderFinance.periodAll
+                        : kind === 'day'
+                          ? t.crossBorderFinance.periodDay
+                          : t.crossBorderFinance.periodMonth}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+              <AppText style={styles.periodTz} myanmarWeight="regular">
+                {t.crossBorderFinance.periodTz}
+              </AppText>
+              {periodKind !== 'all' ? (
+                <View style={styles.closeBox}>
+                  <AppText style={styles.closeStatus} myanmarWeight="semibold">
+                    {settlement?.status === 'submitted'
+                      ? t.crossBorderFinance.settlementSubmitted
+                      : settlement?.status === 'confirmed'
+                        ? t.crossBorderFinance.settlementConfirmed
+                        : settlement?.status === 'rejected'
+                          ? fmt(t.crossBorderFinance.settlementRejected, {
+                              reason: settlement.rejected_reason || '',
+                            })
+                          : periodLocked
+                            ? t.crossBorderFinance.periodLocked
+                            : ''}
+                  </AppText>
+                  {!periodLocked ? (
+                    <Pressable
+                      style={[styles.closeBtn, submittingClose && styles.closeBtnDisabled]}
+                      disabled={submittingClose}
+                      onPress={onSubmitClose}
+                    >
+                      <AppText style={styles.closeBtnText} myanmarWeight="bold">
+                        {periodKind === 'day'
+                          ? t.crossBorderFinance.submitDayClose
+                          : t.crossBorderFinance.submitMonthClose}
+                      </AppText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+              <FinanceSummaryHero
+                operatorName={operatorName ?? t.common.thisStation}
+                hubCode={hubCode}
+                displayedCount={displayed.length}
+                netBalance={netBalance}
+                summary={summary}
+                tabs={tabs}
+                tab={tab}
+                tabCounts={tabCounts}
+                error={error}
+                loading={loading}
+                displayedLength={displayed.length}
+                onAddManual={() => {
+                  if (!periodLocked) setManualModalVisible(true);
+                }}
+                onExport={() => void onExportCsv()}
+                exporting={exporting}
+                onTabChange={setTab}
+                onRetry={() => void load()}
+              />
+              {tab === 'agency' && agencyOutstanding.length > 0 && !periodLocked ? (
+                <View style={styles.remitBox}>
+                  {agencyOutstanding.map((item) => (
+                    <Pressable
+                      key={item.key}
+                      style={styles.remitBtn}
+                      onPress={() => onRemit(item.key, item.amount)}
+                    >
+                      <AppText style={styles.remitBtnText} myanmarWeight="bold">
+                        {t.crossBorderFinance.remitToOrigin} {item.key} · {item.amount}
+                      </AppText>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </View>
           }
           ListEmptyComponent={
             !loading ? (
@@ -283,7 +477,9 @@ export default function CrossBorderFinanceScreen() {
                 {tab === 'all' || tab === 'manual' ? (
                   <Pressable
                     style={({ pressed }) => [styles.emptyCta, pressed && styles.emptyCtaPressed]}
-                    onPress={() => setManualModalVisible(true)}
+                    onPress={() => {
+                      if (!periodLocked) setManualModalVisible(true);
+                    }}
                   >
                     <AppText style={styles.emptyCtaText} myanmarWeight="bold">
                       {t.crossBorderFinance.addManual}
@@ -305,7 +501,7 @@ export default function CrossBorderFinanceScreen() {
             <FinanceLedgerRow
               item={item}
               deleting={deletingId === item.manualEntryId}
-              onDelete={item.deletable ? () => confirmDelete(item) : undefined}
+              onDelete={item.deletable && !periodLocked ? () => confirmDelete(item) : undefined}
             />
           )}
         />
@@ -379,4 +575,38 @@ const styles = StyleSheet.create({
   },
   emptyCtaPressed: { opacity: 0.85 },
   emptyCtaText: { color: colors.white, fontSize: 13, fontWeight: '800' },
+  periodRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  periodChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: colors.card,
+  },
+  periodChipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  periodChipText: { color: colors.slateSoft, fontSize: 12, fontWeight: '800' },
+  periodChipTextOn: { color: colors.white },
+  periodTz: { color: colors.muted2, fontSize: 11, marginBottom: 10 },
+  closeBox: { marginBottom: 12, gap: 8 },
+  closeStatus: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  closeBtn: {
+    backgroundColor: colors.purple,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  closeBtnDisabled: { opacity: 0.6 },
+  closeBtnText: { color: colors.white, fontSize: 13, fontWeight: '800' },
+  remitBox: { gap: 8, marginBottom: 12 },
+  remitBtn: {
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  remitBtnText: { color: colors.slateSoft, fontSize: 12, fontWeight: '700' },
 });

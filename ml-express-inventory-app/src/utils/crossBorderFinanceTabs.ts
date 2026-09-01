@@ -12,6 +12,7 @@ export function formatMmkWithUnit(n: number): string {
 }
 
 export function isAgencyEntry(entry: FinanceLedgerEntry, currentKey: string): boolean {
+  if (entry.category === 'agency_remit') return true;
   const originKey = String(entry.originKey || '').trim();
   if (!originKey || originKey === currentKey) return false;
   return entry.category === 'order_collected' || entry.category === 'order_prepaid';

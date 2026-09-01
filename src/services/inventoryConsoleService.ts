@@ -1,5 +1,6 @@
 import { adminAuthenticatedFetch } from './authService';
 import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
+import type { SettlementSnapshot } from '../utils/yangonFinancePeriod';
 
 export type FinanceOriginAttributionGroup = {
   originKey: string;
@@ -67,6 +68,7 @@ export type CrossBorderStationSummary = {
   transportPaidTotal: number;
   pendingInflowTotal: number;
   agencyPayableTotal: number;
+  agencyRemittedTotal?: number;
   manualIncomeTotal: number;
   manualExpenseTotal: number;
 };
@@ -229,6 +231,7 @@ export type CrossBorderExpenseRow = {
   itemName: string;
   destination?: string;
   originLabel?: string;
+  originKey?: string;
   stationCode: string;
   stationName: string;
   statusLabel: string;
@@ -241,6 +244,8 @@ export type CrossBorderFinanceSummary = {
   transportPaidTotal: number;
   pendingInflowTotal: number;
   transportRegisteredTotal: number;
+  agencyPayableTotal?: number;
+  agencyRemittedTotal?: number;
   manualIncomeTotal: number;
   manualExpenseTotal: number;
 };
@@ -258,6 +263,7 @@ export type CrossBorderManualEntryDraft = {
   amount: number;
   category: string;
   note: string;
+  store_code: string;
 };
 
 export type CrossBorderFinance = {
@@ -287,6 +293,9 @@ export type FinanceLedgerEntryRow = {
   itemName: string;
   destination?: string;
   originLabel?: string;
+  originKey?: string;
+  paid?: boolean;
+  transportFee?: number;
 };
 
 export type FinanceBreakdownGroup = {
@@ -310,14 +319,39 @@ export type StoreFinanceDetail = {
     transport: FinanceBreakdownGroup[];
   };
   reconciliationDetail?: StationReconciliationDetail;
+  crossBorderSummary?: CrossBorderStationSummary;
+  period?: { fromIso: string; toExclusiveIso: string; label: string } | null;
   warnings?: string[];
 };
 
 export type StoreFinanceDetailMode = 'ledger' | 'cod' | 'collected' | 'transport';
 
-export async function fetchStoreFinanceDetail(storeCode: string): Promise<StoreFinanceDetail> {
+export type FinancePeriodParams = {
+  period?: 'day' | 'month' | 'year';
+  date?: string;
+  from?: string;
+  to?: string;
+  storeCode?: string;
+  financeExport?: boolean;
+};
+
+function applyFinancePeriodParams(url: URL, period?: FinancePeriodParams | null): void {
+  if (!period) return;
+  if (period.period) url.searchParams.set('period', period.period);
+  if (period.date) url.searchParams.set('date', period.date);
+  if (period.from) url.searchParams.set('from', period.from);
+  if (period.to) url.searchParams.set('to', period.to);
+  if (period.storeCode) url.searchParams.set('storeCode', period.storeCode);
+  if (period.financeExport) url.searchParams.set('financeExport', '1');
+}
+
+export async function fetchStoreFinanceDetail(
+  storeCode: string,
+  period?: FinancePeriodParams | null,
+): Promise<StoreFinanceDetail> {
   const url = new URL('/.netlify/functions/inventory-admin-finance', window.location.origin);
   url.searchParams.set('storeCode', storeCode);
+  applyFinancePeriodParams(url, period);
 
   const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
@@ -368,6 +402,7 @@ async function fetchInventoryConsoleSection(
   section: 'overview' | 'finance' | 'packs',
   packStatus?: PackStatusFilter,
   financePagination?: { page: number; pageSize: number },
+  period?: FinancePeriodParams | null,
 ): Promise<ConsoleSectionResponse> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', section);
@@ -376,6 +411,7 @@ async function fetchInventoryConsoleSection(
     url.searchParams.set('financePage', String(financePagination.page));
     url.searchParams.set('financePageSize', String(financePagination.pageSize));
   }
+  applyFinancePeriodParams(url, period);
 
   const response = await adminAuthenticatedFetch(url.toString(), {
     method: 'GET',
@@ -422,6 +458,7 @@ export async function fetchInventoryConsoleOverview(): Promise<{
 export async function fetchInventoryConsoleFinance(
   financePage = 1,
   financePageSize = 10,
+  period?: FinancePeriodParams | null,
 ): Promise<{
   transitStores: InventoryTransitStore[];
   crossBorderFinance?: InventoryConsoleData['crossBorderFinance'];
@@ -430,7 +467,7 @@ export async function fetchInventoryConsoleFinance(
   const payload = await fetchInventoryConsoleSection('finance', undefined, {
     page: financePage,
     pageSize: financePageSize,
-  });
+  }, period);
   return {
     transitStores: payload.transitStores ?? [],
     crossBorderFinance: payload.crossBorderFinance,
@@ -872,3 +909,166 @@ export async function createCrossBorderRegisteredCustomer(
   }
   return payload.customer as CrossBorderRegisteredCustomer;
 }
+
+export type StationSettlementRow = {
+  id: string;
+  period_type: 'day' | 'month';
+  period_start: string;
+  period_end: string;
+  store_id: string;
+  store_code: string;
+  hub_code: string;
+  status: 'submitted' | 'confirmed' | 'rejected';
+  snapshot: SettlementSnapshot;
+  submitted_by: string;
+  submitted_at: string;
+  confirmed_by: string;
+  confirmed_at?: string | null;
+  rejected_reason: string;
+  note: string;
+};
+
+export type AnnualFinanceRollup = {
+  year: number;
+  months: Array<{
+    month: number;
+    periodStart: string;
+    missing: boolean;
+    snapshot: SettlementSnapshot | null;
+    storeCount: number;
+  }>;
+  totals: SettlementSnapshot;
+  missingCount: number;
+  settlements?: StationSettlementRow[];
+};
+
+async function postInventorySettlement(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-settlements', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `操作失败 (${response.status})`);
+  }
+  return payload as Record<string, unknown>;
+}
+
+export async function fetchStationSettlements(params?: {
+  status?: string;
+  storeCode?: string;
+  periodType?: string;
+  year?: number;
+}): Promise<StationSettlementRow[]> {
+  const url = new URL('/.netlify/functions/inventory-admin-settlements', window.location.origin);
+  if (params?.status) url.searchParams.set('status', params.status);
+  if (params?.storeCode) url.searchParams.set('storeCode', params.storeCode);
+  if (params?.periodType) url.searchParams.set('periodType', params.periodType);
+  if (params?.year) url.searchParams.set('year', String(params.year));
+  const response = await adminAuthenticatedFetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载结算单失败 (${response.status})`);
+  }
+  return (payload.settlements ?? []) as StationSettlementRow[];
+}
+
+export async function fetchAnnualFinanceRollup(
+  year: number,
+  storeCode?: string,
+): Promise<AnnualFinanceRollup> {
+  const url = new URL('/.netlify/functions/inventory-admin-settlements', window.location.origin);
+  url.searchParams.set('view', 'annual');
+  url.searchParams.set('year', String(year));
+  if (storeCode) url.searchParams.set('storeCode', storeCode);
+  const response = await adminAuthenticatedFetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `加载年报失败 (${response.status})`);
+  }
+  return payload as AnnualFinanceRollup;
+}
+
+export async function fetchSettlementCompare(id: string): Promise<{
+  settlement: StationSettlementRow;
+  snapshot: SettlementSnapshot;
+  live: SettlementSnapshot;
+  diff: {
+    hasDiff: boolean;
+    diffs: Record<string, { snapshot: number; live: number; delta: number }>;
+  };
+}> {
+  const url = new URL('/.netlify/functions/inventory-admin-settlements', window.location.origin);
+  url.searchParams.set('view', 'compare');
+  url.searchParams.set('id', id);
+  const response = await adminAuthenticatedFetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `对比失败 (${response.status})`);
+  }
+  return payload as {
+    settlement: StationSettlementRow;
+    snapshot: SettlementSnapshot;
+    live: SettlementSnapshot;
+    diff: {
+      hasDiff: boolean;
+      diffs: Record<string, { snapshot: number; live: number; delta: number }>;
+    };
+  };
+}
+
+export async function confirmStationSettlement(id: string): Promise<void> {
+  await postInventorySettlement({ action: 'confirm', id });
+}
+
+export async function rejectStationSettlement(id: string, reason: string): Promise<void> {
+  await postInventorySettlement({ action: 'reject', id, reason });
+}
+
+export async function markHqTransportFeePaid(params: {
+  packBarcode: string;
+  storeCode: string;
+  fee?: string;
+  originStoreCode?: string;
+  legDestination?: string;
+}): Promise<void> {
+  await postInventorySettlement({
+    action: 'pay_transport',
+    packBarcode: params.packBarcode,
+    storeCode: params.storeCode,
+    fee: params.fee || '',
+    originStoreCode: params.originStoreCode || '',
+    legDestination: params.legDestination || '',
+  });
+}
+
+export async function recordHqAgencyRemittance(params: {
+  fromStoreCode: string;
+  toOriginKey: string;
+  amount: number;
+  remittedAt?: string;
+  note?: string;
+  toStoreCode?: string;
+}): Promise<void> {
+  await postInventorySettlement({
+    action: 'agency_remit',
+    fromStoreCode: params.fromStoreCode,
+    toOriginKey: params.toOriginKey,
+    amount: params.amount,
+    remittedAt: params.remittedAt,
+    note: params.note,
+    toStoreCode: params.toStoreCode,
+  });
+}
+

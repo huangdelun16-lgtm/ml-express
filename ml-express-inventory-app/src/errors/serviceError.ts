@@ -122,6 +122,13 @@ export type ServiceErrorCode =
   | 'exceptionNotFound'
   | 'exceptionAlreadyClosed'
   | 'exceptionCameraDenied'
+  | 'settlementAlreadySubmitted'
+  | 'settlementAlreadyConfirmed'
+  | 'settlementNotFound'
+  | 'settlementPeriodInvalid'
+  | 'settlementRejectReasonRequired'
+  | 'remitAmountInvalid'
+  | 'remitOriginRequired'
   | 'unknown';
 
 export class ServiceError extends Error {

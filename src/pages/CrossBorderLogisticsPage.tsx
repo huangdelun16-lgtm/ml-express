@@ -29,6 +29,7 @@ import {
   type PackStatusFilter,
   type StoreFinanceDetailMode,
   type CrossBorderExpenseCategory,
+  type FinancePeriodParams,
 } from '../services/inventoryConsoleService';
 import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
 import { collectPricingCustomerOptions } from '../utils/crossBorderRoutePricing';
@@ -41,6 +42,13 @@ import {
 import { buildTripFeeGroupMap, isPrimaryTripFeePack, tripTransportGroupKey } from '../utils/tripTransportFee';
 import '../styles/crossBorderLogistics.css';
 import { feedbackService } from '../services/FeedbackService';
+import CrossBorderFinancePeriodBar from '../components/CrossBorderFinancePeriodBar';
+import StationSettlementQueue from '../components/StationSettlementQueue';
+import { buildHqFinanceExportCsv, downloadCsv } from '../utils/crossBorderFinanceExport';
+import {
+  type FinancePeriodKind,
+  yangonTodayYmd,
+} from '../utils/yangonFinancePeriod';
 
 const CrossBorderAccountManagementModal = lazy(
   () => import('../components/CrossBorderAccountManagementModal'),
@@ -269,6 +277,10 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const [packsPage, setPacksPage] = useState(1);
   const [financePage, setFinancePage] = useState(1);
   const [tablePageSize, setTablePageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [periodKind, setPeriodKind] = useState<FinancePeriodKind>('month');
+  const [periodDate, setPeriodDate] = useState(() => yangonTodayYmd());
+  const [financeStoreCode, setFinanceStoreCode] = useState('');
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   const hubLabel = (regionId?: string) => {
     const hub = CROSS_BORDER_HUBS.find((h) => h.regionId === regionId);
@@ -280,6 +292,9 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const packFilterRef = useRef(packFilter);
   const financePageRef = useRef(financePage);
   const tablePageSizeRef = useRef(tablePageSize);
+  const periodKindRef = useRef(periodKind);
+  const periodDateRef = useRef(periodDate);
+  const financeStoreCodeRef = useRef(financeStoreCode);
   const customersSectionRef = useRef<HTMLElement | null>(null);
   const customersFetchStartedRef = useRef(false);
   const loadSeqRef = useRef(0);
@@ -289,6 +304,21 @@ const CrossBorderLogisticsPage: React.FC = () => {
   packFilterRef.current = packFilter;
   financePageRef.current = financePage;
   tablePageSizeRef.current = tablePageSize;
+  periodKindRef.current = periodKind;
+  periodDateRef.current = periodDate;
+  financeStoreCodeRef.current = financeStoreCode;
+
+  const financePeriodParams = useMemo((): FinancePeriodParams => {
+    return {
+      period: periodKind,
+      date: periodDate,
+      storeCode: financeStoreCode || undefined,
+    };
+  }, [periodKind, periodDate, financeStoreCode]);
+
+  const statementPeriod = useMemo((): FinancePeriodParams => {
+    return { period: periodKind, date: periodDate };
+  }, [periodKind, periodDate]);
 
   const loadCustomers = useCallback(async () => {
     setCustomersLoading(true);
@@ -327,7 +357,11 @@ const CrossBorderLogisticsPage: React.FC = () => {
     const reqId = ++financeReqIdRef.current;
     setFinanceLoading(true);
     try {
-      const result = await fetchInventoryConsoleFinance(page, pageSize);
+      const result = await fetchInventoryConsoleFinance(page, pageSize, {
+        period: periodKindRef.current,
+        date: periodDateRef.current,
+        storeCode: financeStoreCodeRef.current || undefined,
+      });
       if (reqId !== financeReqIdRef.current) return;
       setData((prev) =>
         prev
@@ -360,7 +394,11 @@ const CrossBorderLogisticsPage: React.FC = () => {
 
     const [overviewSettled, financeSettled, packsSettled] = await Promise.allSettled([
       fetchInventoryConsoleOverview(),
-      fetchInventoryConsoleFinance(financePageRef.current, tablePageSizeRef.current),
+      fetchInventoryConsoleFinance(financePageRef.current, tablePageSizeRef.current, {
+        period: periodKindRef.current,
+        date: periodDateRef.current,
+        storeCode: financeStoreCodeRef.current || undefined,
+      }),
       fetchInventoryConsolePacks(filter),
     ]);
 
@@ -450,7 +488,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
   useEffect(() => {
     if (!initialLoadDoneRef.current) return;
     void loadFinanceEntries(financePage, tablePageSize);
-  }, [financePage, tablePageSize, loadFinanceEntries]);
+  }, [financePage, tablePageSize, loadFinanceEntries, periodKind, periodDate, financeStoreCode]);
 
   useEffect(() => {
     if (packsFilterLoadedRef.current === packFilter) return;
@@ -493,6 +531,33 @@ const CrossBorderLogisticsPage: React.FC = () => {
   const expenseSummary = crossBorderFinance?.summary;
   const expensePagination = crossBorderFinance?.pagination;
   const expenseTotalItems = expensePagination?.totalItems ?? expenseSummary?.entryCount ?? 0;
+
+  const handleExportFinanceCsv = useCallback(async () => {
+    setExportingCsv(true);
+    try {
+      const result = await fetchInventoryConsoleFinance(1, 100, {
+        period: periodKind,
+        date: periodDate,
+        storeCode: financeStoreCode || undefined,
+        financeExport: true,
+      });
+      const csv = buildHqFinanceExportCsv({
+        entries: result.crossBorderFinance?.entries ?? [],
+        summary: result.crossBorderFinance?.summary,
+        periodLabel: `${periodKind} ${periodDate}`,
+        stationLabel: financeStoreCode || (isEn ? 'All stations' : '全部站点'),
+        isEn,
+      });
+      downloadCsv(
+        `ML-finance-${periodKind}-${periodDate.slice(0, 10)}.csv`,
+        csv,
+      );
+    } catch (e) {
+      feedbackService.notify(e instanceof Error ? e.message : isEn ? 'Export failed' : '导出失败');
+    } finally {
+      setExportingCsv(false);
+    }
+  }, [periodKind, periodDate, financeStoreCode, isEn]);
 
   /** 总收入/总支出与下方「跨境财务」同源：全站汇总 */
   const totalIncomeAllStations = useMemo(() => {
@@ -866,6 +931,14 @@ const CrossBorderLogisticsPage: React.FC = () => {
           )}
         </section>
 
+        <StationSettlementQueue
+          isEn={isEn}
+          stores={transitStores}
+          year={Number(periodDate.slice(0, 4)) || new Date().getFullYear()}
+          storeCode={financeStoreCode}
+          onChanged={() => void loadFinanceEntries(financePage, tablePageSize)}
+        />
+
         <section className="cbl-card cbl-card--finance-expense">
           <div className="cbl-card__head">
             <h2 className="cbl-card__title">{isEn ? 'Cross-border finance' : '跨境财务'}</h2>
@@ -892,6 +965,27 @@ const CrossBorderLogisticsPage: React.FC = () => {
                 {isEn ? '+ Other' : '+ 其它开销'}
               </button>
             </div>
+            <CrossBorderFinancePeriodBar
+              kind={periodKind}
+              date={periodDate}
+              storeCode={financeStoreCode}
+              stores={transitStores}
+              isEn={isEn}
+              exporting={exportingCsv}
+              onKindChange={(kind) => {
+                setPeriodKind(kind);
+                setFinancePage(1);
+              }}
+              onDateChange={(next) => {
+                setPeriodDate(next);
+                setFinancePage(1);
+              }}
+              onStoreCodeChange={(code) => {
+                setFinanceStoreCode(code);
+                setFinancePage(1);
+              }}
+              onExport={() => void handleExportFinanceCsv()}
+            />
             <div className="cbl-expense-summary">
               <div className="cbl-expense-summary__item">
                 <span className="cbl-expense-summary__label">
@@ -932,6 +1026,12 @@ const CrossBorderLogisticsPage: React.FC = () => {
                   {isEn ? 'Other expense' : '其它支出'}
                 </span>
                 <strong>{formatMmK(expenseSummary?.manualExpenseTotal ?? 0)}</strong>
+              </div>
+              <div className="cbl-expense-summary__item">
+                <span className="cbl-expense-summary__label">
+                  {isEn ? 'Remitted' : '已汇发站'}
+                </span>
+                <strong>{formatMmK(expenseSummary?.agencyRemittedTotal ?? 0)}</strong>
               </div>
               <div className="cbl-expense-summary__item cbl-expense-summary__item--muted">
                 <span className="cbl-expense-summary__label">
@@ -1044,6 +1144,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
                         <th>{isEn ? 'Collected MMK' : '已收MMK'}</th>
                         <th>{isEn ? 'Unpaid truck MMK' : '待付车费MMK'}</th>
                         <th>{isEn ? 'Paid truck MMK' : '已付车费MMK'}</th>
+                        <th>{isEn ? 'Manual' : '手工收支'}</th>
                         <th>{isEn ? 'Statement' : '对账'}</th>
                       </tr>
                     </thead>
@@ -1122,6 +1223,16 @@ const CrossBorderLogisticsPage: React.FC = () => {
                                 </span>
                                 <span className="cbl-io-cell__sub">
                                   {isEn ? 'Inbound truck paid' : '本站已付装车车费'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="cbl-finance-cell">
+                              <div className="cbl-io-cell">
+                                <span className="cbl-io-cell__main cbl-io-cell__main--in">
+                                  +{formatMmK(finance?.crossBorderSummary?.manualIncomeTotal ?? 0)}
+                                </span>
+                                <span className="cbl-io-cell__sub cbl-io-cell__main--out">
+                                  −{formatMmK(finance?.crossBorderSummary?.manualExpenseTotal ?? 0)}
                                 </span>
                               </div>
                             </td>
@@ -1450,6 +1561,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
           open={showManualEntryModal}
           onClose={() => setShowManualEntryModal(false)}
           onSaved={() => void load()}
+          stores={transitStores}
         />
       </CblLazyModal>
 
@@ -1495,6 +1607,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
           onClose={closeFinanceDetail}
           store={financeModalStore}
           mode={financeModalMode}
+          period={statementPeriod}
         />
       </CblLazyModal>
 
@@ -1503,6 +1616,7 @@ const CrossBorderLogisticsPage: React.FC = () => {
           open={reconcileModalStore != null}
           onClose={() => setReconcileModalStore(null)}
           store={reconcileModalStore}
+          period={statementPeriod}
         />
       </CblLazyModal>
 

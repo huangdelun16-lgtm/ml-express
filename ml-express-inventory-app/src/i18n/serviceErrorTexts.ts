@@ -128,6 +128,13 @@ export const serviceErrorsZh: ServiceErrorTexts = {
   exceptionNotFound: '未找到该异常件',
   exceptionAlreadyClosed: '该异常件已关闭',
   exceptionCameraDenied: '需要相机或相册权限才能添加异常件照片',
+  settlementAlreadySubmitted: '该期已提交，等待总部确认',
+  settlementAlreadyConfirmed: '该期已确认，不能再改',
+  settlementNotFound: '未找到关账单',
+  settlementPeriodInvalid: '关账期间无效',
+  settlementRejectReasonRequired: '驳回须填写原因',
+  remitAmountInvalid: '请填写大于 0 的汇出金额',
+  remitOriginRequired: '请选择发站',
   unknown: '操作失败，请重试',
 };
 
@@ -258,6 +265,13 @@ export const serviceErrorsEn: ServiceErrorTexts = {
   exceptionNotFound: 'Exception record not found.',
   exceptionAlreadyClosed: 'This exception is already closed.',
   exceptionCameraDenied: 'Camera or photo library permission is required to add exception photos.',
+  settlementAlreadySubmitted: 'This period is already submitted and awaiting HQ.',
+  settlementAlreadyConfirmed: 'This period is confirmed and locked.',
+  settlementNotFound: 'Settlement not found.',
+  settlementPeriodInvalid: 'Invalid close period.',
+  settlementRejectReasonRequired: 'A reject reason is required.',
+  remitAmountInvalid: 'Enter a remit amount greater than 0.',
+  remitOriginRequired: 'Select the origin hub.',
   unknown: 'Operation failed. Try again.',
 };
 
@@ -385,6 +399,13 @@ export const serviceErrorsMy: ServiceErrorTexts = {
   exceptionNotFound: 'ချွတ်ယွင်းမှတ်တမ်း မတွေ့',
   exceptionAlreadyClosed: 'ဤချွတ်ယွင်း ပိတ်ပြီး',
   exceptionCameraDenied: 'ဓာတ်ပုံရိုက်ရန် ကင်မရာ ခွင့်ပြုချက် လိုအပ်',
+  settlementAlreadySubmitted: 'ဤကာလ တင်ပြီး — ရုံးချုပ် စောင့်',
+  settlementAlreadyConfirmed: 'ဤကာလ အတည်ပြုပြီး',
+  settlementNotFound: 'ပိတ်စာရင်း မတွေ့',
+  settlementPeriodInvalid: 'ကာလ မမှန်',
+  settlementRejectReasonRequired: 'ပယ်ချ အကြောင်းရင်း လို',
+  remitAmountInvalid: 'ပမာဏ ၀ ထက် ကြီးအောင်',
+  remitOriginRequired: 'မူလစခန်း ရွေးပါ',
   unknown: 'မအောင်မြင် — ထပ်ကြိုးစားပါ',
 };
 

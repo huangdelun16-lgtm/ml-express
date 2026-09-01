@@ -201,6 +201,12 @@ export const LEDGER_CATEGORY_STYLE: Record<
     tint: 'rgba(148,163,184,0.1)',
     pillBg: 'rgba(148,163,184,0.15)',
   },
+  agency_remit: {
+    icon: '⇄',
+    accent: '#f59e0b',
+    tint: 'rgba(245,158,11,0.12)',
+    pillBg: 'rgba(245,158,11,0.18)',
+  },
 };
 
 export function getExceptionTypeLabel(t: TranslationDict, type: string): string {

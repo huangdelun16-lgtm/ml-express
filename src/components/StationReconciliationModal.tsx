@@ -8,6 +8,9 @@ import {
   type InventoryTransitStore,
   type ReconciliationEntryBucket,
   type StationReconciliationDetail,
+  type FinancePeriodParams,
+  markHqTransportFeePaid,
+  recordHqAgencyRemittance,
 } from '../services/inventoryConsoleService';
 import '../styles/crossBorderLogistics.css';
 
@@ -15,6 +18,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   store: InventoryTransitStore | null;
+  period?: FinancePeriodParams | null;
 };
 
 function formatMmK(n: number): string {
@@ -35,7 +39,17 @@ function formatWhen(iso: string, lang: string): string {
   }
 }
 
-function EntryLine({ entry, isEn }: { entry: FinanceLedgerEntryRow; isEn: boolean }) {
+function EntryLine({
+  entry,
+  isEn,
+  onPayTransport,
+  paying,
+}: {
+  entry: FinanceLedgerEntryRow;
+  isEn: boolean;
+  onPayTransport?: (entry: FinanceLedgerEntryRow) => void;
+  paying?: boolean;
+}) {
   return (
     <div className="cbl-reconcile-entry">
       <div className="cbl-reconcile-entry__main">
@@ -50,6 +64,16 @@ function EntryLine({ entry, isEn }: { entry: FinanceLedgerEntryRow; isEn: boolea
         {entry.destination ? <span>→ {entry.destination}</span> : null}
         <span>{formatWhen(entry.occurredAt, isEn ? 'en' : 'zh')}</span>
         <span className="cbl-code">{entry.barcode}</span>
+        {onPayTransport && entry.category === 'transport_cost' && !entry.paid ? (
+          <button
+            type="button"
+            className="cbl-btn cbl-btn--primary cbl-btn--sm"
+            disabled={paying}
+            onClick={() => onPayTransport(entry)}
+          >
+            {isEn ? 'Mark paid' : '代记已付'}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -102,15 +126,25 @@ function SectionBlock({
 function BucketEntries({
   bucket,
   isEn,
+  onPayTransport,
+  paying,
 }: {
   bucket?: ReconciliationEntryBucket;
   isEn: boolean;
+  onPayTransport?: (entry: FinanceLedgerEntryRow) => void;
+  paying?: boolean;
 }) {
   if (!bucket?.items?.length) return null;
   return (
     <>
       {bucket.items.map((entry) => (
-        <EntryLine key={entry.id} entry={entry} isEn={isEn} />
+        <EntryLine
+          key={entry.id}
+          entry={entry}
+          isEn={isEn}
+          onPayTransport={onPayTransport}
+          paying={paying}
+        />
       ))}
     </>
   );
@@ -119,9 +153,13 @@ function BucketEntries({
 function OriginGroups({
   groups,
   isEn,
+  onRemit,
+  remittingKey,
 }: {
   groups: Array<FinanceOriginAttributionGroup & { items?: FinanceLedgerEntryRow[] }>;
   isEn: boolean;
+  onRemit?: (group: FinanceOriginAttributionGroup) => void;
+  remittingKey?: string;
 }) {
   if (!groups.length) return null;
   return (
@@ -133,6 +171,16 @@ function OriginGroups({
             <span className="cbl-reconcile-origin-group__stat">
               {group.count} 条 · {formatMmK(group.total)}
             </span>
+            {onRemit ? (
+              <button
+                type="button"
+                className="cbl-btn cbl-btn--primary cbl-btn--sm"
+                disabled={remittingKey === group.originKey}
+                onClick={() => onRemit(group)}
+              >
+                {isEn ? 'Mark remitted' : '已汇给发站'}
+              </button>
+            ) : null}
           </div>
           {group.items?.map((entry) => (
             <EntryLine key={entry.id} entry={entry} isEn={isEn} />
@@ -143,26 +191,37 @@ function OriginGroups({
   );
 }
 
-const StationReconciliationModal: React.FC<Props> = ({ open, onClose, store }) => {
+const StationReconciliationModal: React.FC<Props> = ({ open, onClose, store, period }) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<StationReconciliationDetail | null>(null);
+  const [payingId, setPayingId] = useState('');
+  const [remittingKey, setRemittingKey] = useState('');
+
+  const reload = () => {
+    if (!store?.store_code) return;
+    void fetchStoreFinanceDetail(store.store_code, period)
+      .then((data) => setDetail(data.reconciliationDetail ?? null))
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : '加载失败');
+      });
+  };
 
   useEffect(() => {
     if (!open || !store?.store_code) return;
     setLoading(true);
     setError(null);
-    void fetchStoreFinanceDetail(store.store_code)
+    void fetchStoreFinanceDetail(store.store_code, period)
       .then((data) => setDetail(data.reconciliationDetail ?? null))
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : '加载失败');
         setDetail(null);
       })
       .finally(() => setLoading(false));
-  }, [open, store?.store_code]);
+  }, [open, store?.store_code, period?.period, period?.date, period?.from, period?.to]);
 
   if (!open || !store) return null;
 
@@ -191,9 +250,17 @@ const StationReconciliationModal: React.FC<Props> = ({ open, onClose, store }) =
               </h2>
               <p className="cbl-customer-modal__phone">
                 {isEn ? 'Station reconciliation statement' : '站点对账单'}
+                {period?.date ? ` · ${period.period || ''} ${period.date}` : ''}
               </p>
             </div>
           </div>
+          <button
+            type="button"
+            className="cbl-btn cbl-btn--light cbl-btn--sm"
+            onClick={() => window.print()}
+          >
+            {isEn ? 'Print' : '打印'}
+          </button>
           <button
             type="button"
             className="cbl-pricing-modal__close"
@@ -326,6 +393,27 @@ const StationReconciliationModal: React.FC<Props> = ({ open, onClose, store }) =
                 <OriginGroups
                   groups={sections?.dest_agency_collected_by_origin ?? []}
                   isEn={isEn}
+                  remittingKey={remittingKey}
+                  onRemit={(group) => {
+                    if (!store) return;
+                    const amount = window.prompt(
+                      isEn ? 'Remit amount MMK' : '汇出金额 MMK',
+                      String(Math.round(group.total || 0)),
+                    );
+                    const n = Math.round(Number(amount || 0));
+                    if (!Number.isFinite(n) || n <= 0) return;
+                    setRemittingKey(group.originKey);
+                    void recordHqAgencyRemittance({
+                      fromStoreCode: store.store_code,
+                      toOriginKey: group.originKey,
+                      amount: n,
+                    })
+                      .then(() => reload())
+                      .catch((e: unknown) => {
+                        setError(e instanceof Error ? e.message : '登记失败');
+                      })
+                      .finally(() => setRemittingKey(''));
+                  }}
                 />
               </SectionBlock>
 
@@ -358,7 +446,27 @@ const StationReconciliationModal: React.FC<Props> = ({ open, onClose, store }) =
                 tone="out"
               >
                 <BucketEntries bucket={sections?.transport_out} isEn={isEn} />
-                <BucketEntries bucket={sections?.transport_in_unpaid} isEn={isEn} />
+                <BucketEntries
+                  bucket={sections?.transport_in_unpaid}
+                  isEn={isEn}
+                  paying={Boolean(payingId)}
+                  onPayTransport={(entry) => {
+                    if (!store || !entry.barcode) return;
+                    setPayingId(entry.id);
+                    void markHqTransportFeePaid({
+                      packBarcode: entry.barcode,
+                      storeCode: store.store_code,
+                      fee: String(entry.transportFee ?? entry.amount ?? ''),
+                      originStoreCode: entry.originKey || '',
+                      legDestination: entry.destination || '',
+                    })
+                      .then(() => reload())
+                      .catch((e: unknown) => {
+                        setError(e instanceof Error ? e.message : '代记失败');
+                      })
+                      .finally(() => setPayingId(''));
+                  }}
+                />
               </SectionBlock>
 
               <SectionBlock

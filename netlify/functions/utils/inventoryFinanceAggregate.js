@@ -8,6 +8,10 @@ const {
   buildTransportSubtitle,
   tripTransportGroupKey,
 } = require('./tripTransportFee');
+const {
+  filterEntriesForFinancePeriod,
+  yangonNoonIsoFromYmd,
+} = require('./yangonFinancePeriod');
 
 const HUB_BY_REGION = {
   muse: 'MSE',
@@ -429,6 +433,7 @@ function buildTransportEntry(params) {
     destination: legDest,
     originLabel,
     transportDirection: direction,
+    originKey: ownershipKeyFromStoreCode(params.originStoreCode || originLabel || ''),
   };
 }
 
@@ -771,6 +776,7 @@ function buildCrossBorderFinanceSummary(entries, storeCode, hubCode) {
 
   let manualIncome = 0;
   let manualExpense = 0;
+  let agencyRemitted = 0;
 
   for (const entry of entries) {
     if (entry.category === 'manual_income') {
@@ -779,6 +785,12 @@ function buildCrossBorderFinanceSummary(entries, storeCode, hubCode) {
     }
     if (entry.category === 'manual_expense') {
       manualExpense += entry.amount ?? 0;
+      continue;
+    }
+    if (entry.category === 'agency_remit') {
+      if (entry.remitDirection === 'out') {
+        agencyRemitted += entry.amount ?? 0;
+      }
       continue;
     }
 
@@ -819,6 +831,7 @@ function buildCrossBorderFinanceSummary(entries, storeCode, hubCode) {
     transportPaidTotal: round(buckets.transport_in_paid),
     pendingInflowTotal: round(buckets.dest_pending_agency),
     agencyPayableTotal: round(buckets.dest_agency_collected),
+    agencyRemittedTotal: round(agencyRemitted),
     manualIncomeTotal: round(manualIncome),
     manualExpenseTotal: round(manualExpense),
   };
@@ -875,6 +888,83 @@ function collectCloudTransportEntry(pkg, storeCode, hubCode, transportSeen, tran
     packCount,
     packBarcodes,
   });
+}
+
+function manualsForStore(dataset, store) {
+  const code = String(store.store_code || '').trim().toUpperCase();
+  const hub = hubCodeForRegion(store.region);
+  return (dataset.manualEntries || []).filter((row) => {
+    const rowCode = String(row.store_code || '').trim().toUpperCase();
+    const rowHub = String(row.hub_code || '').trim().toUpperCase();
+    if (rowCode) return rowCode === code;
+    if (rowHub && hub) return rowHub === String(hub).toUpperCase();
+    return false;
+  });
+}
+
+function remittancesForStore(dataset, store) {
+  const code = String(store.store_code || '').trim().toUpperCase();
+  const hub = String(hubCodeForRegion(store.region) || '').toUpperCase();
+  const ownerKey = String(ownershipKeyFromStoreCode(store.store_code || '') || '').toUpperCase();
+  return (dataset.remittances || []).filter((row) => {
+    const from = String(row.from_store_code || '').trim().toUpperCase();
+    const toKey = String(row.to_origin_key || '').trim().toUpperCase();
+    const toStore = String(row.to_store_code || '').trim().toUpperCase();
+    return from === code || toKey === hub || toKey === ownerKey || toStore === code;
+  });
+}
+
+function mapManualRowToLedger(row) {
+  const income = row.kind === 'income';
+  const amount = Math.round(Number(row.amount) || 0);
+  const category = String(row.category || '').trim();
+  const note = String(row.note || '').trim();
+  const occurredAt =
+    yangonNoonIsoFromYmd(String(row.entry_date || '')) ||
+    row.created_at ||
+    `${row.entry_date}T12:00:00.000Z`;
+  return {
+    id: `manual:${row.id}`,
+    manualEntryId: row.id,
+    category: income ? 'manual_income' : 'manual_expense',
+    title: income ? '其它收入' : '其它支出',
+    subtitle: [category, note].filter(Boolean).join(' · ') || '—',
+    amount,
+    amountDisplay: income
+      ? `+${formatMmk(amount)}`
+      : amount > 0
+        ? `−${formatMmk(amount)}`
+        : '0 MMK',
+    occurredAt,
+    barcode: '',
+    itemName: category || (income ? '其它收入' : '其它支出'),
+  };
+}
+
+function mapRemittanceToLedger(row, store) {
+  const fromCode = String(row.from_store_code || '').trim().toUpperCase();
+  const storeCode = String(store.store_code || '').trim().toUpperCase();
+  const isPayer = fromCode === storeCode;
+  const amount = Math.round(Number(row.amount) || 0);
+  const originKey = String(row.to_origin_key || '').trim().toUpperCase();
+  const occurredAt =
+    yangonNoonIsoFromYmd(String(row.remitted_at || '')) || row.created_at || '';
+  return {
+    id: `remit:${row.id}:${isPayer ? 'out' : 'in'}`,
+    remittanceId: row.id,
+    category: 'agency_remit',
+    remitDirection: isPayer ? 'out' : 'in',
+    title: isPayer ? '已汇给发站' : '收到代转汇款',
+    subtitle: [originKey, String(row.note || '').trim()].filter(Boolean).join(' · ') || '—',
+    amount,
+    amountDisplay: isPayer ? `−${formatMmk(amount)}` : `+${formatMmk(amount)}`,
+    occurredAt,
+    barcode: '',
+    itemName: originKey || '代转',
+    originKey,
+    originLabel: originKey,
+    paid: true,
+  };
 }
 
 function buildAllFinanceEntries(store, dataset) {
@@ -1088,6 +1178,13 @@ function buildAllFinanceEntries(store, dataset) {
     entries.push(buildStockOpEntry(row));
   }
 
+  for (const row of manualsForStore(dataset, store)) {
+    entries.push(mapManualRowToLedger(row));
+  }
+  for (const row of remittancesForStore(dataset, store)) {
+    entries.push(mapRemittanceToLedger(row, store));
+  }
+
   const orderEntries = entries.filter(
     (e) =>
       e.category === 'order_prepaid' ||
@@ -1244,6 +1341,7 @@ async function loadFinanceDataset(supabase) {
     packedResult,
     transportPayResult,
     manualResult,
+    remitResult,
   ] = await Promise.all([
     fetchAllRows(
       supabase,
@@ -1300,12 +1398,22 @@ async function loadFinanceDataset(supabase) {
     fetchAllRows(
       supabase,
       'cross_border_manual_entries',
-      'id, entry_date, kind, amount, currency, category, note, created_by, created_at',
+      'id, entry_date, kind, amount, currency, category, note, created_by, created_at, store_id, store_code, hub_code',
       {
         order: [
           { column: 'entry_date', ascending: false },
           { column: 'created_at', ascending: false },
         ],
+        pageSize: 250,
+        maxPages: 10,
+      },
+    ),
+    fetchAllRows(
+      supabase,
+      'inventory_agency_remittances',
+      'id, from_store_id, from_store_code, from_hub_code, to_origin_key, to_store_code, amount, remitted_at, note, created_at',
+      {
+        order: [{ column: 'remitted_at', ascending: false }],
         pageSize: 250,
         maxPages: 10,
       },
@@ -1319,6 +1427,12 @@ async function loadFinanceDataset(supabase) {
   pushQueryWarning(warnings, '本地包裹读取失败', packedResult.error);
   pushQueryWarning(warnings, '车费支付记录读取失败', transportPayResult.error);
   pushQueryWarning(warnings, '其它开销读取失败', manualResult.error);
+  if (
+    remitResult.error &&
+    !/does not exist|schema cache/i.test(String(remitResult.error.message || ''))
+  ) {
+    pushQueryWarning(warnings, '代转汇款读取失败', remitResult.error);
+  }
 
   const movements = movementsResult.data || [];
   const orderRows = ordersResult.data || [];
@@ -1330,6 +1444,7 @@ async function loadFinanceDataset(supabase) {
   }
 
   const manualEntries = manualResult.error ? [] : manualResult.data || [];
+  const remittances = remitResult.error ? [] : remitResult.data || [];
 
   const ordersByPack = {};
   for (const order of orderRows || []) {
@@ -1378,6 +1493,7 @@ async function loadFinanceDataset(supabase) {
       itemsByBarcode,
       transportPaidBarcodes,
       manualEntries,
+      remittances,
       packNotesByBarcode,
     },
     warnings,
@@ -1407,6 +1523,7 @@ function mapLedgerToCrossBorderExpense(item, store, expenseCategory) {
     itemName: item.itemName,
     destination: item.destination,
     originLabel: item.originLabel,
+    originKey: item.originKey,
     stationCode: store.store_code,
     stationName: store.store_name,
     statusLabel,
@@ -1420,7 +1537,11 @@ function mapManualToCrossBorderExpense(row) {
   const subtitleParts = [row.category, row.note]
     .map((s) => String(s || '').trim())
     .filter(Boolean);
-  const occurredAt = row.created_at || `${row.entry_date}T12:00:00.000Z`;
+  const occurredAt =
+    yangonNoonIsoFromYmd(String(row.entry_date || '')) ||
+    row.created_at ||
+    `${row.entry_date}T12:00:00.000Z`;
+  const stationCode = String(row.store_code || '').trim() || '—';
   return {
     id: `manual:${row.id}`,
     category,
@@ -1435,9 +1556,46 @@ function mapManualToCrossBorderExpense(row) {
     occurredAt,
     barcode: '',
     itemName: String(row.category || '').trim() || (isIncome ? '其它收入' : '其它支出'),
-    stationCode: '—',
-    stationName: String(row.created_by || '').trim() || 'Admin',
+    stationCode,
+    stationName: String(row.store_code || row.created_by || '').trim() || 'Admin',
     statusLabel: isIncome ? '收入' : '支出',
+  };
+}
+
+function mapManualLedgerToHqExpense(item, store) {
+  const isIncome = item.category === 'manual_income';
+  return {
+    id: item.id,
+    category: item.category,
+    title: item.title,
+    subtitle: item.subtitle,
+    amount: Math.round(item.amount ?? 0),
+    amountDisplay: item.amountDisplay,
+    occurredAt: item.occurredAt || '',
+    barcode: '',
+    itemName: item.itemName,
+    stationCode: store.store_code,
+    stationName: store.store_name,
+    statusLabel: isIncome ? '收入' : '支出',
+  };
+}
+
+function mapRemitToHqExpense(item, store) {
+  return {
+    id: item.id,
+    category: 'agency_remit',
+    title: item.title,
+    subtitle: item.subtitle,
+    amount: Math.round(item.amount ?? 0),
+    amountDisplay: item.amountDisplay,
+    occurredAt: item.occurredAt || '',
+    barcode: item.barcode || '',
+    itemName: item.itemName,
+    stationCode: store.store_code,
+    stationName: store.store_name,
+    statusLabel: item.remitDirection === 'out' ? '已汇' : '已收汇',
+    originLabel: item.originLabel,
+    originKey: item.originKey,
   };
 }
 
@@ -1449,6 +1607,11 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
   let transportUnpaidTotal = 0;
   let transportPaidTotal = 0;
   let pendingInflowTotal = 0;
+  let agencyPayableTotal = 0;
+  let agencyRemittedTotal = 0;
+  let manualIncome = 0;
+  let manualExpense = 0;
+  const seenManual = new Set();
 
   for (const store of transitStores || []) {
     const hubCode = hubCodeForRegion(store.region);
@@ -1469,6 +1632,10 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
     transportUnpaidTotal += storeSummary.transportUnpaidTotal;
     transportPaidTotal += storeSummary.transportPaidTotal;
     pendingInflowTotal += storeSummary.pendingInflowTotal;
+    agencyPayableTotal += storeSummary.agencyPayableTotal || 0;
+    agencyRemittedTotal += storeSummary.agencyRemittedTotal || 0;
+    manualIncome += storeSummary.manualIncomeTotal || 0;
+    manualExpense += storeSummary.manualExpenseTotal || 0;
 
     const rc = buildReconciliationSummary(financeEntries, store.store_code, hubCode, {
       includeEntries: true,
@@ -1506,17 +1673,32 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
         entries.push(mapLedgerToCrossBorderExpense(item, store, 'pending_inflow'));
       }
     }
+
+    for (const item of financeEntries) {
+      if (item.category === 'manual_income' || item.category === 'manual_expense') {
+        entries.push(mapManualLedgerToHqExpense(item, store));
+        seenManual.add(item.manualEntryId || String(item.id || '').replace(/^manual:/, ''));
+      }
+      if (item.category === 'agency_remit' && item.remitDirection === 'out') {
+        entries.push(mapRemitToHqExpense(item, store));
+      }
+    }
   }
 
-  let manualIncome = 0;
-  let manualExpense = 0;
+  let leftoverManualIncome = 0;
+  let leftoverManualExpense = 0;
   for (const row of dataset.manualEntries || []) {
+    const id = String(row.id || '');
+    if (seenManual.has(id)) continue;
+    if (String(row.store_code || '').trim()) continue;
     const mapped = mapManualToCrossBorderExpense(row);
     entries.push(mapped);
     const amt = mapped.amount ?? 0;
-    if (mapped.category === 'manual_income') manualIncome += amt;
-    if (mapped.category === 'manual_expense') manualExpense += amt;
+    if (mapped.category === 'manual_income') leftoverManualIncome += amt;
+    if (mapped.category === 'manual_expense') leftoverManualExpense += amt;
   }
+  manualIncome += leftoverManualIncome;
+  manualExpense += leftoverManualExpense;
 
   entries.sort(
     (a, b) => new Date(b.occurredAt || 0).getTime() - new Date(a.occurredAt || 0).getTime(),
@@ -1530,6 +1712,8 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
       transportPaidTotal: Math.round(transportPaidTotal),
       pendingInflowTotal: Math.round(pendingInflowTotal),
       transportRegisteredTotal: Math.round(transportUnpaidTotal + transportPaidTotal),
+      agencyPayableTotal: Math.round(agencyPayableTotal),
+      agencyRemittedTotal: Math.round(agencyRemittedTotal),
       manualIncomeTotal: Math.round(manualIncome),
       manualExpenseTotal: Math.round(manualExpense),
     },
@@ -1537,9 +1721,43 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
   };
 }
 
-async function aggregateFinanceForTransitStores(supabase, transitStores) {
+function applyPeriodToCache(cache, range) {
+  if (!range) return cache;
+  const next = new Map();
+  for (const [code, cached] of cache) {
+    const allEntries = filterEntriesForFinancePeriod(cached.allEntries, range);
+    next.set(code, {
+      ...cached,
+      allEntries,
+      financeEntries: filterCrossBorderFinanceEntries(allEntries),
+    });
+  }
+  return next;
+}
+
+function hqSummaryFromStore(store, financeEntries) {
+  const hubCode = hubCodeForRegion(store.region);
+  const s = buildCrossBorderFinanceSummary(financeEntries, store.store_code, hubCode);
+  return {
+    entryCount: financeEntries.length,
+    collectedTotal: Math.round(s.collectedTotal),
+    transportUnpaidTotal: Math.round(s.transportUnpaidTotal),
+    transportPaidTotal: Math.round(s.transportPaidTotal),
+    pendingInflowTotal: Math.round(s.pendingInflowTotal),
+    transportRegisteredTotal: Math.round(s.transportUnpaidTotal + s.transportPaidTotal),
+    agencyPayableTotal: Math.round(s.agencyPayableTotal || 0),
+    agencyRemittedTotal: Math.round(s.agencyRemittedTotal || 0),
+    manualIncomeTotal: Math.round(s.manualIncomeTotal || 0),
+    manualExpenseTotal: Math.round(s.manualExpenseTotal || 0),
+  };
+}
+
+async function aggregateFinanceForTransitStores(supabase, transitStores, opts = {}) {
   const { dataset, warnings } = await loadFinanceDataset(supabase);
-  const entriesCache = buildStoreFinanceEntriesCache(transitStores, dataset);
+  let entriesCache = buildStoreFinanceEntriesCache(transitStores, dataset);
+  const range = opts.range || null;
+  const storeCode = String(opts.storeCode || '').trim().toUpperCase();
+  entriesCache = applyPeriodToCache(entriesCache, range);
 
   const financeByStoreCode = {};
   for (const [code, cached] of entriesCache) {
@@ -1550,12 +1768,28 @@ async function aggregateFinanceForTransitStores(supabase, transitStores) {
     );
   }
 
-  const crossBorderFinance = aggregateCrossBorderExpenses(transitStores, entriesCache, dataset);
+  let crossBorderFinance = aggregateCrossBorderExpenses(transitStores, entriesCache, dataset);
+  if (storeCode) {
+    const filtered = (crossBorderFinance.entries || []).filter(
+      (e) => String(e.stationCode || '').trim().toUpperCase() === storeCode,
+    );
+    const store = (transitStores || []).find(
+      (s) => String(s.store_code || '').trim().toUpperCase() === storeCode,
+    );
+    const cached = entriesCache.get(storeCode);
+    crossBorderFinance = {
+      ...crossBorderFinance,
+      entries: filtered,
+      summary: store && cached
+        ? { ...hqSummaryFromStore(store, cached.financeEntries), entryCount: filtered.length }
+        : { ...crossBorderFinance.summary, entryCount: filtered.length },
+    };
+  }
 
-  return { financeByStoreCode, crossBorderFinance, warnings };
+  return { financeByStoreCode, crossBorderFinance, warnings, period: range };
 }
 
-async function fetchStoreFinanceDetail(supabase, storeCode) {
+async function fetchStoreFinanceDetail(supabase, storeCode, opts = {}) {
   const code = String(storeCode || '').trim().toUpperCase();
   if (!code) return { error: '缺少店铺代码' };
 
@@ -1569,14 +1803,24 @@ async function fetchStoreFinanceDetail(supabase, storeCode) {
   if (!store) return { error: '未找到该中转站' };
 
   const { dataset, warnings } = await loadFinanceDataset(supabase);
-  const entries = buildAllFinanceEntries(store, dataset);
+  let entries = buildAllFinanceEntries(store, dataset);
+  if (opts.range) {
+    entries = filterEntriesForFinancePeriod(entries, opts.range);
+  }
   const hubCode = hubCodeForRegion(store.region);
+  const financeEntries = filterCrossBorderFinanceEntries(entries);
+  const crossBorderSummary = buildCrossBorderFinanceSummary(
+    financeEntries,
+    store.store_code,
+    hubCode,
+  );
   const summary = {
     ...summarize(entries),
     ...buildFinanceAttribution(entries, store.store_code),
     reconciliation: buildReconciliationSummary(entries, store.store_code, hubCode, {
       includeEntries: false,
     }),
+    crossBorderSummary,
   };
   const breakdown = buildFinanceBreakdowns(entries);
   const reconciliationDetail = buildReconciliationSummary(entries, store.store_code, hubCode, {
@@ -1590,6 +1834,8 @@ async function fetchStoreFinanceDetail(supabase, storeCode) {
     entries,
     breakdown,
     reconciliationDetail,
+    crossBorderSummary,
+    period: opts.range || null,
     warnings,
   };
 }

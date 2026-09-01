@@ -7,6 +7,7 @@ import {
   type FinanceLedgerEntryRow,
   type InventoryTransitStore,
   type StoreFinanceDetailMode,
+  type FinancePeriodParams,
 } from '../services/inventoryConsoleService';
 import '../styles/crossBorderLogistics.css';
 
@@ -16,6 +17,9 @@ const CATEGORY_LABEL: Record<string, { zh: string; en: string; accent: string }>
   order_collected: { zh: '已签收', en: 'Collected', accent: '#2563eb' },
   transport_cost: { zh: '运输', en: 'Transport', accent: '#dc2626' },
   stock_op: { zh: '库存', en: 'Stock', accent: '#64748b' },
+  manual_income: { zh: '其它收入', en: 'Other income', accent: '#059669' },
+  manual_expense: { zh: '其它支出', en: 'Other expense', accent: '#dc2626' },
+  agency_remit: { zh: '代转汇款', en: 'Agency remit', accent: '#d97706' },
 };
 
 type Props = {
@@ -23,6 +27,7 @@ type Props = {
   onClose: () => void;
   store: InventoryTransitStore | null;
   mode: StoreFinanceDetailMode;
+  period?: FinancePeriodParams | null;
 };
 
 function formatMmK(n: number): string {
@@ -103,7 +108,7 @@ function BreakdownGroupBlock({
   );
 }
 
-const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode }) => {
+const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode, period }) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
 
@@ -120,7 +125,7 @@ const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode }
     if (!open || !store?.store_code) return;
     setLoading(true);
     setError(null);
-    void fetchStoreFinanceDetail(store.store_code)
+    void fetchStoreFinanceDetail(store.store_code, period)
       .then((data) => {
         setEntries(data.entries);
         setBreakdown(data.breakdown);
@@ -131,7 +136,7 @@ const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode }
         setBreakdown(null);
       })
       .finally(() => setLoading(false));
-  }, [open, store?.store_code]);
+  }, [open, store?.store_code, period?.period, period?.date, period?.from, period?.to]);
 
   const title = useMemo(() => {
     if (!store) return '';

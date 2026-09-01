@@ -6,6 +6,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { verifyAdminToken } = require('./verify-admin');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
+const { hubCodeForRegion } = require('./utils/inventoryFinanceAggregate');
 
 
 function parseBody(event) {
@@ -93,10 +94,48 @@ exports.handler = async (event) => {
   const note = String(body.note || '').trim().slice(0, 500);
   const createdBy =
     String(auth.user?.employee_name || auth.user?.username || '').trim() || 'admin';
+  const storeCode = String(body.store_code || body.storeCode || '')
+    .trim()
+    .toUpperCase();
+  if (!storeCode) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: '请选择中转站' }),
+    };
+  }
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const { data: store, error: storeErr } = await supabase
+    .from('delivery_stores')
+    .select('id, store_code, store_name, region')
+    .eq('store_code', storeCode)
+    .maybeSingle();
+  if (storeErr) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: storeErr.message || '查询站点失败' }),
+    };
+  }
+  if (!store) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: '未找到该中转站' }),
+    };
+  }
+  const hubCode = hubCodeForRegion(store.region);
+  if (!hubCode) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: '该站点无法识别中转区域' }),
+    };
+  }
 
   const now = new Date().toISOString();
   const { data, error } = await supabase
@@ -110,8 +149,13 @@ exports.handler = async (event) => {
       note,
       created_by: createdBy,
       updated_at: now,
+      store_id: store.id,
+      store_code: store.store_code,
+      hub_code: hubCode,
     })
-    .select('id, entry_date, kind, amount, currency, category, note, created_by, created_at')
+    .select(
+      'id, entry_date, kind, amount, currency, category, note, created_by, created_at, store_id, store_code, hub_code',
+    )
     .single();
 
   if (error) {
