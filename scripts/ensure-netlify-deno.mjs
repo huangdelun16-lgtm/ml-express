@@ -2,7 +2,7 @@
 /**
  * Windows / 缅甸网络下，Netlify CLI 打包 Admin Edge Function 会去拉
  * https://dl.deno.land，常报 fetch failed。
- * 本脚本把 Deno 2.2.4（edge-bundler 支持范围的上限）写进本机缓存。
+ * 本脚本把 Deno 2.4.2（当前 netlify-cli edge-bundler 要求 ^2.4.2）写进本机缓存。
  * 生产 eszip 用的是 CLI 自带的 vendor，不依赖 edge.netlify.com bootstrap。
  */
 import { spawnSync } from "node:child_process";
@@ -20,7 +20,7 @@ import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 
-export const DENO_VERSION = "2.2.4";
+export const DENO_VERSION = "2.4.2";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const toolsDir = join(root, ".tools");

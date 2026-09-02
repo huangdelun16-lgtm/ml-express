@@ -39,10 +39,34 @@ if (!existsSync(join(cwd, "package.json")) || !existsSync(join(cwd, "netlify.tom
 const env = { ...process.env, CI: "false" };
 delete env.NETLIFY_AUTH_TOKEN;
 
+function pathEnvKey(from) {
+  return Object.keys(from).find((k) => k.toLowerCase() === "path") || "PATH";
+}
+
+function prependPath(from, dir) {
+  const key = pathEnvKey(from);
+  from[key] = `${dir}${delimiter}${from[key] || ""}`;
+}
+
 if (key === "admin") {
-  console.log("准备 Admin Edge 打包（缓存 Deno 2.2.4，避免再拉 dl.deno.land）…");
+  console.log("准备 Admin Edge 打包（缓存 Deno 2.4.2，避免再拉 dl.deno.land）…");
   const deno = await ensureNetlifyDeno();
-  env.PATH = `${deno.denoDir}${delimiter}${env.PATH || ""}`;
+  prependPath(env, deno.denoDir);
+}
+
+const npmGlobalBin = process.env.APPDATA ? join(process.env.APPDATA, "npm") : "";
+if (npmGlobalBin && existsSync(npmGlobalBin)) prependPath(env, npmGlobalBin);
+prependPath(env, join(root, "node_modules", ".bin"));
+
+const netlifyEntry = [
+  join(root, "node_modules", "netlify-cli", "bin", "run.js"),
+  join(cwd, "node_modules", "netlify-cli", "bin", "run.js"),
+  npmGlobalBin ? join(npmGlobalBin, "node_modules", "netlify-cli", "bin", "run.js") : "",
+].find((p) => p && existsSync(p));
+
+if (!netlifyEntry) {
+  console.error("找不到 netlify-cli。请在仓库根执行：npm install --legacy-peer-deps");
+  process.exit(2);
 }
 
 console.log(`发布 ${site.name} → ${site.domain}`);
@@ -51,8 +75,9 @@ console.log(`站点 ${site.id}`);
 console.log("方式：本机 --prod --build 上传（不是 GitHub trigger）\n");
 
 const result = spawnSync(
-  "netlify",
+  process.execPath,
   [
+    netlifyEntry,
     "deploy",
     "--prod",
     "--build",
@@ -63,7 +88,7 @@ const result = spawnSync(
     "--message",
     `CLI ${key} ${new Date().toISOString().slice(0, 16)}`,
   ],
-  { cwd, env, stdio: "inherit", shell: true },
+  { cwd, env, stdio: "inherit" },
 );
 
 process.exit(result.status ?? 1);

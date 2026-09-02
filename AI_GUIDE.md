@@ -1679,7 +1679,7 @@ npx netlify api restoreSiteDeploy --data '{"site_id":"<站点ID>","deploy_id":"<
 4. 假设「clone 了 GitHub 最新 main = 线上最新」。线上以 Netlify 当前 Published 的 CLI 包为准。
 5. 绕过 `npm run deploy:netlify`，手写带 `--trigger` 或错误 `--site` 的命令。
 
-Admin 本机打包 Edge `supabase-bff` 需要 Deno 1.39–2.2.4。`npm run deploy:netlify` 会先跑 `scripts/ensure-netlify-deno.mjs`：把 Deno 2.2.4 写进 `%APPDATA%\netlify\Config\deno-cli`（优先从 npmmirror 下 zip），避免再去拉 `dl.deno.land`（Windows / 缅甸常见 `fetch failed`）。不要用 `--trigger` 绕过。若仍失败，到 Mac 再发，或 `restoreSiteDeploy` 回到上表锚点。
+Admin 本机打包 Edge `supabase-bff` 需要 Deno **^2.4.2**（仓库 `netlify-cli` 23.12 的 edge-bundler）。`npm run deploy:netlify` 会先跑 `scripts/ensure-netlify-deno.mjs`：把 Deno 2.4.2 写进 `%APPDATA%\netlify\Config\deno-cli`（优先从 npmmirror 下 zip），避免再去拉 `dl.deno.land`（Windows / 缅甸常见 `fetch failed`）。Windows 上不要依赖 PATH 里的 `netlify` 命令（`cmd` 常找不到）；包装脚本改为直接跑仓库里的 `netlify-cli/bin/run.js`。不要用 `--trigger` 绕过。若仍失败，到 Mac 再发，或 `restoreSiteDeploy` 回到上表锚点。
 
 ---
 
@@ -2030,4 +2030,4 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 
 ---
 
-*最后更新：2026-09-02 — Windows 三站构建改走 `CI=false` 环境变量；Admin Edge 打包由 `ensure-netlify-deno.mjs` 缓存 Deno 2.2.4。细节以仓库当前文件为准。*
+*最后更新：2026-09-02 — Windows 发布入口直接调用仓库 `netlify-cli`；Admin Edge 缓存 Deno 2.4.2。细节以仓库当前文件为准。*
