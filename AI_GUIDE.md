@@ -1490,6 +1490,8 @@ Inventory 入库：`crossBorderPricing.ts` 先按客户编码取专属 `per_kg`�
 | `dialPhone.ts` | `tel:` 号码净化 | merchant-app、merchant-web、client |
 | `merchantInProgressOrders.ts` | 进行中订单快照指纹 | merchant-app、merchant-web |
 | `deliveryCountdown.ts` | 配送倒计时 | client、mobile-app |
+| `packingCountdown.ts` | 商家打包时限 | merchant-web、merchant-app |
+| `merchantRiderApproach.ts` | 骑手靠近店铺取件分档 | merchant-web、merchant-app |
 
 各 app `_shared` 目标目录：
 
@@ -1503,8 +1505,11 @@ Inventory 入库：`crossBorderPricing.ts` 先按客户编码取专属 `per_kg`�
 | ml-express-mobile-app | `services/_shared/` |
 
 - ❌ 不要改各 app 内 `_shared/` 副本。
+- ❌ **不要把各端 `_shared/` 当重复代码删除。** `sync.mjs` 会把 `/shared/src` 全量复制到 6 个 app（含该端暂时未引用的模块），副本必须入库，Netlify/EAS 构建才有文件。
+- ❌ **不要合并会员 Web 与商家 Web**（登录、订单、打印、Toast 各有一份是两套站点，不是复制粘贴债）。
+- ❌ **不要把 Inventory `inventory_*` 与 City `packages` 合成一套逻辑。**
 - ✅ 只改 `/shared/src`，再 `npm run sync:shared`（根目录 `prestart`/`prebuild` 会自动跑）。
-- **Inventory App 不使用 `/shared`**。
+- **Inventory App 不使用 `/shared`**（`package.json` 的 `sync:shared` 是空操作）。
 
 ---
 
@@ -2014,7 +2019,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 - 勿把 **跨境物流** 接到 City 会员/商家/骑手会话；只链 Inventory App。
 - 勿在 Admin Web 客户端自签 HMAC，勿恢复 `admin`/`admin` 或明文密码登录回退。
 - 勿在合伙店铺流创建 `transit_station`（走跨境账号）。
-- 勿手改各端 `_shared/` 副本。
+- 勿手改各端 `_shared/` 副本；勿把这些副本、会员/商家两套站点、或 City `packages` 与 Inventory `inventory_*` 当成重复代码删掉或合并。
 - 勿提交 `.env`、keystore、`.cursor/` 计划垃圾。
 - STAFF：勿删管理端；勿改回明文密码登录。
 - 会员 App：勿恢复商家运营能力入口。
@@ -2030,4 +2035,4 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 
 ---
 
-*最后更新：2026-09-02 — Windows 发布入口直接调用仓库 `netlify-cli`；Admin Edge 缓存 Deno 2.4.2。细节以仓库当前文件为准。*
+*最后更新：2026-09-02 — 写明勿把 `_shared` / 双站点 / City↔Inventory 当重复代码清理。细节以仓库当前文件为准。*
