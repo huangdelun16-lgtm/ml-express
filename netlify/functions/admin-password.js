@@ -321,6 +321,8 @@ exports.handler = async (event, context) => {
         } catch (lockErr) {
           console.warn('写入登录失败计数失败:', lockErr);
         }
+      }
+
       let issuedToken = null;
 
       // 如果登录成功，设置 httpOnly Cookie
