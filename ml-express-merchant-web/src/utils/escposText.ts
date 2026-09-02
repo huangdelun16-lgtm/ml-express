@@ -21,7 +21,7 @@ export function itemLabelForEscPos(label: string): string {
 }
 
 export const ESCPOS_RECEIPT_LABELS = {
-  merchantCopy: '*** Merchant Copy ***',
+  merchantCopy: '*** PACKING LIST ***',
   time: 'Time',
   order: 'Order',
   store: 'Store',

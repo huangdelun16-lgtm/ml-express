@@ -39,10 +39,10 @@
     "prestart": "npm run sync:shared",
     "prebuild": "npm run sync:shared",
     "start": "react-scripts start",
-    "build": "CI=false react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy:netlify": "netlify deploy --prod --build --site ed9c2173-4031-4f10-a466-5b041dfe3511",
+    "deploy:netlify": "node scripts/deploy-web.mjs admin",
     "build:netlify": "netlify build",
     "deploy:supabase-proxy": "npx wrangler deploy --config cloudflare/supabase-proxy/wrangler.toml"
   },

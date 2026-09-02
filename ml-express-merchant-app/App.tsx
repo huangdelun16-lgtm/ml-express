@@ -22,6 +22,7 @@ import { ErrorBoundary } from './src/components/ErrorHandler';
 import NetworkStatus from './src/components/NetworkStatus';
 import { GlobalToast } from './src/components/GlobalToast';
 import { OrderAlertModal } from './src/components/OrderAlertModal';
+import MerchantRiderApproachHost from './src/components/MerchantRiderApproachHost';
 
 // 引入商户端相关页面
 import HomeScreen from './src/screens/HomeScreen';
@@ -114,6 +115,8 @@ function AppContent({ onLayoutRootView }: any) {
           <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
         </Stack.Navigator>
       </NavigationContainer>
+
+      <MerchantRiderApproachHost />
 
       {/* 🚀 全局订单提醒 (商户端核心功能) */}
       <OrderAlertModal 

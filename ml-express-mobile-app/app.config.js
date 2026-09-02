@@ -1,5 +1,35 @@
 const baseConfig = require('./app.json');
 const { withInfoPlist } = require('expo/config-plugins');
+const fs = require('fs');
+const path = require('path');
+
+function loadLocalEnv() {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) return;
+    for (const raw of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq <= 0) continue;
+      const key = line.slice(0, eq).trim();
+      let value = line.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (key && process.env[key] == null) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // ignore malformed .env
+  }
+}
+
+loadLocalEnv();
 
 /** 兜底：避免 iOS 原生层报 NSLocation*UsageDescription 缺失（旧 prebuild / 合并异常） */
 const IOS_LOCATION_PLIST_FALLBACK = {
@@ -43,6 +73,8 @@ function withForceIosLocationUsageDescriptions(config) {
 /** Production native builds bake absolute /__sb (Myanmar-reachable). Local expo start keeps env. */
 const NATIVE_SB_PROXY_URL = 'https://admin-market-link-express.com/__sb/';
 const SUPABASE_UPSTREAM_URL = 'https://uopkyuluxnrewvlmutam.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY';
 function resolveExtraSupabaseUrl(envUrl) {
   const easProfile = process.env.EAS_BUILD_PROFILE || "";
   const isEasRelease = process.env.EAS_BUILD === "true" && easProfile !== "development";
@@ -62,7 +94,8 @@ module.exports = ({ config }) => {
     '';
 
   const supabaseUrl = resolveExtraSupabaseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL || '');
-  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+  const supabaseAnonKey =
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
   const netlifyUrl =
     process.env.EXPO_PUBLIC_NETLIFY_URL ||
     'https://admin-market-link-express.netlify.app';

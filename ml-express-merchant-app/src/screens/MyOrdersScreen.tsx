@@ -26,6 +26,7 @@ import { dialCourierByAssignment } from '../utils/courierPhone';
 import { isCourierUnassigned } from '../services/_shared/dialPhone';
 import { filterOrdersBySearch } from '../utils/filterOrdersBySearch';
 import { printerService } from '../services/PrinterService';
+import { buildProductNamePriceMap } from '../utils/parseOrderPackingItems';
 import { batchAcceptOrders, acceptOrderToPacking } from '../services/packageBatchService';
 import {
   pendingConfirmIds,
@@ -355,11 +356,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
       try {
         const products = await merchantService.getStoreProducts(storeId);
         if (cancelled) return;
-        const priceMap = products.reduce<Record<string, number>>((acc, product) => {
-          acc[product.name] = product.price;
-          return acc;
-        }, {});
-        setPackingProductPriceMap(priceMap);
+        setPackingProductPriceMap(buildProductNamePriceMap(products));
       } catch {
         if (!cancelled) setPackingProductPriceMap({});
       }
@@ -787,13 +784,31 @@ export default function MyOrdersScreen({ navigation, route }: any) {
   };
 
   // 🚀 新增：商家接单
-  const handleMerchantAccept = async (orderId: string, paymentMethod: string) => {
+  const handleMerchantAccept = async (order: Order, _paymentMethod: string) => {
     try {
       showLoading(language === 'zh' ? '正在接单...' : 'Accepting...', 'package');
-      const ok = await acceptOrderToPacking(orderId);
+      const ok = await acceptOrderToPacking(order.id);
       if (!ok) throw new Error('accept failed');
-      
-      showToast(language === 'zh' ? '接单成功，请打包' : 'Accepted, please pack', 'success');
+
+      const settings = await printerService.getSettings();
+      if (settings.autoPrint !== false) {
+        try {
+          const priceMap = await loadBatchPriceMap();
+          await printerService.printReceipt(order, { productPriceMap: priceMap });
+        } catch (printError) {
+          LoggerService.error('接单后打印清单失败', printError);
+          showToast(
+            language === 'zh'
+              ? '已接单，但打包清单未打出'
+              : 'Accepted, packing list did not print',
+            'warning',
+          );
+          onRefresh();
+          return;
+        }
+      }
+
+      showToast(language === 'zh' ? '接单成功，清单已发送打印' : 'Accepted, packing list sent', 'success');
       onRefresh();
     } catch (error) {
       feedbackService.notify('错误', '接单失败');
@@ -806,10 +821,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
     if (!customerId) return {};
     try {
       const products = await merchantService.getStoreProducts(customerId);
-      return products.reduce<Record<string, number>>((acc, product) => {
-        acc[product.name] = product.price;
-        return acc;
-      }, {});
+      return buildProductNamePriceMap(products);
     } catch {
       return {};
     }
@@ -1464,7 +1476,7 @@ export default function MyOrdersScreen({ navigation, route }: any) {
                   
                   <TouchableOpacity 
                     style={[styles.merchantsButton, styles.merchantsAcceptButton]}
-                    onPress={() => handleMerchantAccept(order.id, order.payment_method || 'cash')}
+                    onPress={() => handleMerchantAccept(order, order.payment_method || 'cash')}
                   >
                     <Ionicons name="checkmark-circle-outline" size={18} color="white" />
                     <Text style={styles.merchantsAcceptText}>{language === 'zh' ? '接单' : 'Accept'}</Text>

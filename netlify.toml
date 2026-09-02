@@ -6,7 +6,7 @@
 # =============================================================================
 
 [build]
-  command = "npm install --legacy-peer-deps && CI=false npm run build"
+  command = "npm install --legacy-peer-deps && npm run build"
   publish = "build"
   functions = "netlify/functions"
 
@@ -18,6 +18,7 @@
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
   NETLIFY_SKIP_PLUGINS = "true"
+  CI = "false"
 
 # SPA重定向配置 - 解决React Router路由问题
 [[redirects]]

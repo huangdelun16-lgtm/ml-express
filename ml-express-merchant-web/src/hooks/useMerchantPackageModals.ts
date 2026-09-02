@@ -104,7 +104,7 @@ export function useMerchantPackageModals({
               LoggerService.warn('接单后自动打印失败', printError);
               feedbackService.notify(
                 language === 'zh'
-                  ? '接单成功，但小票打印失败。请到「我的账号 → 打印机」检查设置后重试。'
+                  ? '接单成功，但打包清单打印失败。请到「我的账号 → 打印机」检查设置后重试。'
                   : 'Order accepted, but receipt print failed. Check Printer settings.',
               );
             }
@@ -113,10 +113,10 @@ export function useMerchantPackageModals({
           feedbackService.notify(
             language === 'zh'
               ? printerSettings.autoPrint
-                ? '接单成功！小票已发送打印，请开始打包商品。'
+                ? '接单成功！打包清单已发送打印，请开始打包。'
                 : '接单成功！请开始打包商品。'
               : printerSettings.autoPrint
-                ? 'Order accepted! Print job sent.'
+                ? 'Order accepted! Packing list sent.'
                 : 'Order accepted!',
           );
           onPackageStatusChange?.(pkgToAccept.id, MERCHANT_ORDER_STATUS.PACKING);

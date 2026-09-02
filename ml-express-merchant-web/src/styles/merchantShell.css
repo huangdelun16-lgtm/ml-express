@@ -7,6 +7,14 @@
   color: #f8fafc;
 }
 
+html.has-rider-approach .merchant-shell {
+  padding-top: 4.25rem;
+}
+
+html.has-rider-approach .merchant-shell__menu-btn {
+  top: 4.75rem;
+}
+
 .merchant-shell__backdrop {
   display: none;
   position: fixed;

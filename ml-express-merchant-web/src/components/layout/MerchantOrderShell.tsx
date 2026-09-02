@@ -2,6 +2,7 @@ import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { MerchantOrderProvider, useMerchantOrders } from '../../contexts/MerchantOrderContext';
 import OrderAlertModal from '../orders/OrderAlertModal';
+import MerchantRiderApproachHost from '../orders/MerchantRiderApproachHost';
 
 function OrderAlertHost() {
   const { language } = useLanguage();
@@ -29,6 +30,7 @@ const MerchantOrderShell: React.FC<{
   children: React.ReactNode;
 }> = ({ storeId, children }) => (
   <MerchantOrderProvider storeId={storeId}>
+    {storeId ? <MerchantRiderApproachHost storeId={storeId} /> : null}
     {children}
     <OrderAlertHost />
   </MerchantOrderProvider>

@@ -1,0 +1,20 @@
+{
+  "admin": {
+    "id": "ed9c2173-4031-4f10-a466-5b041dfe3511",
+    "name": "admin-market-link-express",
+    "dir": ".",
+    "domain": "https://admin-market-link-express.com"
+  },
+  "client": {
+    "id": "52f5f573-ca0a-4769-a8c7-e5f675764056",
+    "name": "client-ml-express",
+    "dir": "ml-express-client-web",
+    "domain": "https://market-link-express.com"
+  },
+  "merchant": {
+    "id": "126af2b9-244f-47fd-9be9-58fb45b6e7a2",
+    "name": "mlexpress-merchant",
+    "dir": "ml-express-merchant-web",
+    "domain": "https://mlexpress-merchants.com"
+  }
+}

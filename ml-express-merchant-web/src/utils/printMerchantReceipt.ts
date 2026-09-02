@@ -1,5 +1,4 @@
 import LoggerService from '../services/LoggerService';
-import { loadPrinterSettings } from '../services/printerSettings';
 import { webPrinterService } from '../services/webPrinterService';
 import type { MerchantLanguage } from '../constants/merchantOrderStatus';
 
@@ -7,6 +6,7 @@ export async function printMerchantReceipt(
   orderData: {
     id: string;
     created_at?: string;
+    create_time?: string;
     description?: string | null;
     price?: string | null;
     payment_method?: string | null;
@@ -16,7 +16,7 @@ export async function printMerchantReceipt(
     receiver_name?: string | null;
     receiver_phone?: string | null;
     receiver_address?: string | null;
-    notes?: string;
+    notes?: string | null;
     cod_amount?: number;
   },
   productPriceMap: Record<string, number>,
@@ -24,16 +24,14 @@ export async function printMerchantReceipt(
 ): Promise<void> {
   if (!orderData?.id) return;
 
-  const settings = loadPrinterSettings();
-  if (!settings.autoPrint && settings.type !== 'system') {
-    /* manual paths may still call print explicitly */
-  }
-
   try {
     const ok = await webPrinterService.printOrder(
       {
         id: orderData.id,
-        created_at: orderData.created_at || new Date().toISOString(),
+        created_at:
+          orderData.created_at ||
+          orderData.create_time ||
+          new Date().toISOString(),
         sender_name: orderData.sender_name || undefined,
         sender_phone: orderData.sender_phone || undefined,
         receiver_name: orderData.receiver_name || undefined,
@@ -42,7 +40,7 @@ export async function printMerchantReceipt(
         description: orderData.description || undefined,
         price: orderData.price || undefined,
         payment_method: orderData.payment_method || undefined,
-        notes: orderData.notes,
+        notes: orderData.notes || undefined,
         cod_amount: orderData.cod_amount,
       },
       productPriceMap,
@@ -51,7 +49,7 @@ export async function printMerchantReceipt(
       throw new Error('PRINT_NOT_ENABLED');
     }
   } catch (error) {
-    LoggerService.error('生成小票失败:', error);
+    LoggerService.error('打印打包清单失败:', error);
     throw error;
   }
 }

@@ -27,6 +27,7 @@ import {
   type OrderPrintSource,
 } from '../utils/orderToMerchantReceipt';
 import { buildReceiptItemDisplays } from '../utils/receiptItemFormat';
+import { buildProductNamePriceMap } from '../utils/parseOrderPackingItems';
 import { feedbackService } from '../services/FeedbackService';
 import { acceptOrderToPacking } from '../services/packageBatchService';
 
@@ -191,10 +192,7 @@ export const OrderAlertModal = ({
     if (Object.keys(productPriceMap).length > 0) return productPriceMap;
     if (!orderData?.delivery_store_id) return {};
     const products = await merchantService.getStoreProducts(orderData.delivery_store_id);
-    return products.reduce<Record<string, number>>((acc, product) => {
-      acc[product.name] = product.price;
-      return acc;
-    }, {});
+    return buildProductNamePriceMap(products);
   };
 
   const receiptSummary = useMemo(() => {
@@ -214,11 +212,7 @@ export const OrderAlertModal = ({
       }
       const products = await merchantService.getStoreProducts(orderData.delivery_store_id);
       if (!isActive) return;
-      const priceMap = products.reduce<Record<string, number>>((acc, product) => {
-        acc[product.name] = product.price;
-        return acc;
-      }, {});
-      setProductPriceMap(priceMap);
+      setProductPriceMap(buildProductNamePriceMap(products));
     };
     loadProducts();
     return () => {
@@ -226,45 +220,43 @@ export const OrderAlertModal = ({
     };
   }, [orderData?.delivery_store_id]);
 
-  const handlePrintOrder = async (): Promise<boolean> => {
-    if (!orderData) return false;
-
-    const settings = await printerService.getSettings();
-    if (!settings.enabled) {
-      return false;
-    }
-
-    const priceMap = await resolveProductPriceMap();
-    return printerService.printReceipt(orderData, { productPriceMap: priceMap });
+  const handlePrintOrder = async (
+    order: any,
+    priceMap?: Record<string, number>,
+  ): Promise<boolean> => {
+    if (!order) return false;
+    const map = priceMap ?? (await resolveProductPriceMap());
+    return printerService.printReceipt(order, { productPriceMap: map });
   };
 
   const handleAccept = async () => {
     if (!orderData || isProcessing) return;
     beginProcessing();
+    const accepted = orderData;
     try {
-      const ok = await acceptOrderToPacking(String(orderData.id));
+      const ok = await acceptOrderToPacking(String(accepted.id));
       if (!ok) throw new Error('update failed');
       onStatusUpdate?.();
-      onAccepted?.(orderData);
+      onAccepted?.(accepted);
       endProcessing();
 
       const settings = await printerService.getSettings();
-      if (settings.autoPrint) {
+      if (settings.autoPrint !== false) {
         void (async () => {
           try {
-            const printed = await handlePrintOrder();
+            const printed = await handlePrintOrder(accepted);
             if (!printed) {
               feedbackService.notify(
-                language === 'zh' ? '小票未打印' : 'Receipt not printed',
+                language === 'zh' ? '清单未打印' : 'Packing list not printed',
                 language === 'zh'
-                  ? '订单已接单，但打印机未连接或未就绪。请到「小票机」连接后在订单详情「重新打印小票」。'
-                  : 'Order accepted, but printer is not connected. Reprint from order details.',
+                  ? '订单已接单。请连接小票机，或在订单详情「重新打印小票」。'
+                  : 'Order accepted. Connect a printer or reprint from order details.',
               );
             }
           } catch (printError) {
             console.error('打印失败:', printError);
             feedbackService.notify(
-              language === 'zh' ? '小票打印失败' : 'Print failed',
+              language === 'zh' ? '打包清单打印失败' : 'Print failed',
               language === 'zh'
                 ? '订单已接单，但自动打印失败。请到订单详情点击「重新打印小票」。'
                 : 'Order accepted, but auto-print failed. Reprint from order details.',

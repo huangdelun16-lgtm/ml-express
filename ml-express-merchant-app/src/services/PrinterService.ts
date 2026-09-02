@@ -19,6 +19,11 @@ export interface PrinterSettings {
 
 const PRINTER_SETTINGS_KEY = 'merchant_printer_settings';
 
+function thermalCopies(settings: PrinterSettings): number {
+  if (settings.type === 'system') return 1;
+  return Math.max(1, Math.min(Number(settings.copies) || 1, 5));
+}
+
 export const printerService = {
   async getSettings(): Promise<PrinterSettings> {
     try {
@@ -48,14 +53,18 @@ export const printerService = {
 
   async printMerchantReceipt(data: MerchantReceiptData): Promise<boolean> {
     const settings = await this.getSettings();
-    if (!settings.enabled) {
-      return false;
-    }
 
     try {
-      if (settings.type === 'bluetooth') {
+      const useBle = settings.type === 'bluetooth' && settings.enabled;
+      if (useBle) {
         const paperWidth = await loadReceiptPaperWidth();
-        await printMerchantReceiptViaBle(data, paperWidth);
+        const copies = thermalCopies(settings);
+        for (let i = 0; i < copies; i += 1) {
+          await printMerchantReceiptViaBle(data, paperWidth);
+          if (i < copies - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 400));
+          }
+        }
         return true;
       }
 
@@ -63,7 +72,7 @@ export const printerService = {
       await Print.printAsync({ html });
       return true;
     } catch (error) {
-      LoggerService.error(`打印小票 ${data.orderId} 失败:`, error);
+      LoggerService.error(`打印清单 ${data.orderId} 失败:`, error);
       throw error;
     }
   },
@@ -78,17 +87,14 @@ export const printerService = {
 
   async printOrder(html: string, orderId: string, receiptData?: MerchantReceiptData): Promise<boolean> {
     const settings = await this.getSettings();
-    if (!settings.enabled) {
-      console.log('🖨️ 打印机未启用，跳过打印任务');
-      return false;
-    }
+    const canBle = settings.type === 'bluetooth' && settings.enabled;
 
     try {
-      if (settings.type === 'bluetooth' && receiptData) {
+      if (canBle && receiptData) {
         return this.printMerchantReceipt(receiptData);
       }
 
-      if (settings.type === 'bluetooth') {
+      if (settings.type === 'bluetooth' && !receiptData && canBle) {
         throw new Error('BLE_RECEIPT_DATA_REQUIRED');
       }
 

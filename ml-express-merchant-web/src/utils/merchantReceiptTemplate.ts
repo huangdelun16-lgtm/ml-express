@@ -111,7 +111,7 @@ export function buildMerchantReceiptHtml(
     <div class="ticket">
       ${data.isSample ? '<div class="sample">[ Sample / Test ]</div>' : ''}
       <div class="center brand">MARKET LINK EXPRESS</div>
-      <div class="center">*** Merchant Copy ***</div>
+      <div class="center">*** 打包清单 / Packing List ***</div>
       <div class="center order-no">#${data.orderId.slice(-5)}</div>
       <div class="dash"></div>
       <div class="row"><span>Time</span><span>${createdLabel}</span></div>

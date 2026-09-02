@@ -79,7 +79,7 @@ export function buildMerchantReceiptHtml(data: MerchantReceiptData): string {
         <body>
           <div class="ticket">
             <div class="title">MARKET LINK EXPRESS</div>
-            <div class="subtitle">*** 商家存根 / Merchant Copy ***</div>
+            <div class="subtitle">*** 打包清单 / Packing List ***</div>
             ${data.isSample ? '<div class="sample">[ 测试小票 · 仅供预览 ]</div>' : ''}
             <div style="text-align: center; font-size: 24px; font-weight: 900; margin: 10px 0;">#${data.orderId.slice(-5)}</div>
 

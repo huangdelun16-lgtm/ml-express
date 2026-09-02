@@ -88,21 +88,27 @@ export const webPrinterService = {
     }
 
     try {
-      if (settings.type === 'bluetooth') {
-        const bytes = buildEscPosReceiptBytes(data, paperWidth);
-        await sendEscPosViaWebBluetooth(bytes);
-        return true;
-      }
+      const copies =
+        settings.type === 'system'
+          ? 1
+          : Math.max(1, Math.min(Number(settings.copies) || 1, 5));
 
-      if (settings.type === 'wifi') {
-        const bytes = buildEscPosReceiptBytes(data, paperWidth);
-        await sendEscPosViaWifi(bytes, settings);
-        return true;
+      for (let i = 0; i < copies; i += 1) {
+        if (settings.type === 'bluetooth') {
+          const bytes = buildEscPosReceiptBytes(data, paperWidth);
+          await sendEscPosViaWebBluetooth(bytes);
+        } else if (settings.type === 'wifi') {
+          const bytes = buildEscPosReceiptBytes(data, paperWidth);
+          await sendEscPosViaWifi(bytes, settings);
+        } else {
+          const qrDataUrl = await QRCode.toDataURL(data.orderId, { margin: 1, width: 160 });
+          const html = buildMerchantReceiptHtml(data, paperWidth, qrDataUrl);
+          await this.printHtmlViaBrowser(html);
+        }
+        if (i < copies - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+        }
       }
-
-      const qrDataUrl = await QRCode.toDataURL(data.orderId, { margin: 1, width: 160 });
-      const html = buildMerchantReceiptHtml(data, paperWidth, qrDataUrl);
-      await this.printHtmlViaBrowser(html);
       return true;
     } catch (error) {
       LoggerService.error('Web print failed', error);

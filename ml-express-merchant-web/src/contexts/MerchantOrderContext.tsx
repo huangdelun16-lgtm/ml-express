@@ -52,7 +52,7 @@ const VOICE_STORAGE_KEY = 'ml-merchant-voice-alert';
 const PENDING_POLL_MS = 10_000;
 const IN_PROGRESS_SELECT = 'id,status,courier';
 const PENDING_SELECT =
-  'id,status,delivery_store_id,sender_name,receiver_name,receiver_address,receiver_phone,description,price,created_at,create_time,payment_method,cod_amount';
+  'id,status,delivery_store_id,customer_id,sender_name,sender_phone,receiver_name,receiver_address,receiver_phone,description,price,created_at,create_time,payment_method,cod_amount,notes';
 
 export function MerchantOrderProvider({
   storeId,

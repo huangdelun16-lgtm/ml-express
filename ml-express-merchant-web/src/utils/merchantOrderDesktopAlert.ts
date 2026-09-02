@@ -76,6 +76,41 @@ export function showNewOrderDesktopNotification(
   }
 }
 
+export function showRiderApproachDesktopNotification(
+  title: string,
+  body: string,
+  onActivate?: () => void,
+): void {
+  if (!isDesktopNotificationSupported() || Notification.permission !== 'granted') return;
+  try {
+    const notification = new Notification(title, {
+      body,
+      tag: 'ml-merchant-rider-approach',
+      requireInteraction: true,
+      silent: false,
+    });
+    notification.onclick = (event) => {
+      event.preventDefault();
+      notification.close();
+      focusMerchantWindow();
+      onActivate?.();
+    };
+  } catch {
+    /* ignore */
+  }
+}
+
+export function startRiderApproachTitleFlash(label: string): void {
+  if (typeof document === 'undefined' || !label) return;
+  stopPendingOrderTitleFlash();
+  savedDocumentTitle = document.title;
+  let on = false;
+  titleFlashTimer = setInterval(() => {
+    document.title = on ? savedDocumentTitle : `🛵 ${label} — ${savedDocumentTitle}`;
+    on = !on;
+  }, TITLE_FLASH_MS);
+}
+
 /** 浏览器允许范围内尽力把窗口/tab 拉回；无法越过其它桌面应用 */
 export function focusMerchantWindow(): void {
   try {
@@ -147,7 +182,7 @@ function pickSpeechVoice(voiceLang: string): SpeechSynthesisVoice | null {
   );
 }
 
-function speakUtteranceWhenVoicesReady(
+export function speakUtteranceWhenVoicesReady(
   utterance: SpeechSynthesisUtterance,
   voiceLang: string,
 ): void {

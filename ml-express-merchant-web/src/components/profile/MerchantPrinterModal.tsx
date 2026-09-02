@@ -47,7 +47,7 @@ function getCopy(language: MerchantLanguage) {
     paperHint: zh
       ? '76/80/110mm 适合 Wi-Fi 热敏机；57/58mm 适合蓝牙小票机。'
       : '76/80/110mm for Wi-Fi thermal; 57/58mm for Bluetooth receipts.',
-    autoPrint: zh ? '接单后自动打印小票' : 'Auto-print on accept',
+    autoPrint: zh ? '接单后自动打印打包清单' : 'Auto-print packing list on accept',
     connectBle: zh ? '选择并连接蓝牙打印机' : 'Choose Bluetooth printer',
     disconnectBle: zh ? '断开蓝牙' : 'Disconnect',
     bleConnected: zh ? '已连接' : 'Connected',
@@ -326,7 +326,7 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
               style={{ maxWidth: `${paperWidth === 58 ? 220 : paperWidth === 80 ? 300 : 280}px` }}
             >
               <div style={{ textAlign: 'center', fontWeight: 900 }}>MARKET LINK EXPRESS</div>
-              <div style={{ textAlign: 'center', fontSize: 11 }}>*** Merchant Copy ***</div>
+              <div style={{ textAlign: 'center', fontSize: 11 }}>*** PACKING LIST ***</div>
               <div style={{ textAlign: 'center', fontWeight: 900, fontSize: 18, margin: '6px 0' }}>
                 #{receipt.orderId.slice(-5)}
               </div>

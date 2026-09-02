@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import QRCode from 'qrcode';
 import {
   merchantService,
   packageService,
@@ -12,67 +11,12 @@ import {
   buildPackingRows,
   buildProductNamePriceMap,
 } from '../../utils/parseOrderPackingItems';
+import { printMerchantReceipt } from '../../utils/printMerchantReceipt';
 import './OrderAlertModal.css';
 import { feedbackService } from '../../services/FeedbackService';
 import { packingAcceptFields } from '../../services/_shared/packingCountdown';
 
 type Lang = 'zh' | 'en' | 'my';
-
-async function printMerchantReceipt(
-  orderData: MerchantPendingOrder,
-  language: Lang,
-  productPriceMap: Record<string, number>,
-) {
-  const qrDataUrl = await QRCode.toDataURL(String(orderData.id), { width: 140, margin: 1 });
-  const { rows: parsedItems } = buildPackingRows(
-    String(orderData.description || ''),
-    productPriceMap,
-  );
-  const itemPayMatch = String(orderData.description || '').match(
-    /\[(?:商品费用 \(仅余额支付\)|Item Cost \(Balance Only\)|ကုန်ပစ္စည်းဖိုး \(လက်ကျန်ငွေဖြင့်သာ\)|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း): (.*?) MMK\]/,
-  );
-  const itemCost = itemPayMatch?.[1] ? parseFloat(itemPayMatch[1].replace(/,/g, '')) : 0;
-  const deliveryFee = parseFloat(String(orderData.price || '').replace(/[^0-9.]/g, '') || '0');
-  const computedItemTotal = parsedItems.reduce(
-    (sum, item) => sum + (item.lineTotal || 0),
-    0,
-  );
-  const finalItemTotal = itemCost > 0 ? itemCost : computedItemTotal;
-  const totalFee = deliveryFee + finalItemTotal;
-  const paymentText =
-    orderData.payment_method === 'cash'
-      ? language === 'zh'
-        ? '现金支付'
-        : 'Cash'
-      : language === 'zh'
-        ? '余额支付'
-        : 'Balance';
-  const orderIdShort = `#${String(orderData.id).slice(-5)}`;
-  const html = `<html><head><style>
-    body{font-family:sans-serif;padding:20px;color:#111;width:300px;margin:0 auto}
-    .title{text-align:center;font-size:20px;font-weight:900}
-    .row{display:flex;justify-content:space-between;font-size:12px;margin:4px 0}
-  </style></head><body>
-    <div class="title">MARKET LINK EXPRESS</div>
-    <div style="text-align:center;font-size:12px;margin:8px 0">${orderIdShort}</div>
-    <img src="${qrDataUrl}" width="140" height="140" style="display:block;margin:0 auto"/>
-    <div class="row"><span>支付</span><span>${paymentText}</span></div>
-    <div class="row"><span>合计</span><span>${totalFee.toLocaleString()} MMK</span></div>
-  </body></html>`;
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;width:0;height:0;border:none';
-  document.body.appendChild(iframe);
-  const doc = iframe.contentWindow?.document || iframe.contentDocument;
-  if (!doc) return;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  setTimeout(() => {
-    iframe.contentWindow?.focus();
-    iframe.contentWindow?.print();
-    setTimeout(() => document.body.removeChild(iframe), 800);
-  }, 400);
-}
 
 function isMemberBalanceOrder(description: string) {
   return (
@@ -185,20 +129,65 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
   const handleAccept = async () => {
     if (isProcessing || orderData.status !== '待确认') return;
     setIsProcessing(true);
+    const accepted = orderData;
     try {
       const packingFields = packingAcceptFields();
       const ok = await packageService.updatePackageStatus(
-        String(orderData.id),
+        String(accepted.id),
         packingFields.status,
         { packing_started_at: packingFields.packing_started_at },
       );
       if (!ok) throw new Error('update failed');
-      try {
-        await printMerchantReceipt(orderData, language, productPriceMap);
-      } catch (printErr) {
-        LoggerService.warn('打印小票失败', printErr);
+
+      let priceMap = productPriceMap;
+      if (!Object.keys(priceMap).length && accepted.delivery_store_id) {
+        try {
+          const products = await merchantService.getStoreProducts(
+            String(accepted.delivery_store_id),
+          );
+          priceMap = buildProductNamePriceMap(products);
+        } catch {
+          /* print with empty map; item names still appear */
+        }
       }
-      onAccepted(String(orderData.id));
+
+      try {
+        await printMerchantReceipt(
+          {
+            id: String(accepted.id),
+            created_at: String(accepted.created_at || accepted.create_time || ''),
+            create_time: accepted.create_time ? String(accepted.create_time) : undefined,
+            description: accepted.description ? String(accepted.description) : undefined,
+            price: accepted.price != null ? String(accepted.price) : undefined,
+            payment_method: accepted.payment_method
+              ? String(accepted.payment_method)
+              : undefined,
+            sender_name: accepted.sender_name ? String(accepted.sender_name) : undefined,
+            sender_phone: accepted.sender_phone ? String(accepted.sender_phone) : undefined,
+            receiver_name: accepted.receiver_name ? String(accepted.receiver_name) : undefined,
+            receiver_phone: accepted.receiver_phone
+              ? String(accepted.receiver_phone)
+              : undefined,
+            receiver_address: accepted.receiver_address
+              ? String(accepted.receiver_address)
+              : undefined,
+            notes: accepted.notes ? String(accepted.notes) : undefined,
+            cod_amount: Number(accepted.cod_amount || 0),
+          },
+          priceMap,
+          language,
+        );
+      } catch (printErr) {
+        LoggerService.warn('接单后打印打包清单失败', printErr);
+        feedbackService.notify(
+          language === 'zh'
+            ? '已接单，但打包清单未打出。请到「我的账号 → 打印机」检查后补打。'
+            : language === 'en'
+              ? 'Accepted, but packing list did not print. Check Account → Printer.'
+              : 'လက်ခံပြီးပါပြီ။ စာရင်း ပရင့်မထွက်ပါ။',
+        );
+      }
+      onAccepted(String(accepted.id));
     } catch (err) {
       LoggerService.error('接单失败', err);
       feedbackService.notify(language === 'zh' ? '接单失败，请重试' : 'Accept failed');

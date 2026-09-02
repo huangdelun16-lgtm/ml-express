@@ -31,9 +31,11 @@
 13. [共享代码层 `/shared`](#13-共享代码层-shared)
 14. [Supabase 与数据模型](#14-supabase-与数据模型)
 15. [Netlify 与 EAS 部署](#15-netlify-与-eas-部署)
+    - [15.3 三站生产发布红线（必读）](#153-三站生产发布红线必读)
 16. [环境变量](#16-环境变量)
 17. [常见问题与排障](#17-常见问题与排障)
     - [17.8 会员 App 订单为空](#178-会员-app我的订单全部-0-单)
+    - [17.10 部署后线上变成旧版](#1710-部署后线上变成旧版)
 18. [给 AI / 维护者的改代码提示](#18-给-ai--维护者的改代码提示)
 19. [常用文件速查](#19-常用文件速查)
 20. [版本与分支](#20-版本与分支)
@@ -146,9 +148,9 @@ ml-express/                          # 仓库根 = Admin Web（market-link-expre
 
 | 产品 | 典型域名 / 渠道 | 说明 |
 |------|-----------------|------|
-| 会员 Web | `https://market-link-express.com` | `ml-express-client-web`；同源 `/__sb/` |
-| 管理后台 | **`https://admin-market-link-express.com`** | 仓库根 CRA + Functions + Edge `/__sb`；备用 `*.netlify.app` |
-| 商家 Web | `https://mlexpress-merchants.com` | `ml-express-merchant-web`；同源 `/__sb/` |
+| 会员 Web | `https://market-link-express.com` | 目录 `ml-express-client-web`；站点 `client-ml-express`；同源 `/__sb/` |
+| 管理后台 | **`https://admin-market-link-express.com`** | **仓库根** CRA + Functions + Edge `/__sb`；站点 `admin-market-link-express` |
+| 商家 Web | `https://mlexpress-merchants.com` | 目录 `ml-express-merchant-web`；站点 `mlexpress-merchant`；同源 `/__sb/` |
 | Inventory App Support | `https://market-link-express.com/support` | App Store Support URL |
 | Inventory iOS / Android | App Store / 内测 APK `com.mlexpress.inventory` | EAS，当前 **2.1.0 (35)** |
 | 会员 App | `com.mlexpress.client` | EAS **2.8.1 (75)**；原生 REST 走 `market-link-express.com/__sb/` |
@@ -159,6 +161,8 @@ ml-express/                          # 仓库根 = Admin Web（market-link-expre
 | Cloudflare 备份 | `ml-supabase-proxy.huangdelun16.workers.dev` | 仅诊断/备份；**生产 Admin 勿拨其 WS** |
 
 > ⚠️ 勿在 App Store 使用无效域名（如 `linkexpress.com/support`）；Support URL 必须可访问。
+>
+> ⚠️ **三站生产包以本机 CLI 上传为准，不是 GitHub `main`。** 正确命令与回滚锚点见 **§15.3**。勿对任一座跑 `netlify deploy --trigger`（会按 `main` 重构建，盖掉 Mac 上刚发的新版）。
 
 ### 2.1 缅甸网络与 `/__sb` 代理（必读）
 
@@ -248,7 +252,7 @@ App / 浏览器
 | **数据** | 生产浏览器走同源 `/__sb/`（anon key 读 City）；跨境写操作经 Netlify Function + service role |
 | **共享** | `prebuild` → `sync:shared` → `src/services/_shared/` |
 | **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`window.confirm` 仅确认/破坏性操作；生产 `installProductionConsoleGate`（**无 Sentry**，勿擅自加） |
-| **部署** | Netlify site `ed9c2173-…`；`npm run deploy:netlify` |
+| **部署** | 站点 `admin-market-link-express`（`ed9c2173-…`）；**仓库根** `npm run deploy:netlify`（CLI 真源，见 §15.3） |
 
 ### 3.1.2 会员 Web（`ml-express-client-web/`）
 
@@ -262,7 +266,7 @@ App / 浏览器
 | **认证** | `users`（customer）→ `localStorage`（`ml-express-customer`）；**非 Supabase Auth** |
 | **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`window.confirm` 仅确认/破坏性操作；生产 `installProductionConsoleGate`；**已有** `@sentry/react`（`sentryInit`），可保留 |
 | **路由** | `/`、`/mall`、`/cart`、`/profile`、`/support`、`/ml-inventory/privacy`、合规页 |
-| **部署** | Netlify site `52f5f573-…`；Base directory = 本子目录 |
+| **部署** | 站点 `client-ml-express`（`52f5f573-…`）；**必须在本子目录** `npm run deploy:netlify`（§15.3） |
 
 ### 3.1.3 商家 Web（`ml-express-merchant-web/`）
 
@@ -275,7 +279,7 @@ App / 浏览器
 | **认证** | `LoginPage` 仍对 `delivery_stores` **客户端比对密码**（与 App 的 `merchant-password` **尚未对齐**）；`merchantLoginGuard` **拒绝** `transit_station` |
 | **体验** | `FeedbackService` + `GlobalToast`：非确认提示走 Toast；`window.confirm` 仅确认/破坏性操作；生产 `installProductionConsoleGate`（**无 Sentry**，勿擅自加） |
 | **路由** | `/login` → `/`（Profile）、`/products`、订单经 Profile/Tracking |
-| **部署** | Netlify site `126af2b9-…` |
+| **部署** | 站点 `mlexpress-merchant`（`126af2b9-…`）；**必须在本子目录** `npm run deploy:netlify`（§15.3） |
 
 ### 3.1.4 会员 App（`ml-express-client/`）
 
@@ -545,12 +549,16 @@ ml-express-client-web/
 
 ### 5.5 部署
 
-- Netlify 站点 ID：`52f5f573-ca0a-4769-a8c7-e5f675764056`；域名 `market-link-express.com`。
-- 构建：`npm install --legacy-peer-deps && CI=false npm run build`（`prebuild` → `sync:shared`）。
+- Netlify 项目名 **`client-ml-express`**；站点 ID：`52f5f573-ca0a-4769-a8c7-e5f675764056`；域名 `market-link-express.com`。
+- Dashboard **Base directory 必须是 `ml-express-client-web`**（勿用仓库根，否则会打成 Admin）。
+- 生产发布只在本目录跑 `npm run deploy:netlify`（已带 `--site`）。详见 **§15.3**。
+- 构建：`npm install --legacy-peer-deps && npm run build`（`prebuild` → `sync:shared`）。
 - 生产浏览器 REST：同源 `/__sb/`（`netlify.toml` rewrite；见 §2.1）。
 
 ```bash
 cd ml-express-client-web && npm install && npm start
+# 生产发布（必须在本目录，勿在仓库根）：
+cd ml-express-client-web && npm run deploy:netlify
 ```
 
 ### 5.6 反馈、日志与监控（对标商家 App §8.8）
@@ -612,11 +620,15 @@ ml-express-merchant-web/
 
 ### 6.6 部署
 
-- Netlify 站点 ID：`126af2b9-244f-47fd-9be9-58fb45b6e7a2`；域名 `mlexpress-merchants.com`。
+- Netlify 项目名 **`mlexpress-merchant`**；站点 ID：`126af2b9-244f-47fd-9be9-58fb45b6e7a2`；域名 `mlexpress-merchants.com`。
+- Dashboard **Base directory 必须是 `ml-express-merchant-web`**。
+- 生产发布只在本目录跑 `npm run deploy:netlify`（已带 `--site`）。详见 **§15.3**。
 - 生产浏览器 REST：同源 `/__sb/`（见 §2.1）。
 
 ```bash
 cd ml-express-merchant-web && npm install && npm start
+# 生产发布（必须在本目录，勿在仓库根）：
+cd ml-express-merchant-web && npm run deploy:netlify
 ```
 
 ### 6.7 反馈、日志与监控（对标商家 App §8.8）
@@ -1603,17 +1615,21 @@ supabase functions deploy ensure-courier-auth
 
 ### 15.1 Netlify 站点
 
-| 应用 | 配置文件 | Base directory | Publish | 站点 ID |
-|------|----------|----------------|---------|---------|
-| 管理后台 | `/netlify.toml` | 仓库根 | `build/` | `ed9c2173-…` |
-| 会员 Web | `ml-express-client-web/netlify.toml` | 子目录 | `build/` | `52f5f573-…` |
-| 商家 Web | `ml-express-merchant-web/netlify.toml` | 子目录 | `build/` | `126af2b9-…` |
+三个 **独立** 站点，域名 / 目录 / Site ID **一对一**，禁止串站。Dashboard 里 GitHub 虽连着 `main`，但 **当前生产包不是从 `main` 打的**（见 §15.3）。
 
-构建：`npm install --legacy-peer-deps && CI=false npm run build`（触发 `prebuild` → `sync:shared`）。
+| 应用 | 生产域名 | Netlify 项目名 | 代码目录 | Base directory | 站点 ID | 发布命令（须在该目录） |
+|------|----------|----------------|----------|----------------|---------|------------------------|
+| 管理后台 | `https://admin-market-link-express.com` | `admin-market-link-express` | 仓库根 `/` | **留空（根）** | `ed9c2173-4031-4f10-a466-5b041dfe3511` | 根目录 `npm run deploy:netlify` |
+| 会员 Web | `https://market-link-express.com` | `client-ml-express` | `ml-express-client-web/` | **`ml-express-client-web`** | `52f5f573-ca0a-4769-a8c7-e5f675764056` | `cd ml-express-client-web && npm run deploy:netlify` |
+| 商家 Web | `https://mlexpress-merchants.com` | `mlexpress-merchant` | `ml-express-merchant-web/` | **`ml-express-merchant-web`** | `126af2b9-244f-47fd-9be9-58fb45b6e7a2` | `cd ml-express-merchant-web && npm run deploy:netlify` |
 
-Admin 部署：`npm run deploy:netlify`（根 package.json）。
+Dashboard：https://app.netlify.com/projects/`<项目名>`。各 `package.json` 的 `deploy:netlify` 已写死 `--site <ID>`；子目录切勿在仓库根执行，否则会推到 Admin 站。
 
-三站均配置 `/__sb/*` → supabase.co（Edge BFF 优先，rewrite 兜底）。会员/商家 Web 的 `netlify.toml` 同样有 `/__sb`。
+本机可再 `npx netlify link --id <上表 ID>`（写入该目录 `.netlify/state.json`，已 gitignore）。
+
+构建：`npm install --legacy-peer-deps && npm run build`（`prebuild` → `sync:shared`）。Windows PowerShell **不能**写 `CI=false npm run build`（会被当成命令名）；Admin 已把 `CI=false` 放到 `netlify.toml` 的 `[build.environment]`。会员/商家 Web 的 `package.json` 仍是 `CI=false react-scripts build`，在 Windows 上本地 `npm run build` / CLI `--build` 会失败，应在对应目录用 `$env:CI='false'; npx react-scripts build` 或先在 Mac 上发。
+
+三站均配置 `/__sb/*` → supabase.co。**仅 Admin 根站**有 Edge `supabase-bff`（剥 `__cf_bm`、禁缓存）；会员/商家 Web 只有 200 rewrite。
 
 Cloudflare Worker 备份：仓库根 `npm run deploy:supabase-proxy`（`cloudflare/supabase-proxy/wrangler.toml`）。
 
@@ -1629,6 +1645,41 @@ Cloudflare Worker 备份：仓库根 `npm run deploy:supabase-proxy`（`cloudfla
 Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.json`；`appVersionSource: local`（版本以 `app.json` 为准）。
 
 **会员 App** 已提交 `android/` + `ios/`：EAS 用原生 versionCode / CFBundleVersion。升号见 §7.8。骑手 App 是 managed（无提交的原生工程），改 `app.json` 即可。
+
+### 15.3 三站生产发布红线（必读）
+
+**生产真源 = 本机 CLI 上传（Mac `npm run deploy:netlify`），不是 GitHub `main`。**  
+三站都连着 `huangdelun16-lgtm/ml-express` 的 `main`，但线上 `published_deploy.commit_ref` 为 **空**、`deploy_source = api`。Mac 上改完直接 CLI 发布；`main` 经常滞后（例如只到投资人 PDF 提交 `4fe16f1`）。
+
+| 站点 | 正确工作目录 | 正确命令 | 2026-09-01 已知完好 CLI 部署（回滚锚点） |
+|------|--------------|----------|------------------------------------------|
+| Admin | 仓库根 `ml-express/` | `npm run deploy:netlify` | `6a970502d5810c82443f3797`（当天 23:31 缅甸时间；2026-09-02 已从误触发的 `main@4fe16f1` 恢复） |
+| 会员 Web | `ml-express-client-web/` | `npm run deploy:netlify` | `6a96b6565dc9992a7e583aba`（当天 17:56 缅甸时间） |
+| 商家 Web | `ml-express-merchant-web/` | `npm run deploy:netlify` | `6a96f30de89a6928f7b62391`（当天 22:15 缅甸时间） |
+
+回滚（把该历史部署重新设为生产，**不会**重跑 `main`）：
+
+```bash
+# 须已 netlify login；勿设过期的 NETLIFY_AUTH_TOKEN
+npx netlify api restoreSiteDeploy --data '{"site_id":"<站点ID>","deploy_id":"<上表部署ID>"}'
+```
+
+各站 `npm run deploy:netlify` 已改走 `scripts/deploy-web.mjs`（按目录选对 Site ID，**拒绝 `--trigger`**）。站点表：`scripts/netlify-web-sites.json`。
+
+**已做的防呆（2026-09-02）**
+
+- 三站 Netlify `build_settings.stop_builds = true`：GitHub push / Dashboard「Trigger deploy」/ `netlify deploy --trigger` **不会再构建**，避免 `main` 旧提交盖生产。本机 `netlify deploy --prod` 上传仍可用。
+- 若以后要临时打开 Git 构建：Dashboard → Project configuration → Build & deploy → 取消 Stop builds，或把 `stop_builds` 改回 `false`。
+
+**禁止**
+
+1. `netlify deploy --trigger` / Dashboard「Trigger deploy」按 `main` 重建 — 会盖掉 CLI 新版（2026-09-02 Admin 已踩过；现已 stop builds）。
+2. 在仓库根发布会员/商家 Web，或在子目录发布 Admin。
+3. 把 Admin 的 `ed9c2173-…` 填进另外两站（或反过来）。
+4. 假设「clone 了 GitHub 最新 main = 线上最新」。线上以 Netlify 当前 Published 的 CLI 包为准。
+5. 绕过 `npm run deploy:netlify`，手写带 `--trigger` 或错误 `--site` 的命令。
+
+Windows 本机若 CLI 卡在 Edge Function `fetch failed`（Deno 打包器下载失败，Admin 常见）：不要改用 `--trigger`。请在 Mac 上对该站再跑一次 `npm run deploy:netlify`，或 `restoreSiteDeploy` 回到上表锚点。
 
 ---
 
@@ -1713,6 +1764,18 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进行中轮询；骑手看 `courierNewOrderMonitor.ts`。不要指望生产 WS。
 
+### 17.10 部署后线上变成旧版
+
+**现象**：Netlify 显示 Published，但登录页/功能是旧 UI；或刚 `deploy --trigger` 后 Admin 不像昨晚 Mac 那版。
+
+**根因**：对已连接 GitHub 的站点跑了 `netlify deploy --trigger`（或 Dashboard 按 `main` Trigger）。云端用仓库 `main` 构建，而生产真源是 Mac CLI 上传（无 `commit_ref`）。`main` 可能停在很旧的提交（如 `4fe16f1`）。
+
+**处理**：
+
+1. 对照 §15.3 表确认站点 ID 与「已知完好 CLI 部署」。
+2. `restoreSiteDeploy` 回到该部署；浏览器强制刷新。
+3. 以后只在**对应子目录**跑 `npm run deploy:netlify`，不要 `--trigger`。
+
 ---
 
 ## 18. 给 AI / 维护者的改代码提示
@@ -1746,6 +1809,7 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 26. **改跨境客户编码**：同步改 `src/utils/crossBorderCustomerCode.ts` 与 `netlify/functions/utils/crossBorderCustomerCode.js`，并跑两边测试。
 28. **改 City 实时状态**：缅甸无 WS。商家改 `/shared/src/merchantInProgressOrders.ts` + AppContext / MerchantOrderContext；骑手改 `courierNewOrderMonitor.ts`；聊天未读改 `/shared/src/chatUnread.ts`。不要给生产加 Worker Realtime。
 29. **改会员订单列表**：`fetchCustomerPackages` 拆查 + `receiver_phone`；测试 `customerPackageQuery.test.ts`。
+30. **发三站 Web 生产**：只跑 §15.3 对应目录的 `npm run deploy:netlify`。勿 `netlify deploy --trigger`；勿在仓库根发会员/商家站。回滚用 `restoreSiteDeploy` + 表内部署 ID。
 
 ---
 
@@ -1798,6 +1862,7 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 | 代购报价表 | `ProxyQuotePage.tsx`、`utils/proxyQuoteExcel.ts` |
 | 商家下单弹窗 | `merchant-web/.../OrderModal.tsx` |
 | 会员/商家计费 | `/shared/src/pricing.ts` |
+| **三站 Web 生产发布 / 回滚** | **§15.3**；Admin 根 `npm run deploy:netlify`；会员 `ml-express-client-web`；商家 `ml-express-merchant-web` |
 | 管理后台权限菜单 | `App.tsx`、`AccountManagement.tsx`、`AdminShellLayout.tsx` |
 | Supabase migrations | `supabase/migrations/` |
 | Edge Functions | `supabase/functions/` |
@@ -1933,6 +1998,7 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 | Inventory JWT / 到站三步 | §10.12 + `cloudWriteGuard` + `hubReceivePack` |
 | 跨境客户编码 / 专属单价 | §11.4 + `crossBorderCustomerCode` + `crossBorderRoutePricing` |
 | 缅甸网络 | §2.1 + `supabase-bff.js` |
+| 三站 Web 发布 / 回滚 | **§15.3**（CLI 真源；禁 `--trigger`） |
 | Schema | `supabase/migrations/` + 更新 §14（64 个文件；勿擅自 db push） |
 | 类型门禁 | `.github/workflows/typecheck.yml` + `scripts/ci-typecheck.mjs` |
 
@@ -1960,7 +2026,8 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 - 商家 App：勿改回客户端明文密码登录；勿把 Maps Key 写回 `app.json`。
 - 商家 App：勿在 Android 选图时申请 `READ_MEDIA_*` / `READ_EXTERNAL_STORAGE`（走 Photo Picker，见 §8.7）。
 - 会员订单查询：勿把 `customer_email` / `[客户ID:]` / 电话 `+` 拼进同一段 PostgREST `.or()`（见 §7.9）。
+- **三站 Web**：勿 `netlify deploy --trigger` / 按 GitHub `main` 重建生产；勿在仓库根发会员/商家站（见 §15.3）。
 
 ---
 
-*最后更新：2026-08-28 — 全仓架构对齐：版本号（会员 2.8.1/75、骑手 2.4.4/82、Inventory 2.1.0/35）、`/shared` 11 模块、会员订单 PostgREST 拆查、商家/骑手 REST 轮询兜底。细节以仓库当前文件为准。*
+*最后更新：2026-09-02 — 三站生产真源改为本机 CLI（§15.3）：Admin / 会员 Web / 商家 Web 的目录、Site ID、回滚部署 ID；禁止 `--trigger` 覆盖 Mac 新版。细节以仓库当前文件为准。*

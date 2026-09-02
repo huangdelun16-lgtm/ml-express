@@ -50,6 +50,9 @@ const BLOCK_MEDIA_READ = [
 /** Production native builds bake absolute /__sb (Myanmar-reachable). Local expo start keeps env. */
 const NATIVE_SB_PROXY_URL = 'https://mlexpress-merchants.com/__sb/';
 const SUPABASE_UPSTREAM_URL = 'https://uopkyuluxnrewvlmutam.supabase.co';
+/** 与 Inventory App 同一把公开 anon key；本地无 .env / EAS 未注入时避免 placeholder-key */
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcGt5dWx1eG5yZXd2bG11dGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDMwMDAsImV4cCI6MjA3NDYxOTAwMH0._6AilDWJcevT-qo90f6wInAKw3aKn2a8jIM8BEGQ3rY';
 function resolveExtraSupabaseUrl(envUrl) {
   const easProfile = process.env.EAS_BUILD_PROFILE || "";
   const isEasRelease = process.env.EAS_BUILD === "true" && easProfile !== "development";
@@ -77,7 +80,9 @@ module.exports = ({ config }) => {
     'https://mlexpress-merchants.com'
   ).trim();
   const supabaseUrl = resolveExtraSupabaseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL || '');
-  const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').trim();
+  const supabaseAnonKey = (
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
+  ).trim();
 
   return {
     ...expoConfig,
