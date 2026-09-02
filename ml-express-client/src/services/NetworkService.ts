@@ -220,7 +220,7 @@ class NetworkService {
           ? '请求超时，请检查网络连接'
           : finalError.status === 0
           ? '网络连接失败，请检查网络设置'
-          : finalError.status >= 500
+          : (finalError.status ?? 0) >= 500
           ? '服务器错误，请稍后重试'
           : appError.message;
 

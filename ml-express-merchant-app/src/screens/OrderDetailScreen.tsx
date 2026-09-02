@@ -28,7 +28,7 @@ import * as Clipboard from "expo-clipboard";
 import { ensureSaveToLibraryPermission } from "../utils/mediaAccess";
 import * as MediaLibrary from "expo-media-library";
 import ViewShot, { captureRef } from "react-native-view-shot";
-import { packageService, merchantService } from "../services/supabase";
+import { packageService, merchantService, supabase } from "../services/supabase";
 import { useApp } from "../contexts/AppContext";
 import { useLoading } from "../contexts/LoadingContext";
 import BackToHomeButton from "../components/BackToHomeButton";

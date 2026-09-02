@@ -124,7 +124,7 @@ class NotificationService {
         };
         await this.saveSettings(this.settings);
       }
-      return this.settings;
+      return this.settings ?? this.getDefaultSettings();
     } catch (error) {
       LoggerService.error('加载通知设置失败:', error);
       return this.getDefaultSettings();
@@ -424,11 +424,11 @@ class NotificationService {
     const NotificationsModule = loadNotificationsModule();
     if (!NotificationsModule) return;
     // 处理前台通知点击
-    NotificationsModule.addNotificationReceivedListener(notification => {
+    NotificationsModule.addNotificationReceivedListener((notification: any) => {
       LoggerService.debug('收到前台通知', notification);
     });
     // 处理通知点击
-    NotificationsModule.addNotificationResponseReceivedListener(response => {
+    NotificationsModule.addNotificationResponseReceivedListener((response: any) => {
       LoggerService.debug('通知被点击', response);
       const data = response.notification.request.content.data;
       

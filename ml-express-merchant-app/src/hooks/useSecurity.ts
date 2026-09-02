@@ -111,7 +111,11 @@ export const useLoginSecurity = () => {
   // 检查登录尝试
   const checkLoginAttempts = useCallback((identifier: string) => {
     const result = securityService.checkLoginAttempts(identifier);
-    setLoginAttempts(result);
+    setLoginAttempts({
+      allowed: result.allowed,
+      remainingAttempts: result.remainingAttempts,
+      lockoutTime: result.lockoutTime,
+    });
   }, []);
   // 记录登录尝试
   const recordLoginAttempt = useCallback((identifier: string, success: boolean) => {

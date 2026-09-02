@@ -23,7 +23,7 @@ export const useLanguageStyles = <T extends Record<string, any>>(
       
       // 如果是数组样式，递归处理
       if (Array.isArray(style)) {
-        adjustedStyles[key] = style.map(s => {
+        adjustedStyles[key] = style.map((s: any) => {
           if (s && typeof s === 'object' && s.fontSize) {
             return { ...s, fontSize: Math.max(s.fontSize - 2, 10) };
           }

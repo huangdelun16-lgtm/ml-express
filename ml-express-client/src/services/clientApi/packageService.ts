@@ -6,7 +6,7 @@ import { retry } from '../../utils/retry';
 import {
   buildCustomerPhoneOrFilter,
   mergePackageRows,
-} from '../../utils/customerPackageQuery';
+} from '../_shared/customerPackageQuery';
 
 const EMPTY_ORDER_STATS = {
   total: 0,

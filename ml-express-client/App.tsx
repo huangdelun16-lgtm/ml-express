@@ -81,7 +81,7 @@ function AppContent({ onLayoutRootView }: any) {
       <NetworkStatus />
       <GlobalToast />
       <NavigationContainer 
-        linking={linking}
+        linking={linking as any}
         onReady={() => {
           console.log('Navigation container ready');
         }}

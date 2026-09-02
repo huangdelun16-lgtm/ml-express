@@ -47,6 +47,8 @@ interface DeliveryStore {
   operating_hours: string;
   is_closed_today?: boolean;
   vacation_dates?: string[];
+  avatar_url?: string | null;
+  updated_at?: string | null;
 }
 
 const AllMerchantsSectionHeader = React.memo(({ title, count, language }: { title: string; count: number; language: string }) => {

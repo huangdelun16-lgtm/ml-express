@@ -7,7 +7,12 @@ interface UsePlaceAutocompleteOptions {
   language: 'zh' | 'en' | 'my';
   selectedLocation: { latitude: number; longitude: number };
   onLocationChange: (coords: { latitude: number; longitude: number }) => void;
-  onPlaceChange?: (place: { name?: string; address?: string } | null) => void;
+  onPlaceChange?: (place: {
+    name?: string;
+    address?: string;
+    types?: string[];
+    rating?: number;
+  } | null) => void;
 }
 export function usePlaceAutocomplete({
   language,
@@ -152,7 +157,7 @@ export function usePlaceAutocomplete({
                 };
               })
               // 优先显示商业地点
-              .sort((a, b) => {
+              .sort((a: { isEstablishment?: boolean }, b: { isEstablishment?: boolean }) => {
                 if (a.isEstablishment && !b.isEstablishment) return -1;
                 if (!a.isEstablishment && b.isEstablishment) return 1;
                 return 0;

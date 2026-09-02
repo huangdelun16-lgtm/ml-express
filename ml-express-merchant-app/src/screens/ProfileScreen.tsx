@@ -53,6 +53,7 @@ import { getScanPrinterStrings } from "../i18n/scanPrinterStrings";
 import { getActiveBluetoothDevice } from "../services/bluetoothScanner";
 import MerchantExportStatementModal from "../components/MerchantExportStatementModal";
 import MerchantCloseReportModal from "../components/MerchantCloseReportModal";
+import { FadeInView } from "../components/Animations";
 import {
   buildTodayCloseReport,
   type TodayCloseReport,
@@ -1390,10 +1391,10 @@ export default function ProfileScreen({ navigation }: any) {
             console.log("✅ 同步成功:", latestRaw);
 
             // 映射字段供 UI 使用
-            const latestUser: any = { ...latestRaw };
+            const latestUser: any = { ...(latestRaw as any) };
             if (detectedUserType === "merchant") {
-              latestUser.name = latestRaw.store_name;
-              latestUser.phone = latestRaw.phone; // 使用正确的 phone 字段
+              latestUser.name = (latestRaw as any).store_name;
+              latestUser.phone = (latestRaw as any).phone;
               latestUser.user_type = "merchant";
               latestUser.balance = 0; // 商家暂无余额字段
             }
@@ -6299,6 +6300,9 @@ const styles = StyleSheet.create({
   darkText: {
     color: "#f8fafc",
   },
+  darkCard: {
+    backgroundColor: "#1e293b",
+  },
   darkSettingsList: {
     backgroundColor: "#1e293b",
     borderColor: "#334155",
@@ -6697,6 +6701,15 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
     textAlign: "center",
   },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.m,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
   input: {
     backgroundColor: theme.colors.background.input,
     borderWidth: 1,
@@ -7018,12 +7031,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: "italic",
   },
-  printerHint: {
-    fontSize: 11,
-    color: "#f59e0b",
-    marginTop: 8,
-    fontStyle: "italic",
-  },
   printerScanEntryBtn: {
     borderRadius: 16,
     overflow: "hidden",
@@ -7228,137 +7235,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#94a3b8",
     fontStyle: "italic",
-  },
-  // 🚀 打印机设置样式
-  printerSettingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-  },
-  printerSettingLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1e293b",
-  },
-  printerSettingDesc: {
-    fontSize: 12,
-    color: "#94a3b8",
-    marginTop: 2,
-  },
-  printerSettingSection: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  printerSectionTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#64748b",
-    marginBottom: 12,
-    textTransform: "uppercase",
-  },
-  printerTypeGrid: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  printerTypeCard: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  printerTypeCardActive: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#3b82f6",
-  },
-  printerTypeLabel: {
-    fontSize: 12,
-    color: "#64748b",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  printerTypeLabelActive: {
-    color: "#3b82f6",
-    fontWeight: "bold",
-  },
-  printerInput: {
-    backgroundColor: "#f1f5f9",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: "#1e293b",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  printerHint: {
-    fontSize: 11,
-    color: "#f59e0b",
-    marginTop: 8,
-    fontStyle: "italic",
-  },
-  printerHint: {
-    fontSize: 11,
-    color: "#f59e0b",
-    marginTop: 8,
-    fontStyle: "italic",
-  },
-  printerScanEntryBtn: {
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  printerPreviewEntryBtn: {
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  printerConnectedHint: {
-    textAlign: "center",
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#059669",
-  },
-  printerScanEntryGradient: {
-    paddingVertical: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  printerScanEntryText: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-  quantityContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 10,
-    padding: 4,
-  },
-  qtyBtn: {
-    width: 32,
-    height: 32,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    ...theme.shadows.small,
-  },
-  qtyBtnText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1e293b",
-  },
-  qtyText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginHorizontal: 15,
-    minWidth: 20,
-    textAlign: "center",
   },
   // 🚀 新增：评价相关样式
   sectionHeaderRow: {

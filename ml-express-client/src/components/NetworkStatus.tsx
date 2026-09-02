@@ -83,7 +83,7 @@ export const NetworkIndicator: React.FC = () => {
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       const connected = state.isConnected && state.isInternetReachable;
-      setIsConnected(connected);
+      setIsConnected(!!connected);
     });
 
     return () => unsubscribe();
@@ -106,7 +106,7 @@ export const useNetworkStatus = () => {
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       const connected = state.isConnected && state.isInternetReachable;
-      setIsConnected(connected);
+      setIsConnected(!!connected);
       setConnectionType(state.type);
     });
 

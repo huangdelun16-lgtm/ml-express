@@ -19,14 +19,12 @@ function gid(raw: string) {
   return `p${raw.replace(/[^a-zA-Z0-9]/g, '')}`;
 }
 
-function TealStops() {
-  return (
-    <>
-      <Stop offset="0" stopColor={TEAL_HI} />
-      <Stop offset="0.45" stopColor={TEAL} />
-      <Stop offset="1" stopColor={TEAL_LO} />
-    </>
-  );
+function tealStops() {
+  return [
+    <Stop key="hi" offset="0" stopColor={TEAL_HI} />,
+    <Stop key="mid" offset="0.45" stopColor={TEAL} />,
+    <Stop key="lo" offset="1" stopColor={TEAL_LO} />,
+  ];
 }
 
 /** Circular 3D courier avatar (teal hoodie, no outlines). */
@@ -45,7 +43,7 @@ export function ProfileAvatar3D({ size = 76 }: SizeProps) {
           <Stop offset="1" stopColor="#D08A58" />
         </RadialGradient>
         <SvgGradient id={`${id}hood`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
         <SvgGradient id={`${id}hair`} x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#4B3A32" />
@@ -94,7 +92,7 @@ export function ClayGear({ size = 40 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}g`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Ellipse cx="32" cy="58" rx="16" ry="4" fill="#2C98A6" opacity="0.16" />
@@ -115,7 +113,7 @@ export function ClayCoupon({ size = 40 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}g`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Ellipse cx="32" cy="56" rx="16" ry="4" fill="#2C98A6" opacity="0.14" />
@@ -198,7 +196,7 @@ export function ClayWallet({ size = 44 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}w`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Ellipse cx="32" cy="56" rx="16" ry="4" fill="#2C98A6" opacity="0.14" />
@@ -258,7 +256,7 @@ export function ClayPlaceOrder({ size = 44 }: SizeProps) {
           <Stop offset="1" stopColor="#8F5A1E" />
         </SvgGradient>
         <SvgGradient id={`${id}p`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Ellipse cx="30" cy="56" rx="16" ry="4" fill="#8F5A1E" opacity="0.16" />
@@ -280,7 +278,7 @@ export function ClayScooter({ size = 44 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}s`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
         <RadialGradient id={`${id}t`} cx="35%" cy="30%" r="70%">
           <Stop offset="0" stopColor="#64748B" />
@@ -307,7 +305,7 @@ export function ClayClipboard({ size = 44 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}c`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Ellipse cx="32" cy="56" rx="14" ry="4" fill="#2C98A6" opacity="0.14" />
@@ -326,7 +324,7 @@ export function ClayHeadset({ size = 44 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}h`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Ellipse cx="32" cy="56" rx="14" ry="4" fill="#2C98A6" opacity="0.14" />
@@ -345,7 +343,7 @@ export function ClayGlobe({ size = 28 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}g`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Circle cx="32" cy="32" r="22" fill={`url(#${id}g)`} />
@@ -362,7 +360,7 @@ export function ClayInfo({ size = 28 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}i`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Circle cx="32" cy="32" r="22" fill={`url(#${id}i)`} />
@@ -403,7 +401,7 @@ export function ClayStoreFront({ size = 44 }: SizeProps) {
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
         <SvgGradient id={`${id}r`} x1="0.2" y1="0" x2="0.8" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
         <SvgGradient id={`${id}w`} x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#F4FEFF" />
@@ -430,7 +428,7 @@ export function ClayShoppingBag({ size = 44 }: SizeProps) {
           <Stop offset="1" stopColor="#E08A3C" />
         </SvgGradient>
         <SvgGradient id={`${id}c`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Ellipse cx="32" cy="56" rx="16" ry="4" fill="#E08A3C" opacity="0.16" />
@@ -453,7 +451,7 @@ export function ClayMapBoard({ size = 44 }: SizeProps) {
           <Stop offset="1" stopColor="#6FBF73" />
         </SvgGradient>
         <SvgGradient id={`${id}n`} x1="0.2" y1="0" x2="0.9" y2="1">
-          <TealStops />
+          {tealStops()}
         </SvgGradient>
       </Defs>
       <Ellipse cx="32" cy="56" rx="16" ry="4" fill="#2C98A6" opacity="0.14" />

@@ -468,9 +468,9 @@ export class CrashReportingService {
   // 设置未处理的Promise拒绝处理器
   private setupUnhandledRejectionHandler(): void {
     // React Native 中的实现
-    const originalHandler = global.onunhandledrejection;
+    const originalHandler = (global as any).onunhandledrejection;
     
-    global.onunhandledrejection = (event) => {
+    (global as any).onunhandledrejection = (event: any) => {
       this.recordException(event.reason, { type: 'unhandledRejection' });
       if (originalHandler) {
         originalHandler(event);

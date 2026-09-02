@@ -16,6 +16,10 @@ import type {
   RechargeRequest,
 } from './_shared/domainTypes';
 import { createBannerService, createTutorialService } from './_shared/services';
+import {
+  buildCustomerPhoneOrFilter,
+  mergePackageRows,
+} from './_shared/customerPackageQuery';
 export type { Banner, Tutorial, ProductCategory, StoreReview, RechargeRequest };
 
 // 使用环境变量配置 Supabase（不再使用硬编码密钥）
@@ -136,6 +140,90 @@ export interface Product {
   listing_status?: 'pending' | 'approved' | 'rejected' | null;
   created_at?: string;
   updated_at?: string;
+}
+
+/**
+ * 拆查会员订单：邮箱、客户ID 描述、电话不要拼进同一段 PostgREST `.or()`。
+ * 也不要在合并后再按邮箱过滤，否则会丢掉只匹配 customer_id / 店铺的单。
+ */
+async function fetchPackagesByUserSplit(opts: {
+  email?: string;
+  phone?: string;
+  startDate?: string;
+  storeId?: string;
+  userId?: string;
+  storeName?: string;
+}): Promise<Package[]> {
+  const { email, phone, startDate, storeId, userId, storeName } = opts;
+  if (!email && !phone && !storeId && !userId && !storeName) {
+    return [];
+  }
+
+  const applyDate = (query: any) =>
+    startDate ? query.gte('created_at', startDate) : query;
+  const runSelect = () => applyDate(supabase.from('packages').select('*'));
+
+  const run = async (
+    build: (query: any) => any,
+    ignore?: (message: string) => boolean,
+  ): Promise<Package[]> => {
+    try {
+      const { data, error } = await build(runSelect()).order('created_at', {
+        ascending: false,
+      });
+      if (error) {
+        const message = String(error.message || '');
+        if (!ignore?.(message)) {
+          LoggerService.error('查询订单失败:', error);
+        }
+        return [];
+      }
+      return (data || []) as Package[];
+    } catch (err) {
+      LoggerService.error('查询订单失败:', err);
+      return [];
+    }
+  };
+
+  const tasks: Array<Promise<Package[]>> = [];
+
+  if (userId) {
+    tasks.push(
+      run(
+        (q) => q.eq('customer_id', userId),
+        (message) =>
+          message.includes('customer_id') && message.includes('does not exist'),
+      ),
+    );
+    tasks.push(
+      run((q) => q.ilike('description', `%[客户ID: ${userId}]%`)),
+    );
+  }
+
+  const emailVal = String(email || '').trim();
+  if (emailVal) {
+    tasks.push(
+      run(
+        (q) => q.eq('customer_email', emailVal),
+        (message) => message.includes('customer_email'),
+      ),
+    );
+  }
+
+  const phoneFilter = buildCustomerPhoneOrFilter(phone);
+  if (phoneFilter) {
+    tasks.push(run((q) => q.or(phoneFilter)));
+  }
+
+  if (storeId) {
+    tasks.push(run((q) => q.eq('delivery_store_id', storeId)));
+  }
+  if (storeName) {
+    tasks.push(run((q) => q.eq('sender_name', storeName)));
+  }
+
+  if (!tasks.length) return [];
+  return mergePackageRows(await Promise.all(tasks));
 }
 
 // 客户端包裹服务（只包含客户端需要的功能）
@@ -327,101 +415,17 @@ export const packageService = {
         LoggerService.debug('getPackagesByUser: 没有查询标识，返回空数组');
         return [];
       }
-
       LoggerService.debug('getPackagesByUser: 开始查询，email:', email, 'phone:', phone, 'startDate:', startDate, 'storeId:', storeId, 'userId:', userId, 'storeName:', storeName);
-
-      // 构建查询条件
-      let query = supabase.from('packages').select('*');
-
-      // 如果有开始时间，添加时间过滤
-      if (startDate) {
-        query = query.gte('created_at', startDate);
-      }
-
-      const conditions: string[] = [];
-      
-      // 1. 根据手机号查询（寄件人或收件人）
-      if (phone) {
-        conditions.push(`sender_phone.eq.${phone}`);
-        conditions.push(`receiver_phone.eq.${phone}`);
-      }
-
-      // 2. 商家账号匹配逻辑
-      if (storeId) {
-        conditions.push(`delivery_store_id.eq.${storeId}`);
-      }
-      if (storeName) {
-        conditions.push(`sender_name.eq.${storeName}`);
-      }
-
-      // 3. 用户账号匹配逻辑
-      if (userId) {
-        conditions.push(`customer_id.eq.${userId}`);
-        conditions.push(`description.ilike.%[客户ID: ${userId}]%`);
-      }
-
-      // 4. 根据 email 匹配
-      if (email) {
-        conditions.push(`customer_email.eq.${email}`);
-      }
-
-      if (conditions.length > 0) {
-        // 使用 OR 连接所有条件
-        const orCondition = conditions.join(',');
-        LoggerService.debug('最终查询条件:', orCondition);
-        query = query.or(orCondition);
-      } else {
-        return [];
-      }
-
-      let { data, error } = await query.order('created_at', { ascending: false });
-      
-      // 如果查询失败且是因为 customer_email 字段不存在，只使用手机号查询
-      if (error && (error.message.includes('customer_email') || error.code === 'PGRST204')) {
-        LoggerService.warn('customer_email 字段不存在，只使用手机号查询');
-        // 重新构建查询，只使用手机号
-        if (phone) {
-          query = supabase.from('packages').select('*');
-          query = query.or(`sender_phone.eq.${phone},receiver_phone.eq.${phone}`);
-          const retryResult = await query.order('created_at', { ascending: false });
-          if (retryResult.error) {
-            error = retryResult.error;
-          } else {
-            data = retryResult.data;
-            error = null;
-          }
-        }
-      }
-      
-      if (error) {
-        LoggerService.error('获取用户包裹列表失败:', error);
-        LoggerService.error('错误详情:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        LoggerService.error('查询条件:', conditions);
-        return [];
-      }
-      
-      // 如果邮箱存在，在结果中进一步过滤（客户端过滤，避免数据库查询错误）
-      if (email && data) {
-        LoggerService.debug('使用邮箱过滤结果，邮箱:', email);
-        data = data.filter((pkg: any) => {
-          // 如果包裹有 customer_email 字段且匹配，或者通过手机号匹配
-          return pkg.customer_email === email || 
-                 pkg.sender_phone === phone || 
-                 pkg.receiver_phone === phone;
-        });
-        LoggerService.debug('过滤后的包裹数量:', data.length);
-      }
-      
-      LoggerService.debug('查询成功，包裹数量:', data?.length || 0);
-      if (data && data.length > 0) {
-        LoggerService.debug('包裹ID列表:', data.map(p => p.id));
-      }
-      return data || [];
+      const rows = await fetchPackagesByUserSplit({
+        email,
+        phone,
+        startDate,
+        storeId,
+        userId,
+        storeName,
+      });
+      LoggerService.debug('查询成功，包裹数量:', rows.length);
+      return rows;
     } catch (err) {
       LoggerService.error('获取用户包裹列表异常:', err);
       return [];

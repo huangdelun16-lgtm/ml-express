@@ -75,12 +75,12 @@ export const colors = {
   
   // 渐变色预设
   gradients: {
-    primary: ['#b0d3e8', '#7895a3'],
-    blue: ['#3b82f6', '#2563eb'],
-    green: ['#10b981', '#059669'],
-    orange: ['#f59e0b', '#d97706'],
-    red: ['#ef4444', '#dc2626'],
-    contact: ['#fa709a', '#fee140'],
+    primary: ['#b0d3e8', '#7895a3'] as [string, string],
+    blue: ['#3b82f6', '#2563eb'] as [string, string],
+    green: ['#10b981', '#059669'] as [string, string],
+    orange: ['#f59e0b', '#d97706'] as [string, string],
+    red: ['#ef4444', '#dc2626'] as [string, string],
+    contact: ['#fa709a', '#fee140'] as [string, string],
   }
 };
 

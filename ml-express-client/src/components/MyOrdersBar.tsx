@@ -52,24 +52,28 @@ const ITEMS = [
     key: 'accept',
     label: { zh: '待接单', en: 'Pending', my: 'လက်ခံရန်' },
     filter: '待确认',
+    muted: false,
     render: (size: number) => <ClayBox size={size} />,
   },
   {
     key: 'pickup',
     label: { zh: '待取件', en: 'Pickup', my: 'ထုပ်ယူရန်' },
     filter: '待取件',
+    muted: false,
     render: (size: number) => <ClayClipboard size={size} />,
   },
   {
     key: 'ship',
     label: { zh: '配送中', en: 'In delivery', my: 'ပို့ဆောင်နေ' },
     filter: '配送中',
+    muted: false,
     render: (size: number) => <ClayScooter size={size} />,
   },
   {
     key: 'done',
     label: { zh: '已完成', en: 'Done', my: 'ပြီးပါပြီ' },
     filter: '已送达',
+    muted: false,
     render: (size: number) => <SealIcon kind="done" size={size} />,
   },
   {

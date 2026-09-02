@@ -1,10 +1,12 @@
+// ⚠️ AUTO-GENERATED from /shared/src — 请勿在此文件直接修改。
+// 修改请编辑 /shared/src 下的源文件，并运行 "npm run sync:shared"。
+
 /**
- * Client-app package matching helpers.
+ * 会员订单匹配辅助。
  *
- * PostgREST `.or()` is a raw filter string: `.` `,` `()` `[]` spaces and `+`
- * are reserved. Mixing `customer_email` (always has `.`) or
- * `description.ilike.%[客户ID: …]%` into one `.or()` makes the whole request
- * fail; the UI then shows 0 orders.
+ * PostgREST `.or()` 是原始过滤字符串：`.` `,` `()` `[]` 空格和 `+` 都是保留字符。
+ * 把 `customer_email`（一定含 `.`）或 `description.ilike.%[客户ID: …]%`
+ * 拼进同一段 `.or()` 会让整次请求失败，界面就显示 0 单。
  */
 
 export function quotePostgrestOrValue(value: string): string {

@@ -1490,6 +1490,7 @@ Inventory 入库：`crossBorderPricing.ts` 先按客户编码取专属 `per_kg`�
 | `dialPhone.ts` | `tel:` 号码净化 | merchant-app、merchant-web、client |
 | `merchantInProgressOrders.ts` | 进行中订单快照指纹 | merchant-app、merchant-web |
 | `deliveryCountdown.ts` | 配送倒计时 | client、mobile-app |
+| `customerPackageQuery.ts` | 会员订单拆查：电话变体、PostgREST 引号、行合并 | client、client-web、merchant-web |
 | `packingCountdown.ts` | 商家打包时限 | merchant-web、merchant-app |
 | `merchantRiderApproach.ts` | 骑手靠近店铺取件分档 | merchant-web、merchant-app |
 
@@ -1763,7 +1764,7 @@ Admin 本机打包 Edge `supabase-bff` 需要 Deno **^2.4.2**（仓库 `netlify-
 2. 只匹配 `sender_phone`，商场单客户是 `receiver_phone`。
 3. 订单 Tab 只在首次 mount 拉单，登录/下单后切回来不刷新。
 
-**处理**：确认已装 **2.8.1 (75)**；查 `fetchCustomerPackages` / `customerPackageQuery.ts`。旧 IPA/APK 仍会空列表。会员 Web 的 `getPackagesByUser` 仍有拼 `.or()` 的遗留，Web 能看见不等于 App 旧包能看见。
+**处理**：确认已装 **2.8.1 (75)**；查 `fetchCustomerPackages` / `customerPackageQuery.ts`。旧 IPA/APK 仍会空列表。会员 Web `getPackagesByUser` 已与 App 一样拆查（邮箱 / 客户ID / 电话分次请求，不再拼进同一段 `.or()`）。
 
 ### 17.9 商家/骑手状态不刷新
 
@@ -1913,8 +1914,8 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 ### 21.2 基线门禁
 
 - 脚本：`scripts/ci-typecheck.mjs` + `scripts/typecheck-baselines.json`
-- **Clean 项目**：必须 0 类型错误。
-- **RN 项目**：以现有错误数为基线（不允许变多）；修复后下调基线。
+- **Clean 项目**：必须 0 类型错误（含会员 App、商家 App；修完历史债后基线已归 0）。
+- 7 个子项目均不允许新增 tsc 错误。
 
 ### 21.3 Inventory 单元测试
 
@@ -2035,4 +2036,4 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 
 ---
 
-*最后更新：2026-09-02 — 写明勿把 `_shared` / 双站点 / City↔Inventory 当重复代码清理。细节以仓库当前文件为准。*
+*最后更新：2026-09-02 — 会员 Web 订单拆查；下调会员/商家 App 类型基线。细节以仓库当前文件为准。*

@@ -84,7 +84,7 @@ type RealtimePatchTarget = {
  * as the Realtime endpoint TLS-resets (CFNetwork -9806) in Myanmar.
  */
 export function applyRealtimeWsFallback(
-  _client: RealtimePatchTarget,
+  _client: unknown,
   _isDev = isNativeDevRuntime(),
 ): void {
   return;
