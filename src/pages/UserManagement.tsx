@@ -1,13 +1,27 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SkeletonTable } from '../components/SkeletonLoader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase, auditLogService, deliveryStoreService, adminAccountService } from '../services/supabase';
-import { useLanguage } from '../contexts/LanguageContext';
-import { useResponsive } from '../hooks/useResponsive';
+import { supabase, auditLogService, rechargeService } from '../services/supabase';
 import '../styles/adminUserManagement.css';
 import { feedbackService } from '../services/FeedbackService';
+import { toCsvRow } from '../services/adminInsightsService';
+import {
+  CUSTOMER_EXPORT_MAX,
+  CUSTOMER_TYPES,
+  DEFAULT_USER_PAGE_SIZE,
+  USER_LIST_PAGE_SIZES,
+  applyCustomerFilters,
+  customerOrder,
+  customerPackageOr,
+  courierSearchOr,
+  isVipUserType,
+  pageRange,
+  sanitizeIlike,
+  type CustomerListFilters,
+  type CustomerSort,
+  type CustomerTypeFilter,
+} from '../utils/adminUserListQuery';
 
-// 用户数据类型定义
 interface User {
   id: string;
   name: string;
@@ -21,16 +35,20 @@ interface User {
   last_login: string;
   total_orders: number;
   total_spent: number;
-  balance?: number; // 🚀 新增：账户余额
+  balance?: number;
   rating: number;
   notes?: string;
   register_region?: string;
+  freeze_reason?: string | null;
+  frozen_at?: string | null;
+  frozen_by?: string | null;
   created_at?: string;
   updated_at?: string;
 }
 
 interface Courier {
   id: string;
+  accountId?: string;
   name: string;
   phone: string;
   email: string;
@@ -44,13 +62,12 @@ interface Courier {
   rating: number;
   notes: string;
   employee_id?: string;
-  department?: string;
-  position?: string;
-  role?: string;
   region?: string;
-  created_at?: string;
-  updated_at?: string;
 }
+
+type UserTab = 'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management';
+
+type JumpCounts = { total: number; active: number };
 
 const REGIONS = [
   { id: 'mandalay', name: '曼德勒', prefix: 'MDY' },
@@ -59,519 +76,536 @@ const REGIONS = [
   { id: 'naypyidaw', name: '内比都', prefix: 'NPW' },
   { id: 'taunggyi', name: '东枝', prefix: 'TGI' },
   { id: 'lashio', name: '腊戌', prefix: 'LSO' },
-  { id: 'muse', name: '木姐', prefix: 'MUSE' }
+  { id: 'muse', name: '木姐', prefix: 'MUSE' },
 ];
 
-const getUserTypeText = (user: any) => {
-  if (user.user_type === 'merchant') return 'MERCHANTS';
-  if (user.user_type === 'courier') return 'Courier';
-  if (user.user_type === 'admin') return 'Admin';
-  
-  // 对于客户类型进行细分
-  if (user.balance > 0 || user.user_type === 'vip') {
-    return 'VIP';
-  }
-  return 'MEMBER';
+const USER_TABS: { id: UserTab; label: string }[] = [
+  { id: 'customer_list', label: '客户' },
+  { id: 'admin_list', label: '管理员' },
+  { id: 'merchant_store', label: '商家' },
+  { id: 'courier_management', label: '骑手' },
+];
+
+const RECHARGE_AMOUNTS = [10000, 50000, 100000, 300000];
+
+const CUSTOMER_COLUMNS_BASE =
+  'id, name, phone, email, address, user_type, status, balance, total_orders, total_spent, rating, notes, register_region, created_at, last_login, registration_date';
+const CUSTOMER_COLUMNS_FREEZE = ', freeze_reason, frozen_at, frozen_by';
+
+let freezeColumnsAvailable = true;
+
+function customerSelectColumns() {
+  return freezeColumnsAvailable ? `${CUSTOMER_COLUMNS_BASE}${CUSTOMER_COLUMNS_FREEZE}` : CUSTOMER_COLUMNS_BASE;
+}
+
+function isMissingFreezeColumn(error: { message?: string; code?: string } | null) {
+  const msg = `${error?.message || ''} ${error?.code || ''}`;
+  return /freeze_reason|frozen_at|frozen_by|PGRST204|42703/i.test(msg);
+}
+
+function asUsers(data: unknown): User[] {
+  return (Array.isArray(data) ? data : []) as User[];
+}
+
+function ledgerStatusLabel(status: string) {
+  if (status === 'completed') return '已完成';
+  if (status === 'rejected') return '已拒绝';
+  if (status === 'pending') return '待审核';
+  return status || '—';
+}
+
+function formatWhen(value?: string | null) {
+  if (!value) return '—';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleString('zh-CN');
+}
+
+const emptyUserForm = {
+  name: '',
+  phone: '',
+  email: '',
+  address: '',
+  password: '',
+  user_type: 'customer' as User['user_type'],
+  status: 'active' as User['status'],
+  register_region: 'mandalay',
+  notes: '',
+  freeze_reason: '',
 };
 
-const getUserTypeBadgeClass = (user: User) => {
-  if (user.user_type === 'admin') return 'user-mgmt-card__badge--admin';
-  if (user.user_type === 'merchant') return 'user-mgmt-card__badge--merchant';
-  if (user.user_type === 'courier') return 'user-mgmt-card__badge--courier';
-  if ((user.balance || 0) > 0 || user.user_type === 'vip') return 'user-mgmt-card__badge--vip';
-  return 'user-mgmt-card__badge--member';
-};
+function getUserTypeText(user: User) {
+  return isVipUserType(user.user_type) ? 'VIP' : '会员';
+}
 
-const USER_TABS = [
-  { id: 'customer_list', label: '客户列表', icon: '👥' },
-  { id: 'admin_list', label: '管理员', icon: '🔐' },
-  { id: 'merchant_store', label: 'MERCHANTS', icon: '🏪' },
-  { id: 'courier_management', label: '快递员', icon: '🛵' },
-] as const;
+function getUserTypeBadgeClass(user: User) {
+  return isVipUserType(user.user_type) ? 'user-mgmt-badge--vip' : 'user-mgmt-badge--member';
+}
 
-const getVehicleIcon = (type: string) => {
-  switch (type) {
-    case 'motorcycle': return '🏍️';
-    case 'car': return '🚗';
-    case 'bicycle': return '🚲';
-    case 'truck': return '🚚';
-    case 'tricycle': return '🛺';
-    case 'small_truck': return '🚛';
-    default: return '🚚';
-  }
-};
+function regionLabel(id?: string) {
+  if (!id) return '—';
+  const match = REGIONS.find((region) => region.id === id || region.prefix === id);
+  return match ? match.name : id;
+}
 
-// 列表行组件 - 用户
-const UserRow = ({
-  user,
-  selectedUsers,
-  handleSelectUser,
-  handleEditUser,
-  updateUserStatus,
-  handleDeleteUser,
-  handleOpenRecharge,
-}: any) => {
-  if (!user) return null;
-
-  const isSelected = selectedUsers.has(user.id);
-
-  const stopCardClick = (e: React.MouseEvent) => {
-    const tag = (e.target as HTMLElement).tagName;
-    if (tag === 'BUTTON' || tag === 'SELECT' || tag === 'OPTION' || tag === 'A' || tag === 'IMG') {
-      e.stopPropagation();
-    }
+function vehicleLabel(type: string) {
+  const labels: Record<string, string> = {
+    motorcycle: '摩托车',
+    car: '汽车',
+    bicycle: '自行车',
+    truck: '货车',
+    tricycle: '三轮车',
+    small_truck: '小货车',
   };
+  return labels[type] || type || '—';
+}
 
+function truncateId(id: string) {
+  if (!id) return '—';
+  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+function avatarColor(user: User) {
+  return isVipUserType(user.user_type) ? '#d97706' : '#1677ff';
+}
+
+function currentOperator() {
+  return {
+    id: sessionStorage.getItem('currentUser') || 'admin',
+    name: sessionStorage.getItem('currentUserName') || '系统管理员',
+  };
+}
+
+async function copyText(label: string, value: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    feedbackService.notify(`已复制${label}`);
+  } catch {
+    feedbackService.notify(value);
+  }
+}
+
+async function countRows(table: string, column?: string, value?: string): Promise<number> {
+  let q = supabase.from(table).select('id', { count: 'exact', head: true });
+  if (column && value) q = q.eq(column, value);
+  const { count } = await q;
+  return count || 0;
+}
+
+function StatusSelect({
+  value,
+  onChange,
+  allowSuspended = true,
+}: {
+  value: string;
+  onChange: (status: User['status']) => void;
+  allowSuspended?: boolean;
+}) {
   return (
-    <article
-      className={`user-mgmt-card${isSelected ? ' is-selected' : ''}`}
-      onClick={(e) => {
-        stopCardClick(e);
-        if (!(e.target as HTMLElement).closest('button, select, a, .user-mgmt-card__check')) {
-          handleSelectUser(user.id);
-        }
-      }}
-    >
-      <div
-        className="user-mgmt-card__check"
-        role="checkbox"
-        aria-checked={isSelected}
-        onClick={(e) => {
-          e.stopPropagation();
-          handleSelectUser(user.id);
-        }}
+    <div className="user-mgmt-card__status-wrap">
+      <select
+        className="user-mgmt-card__status"
+        data-status={value}
+        value={value}
+        onChange={(e) => onChange(e.target.value as User['status'])}
       >
-        {isSelected ? '✓' : ''}
-      </div>
-
-      <div className="user-mgmt-card__head">
-        <div>
-          <div className="user-mgmt-card__name-row">
-            <h3 className="user-mgmt-card__name">{user.name}</h3>
-            <span className="user-mgmt-card__id">{user.id}</span>
-            <span className="user-mgmt-card__balance">💰 {(user.balance ?? 0).toLocaleString()} MMK</span>
-          </div>
-          <p className="user-mgmt-card__meta">
-            注册 {user.registration_date || '—'} · 最后登录 {user.last_login || '—'}
-          </p>
-        </div>
-        <div className="user-mgmt-card__badges">
-          {user.register_region && (
-            <span className="user-mgmt-card__badge user-mgmt-card__badge--region">
-              📍 {REGIONS.find((r) => r.id === user.register_region)?.name || user.register_region}
-            </span>
-          )}
-          <span className={`user-mgmt-card__badge ${getUserTypeBadgeClass(user)}`}>
-            {getUserTypeText(user)}
-          </span>
-          <div className="user-mgmt-card__status-wrap">
-            <select
-              className="user-mgmt-card__status"
-              data-status={user.status}
-              value={user.status}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => updateUserStatus(user, e.target.value as User['status'])}
-            >
-              <option value="active">活跃</option>
-              <option value="inactive">非活跃</option>
-              <option value="suspended">已暂停</option>
-            </select>
-            <span className="user-mgmt-card__status-arrow">▼</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="user-mgmt-card__body">
-        <div>
-          <h4 className="user-mgmt-card__section-title">📞 联系信息</h4>
-          <p className="user-mgmt-card__line">
-            <span className="user-mgmt-card__line-label">电话</span>
-            <span className="user-mgmt-card__line--strong">{user.phone || '—'}</span>
-          </p>
-          <p className="user-mgmt-card__line">
-            <span className="user-mgmt-card__line-label">邮箱</span>
-            {user.email || '未绑定'}
-          </p>
-          <p className="user-mgmt-card__line">
-            <span className="user-mgmt-card__line-label">地址</span>
-            {user.address || '未填写'}
-          </p>
-        </div>
-        <div>
-          <h4 className="user-mgmt-card__section-title">📊 业务统计</h4>
-          <p className="user-mgmt-card__line">
-            <span className="user-mgmt-card__line-label">订单</span>
-            <span className="user-mgmt-card__line--strong">{user.total_orders || 0}</span>
-          </p>
-          <p className="user-mgmt-card__line">
-            <span className="user-mgmt-card__line-label">消费</span>
-            <span className="user-mgmt-card__line--strong">{(user.total_spent ?? 0).toLocaleString()} MMK</span>
-          </p>
-          <p className="user-mgmt-card__line">
-            <span className="user-mgmt-card__line-label">评分</span>
-            ⭐ {user.rating?.toFixed(1) || '5.0'}
-          </p>
-        </div>
-        <div>
-          <h4 className="user-mgmt-card__section-title">📝 内部备注</h4>
-          <p className={`user-mgmt-card__notes${user.notes ? '' : ''}`}>{user.notes || '暂无备注信息'}</p>
-        </div>
-      </div>
-
-      <div className="user-mgmt-card__actions">
-        {user.user_type !== 'admin' && (
-          <button
-            type="button"
-            className="user-mgmt-card__action user-mgmt-card__action--credit"
-            onClick={() => handleOpenRecharge(user)}
-          >
-            💰 Credit 充值
-          </button>
-        )}
-
-        <button type="button" className="user-mgmt-card__action user-mgmt-card__action--edit" onClick={() => handleEditUser(user)}>
-          ✏️ 编辑资料
-        </button>
-        <button
-          type="button"
-          className="user-mgmt-card__action"
-          onClick={() => updateUserStatus(user, user.status === 'active' ? 'inactive' : 'active')}
-        >
-          {user.status === 'active' ? '🚫 停用' : '✅ 启用'}
-        </button>
-        <button type="button" className="user-mgmt-card__action user-mgmt-card__action--delete" onClick={() => handleDeleteUser(user)}>
-          🗑️ 删除账户
-        </button>
-      </div>
-    </article>
+        <option value="active">活跃</option>
+        <option value="inactive">非活跃</option>
+        {allowSuspended && <option value="suspended">已暂停</option>}
+      </select>
+      <span className="user-mgmt-card__status-arrow">▼</span>
+    </div>
   );
-};
+}
 
-// 列表行组件 - 商家店铺
-const StoreRow = ({ store, isMobile }: any) => {
-  if (!store) return null;
-  
+function TablePager({
+  page,
+  pageSize,
+  total,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
+  onPageSize: (size: number) => void;
+}) {
+  if (total <= 0) return null;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safe = Math.min(Math.max(1, page), totalPages);
   return (
-    <div style={{ paddingBottom: '20px', boxSizing: 'border-box' }}>
-      <div 
-        key={store.id} 
-        style={{
-          background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)',
-          borderRadius: '24px',
-          padding: '28px',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(15px)',
-          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
-          position: 'relative',
-          overflow: 'hidden',
-          boxSizing: 'border-box',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-5px) scale(1.01)';
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-          e.currentTarget.style.boxShadow = '0 20px 50px rgba(0,0,0,0.3)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0) scale(1)';
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-          e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.2)';
-        }}
-      >
-        {/* 背景装饰光晕 */}
-        <div style={{
-          position: 'absolute',
-          top: '-50px',
-          right: '-50px',
-          width: '150px',
-          height: '150px',
-          background: store.status === 'active' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(148, 163, 184, 0.1)',
-          borderRadius: '50%',
-          filter: 'blur(40px)',
-          pointerEvents: 'none'
-        }}></div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 2fr 1fr', gap: '32px', alignItems: 'center' }}>
-          {/* 店铺名称与状态 */}
-          <div style={{ borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)', paddingRight: isMobile ? 0 : '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <div style={{ 
-                width: '50px', 
-                height: '50px', 
-                borderRadius: '16px', 
-                background: 'rgba(255,255,255,0.1)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                fontSize: '1.8rem',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-              }}>🏪</div>
-              <div>
-                <h3 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '0.5px' }}>{store.store_name}</h3>
-              </div>
-            </div>
-            <div style={{ 
-              background: store.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(148, 163, 184, 0.2)',
-              color: store.status === 'active' ? '#4ade80' : '#94a3b8',
-              padding: '8px 16px',
-              borderRadius: '12px',
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              border: `1px solid ${store.status === 'active' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(148, 163, 184, 0.3)'}`
-            }}>
-              <span style={{ 
-                width: '8px', 
-                height: '8px', 
-                borderRadius: '50%', 
-                background: store.status === 'active' ? '#22c55e' : '#94a3b8',
-                boxShadow: store.status === 'active' ? '0 0 10px #22c55e' : 'none'
-              }}></span>
-              {store.status === 'active' ? '正在营业' : '暂停营业'}
-            </div>
-          </div>
-
-          {/* 店铺详细信息 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ background: 'rgba(255,255,255,0.1)', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📞</span>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>联系电话</p>
-                <p style={{ margin: 0, color: 'white', fontWeight: 600, fontSize: '1rem' }}>{store.phone || '尚未绑定'}</p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-              <span style={{ background: 'rgba(255,255,255,0.1)', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📍</span>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>详细地址</p>
-                <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '0.95rem', lineHeight: '1.5' }}>{store.address || '尚未填写地址'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* 店铺代码 */}
-          <div style={{ 
-            background: 'rgba(0,0,0,0.2)', 
-            padding: '20px', 
-            borderRadius: '20px', 
-            textAlign: 'center', 
-            border: '1px solid rgba(255,255,255,0.05)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <p style={{ margin: '0 0 8px 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700, textTransform: 'uppercase' }}>店铺专属代码</p>
-            <span style={{ 
-              fontFamily: 'monospace', 
-              color: '#60a5fa', 
-              fontSize: '1.4rem', 
-              fontWeight: 900, 
-              letterSpacing: '2px',
-              textShadow: '0 0 15px rgba(96, 165, 250, 0.3)'
-            }}>{store.store_code || 'N/A'}</span>
-          </div>
-        </div>
+    <div className="user-mgmt-pager">
+      <span className="user-mgmt-pager__info">
+        共 {total} 条 · 第 {safe}/{totalPages} 页
+      </span>
+      <div className="user-mgmt-pager__controls">
+        <label className="user-mgmt-pager__size">
+          每页
+          <select value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))}>
+            {USER_LIST_PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="user-mgmt__btn" disabled={safe <= 1} onClick={() => onPage(safe - 1)}>
+          上一页
+        </button>
+        <button type="button" className="user-mgmt__btn" disabled={safe >= totalPages} onClick={() => onPage(safe + 1)}>
+          下一页
+        </button>
       </div>
     </div>
   );
-};
+}
+
+function UserRow({
+  user,
+  selected,
+  onSelect,
+  onOpen,
+  onEdit,
+  onStatus,
+  onDelete,
+  onRecharge,
+}: {
+  user: User;
+  selected: boolean;
+  onSelect: (id: string) => void;
+  onOpen: (user: User) => void;
+  onEdit: (user: User) => void;
+  onStatus: (user: User, status: User['status']) => void;
+  onDelete: (user: User) => void;
+  onRecharge: (user: User) => void;
+}) {
+  return (
+    <tr className={selected ? 'is-selected' : undefined}>
+      <td className="user-mgmt-table__check">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onSelect(user.id)}
+          aria-label={`选择 ${user.name}`}
+        />
+      </td>
+      <td>
+        <div className="user-mgmt-table__user">
+          <div className="user-mgmt-table__avatar" style={{ background: avatarColor(user) }}>
+            {(user.name || '?').slice(0, 1)}
+          </div>
+          <div>
+            <button type="button" className="user-mgmt-table__id" style={{ fontWeight: 700, fontSize: '0.84rem', fontFamily: 'inherit' }} onClick={() => onOpen(user)}>
+              {user.name || '未命名'}
+            </button>
+            <div className="user-mgmt-table__sub">{user.phone || '未填电话'}</div>
+            <button type="button" className="user-mgmt-table__id" onClick={() => copyText('ID', user.id)}>
+              {truncateId(user.id)}
+            </button>
+          </div>
+        </div>
+      </td>
+      <td>
+        <span className={`user-mgmt-badge ${getUserTypeBadgeClass(user)}`}>{getUserTypeText(user)}</span>
+      </td>
+      <td>
+        <span className="user-mgmt-badge user-mgmt-badge--region">{regionLabel(user.register_region)}</span>
+      </td>
+      <td>
+        <span className="user-mgmt-table__money">{(user.balance ?? 0).toLocaleString()} MMK</span>
+      </td>
+      <td>
+        <span className="user-mgmt-table__num">{user.total_orders || 0}</span>
+      </td>
+      <td>
+        <StatusSelect value={user.status} onChange={(status) => onStatus(user, status)} />
+        {user.status === 'suspended' && user.freeze_reason ? (
+          <div className="user-mgmt-table__sub">{user.freeze_reason}</div>
+        ) : null}
+      </td>
+      <td>
+        <div className="user-mgmt-table__actions">
+          <button type="button" className="user-mgmt-table__action user-mgmt-table__action--edit" onClick={() => onOpen(user)}>
+            详情
+          </button>
+          <button type="button" className="user-mgmt-table__action user-mgmt-table__action--credit" onClick={() => onRecharge(user)}>
+            充值
+          </button>
+          <button type="button" className="user-mgmt-table__action user-mgmt-table__action--edit" onClick={() => onEdit(user)}>
+            编辑
+          </button>
+          <button type="button" className="user-mgmt-table__action user-mgmt-table__action--delete" onClick={() => onDelete(user)}>
+            删除
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function CourierRow({
+  courier,
+  onEdit,
+  onStatus,
+  onDelete,
+}: {
+  courier: Courier;
+  onEdit: (courier: Courier) => void;
+  onStatus: (courier: Courier, status: string) => void;
+  onDelete: (courier: Courier) => void;
+}) {
+  return (
+    <tr>
+      <td>
+        <div className="user-mgmt-table__name">{courier.name || '未命名'}</div>
+        <div className="user-mgmt-table__sub">#{courier.employee_id || '—'}</div>
+      </td>
+      <td>{courier.phone || '—'}</td>
+      <td>{regionLabel(courier.region)}</td>
+      <td>{vehicleLabel(courier.vehicle_type)}</td>
+      <td>
+        <span className="user-mgmt-table__num">{courier.total_deliveries || 0}</span>
+      </td>
+      <td>
+        <StatusSelect
+          value={courier.status === 'active' ? 'active' : 'inactive'}
+          onChange={(status) => onStatus(courier, status)}
+          allowSuspended={false}
+        />
+      </td>
+      <td>
+        <div className="user-mgmt-table__actions">
+          <button type="button" className="user-mgmt-table__action user-mgmt-table__action--edit" onClick={() => onEdit(courier)}>
+            编辑
+          </button>
+          <button type="button" className="user-mgmt-table__action user-mgmt-table__action--delete" onClick={() => onDelete(courier)}>
+            删除
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+type DetailTab = 'profile' | 'orders' | 'ledger';
+
+function CustomerDrawer({
+  user,
+  tab,
+  onTab,
+  onClose,
+  onEdit,
+  onRecharge,
+  onFreeze,
+  onUnfreeze,
+  loading,
+  orders,
+  ledger,
+}: {
+  user: User;
+  tab: DetailTab;
+  onTab: (tab: DetailTab) => void;
+  onClose: () => void;
+  onEdit: (user: User) => void;
+  onRecharge: (user: User) => void;
+  onFreeze: (user: User) => void;
+  onUnfreeze: (user: User) => void;
+  loading: boolean;
+  orders: { id: string; status?: string; price?: string; created_at?: string; sender_name?: string }[];
+  ledger: { id: string; amount?: number; status?: string; notes?: string; created_at?: string }[];
+}) {
+  return (
+    <>
+      <div className="user-mgmt-drawer-overlay" onClick={onClose} />
+      <aside className="user-mgmt-drawer" role="dialog" aria-modal="true" aria-label="客户详情">
+        <div className="user-mgmt-drawer__head">
+          <div>
+            <h2 className="user-mgmt-modal__title">{user.name || '未命名客户'}</h2>
+            <p className="user-mgmt-modal__sub">
+              {user.phone || '未填电话'} · {getUserTypeText(user)} · {regionLabel(user.register_region)}
+            </p>
+          </div>
+          <button type="button" className="user-mgmt-modal__close" onClick={onClose} aria-label="关闭">
+            ✕
+          </button>
+        </div>
+        <div className="user-mgmt-drawer__tabs">
+          {([
+            ['profile', '资料'],
+            ['orders', '订单'],
+            ['ledger', '流水'],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={`user-mgmt-drawer__tab${tab === id ? ' is-active' : ''}`}
+              onClick={() => onTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="user-mgmt-drawer__body">
+          {tab === 'profile' && (
+            <>
+              <dl className="user-mgmt-kv">
+                <dt>ID</dt>
+                <dd>{user.id}</dd>
+                <dt>邮箱</dt>
+                <dd>{user.email || '—'}</dd>
+                <dt>地址</dt>
+                <dd>{user.address || '—'}</dd>
+                <dt>余额</dt>
+                <dd>{(user.balance ?? 0).toLocaleString()} MMK</dd>
+                <dt>订单数</dt>
+                <dd>{user.total_orders || 0}</dd>
+                <dt>累计消费</dt>
+                <dd>{(user.total_spent ?? 0).toLocaleString()} MMK</dd>
+                <dt>状态</dt>
+                <dd>{user.status === 'suspended' ? '已暂停' : user.status === 'inactive' ? '非活跃' : '活跃'}</dd>
+                <dt>冻结原因</dt>
+                <dd>{user.freeze_reason || (user.status === 'suspended' ? '未填写' : '—')}</dd>
+                {user.status === 'suspended' ? (
+                  <>
+                    <dt>冻结时间</dt>
+                    <dd>{formatWhen(user.frozen_at)}</dd>
+                    <dt>操作人</dt>
+                    <dd>{user.frozen_by || '—'}</dd>
+                  </>
+                ) : null}
+                <dt>注册</dt>
+                <dd>{formatWhen(user.created_at) !== '—' ? formatWhen(user.created_at) : user.registration_date || '—'}</dd>
+                <dt>备注</dt>
+                <dd>{user.notes || '—'}</dd>
+              </dl>
+              <div className="user-mgmt-jump__actions" style={{ marginTop: '1rem' }}>
+                <button type="button" className="user-mgmt__btn user-mgmt__btn--primary" onClick={() => onEdit(user)}>
+                  编辑资料
+                </button>
+                <button type="button" className="user-mgmt__btn" onClick={() => onRecharge(user)}>
+                  充值
+                </button>
+                {user.status === 'suspended' ? (
+                  <button type="button" className="user-mgmt__btn" onClick={() => onUnfreeze(user)}>
+                    解冻
+                  </button>
+                ) : (
+                  <button type="button" className="user-mgmt__btn user-mgmt__btn--danger" onClick={() => onFreeze(user)}>
+                    冻结
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+          {tab === 'orders' && (
+            <>
+              <p className="user-mgmt-drawer__hint">按客户 ID 或寄件电话匹配最近 30 单。</p>
+              {loading ? (
+                <SkeletonTable rows={4} />
+              ) : orders.length === 0 ? (
+                <p className="user-mgmt__empty-text">没有找到订单</p>
+              ) : (
+                <table className="user-mgmt-mini-table">
+                  <thead>
+                    <tr>
+                      <th>单号</th>
+                      <th>状态</th>
+                      <th>金额</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          {row.id}
+                          <div className="user-mgmt-table__sub">{formatWhen(row.created_at)}</div>
+                        </td>
+                        <td>{row.status || '—'}</td>
+                        <td>{row.price || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
+          {tab === 'ledger' && (
+            <>
+              <p className="user-mgmt-drawer__hint">来自充值流水表，含后台手动入账。</p>
+              {loading ? (
+                <SkeletonTable rows={4} />
+              ) : ledger.length === 0 ? (
+                <p className="user-mgmt__empty-text">没有流水记录</p>
+              ) : (
+                <table className="user-mgmt-mini-table">
+                  <thead>
+                    <tr>
+                      <th>时间</th>
+                      <th>金额</th>
+                      <th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledger.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          {formatWhen(row.created_at)}
+                          {row.notes ? <div className="user-mgmt-table__sub">{row.notes}</div> : null}
+                        </td>
+                        <td>{Number(row.amount || 0).toLocaleString()} MMK</td>
+                        <td>{ledgerStatusLabel(row.status || '')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
+        </div>
+      </aside>
+    </>
+  );
+}
 
 const UserManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { language } = useLanguage();
+  const [activeTab, setActiveTab] = useState<UserTab>('customer_list');
 
-  const [activeTab, setActiveTab] = useState<'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management'>('customer_list');
-  const CourierRow = ({ courier, isMobile, handleEditCourier, handleCourierStatusChange, handleDeleteCourier }: any) => {
-    if (!courier) return null;
-    
-    return (
-      <div style={{ paddingBottom: '20px', boxSizing: 'border-box' }}>
-        <div 
-          key={courier.id} 
-          style={{ 
-            background: 'linear-gradient(145deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)', 
-            padding: '28px', 
-            borderRadius: '24px', 
-            border: '1px solid rgba(255, 255, 255, 0.15)', 
-            backdropFilter: 'blur(15px)',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.2)',
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            position: 'relative',
-            overflow: 'hidden',
-            boxSizing: 'border-box'
-          }}
-        >
-          {/* 背景光晕装饰 */}
-          <div style={{
-            position: 'absolute',
-            top: '-20px',
-            right: '-20px',
-            width: '100px',
-            height: '100px',
-            background: 'rgba(59, 130, 246, 0.1)',
-            borderRadius: '50%',
-            filter: 'blur(30px)',
-            pointerEvents: 'none'
-          }}></div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.8fr 1.5fr 1fr 1.2fr', gap: '32px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-            {/* 个人信息栏 */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                <div style={{ 
-                  width: '60px', 
-                  height: '60px', 
-                  borderRadius: '18px', 
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.4) 100%)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  fontSize: '2rem',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-                }}>
-                  {getVehicleIcon(courier.vehicle_type)}
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, color: 'white', fontSize: '1.4rem', fontWeight: 800, letterSpacing: '0.5px' }}>{courier.name}</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#4ade80', fontWeight: 700, fontFamily: 'monospace', background: 'rgba(74, 222, 128, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
-                      #{courier.employee_id || '-'}
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{courier.position || '骑手'}</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ color: 'white', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ background: 'rgba(255,255,255,0.1)', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>📞</span> 
-                  <span style={{ fontWeight: 600 }}>{courier.phone}</span>
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ background: 'rgba(255,255,255,0.05)', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>📧</span> 
-                  <span>{courier.email || '未设置邮箱'}</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* 区域与地址 */}
-            <div style={{ paddingLeft: isMobile ? 0 : '20px', borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <span style={{ color: '#60a5fa', fontSize: '1.1rem' }}>📍</span>
-                <span style={{ color: '#93c5fd', fontSize: '1.1rem', fontWeight: 700 }}>
-                  {(() => {
-                    const r = REGIONS.find(reg => reg.id === courier.region || reg.prefix === courier.region);
-                    return r ? `${r.name} (${r.prefix})` : (courier.region || '-');
-                  })()}
-                </span>
-              </div>
-              <p style={{ margin: '0 0 16px 0', color: 'rgba(255,255,255,0.8)', fontSize: '0.95rem', lineHeight: '1.6' }}>
-                {courier.address || '暂无详细地址'}
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <span style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  📅 入职: {courier.join_date}
-                </span>
-              </div>
-            </div>
-
-            {/* 业务数据 */}
-            <div style={{ textAlign: 'center', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>配送成就</p>
-                  <p style={{ margin: 0, color: '#f59e0b', fontSize: '1.8rem', fontWeight: 900 }}>{courier.total_deliveries}</p>
-                </div>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>综合评分</p>
-                  <p style={{ margin: 0, color: '#fbbf24', fontSize: '1.4rem', fontWeight: 900 }}>⭐ {courier.rating?.toFixed(1) || 5.0}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* 操作按钮 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEditCourier(courier);
-                }}
-                style={{ 
-                  padding: '10px 20px', 
-                  borderRadius: '12px', 
-                  border: '1px solid #3498db', 
-                  background: 'rgba(52, 152, 219, 0.15)', 
-                  color: '#3498db', 
-                  cursor: 'pointer', 
-                  fontWeight: 'bold',
-                  fontSize: '0.9rem',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(52, 152, 219, 0.3)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(52, 152, 219, 0.15)'}
-              >✏️ 编辑资料</button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCourierStatusChange(courier.id, courier.status === 'active' ? 'inactive' : 'active');
-                }}
-                style={{ 
-                  padding: '10px 20px', 
-                  borderRadius: '12px', 
-                  border: '1px solid #e67e22', 
-                  background: 'rgba(230, 126, 34, 0.15)', 
-                  color: '#e67e22', 
-                  cursor: 'pointer', 
-                  fontWeight: 'bold',
-                  fontSize: '0.9rem',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(230, 126, 34, 0.3)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(230, 126, 34, 0.15)'}
-              >{courier.status === 'active' ? '🚫 停用账号' : '✅ 启用账号'}</button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteCourier(courier.id);
-                }}
-                style={{ 
-                  padding: '10px 20px', 
-                  borderRadius: '12px', 
-                  border: '1px solid #e74c3c', 
-                  background: 'rgba(231, 76, 60, 0.15)', 
-                  color: '#e74c3c', 
-                  cursor: 'pointer', 
-                  fontWeight: 'bold',
-                  fontSize: '0.9rem',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(231, 76, 60, 0.3)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(231, 76, 60, 0.15)'}
-              >🗑️ 永久删除</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [users, setUsers] = useState<User[]>([]);
+  const [userTotal, setUserTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [merchantStores, setMerchantStores] = useState<any[]>([]);
-  const [loadingStores, setLoadingStores] = useState(false);
-  
-  // 快递员管理状态
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<CustomerTypeFilter>('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterRegion, setFilterRegion] = useState('all');
+  const [sortBy, setSortBy] = useState<CustomerSort>('newest');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_USER_PAGE_SIZE);
+  const skipUserPageReset = useRef(true);
+  const [exporting, setExporting] = useState(false);
+  const [detailUser, setDetailUser] = useState<User | null>(null);
+  const [detailTab, setDetailTab] = useState<DetailTab>('profile');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailOrders, setDetailOrders] = useState<{ id: string; status?: string; price?: string; created_at?: string; sender_name?: string }[]>([]);
+  const [detailLedger, setDetailLedger] = useState<{ id: string; amount?: number; status?: string; notes?: string; created_at?: string }[]>([]);
+  const [freezeUser, setFreezeUser] = useState<User | null>(null);
+  const [freezeReason, setFreezeReason] = useState('');
+  const [freezeSaving, setFreezeSaving] = useState(false);
+
   const [couriers, setCouriers] = useState<Courier[]>([]);
-  const [courierLoading, setCourierLoading] = useState(true);
-  const [courierSubTab, setCourierSubTab] = useState<'list' | 'create'>('list');
+  const [courierTotal, setCourierTotal] = useState(0);
+  const [courierLoading, setCourierLoading] = useState(false);
+  const [courierSearchInput, setCourierSearchInput] = useState('');
   const [courierSearchTerm, setCourierSearchTerm] = useState('');
   const [courierStatusFilter, setCourierStatusFilter] = useState('all');
   const [vehicleFilter, setVehicleFilter] = useState('all');
+  const [courierPage, setCourierPage] = useState(1);
+  const [courierPageSize, setCourierPageSize] = useState(DEFAULT_USER_PAGE_SIZE);
+  const skipCourierPageReset = useRef(true);
   const [editingCourier, setEditingCourier] = useState<Courier | null>(null);
-  const [importing, setImporting] = useState(false);
+  const [showAddCourierForm, setShowAddCourierForm] = useState(false);
   const [courierForm, setCourierForm] = useState({
     name: '',
     phone: '',
@@ -582,365 +616,383 @@ const UserManagement: React.FC = () => {
     status: 'active',
     notes: '',
     employee_id: '',
-    department: '',
-    position: '',
-    role: 'operator' as 'admin' | 'manager' | 'operator' | 'finance',
-    region: 'yangon'
+    region: 'yangon',
   });
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showAddUserForm, setShowAddUserForm] = useState(false);
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [rechargeUser, setRechargeUser] = useState<User | null>(null);
+  const [isRecharging, setIsRecharging] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const [userForm, setUserForm] = useState(emptyUserForm);
+
+  const [customerStats, setCustomerStats] = useState({
+    total: 0,
+    vip: 0,
+    active: 0,
+    suspended: 0,
+  });
+  const [courierStats, setCourierStats] = useState({ total: 0, active: 0, inactive: 0 });
+  const [adminJump, setAdminJump] = useState<JumpCounts>({ total: 0, active: 0 });
+  const [storeJump, setStoreJump] = useState<JumpCounts>({ total: 0, active: 0 });
+  const [jumpLoading, setJumpLoading] = useState(false);
+  const [courierDeskOpen, setCourierDeskOpen] = useState(false);
+
   useEffect(() => {
     const q = searchParams.get('q');
     const tab = searchParams.get('tab');
     const status = searchParams.get('status');
     const type = searchParams.get('type');
     const sort = searchParams.get('sort');
-    if (q) setSearchTerm(q);
-    if (
-      tab &&
-      ['customer_list', 'admin_list', 'merchant_store', 'courier_management'].includes(tab)
-    ) {
-      setActiveTab(
-        tab as 'customer_list' | 'admin_list' | 'merchant_store' | 'courier_management'
-      );
+    const region = searchParams.get('region');
+    if (q && tab === 'courier_management') {
+      setCourierSearchInput(q);
+      setCourierSearchTerm(q);
+      setCourierDeskOpen(true);
+    } else if (q) {
+      setSearchInput(q);
+      setSearchTerm(q);
+    }
+    if (tab && USER_TABS.some((item) => item.id === tab)) {
+      setActiveTab(tab as UserTab);
     }
     if (status && ['all', 'active', 'inactive', 'suspended'].includes(status)) {
       setFilterStatus(status);
     }
     if (type && ['all', 'vip', 'member'].includes(type)) {
-      setFilterType(type);
+      setFilterType(type as CustomerTypeFilter);
     }
     if (sort && ['newest', 'balance', 'orders', 'name'].includes(sort)) {
-      setSortBy(sort as 'newest' | 'balance' | 'orders' | 'name');
+      setSortBy(sort as CustomerSort);
+    }
+    if (region && (region === 'all' || REGIONS.some((item) => item.id === region))) {
+      setFilterRegion(region);
     }
   }, [searchParams]);
-  const [filterType, setFilterType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [sortBy, setSortBy] = useState<'newest' | 'balance' | 'orders' | 'name'>('newest');
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [showAddUserForm, setShowAddUserForm] = useState(false);
-  const [showAddCourierForm, setShowAddCourierForm] = useState(false);
-  
-  // 🚀 新增：充值功能状态
-  const [showRechargeModal, setShowRechargeModal] = useState(false);
-  const [rechargeUser, setRechargeUser] = useState<User | null>(null);
-  const [isRecharging, setIsRecharging] = useState(false);
-  
-  // 批量操作状态
-  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
 
-  // 🚀 新增：统计数据状态
-  const [summaryStats, setSummaryStats] = useState({
-    // 客户统计
-    totalCustomers: 0,
-    vipCustomers: 0,
-    activeCustomers: 0,
-    totalSpent: 0,
-    // 管理员统计
-    totalAdmins: 0,
-    activeAdmins: 0,
-    superAdmins: 0,
-    recentLogins: 0,
-    // 快递员统计
-    totalCouriers: 0,
-    activeCouriers: 0,
-    totalDeliveries: 0,
-    avgRating: 0,
-    // 店铺统计
-    totalStores: 0,
-    activeStores: 0,
-    totalCOD: 0,
-    // 全局统计
-    totalOrders: 0
-  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchTerm(searchInput), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
-  const loadSummaryStats = async () => {
-    try {
-      console.log('📊 正在加载统计数据...');
-      
-      // 1. 获取客户统计 - 分开获取以确定哪个失败
-      const { data: customers, error: custError } = await supabase
-        .from('users')
-        .select('status, balance, total_spent, user_type');
-      
-      if (custError) {
-        console.error('❌ 获取客户表失败 (users):', custError.message, custError.details);
-        // 如果是 400 错误，说明表结构不对
-        if (custError.code === '42703' || custError.message.includes('column')) {
-          console.warn('⚠️ 数据库缺少必要字段 (balance 或 total_spent)，请运行 fix-users-table-columns.sql');
-        }
+  useEffect(() => {
+    const timer = window.setTimeout(() => setCourierSearchTerm(courierSearchInput), 300);
+    return () => window.clearTimeout(timer);
+  }, [courierSearchInput]);
+
+  useEffect(() => {
+    if (skipUserPageReset.current) {
+      skipUserPageReset.current = false;
+      return;
+    }
+    setPage(1);
+    setSelectedUsers(new Set());
+  }, [searchTerm, filterType, filterStatus, filterRegion, sortBy, pageSize]);
+
+  useEffect(() => {
+    if (skipCourierPageReset.current) {
+      skipCourierPageReset.current = false;
+      return;
+    }
+    setCourierPage(1);
+  }, [courierSearchTerm, courierStatusFilter, vehicleFilter, courierPageSize]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (freezeSaving) return;
+      if (freezeUser) {
+        setFreezeUser(null);
+        return;
       }
-      
-      // 2. 获取管理员统计
-      const { data: admins, error: adminError } = await supabase
-        .from('admin_accounts')
-        .select('status, role, last_login, position');
-      
-      if (adminError) console.error('❌ 获取管理员表失败:', adminError.message);
-      
-      // 3. 获取快递员统计
-      const { data: couriersData, error: courierError } = await supabase
-        .from('couriers')
-        .select('status, total_deliveries, rating');
-      
-      if (courierError) console.error('❌ 获取快递员表失败:', courierError.message);
-      
-      // 4. 获取店铺统计
-      const { data: stores, error: storeError } = await supabase
-        .from('delivery_stores')
-        .select('status');
-      
-      if (storeError) console.error('❌ 获取店铺表失败:', storeError.message);
-      
-      // 5. 获取订单总数
-      const { count: orderCount, error: orderError } = await supabase
-        .from('packages')
-        .select('*', { count: 'exact', head: true });
-      
-      if (orderError) console.error('❌ 获取订单表失败:', orderError.message);
+      if (showRechargeModal || showAddUserForm || showAddCourierForm) return;
+      if (detailUser) setDetailUser(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [freezeUser, freezeSaving, showRechargeModal, showAddUserForm, showAddCourierForm, detailUser]);
 
-      const stats = {
-        totalCustomers: customers?.filter(u => u.user_type === 'customer' || u.user_type === 'vip').length || 0,
-        vipCustomers: customers?.filter(u => (u.user_type === 'customer' || u.user_type === 'vip') && ((u.balance || 0) > 0 || u.user_type === 'vip')).length || 0,
-        activeCustomers: customers?.filter(u => (u.user_type === 'customer' || u.user_type === 'vip') && u.status === 'active').length || 0,
-        totalSpent: customers?.reduce((sum, u) => sum + (Number(u.total_spent) || 0), 0) || 0,
-        
-        totalAdmins: admins?.length || 0,
-        activeAdmins: admins?.filter(a => a.status === 'active').length || 0,
-        superAdmins: admins?.filter(a => a.role === 'admin').length || 0,
-        recentLogins: admins?.filter(a => a.last_login && new Date(a.last_login).toDateString() === new Date().toDateString()).length || 0,
-        
-        totalCouriers: admins?.filter(a => a.position === '骑手' || a.position === '骑手队长').length || 0,
-        activeCouriers: admins?.filter(a => (a.position === '骑手' || a.position === '骑手队长') && a.status === 'active').length || 0,
-        totalDeliveries: couriersData?.reduce((sum, c) => sum + (c.total_deliveries || 0), 0) || 0,
-        avgRating: couriersData?.length ? (couriersData.reduce((sum, c) => sum + (c.rating || 0), 0) / couriersData.length) : 5.0,
-        
-        totalStores: stores?.length || 0,
-        activeStores: stores?.filter(s => s.status === 'active').length || 0,
-        totalCOD: 0, 
-        
-        totalOrders: orderCount || 0
+  const loadCustomerStats = useCallback(async () => {
+    const scoped = () => supabase.from('users').select('id', { count: 'exact', head: true }).in('user_type', [...CUSTOMER_TYPES]);
+    const [totalRes, vipRes, activeRes, suspendedRes] = await Promise.all([
+      scoped(),
+      scoped().eq('user_type', 'vip'),
+      scoped().eq('status', 'active'),
+      scoped().eq('status', 'suspended'),
+    ]);
+    setCustomerStats({
+      total: totalRes.count || 0,
+      vip: vipRes.count || 0,
+      active: activeRes.count || 0,
+      suspended: suspendedRes.count || 0,
+    });
+  }, []);
+
+  const loadCourierStats = useCallback(async () => {
+    const [total, active, inactive] = await Promise.all([
+      countRows('couriers'),
+      countRows('couriers', 'status', 'active'),
+      countRows('couriers', 'status', 'inactive'),
+    ]);
+    setCourierStats({ total, active, inactive });
+  }, []);
+
+  const listFilters = useMemo<CustomerListFilters>(
+    () => ({ filterStatus, filterType, filterRegion, searchTerm }),
+    [filterStatus, filterType, filterRegion, searchTerm],
+  );
+
+  const loadCustomers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { from, to } = pageRange(page, pageSize);
+      const order = customerOrder(sortBy);
+      const run = async () => {
+        let query = applyCustomerFilters(
+          supabase.from('users').select(customerSelectColumns(), { count: 'exact' }),
+          listFilters,
+        );
+        return query.order(order.column, { ascending: order.ascending }).range(from, to);
       };
 
-      setSummaryStats(stats);
-    } catch (err) {
-      console.error('❌ 加载统计数据异常:', err);
-    }
-  };
+      let { data, error, count } = await run();
+      if (error && freezeColumnsAvailable && isMissingFreezeColumn(error)) {
+        freezeColumnsAvailable = false;
+        ({ data, error, count } = await run());
+      }
+      if (error) throw error;
 
-  // 批量选择处理
+      const total = count || 0;
+      if ((data || []).length === 0 && total > 0 && from > 0) {
+        setPage(1);
+        return;
+      }
+
+      setUserTotal(total);
+      setUsers(asUsers(data));
+    } catch (error) {
+      console.error('加载客户失败:', error);
+      setUsers([]);
+      setUserTotal(0);
+      feedbackService.notify('加载客户失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, sortBy, listFilters]);
+
+  const loadCouriers = useCallback(async () => {
+    try {
+      setCourierLoading(true);
+      const { from, to } = pageRange(courierPage, courierPageSize);
+      let query = supabase.from('couriers').select('*', { count: 'exact' });
+      if (courierStatusFilter !== 'all') query = query.eq('status', courierStatusFilter);
+      if (vehicleFilter !== 'all') query = query.eq('vehicle_type', vehicleFilter);
+      const like = sanitizeIlike(courierSearchTerm);
+      if (like) query = query.or(courierSearchOr(like));
+
+      const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, to);
+      if (error) throw error;
+
+      const total = count || 0;
+      if ((data || []).length === 0 && total > 0 && from > 0) {
+        setCourierPage(1);
+        return;
+      }
+
+      const rows = data || [];
+      const phones = Array.from(new Set(rows.map((row) => String(row.phone || '')).filter(Boolean)));
+      const empIds = Array.from(new Set(rows.map((row) => String(row.employee_id || '')).filter(Boolean)));
+
+      const accountMap = new Map<string, { id?: string; phone?: string; employee_id?: string; region?: string; notes?: string }>();
+      const ingest = (list: { id?: string; phone?: string; employee_id?: string; region?: string; notes?: string }[]) => {
+        for (const acc of list) {
+          if (acc.employee_id) accountMap.set(`emp:${acc.employee_id}`, acc);
+          if (acc.phone) accountMap.set(`ph:${acc.phone}`, acc);
+        }
+      };
+      if (phones.length) {
+        const { data: byPhone } = await supabase
+          .from('admin_accounts')
+          .select('id, phone, employee_id, region, notes, position')
+          .in('phone', phones);
+        ingest(byPhone || []);
+      }
+      if (empIds.length) {
+        const { data: byEmp } = await supabase
+          .from('admin_accounts')
+          .select('id, phone, employee_id, region, notes, position')
+          .in('employee_id', empIds);
+        ingest(byEmp || []);
+      }
+
+      setCourierTotal(total);
+      setCouriers(
+        rows.map((row) => {
+          const acc =
+            (row.employee_id && accountMap.get(`emp:${row.employee_id}`)) ||
+            (row.phone && accountMap.get(`ph:${row.phone}`)) ||
+            undefined;
+          return {
+            id: String(row.id || ''),
+            accountId: acc?.id,
+            name: row.name || '',
+            phone: row.phone || '',
+            email: row.email || '',
+            address: row.address || '',
+            vehicle_type: row.vehicle_type || 'motorcycle',
+            license_number: row.license_number || '',
+            status: row.status || 'active',
+            join_date: row.created_at ? new Date(row.created_at).toLocaleDateString('zh-CN') : '未知',
+            last_active: row.last_active || '从未上线',
+            total_deliveries: row.total_deliveries || 0,
+            rating: row.rating || 5,
+            notes: row.notes || acc?.notes || '',
+            employee_id: row.employee_id || acc?.employee_id || '',
+            region: row.region || acc?.region || '',
+          } as Courier;
+        }),
+      );
+    } catch (error) {
+      console.error('加载骑手失败:', error);
+      setCouriers([]);
+      setCourierTotal(0);
+      feedbackService.notify('加载骑手失败');
+    } finally {
+      setCourierLoading(false);
+    }
+  }, [courierPage, courierPageSize, courierSearchTerm, courierStatusFilter, vehicleFilter]);
+
+  const loadAdminJump = useCallback(async () => {
+    setJumpLoading(true);
+    try {
+      const [total, active] = await Promise.all([
+        countRows('admin_accounts'),
+        countRows('admin_accounts', 'status', 'active'),
+      ]);
+      setAdminJump({ total, active });
+    } finally {
+      setJumpLoading(false);
+    }
+  }, []);
+
+  const loadStoreJump = useCallback(async () => {
+    setJumpLoading(true);
+    try {
+      const [total, active] = await Promise.all([
+        countRows('delivery_stores'),
+        countRows('delivery_stores', 'status', 'active'),
+      ]);
+      setStoreJump({ total, active });
+    } finally {
+      setJumpLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'customer_list') void loadCustomers();
+  }, [activeTab, loadCustomers]);
+
+  useEffect(() => {
+    if (activeTab === 'customer_list') void loadCustomerStats();
+  }, [activeTab, loadCustomerStats]);
+
+  useEffect(() => {
+    if (activeTab === 'courier_management' && courierDeskOpen) void loadCouriers();
+  }, [activeTab, courierDeskOpen, loadCouriers]);
+
+  useEffect(() => {
+    if (activeTab === 'courier_management') void loadCourierStats();
+  }, [activeTab, loadCourierStats]);
+
+  useEffect(() => {
+    if (activeTab === 'admin_list') void loadAdminJump();
+    else if (activeTab === 'merchant_store') void loadStoreJump();
+  }, [activeTab, loadAdminJump, loadStoreJump]);
+
   const handleSelectAll = () => {
-    if (selectedUsers.size === filteredUsers.length && filteredUsers.length > 0) {
+    if (selectedUsers.size === users.length && users.length > 0) {
       setSelectedUsers(new Set());
     } else {
-      setSelectedUsers(new Set(filteredUsers.map(u => u.id)));
+      setSelectedUsers(new Set(users.map((u) => u.id)));
     }
   };
 
   const handleSelectUser = (userId: string) => {
-    const newSelected = new Set(selectedUsers);
-    if (newSelected.has(userId)) {
-      newSelected.delete(userId);
-    } else {
-      newSelected.add(userId);
-    }
-    setSelectedUsers(newSelected);
+    const next = new Set(selectedUsers);
+    if (next.has(userId)) next.delete(userId);
+    else next.add(userId);
+    setSelectedUsers(next);
   };
 
-  // 批量删除：按用户类型分别删除 users 或 admin_accounts
   const handleBatchDelete = async () => {
     if (selectedUsers.size === 0) return;
-
-    if (!window.confirm(`确定要删除选中的 ${selectedUsers.size} 个用户吗？此操作不可恢复！`)) return;
+    if (!window.confirm(`确定要删除选中的 ${selectedUsers.size} 个客户吗？此操作不可恢复！`)) return;
 
     try {
       setIsBatchDeleting(true);
       const idList = Array.from(selectedUsers);
-      const targets = idList.map((id) => users.find((u) => u.id === id)).filter((u): u is User => Boolean(u));
-
+      if (detailUser && idList.includes(detailUser.id)) setDetailUser(null);
       let failures = 0;
       const errors: string[] = [];
-
-      for (const u of targets) {
-        if (u.user_type === 'admin') {
-          const del =
-            String(u.id).startsWith('ADM-') && String(u.id).length > 4
-              ? await supabase.from('admin_accounts').delete().eq('employee_id', String(u.id).slice(4)).select('id')
-              : await supabase.from('admin_accounts').delete().eq('id', u.id).select('id');
-          if (del.error) {
-            failures++;
-            errors.push(`${u.name}: ${del.error.message}`);
-          } else if (!del.data?.length) {
-            failures++;
-            errors.push(`${u.name}: 未找到后台账号记录`);
-          }
-        } else {
-          await supabase.from('recharge_requests').delete().eq('user_id', u.id);
-          const { error, data } = await supabase.from('users').delete().eq('id', u.id).select('id');
-          if (error) {
-            failures++;
-            errors.push(`${u.name}: ${error.message}`);
-          } else if (!data?.length) {
-            failures++;
-            errors.push(`${u.name}: 未找到 users 记录`);
-          }
+      for (const id of idList) {
+        await supabase.from('recharge_requests').delete().eq('user_id', id);
+        const { error, data } = await supabase.from('users').delete().eq('id', id).select('id');
+        if (error || !data?.length) {
+          failures += 1;
+          errors.push(`${id}: ${error?.message || '未找到记录'}`);
         }
       }
-
-      await loadUsers();
+      await loadCustomers();
+      await loadCustomerStats();
       setSelectedUsers(new Set());
-
       if (failures > 0) {
-        feedbackService.notify(
-          `完成部分删除。失败 ${failures} 条（可能受数据库外键或其它关联限制）。\n\n` + errors.slice(0, 5).join('\n'),
-        );
+        feedbackService.notify(`完成部分删除。失败 ${failures} 条。\n\n${errors.slice(0, 5).join('\n')}`);
       } else {
         feedbackService.notify('批量删除成功');
       }
-    } catch (error) {
-      console.error('批量删除异常:', error);
+    } catch {
       feedbackService.notify('操作出错');
     } finally {
       setIsBatchDeleting(false);
     }
   };
 
-  const [userForm, setUserForm] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    address: '',
-    password: '123456',  // 默认密码
-    user_type: 'customer' as 'customer' | 'courier' | 'admin' | 'merchant' | 'vip',
-    status: 'active' as 'active' | 'inactive' | 'suspended',
-    register_region: 'mandalay',
-    notes: ''
-  });
-
-  // 过滤用户
-  const filteredUsers = useMemo(() => {
-    const list = users.filter((user) => {
-      const q = searchTerm.trim().toLowerCase();
-      const matchesSearch =
-        !q ||
-        user.name?.toLowerCase().includes(q) ||
-        user.phone?.includes(searchTerm.trim()) ||
-        user.email?.toLowerCase().includes(q) ||
-        user.id?.toLowerCase().includes(q);
-
-      let matchesType = true;
-      if (activeTab === 'customer_list') {
-        matchesType = user.user_type === 'customer';
-        if (filterType === 'vip') {
-          matchesType = matchesType && ((user.balance || 0) > 0 || user.user_type === 'vip');
-        } else if (filterType === 'member') {
-          matchesType = matchesType && (user.balance || 0) <= 0 && user.user_type !== 'vip';
-        }
-      } else if (activeTab === 'admin_list') {
-        matchesType = user.user_type === 'admin';
-      }
-
-      const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-      return matchesSearch && matchesType && matchesStatus;
-    });
-
-    return [...list].sort((a, b) => {
-      if (sortBy === 'balance') return (b.balance || 0) - (a.balance || 0);
-      if (sortBy === 'orders') return (b.total_orders || 0) - (a.total_orders || 0);
-      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '', 'zh-CN');
-      const dateA = new Date(a.created_at || a.registration_date || 0).getTime();
-      const dateB = new Date(b.created_at || b.registration_date || 0).getTime();
-      return dateB - dateA;
-    });
-  }, [users, searchTerm, activeTab, filterStatus, filterType, sortBy]);
-
-  const filteredCouriers = useMemo(() => {
-    const q = courierSearchTerm.trim().toLowerCase();
-    return couriers.filter((courier) => {
-      const matchesSearch =
-        !q ||
-        courier.name?.toLowerCase().includes(q) ||
-        courier.phone?.includes(courierSearchTerm.trim()) ||
-        courier.employee_id?.toLowerCase().includes(q);
-      const matchesStatus = courierStatusFilter === 'all' || courier.status === courierStatusFilter;
-      const matchesVehicle = vehicleFilter === 'all' || courier.vehicle_type === vehicleFilter;
-      return matchesSearch && matchesStatus && matchesVehicle;
-    });
-  }, [couriers, courierSearchTerm, courierStatusFilter, vehicleFilter]);
-
-  // 初始加载用户数据
-  useEffect(() => {
-    loadUsers();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const resetUserFilters = () => {
+    setSearchInput('');
     setSearchTerm('');
     setFilterStatus('all');
     setFilterType('all');
+    setFilterRegion('all');
     setSortBy('newest');
+    setPage(1);
     setSelectedUsers(new Set());
     navigate('/admin/users', { replace: true });
   };
 
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      loadSummaryStats(); // 🚀 同时刷新统计
-      
-      // 1. 获取普通用户（客户）
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (usersError) throw usersError;
-
-      // 2. 获取所有管理端账号并整合进管理员列表
-      const adminAccounts = await adminAccountService.getAllAccounts();
-      const adminUsers = adminAccounts
-        .map(acc => ({
-          id: acc.id || `ADM-${acc.employee_id}`,
-          name: acc.employee_name || acc.username,
-          phone: acc.phone,
-          email: acc.email,
-          address: acc.address || '',
-          user_type: 'admin' as const,
-          status: acc.status,
-          registration_date: acc.created_at ? new Date(acc.created_at).toLocaleDateString('zh-CN') : '未知',
-          last_login: acc.last_login ? new Date(acc.last_login).toLocaleString('zh-CN') : '从未登录',
-          total_orders: 0,
-          total_spent: 0,
-          rating: 0,
-          notes: acc.notes || `职位: ${acc.position || '员工'} | 角色: ${acc.role}`,
-          created_at: acc.created_at
-        }));
-
-      const allUsers = [...(usersData || []), ...adminUsers];
-      const uniqueUsers = Array.from(new Map(allUsers.map(item => [item.id, item])).values());
-      setUsers(uniqueUsers);
-    } catch (error) {
-      console.error('加载用户数据失败:', error);
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
+  const closeUserForm = () => {
+    setShowAddUserForm(false);
+    setEditingUser(null);
+    setUserForm(emptyUserForm);
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newId = `USR${String(Date.now()).slice(-6)}`;
-    
-    // 🚀 优化：只发送必要的字段
+    if (!userForm.password.trim()) {
+      feedbackService.notify('请设置登录密码');
+      return;
+    }
+
     const newUser = {
-      id: newId,
+      id: `USR${String(Date.now()).slice(-6)}`,
       name: userForm.name,
       phone: userForm.phone,
       email: userForm.email.trim() || '',
       address: userForm.address,
-      password: userForm.password || '123456',
-      user_type: userForm.user_type,
-      status: userForm.status,
+      password: userForm.password.trim(),
+      user_type: 'customer' as const,
+      status: userForm.status === 'inactive' ? 'inactive' : 'active',
       register_region: userForm.register_region,
       notes: userForm.notes,
       registration_date: new Date().toLocaleDateString('zh-CN'),
@@ -949,45 +1001,42 @@ const UserManagement: React.FC = () => {
       total_spent: 0,
       rating: 0,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
     try {
       const { error } = await supabase.from('users').insert([newUser]);
       if (error) {
-        console.error('❌ 创建用户详细错误:', error.message, error.details, error.hint);
         feedbackService.notify(`创建用户失败: ${error.message}`);
-      } else {
-        await loadUsers();
-        feedbackService.notify('用户创建成功！');
-        setShowAddUserForm(false);
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ 创建用户异常:', error);
-      feedbackService.notify(`创建用户异常: ${error.message || '未知错误'}`);
+      setPage(1);
+      await loadCustomers();
+      await loadCustomerStats();
+      feedbackService.notify('客户创建成功');
+      closeUserForm();
+    } catch (error: unknown) {
+      feedbackService.notify(`创建用户异常: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 
   const handleEditUser = (user: User) => {
-    console.log('🚀 开始编辑用户:', user);
     setEditingUser(user);
-    const formData = {
+    setUserForm({
       name: user.name || '',
       phone: user.phone || '',
       email: user.email || '',
       address: user.address || '',
       password: '',
-      user_type: user.user_type || 'customer',
+      user_type: user.user_type === 'vip' ? 'vip' : 'customer',
       status: user.status || 'active',
       register_region: user.register_region || 'mandalay',
-      notes: user.notes || ''
-    };
-    console.log('📋 准备填充表单数据:', formData);
-    setUserForm(formData);
+      notes: user.notes || '',
+      freeze_reason: user.freeze_reason || '',
+    });
     setShowAddUserForm(true);
   };
 
-  // 🚀 新增：充值处理逻辑
   const handleOpenRecharge = (user: User) => {
     setRechargeUser(user);
     setShowRechargeModal(true);
@@ -995,46 +1044,42 @@ const UserManagement: React.FC = () => {
 
   const handleRecharge = async (amount: number) => {
     if (!rechargeUser) return;
-    
-    if (!window.confirm(`确定要为用户 "${rechargeUser.name}" 充值 ${amount.toLocaleString()} MMK 吗？`)) {
+    if (!window.confirm(`确定要为「${rechargeUser.name}」充值 ${amount.toLocaleString()} MMK 吗？\n将写入充值流水并记录当前操作人。`)) {
       return;
     }
 
     try {
       setIsRecharging(true);
-      const currentBalance = rechargeUser.balance || 0;
-      const newBalance = currentBalance + amount;
-
-      const { error } = await supabase
-        .from('users')
-        .update({ 
-          balance: newBalance,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', rechargeUser.id);
-
-      if (error) {
-        console.error('充值失败:', error);
+      const operator = currentOperator();
+      const success = await rechargeService.manualAdjustBalance(
+        rechargeUser.id,
+        amount,
+        `后台用户管理手动充值 · 操作人 ${operator.name} (${operator.id})`,
+      );
+      if (!success) {
         feedbackService.notify('充值失败，请重试');
-      } else {
-        // 记录审计日志
-        await auditLogService.log({
-          user_id: 'admin',
-          user_name: '管理员',
-          action_type: 'update',
-          module: 'users',
-          target_id: rechargeUser.id,
-          target_name: rechargeUser.name,
-          action_description: `充值余额: ${amount} MMK, 新余额: ${newBalance} MMK`
-        });
-
-        await loadUsers();
-        setShowRechargeModal(false);
-        setRechargeUser(null);
-        feedbackService.notify('充值成功！');
+        return;
       }
-    } catch (error) {
-      console.error('充值异常:', error);
+
+      await auditLogService.log({
+        user_id: operator.id,
+        user_name: operator.name,
+        action_type: 'update',
+        module: 'finance',
+        target_id: rechargeUser.id,
+        target_name: rechargeUser.name,
+        action_description: `手动充值 ${amount.toLocaleString()} MMK（用户管理）`,
+      });
+
+      await loadCustomers();
+      await loadCustomerStats();
+      if (detailUser?.id === rechargeUser.id) {
+        setDetailUser({ ...detailUser, balance: (detailUser.balance || 0) + amount });
+      }
+      setShowRechargeModal(false);
+      setRechargeUser(null);
+      feedbackService.notify('充值成功，已写入流水');
+    } catch {
       feedbackService.notify('操作出错');
     } finally {
       setIsRecharging(false);
@@ -1045,389 +1090,493 @@ const UserManagement: React.FC = () => {
     e.preventDefault();
     if (!editingUser) return;
 
-    if (editingUser.user_type === 'admin') {
-      feedbackService.notify(
-        '当前条目为后台「员工/管理员」账号，数据保存在「账户管理」中。\n\n请前往：控制台 → 系统设置 → 账户管理 进行修改。',
-      );
-      return;
+    if (userForm.status === 'suspended' && editingUser.status !== 'suspended') {
+      const reason = userForm.freeze_reason.trim();
+      if (!reason) {
+        feedbackService.notify('冻结客户须填写原因');
+        return;
+      }
     }
 
-    // 🚀 优化：清理更新数据，只发送数据库支持且必要的字段
-    // 排除前端本地计算的字段 (如 registration_date, last_login, total_orders 等)
-    const updateData: any = {
+    const nextType = userForm.user_type === 'vip' ? 'vip' : 'customer';
+    const nextStatus = userForm.status;
+    const updateData: Record<string, unknown> = {
       name: userForm.name,
       phone: userForm.phone,
       email: userForm.email,
       address: userForm.address,
-      user_type: userForm.user_type,
-      status: userForm.status,
+      user_type: nextType,
+      status: nextStatus,
       register_region: userForm.register_region,
       notes: userForm.notes,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
-
-    // 只有在填写了密码时才更新密码
-    if (userForm.password && userForm.password.trim() !== '') {
-      updateData.password = userForm.password;
+    if (userForm.password.trim()) updateData.password = userForm.password.trim();
+    if (freezeColumnsAvailable) {
+      if (nextStatus === 'suspended') {
+        const operator = currentOperator();
+        updateData.freeze_reason = userForm.freeze_reason.trim();
+        if (editingUser.status !== 'suspended') {
+          updateData.frozen_at = new Date().toISOString();
+          updateData.frozen_by = `${operator.name} (${operator.id})`;
+        }
+      } else if (editingUser.status === 'suspended') {
+        updateData.freeze_reason = null;
+        updateData.frozen_at = null;
+        updateData.frozen_by = null;
+      }
     }
 
-    console.log('📡 正在更新用户数据:', updateData);
-
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .update(updateData)
-        .eq('id', editingUser.id)
-        .select();
-
-      if (error) {
-        console.error('❌ 更新用户详细错误:', error.message, error.details, error.hint);
-        feedbackService.notify(`更新用户失败: ${error.message}${error.hint ? '\n提示: ' + error.hint : ''}`);
-      } else {
-        console.log('✅ 用户更新成功:', data);
-        await loadUsers();
-        feedbackService.notify('用户更新成功！');
-        setShowAddUserForm(false);
-        setEditingUser(null);
+      const { error } = await supabase.from('users').update(updateData).eq('id', editingUser.id).select();
+      let freezeDegraded = false;
+      if (error && freezeColumnsAvailable && isMissingFreezeColumn(error)) {
+        freezeColumnsAvailable = false;
+        freezeDegraded = nextStatus === 'suspended';
+        const retryData = { ...updateData };
+        delete retryData.freeze_reason;
+        delete retryData.frozen_at;
+        delete retryData.frozen_by;
+        const retry = await supabase.from('users').update(retryData).eq('id', editingUser.id).select();
+        if (retry.error) {
+          feedbackService.notify(`更新用户失败: ${retry.error.message}`);
+          return;
+        }
+      } else if (error) {
+        feedbackService.notify(`更新用户失败: ${error.message}`);
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ 更新用户异常:', error);
-      feedbackService.notify(`更新用户异常: ${error.message || '未知错误'}`);
+      await loadCustomers();
+      await loadCustomerStats();
+      if (detailUser?.id === editingUser.id) {
+        setDetailUser({
+          ...detailUser,
+          name: userForm.name,
+          phone: userForm.phone,
+          email: userForm.email,
+          address: userForm.address,
+          user_type: nextType,
+          status: nextStatus,
+          register_region: userForm.register_region,
+          notes: userForm.notes,
+          freeze_reason: nextStatus === 'suspended' ? userForm.freeze_reason.trim() : null,
+        });
+      }
+      feedbackService.notify(
+        freezeDegraded ? '资料已保存。数据库尚未包含冻结原因字段，请先执行迁移。' : '用户更新成功',
+      );
+      closeUserForm();
+    } catch (error: unknown) {
+      feedbackService.notify(`更新用户异常: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 
   const handleDeleteUser = async (user: User) => {
     if (!window.confirm(`确定要删除用户「${user.name}」吗？此操作不可恢复。`)) return;
     try {
-      if (user.user_type === 'admin') {
-        const del =
-          String(user.id).startsWith('ADM-') && String(user.id).length > 4
-            ? await supabase.from('admin_accounts').delete().eq('employee_id', String(user.id).slice(4)).select('id')
-            : await supabase.from('admin_accounts').delete().eq('id', user.id).select('id');
-        if (del.error) {
-          feedbackService.notify(`删除管理员失败：${del.error.message}${del.error.hint ? '\n提示：' + del.error.hint : ''}`);
-          return;
-        }
-        if (!del.data?.length) {
-          feedbackService.notify('未删除任何记录：未在「账户管理」中找到对应后台账号。');
-          return;
-        }
-      } else {
-        await supabase.from('recharge_requests').delete().eq('user_id', user.id);
-        const { error, data } = await supabase.from('users').delete().eq('id', user.id).select('id');
-        if (error) {
-          feedbackService.notify(
-            `删除失败：${error.message}${error.details ? '\n' + error.details : ''}${error.hint ? '\n提示：' + error.hint : ''}`,
-          );
-          return;
-        }
-        if (!data?.length) {
-          feedbackService.notify('未删除任何记录：该用户可能已不存在，或数据在非 users 表中。');
-          return;
-        }
+      await supabase.from('recharge_requests').delete().eq('user_id', user.id);
+      const { error, data } = await supabase.from('users').delete().eq('id', user.id).select('id');
+      if (error) {
+        feedbackService.notify(`删除失败：${error.message}`);
+        return;
       }
-      await loadUsers();
+      if (!data?.length) {
+        feedbackService.notify('未删除任何记录：该用户可能已不存在。');
+        return;
+      }
+      if (detailUser?.id === user.id) setDetailUser(null);
+      await loadCustomers();
+      await loadCustomerStats();
       feedbackService.notify('删除成功');
     } catch (error: unknown) {
-      console.error('删除用户异常:', error);
       feedbackService.notify(error instanceof Error ? error.message : '删除异常');
     }
   };
 
-  const updateUserStatus = async (user: User, newStatus: 'active' | 'inactive' | 'suspended') => {
+  const updateUserStatus = async (user: User, newStatus: User['status']) => {
+    if (newStatus === 'suspended' && user.status !== 'suspended') {
+      setFreezeUser(user);
+      setFreezeReason(user.freeze_reason || '');
+      return;
+    }
     try {
-      if (user.user_type === 'admin') {
-        const up =
-          String(user.id).startsWith('ADM-') && String(user.id).length > 4
-            ? await supabase.from('admin_accounts').update({ status: newStatus }).eq('employee_id', String(user.id).slice(4))
-            : await supabase.from('admin_accounts').update({ status: newStatus }).eq('id', user.id);
-        if (up.error) {
-          feedbackService.notify('更新状态失败：' + up.error.message);
-          return;
-        }
-      } else {
-        const { error } = await supabase.from('users').update({ status: newStatus }).eq('id', user.id);
-        if (error) {
-          feedbackService.notify('更新状态失败：' + error.message);
-          return;
-        }
+      const patch: Record<string, unknown> = {
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      };
+      if (user.status === 'suspended' && newStatus !== 'suspended' && freezeColumnsAvailable) {
+        patch.freeze_reason = null;
+        patch.frozen_at = null;
+        patch.frozen_by = null;
       }
-      await loadUsers();
-    } catch (error) {
-      console.error('更新状态异常', error);
+      const { error } = await supabase.from('users').update(patch).eq('id', user.id);
+      if (error && freezeColumnsAvailable && isMissingFreezeColumn(error)) {
+        freezeColumnsAvailable = false;
+        const retry = await supabase.from('users').update({ status: newStatus }).eq('id', user.id);
+        if (retry.error) {
+          feedbackService.notify('更新状态失败：' + retry.error.message);
+          return;
+        }
+      } else if (error) {
+        feedbackService.notify('更新状态失败：' + error.message);
+        return;
+      }
+      await loadCustomers();
+      await loadCustomerStats();
+      if (detailUser?.id === user.id) {
+        setDetailUser({
+          ...user,
+          status: newStatus,
+          freeze_reason: newStatus === 'suspended' ? user.freeze_reason : null,
+        });
+      }
+    } catch {
       feedbackService.notify('更新状态异常');
     }
   };
 
-  const loadMerchantStores = async () => {
+  const submitFreeze = async () => {
+    if (!freezeUser) return;
+    const reason = freezeReason.trim();
+    if (!reason) {
+      feedbackService.notify('请填写冻结原因');
+      return;
+    }
     try {
-      setLoadingStores(true);
-      const data = await deliveryStoreService.getAllStores();
-      setMerchantStores(data || []);
-    } catch (error) {
-      setMerchantStores([]);
+      setFreezeSaving(true);
+      const operator = currentOperator();
+      const patch: Record<string, unknown> = {
+        status: 'suspended',
+        updated_at: new Date().toISOString(),
+      };
+      if (freezeColumnsAvailable) {
+        patch.freeze_reason = reason;
+        patch.frozen_at = new Date().toISOString();
+        patch.frozen_by = `${operator.name} (${operator.id})`;
+      }
+      const { error } = await supabase.from('users').update(patch).eq('id', freezeUser.id);
+      if (error && freezeColumnsAvailable && isMissingFreezeColumn(error)) {
+        freezeColumnsAvailable = false;
+        const retry = await supabase.from('users').update({ status: 'suspended' }).eq('id', freezeUser.id);
+        if (retry.error) {
+          feedbackService.notify('冻结失败：' + retry.error.message);
+          return;
+        }
+        feedbackService.notify('账号已暂停。数据库尚未包含冻结原因字段，请先执行迁移。');
+      } else if (error) {
+        feedbackService.notify('冻结失败：' + error.message);
+        return;
+      } else {
+        feedbackService.notify('账号已冻结');
+      }
+      setFreezeUser(null);
+      setFreezeReason('');
+      await loadCustomers();
+      await loadCustomerStats();
+      if (detailUser?.id === freezeUser.id) {
+        setDetailUser({ ...freezeUser, status: 'suspended', freeze_reason: reason });
+      }
     } finally {
-      setLoadingStores(false);
+      setFreezeSaving(false);
     }
   };
 
-  const loadCouriers = async () => {
+  const exportCustomers = async () => {
     try {
-      setCourierLoading(true);
-      const accounts = await adminAccountService.getAllAccounts();
-      const riderAccounts = accounts.filter(acc => acc.position === '骑手' || acc.position === '骑手队长');
-      const { data: realTimeData } = await supabase.from('couriers').select('*');
-
-      const combinedCouriers: Courier[] = riderAccounts.map(acc => {
-        const rtInfo = realTimeData?.find(c => c.phone === acc.phone || c.employee_id === acc.employee_id);
-        return {
-          id: acc.id || '',
-          name: acc.employee_name,
-          phone: acc.phone,
-          email: acc.email,
-          address: acc.address || '',
-          vehicle_type: rtInfo?.vehicle_type || (acc.position === '骑手队长' ? 'car' : 'motorcycle'),
-          license_number: rtInfo?.license_number || '',
-          status: acc.status,
-          join_date: acc.hire_date || (acc.created_at ? new Date(acc.created_at).toLocaleDateString('zh-CN') : '未知'),
-          last_active: rtInfo?.last_active || '从未上线',
-          total_deliveries: rtInfo?.total_deliveries || 0,
-          rating: rtInfo?.rating || 5.0,
-          notes: acc.notes || '',
-          employee_id: acc.employee_id,
-          department: acc.department,
-          position: acc.position,
-          role: acc.role,
-          region: acc.region,
-          created_at: acc.created_at,
-          updated_at: acc.updated_at
-        };
-      });
-      setCouriers(combinedCouriers);
-    } catch (error) {
-      setCouriers([]);
+      setExporting(true);
+      const order = customerOrder(sortBy);
+      const rows: User[] = [];
+      const pageSizeExport = 100;
+      for (let p = 1; p <= Math.ceil(CUSTOMER_EXPORT_MAX / pageSizeExport); p += 1) {
+        const { from, to } = pageRange(p, pageSizeExport);
+        const { data, error } = await applyCustomerFilters(
+          supabase.from('users').select(customerSelectColumns()),
+          listFilters,
+        )
+          .order(order.column, { ascending: order.ascending })
+          .range(from, to);
+        if (error) {
+          if (freezeColumnsAvailable && isMissingFreezeColumn(error)) {
+            freezeColumnsAvailable = false;
+            p -= 1;
+            continue;
+          }
+          throw error;
+        }
+        rows.push(...asUsers(data));
+        if (!data || data.length < pageSizeExport) break;
+      }
+      const truncated = rows.length >= CUSTOMER_EXPORT_MAX;
+      const head = toCsvRow([
+        'ID',
+        '姓名',
+        '电话',
+        '邮箱',
+        '地区',
+        '类型',
+        '状态',
+        '余额',
+        '订单',
+        '累计消费',
+        '冻结原因',
+        '注册时间',
+      ]);
+      const lines = rows.slice(0, CUSTOMER_EXPORT_MAX).map((user) =>
+        toCsvRow([
+          user.id,
+          user.name,
+          user.phone,
+          user.email,
+          regionLabel(user.register_region),
+          getUserTypeText(user),
+          user.status,
+          user.balance ?? 0,
+          user.total_orders || 0,
+          user.total_spent ?? 0,
+          user.freeze_reason || '',
+          user.created_at || user.registration_date || '',
+        ]),
+      );
+      const blob = new Blob(['\uFEFF', [head, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ml-customers-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      feedbackService.notify(truncated ? `已导出前 ${CUSTOMER_EXPORT_MAX} 条，请收窄筛选后再导出` : `已导出 ${rows.length} 条`);
+    } catch (error: unknown) {
+      feedbackService.notify(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
-      setCourierLoading(false);
+      setExporting(false);
     }
   };
+
+  const openDetail = (user: User) => {
+    setDetailUser(user);
+    setDetailTab('profile');
+  };
+
+  useEffect(() => {
+    if (!detailUser) {
+      setDetailOrders([]);
+      setDetailLedger([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setDetailLoading(true);
+      try {
+        const orFilter = customerPackageOr(detailUser.id, detailUser.phone || '');
+        const [ordersRes, ledgerRes] = await Promise.all([
+          supabase
+            .from('packages')
+            .select('id, status, price, created_at, sender_name')
+            .or(orFilter)
+            .order('created_at', { ascending: false })
+            .limit(30),
+          supabase
+            .from('recharge_requests')
+            .select('id, amount, status, notes, created_at')
+            .eq('user_id', detailUser.id)
+            .order('created_at', { ascending: false })
+            .limit(50),
+        ]);
+        if (cancelled) return;
+        if (ordersRes.error) {
+          setDetailOrders([]);
+        } else {
+          setDetailOrders(ordersRes.data || []);
+        }
+        if (ledgerRes.error) {
+          setDetailLedger([]);
+        } else {
+          setDetailLedger(ledgerRes.data || []);
+        }
+      } finally {
+        if (!cancelled) setDetailLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [detailUser]);
 
   const handleEditCourier = (courier: Courier) => {
-    console.log('🚀 准备编辑快递员:', courier.name, courier.id);
-    if (!courier) return;
-    
-    try {
-      setEditingCourier(courier);
-      setCourierForm({
-        name: courier.name || '',
-        phone: courier.phone || '',
-        email: courier.email || '',
-        address: courier.address || '',
-        vehicle_type: (courier.vehicle_type as any) || 'motorcycle',
-        license_number: courier.license_number || '',
-        status: (courier.status as any) || 'active',
-        notes: courier.notes || '',
-        employee_id: courier.employee_id || '',
-        department: courier.department || '',
-        position: courier.position || '',
-        role: (courier.role as any) || 'operator',
-        region: courier.region || 'yangon'
-      });
-      setShowAddCourierForm(true);
-      console.log('✅ 快递员编辑模态框已开启');
-    } catch (err) {
-      console.error('开启编辑模态框失败:', err);
-    }
+    setEditingCourier(courier);
+    setCourierForm({
+      name: courier.name || '',
+      phone: courier.phone || '',
+      email: courier.email || '',
+      address: courier.address || '',
+      vehicle_type: courier.vehicle_type || 'motorcycle',
+      license_number: courier.license_number || '',
+      status: courier.status || 'active',
+      notes: courier.notes || '',
+      employee_id: courier.employee_id || '',
+      region: courier.region || 'yangon',
+    });
+    setShowAddCourierForm(true);
   };
 
   const handleUpdateCourier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCourier) return;
-
     try {
-      // 1. 更新账号系统 (admin_accounts)
-      const adminUpdateData = {
-        employee_name: courierForm.name,
-        phone: courierForm.phone,
-        email: courierForm.email,
-        address: courierForm.address,
-        notes: courierForm.notes,
-        employee_id: courierForm.employee_id,
-        department: courierForm.department,
-        position: courierForm.position,
-        role: courierForm.role,
-        region: courierForm.region,
-        status: courierForm.status
-      };
-
-      const { error: adminError } = await supabase
-        .from('admin_accounts')
-        .update(adminUpdateData)
-        .eq('id', editingCourier.id);
-
-      if (adminError) throw adminError;
-
-      // 2. 同步更新快递员表 (couriers)
-      const courierUpdateData = {
-        name: courierForm.name,
-        phone: courierForm.phone,
-        email: courierForm.email,
-        address: courierForm.address,
-        vehicle_type: courierForm.vehicle_type,
-        license_number: courierForm.license_number,
-        status: courierForm.status,
-        notes: courierForm.notes,
-        employee_id: courierForm.employee_id,
-        region: courierForm.region
-      };
-
-      await supabase
+      const { error: courierError } = await supabase
         .from('couriers')
-        .update(courierUpdateData)
-        .eq('employee_id', editingCourier.employee_id);
+        .update({
+          name: courierForm.name,
+          phone: courierForm.phone,
+          email: courierForm.email,
+          address: courierForm.address,
+          vehicle_type: courierForm.vehicle_type,
+          license_number: courierForm.license_number,
+          status: courierForm.status,
+          notes: courierForm.notes,
+          employee_id: courierForm.employee_id,
+          region: courierForm.region,
+        })
+        .eq('id', editingCourier.id);
+      if (courierError) throw courierError;
 
-      feedbackService.notify('资料更新成功！');
+      if (editingCourier.accountId) {
+        const { error: adminError } = await supabase
+          .from('admin_accounts')
+          .update({
+            employee_name: courierForm.name,
+            phone: courierForm.phone,
+            email: courierForm.email,
+            address: courierForm.address,
+            notes: courierForm.notes,
+            employee_id: courierForm.employee_id,
+            region: courierForm.region,
+            status: courierForm.status,
+          })
+          .eq('id', editingCourier.accountId);
+        if (adminError) {
+          feedbackService.notify(`骑手资料已保存，但账号同步失败：${adminError.message}`);
+          await loadCouriers();
+          return;
+        }
+      }
+
+      feedbackService.notify('资料更新成功');
       setShowAddCourierForm(false);
       setEditingCourier(null);
       await loadCouriers();
-    } catch (error: any) {
-      console.error('更新快递员资料失败:', error);
-      feedbackService.notify(`更新失败: ${error.message}`);
+      await loadCourierStats();
+    } catch (error: unknown) {
+      feedbackService.notify(`更新失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 
-  const handleCourierStatusChange = async (courierId: string, newStatus: any) => {
-    console.log('🔄 更改快递员状态:', courierId, newStatus);
-    if (!courierId) {
-      feedbackService.notify('错误：无效的快递员ID');
-      return;
-    }
+  const handleCourierStatusChange = async (courier: Courier, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('admin_accounts')
-        .update({ status: newStatus })
-        .eq('id', courierId);
-      
-      if (!error) {
-        await loadCouriers();
-        feedbackService.notify('状态已更新');
-      } else {
-        console.error('更新状态失败:', error);
+      const { error } = await supabase.from('couriers').update({ status: newStatus }).eq('id', courier.id);
+      if (error) {
         feedbackService.notify('状态更新失败: ' + error.message);
+        return;
       }
-    } catch (error) {
-      console.error('更新状态异常');
+      if (courier.accountId) {
+        const acc = await supabase.from('admin_accounts').update({ status: newStatus }).eq('id', courier.accountId);
+        if (acc.error) {
+          feedbackService.notify(`骑手状态已更新，但账号同步失败：${acc.error.message}`);
+        }
+      }
+      await loadCouriers();
+      await loadCourierStats();
+      feedbackService.notify('状态已更新');
+    } catch {
+      feedbackService.notify('更新状态异常');
     }
   };
 
-  const handleDeleteCourier = async (courierId: string) => {
-    console.log('🗑️ 删除快递员:', courierId);
-    if (!courierId) {
-      feedbackService.notify('错误：无效的快递员ID');
+  const handleDeleteCourier = async (courier: Courier) => {
+    if (!courier.id) {
+      feedbackService.notify('错误：无效的骑手 ID');
       return;
     }
-    if (!window.confirm('确定要永久删除这个快递员账号吗？此操作将移除该账号的所有访问权限！')) return;
+    if (!window.confirm('确定删除这名骑手？将先删除骑手资料，再尝试移除对应后台登录账号。')) return;
     try {
-      // 1. 从账号系统删除 (admin_accounts)
-      const { error: adminError } = await supabase
-        .from('admin_accounts')
-        .delete()
-        .eq('id', courierId);
-      
-      // 2. 从快递员表删除 (couriers)
-      const { error: courierError } = await supabase
+      const { error: courierError, data: courierDeleted } = await supabase
         .from('couriers')
         .delete()
-        .eq('id', courierId);
-
-      if (!adminError || !courierError) {
-        await loadCouriers();
-        feedbackService.notify('账号已从权限系统和快递员库中删除');
-      } else {
-        console.error('删除失败:', adminError || courierError);
-        feedbackService.notify('删除失败，请重试');
+        .eq('id', courier.id)
+        .select('id');
+      if (courierError || !courierDeleted?.length) {
+        feedbackService.notify(`删除骑手资料失败：${courierError?.message || '未找到记录'}`);
+        return;
       }
-    } catch (error) {
-      console.error('删除账号异常');
+
+      let accountError: string | null = null;
+      if (courier.accountId) {
+        const acc = await supabase.from('admin_accounts').delete().eq('id', courier.accountId).select('id');
+        if (acc.error) accountError = acc.error.message;
+      } else if (courier.employee_id) {
+        const acc = await supabase
+          .from('admin_accounts')
+          .delete()
+          .eq('employee_id', courier.employee_id)
+          .in('position', ['骑手', '骑手队长'])
+          .select('id');
+        if (acc.error) accountError = acc.error.message;
+      }
+
+      await loadCouriers();
+      await loadCourierStats();
+      if (accountError) {
+        feedbackService.notify(`骑手资料已删除，但后台登录账号删除失败：${accountError}。请到账户管理手动移除。`);
+        return;
+      }
+      if (!courier.accountId && !courier.employee_id) {
+        feedbackService.notify('骑手资料已删除。未找到关联后台账号。');
+        return;
+      }
+      feedbackService.notify('已从骑手表删除，并同步处理后台账号');
+    } catch {
+      feedbackService.notify('删除账号异常');
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'courier_management') loadCouriers();
-    else if (activeTab === 'merchant_store') loadMerchantStores();
-    else loadUsers();
-  }, [activeTab]);
-
   const statCards = useMemo(() => {
-    switch (activeTab) {
-      case 'customer_list':
-        return [
-          { tone: 'blue', value: summaryStats.totalCustomers, label: '客户总数' },
-          { tone: 'amber', value: summaryStats.vipCustomers, label: 'VIP 会员' },
-          { tone: 'green', value: summaryStats.activeCustomers, label: '活跃客户' },
-          { tone: 'purple', value: summaryStats.totalOrders, label: '总订单数' },
-        ];
-      case 'admin_list':
-        return [
-          { tone: 'blue', value: summaryStats.totalAdmins, label: '管理账号总数' },
-          { tone: 'green', value: summaryStats.activeAdmins, label: '活跃账号' },
-          { tone: 'purple', value: summaryStats.superAdmins, label: '超级管理员' },
-          { tone: 'amber', value: summaryStats.recentLogins, label: '今日活跃' },
-        ];
-      case 'merchant_store':
-        return [
-          { tone: 'blue', value: summaryStats.totalStores, label: '店铺总数' },
-          { tone: 'green', value: summaryStats.activeStores, label: '正在营业' },
-          { tone: 'red', value: summaryStats.totalStores - summaryStats.activeStores, label: '休息中' },
-          { tone: 'amber', value: summaryStats.totalOrders, label: '总订单数' },
-        ];
-      case 'courier_management':
-        return [
-          { tone: 'purple', value: summaryStats.totalCouriers, label: '快递员总数' },
-          { tone: 'green', value: summaryStats.activeCouriers, label: '活跃骑手' },
-          { tone: 'amber', value: summaryStats.totalDeliveries, label: '配送总数' },
-          { tone: 'blue', value: summaryStats.avgRating.toFixed(1), label: '平均评分' },
-        ];
-      default:
-        return [];
+    if (activeTab === 'customer_list') {
+      return [
+        { tone: 'blue', value: customerStats.total, label: '客户总数' },
+        { tone: 'amber', value: customerStats.vip, label: 'VIP 会员' },
+        { tone: 'green', value: customerStats.active, label: '活跃客户' },
+        { tone: 'red', value: customerStats.suspended, label: '已暂停' },
+      ];
     }
-  }, [activeTab, summaryStats]);
+    return [];
+  }, [activeTab, customerStats]);
 
   return (
     <div className="user-mgmt">
       <div className="user-mgmt__glow" aria-hidden />
       <div className="user-mgmt__inner">
         <header className="user-mgmt__head">
-          <div>
-            <div className="user-mgmt__eyebrow">ML EXPRESS · ADMIN</div>
-            <h1 className="user-mgmt__title">用户管理</h1>
-            <p className="user-mgmt__desc">
-              管理客户、商户、快递员与管理员；删除与状态已按数据源自动同步到「用户表」或「后台账户表」。
-            </p>
-          </div>
-          <button type="button" className="user-mgmt__back" onClick={() => navigate('/admin/dashboard')}>
-            ← 返回管理后台
-          </button>
+          <div className="user-mgmt__eyebrow">ML EXPRESS · ADMIN</div>
+          <h1 className="user-mgmt__title">用户管理</h1>
+          <p className="user-mgmt__desc">本页维护会员客户。管理员与商家请到对应后台；骑手以骑手表为准，登录账号仍在账户管理。</p>
         </header>
 
         <nav className="user-mgmt__tabs" aria-label="用户管理分类">
-          {USER_TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                type="button"
-                key={tab.id}
-                className={`user-mgmt__tab${isActive ? ' is-active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+          {USER_TABS.map((tab) => (
+            <button
+              type="button"
+              key={tab.id}
+              className={`user-mgmt__tab${activeTab === tab.id ? ' is-active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </nav>
 
-        {(activeTab === 'customer_list' || activeTab === 'admin_list' || activeTab === 'merchant_store' || activeTab === 'courier_management') && !showAddUserForm && statCards.length > 0 && (
-          <div className="user-mgmt__stats">
+        {statCards.length > 0 && (
+          <div className={`user-mgmt__stats${statCards.length === 3 ? ' user-mgmt__stats--3' : ''}`}>
             {statCards.map((card) => (
               <div key={card.label} className={`user-mgmt__stat user-mgmt__stat--${card.tone}`}>
                 <p className="user-mgmt__stat-value">{card.value}</p>
@@ -1437,69 +1586,84 @@ const UserManagement: React.FC = () => {
           </div>
         )}
 
-        {(activeTab === 'customer_list' || activeTab === 'admin_list') && !showAddUserForm && (
+        {activeTab === 'customer_list' && (
           <section className="user-mgmt__panel">
             <div className="user-mgmt__toolbar">
-              <div>
-                <h2 className="user-mgmt__toolbar-title">
-                  {activeTab === 'customer_list' ? '客户列表' : '管理员列表'}
-                </h2>
-                <div className="user-mgmt__toolbar-meta">
-                  <span className="user-mgmt__count">共 {filteredUsers.length} 人</span>
-                  {selectedUsers.size > 0 && (
-                    <span className="user-mgmt__count">已选 {selectedUsers.size}</span>
-                  )}
+              <div className="user-mgmt__toolbar-top">
+                <div>
+                  <h2 className="user-mgmt__toolbar-title">客户列表</h2>
+                  <div className="user-mgmt__toolbar-meta">
+                    <span className="user-mgmt__count">共 {userTotal} 人</span>
+                    {selectedUsers.size > 0 && <span className="user-mgmt__count">本页已选 {selectedUsers.size}</span>}
+                  </div>
+                </div>
+                <div className="user-mgmt__actions">
+                  <button
+                    type="button"
+                    className="user-mgmt__btn user-mgmt__btn--primary"
+                    onClick={() => {
+                      setEditingUser(null);
+                      setUserForm(emptyUserForm);
+                      setShowAddUserForm(true);
+                    }}
+                  >
+                    新增客户
+                  </button>
+                  <button type="button" className="user-mgmt__btn" onClick={handleSelectAll}>
+                    {selectedUsers.size === users.length && users.length > 0 ? '取消全选' : '全选本页'}
+                  </button>
+                  <button type="button" className="user-mgmt__btn" onClick={() => void loadCustomers()}>
+                    刷新
+                  </button>
+                  <button type="button" className="user-mgmt__btn" onClick={() => void exportCustomers()} disabled={exporting}>
+                    {exporting ? '导出中…' : '导出 CSV'}
+                  </button>
                 </div>
               </div>
               <div className="user-mgmt__filters">
                 <div className="user-mgmt__search">
-                  <span className="user-mgmt__search-icon">🔍</span>
+                  <span className="user-mgmt__search-icon">⌕</span>
                   <input
                     type="search"
-                    placeholder={activeTab === 'customer_list' ? '搜索姓名、电话、邮箱、ID…' : '搜索管理员…'}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="搜索姓名、电话、邮箱、ID…"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                   />
                 </div>
-                {activeTab === 'customer_list' && (
-                  <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-                    <option value="all">全部客户</option>
-                    <option value="vip">VIP 会员</option>
-                    <option value="member">普通会员</option>
-                  </select>
-                )}
+                <select value={filterType} onChange={(e) => setFilterType(e.target.value as CustomerTypeFilter)}>
+                  <option value="all">全部客户</option>
+                  <option value="vip">VIP 会员</option>
+                  <option value="member">普通会员</option>
+                </select>
                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                   <option value="all">全部状态</option>
                   <option value="active">活跃</option>
                   <option value="inactive">非活跃</option>
                   <option value="suspended">已暂停</option>
                 </select>
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}>
+                  <option value="all">全部地区</option>
+                  {REGIONS.map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.name}
+                    </option>
+                  ))}
+                </select>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as CustomerSort)}>
                   <option value="newest">最新注册</option>
                   <option value="balance">余额从高到低</option>
                   <option value="orders">订单从多到少</option>
                   <option value="name">姓名 A-Z</option>
                 </select>
               </div>
-              <div className="user-mgmt__actions">
-                <button type="button" className="user-mgmt__btn user-mgmt__btn--primary" onClick={() => setShowAddUserForm(true)}>
-                  ＋ 新增用户
-                </button>
-                <button type="button" className="user-mgmt__btn" onClick={handleSelectAll}>
-                  {selectedUsers.size === filteredUsers.length && filteredUsers.length > 0 ? '取消全选' : '全选'}
-                </button>
-                <button type="button" className="user-mgmt__btn" onClick={() => loadUsers()}>
-                  🔄 刷新
-                </button>
-              </div>
             </div>
 
             {selectedUsers.size > 0 && (
               <div className="user-mgmt__bulk">
-                <span className="user-mgmt__bulk-text">已选择 {selectedUsers.size} 个用户</span>
+                <span className="user-mgmt__bulk-text">已选择 {selectedUsers.size} 个客户（仅当前页）</span>
                 <div className="user-mgmt__actions">
                   <button type="button" className="user-mgmt__btn user-mgmt__btn--danger" onClick={handleBatchDelete} disabled={isBatchDeleting}>
-                    {isBatchDeleting ? '删除中…' : '🗑️ 批量删除'}
+                    {isBatchDeleting ? '删除中…' : '批量删除'}
                   </button>
                   <button type="button" className="user-mgmt__btn" onClick={() => setSelectedUsers(new Set())}>
                     取消选择
@@ -1509,29 +1673,81 @@ const UserManagement: React.FC = () => {
             )}
 
             {loading ? (
-              <SkeletonTable rows={4} />
-            ) : filteredUsers.length === 0 ? (
+              <SkeletonTable rows={6} />
+            ) : users.length === 0 ? (
               <div className="user-mgmt__empty">
-                <div className="user-mgmt__empty-icon">👥</div>
-                <p className="user-mgmt__empty-text">没有匹配的用户</p>
+                <p className="user-mgmt__empty-text">没有匹配的客户</p>
                 <button type="button" className="user-mgmt__reset" onClick={resetUserFilters}>
                   重置筛选条件
                 </button>
               </div>
             ) : (
-              <div className="user-mgmt__list">
-                {filteredUsers.map((user) => (
-                  <UserRow
-                    key={user.id}
-                    user={user}
-                    selectedUsers={selectedUsers}
-                    handleSelectUser={handleSelectUser}
-                    handleEditUser={handleEditUser}
-                    updateUserStatus={updateUserStatus}
-                    handleDeleteUser={handleDeleteUser}
-                    handleOpenRecharge={handleOpenRecharge}
-                  />
-                ))}
+              <>
+                <div className="user-mgmt-table-wrap">
+                  <table className="user-mgmt-table">
+                    <thead>
+                      <tr>
+                        <th className="user-mgmt-table__check" aria-label="选择" />
+                        <th>客户</th>
+                        <th>类型</th>
+                        <th>地区</th>
+                        <th>余额</th>
+                        <th>订单</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <UserRow
+                          key={user.id}
+                          user={user}
+                          selected={selectedUsers.has(user.id)}
+                          onSelect={handleSelectUser}
+                          onOpen={openDetail}
+                          onEdit={handleEditUser}
+                          onStatus={updateUserStatus}
+                          onDelete={handleDeleteUser}
+                          onRecharge={handleOpenRecharge}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <TablePager
+                  page={page}
+                  pageSize={pageSize}
+                  total={userTotal}
+                  onPage={setPage}
+                  onPageSize={(size) => {
+                    setPageSize(size);
+                    setPage(1);
+                  }}
+                />
+              </>
+            )}
+          </section>
+        )}
+
+        {activeTab === 'admin_list' && (
+          <section className="user-mgmt__panel">
+            {jumpLoading ? (
+              <SkeletonTable rows={2} />
+            ) : (
+              <div className="user-mgmt-jump">
+                <h2 className="user-mgmt-jump__title">管理员账号</h2>
+                <p className="user-mgmt-jump__desc">
+                  后台员工的登录、职位和权限在「系统设置 → 账户管理」中维护，这里不再重复一份列表，避免改错数据源。
+                </p>
+                <div className="user-mgmt-jump__meta">
+                  <span className="user-mgmt__count">共 {adminJump.total} 个账号</span>
+                  <span className="user-mgmt__count">活跃 {adminJump.active}</span>
+                </div>
+                <div className="user-mgmt-jump__actions">
+                  <button type="button" className="user-mgmt__btn user-mgmt__btn--primary" onClick={() => navigate('/admin/accounts')}>
+                    前往账户管理
+                  </button>
+                </div>
               </div>
             )}
           </section>
@@ -1539,35 +1755,23 @@ const UserManagement: React.FC = () => {
 
         {activeTab === 'merchant_store' && (
           <section className="user-mgmt__panel">
-            <div className="user-mgmt__toolbar">
-              <div>
-                <h2 className="user-mgmt__toolbar-title">MERCHANTS 店铺</h2>
-                <div className="user-mgmt__toolbar-meta">
-                  <span className="user-mgmt__count">共 {merchantStores.length} 家</span>
-                </div>
-              </div>
-              <div className="user-mgmt__actions">
-                <button type="button" className="user-mgmt__btn" onClick={() => navigate('/admin/delivery-stores')}>
-                  🏪 前往商家管理
-                </button>
-              </div>
-            </div>
-            {loadingStores ? (
-              <SkeletonTable rows={3} />
-            ) : merchantStores.length === 0 ? (
-              <div className="user-mgmt__empty">
-                <div className="user-mgmt__empty-icon">🏪</div>
-                <p className="user-mgmt__empty-text">暂无合伙店铺数据</p>
-              </div>
+            {jumpLoading ? (
+              <SkeletonTable rows={2} />
             ) : (
-              <div className="user-mgmt__list">
-                {merchantStores.map((store) => (
-                  <StoreRow
-                    key={store.id}
-                    store={store}
-                    isMobile={isMobile}
-                  />
-                ))}
+              <div className="user-mgmt-jump">
+                <h2 className="user-mgmt-jump__title">商家店铺</h2>
+                <p className="user-mgmt-jump__desc">
+                  开关店、打包时效和店铺资料请到商家管理。本页只提供入口，避免和店铺后台两套操作。
+                </p>
+                <div className="user-mgmt-jump__meta">
+                  <span className="user-mgmt__count">共 {storeJump.total} 家</span>
+                  <span className="user-mgmt__count">营业中 {storeJump.active}</span>
+                </div>
+                <div className="user-mgmt-jump__actions">
+                  <button type="button" className="user-mgmt__btn user-mgmt__btn--primary" onClick={() => navigate('/admin/delivery-stores')}>
+                    前往商家管理
+                  </button>
+                </div>
               </div>
             )}
           </section>
@@ -1575,21 +1779,60 @@ const UserManagement: React.FC = () => {
 
         {activeTab === 'courier_management' && (
           <section className="user-mgmt__panel">
-            <div className="user-mgmt__toolbar">
-              <div>
-                <h2 className="user-mgmt__toolbar-title">快递员管理</h2>
-                <div className="user-mgmt__toolbar-meta">
-                  <span className="user-mgmt__count">共 {filteredCouriers.length} 人</span>
+            <div className="user-mgmt-jump">
+              <h2 className="user-mgmt-jump__title">骑手账号</h2>
+              <p className="user-mgmt-jump__desc">
+                配送员档案以骑手表为准。登录权限在账户管理，绩效在骑手绩效。需要改车型、地区或停用时，点下方进入骑手列表。
+              </p>
+              <div className="user-mgmt-jump__meta">
+                <span className="user-mgmt__count">共 {courierStats.total} 人</span>
+                <span className="user-mgmt__count">活跃 {courierStats.active}</span>
+                <span className="user-mgmt__count">已停用 {courierStats.inactive}</span>
+              </div>
+              <div className="user-mgmt-jump__actions">
+                <button
+                  type="button"
+                  className="user-mgmt__btn user-mgmt__btn--primary"
+                  onClick={() => setCourierDeskOpen(true)}
+                >
+                  前往骑手管理
+                </button>
+                <button type="button" className="user-mgmt__btn" onClick={() => navigate('/admin/accounts')}>
+                  前往账户管理
+                </button>
+                <button type="button" className="user-mgmt__btn" onClick={() => navigate('/admin/courier-performance')}>
+                  前往骑手绩效
+                </button>
+              </div>
+            </div>
+
+            {courierDeskOpen && (
+            <>
+            <div className="user-mgmt__toolbar" id="user-mgmt-courier-desk">
+              <div className="user-mgmt__toolbar-top">
+                <div>
+                  <h2 className="user-mgmt__toolbar-title">骑手列表</h2>
+                  <div className="user-mgmt__toolbar-meta">
+                    <span className="user-mgmt__count">共 {courierTotal} 人</span>
+                  </div>
+                </div>
+                <div className="user-mgmt__actions">
+                  <button type="button" className="user-mgmt__btn" onClick={() => void loadCouriers()}>
+                    刷新
+                  </button>
+                  <button type="button" className="user-mgmt__btn" onClick={() => setCourierDeskOpen(false)}>
+                    收起列表
+                  </button>
                 </div>
               </div>
               <div className="user-mgmt__filters">
                 <div className="user-mgmt__search">
-                  <span className="user-mgmt__search-icon">🔍</span>
+                  <span className="user-mgmt__search-icon">⌕</span>
                   <input
                     type="search"
                     placeholder="搜索姓名、电话、工号…"
-                    value={courierSearchTerm}
-                    onChange={(e) => setCourierSearchTerm(e.target.value)}
+                    value={courierSearchInput}
+                    onChange={(e) => setCourierSearchInput(e.target.value)}
                   />
                 </div>
                 <select value={courierStatusFilter} onChange={(e) => setCourierStatusFilter(e.target.value)}>
@@ -1605,96 +1848,151 @@ const UserManagement: React.FC = () => {
                   <option value="truck">货车</option>
                 </select>
               </div>
-              <div className="user-mgmt__actions">
-                <button type="button" className="user-mgmt__btn" onClick={() => loadCouriers()}>
-                  🔄 刷新
-                </button>
-              </div>
             </div>
             {courierLoading ? (
-              <SkeletonTable rows={3} />
-            ) : filteredCouriers.length === 0 ? (
+              <SkeletonTable rows={4} />
+            ) : couriers.length === 0 ? (
               <div className="user-mgmt__empty">
-                <div className="user-mgmt__empty-icon">🛵</div>
-                <p className="user-mgmt__empty-text">没有匹配的快递员</p>
+                <p className="user-mgmt__empty-text">没有匹配的骑手</p>
               </div>
             ) : (
-              <div className="user-mgmt__list">
-                {filteredCouriers.map((courier) => (
-                  <CourierRow
-                    key={courier.id}
-                    courier={courier}
-                    isMobile={isMobile}
-                    handleEditCourier={handleEditCourier}
-                    handleCourierStatusChange={handleCourierStatusChange}
-                    handleDeleteCourier={handleDeleteCourier}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="user-mgmt-table-wrap">
+                  <table className="user-mgmt-table user-mgmt-table--couriers">
+                    <thead>
+                      <tr>
+                        <th>骑手</th>
+                        <th>电话</th>
+                        <th>地区</th>
+                        <th>车型</th>
+                        <th>配送</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {couriers.map((courier) => (
+                        <CourierRow
+                          key={courier.id}
+                          courier={courier}
+                          onEdit={handleEditCourier}
+                          onStatus={handleCourierStatusChange}
+                          onDelete={handleDeleteCourier}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <TablePager
+                  page={courierPage}
+                  pageSize={courierPageSize}
+                  total={courierTotal}
+                  onPage={setCourierPage}
+                  onPageSize={(size) => {
+                    setCourierPageSize(size);
+                    setCourierPage(1);
+                  }}
+                />
+              </>
+            )}
+            </>
             )}
           </section>
         )}
 
         {showAddUserForm && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', padding: '40px', borderRadius: '24px', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '30px', fontSize: '1.8rem', fontWeight: 800 }}>{editingUser ? '编辑用户资料' : '新增用户账号'}</h2>
-              <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
-                  <div style={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>姓名</label>
-                    <input type="text" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} required style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+          <div className="user-mgmt-modal-overlay" onClick={closeUserForm}>
+            <div className="user-mgmt-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+              <div className="user-mgmt-modal__head">
+                <div>
+                  <h2 className="user-mgmt-modal__title">{editingUser ? '编辑客户资料' : '新增客户'}</h2>
+                  <p className="user-mgmt-modal__sub">仅创建会员客户。管理员与骑手请到系统设置 → 账户管理。</p>
+                </div>
+                <button type="button" className="user-mgmt-modal__close" onClick={closeUserForm} aria-label="关闭">
+                  ✕
+                </button>
+              </div>
+              <form className="user-mgmt-modal__body" onSubmit={editingUser ? handleUpdateUser : handleCreateUser}>
+                <div className="user-mgmt-form">
+                  <div className="user-mgmt-field user-mgmt-field--full">
+                    <label>姓名</label>
+                    <input type="text" value={userForm.name} onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} required />
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>电话</label>
-                    <input type="tel" value={userForm.phone} onChange={e => setUserForm({...userForm, phone: e.target.value})} required style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  <div className="user-mgmt-field">
+                    <label>电话</label>
+                    <input type="tel" value={userForm.phone} onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })} required />
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>邮箱</label>
-                    <input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  <div className="user-mgmt-field">
+                    <label>邮箱</label>
+                    <input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>登录密码 {editingUser && '(留空表示不修改)'}</label>
-                    <input type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} placeholder={editingUser ? '••••••' : '默认密码 123456'} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  <div className="user-mgmt-field">
+                    <label>{editingUser ? '登录密码（留空不修改）' : '登录密码'}</label>
+                    <input
+                      type="password"
+                      value={userForm.password}
+                      onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                      placeholder={editingUser ? '不修改请留空' : '必填'}
+                      required={!editingUser}
+                    />
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>注册领区</label>
-                    <select value={userForm.register_region} onChange={e => setUserForm({...userForm, register_region: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}>
-                      {REGIONS.map(region => (
-                        <option key={region.id} value={region.id}>{region.name}</option>
+                  <div className="user-mgmt-field">
+                    <label>注册领区</label>
+                    <select value={userForm.register_region} onChange={(e) => setUserForm({ ...userForm, register_region: e.target.value })}>
+                      {REGIONS.map((region) => (
+                        <option key={region.id} value={region.id}>
+                          {region.name}
+                        </option>
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>用户类型</label>
-                    <select value={userForm.user_type} onChange={e => setUserForm({...userForm, user_type: e.target.value as any})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}>
-                      <option value="customer">👤 普通客户</option>
-                      <option value="vip">👑 VIP 会员</option>
-                      <option value="merchant">🏪 商家/合伙人</option>
-                      <option value="admin">🔐 管理员</option>
-                      <option value="courier">🛵 快递员</option>
+                  {editingUser && (
+                    <div className="user-mgmt-field">
+                      <label>会员类型</label>
+                      <select
+                        value={userForm.user_type === 'vip' ? 'vip' : 'customer'}
+                        onChange={(e) => setUserForm({ ...userForm, user_type: e.target.value as User['user_type'] })}
+                      >
+                        <option value="customer">普通会员</option>
+                        <option value="vip">VIP 会员</option>
+                      </select>
+                    </div>
+                  )}
+                  <div className="user-mgmt-field">
+                    <label>账号状态</label>
+                    <select value={userForm.status} onChange={(e) => setUserForm({ ...userForm, status: e.target.value as User['status'] })}>
+                      <option value="active">活跃</option>
+                      <option value="inactive">非活跃</option>
+                      {editingUser && <option value="suspended">已暂停</option>}
                     </select>
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>账号状态</label>
-                    <select value={userForm.status} onChange={e => setUserForm({...userForm, status: e.target.value as any})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}>
-                      <option value="active">✅ 活跃</option>
-                      <option value="inactive">💤 非活跃</option>
-                      <option value="suspended">🚫 已暂停</option>
-                    </select>
+                  {editingUser && userForm.status === 'suspended' && (
+                    <div className="user-mgmt-field user-mgmt-field--full">
+                      <label>冻结原因</label>
+                      <textarea
+                        value={userForm.freeze_reason}
+                        onChange={(e) => setUserForm({ ...userForm, freeze_reason: e.target.value })}
+                        placeholder="冻结账号必须填写原因"
+                        required
+                      />
+                    </div>
+                  )}
+                  <div className="user-mgmt-field user-mgmt-field--full">
+                    <label>联系地址</label>
+                    <textarea value={userForm.address} onChange={(e) => setUserForm({ ...userForm, address: e.target.value })} />
                   </div>
-                  <div style={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>联系地址</label>
-                    <textarea value={userForm.address} onChange={e => setUserForm({...userForm, address: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white', minHeight: '80px' }} />
-                  </div>
-                  <div style={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>备注信息</label>
-                    <textarea value={userForm.notes} onChange={e => setUserForm({...userForm, notes: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white', minHeight: '60px' }} />
+                  <div className="user-mgmt-field user-mgmt-field--full">
+                    <label>备注信息</label>
+                    <textarea value={userForm.notes} onChange={(e) => setUserForm({ ...userForm, notes: e.target.value })} />
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '15px' }}>
-                  <button type="submit" style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: '#27ae60', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>{editingUser ? '保存修改' : '确认创建'}</button>
-                  <button type="button" onClick={() => { setShowAddUserForm(false); setEditingUser(null); }} style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>取消</button>
+                <div className="user-mgmt-modal__foot">
+                  <button type="submit" className="user-mgmt__btn user-mgmt__btn--primary">
+                    {editingUser ? '保存修改' : '确认创建'}
+                  </button>
+                  <button type="button" className="user-mgmt__btn" onClick={closeUserForm}>
+                    取消
+                  </button>
                 </div>
               </form>
             </div>
@@ -1702,131 +2000,217 @@ const UserManagement: React.FC = () => {
         )}
 
         {showAddCourierForm && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', padding: '40px', borderRadius: '24px', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '30px', fontSize: '1.8rem', fontWeight: 800 }}>编辑快递员资料</h2>
-              <form onSubmit={handleUpdateCourier}>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
-                  <div style={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>姓名</label>
-                    <input type="text" value={courierForm.name} onChange={e => setCourierForm({...courierForm, name: e.target.value})} required style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+          <div
+            className="user-mgmt-modal-overlay"
+            onClick={() => {
+              setShowAddCourierForm(false);
+              setEditingCourier(null);
+            }}
+          >
+            <div className="user-mgmt-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+              <div className="user-mgmt-modal__head">
+                <div>
+                  <h2 className="user-mgmt-modal__title">编辑骑手资料</h2>
+                  <p className="user-mgmt-modal__sub">以骑手表为主；若已关联后台账号，会同步姓名、电话和状态。</p>
+                </div>
+                <button
+                  type="button"
+                  className="user-mgmt-modal__close"
+                  onClick={() => {
+                    setShowAddCourierForm(false);
+                    setEditingCourier(null);
+                  }}
+                  aria-label="关闭"
+                >
+                  ✕
+                </button>
+              </div>
+              <form className="user-mgmt-modal__body" onSubmit={handleUpdateCourier}>
+                <div className="user-mgmt-form">
+                  <div className="user-mgmt-field user-mgmt-field--full">
+                    <label>姓名</label>
+                    <input type="text" value={courierForm.name} onChange={(e) => setCourierForm({ ...courierForm, name: e.target.value })} required />
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>电话</label>
-                    <input type="tel" value={courierForm.phone} onChange={e => setCourierForm({...courierForm, phone: e.target.value})} required style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  <div className="user-mgmt-field">
+                    <label>电话</label>
+                    <input type="tel" value={courierForm.phone} onChange={(e) => setCourierForm({ ...courierForm, phone: e.target.value })} required />
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>员工编号</label>
-                    <input type="text" value={courierForm.employee_id} onChange={e => setCourierForm({...courierForm, employee_id: e.target.value})} required style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  <div className="user-mgmt-field">
+                    <label>员工编号</label>
+                    <input
+                      type="text"
+                      value={courierForm.employee_id}
+                      onChange={(e) => setCourierForm({ ...courierForm, employee_id: e.target.value })}
+                    />
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>车辆类型</label>
-                    <select value={courierForm.vehicle_type} onChange={e => setCourierForm({...courierForm, vehicle_type: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}>
-                      <option value="motorcycle">🏍️ 摩托车</option>
-                      <option value="car">🚗 汽车</option>
-                      <option value="truck">🚚 卡车</option>
+                  <div className="user-mgmt-field">
+                    <label>车辆类型</label>
+                    <select value={courierForm.vehicle_type} onChange={(e) => setCourierForm({ ...courierForm, vehicle_type: e.target.value })}>
+                      <option value="motorcycle">摩托车</option>
+                      <option value="car">汽车</option>
+                      <option value="truck">货车</option>
                     </select>
                   </div>
-                  <div>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>车牌号</label>
-                    <input type="text" value={courierForm.license_number} onChange={e => setCourierForm({...courierForm, license_number: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }} />
+                  <div className="user-mgmt-field">
+                    <label>车牌号</label>
+                    <input
+                      type="text"
+                      value={courierForm.license_number}
+                      onChange={(e) => setCourierForm({ ...courierForm, license_number: e.target.value })}
+                    />
                   </div>
-                  <div style={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
-                    <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>注册地址</label>
-                    <textarea value={courierForm.address} onChange={e => setCourierForm({...courierForm, address: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(0,0,0,0.2)', color: 'white', minHeight: '80px' }} />
+                  <div className="user-mgmt-field user-mgmt-field--full">
+                    <label>注册地址</label>
+                    <textarea value={courierForm.address} onChange={(e) => setCourierForm({ ...courierForm, address: e.target.value })} />
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '15px' }}>
-                  <button type="submit" style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: '#27ae60', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>保存修改</button>
-                  <button type="button" onClick={() => setShowAddCourierForm(false)} style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>取消</button>
+                <div className="user-mgmt-modal__foot">
+                  <button type="submit" className="user-mgmt__btn user-mgmt__btn--primary">
+                    保存修改
+                  </button>
+                  <button
+                    type="button"
+                    className="user-mgmt__btn"
+                    onClick={() => {
+                      setShowAddCourierForm(false);
+                      setEditingCourier(null);
+                    }}
+                  >
+                    取消
+                  </button>
                 </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* 🚀 新增：充值模态框 */}
         {showRechargeModal && rechargeUser && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(15px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '20px' }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', 
-              padding: '40px', 
-              borderRadius: '32px', 
-              width: '100%', 
-              maxWidth: '500px', 
-              border: '1px solid rgba(255,255,255,0.15)',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.4)',
-              position: 'relative'
-            }}>
-              <button 
-                onClick={() => setShowRechargeModal(false)}
-                style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >✕</button>
-
-              <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                <div style={{ fontSize: '3.5rem', marginBottom: '15px' }}>💳</div>
-                <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: 800, margin: 0 }}>账户充值</h2>
-                <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: '10px' }}>为用户 <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{rechargeUser.name}</span> 选择充值金额</p>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '30px' }}>
-                {[10000, 50000, 100000, 300000].map(amount => (
-                  <button
-                    key={amount}
-                    onClick={() => handleRecharge(amount)}
-                    disabled={isRecharging}
-                    style={{
-                      padding: '20px',
-                      borderRadius: '16px',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      color: 'white',
-                      fontSize: '1.1rem',
-                      fontWeight: '800',
-                      cursor: isRecharging ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }}
-                    onMouseOver={(e) => {
-                      if (!isRecharging) {
-                        e.currentTarget.style.background = '#fbbf24';
-                        e.currentTarget.style.color = '#1e3c72';
-                        e.currentTarget.style.transform = 'translateY(-3px)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (!isRecharging) {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                        e.currentTarget.style.color = 'white';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }
-                    }}
-                  >
-                    {amount.toLocaleString()} MMK
-                  </button>
-                ))}
-              </div>
-
-              <button 
-                onClick={() => setShowRechargeModal(false)}
-                style={{ 
-                  width: '100%', 
-                  padding: '16px', 
-                  borderRadius: '16px', 
-                  background: 'rgba(255,255,255,0.1)', 
-                  border: '1px solid rgba(255,255,255,0.2)', 
-                  color: 'white', 
-                  fontSize: '1rem', 
-                  fontWeight: 'bold', 
-                  cursor: 'pointer' 
-                }}
-              >返回列表</button>
-
-              {isRecharging && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', borderRadius: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.3)', borderTop: '4px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+          <div
+            className="user-mgmt-modal-overlay"
+            onClick={() => {
+              if (!isRecharging) {
+                setShowRechargeModal(false);
+                setRechargeUser(null);
+              }
+            }}
+          >
+            <div className="user-mgmt-modal user-mgmt-modal--sm" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+              <div className="user-mgmt-modal__head">
+                <div>
+                  <h2 className="user-mgmt-modal__title">账户充值</h2>
+                  <p className="user-mgmt-modal__sub">
+                    {rechargeUser.name} · 当前余额 {(rechargeUser.balance ?? 0).toLocaleString()} MMK
+                    <br />
+                    将写入充值流水，并记录当前登录管理员。
+                  </p>
                 </div>
-              )}
+                <button
+                  type="button"
+                  className="user-mgmt-modal__close"
+                  onClick={() => {
+                    if (!isRecharging) {
+                      setShowRechargeModal(false);
+                      setRechargeUser(null);
+                    }
+                  }}
+                  aria-label="关闭"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="user-mgmt-modal__body">
+                {isRecharging && <p className="user-mgmt-modal__busy">正在入账…</p>}
+                <div className="user-mgmt-recharge-grid">
+                  {RECHARGE_AMOUNTS.map((amount) => (
+                    <button
+                      key={amount}
+                      type="button"
+                      className="user-mgmt-recharge-amt"
+                      disabled={isRecharging}
+                      onClick={() => handleRecharge(amount)}
+                    >
+                      {amount.toLocaleString()} MMK
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="user-mgmt__btn"
+                  style={{ width: '100%' }}
+                  disabled={isRecharging}
+                  onClick={() => {
+                    setShowRechargeModal(false);
+                    setRechargeUser(null);
+                  }}
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {detailUser && (
+          <CustomerDrawer
+            user={detailUser}
+            tab={detailTab}
+            onTab={setDetailTab}
+            onClose={() => setDetailUser(null)}
+            onEdit={(user) => {
+              handleEditUser(user);
+            }}
+            onRecharge={handleOpenRecharge}
+            onFreeze={(user) => {
+              setFreezeUser(user);
+              setFreezeReason(user.freeze_reason || '');
+            }}
+            onUnfreeze={(user) => {
+              void updateUserStatus(user, 'active');
+            }}
+            loading={detailLoading}
+            orders={detailOrders}
+            ledger={detailLedger}
+          />
+        )}
+
+        {freezeUser && (
+          <div
+            className="user-mgmt-modal-overlay"
+            onClick={() => {
+              if (!freezeSaving) setFreezeUser(null);
+            }}
+          >
+            <div className="user-mgmt-modal user-mgmt-modal--sm" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+              <div className="user-mgmt-modal__head">
+                <div>
+                  <h2 className="user-mgmt-modal__title">冻结客户</h2>
+                  <p className="user-mgmt-modal__sub">
+                    {freezeUser.name} 将被设为「已暂停」。必须填写原因，解冻时会清空。
+                  </p>
+                </div>
+                <button type="button" className="user-mgmt-modal__close" onClick={() => !freezeSaving && setFreezeUser(null)} aria-label="关闭">
+                  ✕
+                </button>
+              </div>
+              <div className="user-mgmt-modal__body">
+                <div className="user-mgmt-field user-mgmt-field--full">
+                  <label>冻结原因</label>
+                  <textarea
+                    value={freezeReason}
+                    onChange={(e) => setFreezeReason(e.target.value)}
+                    placeholder="例如：投诉未处理、异常充值、客户要求停用…"
+                    required
+                  />
+                </div>
+                <div className="user-mgmt-modal__foot">
+                  <button type="button" className="user-mgmt__btn user-mgmt__btn--danger" onClick={() => void submitFreeze()} disabled={freezeSaving}>
+                    {freezeSaving ? '提交中…' : '确认冻结'}
+                  </button>
+                  <button type="button" className="user-mgmt__btn" disabled={freezeSaving} onClick={() => setFreezeUser(null)}>
+                    取消
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
