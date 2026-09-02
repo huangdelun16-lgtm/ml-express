@@ -1627,7 +1627,7 @@ Dashboard：https://app.netlify.com/projects/`<项目名>`。各 `package.json` 
 
 本机可再 `npx netlify link --id <上表 ID>`（写入该目录 `.netlify/state.json`，已 gitignore）。
 
-构建：`npm install --legacy-peer-deps && npm run build`（`prebuild` → `sync:shared`）。Windows PowerShell **不能**写 `CI=false npm run build`（会被当成命令名）；Admin 已把 `CI=false` 放到 `netlify.toml` 的 `[build.environment]`。会员/商家 Web 的 `package.json` 仍是 `CI=false react-scripts build`，在 Windows 上本地 `npm run build` / CLI `--build` 会失败，应在对应目录用 `$env:CI='false'; npx react-scripts build` 或先在 Mac 上发。
+构建：`npm install --legacy-peer-deps && npm run build`（`prebuild` → `sync:shared`）。Windows PowerShell **不能**把 `CI=false` 写进命令行（会被当成命令名）。三站都把 `CI=false` 放在各自 `netlify.toml` 的 `[build.environment]`，`package.json` 的 `build` 只跑 `react-scripts build`。发布入口 `scripts/deploy-web.mjs` 也会注入 `CI=false`。
 
 三站均配置 `/__sb/*` → supabase.co。**仅 Admin 根站**有 Edge `supabase-bff`（剥 `__cf_bm`、禁缓存）；会员/商家 Web 只有 200 rewrite。
 
@@ -1648,7 +1648,7 @@ Inventory EAS project 与 Supabase ref 配置见 `ml-express-inventory-app/eas.j
 
 ### 15.3 三站生产发布红线（必读）
 
-**生产真源 = 本机 CLI 上传（Mac `npm run deploy:netlify`），不是 GitHub `main`。**  
+**生产真源 = 本机 CLI 上传（`npm run deploy:netlify`），不是 GitHub `main`。**  
 三站都连着 `huangdelun16-lgtm/ml-express` 的 `main`，但线上 `published_deploy.commit_ref` 为 **空**、`deploy_source = api`。Mac 上改完直接 CLI 发布；`main` 经常滞后（例如只到投资人 PDF 提交 `4fe16f1`）。
 
 | 站点 | 正确工作目录 | 正确命令 | 2026-09-01 已知完好 CLI 部署（回滚锚点） |
@@ -1679,7 +1679,7 @@ npx netlify api restoreSiteDeploy --data '{"site_id":"<站点ID>","deploy_id":"<
 4. 假设「clone 了 GitHub 最新 main = 线上最新」。线上以 Netlify 当前 Published 的 CLI 包为准。
 5. 绕过 `npm run deploy:netlify`，手写带 `--trigger` 或错误 `--site` 的命令。
 
-Windows 本机若 CLI 卡在 Edge Function `fetch failed`（Deno 打包器下载失败，Admin 常见）：不要改用 `--trigger`。请在 Mac 上对该站再跑一次 `npm run deploy:netlify`，或 `restoreSiteDeploy` 回到上表锚点。
+Admin 本机打包 Edge `supabase-bff` 需要 Deno 1.39–2.2.4。`npm run deploy:netlify` 会先跑 `scripts/ensure-netlify-deno.mjs`：把 Deno 2.2.4 写进 `%APPDATA%\netlify\Config\deno-cli`（优先从 npmmirror 下 zip），避免再去拉 `dl.deno.land`（Windows / 缅甸常见 `fetch failed`）。不要用 `--trigger` 绕过。若仍失败，到 Mac 再发，或 `restoreSiteDeploy` 回到上表锚点。
 
 ---
 
@@ -2030,4 +2030,4 @@ Inventory→ inventory-store-login → Supabase Auth JWT（移动端唯一 JWT �
 
 ---
 
-*最后更新：2026-09-02 — 三站生产真源改为本机 CLI（§15.3）：Admin / 会员 Web / 商家 Web 的目录、Site ID、回滚部署 ID；禁止 `--trigger` 覆盖 Mac 新版。细节以仓库当前文件为准。*
+*最后更新：2026-09-02 — Windows 三站构建改走 `CI=false` 环境变量；Admin Edge 打包由 `ensure-netlify-deno.mjs` 缓存 Deno 2.2.4。细节以仓库当前文件为准。*

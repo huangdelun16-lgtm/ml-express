@@ -25,6 +25,9 @@ yarn-error.log*
 # Netlify
 .netlify
 
+# 本机 Deno / Edge bootstrap 缓存（Windows 发 Admin 用，勿入库）
+.tools/
+
 # Cloudflare Wrangler
 .wrangler/
 cloudflare/**/.wrangler/

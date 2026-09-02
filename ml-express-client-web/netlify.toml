@@ -6,7 +6,7 @@
 # CLI（在本目录下且已 link 到对应站点）：npm run deploy:netlify
 # =============================================================================
 [build]
-  command = "npm install --legacy-peer-deps && CI=false npm run build"
+  command = "npm install --legacy-peer-deps && npm run build"
   publish = "build"
   functions = "netlify/functions"
 
@@ -14,6 +14,7 @@
   NODE_VERSION = "18"
   NPM_FLAGS = "--legacy-peer-deps"
   NETLIFY_SKIP_PLUGINS = "true"
+  CI = "false"
   # CLI `netlify deploy --build` 默认 context=dev，必须写在 build.environment 才会生效。
   # 前端包会打入 anon / Maps 公钥，属预期；勿把 service role / Twilio / Gmail 加进 OMIT。
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"

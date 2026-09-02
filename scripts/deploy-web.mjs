@@ -8,8 +8,9 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureNetlifyDeno } from "./ensure-netlify-deno.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sites = JSON.parse(readFileSync(join(root, "scripts/netlify-web-sites.json"), "utf8"));
@@ -37,6 +38,12 @@ if (!existsSync(join(cwd, "package.json")) || !existsSync(join(cwd, "netlify.tom
 
 const env = { ...process.env, CI: "false" };
 delete env.NETLIFY_AUTH_TOKEN;
+
+if (key === "admin") {
+  console.log("准备 Admin Edge 打包（缓存 Deno 2.2.4，避免再拉 dl.deno.land）…");
+  const deno = await ensureNetlifyDeno();
+  env.PATH = `${deno.denoDir}${delimiter}${env.PATH || ""}`;
+}
 
 console.log(`发布 ${site.name} → ${site.domain}`);
 console.log(`目录 ${cwd}`);

@@ -30,7 +30,7 @@
     "prestart": "npm run sync:shared",
     "prebuild": "npm run sync:shared",
     "start": "react-scripts start",
-    "build": "CI=false react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "deploy:netlify": "node ../scripts/deploy-web.mjs merchant"
