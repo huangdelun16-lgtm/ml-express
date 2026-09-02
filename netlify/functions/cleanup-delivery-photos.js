@@ -88,6 +88,42 @@ exports.handler = async (event) => {
     }
     console.log(`✅ delivery_photos 清理完成，删除 ${deleted} 条（保留 ${RETENTION_DAYS} 天）`);
 
+    let auditDeleted = 0;
+    let auditRetentionDays = 90;
+    try {
+      const { data: retentionRow } = await supabase
+        .from('system_settings')
+        .select('settings_value')
+        .eq('settings_key', 'security.audit_log_retention_days')
+        .maybeSingle();
+      const parsed = Number(retentionRow?.settings_value);
+      if (Number.isFinite(parsed)) auditRetentionDays = parsed;
+      auditRetentionDays = Math.min(365, Math.max(7, Math.round(auditRetentionDays)));
+      const auditCutoff = new Date(Date.now() - auditRetentionDays * 86400000).toISOString();
+      for (let batch = 0; batch < 8; batch += 1) {
+        const { data: oldLogs, error: selectErr } = await supabase
+          .from('audit_logs')
+          .select('id')
+          .lt('action_time', auditCutoff)
+          .limit(400);
+        if (selectErr) throw selectErr;
+        if (!oldLogs || oldLogs.length === 0) break;
+        const { error: delAuditErr, count } = await supabase
+          .from('audit_logs')
+          .delete({ count: 'exact' })
+          .in(
+            'id',
+            oldLogs.map((row) => row.id),
+          );
+        if (delAuditErr) throw delAuditErr;
+        auditDeleted += count ?? oldLogs.length;
+        if (oldLogs.length < 400) break;
+      }
+      console.log(`✅ audit_logs 清理完成，删除 ${auditDeleted} 条（保留 ${auditRetentionDays} 天）`);
+    } catch (auditErr) {
+      console.warn('audit_logs 清理失败（照片清理已完成）:', auditErr.message || auditErr);
+    }
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -95,6 +131,8 @@ exports.handler = async (event) => {
         ok: true,
         deleted,
         retentionDays: RETENTION_DAYS,
+        auditDeleted,
+        auditRetentionDays,
         at: new Date().toISOString(),
       }),
     };

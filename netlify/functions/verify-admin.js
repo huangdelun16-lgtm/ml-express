@@ -226,6 +226,15 @@ function generateAdminToken(username, role) {
 // 引入 CORS 工具函数
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 const { getAdminTokenFromEvent } = require('./utils/adminToken');
+const {
+  isAdminBrowserRequest,
+  getClientIp,
+  shouldEnforceIpWhitelist,
+  ipAllowed,
+  loadSecuritySettings,
+  denyIpMessage,
+} = require('./utils/adminSecurity');
+const { fetchSettingsRows } = require('./utils/systemSettingsRest');
 
 /**
  * Netlify Function 主处理函数
@@ -293,11 +302,30 @@ exports.handler = async (event, context) => {
       }
       const result = await verifyAdminToken(tokenToVerify, requiredRoles || [], permIds);
 
+      if (result.valid && isAdminBrowserRequest(event) && supabaseUrl && supabaseKey) {
+        const policy = await loadSecuritySettings((keys) =>
+          fetchSettingsRows(supabaseUrl, supabaseKey, keys),
+        );
+        if (
+          shouldEnforceIpWhitelist(
+            policy['security.ip_whitelist_enabled'],
+            policy['security.ip_whitelist'],
+          )
+        ) {
+          const clientIp = getClientIp(event);
+          if (!ipAllowed(clientIp, policy['security.ip_whitelist'])) {
+            result.valid = false;
+            result.error = denyIpMessage();
+            delete result.user;
+          }
+        }
+      }
+
       // 权限不足只表示打不开某一页，不要清 Cookie（否则控制台 401 后整站被踢出）
       const wipeSession =
         !result.valid &&
         (!result.error ||
-          /令牌|未找到认证|无效的令牌|已过期|签名|用户不存在|停用/.test(String(result.error)));
+          /令牌|未找到认证|无效的令牌|已过期|签名|用户不存在|停用|白名单/.test(String(result.error)));
       if (wipeSession) {
         headers['Set-Cookie'] = 'admin_auth_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax';
       }

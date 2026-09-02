@@ -62,9 +62,13 @@
 [build.processing.skip]
   paths = ["*.md", "*.html", "test-*", "diagnose-*"]
 
-# 骑手送达证明图：每天 UTC 04:00 清理超过 7 天的 delivery_photos
+# 骑手送达证明图 + 过期审计日志：每天 UTC 04:00
 [functions."cleanup-delivery-photos"]
   schedule = "0 4 * * *"
+
+# 自动派单 / 超时改派：每分钟（读取 system_settings automation.*）
+[functions."courier-auto-dispatch"]
+  schedule = "* * * * *"
 
 # 环境变量
 # 注意：敏感信息（如 Supabase 密钥）应在 Netlify Dashboard 中配置

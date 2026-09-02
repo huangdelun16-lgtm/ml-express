@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../services/errorHandler';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, Polyline } from '@react-google-maps/api';
 import '../styles/adminRealTimeTracking.css';
 import { packageService, Package, supabase, CourierLocation, deliveryStoreService, DeliveryStore, adminAccountService, systemSettingsService } from '../services/supabase';
 import { useResponsive } from '../hooks/useResponsive';
@@ -27,6 +27,26 @@ import { AssignCourierModal } from '../components/AssignCourierModal';
 import { DeliveryCountdownBadge } from '../components/DeliveryCountdownBadge';
 import { feedbackService } from '../services/FeedbackService';
 import { isBrowserRealtimeAvailable } from '../utils/supabaseBrowserUrl';
+import {
+  buildRouteJobs,
+  formatRouteEtaLabel,
+  routeJobSignature,
+  routeReasonLabel,
+  type RouteJob,
+} from '../utils/routePrediction';
+import { fetchDrivingRoute, type DrivingRouteResult } from '../utils/googleDrivingDirections';
+
+type PredictedRoute = RouteJob & DrivingRouteResult;
+
+function PredictedEtaLine({ route }: { route?: PredictedRoute }) {
+  if (!route) return null;
+  const stop = route.stopKind === 'pickup' ? '前往取件' : '前往送达';
+  return (
+    <p className="rt-tracking__route-eta">
+      🛣️ {stop} · {formatRouteEtaLabel(route)} · {routeReasonLabel(route.reason)}
+    </p>
+  );
+}
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
@@ -189,6 +209,7 @@ const RealTimeTracking: React.FC = () => {
   const [mapThemeSetting, setMapThemeSetting] = useState<MapThemeSetting>('dark');
   const [routePredictionEnabled, setRoutePredictionEnabled] = useState(false);
   const [webhookPushEnabled, setWebhookPushEnabled] = useState(false);
+  const [predictedRoutes, setPredictedRoutes] = useState<PredictedRoute[]>([]);
 
   // 音频提示相关状态
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -1043,6 +1064,60 @@ const RealTimeTracking: React.FC = () => {
     [cityFilteredPackages],
   );
 
+  const routeJobs = useMemo(() => {
+    if (!routePredictionEnabled) return [];
+    return buildRouteJobs({
+      packages: cityFilteredPackages,
+      couriers,
+      selectedCourierId: selectedCourier?.id,
+    });
+  }, [routePredictionEnabled, cityFilteredPackages, couriers, selectedCourier?.id]);
+
+  const routeJobsSignature = useMemo(
+    () => routeJobs.map((job) => routeJobSignature(job)).join(';'),
+    [routeJobs],
+  );
+  const routeJobsRef = useRef(routeJobs);
+  routeJobsRef.current = routeJobs;
+
+  useEffect(() => {
+    if (!routePredictionEnabled || !isMapLoaded) {
+      setPredictedRoutes([]);
+      return;
+    }
+    const jobs = routeJobsRef.current;
+    if (jobs.length === 0) {
+      setPredictedRoutes([]);
+      return;
+    }
+    let alive = true;
+    void Promise.all(
+      jobs.map(async (job) => {
+        const driven = await fetchDrivingRoute(job.origin, job.destination);
+        if (!driven) return null;
+        return { ...job, ...driven };
+      }),
+    ).then((rows) => {
+      if (!alive) return;
+      setPredictedRoutes(rows.filter((row): row is PredictedRoute => Boolean(row)));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [routePredictionEnabled, isMapLoaded, routeJobsSignature]);
+
+  const predictedByPackageId = useMemo(() => {
+    const map = new Map<string, PredictedRoute>();
+    predictedRoutes.forEach((row) => map.set(row.packageId, row));
+    return map;
+  }, [predictedRoutes]);
+
+  const predictedByCourierId = useMemo(() => {
+    const map = new Map<string, PredictedRoute>();
+    predictedRoutes.forEach((row) => map.set(row.courierId, row));
+    return map;
+  }, [predictedRoutes]);
+
   const pendingCodStats = useMemo(() => {
     const withCod = pendingPackages.filter((p) => packageHasCod(p));
     return {
@@ -1186,6 +1261,11 @@ const RealTimeTracking: React.FC = () => {
           <span className="rt-tracking__chip rt-tracking__chip--delivering">
             配送中 {assignedPackages.length}
           </span>
+          {routePredictionEnabled && (
+            <span className="rt-tracking__chip rt-tracking__chip--route">
+              路线 {predictedRoutes.length}
+            </span>
+          )}
         </div>
 
         <div className="rt-tracking__actions">
@@ -1348,6 +1428,41 @@ const RealTimeTracking: React.FC = () => {
                         />
                       );
                     })}
+
+                  {predictedRoutes.map((route) => {
+                    const selected = selectedCourier?.id === route.courierId;
+                    const color =
+                      route.reason === 'food' ? '#ca8a04' : '#ea580c';
+                    return (
+                      <React.Fragment key={`pred-${route.courierId}-${route.packageId}`}>
+                        <Polyline
+                          path={route.path}
+                          options={{
+                            strokeColor: selected ? '#c2410c' : color,
+                            strokeOpacity: selected ? 0.95 : 0.82,
+                            strokeWeight: selected ? 6 : 4,
+                            geodesic: true,
+                            zIndex: selected ? 460 : 420,
+                            clickable: false,
+                          }}
+                        />
+                        <Marker
+                          position={route.destination}
+                          zIndex={selected ? 620 : 580}
+                          icon={{
+                            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                              <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="18" cy="18" r="16" fill="${selected ? '#c2410c' : color}" stroke="white" stroke-width="2"/>
+                                <text x="18" y="23" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${route.stopKind === 'pickup' ? 'P' : 'D'}</text>
+                              </svg>
+                            `)}`,
+                            scaledSize: new window.google.maps.Size(36, 36),
+                            anchor: new window.google.maps.Point(18, 18),
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  })}
 
                   {/* 显示快递店位置及围栏 */}
                   {stores
@@ -1534,6 +1649,19 @@ const RealTimeTracking: React.FC = () => {
                             <strong>📍 GPS:</strong>{' '}
                             {Number(selectedCourier.latitude).toFixed(6)}, {Number(selectedCourier.longitude).toFixed(6)}
                           </p>
+                          {(() => {
+                            const predicted = predictedByCourierId.get(selectedCourier.id);
+                            if (!predicted) return null;
+                            return (
+                              <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#c2410c', fontWeight: 700 }}>
+                                🛣️ {predicted.stopKind === 'pickup' ? '前往取件' : '前往送达'}
+                                {' · '}
+                                {formatRouteEtaLabel(predicted)}
+                                {' · '}
+                                {routeReasonLabel(predicted.reason)}
+                              </p>
+                            );
+                          })()}
                           {(selectedCourier as CourierWithLocation & { location_updated_at?: string }).location_updated_at && (
                             <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', color: '#6b7280' }}>
                               <strong>🕐 上报时间:</strong>{' '}
@@ -1672,6 +1800,13 @@ const RealTimeTracking: React.FC = () => {
                   )}
                 </GoogleMap>
               )}
+              {routePredictionEnabled && (
+                <div className="rt-tracking__route-overlay">
+                  {predictedRoutes.length > 0
+                    ? `路线预测 · 急送达/餐饮 ${predictedRoutes.length} 条`
+                    : '路线预测已开 · 当前无已派的急送达/餐饮单'}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -1774,6 +1909,7 @@ const RealTimeTracking: React.FC = () => {
                         <div className="rt-tracking__badges">{renderPackageIdentityBadges(pkg)}</div>
                       </div>
                       <DeliveryCountdownBadge pkg={pkg} />
+                      <PredictedEtaLine route={predictedByPackageId.get(pkg.id)} />
                       <div className="rt-tracking__pkg-body">
                         <p>
                           从 {formatTrackingAddress(pkg.sender_address)}
@@ -1860,6 +1996,7 @@ const RealTimeTracking: React.FC = () => {
                     </div>
                   </div>
                   <DeliveryCountdownBadge pkg={pkg} />
+                  <PredictedEtaLine route={predictedByPackageId.get(pkg.id)} />
                   <div className="rt-tracking__pkg-body">
                     <p>
                       {pkg.sender_name} → {pkg.receiver_name}

@@ -4,7 +4,7 @@ import { SystemSetting, systemSettingsService } from '../services/supabase';
 import SecurityVerificationModal from '../components/SecurityVerificationModal';
 import '../styles/adminSystemSettings.css';
 
-type SettingCategory = 'general' | 'pricing' | 'notification' | 'automation' | 'tracking' | 'security';
+type SettingCategory = 'general' | 'pricing' | 'automation' | 'tracking' | 'security';
 
 type SettingFieldType = 'text' | 'number' | 'textarea' | 'switch' | 'select';
 
@@ -31,7 +31,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'company.name',
     label: '公司名称',
-    description: '用于系统展示、通知模板和对外显示的公司全称。',
+    description: '用于系统展示和对外显示的公司全称。',
     category: 'general',
     type: 'text',
     defaultValue: 'Market Link Express',
@@ -194,43 +194,9 @@ const settingDefinitions: SettingDefinition[] = [
     suffix: 'MMK/单'
   },
   {
-    key: 'notification.sms_enabled',
-    label: '启用短信通知',
-    description: '开启后将在订单状态变更时向客户发送短信提醒。',
-    category: 'notification',
-    type: 'switch',
-    defaultValue: true
-  },
-  {
-    key: 'notification.email_enabled',
-    label: '启用邮件通知',
-    description: '开启后将在重要事件（如配送异常、财务提醒）时发送邮件通知。',
-    category: 'notification',
-    type: 'switch',
-    defaultValue: true
-  },
-  {
-    key: 'notification.customer_template',
-    label: '客户通知模板',
-    description: '支持变量 {{order_id}}、{{status}}、{{eta}} 用于自动替换。',
-    category: 'notification',
-    type: 'textarea',
-    defaultValue: '您好，您的订单 {{order_id}} 当前状态更新为：{{status}}，预计送达时间 {{eta}}。',
-    helpText: '可用变量：{{order_id}}、{{status}}、{{eta}}'
-  },
-  {
-    key: 'notification.internal_template',
-    label: '内部通知模板',
-    description: '给运营或客服团队的提醒内容，支持 {{courier}}、{{event}}、{{time}} 变量。',
-    category: 'notification',
-    type: 'textarea',
-    defaultValue: '快递员 {{courier}} 触发事件：{{event}}，时间 {{time}}。请及时关注。',
-    helpText: '可用变量：{{courier}}、{{event}}、{{time}}'
-  },
-  {
     key: 'automation.auto_assign_strategy',
     label: '自动派单策略',
-    description: '根据距离、评分或工作量自动选择快递员。',
+    description: '自动派单时按距离、评分或手头单量选择骑手。人工点选派单仍可手动指定。',
     category: 'automation',
     type: 'select',
     defaultValue: 'distance_first',
@@ -243,7 +209,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'automation.auto_dispatch_enabled',
     label: '启用自动派单',
-    description: '开启后系统会在创建订单后自动根据策略分配快递员。',
+    description: '开启后，待取件/待收款且尚未派骑手的订单会由后台每分钟按策略自动分配。商家未接的待确认单不会派。',
     category: 'automation',
     type: 'switch',
     defaultValue: true
@@ -251,7 +217,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'automation.max_active_orders',
     label: '单个快递员最大活跃订单数',
-    description: '避免快递员负载过高，超过该阈值则不会再分配新订单。',
+    description: '自动派单/改派时，手头进行中订单达到该数量的骑手不再接收新单。人工派单不受此限制。',
     category: 'automation',
     type: 'number',
     defaultValue: 12
@@ -259,7 +225,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'automation.reassign_timeout_minutes',
     label: '自动改派超时时间 (分钟)',
-    description: '当快递员在指定时间内未接受订单时，系统自动改派。',
+    description: '已派给骑手但仍为待取件、超过该分钟数且该骑手已下线时，改派给其他在线骑手。设为 0 则关闭改派。在线骑手在途取件不会被抢走。',
     category: 'automation',
     type: 'number',
     defaultValue: 8,
@@ -290,7 +256,8 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'tracking.route_prediction_enabled',
     label: '启用路线预测',
-    description: '开启后结合历史轨迹推测 ETA，适合高并发场景。',
+    description:
+      '开启后，后台跟踪工作台仅对已派骑手的「急送达」和「食品和饮料」订单自动规划沿路路线并估算到达时间。准时达等普通单不画线。关闭后立刻停止。',
     category: 'tracking',
     type: 'switch',
     defaultValue: false
@@ -306,7 +273,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'security.session_timeout_minutes',
     label: '会话超时时间',
-    description: '管理员长时间无操作后自动登出，提升安全性。',
+    description: '管理员闲置达到该分钟数后自动退出。提前 5 分钟会弹出提示。',
     category: 'security',
     type: 'number',
     defaultValue: 45,
@@ -315,7 +282,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'security.failed_login_limit',
     label: '连续登录失败限制',
-    description: '当同一账号连续失败达到该次数后触发锁定机制。',
+    description: '同一账号连续输错密码达到该次数后锁定 15 分钟。骑手账号与后台账号共用此限制。',
     category: 'security',
     type: 'number',
     defaultValue: 5,
@@ -324,7 +291,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'security.audit_log_retention_days',
     label: '审计日志保留天数',
-    description: '系统保留后台操作日志的时间，用于追踪问题。',
+    description: '超过该天数的操作审计记录会在每日凌晨随照片清理任务一并删除。最短 7 天。',
     category: 'security',
     type: 'number',
     defaultValue: 90,
@@ -333,7 +300,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'security.ip_whitelist_enabled',
     label: '启用后台 IP 白名单',
-    description: '开启后仅允许配置的 IP 地址访问管理后台。',
+    description: '开启后仅允许名单中的 IP 登录管理后台网页。骑手 App 不受此限制。启用前必须填写至少一个 IP。',
     category: 'security',
     type: 'switch',
     defaultValue: false
@@ -353,7 +320,6 @@ const settingDefinitions: SettingDefinition[] = [
 const categories: Array<{ id: SettingCategory; name: string; description: string; icon: string }> = [
   { id: 'general', name: '基础信息', description: '公司信息、营业时间与客服渠道配置', icon: '🏢' },
   { id: 'pricing', name: '计费规则', description: '客户端运费规则与骑手结算参数（分区配置）', icon: '💸' },
-  { id: 'notification', name: '通知中心', description: '短信、邮件通知开关与模板', icon: '🔔' },
   { id: 'automation', name: '自动化', description: '派单策略、超时改派等自动化流程', icon: '🤖' },
   { id: 'tracking', name: '实时跟踪', description: '地图刷新、路线预测与数据推送', icon: '🗺️' },
   { id: 'security', name: '安全与合规', description: '后台安全策略与访问控制', icon: '🛡️' }
@@ -542,6 +508,15 @@ const SystemSettings: React.FC = () => {
     setSuccessMessage(null);
     setErrorMessage(null);
 
+    if (Boolean(settingsValues['security.ip_whitelist_enabled'])) {
+      const whitelistText = String(settingsValues['security.ip_whitelist'] || '').trim();
+      if (!whitelistText) {
+        setErrorMessage('启用后台 IP 白名单前，请至少填写一个 IP 或 CIDR 段。');
+        setSaving(false);
+        return;
+      }
+    }
+
     const payload: Array<Omit<SystemSetting, 'id'>> = [];
 
     for (const def of settingDefinitions) {
@@ -720,7 +695,7 @@ const SystemSettings: React.FC = () => {
               <span className="sys-settings__dirty">未保存</span>
             )}
           </h1>
-          <p className="sys-settings__sub">统一管理计费规则、通知策略、自动化流程与安全策略</p>
+          <p className="sys-settings__sub">统一管理计费规则、自动化流程与安全策略</p>
           {lastSavedAt && (
             <span className="sys-settings__saved">最近保存：{formatTimestamp(lastSavedAt)}</span>
           )}

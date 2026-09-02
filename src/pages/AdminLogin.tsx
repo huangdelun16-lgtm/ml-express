@@ -15,7 +15,7 @@ const AdminLogin: React.FC = () => {
     setLoading(true);
 
     try {
-      const { account, authToken } = await adminAccountService.login(username, password);
+      const { account, authToken, error: loginError } = await adminAccountService.login(username, password);
 
       if (account) {
         await saveToken(account.username, account.role, account.employee_name, account.region, account.permissions as string[] | undefined, authToken);
@@ -30,7 +30,7 @@ const AdminLogin: React.FC = () => {
 
         navigate('/admin/dashboard');
       } else {
-        feedbackService.notify('用户名或密码错误，或账号已被停用');
+        feedbackService.notify(loginError || '用户名或密码错误，或账号已被停用');
       }
     } catch (error) {
       console.error('登录异常:', error);

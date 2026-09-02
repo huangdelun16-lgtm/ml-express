@@ -26,7 +26,7 @@ const verifyInflight = new Map<string, Promise<VerifyOk>>();
 
 function shouldWipeAdminSession(error?: string): boolean {
   if (!error) return true;
-  return /令牌|未找到认证|无效的令牌|已过期|签名|用户不存在|停用/.test(error);
+  return /令牌|未找到认证|无效的令牌|已过期|签名|用户不存在|停用|白名单/.test(error);
 }
 
 function normalizePermissionKey(permissionId?: string | string[]): string | undefined {

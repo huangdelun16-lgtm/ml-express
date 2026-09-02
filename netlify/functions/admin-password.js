@@ -234,7 +234,93 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({ error: '缺少用户名或密码' })
         };
       }
+
+      const {
+        isAdminBrowserRequest,
+        getClientIp,
+        shouldEnforceIpWhitelist,
+        ipAllowed,
+        loadSecuritySettings,
+        evaluateLoginLock,
+        recordFailedLogin,
+        clearFailedLogin,
+        denyIpMessage,
+        lockMessage,
+        FAILED_LOGIN_STATE_KEY,
+        clampFailedLoginLimit,
+      } = require('./utils/adminSecurity');
+      const { fetchSettingsRows, upsertSettingValue, settingMap } = require('./utils/systemSettingsRest');
+      const fetchRows = (keys) => fetchSettingsRows(supabaseUrl, supabaseKey, keys);
+
+      if (isAdminBrowserRequest(event)) {
+        const policy = await loadSecuritySettings(fetchRows);
+        if (
+          shouldEnforceIpWhitelist(
+            policy['security.ip_whitelist_enabled'],
+            policy['security.ip_whitelist'],
+          )
+        ) {
+          const clientIp = getClientIp(event);
+          if (!ipAllowed(clientIp, policy['security.ip_whitelist'])) {
+            return {
+              statusCode: 403,
+              headers,
+              body: JSON.stringify({ success: false, error: denyIpMessage() }),
+            };
+          }
+        }
+      }
+
+      const lockRows = await fetchRows([FAILED_LOGIN_STATE_KEY, 'security.failed_login_limit']);
+      const lockMap = settingMap(lockRows);
+      const failedLimit = clampFailedLoginLimit(lockMap['security.failed_login_limit']);
+      let lockState = lockMap[FAILED_LOGIN_STATE_KEY];
+      if (!lockState || typeof lockState !== 'object' || Array.isArray(lockState)) {
+        lockState = {};
+      }
+
+      const persistLockState = async (nextState) => {
+        await upsertSettingValue(supabaseUrl, supabaseKey, {
+          key: FAILED_LOGIN_STATE_KEY,
+          value: nextState,
+          category: 'security',
+          description: '后台登录失败计数（系统内部）',
+          updatedBy: 'admin-password',
+        });
+      };
+
+      const lock = evaluateLoginLock(lockState, username);
+      if (lock.blocked) {
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({
+            success: false,
+            error: lockMessage(lock.remainingMinutes),
+          }),
+        };
+      }
+
       const result = await verifyLogin(username, password);
+
+      if (result.success) {
+        if (lockState[String(username || '').trim()]) {
+          try {
+            await persistLockState(clearFailedLogin(lockState, username));
+          } catch (lockErr) {
+            console.warn('清除登录失败计数失败:', lockErr);
+          }
+        }
+      } else if (/密码错误/.test(String(result.error || ''))) {
+        try {
+          const recorded = recordFailedLogin(lockState, username, Date.now(), failedLimit);
+          await persistLockState(recorded.state);
+          if (recorded.locked) {
+            result.error = lockMessage(15);
+          }
+        } catch (lockErr) {
+          console.warn('写入登录失败计数失败:', lockErr);
+        }
       let issuedToken = null;
 
       // 如果登录成功，设置 httpOnly Cookie

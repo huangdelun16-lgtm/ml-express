@@ -2042,7 +2042,7 @@ export const userService = {
 // 管理员账号数据库操作
 export const adminAccountService = {
   // 登录验证（使用加密密码验证）
-  async login(username: string, password: string): Promise<{ account: AdminAccount | null; authToken?: string }> {
+  async login(username: string, password: string): Promise<{ account: AdminAccount | null; authToken?: string; error?: string }> {
     try {
       // 使用 Netlify Function 验证登录（包含密码加密验证）
       const response = await fetch('/.netlify/functions/admin-password', {
@@ -2062,7 +2062,7 @@ export const adminAccountService = {
 
       if (!result.success || !result.account) {
         console.error('登录失败:', result.error || '未知错误');
-        return { account: null };
+        return { account: null, error: result.error || '用户名或密码错误，或账号已被停用' };
       }
 
       // 最后登录时间走浏览器→Worker，不能挡住已经成功的 Netlify 登录
@@ -2082,7 +2082,7 @@ export const adminAccountService = {
       };
     } catch (err) {
       console.error('登录异常:', err);
-      return { account: null };
+      return { account: null, error: '登录失败，请检查网络连接' };
     }
   },
 

@@ -431,6 +431,14 @@ App / 浏览器
 | `/admin/personal-expenses` | 个人开销 | — |
 | `/admin/cross-border-logistics` | 跨境物流（**全屏独立**） | `cross_border_logistics` |
 
+系统设置中心（`SystemSettings.tsx`）写入 `system_settings` 后：
+
+- **计费规则**：各端读 `pricing.*`（真生效）
+- **自动化**：`courier-auto-dispatch` 每分钟读 `automation.*`，给待分配 City 单派骑手；超时未取件改派。商家「待确认」不派
+- **安全与合规**：闲置退出读 `security.session_timeout_minutes`；登录失败锁定与后台网页 IP 白名单走 `admin-password` / `verify-admin`（骑手 App 不走 IP 白名单）；审计保留天数由每日 `cleanup-delivery-photos` 删除过期 `audit_logs`
+- **实时跟踪**：刷新间隔 / 地图主题被跟踪页读取；`tracking.route_prediction_enabled` 开启后仅对已派的急送达、食品和饮料订单向 Google Directions 要沿路折线与 ETA（3 分钟缓存，每骑手一条，最多 8 条）
+- **基础信息**：目前主要给设置页自己展示
+
 ### 4.4 独立全屏模块
 
 `STANDALONE_ADMIN_MODULE_PATHS`：`/admin/metric-management`、`/admin/cross-border-logistics`。无通用侧栏/全局搜索/待办条。
@@ -468,7 +476,8 @@ App / 浏览器
 | `send-order-confirmation` | 下单确认邮件 |
 | `ensure-courier-auth` | 骑手 Auth 代理 |
 | `upload-banner` | Banner 上传 |
-| `cleanup-delivery-photos` | 配送照片清理（cron） |
+| `cleanup-delivery-photos` | 配送照片清理 + 审计日志按 `security.audit_log_retention_days` 删除（每日 cron） |
+| `courier-auto-dispatch` | City 自动派单 / 超时改派（每分钟 cron；读 `automation.*`） |
 | `merchant-admin-applications` | 商家申请审核 |
 
 **跨境 / Inventory Admin**
@@ -1816,6 +1825,7 @@ Realtime 过不了 Netlify。商家看 `MerchantOrderContext` / AppContext 进�
 28. **改 City 实时状态**：缅甸无 WS。商家改 `/shared/src/merchantInProgressOrders.ts` + AppContext / MerchantOrderContext；骑手改 `courierNewOrderMonitor.ts`；聊天未读改 `/shared/src/chatUnread.ts`。不要给生产加 Worker Realtime。
 29. **改会员订单列表**：`fetchCustomerPackages` 拆查 + `receiver_phone`；测试 `customerPackageQuery.test.ts`。
 30. **发三站 Web 生产**：只跑 §15.3 对应目录的 `npm run deploy:netlify`。勿 `netlify deploy --trigger`；勿在仓库根发会员/商家站。回滚用 `restoreSiteDeploy` + 表内部署 ID。
+31. **改系统设置自动化/安全**：设置页只存 `system_settings`；自动派单改 `netlify/functions/courier-auto-dispatch.js` + `utils/courierDispatch.js`；闲置退出改 `useAdminIdleLock.ts`；登录失败/IP 白名单改 `admin-password.js` / `verify-admin.js` + `utils/adminSecurity.js`。勿把 IP 白名单套到骑手 App。
 
 ---
 

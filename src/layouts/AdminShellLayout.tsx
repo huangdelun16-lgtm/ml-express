@@ -162,7 +162,7 @@ const AdminShellLayout: React.FC = () => {
     navigate('/admin/login');
   };
 
-  const { warning: idleWarning, staySignedIn } = useAdminIdleLock(true, () => {
+  const { warning: idleWarning, staySignedIn, timeoutMinutes, warnMinutes } = useAdminIdleLock(true, () => {
     void handleLogout();
   });
 
@@ -449,8 +449,8 @@ const AdminShellLayout: React.FC = () => {
               <h2>{language === 'zh' ? '会话即将锁定' : 'Session idle'}</h2>
               <p className="admin-modal__warn">
                 {language === 'zh'
-                  ? '已闲置超过 20 分钟。再过约 5 分钟将自动退出，避免他人误用账号。'
-                  : 'You have been idle for 20 minutes. You will be signed out in about 5 minutes.'}
+                  ? `已闲置超过 ${warnMinutes} 分钟。再过约 ${timeoutMinutes - warnMinutes} 分钟将自动退出，避免他人误用账号。`
+                  : `You have been idle for ${warnMinutes} minutes. You will be signed out in about ${timeoutMinutes - warnMinutes} minutes.`}
               </p>
               <div className="admin-modal__actions">
                 <button type="button" className="admin-shell__btn admin-shell__btn--primary" onClick={staySignedIn}>
@@ -690,9 +690,9 @@ const AdminShellLayout: React.FC = () => {
           <div className="admin-modal">
             <h2>{language === 'zh' ? '会话即将锁定' : 'Session idle'}</h2>
             <p className="admin-modal__warn">
-              {language === 'zh'
-                ? '已闲置超过 20 分钟。再过约 5 分钟将自动退出，避免他人误用账号。'
-                : 'You have been idle for 20 minutes. You will be signed out in about 5 minutes.'}
+                {language === 'zh'
+                  ? `已闲置超过 ${warnMinutes} 分钟。再过约 ${timeoutMinutes - warnMinutes} 分钟将自动退出，避免他人误用账号。`
+                  : `You have been idle for ${warnMinutes} minutes. You will be signed out in about ${timeoutMinutes - warnMinutes} minutes.`}
             </p>
             <div className="admin-modal__actions">
               <button type="button" className="admin-shell__btn admin-shell__btn--primary" onClick={staySignedIn}>
