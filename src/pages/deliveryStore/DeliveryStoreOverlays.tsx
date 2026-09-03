@@ -2663,11 +2663,12 @@ const DeliveryStoreOverlays: React.FC = () => {
                         if (e.key === 'Enter' || e.key === ' ') setSelectedAdminProductId(product.id);
                       }}
                       style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      borderRadius: '16px',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      borderRadius: '18px',
                       padding: '16px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      transition: 'transform 0.3s ease',
+                      border: '1px solid rgba(148, 163, 184, 0.18)',
+                      transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease',
+                      boxShadow: '0 14px 35px rgba(2, 6, 23, 0.18)',
                       cursor: 'pointer',
                     }}
                     onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; }}
@@ -2677,7 +2678,7 @@ const DeliveryStoreOverlays: React.FC = () => {
                         width: '100%',
                         aspectRatio: '1',
                         borderRadius: '12px',
-                        background: '#0f172a',
+                        background: 'rgba(2, 6, 23, 0.55)',
                         marginBottom: '12px',
                         overflow: 'hidden',
                         display: 'flex',
@@ -2685,12 +2686,50 @@ const DeliveryStoreOverlays: React.FC = () => {
                         alignItems: 'center'
                       }}>
                         {display.image_url ? (
-                          <img src={publicStorageUrl(display.image_url)} alt={display.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img
+                            src={publicStorageUrl(display.image_url)}
+                            alt={display.name}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              padding: '14px',
+                              background: 'transparent',
+                            }}
+                          />
                         ) : (
-                          <span style={{ fontSize: '2rem' }}>🖼️</span>
+                          <div
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              gap: '10px',
+                              color: 'rgba(255, 255, 255, 0.35)',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <span style={{ fontSize: '1.6rem' }}>🖼️</span>
+                            <span style={{ fontSize: '0.85rem' }}>无图片</span>
+                          </div>
                         )}
                       </div>
-                      <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'white' }}>{display.name}</h3>
+                      <h3
+                        style={{
+                          margin: '0 0 10px 0',
+                          fontSize: '1.05rem',
+                          color: 'white',
+                          minHeight: '2.6rem',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {display.name}
+                      </h3>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                         <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.2rem' }}>{display.price.toLocaleString()} MMK</span>
                         <span style={{ 

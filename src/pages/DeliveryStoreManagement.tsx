@@ -28,6 +28,7 @@ import { applyProductReviewDecision } from '../services/productReviewQueueServic
 import { isValidRejectReason } from '../utils/productReviewDecision';
 import { normalizeStorePackingSlaMinutes } from '../services/_shared/packingCountdown';
 import { withPublicProductImages } from '../utils/supabaseBrowserUrl';
+import { resolveStoreHoursState } from '../utils/merchantOpsWatch';
 
 import {
   ErrorBoundary,
@@ -145,6 +146,13 @@ const DeliveryStoreManagement: React.FC = () => {
   const [pendingReviewByStoreId, setPendingReviewByStoreId] = useState<Record<string, number>>({});
   /** 各合伙店铺商品总数（store_id → 件数） */
   const [productCountByStoreId, setProductCountByStoreId] = useState<Record<string, number>>({});
+
+  // 用于“实时营业状态”badge（根据 operating_hours 计算当前是否在营业时间段）
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => window.clearInterval(t);
+  }, []);
 
   // Google Places API 相关状态
   const [placeSearchInput, setPlaceSearchInput] = useState('');
@@ -1697,6 +1705,7 @@ const DeliveryStoreManagement: React.FC = () => {
               {stores.map((store) => {
                 const pendingN = store.id ? (pendingReviewByStoreId[store.id] ?? 0) : 0;
                 const productTotal = store.id ? (productCountByStoreId[store.id] ?? 0) : 0;
+                const hoursState = resolveStoreHoursState(store, now);
                 const baseShadow = selectedStore?.id === store.id ? '0 10px 25px rgba(0,0,0,0.2)' : '0 4px 15px rgba(0,0,0,0.1)';
                 const pendingInset = pendingN > 0 ? ', inset 5px 0 0 0 rgba(245, 158, 11, 0.92)' : '';
                 return (
@@ -1771,17 +1780,19 @@ const DeliveryStoreManagement: React.FC = () => {
                         padding: '4px 8px',
                         borderRadius: '6px',
                         background:
-                          store.status === 'active'
-                            ? 'rgba(72, 187, 120, 0.3)'
+                          store.status === 'maintenance'
+                            ? 'rgba(245, 101, 101, 0.3)'
                             : store.status === 'inactive'
-                            ? 'rgba(160, 174, 192, 0.3)'
-                            : 'rgba(245, 101, 101, 0.3)',
+                              ? 'rgba(160, 174, 192, 0.3)'
+                              : hoursState.shouldBeOpen
+                                ? 'rgba(72, 187, 120, 0.3)'
+                                : 'rgba(148, 163, 184, 0.32)',
                         fontSize: '0.8rem'
                       }}
                     >
-                      {store.status === 'active' && '营业中'}
-                      {store.status === 'inactive' && '暂停营业'}
                       {store.status === 'maintenance' && '维护中'}
+                      {store.status === 'inactive' && '暂停营业'}
+                      {store.status === 'active' && (hoursState.shouldBeOpen ? '营业中' : '休息中')}
                     </span>
                   </div>
                   <p style={{ margin: '4px 0', opacity: 0.8, fontSize: '0.9rem' }}>{store.address}</p>
@@ -2272,11 +2283,31 @@ const DeliveryStoreManagement: React.FC = () => {
                               display: 'flex',
                               alignItems: 'center',
                               gap: '5px',
-                              backgroundColor: selectedStore.status === 'active' ? '#def7ec' : selectedStore.status === 'maintenance' ? '#fefcbf' : '#fed7d7',
-                              color: selectedStore.status === 'active' ? '#03543f' : selectedStore.status === 'maintenance' ? '#744210' : '#9b2c2c',
+                              backgroundColor:
+                                selectedStore.status === 'maintenance'
+                                  ? '#fefcbf'
+                                  : selectedStore.status === 'inactive'
+                                    ? '#fed7d7'
+                                    : resolveStoreHoursState(selectedStore, now).shouldBeOpen
+                                      ? '#def7ec'
+                                      : '#edf2f7',
+                              color:
+                                selectedStore.status === 'maintenance'
+                                  ? '#744210'
+                                  : selectedStore.status === 'inactive'
+                                    ? '#9b2c2c'
+                                    : resolveStoreHoursState(selectedStore, now).shouldBeOpen
+                                      ? '#03543f'
+                                      : '#4a5568',
                             }}>
                               <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor' }}></div>
-                              {selectedStore.status === 'active' ? '营业中' : selectedStore.status === 'maintenance' ? '维护中' : '暂停营业'}
+                              {selectedStore.status === 'active'
+                                ? resolveStoreHoursState(selectedStore, now).shouldBeOpen
+                                  ? '营业中'
+                                  : '休息中'
+                                : selectedStore.status === 'maintenance'
+                                  ? '维护中'
+                                  : '暂停营业'}
                             </div>
 
                             {/* 按钮 */}
