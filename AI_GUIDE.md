@@ -178,8 +178,8 @@ App / 浏览器
 | 层 | 文件 | 要点 |
 |----|------|------|
 | Admin / 会员 Web / 商家 Web 浏览器 | `src/utils/supabaseBrowserUrl.ts`（及各 Web 副本） | 生产 `resolveBrowserSupabaseUrl` → `origin/__sb/`；本地 `localhost` 可直连上游 |
-| Netlify Edge BFF（**仅 Admin 根站**） | `netlify/edge-functions/supabase-bff.js` | `netlify.toml` `[[edge_functions]] path = "/__sb/*"`；**剥掉 `Set-Cookie __cf_bm`**（Firefox 会拒跨域 cookie）；响应 `Cache-Control: no-store`（避免到站确认后 GET 仍返回「在途」） |
-| Netlify rewrite | 各站 `netlify.toml` `from = "/__sb/*"` | 会员/商家 Web **只有** 200 rewrite（无 Edge BFF）；**不能**升级 WebSocket |
+| Netlify Edge BFF | 各站 `netlify/edge-functions/supabase-bff.js` | `netlify.toml` `[[edge_functions]] path = "/__sb/*"`；**剥掉 `Set-Cookie __cf_bm`**（Firefox 会拒跨域 cookie）。Admin REST `no-store`；会员/商家 Storage 图可短缓存 |
+| Netlify rewrite | 各站 `netlify.toml` `from = "/__sb/*"` | Edge 未部署时的 200 rewrite 回退；**不能**升级 WebSocket |
 | Cloudflare Worker | `cloudflare/supabase-proxy/`；根脚本 `deploy:supabase-proxy` | 备份通道；Realtime 路径存在，但缅甸拨 Worker WS 同样会断 |
 | Inventory 原生 | `ml-express-inventory-app/src/services/nativeSupabaseUrl.ts` | 生产基址 `https://admin-market-link-express.com/__sb/`；`EXPO_PUBLIC_SUPABASE_DIRECT=1` 仅 VPN 可达 supabase.co 时使用 |
 | Inventory fetch | `ml-express-inventory-app/src/services/supabase.ts` | 对 `/rest/v1`、`/functions/v1` **强制 Authorization = 店铺 access_token**（`shouldAttachInventoryUserJwt`）；**不要**改 `/auth/v1` |
@@ -447,6 +447,38 @@ App / 浏览器
 
 - **合伙店铺**：City 配送门店；列表过滤 `transit_station`。
 - **跨境物流**：中转站账号、财务、包裹；**跨境账号管理** 创建/编辑 `transit_station`。
+
+### 4.5.1 合伙店铺入驻证件（“证件”按钮）
+
+需求口径：在 Admin「商家管理」→「合伙店铺列表」窗口中，商家卡片内增加 **“证件”** 按钮；点击后展示该店铺入驻时上传的证件（传了几张就展示几张）。
+
+- 前端入口
+  - `src/pages/DeliveryStoreManagement.tsx`
+    - 卡片按钮：`openStoreLicenseDocs(store)`
+    - 证件弹窗：`StoreLicenseDocsModal`
+- 前端渲染组件
+  - `src/components/MerchantLicenseDocCard.tsx`：单张证件卡（预览/新窗口打开/下载原件；图片不可预览时有 fallback）
+  - `src/components/StoreLicenseDocsModal.tsx`：证件列表弹窗（标题“入驻证件”，空态提示“该店铺没有入驻时上传的证件”）
+- 数据获取与匹配
+  - `src/services/merchantApplicationService.ts`
+    - `fetchStoreLicenseDocuments({ storeId, storeCode, phone, storeName })`
+    - 先走 Netlify Function 精准查询；若返回不包含 `documents` 数组，则 fallback 拉取 `status=all`，再用 `src/utils/merchantLicenseDocs.ts` 本地匹配/筛选
+  - `src/utils/merchantLicenseDocs.ts`
+    - 匹配规则优先级：
+      1) `merchant_applications.created_store_id === store.id`
+      2) `merchant_applications.provisioned_store_code === store.store_code`
+      3) `phone + store_name` 归一化后再比对
+    - 只取 `status=approved` 的证件 URL
+    - 去重并保持上传顺序
+- 服务端接口（Netlify Function）
+  - `netlify/functions/merchant-admin-applications.js`
+    - GET 参数：`?storeId=&storeCode=&phone=&storeName=`
+    - 返回：`{ documents, applicationId, count }`
+- 存储位置（Supabase Storage）
+  - 桶：`merchant-application-docs`
+  - 路径：`applications/{时间戳}_{随机}.{ext}`
+- Myanmar 图片可用性（/__sb 必读）
+  - 证件图片 URL 通过 `src/utils/supabaseBrowserUrl.ts` 的 `rewritePublicStorageUrl()` 重写到 Admin 的同源 `/__sb`，避免缅甸直连 `*.supabase.co` 的 TLS reset。
 
 ### 4.6 跨境物流前端关键文件
 
@@ -1644,7 +1676,7 @@ Dashboard：https://app.netlify.com/projects/`<项目名>`。各 `package.json` 
 
 构建：`npm install --legacy-peer-deps && npm run build`（`prebuild` → `sync:shared`）。Windows PowerShell **不能**把 `CI=false` 写进命令行（会被当成命令名）。三站都把 `CI=false` 放在各自 `netlify.toml` 的 `[build.environment]`，`package.json` 的 `build` 只跑 `react-scripts build`。发布入口 `scripts/deploy-web.mjs` 也会注入 `CI=false`。
 
-三站均配置 `/__sb/*` → supabase.co。**仅 Admin 根站**有 Edge `supabase-bff`（剥 `__cf_bm`、禁缓存）；会员/商家 Web 只有 200 rewrite。
+三站均配置 `/__sb/*` → supabase.co，并带 Edge `supabase-bff`（剥 `__cf_bm`）。rewrite 仅作 Edge 未部署时的回退。
 
 Cloudflare Worker 备份：仓库根 `npm run deploy:supabase-proxy`（`cloudflare/supabase-proxy/wrangler.toml`）。
 
