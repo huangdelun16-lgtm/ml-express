@@ -25,6 +25,7 @@ import {
   productNeedsAdminReview,
 } from './deliveryStoreShared';
 import { useDeliveryStoreWorkspace } from './DeliveryStoreWorkspace';
+import { publicStorageUrl } from '../../utils/supabaseBrowserUrl';
 
 const DeliveryStoreOverlays: React.FC = () => {
   const {
@@ -485,7 +486,7 @@ const DeliveryStoreOverlays: React.FC = () => {
                             tabIndex={0}
                           >
                             {adminProductForm.image_url ? (
-                              <img src={adminProductForm.image_url} alt="" />
+                              <img src={publicStorageUrl(adminProductForm.image_url)} alt="" />
                             ) : (
                               <>
                                 <span className="store-form-product__upload-icon" aria-hidden>📸</span>
@@ -525,7 +526,7 @@ const DeliveryStoreOverlays: React.FC = () => {
                                 <div className="store-form-product__detail-scroll">
                                   {adminProductForm.detail_image_urls.map((url, idx) => (
                                     <div key={`${url}-${idx}`} className="store-form-product__detail-thumb">
-                                      <img src={url} alt="" />
+                                      <img src={publicStorageUrl(url)} alt="" />
                                       <button
                                         type="button"
                                         className="store-form-product__detail-remove"
@@ -2240,10 +2241,10 @@ const DeliveryStoreOverlays: React.FC = () => {
                           marginBottom: '0.5rem'
                         }}>
                           <div>
-                            <span style={{ opacity: 0.7 }}>店铺名称:</span> {currentViewStore.store_name}
+                            <span style={{ opacity: 0.7 }}>店铺名称:</span> {pkg.sender_name || currentViewStore.store_name}
                           </div>
                           <div>
-                            <span style={{ opacity: 0.7 }}>店铺电话:</span> {currentViewStore.phone}
+                            <span style={{ opacity: 0.7 }}>店铺电话:</span> {pkg.sender_phone || currentViewStore.phone}
                           </div>
                           <div>
                             <span style={{ opacity: 0.7 }}>收件人:</span> {pkg.receiver_name}
@@ -2684,7 +2685,7 @@ const DeliveryStoreOverlays: React.FC = () => {
                         alignItems: 'center'
                       }}>
                         {display.image_url ? (
-                          <img src={display.image_url} alt={display.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={publicStorageUrl(display.image_url)} alt={display.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           <span style={{ fontSize: '2rem' }}>🖼️</span>
                         )}
@@ -2802,7 +2803,7 @@ const DeliveryStoreOverlays: React.FC = () => {
           const submittedAt = typeof pu?.submitted_at === 'string' ? pu.submitted_at : null;
 
           const renderImageValue = (value: unknown) => {
-            const url = typeof value === 'string' ? value : '';
+            const url = typeof value === 'string' ? publicStorageUrl(value) : '';
             if (!url) return <span className="admin-product-detail__empty">无</span>;
             return (
               <a href={url} target="_blank" rel="noreferrer" className="admin-product-detail__img-link">
@@ -2812,7 +2813,9 @@ const DeliveryStoreOverlays: React.FC = () => {
           };
 
           const renderDetailImages = (value: unknown) => {
-            const urls = Array.isArray(value) ? value.filter((u) => typeof u === 'string') as string[] : [];
+            const urls = Array.isArray(value)
+              ? (value.filter((u) => typeof u === 'string') as string[]).map((u) => publicStorageUrl(u)).filter(Boolean)
+              : [];
             if (!urls.length) return <span className="admin-product-detail__empty">无</span>;
             return (
               <div className="admin-product-detail__detail-scroll">

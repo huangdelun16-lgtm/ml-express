@@ -2,10 +2,12 @@ import {
   ADMIN_PUBLIC_SB_PROXY,
   applyNetlifyRealtimeFallback,
   isBrowserRealtimeAvailable,
+  publicStorageUrl,
   resolveBrowserSupabaseUrl,
   rewritePublicStorageUrl,
   SUPABASE_BROWSER_PROXY_URL,
   SUPABASE_UPSTREAM_HOST,
+  withPublicProductImages,
 } from './supabaseBrowserUrl';
 
 const UPSTREAM = 'https://' + SUPABASE_UPSTREAM_HOST;
@@ -127,5 +129,46 @@ describe('rewritePublicStorageUrl', () => {
         'https://mlexpress-merchants.com/__sb/storage/v1/object/public/product_images/x.jpg',
       ),
     ).toBe('https://admin-market-link-express.com/__sb/storage/v1/object/public/product_images/x.jpg');
+  });
+});
+
+describe('publicStorageUrl', () => {
+  it('rewrites supabase.co product images onto the admin /__sb proxy', () => {
+    expect(
+      publicStorageUrl(
+        `${UPSTREAM}/storage/v1/object/public/product_images/84e7/a.jpg`,
+      ),
+    ).toBe(`${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/84e7/a.jpg`);
+  });
+
+  it('builds a proxy URL from a storage object path', () => {
+    expect(publicStorageUrl('84e7/a.jpg')).toBe(
+      `${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/84e7/a.jpg`,
+    );
+  });
+
+  it('leaves blob and empty URLs untouched', () => {
+    expect(publicStorageUrl('')).toBe('');
+    expect(publicStorageUrl('blob:http://localhost/1')).toBe('blob:http://localhost/1');
+    expect(publicStorageUrl('data:image/png;base64,xx')).toBe('data:image/png;base64,xx');
+  });
+});
+
+describe('withPublicProductImages', () => {
+  it('rewrites cover, detail, and pending-edit image urls', () => {
+    const mapped = withPublicProductImages({
+      image_url: `${UPSTREAM}/storage/v1/object/public/product_images/a.jpg`,
+      detail_image_urls: [`${UPSTREAM}/storage/v1/object/public/product_images/b.jpg`],
+      pending_update: {
+        image_url: `${UPSTREAM}/storage/v1/object/public/product_images/c.jpg`,
+      },
+    });
+    expect(mapped.image_url).toBe(`${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/a.jpg`);
+    expect(mapped.detail_image_urls).toEqual([
+      `${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/b.jpg`,
+    ]);
+    expect(mapped.pending_update?.image_url).toBe(
+      `${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/product_images/c.jpg`,
+    );
   });
 });

@@ -21,9 +21,13 @@ import {
 } from '../utils/merchantStoreCode';
 import { feedbackService } from '../services/FeedbackService';
 import ProductReviewRejectModal from '../components/ProductReviewRejectModal';
+import StoreLicenseDocsModal from '../components/StoreLicenseDocsModal';
+import { fetchStoreLicenseDocuments } from '../services/merchantApplicationService';
+import '../styles/merchantApplications.css';
 import { applyProductReviewDecision } from '../services/productReviewQueueService';
 import { isValidRejectReason } from '../utils/productReviewDecision';
 import { normalizeStorePackingSlaMinutes } from '../services/_shared/packingCountdown';
+import { withPublicProductImages } from '../utils/supabaseBrowserUrl';
 
 import {
   ErrorBoundary,
@@ -97,6 +101,10 @@ const DeliveryStoreManagement: React.FC = () => {
   
   // 🚀 新增：店铺商品查看状态
   const [showProductsModal, setShowProductsModal] = useState(false);
+  const [licenseDocsStore, setLicenseDocsStore] = useState<DeliveryStore | null>(null);
+  const [licenseDocsUrls, setLicenseDocsUrls] = useState<string[]>([]);
+  const [licenseDocsLoading, setLicenseDocsLoading] = useState(false);
+  const [licenseDocsError, setLicenseDocsError] = useState<string | null>(null);
   const [viewingStoreName, setViewingStoreName] = useState('');
   const [viewingStoreId, setViewingStoreId] = useState<string | null>(null);
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
@@ -496,7 +504,7 @@ const DeliveryStoreManagement: React.FC = () => {
       .eq('store_id', storeId)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    setStoreProducts(data || []);
+    setStoreProducts((data || []).map(withPublicProductImages));
   };
 
   const saveAdminProductForStore = async (
@@ -839,7 +847,7 @@ const DeliveryStoreManagement: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setStoreProducts(data || []);
+      setStoreProducts((data || []).map(withPublicProductImages));
     } catch (error) {
       console.error('加载店铺商品失败:', error);
       feedbackService.notify('加载商品失败，请重试');
@@ -940,7 +948,7 @@ const DeliveryStoreManagement: React.FC = () => {
         .eq('store_id', viewingStoreId)
         .order('created_at', { ascending: false });
       if (reloadError) throw reloadError;
-      setStoreProducts(data || []);
+      setStoreProducts((data || []).map(withPublicProductImages));
       await loadPendingProductReviewSummary();
       notifyAdminTodosRefresh();
       feedbackService.notify(
@@ -1202,23 +1210,47 @@ const DeliveryStoreManagement: React.FC = () => {
     }
   };
 
+  const openStoreLicenseDocs = async (store: DeliveryStore) => {
+    setLicenseDocsStore(store);
+    setLicenseDocsUrls([]);
+    setLicenseDocsError(null);
+    setLicenseDocsLoading(true);
+    try {
+      const urls = await fetchStoreLicenseDocuments({
+        id: store.id,
+        store_code: store.store_code,
+        phone: store.phone,
+        store_name: store.store_name,
+      });
+      setLicenseDocsUrls(urls);
+    } catch (error) {
+      setLicenseDocsError(error instanceof Error ? error.message : '加载证件失败');
+    } finally {
+      setLicenseDocsLoading(false);
+    }
+  };
+
   // 删除店铺
   const handleDeleteStore = async (store: DeliveryStore) => {
-    if (!window.confirm(`确定要删除店铺 "${store.store_name}" 吗？\n\n此操作不可撤销！`)) {
+    if (
+      !window.confirm(
+        `确定要删除店铺「${store.store_name}」吗？\n\n将同时清除该店商品、评价和该店自己下的订单。入驻申请和证件会留底备查。\n此操作不可撤销。`,
+      )
+    ) {
       return;
     }
 
     try {
       const result = await deliveryStoreService.deleteStore(store.id!);
-      if (result) {
-        setSuccessMessage(`店铺 "${store.store_name}" 已成功删除`);
+      if (result.success) {
+        setSuccessMessage(`店铺「${store.store_name}」已删除，经营数据已清除`);
         loadStores();
       } else {
-        setErrorMessage('删除店铺失败，请重试');
+        setErrorMessage(result.error || '删除店铺失败，请重试');
       }
     } catch (error) {
       console.error('删除店铺失败:', error);
-      setErrorMessage('删除店铺失败，请重试');
+      setErrorMessage(error instanceof Error ? error.message : '删除店铺失败，请重试');
     }
   };
 
@@ -1766,7 +1798,7 @@ const DeliveryStoreManagement: React.FC = () => {
                     <span style={{ marginLeft: '12px' }}>容量: {store.capacity}</span>
                     <span style={{ marginLeft: '12px' }}>负载: {store.current_load}</span>
                   </div>
-                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                  <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1828,6 +1860,37 @@ const DeliveryStoreManagement: React.FC = () => {
                       }}
                     >
                       进入店铺
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void openStoreLicenseDocs(store);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(79, 70, 229, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(79, 70, 229, 0.3)';
+                      }}
+                    >
+                      证件
                     </button>
                     <button
                       onClick={(e) => {
@@ -2277,6 +2340,20 @@ const DeliveryStoreManagement: React.FC = () => {
         </div>
       </div>
 
+      {licenseDocsStore && (
+        <StoreLicenseDocsModal
+          storeName={licenseDocsStore.store_name}
+          urls={licenseDocsUrls}
+          loading={licenseDocsLoading}
+          error={licenseDocsError}
+          isEn={language === 'en'}
+          onClose={() => {
+            setLicenseDocsStore(null);
+            setLicenseDocsUrls([]);
+            setLicenseDocsError(null);
+          }}
+        />
+      )}
       <DeliveryStoreOverlays />
       <ProductReviewRejectModal
         open={!!rejectTargetProductId}

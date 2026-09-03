@@ -105,3 +105,48 @@ export function rewritePublicStorageUrl(url: string): string {
       proxy,
     );
 }
+
+/** Public Storage URL for <img>. Full supabase.co links go through /__sb; bare paths assume product_images. */
+export function publicStorageUrl(url?: string | null): string {
+  const raw = String(url || '').trim();
+  if (!raw || /^(file:|content:)/i.test(raw)) return '';
+  if (/^(blob:|data:)/i.test(raw)) return raw;
+  if (/^https?:\/\//i.test(raw)) return rewritePublicStorageUrl(raw);
+  const path = raw.replace(/^\/+/, '').replace(/^product_images\//, '');
+  return rewritePublicStorageUrl(
+    `${storageProxyBase().replace(/\/$/, '')}/storage/v1/object/public/product_images/${path}`,
+  );
+}
+
+function mapPublicImageList(urls: unknown): string[] | undefined {
+  if (!Array.isArray(urls)) return undefined;
+  return urls.map((url) => publicStorageUrl(String(url || ''))).filter(Boolean);
+}
+
+/** Rewrite product cover / detail / pending-edit images so Admin can load them in Myanmar. */
+export function withPublicProductImages<
+  T extends {
+    image_url?: string | null;
+    detail_image_urls?: string[] | null;
+    pending_update?: Record<string, unknown> | null;
+  },
+>(row: T): T {
+  const pending = row.pending_update;
+  return {
+    ...row,
+    image_url: row.image_url ? publicStorageUrl(row.image_url) : row.image_url,
+    detail_image_urls: mapPublicImageList(row.detail_image_urls) ?? row.detail_image_urls,
+    pending_update:
+      pending && typeof pending === 'object'
+        ? {
+            ...pending,
+            image_url:
+              typeof pending.image_url === 'string'
+                ? publicStorageUrl(pending.image_url)
+                : pending.image_url,
+            detail_image_urls:
+              mapPublicImageList(pending.detail_image_urls) ?? pending.detail_image_urls,
+          }
+        : pending,
+  };
+}
