@@ -403,9 +403,22 @@
   text-decoration: underline;
 }
 
+.merchant-apps-archive-hint,
+.merchant-apps-docs-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.merchant-apps-docs-hint {
+  margin: 0 0 0.65rem;
+  color: #64748b;
+}
+
 .merchant-apps-docs {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: 0.65rem;
 }
 
@@ -428,17 +441,49 @@
 
 .merchant-apps-doc__thumb {
   aspect-ratio: 4 / 3;
-  background: #f1f5f9;
+  background: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
 
+.merchant-apps-doc__thumb--btn {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  cursor: zoom-in;
+}
+
+.merchant-apps-doc__thumb--failed {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: center;
+}
+
 .merchant-apps-doc__thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+}
+
+.merchant-apps-doc__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  padding: 0 0.5rem 0.5rem;
+  font-size: 0.68rem;
+}
+
+.merchant-apps-doc__actions a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.merchant-apps-doc__actions a:hover {
+  text-decoration: underline;
 }
 
 .merchant-apps-doc__pdf {

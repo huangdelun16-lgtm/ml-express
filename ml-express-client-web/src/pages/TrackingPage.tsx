@@ -16,14 +16,12 @@ import { TRACKING_COURIER_COLOR, TRACKING_DESTINATION_COLOR, TRACKING_MAP_OPTION
 import { getCourierMarkerIcon, getDestinationMarkerIcon } from '../utils/trackingMapMarkers';
 import { formatTrackingAge } from '../utils/trackingRelativeTime';
 import { feedbackService } from '../services/FeedbackService';
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LOADER_OPTIONS } from '../utils/googleMapsLoader';
 import '../styles/trackingLiveMap.css';
 
-// Google Maps API 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
   LoggerService.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
-const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 /** 与客户端 App「追踪订单」一致：优先使用库里的收货坐标，其次才对地址做地理编码 */
 function parseReceiverLatLng(pkg: { receiver_latitude?: number | null; receiver_longitude?: number | null } | null): { lat: number; lng: number } | null {
@@ -44,10 +42,7 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ embedInLanding }) => {
   const { language, setLanguage, t } = useLanguage();
   
   // Google Maps API 加载
-  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES
-  });
+  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
 
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY) {

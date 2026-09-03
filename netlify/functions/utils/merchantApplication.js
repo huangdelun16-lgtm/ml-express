@@ -27,6 +27,39 @@ const MERCHANT_STORE_TYPES = [
 
 const COD_SETTLEMENT_DAYS = ['7', '10', '15', '30'];
 
+const PACKING_PROFILE_BY_STORE = {
+  restaurant: 'food_safety',
+  breakfast: 'food_safety',
+  drinks_snacks: 'drinks_seal',
+  tea_shop: 'drinks_seal',
+  cake_shop: 'bakery_box',
+  flower_shop: 'flower_wrap',
+  clothing_store: 'apparel_bag',
+  grocery: 'grocery_sort',
+  supermarket: 'grocery_sort',
+  other: 'parcel_standard',
+};
+
+const PACKING_PROFILE_LABEL_ZH = {
+  food_safety: '食品安全包装',
+  drinks_seal: '饮品防漏包装',
+  bakery_box: '蛋糕直立包装',
+  flower_wrap: '鲜花保水包装',
+  apparel_bag: '服装平整包装',
+  grocery_sort: '百货分装包装',
+  parcel_standard: '标准包裹包装',
+};
+
+function appendPackingAckToNotes(notes, profileId) {
+  const label = PACKING_PROFILE_LABEL_ZH[profileId] || profileId;
+  const line = `[平台打包] 已确认：${label}`;
+  const cleaned = String(notes || '')
+    .replace(/\[平台打包\][^\n]*/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return cleaned ? `${cleaned}\n${line}` : line;
+}
+
 function findRegion(regionId) {
   return MERCHANT_REGIONS.find((r) => r.id === regionId) || MERCHANT_REGIONS[0];
 }
@@ -104,6 +137,11 @@ function validateApplicationPayload(body) {
   if (license_document_urls.length > 8) {
     return { error: '证件数量过多，最多 8 份' };
   }
+  const expectedPacking = PACKING_PROFILE_BY_STORE[store_type];
+  if (body.packing_acknowledged !== true || String(body.packing_profile || '') !== expectedPacking) {
+    return { error: '请先查看并确认当前店铺类型的平台打包要求' };
+  }
+  const notesWithAck = appendPackingAckToNotes(notes, expectedPacking);
 
   return {
     data: {
@@ -120,7 +158,7 @@ function validateApplicationPayload(body) {
       operating_hours,
       cod_settlement_day,
       facilities,
-      notes,
+      notes: notesWithAck,
       applicant_name,
       salesperson_name,
       application_date,

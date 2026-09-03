@@ -1,13 +1,40 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import NavigationBar from '../components/home/NavigationBar';
+import MerchantApplySuccess from '../components/merchant/MerchantApplySuccess';
+import PackingGuideModal from '../components/merchant/PackingGuideModal';
 import { useLanguage } from '../contexts/LanguageContext';
 import { MERCHANT_STORE_TYPE_OPTIONS } from '../services/_shared/merchantStoreTypes';
+import { getMerchantApplyCopy, statusLabel } from '../utils/merchantApplyCopy';
+import {
+  formatCoordPair,
+  geocoderLanguage,
+  isLikelyMyanmarCoord,
+  parseCoordinatePair,
+  pickFormattedAddress,
+} from '../utils/merchantApplyLocation';
+import {
+  lookupMerchantApplication,
+  uploadMerchantApplyDocument,
+  type PublicApplicationStatus,
+} from '../utils/merchantApplyUpload';
+import {
+  appendPackingAckToNotes,
+  getPackingProfile,
+  type PackingLang,
+} from '../utils/platformPackingGuide';
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LOADER_OPTIONS } from '../utils/googleMapsLoader';
 import '../styles/merchantApply.css';
 
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
-const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places'];
+const MAP_CONTAINER_STYLE: React.CSSProperties = { width: '100%', height: '100%' };
+const MAP_OPTIONS = {
+  streetViewControl: false,
+  mapTypeControl: false,
+  fullscreenControl: false,
+  clickableIcons: false,
+  gestureHandling: 'greedy' as const,
+};
 
 const REGIONS = [
   { id: 'mandalay', zh: '曼德勒', en: 'Mandalay', my: 'မန္တလေး', lat: 21.9588, lng: 96.0891 },
@@ -29,6 +56,48 @@ const COD_OPTIONS = [
 ];
 
 const MAX_LICENSE_FILES = 8;
+
+type PlaceSuggestion = {
+  place_id: string;
+  main_text: string;
+  secondary_text: string;
+  description: string;
+};
+
+type LicenseDocItem = {
+  id: string;
+  file: File;
+  fileName: string;
+  contentType: string;
+  previewUrl: string;
+  url?: string;
+  status: 'uploading' | 'ready' | 'error';
+  error?: string;
+};
+
+type FormState = {
+  store_name: string;
+  store_type: string;
+  region: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  phone: string;
+  email: string;
+  manager_name: string;
+  manager_phone: string;
+  operating_hours: string;
+  cod_settlement_day: string;
+  salesperson_name: string;
+  application_date: string;
+  notes: string;
+};
+
+type SubmittedState = {
+  applicationId: string;
+  phone: string;
+  email: string;
+};
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -67,45 +136,13 @@ function formatDateWeekday(iso: string, isEn: boolean, isMy: boolean): string {
   return weekdays[date.getDay()];
 }
 
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result ?? '');
-      resolve(result.includes(',') ? result.split(',')[1] : result);
-    };
-    reader.onerror = () => reject(new Error('read failed'));
-    reader.readAsDataURL(file);
-  });
+function newDocId(): string {
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
-
-type LicenseDocItem = {
-  id: string;
-  file: File;
-  previewUrl: string;
-};
-
-type FormState = {
-  store_name: string;
-  store_type: string;
-  region: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  phone: string;
-  email: string;
-  manager_name: string;
-  manager_phone: string;
-  operating_hours: string;
-  cod_settlement_day: string;
-  salesperson_name: string;
-  application_date: string;
-  notes: string;
-};
 
 const DEFAULT_FORM: FormState = {
   store_name: '',
-  store_type: 'restaurant',
+  store_type: '',
   region: 'mandalay',
   address: '',
   latitude: 21.9588,
@@ -126,147 +163,335 @@ const MerchantApplyPage: React.FC = () => {
   const { language, setLanguage } = useLanguage();
   const isEn = language === 'en';
   const isMy = language === 'my';
+  const packingLang: PackingLang = isEn ? 'en' : isMy ? 'my' : 'zh';
+  const t = useMemo(() => getMerchantApplyCopy(packingLang), [packingLang]);
+
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [licenseDocs, setLicenseDocs] = useState<LicenseDocItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<SubmittedState | null>(null);
+  const [packingModalOpen, setPackingModalOpen] = useState(false);
+  const [packingViewed, setPackingViewed] = useState(false);
+  const [packingAcked, setPackingAcked] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [mapAuthFailed, setMapAuthFailed] = useState(false);
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [latInput, setLatInput] = useState(String(DEFAULT_FORM.latitude));
+  const [lngInput, setLngInput] = useState(String(DEFAULT_FORM.longitude));
+  const [showLookup, setShowLookup] = useState(false);
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [looking, setLooking] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupRow, setLookupRow] = useState<PublicApplicationStatus | null>(null);
 
-  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const placesAttrRef = useRef<HTMLDivElement>(null);
+  const autocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesRef = useRef<google.maps.places.PlacesService | null>(null);
+  const searchTimerRef = useRef<number | null>(null);
+  const addressDirtyRef = useRef(false);
+  const initialMapCenter = useRef({ lat: DEFAULT_FORM.latitude, lng: DEFAULT_FORM.longitude });
+  const formCoordsRef = useRef({ lat: form.latitude, lng: form.longitude });
+  formCoordsRef.current = { lat: form.latitude, lng: form.longitude };
 
-  const t = useMemo(
-    () =>
-      isEn
-        ? {
-            badge: 'Partner onboarding',
-            title: 'Join MARKET LINK Merchant Platform',
-            subtitle:
-              'Apply to list your store on our City Mall. After review, we will issue your store code and password for the Merchant App and Web.',
-            step1: '1. Fill in details',
-            step2: '2. Admin review',
-            step3: '3. Receive login credentials',
-            registration: 'Application registration',
-            salesperson: 'Salesperson',
-            salespersonPlaceholder: 'MARKET LINK sales contact name',
-            applicationDate: 'Date',
-            uploadLicense: '+ Upload license',
-            uploadHint: 'Business license, shop registration, or other store credentials (required)',
-            uploadFormats: 'JPG, PNG, WEBP or PDF · max 5MB each · up to 8 files',
-            removeDoc: 'Remove',
-            noDocsYet: 'No documents uploaded yet',
-            basic: 'Store information',
-            storeName: 'Store name',
-            storeType: 'Store type',
-            region: 'City / region',
-            address: 'Full address',
-            mapHint: 'Tap or click on the map to pin your store location',
-            phone: 'Store phone',
-            email: 'Email (optional)',
-            manager: 'Manager name',
-            managerPhone: 'Manager phone',
-            hours: 'Operating hours',
-            hoursPlaceholder: 'e.g. 08:00 - 22:00',
-            cod: 'COD settlement cycle',
-            notes: 'Notes (optional)',
-            notesPlaceholder: 'Briefly describe your store or products…',
-            submit: 'Submit application',
-            submitting: 'Submitting…',
-            home: 'Back to home',
-            successTitle: 'Application submitted successfully',
-            coords: 'Pinned location',
-            mapUnavailable: 'Map is unavailable. Please contact support for help with location.',
-            mapLoading: 'Loading map…',
-            submitError: 'Submission failed. Please try again.',
-          }
-        : isMy
-          ? {
-              badge: 'ကုန်သည်လျှောက်ထားမှု',
-              title: 'MARKET LINK ကုန်သည်ပလက်ဖောင်းသို့ ချိတ်ဆက်ရန်',
-              subtitle:
-                'City Mall တွင် ဆိုင်ဖွင့်ရန် လျှောက်လွှာတင်ပါ။ Admin အတည်ပြုပြီးနောက် Merchant App/Web အတွက် ဆိုင်ကုဒ်နှင့် လျှို့ဝှက်နံပါတ် ပေးအပ်ပါမည်။',
-              step1: '၁. အချက်အလက်ဖြည့်ပါ',
-              step2: '၂. Admin စစ်ဆေးမည်',
-              step3: '၃. အကောင့်ရယူပါ',
-              registration: 'လျှောက်လွှာ မှတ်တမ်း',
-              salesperson: 'အရောင်းနာမည်',
-              salespersonPlaceholder: 'MARKET LINK အရောင်းသက်ဆိုင်ရာ အမည်',
-              applicationDate: 'ရက်စွဲ',
-              uploadLicense: '+ မှတ်ပုံတင်တင်ရန်',
-              uploadHint: 'လုပ်ငန်းလိုင်စင်၊ ဆိုင်မှတ်ပုံတင် စသည့် အထောက်အထားများ (မဖြစ်မနေ)',
-              uploadFormats: 'JPG, PNG, WEBP သို့ PDF · ဖိုင် 5MB အထိ · ၈ ဖိုင်အထိ',
-              removeDoc: 'ဖယ်ရှားရန်',
-              noDocsYet: 'မှတ်ပုံတင် မတင်ရသေးပါ',
-              basic: 'ဆိုင်အချက်အလက်',
-              storeName: 'ဆိုင်အမည်',
-              storeType: 'ဆိုင်အမျိုးအစား',
-              region: 'ဒေသ / မြို့',
-              address: 'လိပ်စာ',
-              mapHint: 'မြေပုံပေါ်တွင် ဆိုင်တည်နေရာ ရွေးချယ်ပါ',
-              phone: 'ဆိုင်ဖုန်း',
-              email: 'Email (မဖြည့်လည်းရ)',
-              manager: 'တာဝန်ခံအမည်',
-              managerPhone: 'တာဝန်ခံဖုန်း',
-              hours: 'ဖွင့်ချိန်',
-              hoursPlaceholder: 'ဥပမာ 08:00 - 22:00',
-              cod: 'COD ရက်ချိန်သတ်မှတ်ချက်',
-              notes: 'မှတ်ချက် (မဖြည့်လည်းရ)',
-              notesPlaceholder: 'ဆိုင်နှင့် ရောင်းချသောပစ္စည်းအကြောင်း အကျဉ်းချုပ်…',
-              submit: 'လျှောက်လွှာတင်ရန်',
-              submitting: 'တင်နေသည်…',
-              home: 'ပင်မသို့',
-              successTitle: 'လျှောက်လွှာ တင်ပြီးပါပြီ',
-              coords: 'ရွေးချယ်ထားသော တည်နေရာ',
-              mapUnavailable: 'မြေပုံ မရရှိနိုင်ပါ။ တည်နေရာအတွက် customer service ကို ဆက်သွယ်ပါ။',
-              mapLoading: 'မြေပုံ ဖွင့်နေသည်…',
-              submitError: 'တင်သွင်းမှု မအောင်မြင်ပါ။ ထပ်မံကြိုးစားပါ။',
-            }
-          : {
-              badge: '商家入驻',
-              title: '申请加入 MARKET LINK 商家平台',
-              subtitle:
-                '填写以下资料申请入驻同城商场。审核通过后，我们将为您开通商家账号（店铺代码 + 密码），可用于商家 App / Web 登录经营。',
-              step1: '1. 填写资料',
-              step2: '2. 平台审核',
-              step3: '3. 获取账号',
-              registration: '申请登记',
-              salesperson: '推销员',
-              salespersonPlaceholder: 'MARKET LINK 推销员姓名',
-              applicationDate: '日期',
-              uploadLicense: '+ 上传证件',
-              uploadHint: '请上传营业执照、店铺登记证等商店证件（必填）',
-              uploadFormats: '支持 JPG、PNG、WEBP 或 PDF · 单个不超过 5MB · 最多 8 份',
-              removeDoc: '删除',
-              noDocsYet: '尚未上传证件',
-              basic: '店铺基本信息',
-              storeName: '店铺名称',
-              storeType: '店铺类型',
-              region: '经营区域',
-              address: '详细地址',
-              mapHint: '在地图上点击选择店铺坐标',
-              phone: '店铺电话',
-              email: '邮箱（选填）',
-              manager: '负责人姓名',
-              managerPhone: '负责人手机',
-              hours: '营业时间',
-              hoursPlaceholder: '例如 08:00 - 22:00',
-              cod: 'COD 结清周期',
-              notes: '备注（选填）',
-              notesPlaceholder: '可简要介绍店铺或主营商品…',
-              submit: '提交入驻申请',
-              submitting: '提交中…',
-              home: '返回首页',
-              successTitle: '申请已提交',
-              coords: '已选坐标',
-              mapUnavailable: '地图暂不可用，请联系客服协助选点。',
-              mapLoading: '地图加载中…',
-              submitError: '提交失败，请稍后再试',
-            },
-    [isEn, isMy],
+  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
+  const mapsReady = Boolean(isMapLoaded && !mapLoadError && window.google?.maps);
+
+  useEffect(() => {
+    if (mapLoadError) {
+      console.error('[MerchantApply] Google Maps 加载失败:', mapLoadError);
+    }
+  }, [mapLoadError]);
+
+  useEffect(() => {
+    const gwindow = window as Window & { gm_authFailure?: () => void };
+    const previous = gwindow.gm_authFailure;
+    gwindow.gm_authFailure = () => {
+      setMapAuthFailed(true);
+    };
+    return () => {
+      gwindow.gm_authFailure = previous;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
+      licenseDocs.forEach((item) => {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ensurePlaces = useCallback(() => {
+    if (!window.google?.maps?.places) return false;
+    if (!autocompleteRef.current) {
+      autocompleteRef.current = new window.google.maps.places.AutocompleteService();
+    }
+    if (!placesRef.current) {
+      const node = mapRef.current || placesAttrRef.current;
+      if (node) {
+        placesRef.current = new window.google.maps.places.PlacesService(node as google.maps.Map);
+      }
+    }
+    return Boolean(autocompleteRef.current);
+  }, []);
+
+  const reverseGeocode = useCallback(
+    async (lat: number, lng: number) => {
+      if (!window.google?.maps?.Geocoder) return '';
+      const geocoder = new window.google.maps.Geocoder();
+      const response = await geocoder.geocode({
+        location: { lat, lng },
+        language: geocoderLanguage(packingLang),
+      });
+      return pickFormattedAddress(response.results?.[0]);
+    },
+    [packingLang],
   );
+
+  const applyPinnedLocation = useCallback(
+    (
+      lat: number,
+      lng: number,
+      options?: { zoom?: number; address?: string; fillAddress?: boolean },
+    ) => {
+      setLocationConfirmed(true);
+      setLatInput(lat.toFixed(5));
+      setLngInput(lng.toFixed(5));
+      setForm((prev) => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng,
+        address: options?.address || prev.address,
+      }));
+      if (mapRef.current) {
+        mapRef.current.panTo({ lat, lng });
+        if (options?.zoom != null) mapRef.current.setZoom(options.zoom);
+      }
+      if (options?.fillAddress && !options.address && !addressDirtyRef.current) {
+        reverseGeocode(lat, lng)
+          .then((addr) => {
+            if (!addr || addressDirtyRef.current) return;
+            setForm((prev) => (prev.address.trim() ? prev : { ...prev, address: addr }));
+          })
+          .catch(() => {});
+      }
+    },
+    [reverseGeocode],
+  );
+
+  const handleMapLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+    map.panTo(formCoordsRef.current);
+    if (window.google?.maps?.places) {
+      autocompleteRef.current = new window.google.maps.places.AutocompleteService();
+      placesRef.current = new window.google.maps.places.PlacesService(map);
+    }
+  }, []);
+
+  const handleMapClick = useCallback(
+    (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng) return;
+      applyPinnedLocation(event.latLng.lat(), event.latLng.lng(), { fillAddress: true });
+    },
+    [applyPinnedLocation],
+  );
+
+  const handleLocate = useCallback(() => {
+    if (!navigator.geolocation) {
+      setError(t.locateUnsupported);
+      return;
+    }
+    setLocating(true);
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        applyPinnedLocation(position.coords.latitude, position.coords.longitude, {
+          zoom: 16,
+          fillAddress: true,
+        });
+        setLocating(false);
+      },
+      (geoError) => {
+        setLocating(false);
+        if (geoError.code === 1) setError(t.locateDenied);
+        else if (geoError.code === 2) setError(t.locateUnavailable);
+        else if (geoError.code === 3) setError(t.locateTimeout);
+        else setError(t.locateFailed);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60_000 },
+    );
+  }, [
+    applyPinnedLocation,
+    t.locateDenied,
+    t.locateFailed,
+    t.locateTimeout,
+    t.locateUnavailable,
+    t.locateUnsupported,
+  ]);
+
+  const geocodeQuery = useCallback(
+    async (query: string) => {
+      if (!window.google?.maps?.Geocoder) throw new Error('NO_GEOCODER');
+      const geocoder = new window.google.maps.Geocoder();
+      const response = await geocoder.geocode({
+        address: `${query}, Myanmar`,
+        language: geocoderLanguage(packingLang),
+        componentRestrictions: { country: 'MM' },
+      });
+      const first = response.results?.[0];
+      const loc = first?.geometry?.location;
+      if (!loc) throw new Error('NO_RESULT');
+      applyPinnedLocation(loc.lat(), loc.lng(), {
+        zoom: 16,
+        address: pickFormattedAddress(first),
+      });
+      addressDirtyRef.current = true;
+    },
+    [applyPinnedLocation, packingLang],
+  );
+
+  const selectPlace = useCallback(
+    (placeId: string) => {
+      ensurePlaces();
+      const service = placesRef.current;
+      if (!service) {
+        setError(t.searchFailed);
+        return;
+      }
+      service.getDetails(
+        { placeId, fields: ['geometry', 'formatted_address', 'name'] },
+        (place, status) => {
+          if (status !== window.google.maps.places.PlacesServiceStatus.OK || !place?.geometry?.location) {
+            setError(t.searchFailed);
+            return;
+          }
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const address = pickFormattedAddress(place);
+          addressDirtyRef.current = true;
+          applyPinnedLocation(lat, lng, { zoom: 16, address });
+          setSearchQuery(address || searchQuery);
+          setSuggestions([]);
+          setShowSuggestions(false);
+        },
+      );
+    },
+    [applyPinnedLocation, ensurePlaces, searchQuery, t.searchFailed],
+  );
+
+  const runPredictionSearch = useCallback(
+    (input: string) => {
+      if (mapAuthFailed || !ensurePlaces() || !autocompleteRef.current) {
+        setSearching(false);
+        return;
+      }
+      const stuckTimer = window.setTimeout(() => setSearching(false), 4000);
+      autocompleteRef.current.getPlacePredictions(
+        {
+          input,
+          location: new window.google.maps.LatLng(formCoordsRef.current.lat, formCoordsRef.current.lng),
+          radius: 50000,
+          componentRestrictions: { country: 'mm' },
+          language: packingLang === 'zh' ? 'zh-CN' : 'en',
+        },
+        (predictions, status) => {
+          window.clearTimeout(stuckTimer);
+          setSearching(false);
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions?.length) {
+            setSuggestions(
+              predictions.slice(0, 8).map((prediction) => ({
+                place_id: prediction.place_id,
+                main_text: prediction.structured_formatting?.main_text || prediction.description,
+                secondary_text: prediction.structured_formatting?.secondary_text || '',
+                description: prediction.description,
+              })),
+            );
+            setShowSuggestions(true);
+            return;
+          }
+          setSuggestions([]);
+          setShowSuggestions(false);
+        },
+      );
+    },
+    [ensurePlaces, mapAuthFailed, packingLang],
+  );
+
+  const handleSearchInput = (value: string) => {
+    setSearchQuery(value);
+    if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setSearching(false);
+      return;
+    }
+    if (!mapsReady || mapAuthFailed) {
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    searchTimerRef.current = window.setTimeout(() => {
+      runPredictionSearch(value.trim());
+    }, 300);
+  };
+
+  const handleSearchSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const query = searchQuery.trim();
+    if (query.length < 2) return;
+    setError(null);
+    if (suggestions[0]) {
+      selectPlace(suggestions[0].place_id);
+      return;
+    }
+    try {
+      setSearching(true);
+      await geocodeQuery(query);
+      setShowSuggestions(false);
+    } catch {
+      setError(t.searchNoResults);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleUseTypedAddress = async () => {
+    const query = form.address.trim();
+    if (query.length < 3) {
+      setError(t.searchFailed);
+      return;
+    }
+    setSearchQuery(query);
+    setError(null);
+    try {
+      setSearching(true);
+      await geocodeQuery(query);
+    } catch {
+      setError(t.searchNoResults);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleApplyManualCoords = () => {
+    const parsed = parseCoordinatePair(latInput, lngInput);
+    if (!parsed.ok) {
+      setError(t.invalidCoords);
+      return;
+    }
+    setError(isLikelyMyanmarCoord(parsed.lat, parsed.lng) ? null : t.coordsOutsideHint);
+    applyPinnedLocation(parsed.lat, parsed.lng, { zoom: 16, fillAddress: true });
+  };
 
   const labelRegion = (id: string) => {
     const row = REGIONS.find((r) => r.id === id);
@@ -280,24 +505,62 @@ const MerchantApplyPage: React.FC = () => {
     return isEn ? row.en : isMy ? row.my : row.zh;
   };
 
+  const packingProfile = useMemo(() => getPackingProfile(form.store_type), [form.store_type]);
+
+  const resetPackingAck = () => {
+    setPackingViewed(false);
+    setPackingAcked(false);
+  };
+
+  const handleStoreTypeChange = (storeType: string) => {
+    setForm((prev) => ({ ...prev, store_type: storeType }));
+    resetPackingAck();
+    setPackingModalOpen(true);
+  };
+
   const handleRegionChange = (region: string) => {
     const hub = REGIONS.find((r) => r.id === region) || REGIONS[0];
+    if (locationConfirmed) {
+      setForm((prev) => ({ ...prev, region }));
+      return;
+    }
     setForm((prev) => ({
       ...prev,
       region,
       latitude: hub.lat,
       longitude: hub.lng,
     }));
+    setLatInput(hub.lat.toFixed(5));
+    setLngInput(hub.lng.toFixed(5));
+    mapRef.current?.panTo({ lat: hub.lat, lng: hub.lng });
   };
 
-  const handleMapClick = useCallback((event: google.maps.MapMouseEvent) => {
-    if (!event.latLng) return;
-    setForm((prev) => ({
-      ...prev,
-      latitude: event.latLng!.lat(),
-      longitude: event.latLng!.lng(),
-    }));
-  }, []);
+  const uploadMessage = (code: string) => {
+    if (code === 'UNSUPPORTED_TYPE') return t.badFileType;
+    if (code === 'PDF_TOO_LARGE') return t.pdfTooLarge;
+    if (code === 'IMAGE_TOO_LARGE') return t.fileTooLarge;
+    return t.uploadFailed;
+  };
+
+  const startUpload = async (item: LicenseDocItem) => {
+    try {
+      const result = await uploadMerchantApplyDocument(item.file);
+      setLicenseDocs((prev) =>
+        prev.map((doc) =>
+          doc.id === item.id
+            ? { ...doc, status: 'ready', url: result.url, fileName: result.fileName, error: undefined }
+            : doc,
+        ),
+      );
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'UPLOAD_FAILED';
+      setLicenseDocs((prev) =>
+        prev.map((doc) =>
+          doc.id === item.id ? { ...doc, status: 'error', error: uploadMessage(code) } : doc,
+        ),
+      );
+    }
+  };
 
   const handlePickDocuments = (event: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files || []);
@@ -307,7 +570,7 @@ const MerchantApplyPage: React.FC = () => {
     setError(null);
     const remaining = MAX_LICENSE_FILES - licenseDocs.length;
     if (remaining <= 0) {
-      setError(isEn ? 'Maximum 8 documents' : isMy ? 'ဖိုင် ၈ ခု အထိသာ' : '最多上传 8 份证件');
+      setError(t.tooManyDocs);
       return;
     }
 
@@ -318,23 +581,41 @@ const MerchantApplyPage: React.FC = () => {
       const isImage = file.type.startsWith('image/');
       const isPdf = file.type === 'application/pdf';
       if (!isImage && !isPdf) {
-        setError(isEn ? 'Only JPG, PNG, WEBP or PDF' : isMy ? 'JPG, PNG, WEBP, PDF သာ' : '仅支持 JPG、PNG、WEBP 或 PDF');
+        setError(t.badFileType);
         continue;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setError(isEn ? 'Each file must be under 5MB' : isMy ? 'ဖိုင် 5MB ထက်မကြီးရ' : '单个文件不能超过 5MB');
+      if (isPdf && file.size > 3.5 * 1024 * 1024) {
+        setError(t.pdfTooLarge);
+        continue;
+      }
+      if (isImage && file.size > 5 * 1024 * 1024) {
+        setError(t.fileTooLarge);
         continue;
       }
       nextItems.push({
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: newDocId(),
         file,
+        fileName: file.name,
+        contentType: file.type || 'application/octet-stream',
         previewUrl: isImage ? URL.createObjectURL(file) : '',
+        status: 'uploading',
       });
     }
 
-    if (nextItems.length) {
-      setLicenseDocs((prev) => [...prev, ...nextItems]);
-    }
+    if (!nextItems.length) return;
+    setLicenseDocs((prev) => [...prev, ...nextItems]);
+    nextItems.forEach((item) => {
+      void startUpload(item);
+    });
+  };
+
+  const handleRetryUpload = (id: string) => {
+    const target = licenseDocs.find((item) => item.id === id);
+    if (!target) return;
+    setLicenseDocs((prev) =>
+      prev.map((doc) => (doc.id === id ? { ...doc, status: 'uploading', error: undefined } : doc)),
+    );
+    void startUpload({ ...target, status: 'uploading', error: undefined });
   };
 
   const handleRemoveDocument = (id: string) => {
@@ -352,40 +633,54 @@ const MerchantApplyPage: React.FC = () => {
     setLicenseDocs([]);
   };
 
+  const readyDocUrls = licenseDocs.filter((doc) => doc.status === 'ready' && doc.url).map((doc) => doc.url as string);
+  const uploadingDocs = licenseDocs.some((doc) => doc.status === 'uploading');
+  const coordsLookForeign = locationConfirmed && !isLikelyMyanmarCoord(form.latitude, form.longitude);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (licenseDocs.length < 1) {
-      setError(isEn ? 'Please upload at least one store license' : isMy ? 'မှတ်ပုံတင် အနည်းဆုံး ၁ ခု တင်ပါ' : '请至少上传一份商店证件');
+    if (uploadingDocs) {
+      setError(t.uploadStillUploading);
+      return;
+    }
+    if (readyDocUrls.length < 1) {
+      setError(t.uploadNeedReady);
+      return;
+    }
+    if (!locationConfirmed) {
+      setError(t.locationRequired);
+      return;
+    }
+    if (!packingAcked) {
+      setPackingModalOpen(true);
+      setError(t.packingRequired);
       return;
     }
 
     setSubmitting(true);
     setError(null);
-    setSuccess(null);
     try {
-      const license_documents = await Promise.all(
-        licenseDocs.map(async (doc) => ({
-          fileName: doc.file.name,
-          contentType: doc.file.type || 'application/octet-stream',
-          base64: await fileToBase64(doc.file),
-        })),
-      );
-
       const response = await fetch('/.netlify/functions/merchant-apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
-          license_documents,
+          notes: appendPackingAckToNotes(form.notes, packingProfile),
+          packing_acknowledged: true,
+          packing_profile: packingProfile.id,
+          license_document_urls: readyDocUrls,
         }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || t.submitError);
       }
-      setSuccess(payload.message || t.successTitle);
-      setForm({ ...DEFAULT_FORM, application_date: todayISO() });
-      clearLicenseDocs();
+      setSubmitted({
+        applicationId: String(payload.applicationId || ''),
+        phone: form.phone,
+        email: form.email,
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       setError(err instanceof Error ? err.message : t.submitError);
     } finally {
@@ -393,7 +688,38 @@ const MerchantApplyPage: React.FC = () => {
     }
   };
 
+  const handleApplyAgain = () => {
+    setSubmitted(null);
+    setForm({ ...DEFAULT_FORM, application_date: todayISO() });
+    setLatInput(String(DEFAULT_FORM.latitude));
+    setLngInput(String(DEFAULT_FORM.longitude));
+    setLocationConfirmed(false);
+    addressDirtyRef.current = false;
+    resetPackingAck();
+    clearLicenseDocs();
+    setError(null);
+    setSearchQuery('');
+  };
+
+  const handleLookup = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLooking(true);
+    setLookupError(null);
+    try {
+      const row = await lookupMerchantApplication(lookupPhone);
+      setLookupRow(row);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.lookupFailed;
+      setLookupRow(null);
+      setLookupError(/未找到|not found/i.test(message) ? t.lookupNotFound : t.lookupFailed);
+    } finally {
+      setLooking(false);
+    }
+  };
+
   const dateDisplay = formatDateLabel(form.application_date, isEn, isMy);
+  const mapBlocked = !GOOGLE_MAPS_API_KEY || Boolean(mapLoadError);
+  const submitDisabled = submitting || !packingAcked || uploadingDocs || readyDocUrls.length < 1 || !locationConfirmed;
 
   return (
     <div className="merchant-apply-page">
@@ -422,275 +748,516 @@ const MerchantApplyPage: React.FC = () => {
         </header>
 
         <div className="merchant-apply-card">
-          {error && (
-            <div className="merchant-apply-alert merchant-apply-alert--error" role="alert">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="merchant-apply-alert merchant-apply-alert--success" role="status">
-              {success}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <section className="merchant-apply-section merchant-apply-section--registration">
-              <div className="merchant-apply-section__head">
-                <span className="merchant-apply-section__icon" aria-hidden="true">
-                  📋
-                </span>
-                <h2>{t.registration}</h2>
-              </div>
-              <div className="merchant-apply-grid merchant-apply-grid--registration">
-                <div className="merchant-apply-field">
-                  <label htmlFor="salesperson_name">{t.salesperson}</label>
-                  <input
-                    id="salesperson_name"
-                    value={form.salesperson_name}
-                    onChange={(e) => setForm({ ...form, salesperson_name: e.target.value })}
-                    placeholder={t.salespersonPlaceholder}
-                  />
+          {submitted ? (
+            <MerchantApplySuccess
+              t={t}
+              applicationId={submitted.applicationId}
+              phone={submitted.phone}
+              email={submitted.email}
+              onApplyAgain={handleApplyAgain}
+            />
+          ) : (
+            <>
+              {error && (
+                <div className="merchant-apply-alert merchant-apply-alert--error" role="alert">
+                  {error}
                 </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="application_date">{t.applicationDate} *</label>
-                  <div className="merchant-apply-date merchant-apply-date--compact">
+              )}
+
+              <button
+                type="button"
+                className="merchant-apply-lookup-toggle"
+                onClick={() => setShowLookup((open) => !open)}
+              >
+                {showLookup ? t.hideStatus : t.checkStatus}
+              </button>
+              {showLookup ? (
+                <form className="merchant-apply-lookup merchant-apply-lookup--card" onSubmit={handleLookup}>
+                  <h3>{t.successLookupTitle}</h3>
+                  <p>{t.successLookupHint}</p>
+                  <label htmlFor="form_lookup_phone">{t.successLookupPhone}</label>
+                  <div className="merchant-apply-lookup__row">
                     <input
-                      id="application_date"
-                      type="date"
-                      className="merchant-apply-date__input-visible"
-                      value={form.application_date}
-                      onChange={(e) => setForm({ ...form, application_date: e.target.value })}
+                      id="form_lookup_phone"
+                      value={lookupPhone}
+                      onChange={(e) => setLookupPhone(e.target.value)}
                       required
                     />
-                    <span className="merchant-apply-date__hint">
-                      {formatDateWeekday(form.application_date, isEn, isMy)}
-                      {formatDateWeekday(form.application_date, isEn, isMy) ? ' · ' : ''}
-                      {dateDisplay}
-                    </span>
+                    <button type="submit" className="merchant-apply-btn merchant-apply-btn--primary" disabled={looking}>
+                      {looking ? t.successLookuping : t.successLookupBtn}
+                    </button>
                   </div>
-                </div>
-              </div>
+                  {lookupError ? <p className="merchant-apply-lookup__error">{lookupError}</p> : null}
+                  {lookupRow ? (
+                    <dl className="merchant-apply-lookup__result">
+                      <div>
+                        <dt>{t.successId}</dt>
+                        <dd>{lookupRow.applicationId}</dd>
+                      </div>
+                      <div>
+                        <dt>{t.storeName}</dt>
+                        <dd>{lookupRow.store_name || '—'}</dd>
+                      </div>
+                      <div>
+                        <dt>{statusLabel(lookupRow.status, t)}</dt>
+                        <dd>{lookupRow.created_at ? lookupRow.created_at.slice(0, 10) : '—'}</dd>
+                      </div>
+                    </dl>
+                  ) : null}
+                </form>
+              ) : null}
 
-              <div className="merchant-apply-upload">
-                <div className="merchant-apply-upload__head">
-                  <p className="merchant-apply-upload__title">{t.uploadHint}</p>
-                  <p className="merchant-apply-upload__formats">{t.uploadFormats}</p>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-                  multiple
-                  className="merchant-apply-upload__native"
-                  onChange={handlePickDocuments}
-                />
-                <button
-                  type="button"
-                  className="merchant-apply-upload__add"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={licenseDocs.length >= MAX_LICENSE_FILES || submitting}
-                >
-                  {t.uploadLicense}
-                </button>
+              <form onSubmit={handleSubmit}>
+                <section className="merchant-apply-section merchant-apply-section--registration">
+                  <div className="merchant-apply-section__head">
+                    <span className="merchant-apply-section__icon" aria-hidden="true">
+                      📋
+                    </span>
+                    <h2>{t.registration}</h2>
+                  </div>
+                  <div className="merchant-apply-grid merchant-apply-grid--registration">
+                    <div className="merchant-apply-field">
+                      <label htmlFor="salesperson_name">{t.salesperson}</label>
+                      <input
+                        id="salesperson_name"
+                        value={form.salesperson_name}
+                        onChange={(e) => setForm({ ...form, salesperson_name: e.target.value })}
+                        placeholder={t.salespersonPlaceholder}
+                      />
+                    </div>
+                    <div className="merchant-apply-field">
+                      <label htmlFor="application_date">{t.applicationDate} *</label>
+                      <div className="merchant-apply-date merchant-apply-date--compact">
+                        <input
+                          id="application_date"
+                          type="date"
+                          className="merchant-apply-date__input-visible"
+                          value={form.application_date}
+                          onChange={(e) => setForm({ ...form, application_date: e.target.value })}
+                          required
+                        />
+                        <span className="merchant-apply-date__hint">
+                          {formatDateWeekday(form.application_date, isEn, isMy)}
+                          {formatDateWeekday(form.application_date, isEn, isMy) ? ' · ' : ''}
+                          {dateDisplay}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-                {licenseDocs.length === 0 ? (
-                  <p className="merchant-apply-upload__empty">{t.noDocsYet}</p>
-                ) : (
-                  <ul className="merchant-apply-upload__list">
-                    {licenseDocs.map((doc) => (
-                      <li key={doc.id} className="merchant-apply-upload__item">
-                        {doc.previewUrl ? (
-                          <img src={doc.previewUrl} alt="" className="merchant-apply-upload__thumb" />
-                        ) : (
-                          <div className="merchant-apply-upload__pdf">PDF</div>
-                        )}
-                        <div className="merchant-apply-upload__meta">
-                          <span className="merchant-apply-upload__name">{doc.file.name}</span>
-                          <span className="merchant-apply-upload__size">
-                            {(doc.file.size / 1024).toFixed(0)} KB
-                          </span>
+                  <div className="merchant-apply-upload">
+                    <div className="merchant-apply-upload__head">
+                      <p className="merchant-apply-upload__title">{t.uploadHint}</p>
+                      <p className="merchant-apply-upload__formats">{t.uploadFormats}</p>
+                      <p className="merchant-apply-upload__formats">{t.archiveHint}</p>
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                      multiple
+                      className="merchant-apply-upload__native"
+                      onChange={handlePickDocuments}
+                    />
+                    <button
+                      type="button"
+                      className="merchant-apply-upload__add"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={licenseDocs.length >= MAX_LICENSE_FILES || submitting}
+                    >
+                      {t.uploadLicense}
+                    </button>
+
+                    {licenseDocs.length === 0 ? (
+                      <p className="merchant-apply-upload__empty">{t.noDocsYet}</p>
+                    ) : (
+                      <ul className="merchant-apply-upload__list">
+                        {licenseDocs.map((doc) => (
+                          <li key={doc.id} className={`merchant-apply-upload__item merchant-apply-upload__item--${doc.status}`}>
+                            {doc.previewUrl ? (
+                              <img src={doc.previewUrl} alt="" className="merchant-apply-upload__thumb" />
+                            ) : (
+                              <div className="merchant-apply-upload__pdf">PDF</div>
+                            )}
+                            <div className="merchant-apply-upload__meta">
+                              <span className="merchant-apply-upload__name">{doc.fileName}</span>
+                              <span
+                                className={`merchant-apply-upload__status merchant-apply-upload__status--${doc.status}`}
+                              >
+                                {doc.status === 'uploading'
+                                  ? t.uploadUploading
+                                  : doc.status === 'ready'
+                                    ? t.uploadReady
+                                    : doc.error || t.uploadFailed}
+                              </span>
+                            </div>
+                            {doc.status === 'error' ? (
+                              <button
+                                type="button"
+                                className="merchant-apply-upload__retry"
+                                onClick={() => handleRetryUpload(doc.id)}
+                                disabled={submitting}
+                              >
+                                {t.uploadRetry}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="merchant-apply-upload__remove"
+                              onClick={() => handleRemoveDocument(doc.id)}
+                              disabled={submitting}
+                            >
+                              {t.removeDoc}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </section>
+
+                <section className="merchant-apply-section">
+                  <div className="merchant-apply-section__head">
+                    <span className="merchant-apply-section__icon" aria-hidden="true">
+                      🏪
+                    </span>
+                    <h2>{t.basic}</h2>
+                  </div>
+                  <div className="merchant-apply-grid">
+                    <div className="merchant-apply-field">
+                      <label htmlFor="store_name">{t.storeName} *</label>
+                      <input
+                        id="store_name"
+                        value={form.store_name}
+                        onChange={(e) => setForm({ ...form, store_name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="merchant-apply-field">
+                      <label htmlFor="phone">{t.phone} *</label>
+                      <input
+                        id="phone"
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="merchant-apply-field">
+                      <label htmlFor="store_type">{t.storeType} *</label>
+                      <select
+                        id="store_type"
+                        value={form.store_type}
+                        onChange={(e) => handleStoreTypeChange(e.target.value)}
+                        required
+                      >
+                        <option value="" disabled>
+                          {t.storeTypePlaceholder}
+                        </option>
+                        {STORE_TYPES.map((type) => (
+                          <option key={type.value} value={type.value}>
+                            {labelStoreType(type.value)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="merchant-apply-field">
+                      <label htmlFor="region">{t.region} *</label>
+                      <select
+                        id="region"
+                        value={form.region}
+                        onChange={(e) => handleRegionChange(e.target.value)}
+                        required
+                      >
+                        {REGIONS.map((region) => (
+                          <option key={region.id} value={region.id}>
+                            {labelRegion(region.id)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {form.store_type ? (
+                      <div className="merchant-apply-field merchant-apply-field--full">
+                        <div
+                          className={`merchant-apply-packing${packingAcked ? ' merchant-apply-packing--done' : ''}`}
+                        >
+                          <div className="merchant-apply-packing__top">
+                            <div>
+                              <p className="merchant-apply-packing__label">{t.packingLabel}</p>
+                              <p className="merchant-apply-packing__title">{packingProfile.title[packingLang]}</p>
+                              <p className="merchant-apply-packing__hint">{packingProfile.hint[packingLang]}</p>
+                            </div>
+                            <span
+                              className={`merchant-apply-packing__status${
+                                packingAcked ? ' merchant-apply-packing__status--done' : ''
+                              }`}
+                            >
+                              {packingAcked ? t.packingDone : t.packingPending}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="merchant-apply-packing__view"
+                            onClick={() => setPackingModalOpen(true)}
+                          >
+                            {t.packingView}
+                          </button>
+                          <label className="merchant-apply-packing__ack">
+                            <input
+                              type="checkbox"
+                              checked={packingAcked}
+                              onChange={(e) => {
+                                if (!packingViewed) {
+                                  setPackingModalOpen(true);
+                                  return;
+                                }
+                                setPackingAcked(e.target.checked);
+                              }}
+                            />
+                            <span>{packingViewed ? t.packingAck : t.packingNeedView}</span>
+                          </label>
                         </div>
+                      </div>
+                    ) : null}
+                    <div className="merchant-apply-field">
+                      <label htmlFor="operating_hours">{t.hours} *</label>
+                      <input
+                        id="operating_hours"
+                        value={form.operating_hours}
+                        onChange={(e) => setForm({ ...form, operating_hours: e.target.value })}
+                        placeholder={t.hoursPlaceholder}
+                        required
+                      />
+                    </div>
+                    <div className="merchant-apply-field">
+                      <label htmlFor="cod_settlement_day">{t.cod} *</label>
+                      <select
+                        id="cod_settlement_day"
+                        value={form.cod_settlement_day}
+                        onChange={(e) => setForm({ ...form, cod_settlement_day: e.target.value })}
+                        required
+                      >
+                        {COD_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {isEn ? opt.en : isMy ? opt.my : opt.zh}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="merchant-apply-field">
+                      <label htmlFor="email">{t.email}</label>
+                      <input
+                        id="email"
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      />
+                    </div>
+                    <div className="merchant-apply-field">
+                      <label htmlFor="manager_name">{t.manager} *</label>
+                      <input
+                        id="manager_name"
+                        value={form.manager_name}
+                        onChange={(e) => setForm({ ...form, manager_name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="merchant-apply-field">
+                      <label htmlFor="manager_phone">{t.managerPhone} *</label>
+                      <input
+                        id="manager_phone"
+                        value={form.manager_phone}
+                        onChange={(e) => setForm({ ...form, manager_phone: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="merchant-apply-field merchant-apply-field--full">
+                      <label htmlFor="address">{t.address} *</label>
+                      <div className="merchant-apply-address-row">
+                        <input
+                          id="address"
+                          value={form.address}
+                          onChange={(e) => {
+                            addressDirtyRef.current = true;
+                            setForm({ ...form, address: e.target.value });
+                          }}
+                          required
+                        />
                         <button
                           type="button"
-                          className="merchant-apply-upload__remove"
-                          onClick={() => handleRemoveDocument(doc.id)}
-                          disabled={submitting}
+                          className="merchant-apply-address-find"
+                          onClick={handleUseTypedAddress}
+                          disabled={searching || form.address.trim().length < 3}
                         >
-                          {t.removeDoc}
+                          {t.searchUseAddress}
                         </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </section>
-
-            <section className="merchant-apply-section">
-              <div className="merchant-apply-section__head">
-                <span className="merchant-apply-section__icon" aria-hidden="true">
-                  🏪
-                </span>
-                <h2>{t.basic}</h2>
-              </div>
-              <div className="merchant-apply-grid">
-                <div className="merchant-apply-field">
-                  <label htmlFor="store_name">{t.storeName} *</label>
-                  <input
-                    id="store_name"
-                    value={form.store_name}
-                    onChange={(e) => setForm({ ...form, store_name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="phone">{t.phone} *</label>
-                  <input
-                    id="phone"
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="store_type">{t.storeType} *</label>
-                  <select
-                    id="store_type"
-                    value={form.store_type}
-                    onChange={(e) => setForm({ ...form, store_type: e.target.value })}
-                    required
-                  >
-                    {STORE_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {labelStoreType(type.value)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="region">{t.region} *</label>
-                  <select
-                    id="region"
-                    value={form.region}
-                    onChange={(e) => handleRegionChange(e.target.value)}
-                    required
-                  >
-                    {REGIONS.map((region) => (
-                      <option key={region.id} value={region.id}>
-                        {labelRegion(region.id)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="operating_hours">{t.hours} *</label>
-                  <input
-                    id="operating_hours"
-                    value={form.operating_hours}
-                    onChange={(e) => setForm({ ...form, operating_hours: e.target.value })}
-                    placeholder={t.hoursPlaceholder}
-                    required
-                  />
-                </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="cod_settlement_day">{t.cod} *</label>
-                  <select
-                    id="cod_settlement_day"
-                    value={form.cod_settlement_day}
-                    onChange={(e) => setForm({ ...form, cod_settlement_day: e.target.value })}
-                    required
-                  >
-                    {COD_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {isEn ? opt.en : isMy ? opt.my : opt.zh}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="email">{t.email}</label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
-                </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="manager_name">{t.manager} *</label>
-                  <input
-                    id="manager_name"
-                    value={form.manager_name}
-                    onChange={(e) => setForm({ ...form, manager_name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="merchant-apply-field">
-                  <label htmlFor="manager_phone">{t.managerPhone} *</label>
-                  <input
-                    id="manager_phone"
-                    value={form.manager_phone}
-                    onChange={(e) => setForm({ ...form, manager_phone: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="merchant-apply-field merchant-apply-field--full">
-                  <label htmlFor="address">{t.address} *</label>
-                  <input
-                    id="address"
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <p className="merchant-apply-footnote">{t.mapHint}</p>
-              <div className="merchant-apply-map-wrap">
-                {!GOOGLE_MAPS_API_KEY || mapLoadError ? (
-                  <div className="merchant-apply-map-placeholder">{t.mapUnavailable}</div>
-                ) : !isMapLoaded ? (
-                  <div className="merchant-apply-map-placeholder">{t.mapLoading}</div>
-                ) : (
-                  <div className="merchant-apply-map">
-                    <GoogleMap
-                      mapContainerStyle={{ width: '100%', height: '100%' }}
-                      center={{ lat: form.latitude, lng: form.longitude }}
-                      zoom={13}
-                      onClick={handleMapClick}
-                    >
-                      <Marker position={{ lat: form.latitude, lng: form.longitude }} />
-                    </GoogleMap>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-              <div className="merchant-apply-coords">
-                {t.coords}: {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
-              </div>
-              <div className="merchant-apply-field merchant-apply-field--full merchant-apply-field--notes">
-                <label htmlFor="notes">{t.notes}</label>
-                <textarea
-                  id="notes"
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder={t.notesPlaceholder}
-                />
-              </div>
-            </section>
+                  <p className="merchant-apply-footnote">{t.mapHint}</p>
+                  <div className="merchant-apply-search">
+                    <label htmlFor="map_search">{t.searchAddress}</label>
+                    <div className="merchant-apply-search__row">
+                      <input
+                        id="map_search"
+                        value={searchQuery}
+                        onChange={(e) => handleSearchInput(e.target.value)}
+                        onFocus={() => suggestions.length && setShowSuggestions(true)}
+                        placeholder={t.searchAddressPlaceholder}
+                        autoComplete="off"
+                      />
+                      <button
+                        type="button"
+                        className="merchant-apply-search__btn"
+                        onClick={() => void handleSearchSubmit()}
+                        disabled={searchQuery.trim().length < 2}
+                      >
+                        {t.searchAddressBtn}
+                      </button>
+                    </div>
+                    {showSuggestions && suggestions.length > 0 ? (
+                      <ul className="merchant-apply-search__list">
+                        {suggestions.map((item) => (
+                          <li key={item.place_id}>
+                            <button type="button" onClick={() => selectPlace(item.place_id)}>
+                              <strong>{item.main_text}</strong>
+                              {item.secondary_text ? <span>{item.secondary_text}</span> : null}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                  <div className="merchant-apply-map-wrap">
+                    {mapBlocked ? (
+                      <div className="merchant-apply-map-placeholder">{t.mapUnavailable}</div>
+                    ) : !isMapLoaded ? (
+                      <div className="merchant-apply-map-placeholder">{t.mapLoading}</div>
+                    ) : (
+                      <div className="merchant-apply-map">
+                        <GoogleMap
+                          mapContainerStyle={MAP_CONTAINER_STYLE}
+                          center={initialMapCenter.current}
+                          zoom={13}
+                          options={MAP_OPTIONS}
+                          onLoad={handleMapLoad}
+                          onClick={handleMapClick}
+                        >
+                          <Marker position={{ lat: form.latitude, lng: form.longitude }} />
+                        </GoogleMap>
+                        {mapAuthFailed ? (
+                          <div className="merchant-apply-map-placeholder merchant-apply-map-placeholder--overlay">
+                            {t.mapAuthFailed}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="merchant-apply-locate"
+                      onClick={handleLocate}
+                      disabled={locating}
+                      aria-label={t.locateLabel}
+                      title={t.locateLabel}
+                    >
+                      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3" fill="currentColor" />
+                        <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
+                        <path
+                          d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="merchant-apply-coords-row">
+                    <div
+                      className={`merchant-apply-coords${
+                        locationConfirmed ? ' merchant-apply-coords--ok' : ''
+                      }`}
+                    >
+                      {t.coords}: {formatCoordPair(form.latitude, form.longitude)}
+                      <span>{locationConfirmed ? t.locationConfirmed : t.locationPending}</span>
+                    </div>
+                  </div>
+                  {coordsLookForeign ? (
+                    <p className="merchant-apply-footnote merchant-apply-footnote--warn">{t.coordsOutsideHint}</p>
+                  ) : null}
+                  <div className="merchant-apply-manual">
+                    <p>{t.manualCoords}</p>
+                    <div className="merchant-apply-manual__row">
+                      <label>
+                        {t.manualLat}
+                        <input
+                          inputMode="decimal"
+                          value={latInput}
+                          onChange={(e) => setLatInput(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        {t.manualLng}
+                        <input
+                          inputMode="decimal"
+                          value={lngInput}
+                          onChange={(e) => setLngInput(e.target.value)}
+                        />
+                      </label>
+                      <button type="button" className="merchant-apply-manual__apply" onClick={handleApplyManualCoords}>
+                        {t.applyCoords}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="merchant-apply-field merchant-apply-field--full merchant-apply-field--notes">
+                    <label htmlFor="notes">{t.notes}</label>
+                    <textarea
+                      id="notes"
+                      value={form.notes}
+                      onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                      placeholder={t.notesPlaceholder}
+                    />
+                  </div>
+                </section>
 
-            <div className="merchant-apply-actions">
-              <Link to="/" className="merchant-apply-btn merchant-apply-btn--ghost">
-                {t.home}
-              </Link>
-              <button
-                type="submit"
-                className="merchant-apply-btn merchant-apply-btn--primary"
-                disabled={submitting}
-              >
-                {submitting ? t.submitting : t.submit}
-              </button>
-            </div>
-          </form>
+                <div className="merchant-apply-actions">
+                  <Link to="/" className="merchant-apply-btn merchant-apply-btn--ghost">
+                    {t.home}
+                  </Link>
+                  <button
+                    type="submit"
+                    className="merchant-apply-btn merchant-apply-btn--primary"
+                    disabled={submitDisabled}
+                  >
+                    {submitting ? t.submitting : t.submit}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
         </div>
       </div>
+      <div ref={placesAttrRef} hidden />
+      <PackingGuideModal
+        open={packingModalOpen}
+        profile={packingProfile}
+        storeTypeLabel={labelStoreType(form.store_type)}
+        lang={packingLang}
+        copy={{
+          kicker: t.packingKicker,
+          forType: t.packingForType,
+          confirm: t.packingConfirm,
+          close: t.packingClose,
+          confirmHint: t.packingConfirmHint,
+        }}
+        onClose={() => setPackingModalOpen(false)}
+        onConfirm={() => {
+          setPackingViewed(true);
+          setPackingAcked(true);
+          setPackingModalOpen(false);
+          setError(null);
+        }}
+      />
     </div>
   );
 };

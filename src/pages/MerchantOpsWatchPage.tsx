@@ -58,6 +58,7 @@ const MerchantOpsWatchPage: React.FC = () => {
 
   const lockedRegion = detectRegionFilter();
   const [rows, setRows] = useState<MerchantOpsWatchRow[]>([]);
+  const [watchedStoreCount, setWatchedStoreCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -70,7 +71,8 @@ const MerchantOpsWatchPage: React.FC = () => {
     setError(null);
     try {
       const next = await fetchMerchantOpsWatch();
-      setRows(next);
+      setRows(next.rows);
+      setWatchedStoreCount(next.watchedStoreCount);
       setLastUpdatedAt(Date.now());
     } catch (err) {
       setError(err instanceof Error ? err.message : isEn ? 'Failed to load' : '加载失败');
@@ -120,6 +122,11 @@ const MerchantOpsWatchPage: React.FC = () => {
             {isEn
               ? `Same rules as merchant web: closed today / vacation, stock 0 or ≤3, and 待确认 older than ${PENDING_ACCEPT_TIMEOUT_MINUTES} minutes.`
               : `与商家端对齐：今日打烊/休假、缺货或库存≤3、待确认超过 ${PENDING_ACCEPT_TIMEOUT_MINUTES} 分钟未接。`}
+          </p>
+          <p className="merchant-apps-archive-hint">
+            {isEn
+              ? `Connected to the database · watching ${watchedStoreCount} partner store(s). Transit stations are excluded.`
+              : `已连接数据库 · 监管 ${watchedStoreCount} 家合伙店（不含中转仓）。`}
           </p>
           <p style={{ marginTop: '0.35rem' }}>
             <Link to="/admin/delivery-stores" style={{ color: '#2563eb' }}>
@@ -195,7 +202,13 @@ const MerchantOpsWatchPage: React.FC = () => {
           <div className="merchant-apps-empty">{isEn ? 'Loading…' : '加载中…'}</div>
         ) : visible.length === 0 ? (
           <div className="merchant-apps-empty">
-            {isEn ? 'No stores need attention in this filter.' : '这个筛选下没有需要跟进的店铺。'}
+            {rows.length === 0
+              ? isEn
+                ? `Connected to the database · watching ${watchedStoreCount} partner store(s) · none closed, low-stock, or overdue to accept.`
+                : `已连接数据库 · 监管 ${watchedStoreCount} 家合伙店 · 当前没有打烊/缺货/超时待接单`
+              : isEn
+                ? 'No stores need attention in this filter.'
+                : '这个筛选下没有需要跟进的店铺。'}
           </div>
         ) : (
           <table className="merchant-apps-table">

@@ -87,6 +87,16 @@ describe('rewritePublicStorageUrl', () => {
     ).toBe(`${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/banners/app-banners/x.jpg`);
   });
 
+  it('rewrites merchant license storage onto the admin /__sb proxy in local jsdom', () => {
+    expect(
+      rewritePublicStorageUrl(
+        'https://uopkyuluxnrewvlmutam.supabase.co/storage/v1/object/public/merchant-application-docs/applications/1788415991618_iqm4vo5.jpg',
+      ),
+    ).toBe(
+      `${ADMIN_PUBLIC_SB_PROXY}/storage/v1/object/public/merchant-application-docs/applications/1788415991618_iqm4vo5.jpg`,
+    );
+  });
+
   it('keeps blob and empty URLs unchanged', () => {
     expect(rewritePublicStorageUrl('')).toBe('');
     expect(rewritePublicStorageUrl('blob:http://localhost/abc')).toBe('blob:http://localhost/abc');

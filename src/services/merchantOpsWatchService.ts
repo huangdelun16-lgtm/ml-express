@@ -67,7 +67,12 @@ async function loadStores(): Promise<StoreRow[]> {
   return (fallback.data || []) as StoreRow[];
 }
 
-export async function fetchMerchantOpsWatch(now = new Date()): Promise<MerchantOpsWatchRow[]> {
+export type MerchantOpsWatchResult = {
+  rows: MerchantOpsWatchRow[];
+  watchedStoreCount: number;
+};
+
+export async function fetchMerchantOpsWatch(now = new Date()): Promise<MerchantOpsWatchResult> {
   const [stores, pendingRes, productsRes] = await Promise.all([
     loadStores(),
     supabase
@@ -101,8 +106,8 @@ export async function fetchMerchantOpsWatch(now = new Date()): Promise<MerchantO
     productsByStore.set(storeId, list);
   }
 
-  const rows: MerchantOpsWatchRow[] = stores
-    .filter((store) => store?.id)
+  const watchedStores = stores.filter((store) => store?.id);
+  const rows: MerchantOpsWatchRow[] = watchedStores
     .map((store) => {
       const pending = buildPendingWatchOrders(pendingRawByStore.get(store.id) || [], now);
       const overdue = pending.filter((item) => item.overdue);
@@ -128,7 +133,10 @@ export async function fetchMerchantOpsWatch(now = new Date()): Promise<MerchantO
     })
     .filter(rowHasWatchIssue);
 
-  return sortWatchRows(rows);
+  return {
+    rows: sortWatchRows(rows),
+    watchedStoreCount: watchedStores.length,
+  };
 }
 
 export async function fetchOverdueMerchantAcceptCount(now = new Date()): Promise<number> {

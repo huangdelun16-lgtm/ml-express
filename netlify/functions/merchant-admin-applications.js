@@ -3,6 +3,9 @@
  * GET  ?status=pending|approved|rejected|all
  * GET  ?id=<uuid>
  * POST { action: 'approve'|'reject', applicationId, review_notes?, password? }
+ *
+ * Approve/reject only updates status. Do not delete merchant_applications
+ * rows or license files in merchant-application-docs.
  */
 
 const { createClient } = require('@supabase/supabase-js');

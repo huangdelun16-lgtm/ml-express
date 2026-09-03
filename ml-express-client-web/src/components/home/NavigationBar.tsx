@@ -93,7 +93,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: window.innerWidth < 768 ? '1rem' : '1.5rem',
+        columnGap: window.innerWidth < 768 ? '1rem' : '1.5rem',
         flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
         justifyContent: window.innerWidth < 1024 ? 'flex-start' : 'flex-end',
         rowGap: '0.5rem',
@@ -102,7 +102,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: window.innerWidth < 768 ? '1rem' : '1.5rem',
+          columnGap: window.innerWidth < 768 ? '1rem' : '1.5rem',
           flexWrap: window.innerWidth < 640 ? 'wrap' : 'nowrap',
           rowGap: '0.4rem'
         }}>
@@ -143,7 +143,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem',
+          columnGap: '0.75rem',
           flexWrap: 'wrap',
           justifyContent: window.innerWidth < 1024 ? 'flex-start' : 'flex-end',
           rowGap: '0.5rem'
@@ -308,7 +308,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           boxShadow: 'none',
-          gap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
+          columnGap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
           flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
           rowGap: 'var(--spacing-3)'
         }}
@@ -330,7 +330,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         justifyContent: 'space-between',
         alignItems: 'center',
         boxShadow: 'none',
-        gap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
+        columnGap: window.innerWidth < 768 ? 'var(--spacing-3)' : 'var(--spacing-4)',
         flexWrap: window.innerWidth < 1024 ? 'wrap' : 'nowrap',
         rowGap: 'var(--spacing-3)'
       }}

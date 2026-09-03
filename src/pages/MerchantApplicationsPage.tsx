@@ -13,6 +13,7 @@ import {
 } from '../services/merchantApplicationService';
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 import { getMerchantStoreTypeLabel } from '../constants/merchantStoreTypes';
+import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 import '../styles/merchantApplications.css';
 
 const REGION_LABELS: Record<string, string> = {
@@ -67,6 +68,74 @@ function generatePassword(length = 8) {
 
 function googleMapsUrl(lat: number, lng: number) {
   return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
+function LicenseDocCard({
+  url,
+  index,
+  isEn,
+  onOpen,
+}: {
+  url: string;
+  index: number;
+  isEn: boolean;
+  onOpen: (previewUrl: string) => void;
+}) {
+  const [failed, setFailed] = useState(false);
+  const pdf = isPdfUrl(url);
+  const name = docFileName(url, index);
+  const previewUrl = rewritePublicStorageUrl(url);
+
+  return (
+    <article className="merchant-apps-doc">
+      {pdf ? (
+        <a
+          className="merchant-apps-doc__thumb"
+          href={previewUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          <span className="merchant-apps-doc__pdf">PDF</span>
+        </a>
+      ) : failed ? (
+        <div className="merchant-apps-doc__thumb merchant-apps-doc__thumb--failed">
+          <span>{isEn ? 'Preview unavailable' : '无法预览'}</span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="merchant-apps-doc__thumb merchant-apps-doc__thumb--btn"
+          onClick={() => onOpen(previewUrl)}
+        >
+          <img src={previewUrl} alt={name} loading="lazy" onError={() => setFailed(true)} />
+        </button>
+      )}
+      <span className="merchant-apps-doc__label" title={name}>
+        {name}
+      </span>
+      <div className="merchant-apps-doc__actions">
+        <a href={previewUrl} target="_blank" rel="noreferrer noopener">
+          {isEn ? 'Open' : '新窗口打开'}
+        </a>
+        <a href={previewUrl} download={name} target="_blank" rel="noreferrer noopener">
+          {isEn ? 'Download original' : '下载原件'}
+        </a>
+      </div>
+    </article>
+  );
+}
+
+function parsePackingAckFromNotes(notes?: string | null): string | null {
+  const match = String(notes || '').match(/\[平台打包\]\s*已确认：(.+)/);
+  const label = match?.[1]?.trim();
+  return label || null;
+}
+
+function notesWithoutPackingAck(notes?: string | null): string {
+  return String(notes || '')
+    .replace(/\[平台打包\][^\n]*/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 type DetailItemProps = {
@@ -368,10 +437,16 @@ const MerchantApplicationsPage: React.FC = () => {
     void copyText(text);
   };
 
+  const packingAckLabel = selected ? parsePackingAckFromNotes(selected.notes) : null;
+  const merchantNotes = selected ? notesWithoutPackingAck(selected.notes) : '';
+
   const title = isEn ? 'Merchant onboarding applications' : '商家入驻申请';
   const subtitle = isEn
     ? 'Review online applications. Approved merchants receive a store code and password for Merchant App/Web.'
     : '审核官网提交的入驻申请。通过后自动创建合伙店铺并生成登录账号。';
+  const archiveHint = isEn
+    ? 'Applications and license files are kept permanently for audit. Approving or rejecting does not delete the record or originals.'
+    : '申请记录和证件长期保留，出事可查。通过或拒绝都不会删除申请或证件原件。';
 
   const rows = useMemo(() => applications, [applications]);
 
@@ -381,6 +456,7 @@ const MerchantApplicationsPage: React.FC = () => {
         <div>
           <h1>{title}</h1>
           <p>{subtitle}</p>
+          <p className="merchant-apps-archive-hint">{archiveHint}</p>
           <p style={{ marginTop: '0.35rem' }}>
             <Link to="/admin/delivery-stores" style={{ color: '#93c5fd' }}>
               {isEn ? '← Back to merchant stores' : '← 返回商家管理'}
@@ -580,6 +656,13 @@ const MerchantApplicationsPage: React.FC = () => {
                   <DetailItem label={isEn ? 'Hours' : '营业时间'} value={selected.operating_hours} />
                   <DetailItem label="COD" value={`${selected.cod_settlement_day} ${isEn ? 'days' : '天'}`} />
                   <DetailItem label={isEn ? 'Address' : '地址'} value={selected.address} full />
+                  {packingAckLabel && (
+                    <DetailItem
+                      label={isEn ? 'Packing style' : '平台打包'}
+                      value={isEn ? `Confirmed: ${packingAckLabel}` : `已确认：${packingAckLabel}`}
+                      full
+                    />
+                  )}
                   <div className="merchant-apps-detail-item merchant-apps-detail-item--full">
                     <dt>{isEn ? 'Location' : '地图位置'}</dt>
                     <dd>
@@ -596,8 +679,8 @@ const MerchantApplicationsPage: React.FC = () => {
                       </div>
                     </dd>
                   </div>
-                  {selected.notes && (
-                    <DetailItem label={isEn ? 'Notes' : '备注'} value={selected.notes} full />
+                  {merchantNotes && (
+                    <DetailItem label={isEn ? 'Notes' : '备注'} value={merchantNotes} full />
                   )}
                   {selected.provisioned_store_code && (
                     <DetailItem
@@ -613,35 +696,21 @@ const MerchantApplicationsPage: React.FC = () => {
 
               {selected.license_document_urls?.length > 0 && (
                 <Section icon="📄" title={isEn ? 'Store licenses' : '商店证件'}>
+                  <p className="merchant-apps-docs-hint">
+                    {isEn
+                      ? 'Originals stay on file after review. Open or download if the thumbnail fails.'
+                      : '审核后证件原件仍会留底。缩略图打不开时可新窗口打开或下载原件。'}
+                  </p>
                   <div className="merchant-apps-docs">
-                    {selected.license_document_urls.map((url, index) => {
-                      const pdf = isPdfUrl(url);
-                      const name = docFileName(url, index);
-                      return (
-                        <a
-                          key={url}
-                          className="merchant-apps-doc"
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          onClick={(e) => {
-                            if (!pdf) {
-                              e.preventDefault();
-                              setLightboxUrl(url);
-                            }
-                          }}
-                        >
-                          <div className="merchant-apps-doc__thumb">
-                            {pdf ? (
-                              <span className="merchant-apps-doc__pdf">PDF</span>
-                            ) : (
-                              <img src={url} alt={name} loading="lazy" />
-                            )}
-                          </div>
-                          <span className="merchant-apps-doc__label">{name}</span>
-                        </a>
-                      );
-                    })}
+                    {selected.license_document_urls.map((url, index) => (
+                      <LicenseDocCard
+                        key={`${url}-${index}`}
+                        url={url}
+                        index={index}
+                        isEn={isEn}
+                        onOpen={setLightboxUrl}
+                      />
+                    ))}
                   </div>
                 </Section>
               )}
@@ -791,7 +860,7 @@ const MerchantApplicationsPage: React.FC = () => {
           role="presentation"
           onClick={() => setLightboxUrl(null)}
         >
-          <img src={lightboxUrl} alt="" />
+          <img src={rewritePublicStorageUrl(lightboxUrl)} alt="" />
         </div>
       )}
 

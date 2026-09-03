@@ -24,6 +24,7 @@ function getAllowedOrigins() {
     'https://client-ml-express.netlify.app',
     'http://localhost:3000',      // 本地开发（admin）
     'http://localhost:3001',      // 本地开发（client）
+    'http://localhost:3012',      // 本地开发（client-web CRA）
     'http://localhost:8888',      // Netlify Dev
   ];
 }

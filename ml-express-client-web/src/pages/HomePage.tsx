@@ -15,6 +15,7 @@ import { MYANMAR_CITIES, CityKey, DEFAULT_CITY_KEY, DEFAULT_CITY_CENTER } from '
 import { deriveInitialOrderStatus } from '../utils/orderSubmitHelpers';
 import '../styles/homeLanding.css';
 import { feedbackService } from '../services/FeedbackService';
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_LOADER_OPTIONS } from '../utils/googleMapsLoader';
 // import { getNearestCityKey } from '../utils/locationUtils';
 
 const LandingServicesChunk = lazy(() => import('./ServicesPage'));
@@ -39,12 +40,9 @@ function LandingEmbedFallback() {
   );
 }
 
-// Google Maps API 配置
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 if (!GOOGLE_MAPS_API_KEY) {
   console.error('❌ Google Maps API Key 未配置！请检查环境变量 REACT_APP_GOOGLE_MAPS_API_KEY');
 }
-const GOOGLE_MAPS_LIBRARIES: any = ['places'];
 
 
 // 错误边界组件
@@ -285,10 +283,7 @@ const HomePage: React.FC = () => {
   }, [selectedProducts, hasCOD, currentUser, language]);
 
   // Google Maps API 加载
-  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: GOOGLE_MAPS_LIBRARIES
-  });
+  const { isLoaded: isMapLoaded, loadError: mapLoadError } = useJsApiLoader(GOOGLE_MAPS_LOADER_OPTIONS);
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY) {
       console.error('[Google Maps] 缺少 REACT_APP_GOOGLE_MAPS_API_KEY 环境变量，地图无法加载。');
