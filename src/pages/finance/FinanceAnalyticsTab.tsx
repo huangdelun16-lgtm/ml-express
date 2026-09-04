@@ -22,6 +22,7 @@ import { TranslationKeys } from "../FinanceManagement.translations";
 import {
   filterByTimePeriod,
   getDaysFromPeriod,
+  isCompletedFinanceRecord,
   type FinanceTimePeriod,
 } from "../FinanceManagement.helpers";
 
@@ -165,10 +166,17 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                   getDaysFromPeriod(timePeriod) || Math.max(records.length, 1);
 
                 const recentIncome = recentRecords
-                  .filter((r) => r.record_type === "income")
+                  .filter(
+                    (r) =>
+                      isCompletedFinanceRecord(r) && r.record_type === "income",
+                  )
                   .reduce((sum, r) => sum + (r.amount || 0), 0);
                 const recentExpense = recentRecords
-                  .filter((r) => r.record_type === "expense")
+                  .filter(
+                    (r) =>
+                      isCompletedFinanceRecord(r) &&
+                      r.record_type === "expense",
+                  )
                   .reduce((sum, r) => sum + (r.amount || 0), 0);
                 const recentPackageIncome = recentPackages
                   .filter((pkg) => pkg.status === "已送达")
@@ -184,7 +192,10 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
 
                 // 计算增长率（与总数据对比）
                 const totalIncome = records
-                  .filter((r) => r.record_type === "income")
+                  .filter(
+                    (r) =>
+                      isCompletedFinanceRecord(r) && r.record_type === "income",
+                  )
                   .reduce((sum, r) => sum + (r.amount || 0), 0);
                 const avgDailyIncome =
                   totalIncome / Math.max(records.length, 1);
@@ -444,6 +455,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
 
                 // 处理财务记录
                 records.forEach((record) => {
+                  if (!isCompletedFinanceRecord(record)) return;
                   const date = new Date(record.record_date);
                   const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
@@ -779,6 +791,7 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                         "record_date",
                       );
                       recentRecords.forEach((record) => {
+                        if (!isCompletedFinanceRecord(record)) return;
                         const dateKey = record.record_date;
                         if (dailyData[dateKey]) {
                           if (record.record_type === "income") {
@@ -1261,7 +1274,11 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                   const incomeStats: Record<string, number> = {};
 
                   recentRecords
-                    .filter((r) => r.record_type === "income")
+                    .filter(
+                      (r) =>
+                        isCompletedFinanceRecord(r) &&
+                        r.record_type === "income",
+                    )
                     .forEach((record) => {
                       const category = record.category || "其他";
                       incomeStats[category] =
@@ -1417,7 +1434,11 @@ const FinanceAnalyticsTab: React.FC<Props> = ({
                   const expenseStats: Record<string, number> = {};
 
                   recentRecords
-                    .filter((r) => r.record_type === "expense")
+                    .filter(
+                      (r) =>
+                        isCompletedFinanceRecord(r) &&
+                        r.record_type === "expense",
+                    )
                     .forEach((record) => {
                       const category = record.category || "其他";
                       expenseStats[category] =

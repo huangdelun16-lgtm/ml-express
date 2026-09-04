@@ -325,6 +325,7 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                                 onClick={() =>
                                   handleMerchantCollectionClick(
                                     store.store_name,
+                                    { scope: "all" },
                                   )
                                 }
                                 style={{
@@ -795,7 +796,9 @@ const FinanceMerchantsCollectionTab: React.FC = () => {
                       </div>
                       <div
                         onClick={() =>
-                          handleMerchantCollectionClick(store.store_name)
+                          handleMerchantCollectionClick(store.store_name, {
+                            scope: "all",
+                          })
                         }
                         style={{
                           background: "rgba(239, 68, 68, 0.1)",

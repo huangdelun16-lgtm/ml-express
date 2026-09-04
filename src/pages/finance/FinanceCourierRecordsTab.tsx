@@ -2,7 +2,7 @@
 import React from "react";
 import { courierSalaryService } from "../../services/supabase";
 import { feedbackService } from "../../services/FeedbackService";
-import { getRegionalPricingForPackage, getRiderDeliveryShareMmk, getRiderShareBaseFeeMmk, getDateKey } from "../FinanceManagement.helpers";
+import { getRegionalPricingForPackage, getRiderDeliveryShareMmk, getRiderShareBaseFeeMmk, getDateKey, packageMatchesRegionPrefix } from "../FinanceManagement.helpers";
 import { useFinanceWorkspace } from "./FinanceWorkspace";
 
 const FinanceCourierRecordsTab: React.FC = () => {
@@ -1181,7 +1181,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         fontSize: "0.9rem",
                       }}
                     >
-                      骑手分得总额（准时达=总费−起步价；顺路递=固定额）
+                      骑手分得总额（准时达=总费−起步价；顺路递=实付一半）
                     </div>
                   </div>
                   <div
@@ -1200,7 +1200,15 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         fontWeight: "bold",
                       }}
                     >
-                      {packages.filter((pkg) => pkg.status === "已送达").length}
+                      {packages.filter(
+                        (pkg) =>
+                          pkg.status === "已送达" &&
+                          (!isRegionalUser ||
+                            packageMatchesRegionPrefix(
+                              pkg,
+                              currentRegionPrefix,
+                            )),
+                      ).length}
                     </div>
                     <div
                       style={{
@@ -1427,7 +1435,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                             fontSize: "0.9rem",
                           }}
                         >
-                          骑手收入（总费−起步价 / 顺路递固定额）
+                          骑手收入（总费−起步价 / 顺路递一半）
                         </th>
                         <th
                           style={{
@@ -1458,7 +1466,12 @@ const FinanceCourierRecordsTab: React.FC = () => {
                             (pkg) =>
                               pkg.status === "已送达" &&
                               pkg.courier &&
-                              pkg.courier !== "待分配",
+                              pkg.courier !== "待分配" &&
+                              (!isRegionalUser ||
+                                packageMatchesRegionPrefix(
+                                  pkg,
+                                  currentRegionPrefix,
+                                )),
                           )
                           .forEach((pkg) => {
                             const courierId = pkg.courier;

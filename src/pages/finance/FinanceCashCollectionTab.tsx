@@ -2,7 +2,13 @@
 import React from "react";
 import { packageService, Package } from "../../services/supabase";
 import { feedbackService } from "../../services/FeedbackService";
-import { REGIONS } from "../FinanceManagement.helpers";
+import {
+  REGIONS,
+  getLocalDateYYYYMMDD,
+  getPackageFinanceDateKey,
+  shiftLocalDateYYYYMMDD,
+  summarizeRiderCashCollection,
+} from "../FinanceManagement.helpers";
 import { useFinanceWorkspace } from "./FinanceWorkspace";
 
 const FinanceCashCollectionTab: React.FC = () => {
@@ -24,7 +30,6 @@ const FinanceCashCollectionTab: React.FC = () => {
     getCashDetailPlatformItemProductMmk,
     getCashDetailPlatformLineTotal,
     isMobile,
-    isPackageInCashCollectionDayView,
     isRegionalUser,
     language,
     loadRecords,
@@ -51,219 +56,88 @@ const FinanceCashCollectionTab: React.FC = () => {
     <>
           <div>
             {/* 顶部标题和统计 */}
-            <div
-              style={{
-                background: "#ffffff",
-                borderRadius: "16px",
-                padding: isMobile ? "16px" : "24px",
-                marginBottom: "24px",
-                border: "1px solid #f8fafc",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "20px",
-                  flexWrap: "wrap",
-                  gap: "10px",
-                }}
-              >
-                <h3 style={{ margin: 0, color: "#0f172a", fontSize: "1.5rem" }}>
-                  💵 {t.cashCollection}
-                </h3>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    background: "#f1f5f9",
-                    padding: "4px 8px",
-                    borderRadius: "8px",
-                    border: "1px solid #e2e8f0",
-                  }}
-                >
-                  <button
-                    onClick={() => {
-                      const date = new Date(cashCollectionDate);
-                      date.setDate(date.getDate() - 1);
-                      setCashCollectionDate(date.toISOString().split("T")[0]);
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "#0f172a",
-                      cursor: "pointer",
-                      fontSize: "1.2rem",
-                      padding: "0 8px",
-                      fontWeight: "bold",
-                      opacity: 0.8,
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.opacity = "1")}
-                    onMouseOut={(e) => (e.currentTarget.style.opacity = "0.8")}
-                    title={t.prevDay}
-                  >
-                    &lt;
-                  </button>
+            <div className="finance-cash-board">
+              <div className="finance-cash-board__bar">
+                <h3 className="finance-cash-board__title">{t.cashCollection}</h3>
+                <div className="finance-cash-board__tools">
+                  <div className="finance-cash-date">
+                    <button
+                      type="button"
+                      className="finance-cash-date__nav"
+                      onClick={() => {
+                        setCashCollectionDate(
+                          shiftLocalDateYYYYMMDD(cashCollectionDate, -1),
+                        );
+                      }}
+                      title={t.prevDay}
+                    >
+                      &lt;
+                    </button>
+                    <input
+                      type="date"
+                      value={cashCollectionDate}
+                      onChange={(e) => setCashCollectionDate(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="finance-cash-date__nav"
+                      onClick={() => {
+                        setCashCollectionDate(
+                          shiftLocalDateYYYYMMDD(cashCollectionDate, 1),
+                        );
+                      }}
+                      title={t.nextDay}
+                    >
+                      &gt;
+                    </button>
+                    <button
+                      type="button"
+                      className="finance-cash-date__today"
+                      onClick={() =>
+                        setCashCollectionDate(getLocalDateYYYYMMDD())
+                      }
+                    >
+                      {t.today}
+                    </button>
+                  </div>
 
-                  <input
-                    type="date"
-                    value={cashCollectionDate}
-                    onChange={(e) => setCashCollectionDate(e.target.value)}
-                    style={{
-                      padding: "4px 8px",
-                      borderRadius: "4px",
-                      border: "none",
-                      background: "transparent",
-                      color: "#0f172a",
-                      fontSize: "1rem",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      outline: "none",
-                    }}
-                  />
-
-                  <button
-                    onClick={() => {
-                      const date = new Date(cashCollectionDate);
-                      date.setDate(date.getDate() + 1);
-                      setCashCollectionDate(date.toISOString().split("T")[0]);
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "#0f172a",
-                      cursor: "pointer",
-                      fontSize: "1.2rem",
-                      padding: "0 8px",
-                      fontWeight: "bold",
-                      opacity: 0.8,
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.opacity = "1")}
-                    onMouseOut={(e) => (e.currentTarget.style.opacity = "0.8")}
-                    title={t.nextDay}
-                  >
-                    &gt;
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      setCashCollectionDate(
-                        new Date().toISOString().split("T")[0],
-                      )
-                    }
-                    style={{
-                      background: "#f1f5f9",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "4px",
-                      color: "#0f172a",
-                      cursor: "pointer",
-                      fontSize: "0.85rem",
-                      padding: "4px 10px",
-                      marginLeft: "8px",
-                      fontWeight: "500",
-                    }}
-                    onMouseOver={(e) =>
-                      (e.currentTarget.style.background =
-                        "#e2e8f0")
-                    }
-                    onMouseOut={(e) =>
-                      (e.currentTarget.style.background =
-                        "#f1f5f9")
-                    }
-                  >
-                    {t.today}
-                  </button>
-                </div>
-
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                >
-                  <span
-                    style={{
-                      color: "#334155",
-                      fontSize: "0.9rem",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    {t.statusFilter}:
-                    {showYesterdayCashUnsettledReminder && (
-                      <span
-                        title={t.cashYesterdayUnsettledReminder}
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          background: "#f97316",
-                          boxShadow: "0 0 0 2px rgba(249, 115, 22, 0.4)",
-                          flexShrink: 0,
-                        }}
-                        aria-hidden
-                      />
-                    )}
-                    {showCashSettlementReminder && (
-                      <span
-                        title={t.cashSettlementReminder}
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          background: "#ffc107",
-                          boxShadow: "0 0 0 2px rgba(255, 193, 7, 0.35)",
-                          flexShrink: 0,
-                        }}
-                        aria-hidden
-                      />
-                    )}
-                  </span>
-                  <select
-                    value={cashSettlementStatus}
-                    onChange={(e) =>
-                      setCashSettlementStatus(e.target.value as any)
-                    }
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "8px",
-                      border: "1px solid #e2e8f0",
-                      background: "#f1f5f9",
-                      color: "#0f172a",
-                      fontSize: "0.9rem",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <option value="unsettled" style={{ color: "#000" }}>
-                      {t.unsettled}
-                    </option>
-                    <option value="settled" style={{ color: "#000" }}>
-                      {t.settled}
-                    </option>
-                    <option value="all" style={{ color: "#000" }}>
-                      {t.all}
-                    </option>
-                  </select>
+                  <div className="finance-cash-filter">
+                    <span className="finance-cash-filter__label">
+                      {t.statusFilter}
+                      {showYesterdayCashUnsettledReminder && (
+                        <span
+                          title={t.cashYesterdayUnsettledReminder}
+                          className="finance-cash-filter__dot finance-cash-filter__dot--yesterday"
+                          aria-hidden
+                        />
+                      )}
+                      {showCashSettlementReminder && (
+                        <span
+                          title={t.cashSettlementReminder}
+                          className="finance-cash-filter__dot finance-cash-filter__dot--today"
+                          aria-hidden
+                        />
+                      )}
+                    </span>
+                    <select
+                      value={cashSettlementStatus}
+                      onChange={(e) =>
+                        setCashSettlementStatus(e.target.value as any)
+                      }
+                    >
+                      <option value="unsettled">{t.unsettled}</option>
+                      <option value="settled">{t.settled}</option>
+                      <option value="all">{t.all}</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
               {showYesterdayCashUnsettledReminder && (
                 <div
                   role="status"
-                  style={{
-                    marginBottom: "12px",
-                    padding: "12px 14px",
-                    borderRadius: "10px",
-                    background: "rgba(249, 115, 22, 0.2)",
-                    border: "1px solid rgba(249, 115, 22, 0.5)",
-                    color: "#0f172a",
-                    fontSize: "0.95rem",
-                    lineHeight: 1.5,
-                  }}
+                  className="finance-cash-alert finance-cash-alert--yesterday"
                 >
-                  <span style={{ marginRight: "8px" }} aria-hidden>
-                    ⚠️
-                  </span>
                   {t.cashYesterdayUnsettledReminder}
                 </div>
               )}
@@ -271,175 +145,91 @@ const FinanceCashCollectionTab: React.FC = () => {
               {showCashSettlementReminder && (
                 <div
                   role="status"
-                  style={{
-                    marginBottom: "16px",
-                    padding: "12px 14px",
-                    borderRadius: "10px",
-                    background: "rgba(255, 193, 7, 0.18)",
-                    border: "1px solid rgba(255, 193, 7, 0.45)",
-                    color: "#0f172a",
-                    fontSize: "0.95rem",
-                    lineHeight: 1.5,
-                  }}
+                  className="finance-cash-alert finance-cash-alert--today"
                 >
-                  <span style={{ marginRight: "8px" }} aria-hidden>
-                    🔔
-                  </span>
                   {t.cashSettlementReminder}
                 </div>
               )}
 
-              {/* 统计卡片 */}
               {(() => {
-                const cashPackages = packages.filter(
-                  isPackageInCashCollectionDayView,
-                );
-
-                let totalDeliveryFee = 0;
-                let totalCOD = 0;
-                let totalPlatformPayment = 0;
-
-                cashPackages.forEach((pkg) => {
-                  totalDeliveryFee += getCashDetailDeliveryLineCashOnly(pkg);
-                  totalCOD += getCashDetailMerchantRiderCodMmk(pkg);
-                  totalPlatformPayment += getCashDetailPlatformLineTotal(pkg);
+                const board = summarizeRiderCashCollection({
+                  packages,
+                  selectedDate: cashCollectionDate,
+                  settlementStatus: cashSettlementStatus,
+                  stores: deliveryStores,
+                  regionPrefix: isRegionalUser
+                    ? currentRegionPrefix
+                    : undefined,
+                  getPlatformLineTotal: getCashDetailPlatformLineTotal,
                 });
 
-                const totalAmount = totalDeliveryFee + totalCOD;
-
                 return (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile
-                        ? "1fr"
-                        : "repeat(auto-fit, minmax(200px, 1fr))",
-                      gap: "16px",
-                    }}
-                  >
-                    {/* 总现金（未结清） */}
-                    <div
-                      style={{
-                        background: "rgba(167, 243, 208, 0.2)",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        border: "1px solid rgba(167, 243, 208, 0.3)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#a7f3d0",
-                          fontSize: "0.9rem",
-                          marginBottom: "8px",
-                        }}
-                      >
+                  <div className="finance-cash-metrics">
+                    <div className="finance-cash-metric finance-cash-metric--cash">
+                      <div className="finance-cash-metric__label">
                         {language === "zh"
-                          ? "总现金（未结清）"
+                          ? "当日现金"
                           : language === "en"
-                            ? "Total cash (unsettled)"
-                            : "စုစုပေါင်း ငွေသား (မရှင်းရသေးပါ)"}
+                            ? "Cash today"
+                            : "ယနေ့ ငွေသား"}
                       </div>
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: "1.5rem",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {totalAmount.toLocaleString()} MMK
+                      <div className="finance-cash-metric__value">
+                        {board.selectedDayCashMmk.toLocaleString()} MMK
                       </div>
-                      <div
-                        style={{
-                          color: "#64748b",
-                          fontSize: "0.8rem",
-                          marginTop: "6px",
-                        }}
-                      >
+                      <div className="finance-cash-metric__hint">
                         {language === "zh"
-                          ? "现金跑腿 + 代收款（现金），不含总平台支付"
+                          ? "所选日现金跑腿 + 现金代收，不含平台支付"
                           : language === "en"
-                            ? "Cash delivery fee + cash COD, excl. platform"
-                            : "ငွေသားပို့ဆောင်+ငွေသားကိုယ်စားကောက် (ပလက်ဖောင်းမပါ)"}
+                            ? "Selected-day cash fee + cash COD, excl. platform"
+                            : "ရွေးထားသည့်နေ့ ငွေသားပို့ဆောင်+ကိုယ်စားကောက် (ပလက်ဖောင်းမပါ)"}
                       </div>
                     </div>
 
-                    {/* 🚀 新增：总平台支付 */}
-                    <div
-                      style={{
-                        background: "rgba(59, 130, 246, 0.2)",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        border: "1px solid rgba(59, 130, 246, 0.3)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#1677ff",
-                          fontSize: "0.9rem",
-                          marginBottom: "8px",
-                        }}
-                      >
+                    <div className="finance-cash-metric finance-cash-metric--overdue">
+                      <div className="finance-cash-metric__label">
+                        {t.riderPriorUnsettled}
+                      </div>
+                      <div className="finance-cash-metric__value">
+                        {board.overdueCashMmk.toLocaleString()} MMK
+                      </div>
+                      <div className="finance-cash-metric__hint">
+                        {language === "zh"
+                          ? `${board.overduePackages.length} 单所选日之前仍未交账`
+                          : language === "en"
+                            ? `${board.overduePackages.length} bills still open before the selected day`
+                            : `ရွေးထားသည့်နေ့မတိုင်မီ ${board.overduePackages.length} ခု မရှင်းရသေး`}
+                      </div>
+                    </div>
+
+                    <div className="finance-cash-metric finance-cash-metric--platform">
+                      <div className="finance-cash-metric__label">
                         {language === "my"
                           ? "စုစုပေါင်း ပလက်ဖောင်းမှပေးချေမှု"
                           : "总平台支付"}
                       </div>
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: "1.5rem",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {totalPlatformPayment.toLocaleString()} MMK
+                      <div className="finance-cash-metric__value">
+                        {board.selectedDayPlatformMmk.toLocaleString()} MMK
                       </div>
-                      <div
-                        style={{
-                          color: "#334155",
-                          fontSize: "0.85rem",
-                          marginTop: "4px",
-                        }}
-                      >
+                      <div className="finance-cash-metric__hint">
                         {language === "my"
                           ? "လက်ကျန်ငွေဖြင့် ပေးချေခြင်း"
                           : "余额支付汇总"}
                       </div>
                     </div>
 
-                    {/* 快递员数 */}
-                    <div
-                      style={{
-                        background: "rgba(219, 234, 254, 0.2)",
-                        borderRadius: "12px",
-                        padding: "20px",
-                        border: "1px solid rgba(219, 234, 254, 0.3)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#334155",
-                          fontSize: "0.9rem",
-                          marginBottom: "8px",
-                        }}
-                      >
+                    <div className="finance-cash-metric finance-cash-metric--riders">
+                      <div className="finance-cash-metric__label">
                         {t.totalCourierCount}
                       </div>
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: "1.5rem",
-                          fontWeight: "bold",
-                        }}
-                      >
+                      <div className="finance-cash-metric__value">
                         {couriers.length}
                       </div>
-                      <div
-                        style={{
-                          color: "#334155",
-                          fontSize: "0.85rem",
-                          marginTop: "4px",
-                        }}
-                      >
-                        {couriers.length} {t.courierSuffix}
+                      <div className="finance-cash-metric__hint">
+                        {language === "zh"
+                          ? "当前在册骑手"
+                          : language === "en"
+                            ? "Registered riders"
+                            : "မှတ်ပုံတင်ထားသော စီးနင်းသူ"}
                       </div>
                     </div>
                   </div>
@@ -449,28 +239,6 @@ const FinanceCashCollectionTab: React.FC = () => {
 
             {/* 快递员列表 */}
             {(() => {
-              // 与统计卡片、商家代收款明细、现金详情弹窗默认日 使用同一筛选
-              const cashPackages = packages.filter(
-                isPackageInCashCollectionDayView,
-              );
-
-              const courierCashMap: Record<
-                string,
-                { packages: Package[]; total: number }
-              > = {};
-
-              cashPackages.forEach((pkg) => {
-                const courier = pkg.courier || "未分配";
-                if (!courierCashMap[courier]) {
-                  courierCashMap[courier] = { packages: [], total: 0 };
-                }
-                courierCashMap[courier].packages.push(pkg);
-                courierCashMap[courier].total +=
-                  getCashDetailDeliveryLineCashOnly(pkg) +
-                  getCashDetailPlatformLineTotal(pkg);
-              });
-
-              // 过滤快递员列表（如果为领区用户，仅显示所属领区的骑手）
               let displayCouriers = [...couriers];
               if (isRegionalUser) {
                 displayCouriers = displayCouriers.filter(
@@ -482,279 +250,154 @@ const FinanceCashCollectionTab: React.FC = () => {
 
               if (displayCouriers.length === 0) {
                 return (
-                  <div
-                    style={{
-                      background: "#ffffff",
-                      borderRadius: "16px",
-                      padding: "60px 20px",
-                      textAlign: "center",
-                      border: "1px solid #f8fafc",
-                    }}
-                  >
-                    <div style={{ fontSize: "3rem", marginBottom: "16px" }}>
-                      🚚
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "1.1rem",
-                      }}
-                    >
-                      暂无快递员数据
-                    </div>
-                  </div>
+                  <div className="finance-cash-empty">暂无快递员数据</div>
                 );
               }
 
+              const regionPrefix = isRegionalUser
+                ? currentRegionPrefix
+                : undefined;
+
+              const breakdowns = displayCouriers.map((courier) => {
+                const courierName = courier.name || "未知";
+                return {
+                  courier,
+                  courierName,
+                  board: summarizeRiderCashCollection({
+                    packages,
+                    selectedDate: cashCollectionDate,
+                    settlementStatus: cashSettlementStatus,
+                    stores: deliveryStores,
+                    regionPrefix,
+                    courierName,
+                    getPlatformLineTotal: getCashDetailPlatformLineTotal,
+                  }),
+                };
+              });
+
+              breakdowns.sort((a, b) => {
+                if (a.board.overdueCashMmk !== b.board.overdueCashMmk) {
+                  return b.board.overdueCashMmk - a.board.overdueCashMmk;
+                }
+                const aDue =
+                  a.board.selectedDayCashMmk + a.board.overdueCashMmk;
+                const bDue =
+                  b.board.selectedDayCashMmk + b.board.overdueCashMmk;
+                return bDue - aDue;
+              });
+
               return (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
-                  {displayCouriers.map((courier) => {
-                    const courierName = courier.name || "未知";
+                <div className="finance-cash-riders">
+                  {breakdowns.map(({ courier, courierName, board }) => {
                     const employeeId = courier.employee_id || "无";
-                    const cashData = courierCashMap[courierName] || {
-                      packages: [],
-                      total: 0,
-                    };
+                    const hasOverdue = board.overdueCashMmk > 0;
+                    const hasTodayDue =
+                      cashSettlementStatus !== "settled" &&
+                      board.selectedDayCashMmk > 0;
+                    const hasPackages =
+                      board.selectedDayPackages.length > 0 ||
+                      board.overduePackages.length > 0;
+                    const regionLabel = (() => {
+                      const r = REGIONS.find(
+                        (reg) =>
+                          reg.id === courier.region ||
+                          reg.prefix === courier.region,
+                      );
+                      return r ? r.prefix : courier.region || "-";
+                    })();
 
                     return (
                       <div
                         key={courier.id}
-                        style={{
-                          background:
-                            "#ffffff",
-                          borderRadius: "20px",
-                          padding: isMobile ? "20px" : "24px",
-                          border: "1px solid #f1f5f9",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                          gap: "16px",
-                          backdropFilter: "blur(10px)",
-                          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-                          transition: "transform 0.3s ease",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.transform = "translateY(-4px)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.transform = "translateY(0)")
-                        }
+                        className={`finance-cash-rider${hasOverdue ? " has-overdue" : ""}`}
                       >
-                        <div style={{ flex: 1, minWidth: "250px" }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "16px",
-                              marginBottom: "12px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "50px",
-                                height: "50px",
-                                borderRadius: "14px",
-                                background: "rgba(59, 130, 246, 0.25)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "1.8rem",
-                                border: "1px solid rgba(59, 130, 246, 0.3)",
-                              }}
-                            >
-                              {courier.vehicle_type === "car" ? "🚗" : "🏍️"}
-                            </div>
-                            <div>
-                              <h4
-                                style={{
-                                  margin: 0,
-                                  color: "#0f172a",
-                                  fontSize: "1.3rem",
-                                  fontWeight: 800,
-                                }}
-                              >
-                                {courierName}
-                              </h4>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: "8px",
-                                  marginTop: "4px",
-                                  alignItems: "center",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    background: "rgba(72, 187, 120, 0.15)",
-                                    color: "#16a34a",
-                                    padding: "2px 8px",
-                                    borderRadius: "6px",
-                                    fontSize: "0.8rem",
-                                    fontWeight: 700,
-                                    fontFamily: "monospace",
-                                  }}
-                                >
-                                  #{employeeId}
-                                </span>
-                                <span
-                                  style={{
-                                    color: "#64748b",
-                                    fontSize: "0.8rem",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  {(() => {
-                                    const r = REGIONS.find(
-                                      (reg) =>
-                                        reg.id === courier.region ||
-                                        reg.prefix === courier.region,
-                                    );
-                                    return r ? r.prefix : courier.region || "-";
-                                  })()}
-                                </span>
-                              </div>
-                            </div>
+                        <div className="finance-cash-rider__who">
+                          <div className="finance-cash-rider__avatar">
+                            {courier.vehicle_type === "car" ? "🚗" : "🏍️"}
                           </div>
-
-                          <div
-                            style={{
-                              background: "#f8fafc",
-                              padding: "12px 16px",
-                              borderRadius: "12px",
-                              border: "1px solid #f8fafc",
-                              display: "inline-block",
-                            }}
-                          >
-                            <div
-                              style={{
-                                color: "#64748b",
-                                fontSize: "0.85rem",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              {t.riderCollection}
-                            </div>
-                            <div
-                              style={{
-                                color:
-                                  cashData.total > 0
-                                    ? "#d97706"
-                                    : "#cbd5e1",
-                                fontSize: "1.2rem",
-                                fontWeight: 800,
-                              }}
-                            >
-                              {cashData.total.toLocaleString()} MMK
-                              <span
-                                style={{
-                                  fontSize: "0.85rem",
-                                  fontWeight: 500,
-                                  marginLeft: "8px",
-                                  opacity: 0.7,
-                                }}
-                              >
-                                ({cashData.packages.length} {t.packageSuffix})
+                          <div>
+                            <h4 className="finance-cash-rider__name">
+                              {courierName}
+                            </h4>
+                            <div className="finance-cash-rider__meta">
+                              <span className="finance-cash-rider__id">
+                                #{employeeId}
+                              </span>
+                              <span className="finance-cash-rider__region">
+                                {regionLabel}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "12px",
-                            alignItems: isMobile ? "flex-start" : "flex-end",
-                          }}
-                        >
+                        <div className="finance-cash-rider__metrics">
+                          <div className="finance-cash-rider__cash">
+                            <div className="finance-cash-rider__cash-label">
+                              {t.riderCollection}
+                            </div>
+                            <div
+                              className={`finance-cash-rider__cash-value${hasTodayDue ? " is-due" : ""}`}
+                            >
+                              {board.selectedDayCashMmk.toLocaleString()} MMK
+                              <span className="finance-cash-rider__cash-count">
+                                {board.selectedDayPackages.length}{" "}
+                                {t.packageSuffix}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="finance-cash-rider__cash">
+                            <div className="finance-cash-rider__cash-label">
+                              {t.riderPriorUnsettled}
+                            </div>
+                            <div
+                              className={`finance-cash-rider__cash-value${hasOverdue ? " is-due" : ""}`}
+                            >
+                              {board.overdueCashMmk.toLocaleString()} MMK
+                              <span className="finance-cash-rider__cash-count">
+                                {board.overduePackages.length} {t.packageSuffix}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="finance-cash-rider__cash">
+                            <div className="finance-cash-rider__cash-label">
+                              {t.riderDayPlatform}
+                            </div>
+                            <div className="finance-cash-rider__cash-value">
+                              {board.selectedDayPlatformMmk.toLocaleString()} MMK
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="finance-cash-rider__actions">
                           <div
-                            style={{
-                              background:
-                                courier.status === "active"
-                                  ? "rgba(16, 185, 129, 0.2)"
-                                  : "rgba(239, 68, 68, 0.2)",
-                              color:
-                                courier.status === "active"
-                                  ? "#10b981"
-                                  : "#f87171",
-                              padding: "6px 16px",
-                              borderRadius: "10px",
-                              fontSize: "0.85rem",
-                              fontWeight: 800,
-                              border: `1px solid ${courier.status === "active" ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                            }}
+                            className={`finance-cash-rider__status${
+                              courier.status === "active" ? " is-on" : " is-off"
+                            }`}
                           >
                             <span
-                              style={{
-                                width: "6px",
-                                height: "6px",
-                                borderRadius: "50%",
-                                background: "currentColor",
-                                boxShadow: "0 0 8px currentColor",
-                              }}
-                            ></span>
+                              className="finance-cash-rider__status-dot"
+                              aria-hidden
+                            />
                             {courier.status === "active" ? t.online : t.offline}
                           </div>
 
                           <button
+                            type="button"
+                            className={`finance-cash-rider__detail${
+                              hasPackages ? " is-ready" : " is-empty"
+                            }`}
+                            disabled={!hasPackages}
                             onClick={() => {
+                              const startDate =
+                                board.earliestOverdueDate ||
+                                cashCollectionDate;
                               setSelectedCourier(courierName);
                               setShowCashDetailModal(true);
-                              // 默认仅显示「当日收款管理」所选日期，与列表中该骑手的单量、商家 COD 明细口径一致
                               setCashDetailDateFilter("custom");
-                              setCashDetailStartDate(cashCollectionDate);
+                              setCashDetailStartDate(startDate);
                               setCashDetailEndDate(cashCollectionDate);
                               setSelectedCashPackages(new Set());
                               setClearedCashPackages(new Set());
-                            }}
-                            style={{
-                              background:
-                                cashData.packages.length > 0
-                                  ? "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
-                                  : "#f1f5f9",
-                              color:
-                                cashData.packages.length > 0
-                                  ? "#fff"
-                                  : "#64748b",
-                              border: "none",
-                              padding: "12px 32px",
-                              borderRadius: "12px",
-                              fontSize: "1rem",
-                              fontWeight: "bold",
-                              cursor:
-                                cashData.packages.length > 0
-                                  ? "pointer"
-                                  : "not-allowed",
-                              opacity: cashData.packages.length > 0 ? 1 : 0.5,
-                              transition: "all 0.3s ease",
-                              boxShadow:
-                                cashData.packages.length > 0
-                                  ? "0 8px 20px rgba(59, 130, 246, 0.35)"
-                                  : "none",
-                            }}
-                            disabled={cashData.packages.length === 0}
-                            onMouseOver={(e) => {
-                              if (cashData.packages.length > 0) {
-                                e.currentTarget.style.transform = "scale(1.05)";
-                                e.currentTarget.style.filter =
-                                  "brightness(1.1)";
-                              }
-                            }}
-                            onMouseOut={(e) => {
-                              if (cashData.packages.length > 0) {
-                                e.currentTarget.style.transform = "scale(1)";
-                                e.currentTarget.style.filter = "brightness(1)";
-                              }
                             }}
                           >
                             {t.viewDetail}
@@ -838,7 +481,7 @@ const FinanceCashCollectionTab: React.FC = () => {
                       color: "#334155",
                     }}
                   >
-                    默认日期为上方「当日收款管理」所选日；与下方结清筛选项、商家代收款订单为同一套规则。可改日期以查看其他区间。
+                    有往日未结时，日期会自动扩到最早未结日，避免漏结。也可改区间或选「全部」。
                   </p>
                   <p
                     style={{
@@ -1593,6 +1236,12 @@ const FinanceCashCollectionTab: React.FC = () => {
                             const isMerchant =
                               !!pkg.delivery_store_id || isStoreMatch;
                             const codVal = Number(pkg.cod_amount || 0);
+                            const pkgDate = getPackageFinanceDateKey(pkg);
+                            const isPriorUnsettled =
+                              Boolean(pkgDate) &&
+                              pkgDate < cashCollectionDate &&
+                              !pkg.rider_settled &&
+                              pkg.payment_method === "cash";
 
                             return (
                               <div
@@ -1686,6 +1335,23 @@ const FinanceCashCollectionTab: React.FC = () => {
                                       }}
                                     >
                                       {pkg.id}
+                                      {isPriorUnsettled && (
+                                        <span
+                                          style={{
+                                            marginLeft: "8px",
+                                            background: "#fef3c7",
+                                            color: "#92400e",
+                                            padding: "2px 7px",
+                                            borderRadius: "6px",
+                                            fontSize: "0.7rem",
+                                            fontWeight: 700,
+                                            whiteSpace: "nowrap",
+                                          }}
+                                        >
+                                          {t.riderPriorUnsettled}
+                                          {pkgDate ? ` ${pkgDate}` : ""}
+                                        </span>
+                                      )}
                                     </div>
                                     <div
                                       style={{

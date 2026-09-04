@@ -3,105 +3,208 @@ import React from "react";
 
 import { useFinanceWorkspace } from "./FinanceWorkspace";
 
+const formatMmk = (value: number) => `${(value || 0).toLocaleString()} MMK`;
+
+const OverviewCard = ({
+  title,
+  value,
+  description,
+  tone,
+  onClick,
+  clickHint,
+}) => {
+  const className = `finance-ov-card finance-ov-card--${tone}${
+    onClick ? " finance-ov-card--click" : ""
+  }`;
+  const body = (
+    <>
+      <div className="finance-ov-card__label">{title}</div>
+      <div className="finance-ov-card__value">{formatMmk(value)}</div>
+      <div className="finance-ov-card__desc">{description}</div>
+      {onClick ? (
+        <div className="finance-ov-card__hint">{clickHint}</div>
+      ) : null}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        {body}
+      </button>
+    );
+  }
+
+  return <div className={className}>{body}</div>;
+};
+
 const FinanceOverviewTab: React.FC = () => {
   const {
     handleMerchantCollectionClick,
-    handlePendingPaymentsClick,
+    handlePendingCashClick,
     handlePlatformPaymentClick,
-    isMobile,
     language,
-    renderSummaryCard,
     summary,
     t,
   } = useFinanceWorkspace();
 
+  const booksLeft =
+    (summary.totalStartingFee || 0) +
+    (summary.waySidePlatformKeep || 0) +
+    (summary.courierKmCost || 0);
+  const booksGap = booksLeft - (summary.packageIncome || 0);
+  const booksOk = !!summary.booksBalanced;
+
+  const platformTitle =
+    language === "my"
+      ? "စုစုပေါင်း ပလက်ဖောင်းမှပေးချေမှု"
+      : language === "en"
+        ? "Platform / balance pay"
+        : "总平台支付（余额支付）";
+  const platformDesc =
+    language === "my"
+      ? "လက်ကျန်ငွေဖြင့် ပေးချေခြင်း"
+      : language === "en"
+        ? "Balance/platform tags on delivered orders"
+        : "已送达订单 description 中的余额/平台支付合计";
+
   return (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-              gap: "18px",
-            }}
-          >
-            {/* 排列规则：1排3张卡片 - 严格执行用户要求的顺序 */}
+    <div className="finance-ov">
+      <p className="finance-ov-note">{t.overviewLedgerHint}</p>
 
-            {/* 第一排：核心财务状况 */}
-            {renderSummaryCard(
-              t.totalIncome,
-              summary.totalIncome,
-              t.totalIncomeDesc,
-              "#4cd137",
-            )}
-            {renderSummaryCard(
-              t.totalExpense,
-              summary.totalExpense,
-              t.totalExpenseDesc,
-              "#ff7979",
-            )}
-            {renderSummaryCard(
-              t.netProfit,
-              summary.netProfit,
-              t.netProfitDesc,
-              summary.netProfit >= 0 ? "#00cec9" : "#ff7675",
-            )}
+      <section className="finance-ov-panel">
+        <h3 className="finance-ov-panel__title">{t.overviewSectionBooks}</h3>
+        <div className="finance-ov-grid finance-ov-grid--3">
+          <OverviewCard
+            title={t.totalIncome}
+            value={summary.totalIncome}
+            description={t.totalIncomeDesc}
+            tone="in"
+          />
+          <OverviewCard
+            title={t.totalExpense}
+            value={summary.totalExpense}
+            description={t.totalExpenseDesc}
+            tone="out"
+          />
+          <OverviewCard
+            title={t.netProfit}
+            value={summary.netProfit}
+            description={t.netProfitDesc}
+            tone={summary.netProfit >= 0 ? "net" : "net-neg"}
+          />
+        </div>
+      </section>
 
-            {/* 第二排：收支明细与代收 */}
-            {renderSummaryCard(
-              language === "my"
-                ? "စုစုပေါင်း ပလက်ဖောင်းမှပေးချေမှု"
-                : "总平台支付 (余额支付)",
-              summary.totalPlatformPayment,
-              language === "my"
-                ? "လက်ကျန်ငွေဖြင့် ပေးချေခြင်း"
-                : "所有订单的余额支付汇总",
-              "#3b82f6",
-              () => handlePlatformPaymentClick(),
-            )}
-            {renderSummaryCard(
-              t.pendingPayments,
-              summary.pendingPayments,
-              t.pendingAmountDesc,
-              "#fbc531",
-              () => handleMerchantCollectionClick(),
-            )}
-            {renderSummaryCard(
-              t.totalMerchantCollection,
-              summary.merchantsCollection,
-              t.merchantsCollectionDesc,
-              "#ef4444",
-              () => handlePendingPaymentsClick(),
-            )}
+      <section className="finance-ov-panel">
+        <h3 className="finance-ov-panel__title">{t.overviewSectionCollection}</h3>
+        <div className="finance-ov-grid finance-ov-grid--3">
+          <OverviewCard
+            title={platformTitle}
+            value={summary.totalPlatformPayment}
+            description={platformDesc}
+            tone="platform"
+            onClick={() => handlePlatformPaymentClick()}
+            clickHint={t.overviewClickHint}
+          />
+          <OverviewCard
+            title={t.pendingPayments}
+            value={summary.pendingPayments}
+            description={t.pendingAmountDesc}
+            tone="pending"
+            onClick={() => handlePendingCashClick()}
+            clickHint={t.overviewClickHint}
+          />
+          <OverviewCard
+            title={t.totalMerchantCollection}
+            value={summary.merchantsCollection}
+            description={t.merchantsCollectionDesc}
+            tone="merchant"
+            onClick={() =>
+              handleMerchantCollectionClick(undefined, { scope: "all" })
+            }
+            clickHint={t.overviewClickHint}
+          />
+        </div>
+      </section>
 
-            {/* 第三排：成本与分成 */}
-            {renderSummaryCard(
-              t.totalStartingFee,
-              summary.totalStartingFee,
-              t.totalStartingFeeDesc,
-              "#a29bfe",
-            )}
-            {renderSummaryCard(
-              t.courierKmCost,
-              summary.courierKmCost,
-              language === "zh"
-                ? "骑手分得总额：准时达等=客户实付−起步价快照；顺路递=固定 MMK/单（平台收剩余）。不按公里计价。曼德勒改价不影响仰光单。"
-                : "Rider share uses each package's region pricing (Admin billing regions). Mandalay changes do not affect Yangon orders.",
-              "#fd79a8",
-            )}
-            {renderSummaryCard(
-              t.orderIncome,
-              summary.packageIncome,
+      <section className="finance-ov-panel">
+        <h3 className="finance-ov-panel__title">{t.overviewSectionOrders}</h3>
+        <div className="finance-ov-grid finance-ov-grid--orders">
+          <OverviewCard
+            title={t.totalStartingFee}
+            value={summary.totalStartingFee}
+            description={t.totalStartingFeeDesc}
+            tone="start"
+          />
+          <OverviewCard
+            title={t.waySidePlatformKeep}
+            value={summary.waySidePlatformKeep}
+            description={
+              <>
+                <div>{t.waySidePlatformKeepDesc}</div>
+                {summary.waySideCount > 0 ? (
+                  <div>
+                    {summary.waySideCount} {t.packageSuffix}
+                  </div>
+                ) : null}
+              </>
+            }
+            tone="wayside"
+          />
+          <OverviewCard
+            title={t.courierKmCost}
+            value={summary.courierKmCost}
+            description={t.courierFeeDesc}
+            tone="rider"
+          />
+          <OverviewCard
+            title={t.orderIncome}
+            value={summary.packageIncome}
+            description={
               <>
                 <div>
-                  现金支付：{summary.packageIncomeCash.toLocaleString()} MMK
+                  {t.orderIncomeCashLabel}：
+                  {formatMmk(summary.packageIncomeCash)}（
+                  {summary.packageIncomeCashCount || 0} {t.packageSuffix}）
                 </div>
                 <div>
-                  余额支付：{summary.packageIncomeBalance.toLocaleString()}{" "}
-                  MMK（{summary.packageCount} {t.packageSuffix}）
+                  {t.orderIncomeBalanceLabel}：
+                  {formatMmk(summary.packageIncomeBalance)}（
+                  {summary.packageIncomeBalanceCount || 0} {t.packageSuffix}）
                 </div>
-              </>,
-              "#6c5ce7",
-            )}
-          </div>
+              </>
+            }
+            tone="income"
+          />
+        </div>
+
+        <div
+          className={`finance-ov-eq${booksOk ? " finance-ov-eq--ok" : " finance-ov-eq--gap"}`}
+        >
+          <span className="finance-ov-eq__term">
+            {t.totalStartingFee} {formatMmk(summary.totalStartingFee)}
+          </span>
+          <span className="finance-ov-eq__op">+</span>
+          <span className="finance-ov-eq__term">
+            {t.waySidePlatformKeep} {formatMmk(summary.waySidePlatformKeep)}
+          </span>
+          <span className="finance-ov-eq__op">+</span>
+          <span className="finance-ov-eq__term">
+            {t.courierKmCost} {formatMmk(summary.courierKmCost)}
+          </span>
+          <span className="finance-ov-eq__op">=</span>
+          <span className="finance-ov-eq__sum">
+            {t.orderIncome} {formatMmk(summary.packageIncome)}
+          </span>
+          <span className="finance-ov-eq__status">
+            {booksOk
+              ? t.overviewBooksOk
+              : `${t.overviewBooksGap} ${formatMmk(Math.abs(booksGap))}`}
+          </span>
+        </div>
+      </section>
+    </div>
   );
 };
 

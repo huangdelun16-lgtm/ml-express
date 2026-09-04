@@ -38,9 +38,23 @@ import {
   getRegionalPricingForPackage,
   getDateKey,
   getLocalDateYYYYMMDD,
-  getLocalDateMinusDays,
   getRiderShareBaseFeeMmk,
   getRiderDeliveryShareMmk,
+  getPlatformPaymentAmountFromDescription,
+  getMerchantUnclearedAmountMmk,
+  getMerchantSettlementParts,
+  getMerchantRecordedAmountMmk,
+  getPendingRiderCashAmountMmk,
+  isRiderCashUnsettledPackage,
+  getPackageFinanceDateKey,
+  packageMatchesRegionPrefix,
+  isMerchantFinancePackage,
+  parsePackagePriceMmk,
+  calculateFinanceOverviewSummary,
+  detectFinanceRegionPrefix,
+  getLocalMonthBounds,
+  groupDeliveredPackagesForSalaryMonth,
+  isPackageInLocalMonth,
   defaultForm,
   currencyOptions,
   paymentOptions,
@@ -88,17 +102,8 @@ const FinanceManagement: React.FC = () => {
 
   const isFinance = currentUserRole === "finance";
 
-  // 领区识别逻辑更新：确保 MDY 和 POL 彻底分开
-  const getDetectedRegion = () => {
-    const userUpper = currentUser.toUpperCase();
-    if (currentUserRegion === "yangon" || userUpper.startsWith("YGN"))
-      return "YGN";
-    if (currentUserRegion === "maymyo" || userUpper.startsWith("POL"))
-      return "POL";
-    if (currentUserRegion === "mandalay" || userUpper.startsWith("MDY"))
-      return "MDY";
-    return "";
-  };
+  const getDetectedRegion = () =>
+    detectFinanceRegionPrefix(currentUser, currentUserRegion);
 
   const currentRegionPrefix = getDetectedRegion();
   const isRegionalUser =
@@ -119,7 +124,7 @@ const FinanceManagement: React.FC = () => {
   );
   const { isMobile, isTablet, isDesktop, width } = useResponsive();
   const [cashCollectionDate, setCashCollectionDate] = useState(
-    new Date().toISOString().split("T")[0],
+    getLocalDateYYYYMMDD(),
   );
   const [cashSettlementStatus, setCashSettlementStatus] = useState<
     "unsettled" | "settled" | "all"
@@ -207,6 +212,9 @@ const FinanceManagement: React.FC = () => {
   const [merchantCodModalKind, setMerchantCodModalKind] = useState<
     "uncleared" | "settled_all"
   >("uncleared");
+  const [merchantCodModalScope, setMerchantCodModalScope] = useState<
+    "month" | "all"
+  >("month");
   const [showPendingOrdersModal, setShowPendingOrdersModal] =
     useState<boolean>(false);
   const [modalOrders, setModalOrders] = useState<Package[]>([]);
@@ -317,23 +325,24 @@ const FinanceManagement: React.FC = () => {
   ]);
 
   const cashUnsettledForYesterdayLocal = useMemo(() => {
-    const yesterday = getLocalDateMinusDays(1);
     return packages.filter((pkg) => {
-      if (pkg.payment_method !== "cash") return false;
-      if (pkg.status !== "已送达" && pkg.status !== "已完成") return false;
-      if (pkg.rider_settled) return false;
-      const dateKey = getDateKey(
-        pkg.delivery_time ||
-          pkg.updated_at ||
-          pkg.created_at ||
-          pkg.create_time,
-      );
-      if (!dateKey || dateKey !== yesterday) return false;
-      if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix))
+      if (!isRiderCashUnsettledPackage(pkg)) return false;
+      const dateKey = getPackageFinanceDateKey(pkg);
+      if (!dateKey || dateKey >= cashCollectionDate) return false;
+      if (
+        isRegionalUser &&
+        !packageMatchesRegionPrefix(pkg, currentRegionPrefix)
+      ) {
         return false;
+      }
       return true;
     });
-  }, [packages, isRegionalUser, currentRegionPrefix, cashReminderTick]);
+  }, [
+    packages,
+    cashCollectionDate,
+    isRegionalUser,
+    currentRegionPrefix,
+  ]);
 
   const showYesterdayCashUnsettledReminder = useMemo(() => {
     if (activeTab !== "cash_collection") return false;
@@ -500,14 +509,9 @@ const FinanceManagement: React.FC = () => {
     // 0. 特殊处理 admin 万能账号
     if (createdBy.toLowerCase() === "admin") return t.universal;
 
-    // 1. 先通过前缀快速识别 (MDY, YGN, POL)
-    const userUpper = createdBy.toUpperCase();
-    if (userUpper.startsWith("YGN")) return "YGN";
-    if (userUpper.startsWith("POL")) return "POL";
-    if (userUpper.startsWith("MDY")) return "MDY";
+    const prefixFromName = detectFinanceRegionPrefix(createdBy);
+    if (prefixFromName) return prefixFromName;
 
-    // 2. 如果前缀识别不到，从账号列表中查找该用户的 region 字段
-    // 确保 adminAccounts 已经加载
     if (adminAccounts && adminAccounts.length > 0) {
       const account = adminAccounts.find(
         (acc) =>
@@ -517,7 +521,6 @@ const FinanceManagement: React.FC = () => {
       );
 
       if (account) {
-        // 如果账号角色是超级管理员，也显示万能
         if (
           account.role === "admin" &&
           account.username.toLowerCase() === "admin"
@@ -525,13 +528,11 @@ const FinanceManagement: React.FC = () => {
           return t.universal;
         }
 
-        if (account.region) {
-          const r = account.region.toLowerCase();
-          if (r === "mandalay" || r === "mdy") return "MDY";
-          if (r === "yangon" || r === "ygn") return "YGN";
-          if (r === "maymyo" || r === "pol") return "POL";
-          return account.region.toUpperCase();
-        }
+        const prefixFromAccount = detectFinanceRegionPrefix(
+          createdBy,
+          account.region,
+        );
+        if (prefixFromAccount) return prefixFromAccount;
       }
     }
 
@@ -577,26 +578,27 @@ const FinanceManagement: React.FC = () => {
     packageIncome: 0, // 添加包裹收入
     packageIncomeCash: 0, // 包裹现金跑腿费收入
     packageIncomeBalance: 0, // 包裹余额跑腿费收入
+    packageIncomeCashCount: 0,
+    packageIncomeBalanceCount: 0,
     packageCount: 0, // 添加包裹数量
-    courierKmCost: 0, // 快递员公里费用（仅送货距离）
+    courierKmCost: 0, // 骑手跑腿分成（不按公里）
     totalKm: 0, // 总送货公里数
     merchantsCollection: 0, // 总合伙商家代收款
     totalPlatformPayment: 0, // 总平台支付 (余额支付)
-    totalStartingFee: 0, // 总订单起步费
+    totalStartingFee: 0, // 总订单起步费（不含顺路递）
+    waySidePlatformKeep: 0,
+    waySideRiderShare: 0,
+    waySideOrderIncome: 0,
+    waySideCount: 0,
+    booksBalanced: true,
     monthlyRiderFee: 0, // 骑手当月收入总额
     monthlyRiderCount: 0, // 骑手当月收入笔数
     dailyRiderFee: 0, // 骑手当日收入总额
     dailyRiderCount: 0, // 骑手当日收入笔数
   });
 
-  const getPlatformPaymentAmount = (description?: string): number => {
-    if (!description) return 0;
-    const payMatch = description.match(
-      /\[(?:付给商家|Pay to Merchant|ဆိုင်သို့ ပေးချေရန်|骑手代付|Courier Advance Pay|ကောင်ရီယာမှ ကြိုတင်ပေးချေခြင်း|平台支付|Platform Payment|ပလက်ဖောင်းမှ ပေးချေခြင်း|余额支付|Balance Payment|လက်ကျန်ငွေဖြင့် ပေးချေခြင်း): (.*?) MMK\]/,
-    );
-    if (!payMatch || !payMatch[1]) return 0;
-    return parseFloat(payMatch[1].replace(/[^\d.]/g, "") || "0");
-  };
+  const getPlatformPaymentAmount = (description?: string): number =>
+    getPlatformPaymentAmountFromDescription(description);
 
   const getItemBalanceProductFeeFromDescription = (
     description?: string,
@@ -608,9 +610,6 @@ const FinanceManagement: React.FC = () => {
     if (!m?.[1]) return 0;
     return parseFloat(m[1].replace(/[^\d.]/g, "") || "0");
   };
-
-  const parsePackagePriceMmk = (pkg: Package): number =>
-    parseFloat(String(pkg.price ?? "").replace(/[^\d.]/g, "") || "0");
 
   /** 余额/平台列：描述有 […: x MMK] 优先；否则非现金单计 跑腿(price)+商品余额费 */
   const getCashDetailPlatformLineTotal = (pkg: Package): number => {
@@ -651,14 +650,8 @@ const FinanceManagement: React.FC = () => {
     return parsePackagePriceMmk(pkg);
   };
 
-  const isMerchantPackage = (pkg: Package): boolean => {
-    const isStoreMatch = deliveryStores.some(
-      (store) =>
-        store.store_name === pkg.sender_name ||
-        (pkg.sender_name && pkg.sender_name.startsWith(store.store_name)),
-    );
-    return !!pkg.delivery_store_id || isStoreMatch;
-  };
+  const isMerchantPackage = (pkg: Package): boolean =>
+    isMerchantFinancePackage(pkg, deliveryStores);
 
   /**
    * 总代收款（现金）：仅 `payment_method === "cash"` 的商家单上的 cod_amount。
@@ -746,169 +739,25 @@ const FinanceManagement: React.FC = () => {
   }, [regionalPricingMap, isRegionalUser, currentRegionPrefix]);
 
   useEffect(() => {
-    const calculateSummary = () => {
-      const totalIncome = records
-        .filter((r) => r.record_type === "income")
-        .reduce((sum, record) => sum + (record.amount || 0), 0);
-      const totalExpense = records
-        .filter((r) => r.record_type === "expense")
-        .reduce((sum, record) => sum + (record.amount || 0), 0);
-      const netProfit = totalIncome - totalExpense;
-      const pendingPayments = packages
-        .filter((pkg) => {
-          if (pkg.payment_method !== "cash") return false;
-          if (pkg.status !== "已送达" && pkg.status !== "已完成") return false;
-          if (pkg.rider_settled) return false;
-          const dateKey = getDateKey(
-            pkg.delivery_time ||
-              pkg.updated_at ||
-              pkg.created_at ||
-              pkg.create_time,
-          );
-          return Boolean(dateKey && dateKey === cashCollectionDate);
-        })
-        .reduce((sum, pkg) => {
-          const price = parseFloat(pkg.price?.replace(/[^\d.]/g, "") || "0");
-          const codAmount = isMerchantPackage(pkg)
-            ? Number(pkg.cod_amount || 0)
-            : 0;
-          return sum + price + codAmount;
-        }, 0);
-
-      // 计算订单收入（统计已送达且已结清的包裹）
-      const deliveredPackages = packages.filter(
-        (pkg) => pkg.status === "已送达",
-      );
-
-      let packageIncome = 0;
-      let packageIncomeCash = 0;
-      let packageIncomeBalance = 0;
-      let settledPackageCount = 0;
-      let totalPlatformPayment = 0;
-      let merchantCodTotal = 0;
-      let merchantPlatformPaymentTotal = 0;
-
-      deliveredPackages.forEach((pkg) => {
-        // 🚀 累加平台支付金额
-        const platformAmount = getPlatformPaymentAmount(pkg.description);
-        if (platformAmount > 0) {
-          totalPlatformPayment += platformAmount;
-        }
-
-        if (isMerchantPackage(pkg)) {
-          if (Number(pkg.cod_amount || 0) > 0) {
-            merchantCodTotal += Number(pkg.cod_amount || 0);
-          }
-          if (platformAmount > 0) {
-            merchantPlatformPaymentTotal += platformAmount;
-          }
-        }
-
-        const price = parseFloat(pkg.price?.replace(/[^\d.]/g, "") || "0");
-
-        // 如果是现金支付，必须已结清才计入收入
-        if (pkg.payment_method === "cash") {
-          if (!pkg.rider_settled) {
-            return;
-          }
-          packageIncomeCash += price;
-        } else {
-          packageIncomeBalance += price;
-        }
-
-        packageIncome += price;
-        settledPackageCount++;
-      });
-
-      const packageCount = settledPackageCount;
-
-      // 骑手跑腿分成：准时达=实付−起步价；顺路递=固定额；按订单领区读规则
-      const courierKmCost = deliveredPackages.reduce((sum, pkg) => {
-        const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
-        const settingsBaseFee = regional.base_fee || 1500;
-        return (
-          sum +
-          getRiderDeliveryShareMmk(pkg, settingsBaseFee, regional)
-        );
-      }, 0);
-
-      const totalKm = deliveredPackages.reduce((sum, pkg) => {
-        return sum + (pkg.delivery_distance || 0);
-      }, 0);
-
-      // 总合伙商家代收款 = 已送达 + 骑手已结清 + 商家未结清
-      const merchantsCollection = packages.reduce((sum, pkg) => {
-        if (!isMerchantPackage(pkg)) return sum;
-        if (pkg.status !== "已送达" && pkg.status !== "已完成") return sum;
-        const codAmount = Number(pkg.cod_amount || 0);
-        if (!pkg.rider_settled || pkg.cod_settled) return sum;
-        return sum + codAmount;
-      }, 0);
-
-      // 总起步费：每单快照；无快照时回退该单领区的当前起步价
-      const totalStartingFee = deliveredPackages.reduce((sum, pkg) => {
-        const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
-        const settingsBaseFee = regional.base_fee || 1500;
-        return sum + getRiderShareBaseFeeMmk(pkg, settingsBaseFee);
-      }, 0);
-
-      // 🚀 新增：计算当月和当日骑手收入统计
-      const now_current = new Date();
-      const currentMonthKey = `${now_current.getFullYear()}-${String(now_current.getMonth() + 1).padStart(2, "0")}`;
-
-      let monthlyRiderFee = 0;
-      let monthlyRiderCount = 0;
-      let dailyRiderFee = 0;
-      let dailyRiderCount = 0;
-
-      deliveredPackages.forEach((pkg) => {
-        const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
-        const settingsBaseFee = regional.base_fee || 1500;
-        const riderShare = getRiderDeliveryShareMmk(
-          pkg,
-          settingsBaseFee,
-          regional,
-        );
-        const dateKey = getDateKey(
-          pkg.delivery_time || pkg.updated_at || pkg.created_at,
-        );
-
-        // 当月统计
-        if (dateKey && dateKey.startsWith(currentMonthKey)) {
-          monthlyRiderFee += riderShare;
-          monthlyRiderCount++;
-        }
-
-        // 当日统计 (基于 cashCollectionDate)
-        if (dateKey && dateKey === cashCollectionDate) {
-          dailyRiderFee += riderShare;
-          dailyRiderCount++;
-        }
-      });
-
-      setSummary({
-        totalIncome,
-        totalExpense,
-        netProfit,
-        pendingPayments,
-        packageIncome,
-        packageIncomeCash,
-        packageIncomeBalance,
-        packageCount,
-        courierKmCost,
-        totalKm,
-        merchantsCollection,
-        totalPlatformPayment,
-        totalStartingFee,
-        monthlyRiderFee,
-        monthlyRiderCount,
-        dailyRiderFee,
-        dailyRiderCount,
-      });
-    };
-
-    calculateSummary();
-  }, [records, packages, deliveryStores, cashCollectionDate, regionalPricingMap]);
+    setSummary(
+      calculateFinanceOverviewSummary({
+        records,
+        packages,
+        stores: deliveryStores,
+        regionalPricingMap,
+        cashCollectionDate,
+        regionPrefix: isRegionalUser ? currentRegionPrefix : undefined,
+      }),
+    );
+  }, [
+    records,
+    packages,
+    deliveryStores,
+    cashCollectionDate,
+    regionalPricingMap,
+    isRegionalUser,
+    currentRegionPrefix,
+  ]);
 
   // 计算合伙店铺代收款统计
   const merchantsCollectionStats = useMemo(() => {
@@ -929,36 +778,29 @@ const FinanceManagement: React.FC = () => {
           const isStorePkg =
             pkg.delivery_store_id === store.id ||
             pkg.sender_name === store.store_name;
-          const platformAmount = getPlatformPaymentAmount(pkg.description);
-          return (
-            isStorePkg &&
-            (pkg.status === "已送达" || pkg.status === "已完成") &&
-            (Number(pkg.cod_amount || 0) > 0 || platformAmount > 0)
-          );
+          if (!isStorePkg) return false;
+          const parts = getMerchantSettlementParts(pkg, deliveryStores);
+          return parts.rawCodMmk > 0 || parts.rawPlatformMmk > 0;
         });
 
         // 3. 计算金额和订单数
         // 待结清金额 = 商家COD(需骑手已结清) + 余额支付(不依赖骑手结清)
-        const unclearedPackages = storePackages.filter((pkg) => {
-          const platformAmount = getPlatformPaymentAmount(pkg.description);
-          return (
-            !pkg.cod_settled &&
-            (Number(pkg.cod_amount || 0) > 0 || platformAmount > 0)
-          );
-        });
-        const unclearedAmount = unclearedPackages.reduce((sum, pkg) => {
-          const platformAmount = getPlatformPaymentAmount(pkg.description);
-          const codAmount = Number(pkg.cod_amount || 0);
-          const pendingCod = codAmount > 0 && pkg.rider_settled ? codAmount : 0;
-          return sum + pendingCod + platformAmount;
-        }, 0);
+        const unclearedAmount = storePackages.reduce(
+          (sum, pkg) =>
+            sum + getMerchantUnclearedAmountMmk(pkg, deliveryStores),
+          0,
+        );
+        const unclearedCount = storePackages.filter(
+          (pkg) => getMerchantUnclearedAmountMmk(pkg, deliveryStores) > 0,
+        ).length;
 
         // 已结清金额（全时期累计）+ 今年已结清单数（按 cod_settled_at 自然年）
         const settledPackages = storePackages.filter((pkg) => pkg.cod_settled);
-        const totalAmount = settledPackages.reduce((sum, pkg) => {
-          const platformAmount = getPlatformPaymentAmount(pkg.description);
-          return sum + Number(pkg.cod_amount || 0) + platformAmount;
-        }, 0);
+        const totalAmount = settledPackages.reduce(
+          (sum, pkg) =>
+            sum + getMerchantRecordedAmountMmk(pkg, deliveryStores),
+          0,
+        );
         const y = new Date().getFullYear();
         const yStart = new Date(y, 0, 1).getTime();
         const yEnd = new Date(y, 11, 31, 23, 59, 59, 999).getTime();
@@ -1003,7 +845,7 @@ const FinanceManagement: React.FC = () => {
           totalAmount,
           settledThisYearCount,
           unclearedAmount,
-          unclearedCount: unclearedPackages.length,
+          unclearedCount: unclearedCount,
           lastSettledAt,
         };
       })
@@ -1184,24 +1026,13 @@ const FinanceManagement: React.FC = () => {
         setAdminAccounts(accountsData);
       }
 
-      // 获取所有已送达包裹
-      const deliveredPackages = packages.filter(
-        (pkg) =>
-          pkg.status === "已送达" && pkg.courier && pkg.courier !== "待分配",
+      const { yearMonth } = getLocalMonthBounds();
+      const courierGroups = groupDeliveredPackagesForSalaryMonth(
+        packages,
+        yearMonth,
       );
 
-      // 按骑手分组
-      const courierGroups: Record<string, Package[]> = {};
-      deliveredPackages.forEach((pkg) => {
-        const courierId = pkg.courier;
-        if (!courierGroups[courierId]) {
-          courierGroups[courierId] = [];
-        }
-        courierGroups[courierId].push(pkg);
-      });
-
       setCourierSalaryGroups(courierGroups);
-      // 默认全选
       setSelectedCouriersForSalary(new Set(Object.keys(courierGroups)));
       setShowSalarySelectionModal(true);
     } catch (error) {
@@ -1221,7 +1052,7 @@ const FinanceManagement: React.FC = () => {
 
     if (
       !window.confirm(
-        `确定要为选中的 ${selectedCouriersForSalary.size} 位骑手生成本月工资记录吗？`,
+        `确定要为选中的 ${selectedCouriersForSalary.size} 位骑手生成本月工资记录吗？仅计入本月已送达订单。`,
       )
     )
       return;
@@ -1229,14 +1060,8 @@ const FinanceManagement: React.FC = () => {
     setLoading(true);
     setShowSalarySelectionModal(false);
     try {
-      // 结算周期
-      const now = new Date();
-      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .split("T")[0];
-      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        .toISOString()
-        .split("T")[0];
+      const { start: periodStart, end: periodEnd, yearMonth } =
+        getLocalMonthBounds();
 
       // 为每个选中的骑手生成工资记录
       let successCount = 0;
@@ -1244,8 +1069,10 @@ const FinanceManagement: React.FC = () => {
       let updatedCount = 0;
 
       for (const courierId of Array.from(selectedCouriersForSalary)) {
-        const pkgs = courierSalaryGroups[courierId];
-        if (!pkgs) continue;
+        const pkgs = (courierSalaryGroups[courierId] || []).filter((pkg) =>
+          isPackageInLocalMonth(pkg, yearMonth),
+        );
+        if (!pkgs.length) continue;
 
         // 计算统计数据
         const totalDeliveries = pkgs.length;
@@ -1636,15 +1463,15 @@ const FinanceManagement: React.FC = () => {
               "Status",
             ];
     const body = list.map((pkg) => {
-      const platformAmount = getPlatformPaymentAmount(pkg.description);
+      const parts = getMerchantSettlementParts(pkg, deliveryStores);
       return [
         escape(pkg.id),
         escape(pkg.sender_name),
         escape(pkg.receiver_name),
         escape(pkg.sender_phone),
         escape(pkg.receiver_phone),
-        escape(String(Number(pkg.cod_amount || 0))),
-        escape(String(platformAmount)),
+        escape(String(parts.countedCodMmk)),
+        escape(String(parts.countedPlatformMmk)),
         escape(pkg.delivery_time || ""),
         escape(
           pkg.cod_settled_at
@@ -1687,9 +1514,9 @@ const FinanceManagement: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
   }, [
+    deliveryStores,
     filteredMerchantCodModalOrders,
     getCurrentMonthKey,
-    getPlatformPaymentAmount,
     language,
     merchantCodModalKind,
   ]);
@@ -1698,6 +1525,7 @@ const FinanceManagement: React.FC = () => {
   const handleMerchantAllSettledOrdersClick = (storeName?: string) => {
     setMerchantCodModalSearch("");
     setMerchantCodModalKind("settled_all");
+    setMerchantCodModalScope("month");
     const st = storeName
       ? deliveryStores.find((s) => s.store_name === storeName)
       : undefined;
@@ -1747,10 +1575,15 @@ const FinanceManagement: React.FC = () => {
     setShowMerchantSettledModal(true);
   };
 
-  // 代收款订单明细：与商家端 Web「待结清订单」一致（getPartnerCODOrders settled=false + 当月）
-  const handleMerchantCollectionClick = (storeName?: string) => {
+  // 代收款订单明细：商家 Tab 默认当月（与商家端 Web 一致）；总览卡用 scope=all 对齐待结清合计
+  const handleMerchantCollectionClick = (
+    storeName?: string,
+    options?: { scope?: "month" | "all" },
+  ) => {
+    const scope = options?.scope ?? "month";
     setMerchantCodModalSearch("");
     setMerchantCodModalKind("uncleared");
+    setMerchantCodModalScope(scope);
     const monthKey = getCurrentMonthKey();
     const st = storeName
       ? deliveryStores.find((s) => s.store_name === storeName)
@@ -1761,26 +1594,32 @@ const FinanceManagement: React.FC = () => {
         )
       : deliveryStores;
 
+    const matchesStore = (pkg: Package) => {
+      if (!storeName) {
+        if (scope === "all") return true;
+        return storesInScope.some(
+          (s) =>
+            pkg.delivery_store_id === s.id ||
+            pkg.sender_name === s.store_name,
+        );
+      }
+      if (!st) return pkg.sender_name === storeName;
+      return (
+        pkg.delivery_store_id === st.id || pkg.sender_name === st.store_name
+      );
+    };
+
     const codOrders = packages
       .filter((pkg) => {
-        if (pkg.status !== "已送达") return false;
-        if (pkg.cod_settled) return false;
-        if (!isPackageDeliveryInCalendarMonth(pkg, monthKey)) return false;
         if (isRegionalUser && !pkg.id.startsWith(currentRegionPrefix))
           return false;
-        if (!storeName) {
-          return storesInScope.some(
-            (s) =>
-              pkg.delivery_store_id === s.id ||
-              pkg.sender_name === s.store_name,
-          );
+        if (!matchesStore(pkg)) return false;
+        if (scope === "all") {
+          return getMerchantUnclearedAmountMmk(pkg, deliveryStores) > 0;
         }
-        if (!st) {
-          return pkg.sender_name === storeName;
-        }
-        return (
-          pkg.delivery_store_id === st.id || pkg.sender_name === st.store_name
-        );
+        if (pkg.status !== "已送达") return false;
+        if (pkg.cod_settled) return false;
+        return isPackageDeliveryInCalendarMonth(pkg, monthKey);
       })
       .sort((a, b) => {
         const dateA = a.delivery_time
@@ -1794,9 +1633,42 @@ const FinanceManagement: React.FC = () => {
 
     setModalOrders(codOrders);
     setModalTitle(
-      storeName ? `${storeName} - 代收款订单明细` : "代收款订单明细",
+      storeName
+        ? `${storeName} - 代收款订单明细`
+        : scope === "all"
+          ? language === "zh"
+            ? "商家未结清代收"
+            : "Merchant uncleared"
+          : "代收款订单明细",
     );
     setShowMerchantSettledModal(true);
+  };
+
+  const handlePendingCashClick = () => {
+    setMerchantCodModalSearch("");
+    const pending = packages
+      .filter(
+        (pkg) =>
+          getPendingRiderCashAmountMmk(
+            pkg,
+            cashCollectionDate,
+            deliveryStores,
+          ) > 0,
+      )
+      .sort((a, b) => {
+        const dateA = a.delivery_time ? new Date(a.delivery_time).getTime() : 0;
+        const dateB = b.delivery_time ? new Date(b.delivery_time).getTime() : 0;
+        return dateB - dateA;
+      });
+    setModalOrders(pending);
+    setModalTitle(
+      language === "zh"
+        ? `当日骑手未结现金（${cashCollectionDate}）`
+        : language === "my"
+          ? `မရှင်းရသေးသော ငွေသား (${cashCollectionDate})`
+          : `Unsettled rider cash (${cashCollectionDate})`,
+    );
+    setShowPendingOrdersModal(true);
   };
 
   // 新增：处理待结清金额卡片点击
@@ -1819,11 +1691,7 @@ const FinanceManagement: React.FC = () => {
       );
       const isMerchant = !!pkg.delivery_store_id || isStoreMatch;
       if (!isMerchant || pkg.cod_settled) return false;
-      const platformAmount = getPlatformPaymentAmount(pkg.description);
-      const codAmount = Number(pkg.cod_amount || 0);
-      const pendingCod = codAmount > 0 && pkg.rider_settled;
-      const pendingPlatform = platformAmount > 0;
-      return pendingCod || pendingPlatform;
+      return getMerchantUnclearedAmountMmk(pkg, deliveryStores) > 0;
     });
 
     setModalOrders(pendingOrders);
@@ -1964,6 +1832,18 @@ const FinanceManagement: React.FC = () => {
       >
         {description}
       </div>
+      {onClick ? (
+        <div
+          style={{
+            marginTop: "10px",
+            color: "#0958d9",
+            fontSize: "0.8rem",
+            fontWeight: 600,
+          }}
+        >
+          {t.overviewClickHint}
+        </div>
+      ) : null}
     </div>
   );
 
@@ -2005,6 +1885,7 @@ const FinanceManagement: React.FC = () => {
     handleMerchantAllSettledOrdersClick,
     handleMerchantCollectionClick,
     handleOpenSalaryGeneration,
+    handlePendingCashClick,
     handlePendingPaymentsClick,
     handlePlatformPaymentClick,
     handleSettleMerchant,
@@ -2451,11 +2332,17 @@ const FinanceManagement: React.FC = () => {
                   borderBottom: "1px solid #e2e8f0",
                 }}
               >
-                {language === "zh"
-                  ? `与商家端 Web「待结清订单」同一规则：当前自然月（${getCurrentMonthKey()}）内已送达、商家代收款未结清（cod_settled 为空或 false）；店铺匹配为 delivery_store_id 或 sender_name 与合伙店一致。`
-                  : language === "my"
-                    ? "ဆိုင် Web ရှင်းလင်းရန် စောင့်ဆိုင်းမှု နှင့်တူညီသော စည်းမျဉ်း—လက်ရှိလ၊ ပို့ဆောင်ပြီး cod မရှင်းရသေး"
-                    : `Same rules as merchant web “Uncleared orders”: current month (${getCurrentMonthKey()}), delivered, COD not settled; store by delivery_store_id or sender_name.`}
+                {merchantCodModalScope === "all"
+                  ? language === "zh"
+                    ? "与总览「商家未结清代收」及「商家COD明细」待结清合计同一口径：已送达、商家未结；COD 须骑手已交，余额/平台支付一并计入。"
+                    : language === "my"
+                      ? "အနှစ်ချုပ်ကတ်နှင့် ဆိုင် COD စာရင်း — ပို့ဆောင်ပြီး၊ ဆိုင်မရှင်း၊ COD သည် ပို့ဆောင်သူရှင်းပြီးမှ၊ ပလက်ဖောင်းပေးချေမှု ပါဝင်"
+                      : "Same as the overview card and Merchant COD uncleared total: delivered, merchant not settled; COD after rider settle, plus balance/platform pay."
+                  : language === "zh"
+                    ? `与商家端 Web「待结清订单」同一规则：当前自然月（${getCurrentMonthKey()}）内已送达、商家代收款未结清（cod_settled 为空或 false）；店铺匹配为 delivery_store_id 或 sender_name 与合伙店一致。`
+                    : language === "my"
+                      ? "ဆိုင် Web ရှင်းလင်းရန် စောင့်ဆိုင်းမှု နှင့်တူညီသော စည်းမျဉ်း—လက်ရှိလ၊ ပို့ဆောင်ပြီး cod မရှင်းရသေး"
+                      : `Same rules as merchant web “Uncleared orders”: current month (${getCurrentMonthKey()}), delivered, COD not settled; store by delivery_store_id or sender_name.`}
               </div>
             )}
             {showMerchantSettledModal && merchantCodModalKind === "settled_all" && (
@@ -2587,10 +2474,12 @@ const FinanceManagement: React.FC = () => {
                         {pkg.id}
                       </span>
                       {(() => {
-                        const platformAmount = getPlatformPaymentAmount(
-                          pkg.description,
+                        const parts = getMerchantSettlementParts(
+                          pkg,
+                          deliveryStores,
                         );
-                        const cod = Number(pkg.cod_amount || 0);
+                        const platformAmount = parts.countedPlatformMmk;
+                        const cod = parts.countedCodMmk;
                         if (cod > 0) {
                           return (
                             <span
@@ -2715,25 +2604,149 @@ const FinanceManagement: React.FC = () => {
                         </span>
                       </div>
 
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: "0.9rem",
-                        }}
-                      >
-                        <span style={{ opacity: 0.6 }}>
-                          {language === "zh" ? "代收金额" : "COD"}:
-                        </span>
-                        <span style={{ fontWeight: "bold", color: "#ff7675" }}>
-                          {Number(pkg.cod_amount || 0).toLocaleString()} MMK
-                          {getPlatformPaymentAmount(pkg.description) > 0
-                            ? language === "zh"
-                              ? "（余额支付）"
-                              : " (Balance Pay)"
-                            : ""}
-                        </span>
-                      </div>
+                      {(() => {
+                        const parts = getMerchantSettlementParts(
+                          pkg,
+                          deliveryStores,
+                        );
+                        const lineAmount =
+                          showMerchantSettledModal &&
+                          merchantCodModalKind === "uncleared"
+                            ? parts.unclearedMmk
+                            : parts.countedCodMmk + parts.countedPlatformMmk;
+                        const showUnclearedBreakdown =
+                          showMerchantSettledModal &&
+                          merchantCodModalKind === "uncleared";
+                        const showCodLine = showUnclearedBreakdown
+                          ? parts.pendingCodMmk > 0 ||
+                            (parts.countedCodMmk > 0 && !pkg.rider_settled)
+                          : parts.countedCodMmk > 0;
+                        return (
+                          <>
+                            {showUnclearedBreakdown ? (
+                              <>
+                                {showCodLine && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      fontSize: "0.9rem",
+                                    }}
+                                  >
+                                    <span style={{ opacity: 0.6 }}>
+                                      {language === "zh"
+                                        ? pkg.rider_settled
+                                          ? "代收（已交账）"
+                                          : "代收（骑手未交，不计入）"
+                                        : "COD"}
+                                      :
+                                    </span>
+                                    <span
+                                      style={{
+                                        fontWeight: "bold",
+                                        color: pkg.rider_settled
+                                          ? "#ff7675"
+                                          : "#94a3b8",
+                                      }}
+                                    >
+                                      {parts.pendingCodMmk.toLocaleString()} MMK
+                                      {!pkg.rider_settled &&
+                                      parts.countedCodMmk > 0
+                                        ? ` / ${parts.countedCodMmk.toLocaleString()}`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                )}
+                                {parts.countedPlatformMmk > 0 && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      fontSize: "0.9rem",
+                                    }}
+                                  >
+                                    <span style={{ opacity: 0.6 }}>
+                                      {language === "zh"
+                                        ? "平台支付"
+                                        : "Platform"}
+                                      :
+                                    </span>
+                                    <span
+                                      style={{
+                                        fontWeight: "bold",
+                                        color: "#0ea5e9",
+                                      }}
+                                    >
+                                      {parts.countedPlatformMmk.toLocaleString()}{" "}
+                                      MMK
+                                    </span>
+                                  </div>
+                                )}
+                                {parts.duplicate && (
+                                  <div
+                                    style={{
+                                      color: "#64748b",
+                                      fontSize: "0.75rem",
+                                    }}
+                                  >
+                                    {language === "zh"
+                                      ? "代收与余额为同一笔货款，只计一次"
+                                      : "COD and wallet pay are the same amount; counted once"}
+                                  </div>
+                                )}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    fontSize: "0.95rem",
+                                  }}
+                                >
+                                  <span style={{ opacity: 0.7 }}>
+                                    {language === "zh"
+                                      ? "本单待结清"
+                                      : "This order"}
+                                    :
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontWeight: 800,
+                                      color: "#ef4444",
+                                    }}
+                                  >
+                                    {lineAmount.toLocaleString()} MMK
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  fontSize: "0.9rem",
+                                }}
+                              >
+                                <span style={{ opacity: 0.6 }}>
+                                  {language === "zh" ? "代收金额" : "COD"}:
+                                </span>
+                                <span
+                                  style={{
+                                    fontWeight: "bold",
+                                    color: "#ff7675",
+                                  }}
+                                >
+                                  {(parts.countedCodMmk || 0).toLocaleString()}{" "}
+                                  MMK
+                                  {parts.countedPlatformMmk > 0
+                                    ? language === "zh"
+                                      ? `（余额 ${parts.countedPlatformMmk.toLocaleString()}）`
+                                      : ` (Balance ${parts.countedPlatformMmk.toLocaleString()})`
+                                    : ""}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
 
                       {pkg.delivery_time && (
                         <div
@@ -2829,9 +2842,37 @@ const FinanceManagement: React.FC = () => {
               style={{
                 padding: "20px 24px",
                 borderTop: "1px solid #f1f5f9",
-                textAlign: "right",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "16px",
+                flexWrap: "wrap",
               }}
             >
+              {showMerchantSettledModal &&
+                merchantCodModalKind === "uncleared" && (
+                  <div style={{ color: "#0f172a", fontSize: "0.95rem" }}>
+                    <span style={{ color: "#64748b" }}>
+                      {language === "zh"
+                        ? "弹窗合计（须与卡片待结清金额一致）"
+                        : language === "en"
+                          ? "Modal total (must match the card)"
+                          : "ပေါင်းလဒ်"}
+                      :{" "}
+                    </span>
+                    <strong style={{ color: "#ef4444", fontSize: "1.15rem" }}>
+                      {merchantCodModalDisplayOrders
+                        .reduce(
+                          (sum, pkg) =>
+                            sum +
+                            getMerchantUnclearedAmountMmk(pkg, deliveryStores),
+                          0,
+                        )
+                        .toLocaleString()}{" "}
+                      MMK
+                    </strong>
+                  </div>
+                )}
               <button
                 onClick={() => {
                   setMerchantCodModalSearch("");
@@ -2839,6 +2880,7 @@ const FinanceManagement: React.FC = () => {
                   setShowPendingOrdersModal(false);
                 }}
                 style={{
+                  marginLeft: "auto",
                   background:
                     "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
                   border: "none",

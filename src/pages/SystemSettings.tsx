@@ -176,7 +176,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'pricing.way_side_courier_per_order',
     label: '「顺路递」骑手配送费 (MMK/单)',
-    description: '顺路递每单给骑手的固定金额，平台收「客户实付 − 该金额」。例：起步价 2000、本项 1000 → 平台 1000、骑手 1000。设为 0 时改按「客户实付 − 起步价」分成。',
+    description: '财务与工资已改为顺路递客户实付 50/50：骑手一半、平台一半。此项不再参与分成，仅作历史配置保留。',
     category: 'pricing',
     pricingGroup: 'courier',
     type: 'number',
@@ -838,7 +838,7 @@ const SystemSettings: React.FC = () => {
                       <span>🚚</span> 骑手端计费
                     </h3>
                     <p>
-                      骑手跑腿费按订单类型分成，不按公里计价。准时达等：骑手 = 客户实付 − 基础起步价（例 3600 − 2000 = 1600）。顺路递：骑手收下方固定额，平台收剩余（例各 1000）。当前编辑
+                      骑手跑腿费按订单类型分成，不按公里计价。准时达等：骑手 = 客户实付 − 基础起步价（例 3600 − 2000 = 1600）。顺路递：客户实付对半，平台与骑手各 50%。当前编辑
                       <strong> {REGIONS.find((r) => r.id === selectedRegion)?.name ?? selectedRegion}</strong> 的规则，不影响其他领区。
                     </p>
                   </div>
