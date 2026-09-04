@@ -433,6 +433,12 @@ const FinanceManagement: React.FC = () => {
       }
     });
 
+    const now = new Date();
+    months.add(
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+    );
+    if (selectedSalaryMonth) months.add(selectedSalaryMonth);
+
     // 按日期倒序排列（最新的在前）
     return Array.from(months).sort((a, b) => {
       const dateA = new Date(a + "-01");
@@ -1962,41 +1968,18 @@ const FinanceManagement: React.FC = () => {
   return (
     <FinanceWorkspaceProvider value={financeWorkspace}>
     <div className="admin-page admin-finance">
-      <div
-        style={{
-          maxWidth: "1280px",
-          margin: "0 auto",
-          color: "#0f172a",
-          position: "relative",
-        }}
-      >
+      <div>
         <div className="admin-page-head">
           <div>
-            <h1
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-              }}
-            >
-              💰 {t.title}
+            <h1>
+              {t.title}
               {isRegionalUser && (
-                <span
-                  style={{
-                    background: "#48bb78",
-                    color: "#0f172a",
-                    padding: "4px 12px",
-                    borderRadius: "8px",
-                    fontSize: "0.9rem",
-                    fontWeight: "bold",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                  }}
-                >
-                  📍 {currentRegionPrefix}
+                <span className="admin-page-head__region">
+                  {currentRegionPrefix}
                 </span>
               )}
             </h1>
-            <p style={{ margin: "8px 0 0 0" }}>{t.subtitle}</p>
+            <p>{t.subtitle}</p>
           </div>
           <div className="admin-page-actions">
             <button
@@ -2005,26 +1988,19 @@ const FinanceManagement: React.FC = () => {
               onClick={loadRecords}
               disabled={loading}
             >
-              {loading ? "🔄 " + t.loadingData : "🔄 " + t.refreshData}
+              {loading ? t.loadingData : t.refreshData}
             </button>
             <button
               type="button"
               className="admin-shell__btn"
               onClick={() => navigate("/admin/dashboard")}
             >
-              ← {t.backToDashboard}
+              {t.backToDashboard}
             </button>
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            marginBottom: "24px",
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="admin-finance-tabs" role="tablist">
           {(
             [
               "overview",
@@ -2038,7 +2014,6 @@ const FinanceManagement: React.FC = () => {
           )
             .filter((key) => {
               if (isRegionalUser) {
-                // 🌍 领区账号过滤：隐藏总览、数据分析，保留收支、收款等业务模块
                 return !["overview", "analytics"].includes(key);
               }
               return true;
@@ -2046,23 +2021,15 @@ const FinanceManagement: React.FC = () => {
             .map((key) => (
               <button
                 key={key}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === key}
+                className={`admin-finance-tabs__tab${activeTab === key ? " is-on" : ""}${
+                  key === "cash_collection" && showYesterdayCashTabIndicator
+                    ? " has-alert"
+                    : ""
+                }`}
                 onClick={() => setActiveTab(key)}
-                style={{
-                  padding: "12px 24px",
-                  borderRadius: "12px",
-                  border:
-                    key === "cash_collection" && showYesterdayCashTabIndicator
-                      ? "1px solid #fb923c"
-                      : "1px solid #e2e8f0",
-                  background:
-                    activeTab === key
-                      ? "#e6f4ff"
-                      : "#fff",
-                  color: activeTab === key ? "#0958d9" : "#0f172a",
-                  cursor: "pointer",
-                  fontSize: "1rem",
-                  transition: "all 0.3s ease",
-                }}
                 title={
                   key === "cash_collection" && showYesterdayCashTabIndicator
                     ? t.cashYesterdayUnsettledReminder
@@ -2075,53 +2042,26 @@ const FinanceManagement: React.FC = () => {
                 {key === "package_records" && t.packageFinanceRecords}
                 {key === "courier_records" && t.courierFinanceRecords}
                 {key === "cash_collection" && (
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
+                  <>
                     <span>{t.dailyCollection}</span>
                     {showYesterdayCashTabIndicator && (
-                      <span
-                        aria-hidden
-                        style={{
-                          width: "10px",
-                          height: "10px",
-                          borderRadius: "50%",
-                          background: "#f97316",
-                          boxShadow: "0 0 0 2px rgba(249, 115, 22, 0.45)",
-                          flexShrink: 0,
-                        }}
-                      />
+                      <span className="admin-finance-tabs__dot" aria-hidden />
                     )}
-                  </span>
+                  </>
                 )}
                 {key === "merchants_collection" && t.merchantsCollection}
               </button>
             ))}
           {(activeTab === "records" || activeTab === "package_records") && (
             <button
+              type="button"
+              className="admin-shell__btn admin-shell__btn--primary admin-finance-tabs__add"
               onClick={() => {
                 resetForm();
                 setShowForm(true);
               }}
-              style={{
-                marginLeft: "auto",
-                padding: "12px 24px",
-                borderRadius: "12px",
-                border: "none",
-                background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                color: "#05223b",
-                fontWeight: 700,
-                cursor: "pointer",
-                boxShadow: "0 12px 25px rgba(79, 172, 254, 0.35)",
-                position: "relative",
-                zIndex: 5,
-              }}
             >
-              + {t.addRecord}
+              {t.addRecord}
             </button>
           )}
         </div>

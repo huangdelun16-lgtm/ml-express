@@ -5,6 +5,43 @@ import { feedbackService } from "../../services/FeedbackService";
 import { getRegionalPricingForPackage, getRiderDeliveryShareMmk, getRiderShareBaseFeeMmk, getDateKey, packageMatchesRegionPrefix } from "../FinanceManagement.helpers";
 import { useFinanceWorkspace } from "./FinanceWorkspace";
 
+function CrMetric({
+  tone,
+  label,
+  value,
+  hint,
+}: {
+  tone?: string;
+  label: string;
+  value: React.ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div className={`finance-ov-card${tone ? ` finance-ov-card--${tone}` : ""}`}>
+      <div className="finance-ov-card__label">{label}</div>
+      <div className="finance-ov-card__value">{value}</div>
+      {hint ? <div className="finance-ov-card__desc">{hint}</div> : null}
+    </div>
+  );
+}
+
+function salaryStatusLabel(status: string, t: any, language: string) {
+  if (status === "pending") return t.pending;
+  if (status === "approved") {
+    return language === "my"
+      ? "အတည်ပြုပြီး"
+      : language === "en"
+        ? "Approved"
+        : "已审核";
+  }
+  if (status === "paid") return t.settled;
+  return language === "my"
+    ? "ငြင်းပယ်ခံရသည်"
+    : language === "en"
+      ? "Rejected"
+      : "已拒绝";
+}
+
 const FinanceCourierRecordsTab: React.FC = () => {
   const {
     activeTab,
@@ -53,55 +90,43 @@ const FinanceCourierRecordsTab: React.FC = () => {
   } = useFinanceWorkspace();
 
   return (
-          <div>
-            {/* 顶部操作栏 */}
-            <div
-              style={{
-                background: "#ffffff",
-                borderRadius: "16px",
-                padding: isMobile ? "12px" : "20px",
-                marginBottom: "24px",
-                border: "1px solid #f8fafc",
-                display: "flex",
-                gap: isMobile ? "12px" : "16px",
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <h3 style={{ margin: 0, color: "#0f172a", flex: "1 1 auto" }}>
-                💰 {t.courierFinanceRecords}
-              </h3>
-
-              {/* 状态筛选 */}
+          <div className="finance-cr">
+            <div className="finance-cr-bar">
+              <h3 className="finance-cr-title">{t.courierFinanceRecords}</h3>
+              <label className="finance-cr-label" htmlFor="finance-cr-month">
+                {t.selectMonth}
+              </label>
               <select
-                value={salaryFilterStatus}
-                onChange={(e) => setSalaryFilterStatus(e.target.value as any)}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: "10px",
-                  border: "1px solid #e2e8f0",
-                  background: "#ffffff",
-                  color: "#0f172a",
-                  fontSize: "0.9rem",
+                id="finance-cr-month"
+                className="finance-cr-select"
+                value={selectedSalaryMonth}
+                onChange={(e) => {
+                  setSelectedSalaryMonth(e.target.value);
+                  setSelectedSalaries([]);
                 }}
               >
-                <option value="all" style={{ color: "#000" }}>
-                  {t.allStatus}
-                </option>
-                <option value="pending" style={{ color: "#000" }}>
-                  {t.pending}
-                </option>
-                <option value="approved" style={{ color: "#000" }}>
+                {getAvailableMonths().map((month) => (
+                  <option key={month} value={month}>
+                    {formatMonthDisplay(month)}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="finance-cr-select"
+                value={salaryFilterStatus}
+                onChange={(e) => setSalaryFilterStatus(e.target.value as any)}
+              >
+                <option value="all">{t.allStatus}</option>
+                <option value="pending">{t.pending}</option>
+                <option value="approved">
                   {language === "zh"
                     ? "已审核"
                     : language === "my"
                       ? "အတည်ပြုပြီး"
                       : "Approved"}
                 </option>
-                <option value="paid" style={{ color: "#000" }}>
-                  {t.settled}
-                </option>
-                <option value="rejected" style={{ color: "#000" }}>
+                <option value="paid">{t.settled}</option>
+                <option value="rejected">
                   {language === "zh"
                     ? "已拒绝"
                     : language === "my"
@@ -109,33 +134,30 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       : "Rejected"}
                 </option>
               </select>
-
-              {/* 生成工资按钮 */}
+              <span className="finance-cr-count">
+                {language === "zh"
+                  ? `共 ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} 条`
+                  : language === "my"
+                    ? `စုစုပေါင်း ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} ခု`
+                    : `${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} records`}
+              </span>
+              <div className="finance-cr-tools">
               {!isRegionalUser && (
                 <button
+                  type="button"
+                  className="admin-shell__btn admin-shell__btn--primary"
                   onClick={handleOpenSalaryGeneration}
                   disabled={loading}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "10px",
-                    border: "none",
-                    background: loading
-                      ? "rgba(102, 126, 234, 0.5)"
-                      : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "#fff",
-                    cursor: loading ? "not-allowed" : "pointer",
-                    fontSize: "0.9rem",
-                    fontWeight: "600",
-                    transition: "all 0.3s ease",
-                  }}
                 >
-                  🔄 {t.generateSalaries}
+                  {t.generateSalaries}
                 </button>
               )}
 
               {selectedSalaries.length > 0 && !isRegionalUser && (
                 <>
                   <button
+                    type="button"
+                    className="admin-shell__btn"
                     onClick={async () => {
                       if (
                         !window.confirm(
@@ -167,40 +189,22 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       }
                     }}
                     disabled={loading}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "10px",
-                      border: "none",
-                      background:
-                        "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
-                      color: "#fff",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                    }}
                   >
-                    ✅ 批量审核 ({selectedSalaries.length})
+                    {language === "en" ? "Approve" : "批量审核"} ({selectedSalaries.length})
                   </button>
 
                   <button
+                    type="button"
+                    className="admin-shell__btn"
                     onClick={() => setShowPaymentModal(true)}
                     disabled={loading}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "10px",
-                      border: "none",
-                      background:
-                        "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                      color: "#fff",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                    }}
                   >
-                    💳 批量发放 ({selectedSalaries.length})
+                    {language === "en" ? "Pay" : "批量发放"} ({selectedSalaries.length})
                   </button>
 
                   <button
+                    type="button"
+                    className="admin-shell__btn admin-shell__btn--danger"
                     onClick={async () => {
                       if (
                         !window.confirm(
@@ -214,7 +218,6 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         let successCount = 0;
                         let failCount = 0;
 
-                        // 逐个删除选中的工资记录
                         for (const salaryId of selectedSalaries) {
                           try {
                             const success =
@@ -233,7 +236,6 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           }
                         }
 
-                        // 显示删除结果
                         if (failCount === 0) {
                           feedbackService.notify(
                             `批量删除成功！共删除 ${successCount} 条记录。`,
@@ -244,7 +246,6 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           );
                         }
 
-                        // 重新加载数据并清空选择
                         await loadRecords();
                         setSelectedSalaries([]);
                       } catch (error) {
@@ -255,113 +256,21 @@ const FinanceCourierRecordsTab: React.FC = () => {
                       }
                     }}
                     disabled={loading}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "10px",
-                      border: "none",
-                      background:
-                        "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                      color: "#fff",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                      transition: "all 0.3s ease",
-                    }}
                   >
-                    🗑️ 批量删除 ({selectedSalaries.length})
+                    {language === "en" ? "Delete" : "批量删除"} ({selectedSalaries.length})
                   </button>
                 </>
               )}
-            </div>
-
-            {/* 月份选择器 */}
-            <div
-              style={{
-                background: "#ffffff",
-                borderRadius: "16px",
-                padding: isMobile ? "12px" : "20px",
-                marginBottom: "24px",
-                border: "1px solid #f8fafc",
-                display: "flex",
-                gap: "16px",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <label
-                style={{
-                  color: "#0f172a",
-                  fontSize: "0.95rem",
-                  fontWeight: "600",
-                }}
-              >
-                📅 {t.selectMonth}：
-              </label>
-              <select
-                value={selectedSalaryMonth}
-                onChange={(e) => {
-                  setSelectedSalaryMonth(e.target.value);
-                  setSelectedSalaries([]); // 切换月份时清空选择
-                }}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: "10px",
-                  border: "1px solid #e2e8f0",
-                  background: "#ffffff",
-                  color: "#0f172a",
-                  fontSize: "0.9rem",
-                  cursor: "pointer",
-                  minWidth: "180px",
-                }}
-              >
-                {getAvailableMonths().map((month) => (
-                  <option
-                    key={month}
-                    value={month}
-                    style={{ background: "#ffffff", color: "#0f172a" }}
-                  >
-                    {formatMonthDisplay(month)}
-                  </option>
-                ))}
-              </select>
-              <div
-                style={{
-                  color: "#334155",
-                  fontSize: "0.85rem",
-                  marginLeft: "auto",
-                }}
-              >
-                {language === "zh"
-                  ? `共 ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} 条记录`
-                  : language === "my"
-                    ? "စုစုပေါင်း " +
-                      getFilteredSalariesByMonth(
-                        courierSalaries,
-                        selectedSalaryMonth,
-                      ).length +
-                      " ခု"
-                    : `Total ${getFilteredSalariesByMonth(courierSalaries, selectedSalaryMonth).length} records`}
               </div>
             </div>
 
-            {/* 工资统计卡片 */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile
-                  ? "1fr"
-                  : "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: isMobile ? "12px" : "16px",
-                marginBottom: "24px",
-              }}
-            >
+            <div className="finance-cr-metrics finance-cr-metrics--4">
               {(() => {
                 let monthFilteredSalaries = getFilteredSalariesByMonth(
                   courierSalaries,
                   selectedSalaryMonth,
                 );
 
-                // 领区过滤
                 if (isRegionalUser) {
                   monthFilteredSalaries = monthFilteredSalaries.filter(
                     (s) =>
@@ -372,196 +281,73 @@ const FinanceCourierRecordsTab: React.FC = () => {
 
                 return (
                   <>
-                    <div
-                      style={{
-                        background:
-                          "linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%)",
-                        border: "1px solid rgba(251, 191, 36, 0.3)",
-                        borderRadius: "16px",
-                        padding: isMobile ? "12px" : "20px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#d97706",
-                          fontSize: isMobile ? "1.5rem" : "2rem",
-                          fontWeight: "bold",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        {
-                          monthFilteredSalaries.filter(
-                            (s) => s.status === "pending",
-                          ).length
-                        }
-                      </div>
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: "0.95rem",
-                        }}
-                      >
-                        {t.pending}
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        background:
-                          "linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)",
-                        border: "1px solid rgba(34, 197, 94, 0.3)",
-                        borderRadius: "16px",
-                        padding: isMobile ? "12px" : "20px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#22c55e",
-                          fontSize: isMobile ? "1.5rem" : "2rem",
-                          fontWeight: "bold",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        {
-                          monthFilteredSalaries.filter(
-                            (s) => s.status === "approved",
-                          ).length
-                        }
-                      </div>
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: "0.95rem",
-                        }}
-                      >
-                        {language === "zh"
+                    <CrMetric
+                      tone="pending"
+                      label={t.pending}
+                      value={
+                        monthFilteredSalaries.filter(
+                          (s) => s.status === "pending",
+                        ).length
+                      }
+                    />
+                    <CrMetric
+                      tone="net"
+                      label={
+                        language === "zh"
                           ? "已审核"
                           : language === "my"
                             ? "အတည်ပြုပြီး"
-                            : "Approved"}
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        background:
-                          "linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%)",
-                        border: "1px solid rgba(59, 130, 246, 0.3)",
-                        borderRadius: "16px",
-                        padding: isMobile ? "12px" : "20px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#3b82f6",
-                          fontSize: isMobile ? "1.5rem" : "2rem",
-                          fontWeight: "bold",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        {
-                          monthFilteredSalaries.filter(
-                            (s) => s.status === "paid",
-                          ).length
-                        }
-                      </div>
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: "0.95rem",
-                        }}
-                      >
-                        {t.settled}
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        background:
-                          "linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)",
-                        border: "1px solid rgba(168, 85, 247, 0.3)",
-                        borderRadius: "16px",
-                        padding: isMobile ? "12px" : "20px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#a855f7",
-                          fontSize: "1.6rem",
-                          fontWeight: "bold",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        {monthFilteredSalaries
-                          .reduce((sum, s) => sum + s.net_salary, 0)
-                          .toLocaleString()}{" "}
-                        MMK
-                      </div>
-                      <div
-                        style={{
-                          color: "#0f172a",
-                          fontSize: "0.95rem",
-                        }}
-                      >
-                        {language === "zh"
+                            : "Approved"
+                      }
+                      value={
+                        monthFilteredSalaries.filter(
+                          (s) => s.status === "approved",
+                        ).length
+                      }
+                    />
+                    <CrMetric
+                      tone="platform"
+                      label={t.settled}
+                      value={
+                        monthFilteredSalaries.filter(
+                          (s) => s.status === "paid",
+                        ).length
+                      }
+                    />
+                    <CrMetric
+                      tone="income"
+                      label={
+                        language === "zh"
                           ? "工资总额"
                           : language === "my"
                             ? "စုစုပေါင်း လစာ"
-                            : "Total Salary"}
-                      </div>
-                    </div>
+                            : "Total Salary"
+                      }
+                      value={`${monthFilteredSalaries
+                        .reduce((sum, s) => sum + s.net_salary, 0)
+                        .toLocaleString()} MMK`}
+                    />
                   </>
                 );
               })()}
             </div>
 
-            {/* 工资记录表格 */}
-            <div
-              style={{
-                background: "#ffffff",
-                borderRadius: "16px",
-                padding: "24px",
-                marginBottom: "24px",
-                border: "1px solid #f8fafc",
-                overflow: "auto",
-              }}
-            >
-              <h4
-                style={{
-                  margin: "0 0 16px 0",
-                  color: "#0f172a",
-                  fontSize: "1.1rem",
-                }}
-              >
-                💼 {language === "my" ? "လစာမှတ်တမ်းဇယား" : "工资记录表"}
+            <section className="finance-cr-panel">
+              <h4 className="finance-cr-panel__title">
+                {language === "my" ? "လစာမှတ်တမ်းဇယား" : language === "en" ? "Salary records" : "工资记录"}
               </h4>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  minWidth: "1200px",
-                }}
-              >
+              <p className="finance-cr-panel__sub">
+                {language === "en"
+                  ? "Only delivered orders in the selected month are included when generating salaries."
+                  : language === "my"
+                    ? "လစာထုတ်သည့်အခါ ရွေးထားသောလ၏ ပို့ဆောင်ပြီး အော်ဒါများသာ ပါဝင်သည်။"
+                    : "生成工资时只组所选月份里已送达的订单。"}
+              </p>
+              <div className="finance-cr-table-wrap">
+              <table className="finance-cr-table">
                 <thead>
-                  <tr
-                    style={{
-                      background: "#f1f5f9",
-                      borderBottom: "2px solid #e2e8f0",
-                    }}
-                  >
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "left",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                  <tr>
+                    <th>
                       <input
                         type="checkbox"
                         checked={(() => {
@@ -602,103 +388,31 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         style={{ cursor: "pointer" }}
                       />
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "left",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <th>
                       {t.riderId}
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "left",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <th>
                       {t.settlementPeriod}
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "right",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <th className="is-num">
                       {t.baseSalary}
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "right",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <th className="is-num">
                       {t.kmFee}
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "right",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <th className="is-num">
                       {t.deliveryBonus}
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "right",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
-                      {language === "my" ? "စုစုပေါင်းလစာ" : "实发工资"}
+                    <th className="is-num">
+                      {language === "my" ? "စုစုပေါင်းလစာ" : language === "en" ? "Net pay" : "实发工资"}
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "center",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <th className="is-center">
                       {t.deliveryCount}
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "center",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <th className="is-center">
                       {t.status}
                     </th>
-                    <th
-                      style={{
-                        padding: "14px 12px",
-                        textAlign: "center",
-                        color: "#0f172a",
-                        fontSize: "0.9rem",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <th className="is-center">
                       {t.action}
                     </th>
                   </tr>
@@ -729,39 +443,45 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     if (filtered.length === 0) {
                       return (
                         <tr>
-                          <td
-                            colSpan={10}
-                            style={{
-                              padding: "40px",
-                              textAlign: "center",
-                              color: "#64748b",
-                              fontSize: "1rem",
-                            }}
-                          >
-                            {selectedSalaryMonth
-                              ? `暂无 ${formatMonthDisplay(selectedSalaryMonth)} 的工资记录`
-                              : "暂无工资记录"}
+                          <td colSpan={10}>
+                            <div className="finance-cr-empty">
+                              <p className="finance-cr-empty__title">
+                                {selectedSalaryMonth
+                                  ? language === "en"
+                                    ? `No salary slips for ${formatMonthDisplay(selectedSalaryMonth)}`
+                                    : language === "my"
+                                      ? `${formatMonthDisplay(selectedSalaryMonth)} လစာမှတ်တမ်း မရှိသေးပါ`
+                                      : `${formatMonthDisplay(selectedSalaryMonth)} 还没有工资单`
+                                  : language === "en"
+                                    ? "No salary records"
+                                    : "暂无工资记录"}
+                              </p>
+                              <p className="finance-cr-empty__hint">
+                                {language === "en"
+                                  ? "Choose the month, then generate salaries from delivered orders."
+                                  : language === "my"
+                                    ? "လကိုရွေးပြီး ပို့ဆောင်ပြီး အော်ဒါများမှ လစာ ထုတ်ပါ။"
+                                    : "选对月份后点「生成工资」，只组本月已送达订单。"}
+                              </p>
+                              {!isRegionalUser && (
+                                <button
+                                  type="button"
+                                  className="admin-shell__btn admin-shell__btn--primary"
+                                  onClick={handleOpenSalaryGeneration}
+                                  disabled={loading}
+                                >
+                                  {t.generateSalaries}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
                     }
 
                     return filtered.map((salary) => (
-                      <tr
-                        key={salary.id}
-                        style={{
-                          borderBottom: "1px solid #e2e8f0",
-                          transition: "all 0.2s",
-                        }}
-                        onMouseOver={(e) =>
-                          (e.currentTarget.style.background =
-                            "#f8fafc")
-                        }
-                        onMouseOut={(e) =>
-                          (e.currentTarget.style.background = "transparent")
-                        }
-                      >
-                        <td style={{ padding: "14px 12px", color: "#0f172a" }}>
+                      <tr key={salary.id}>
+                        <td>
                           <input
                             type="checkbox"
                             checked={selectedSalaries.includes(salary.id!)}
@@ -779,132 +499,39 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                 );
                               }
                             }}
-                            style={{ cursor: "pointer" }}
                           />
                         </td>
-                        <td
-                          style={{
-                            padding: "14px 12px",
-                            color: "#0f172a",
-                            fontSize: "0.9rem",
-                            fontWeight: "600",
-                          }}
-                        >
-                          {salary.courier_id}
-                        </td>
-                        <td
-                          style={{
-                            padding: "14px 12px",
-                            color: "#334155",
-                            fontSize: "0.85rem",
-                          }}
-                        >
+                        <td>{salary.courier_id}</td>
+                        <td>
                           {salary.period_start_date} ~ {salary.period_end_date}
                         </td>
-                        <td
-                          style={{
-                            padding: "14px 12px",
-                            textAlign: "right",
-                            color: "#334155",
-                            fontSize: "0.9rem",
-                          }}
-                        >
+                        <td className="is-num">
                           {salary.base_salary.toLocaleString()}
                         </td>
-                        <td
-                          style={{
-                            padding: "14px 12px",
-                            textAlign: "right",
-                            color: "#74b9ff",
-                            fontSize: "0.9rem",
-                            fontWeight: "600",
-                          }}
-                        >
+                        <td className="is-num">
                           {salary.km_fee.toLocaleString()}
                         </td>
-                        <td
-                          style={{
-                            padding: "14px 12px",
-                            textAlign: "right",
-                            color: "#a29bfe",
-                            fontSize: "0.9rem",
-                            fontWeight: "600",
-                          }}
-                        >
+                        <td className="is-num">
                           {salary.delivery_bonus.toLocaleString()}
                         </td>
-                        <td
-                          style={{
-                            padding: "14px 12px",
-                            textAlign: "right",
-                            color: "#55efc4",
-                            fontSize: "1rem",
-                            fontWeight: "bold",
-                          }}
-                        >
+                        <td className="is-num">
                           {salary.net_salary.toLocaleString()} MMK
                         </td>
-                        <td
-                          style={{
-                            padding: "14px 12px",
-                            textAlign: "center",
-                            color: "#334155",
-                            fontSize: "0.9rem",
-                          }}
-                        >
+                        <td className="is-center">
                           {salary.total_deliveries} {t.packageSuffix || "单"}
                         </td>
-                        <td
-                          style={{ padding: "14px 12px", textAlign: "center" }}
-                        >
+                        <td className="is-center">
                           <span
-                            style={{
-                              padding: "6px 12px",
-                              borderRadius: "8px",
-                              fontSize: "0.8rem",
-                              fontWeight: "600",
-                              background:
-                                salary.status === "pending"
-                                  ? "rgba(251, 191, 36, 0.2)"
-                                  : salary.status === "approved"
-                                    ? "rgba(34, 197, 94, 0.2)"
-                                    : salary.status === "paid"
-                                      ? "rgba(59, 130, 246, 0.2)"
-                                      : "rgba(239, 68, 68, 0.2)",
-                              color:
-                                salary.status === "pending"
-                                  ? "#d97706"
-                                  : salary.status === "approved"
-                                    ? "#22c55e"
-                                    : salary.status === "paid"
-                                      ? "#3b82f6"
-                                      : "#ef4444",
-                            }}
+                            className={`finance-cr-status finance-cr-status--${salary.status === "rejected" ? "rejected" : salary.status}`}
                           >
-                            {salary.status === "pending"
-                              ? t.pending
-                              : salary.status === "approved"
-                                ? language === "my"
-                                  ? "အတည်ပြုပြီး"
-                                  : "已审核"
-                                : salary.status === "paid"
-                                  ? t.settled
-                                  : language === "my"
-                                    ? "ငြင်းပယ်ခံရသည်"
-                                    : "已拒绝"}
+                            {salaryStatusLabel(salary.status, t, language)}
                           </span>
                         </td>
-                        <td
-                          style={{ padding: "14px 12px", textAlign: "center" }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "8px",
-                              justifyContent: "center",
-                            }}
-                          >
+                        <td className="is-center">
+                          <div className="finance-cr-actions">
                             <button
+                              type="button"
+                              className="admin-shell__btn"
                               onClick={async () => {
                                 setSelectedSalary(salary);
                                 const details =
@@ -914,16 +541,6 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                 setSalaryDetails(details);
                                 setShowSalaryDetail(true);
                               }}
-                              style={{
-                                padding: "6px 12px",
-                                borderRadius: "6px",
-                                border: "none",
-                                background: "rgba(59, 130, 246, 0.2)",
-                                color: "#3b82f6",
-                                cursor: "pointer",
-                                fontSize: "0.8rem",
-                                fontWeight: "600",
-                              }}
                             >
                               {t.viewDetail || "详情"}
                             </button>
@@ -932,6 +549,8 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <>
                                 {salary.status === "pending" && (
                                   <button
+                                    type="button"
+                                    className="admin-shell__btn"
                                     onClick={async () => {
                                       if (
                                         !window.confirm(
@@ -979,16 +598,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                         setLoading(false);
                                       }
                                     }}
-                                    style={{
-                                      padding: "6px 12px",
-                                      borderRadius: "6px",
-                                      border: "none",
-                                      background: "rgba(34, 197, 94, 0.2)",
-                                      color: "#22c55e",
-                                      cursor: "pointer",
-                                      fontSize: "0.8rem",
-                                      fontWeight: "600",
-                                    }}
+                                    disabled={loading}
                                   >
                                     {t.audit || "审核"}
                                   </button>
@@ -996,26 +606,20 @@ const FinanceCourierRecordsTab: React.FC = () => {
 
                                 {salary.status === "approved" && (
                                   <button
+                                    type="button"
+                                    className="admin-shell__btn admin-shell__btn--primary"
                                     onClick={() => {
                                       setSelectedSalaries([salary.id!]);
                                       setShowPaymentModal(true);
                                     }}
-                                    style={{
-                                      padding: "6px 12px",
-                                      borderRadius: "6px",
-                                      border: "none",
-                                      background: "rgba(245, 87, 108, 0.2)",
-                                      color: "#f5576c",
-                                      cursor: "pointer",
-                                      fontSize: "0.8rem",
-                                      fontWeight: "600",
-                                    }}
                                   >
-                                    发放
+                                    {language === "en" ? "Pay" : "发放"}
                                   </button>
                                 )}
 
                                 <button
+                                  type="button"
+                                  className="admin-shell__btn admin-shell__btn--danger"
                                   onClick={async () => {
                                     if (
                                       !window.confirm(
@@ -1043,18 +647,8 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                       setLoading(false);
                                     }
                                   }}
-                                  style={{
-                                    padding: "6px 12px",
-                                    borderRadius: "6px",
-                                    border: "none",
-                                    background: "rgba(239, 68, 68, 0.2)",
-                                    color: "#ef4444",
-                                    cursor: "pointer",
-                                    fontSize: "0.8rem",
-                                    fontWeight: "600",
-                                  }}
                                 >
-                                  删除
+                                  {t.delete || "删除"}
                                 </button>
                               </>
                             )}
@@ -1065,142 +659,38 @@ const FinanceCourierRecordsTab: React.FC = () => {
                   })()}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </section>
 
-            {/* =============== 原有的统计信息 (保留) =============== */}
-            <div
-              style={{
-                background: "#ffffff",
-                borderRadius: "20px",
-                padding: "24px",
-                border: "1px solid #f8fafc",
-                boxShadow: "0 12px 35px rgba(7, 23, 55, 0.45)",
-              }}
-            >
-              <h3
-                style={{ marginTop: 0, color: "#0f172a", marginBottom: "20px" }}
-              >
-                📊 骑手数据统计
+            <section className="finance-cr-panel finance-cr-stats">
+              <h3 className="finance-cr-panel__title">
+                {language === "en" ? "Rider delivery stats" : "骑手数据统计"}
               </h3>
-
-              {/* 骑手送货费用统计 */}
-              <div style={{ marginBottom: "24px" }}>
-                <h4
-                  style={{
-                    color: "#0f172a",
-                    marginBottom: "12px",
-                  }}
-                >
-                  📍 骑手送货费用统计
-                </h4>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile
-                      ? "1fr"
-                      : "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: isMobile ? "12px" : "16px",
-                    marginBottom: "16px",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "rgba(253, 121, 168, 0.2)",
-                      border: "1px solid rgba(253, 121, 168, 0.3)",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#fd79a8",
-                        fontSize: "1.5rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {summary.totalKm.toFixed(2)} KM
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      总配送距离
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "rgba(253, 121, 168, 0.2)",
-                      border: "1px solid rgba(253, 121, 168, 0.3)",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#fd79a8",
-                        fontSize: "1.5rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {pricingSettingsDisplay.base_fee || 1500} MMK
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      当前系统起步价（新单默认）
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "rgba(253, 121, 168, 0.2)",
-                      border: "1px solid rgba(253, 121, 168, 0.3)",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#fd79a8",
-                        fontSize: "1.5rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {summary.courierKmCost.toLocaleString()} MMK
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      骑手分得总额（准时达=总费−起步价；顺路递=实付一半）
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "rgba(253, 121, 168, 0.2)",
-                      border: "1px solid rgba(253, 121, 168, 0.3)",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#fd79a8",
-                        fontSize: "1.5rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {packages.filter(
+              <div className="finance-cr-stats__block">
+                <p className="finance-cr-panel__sub">
+                  {language === "en" ? "Delivery distance and rider share" : "骑手送货费用统计"}
+                </p>
+                <div className="finance-cr-metrics">
+                  <CrMetric
+                    tone="rider"
+                    label="总配送距离"
+                    value={`${summary.totalKm.toFixed(2)} KM`}
+                  />
+                  <CrMetric
+                    tone="start"
+                    label="当前系统起步价（新单默认）"
+                    value={`${pricingSettingsDisplay.base_fee || 1500} MMK`}
+                  />
+                  <CrMetric
+                    tone="wayside"
+                    label="骑手分得总额"
+                    hint="准时达=总费−起步价；顺路递=实付一半"
+                    value={`${summary.courierKmCost.toLocaleString()} MMK`}
+                  />
+                  <CrMetric
+                    tone="income"
+                    label="已送达包裹数"
+                    value={packages.filter(
                         (pkg) =>
                           pkg.status === "已送达" &&
                           (!isRegionalUser ||
@@ -1209,192 +699,56 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               currentRegionPrefix,
                             )),
                       ).length}
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      已送达包裹数
-                    </div>
-                  </div>
+                  />
                 </div>
               </div>
 
-              {/* 骑手收入统计 (当月) */}
-              <div style={{ marginBottom: "24px" }}>
-                <h4
-                  style={{
-                    color: "#0f172a",
-                    marginBottom: "12px",
-                  }}
-                >
-                  💰 骑手收入统计 (当月)
-                </h4>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile
-                      ? "1fr"
-                      : "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: isMobile ? "12px" : "16px",
-                    marginBottom: "16px",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "rgba(34, 197, 94, 0.2)",
-                      border: "1px solid rgba(34, 197, 94, 0.3)",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#22c55e",
-                        fontSize: "1.5rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {summary.monthlyRiderCount}
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      当月送达总笔数
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "rgba(34, 197, 94, 0.2)",
-                      border: "1px solid rgba(34, 197, 94, 0.3)",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#22c55e",
-                        fontSize: "1.5rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {summary.monthlyRiderFee.toLocaleString()} MMK
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      当月骑手收入总额
-                    </div>
-                  </div>
+              <div className="finance-cr-stats__block">
+                <p className="finance-cr-panel__sub">
+                  {language === "en" ? "This month" : "骑手收入统计（当月）"}
+                </p>
+                <div className="finance-cr-metrics">
+                  <CrMetric
+                    tone="net"
+                    label="当月送达总笔数"
+                    value={summary.monthlyRiderCount}
+                  />
+                  <CrMetric
+                    tone="income"
+                    label="当月骑手收入总额"
+                    value={`${summary.monthlyRiderFee.toLocaleString()} MMK`}
+                  />
                 </div>
               </div>
 
-              {/* 骑手收入统计 (当日) */}
-              <div style={{ marginBottom: "24px" }}>
-                <h4
-                  style={{
-                    color: "#0f172a",
-                    marginBottom: "12px",
-                  }}
-                >
-                  ⏰ 骑手收入统计 (当日 - {cashCollectionDate})
-                </h4>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile
-                      ? "1fr"
-                      : "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: isMobile ? "12px" : "16px",
-                    marginBottom: "16px",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "rgba(251, 197, 49, 0.15)",
-                      border: "1px solid rgba(251, 197, 49, 0.3)",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#fbc531",
-                        fontSize: "1.5rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {summary.dailyRiderCount}
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      当日送达总笔数
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "rgba(251, 197, 49, 0.15)",
-                      border: "1px solid rgba(251, 197, 49, 0.3)",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#fbc531",
-                        fontSize: "1.5rem",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {summary.dailyRiderFee.toLocaleString()} MMK
-                    </div>
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      当日骑手收入总额
-                    </div>
-                  </div>
+              <div className="finance-cr-stats__block">
+                <p className="finance-cr-panel__sub">
+                  {language === "en"
+                    ? `Today (${cashCollectionDate})`
+                    : `骑手收入统计（当日 ${cashCollectionDate}）`}
+                </p>
+                <div className="finance-cr-metrics">
+                  <CrMetric
+                    tone="pending"
+                    label="当日送达总笔数"
+                    value={summary.dailyRiderCount}
+                  />
+                  <CrMetric
+                    tone="start"
+                    label="当日骑手收入总额"
+                    value={`${summary.dailyRiderFee.toLocaleString()} MMK`}
+                  />
                 </div>
               </div>
 
-              {/* 骑手送货费用明细表 */}
-              <div style={{ marginTop: "24px", marginBottom: "24px" }}>
-                <h4
-                  style={{
-                    color: "#0f172a",
-                    marginBottom: "12px",
-                  }}
-                >
-                  📋 骑手送货费用明细 (按骑手统计)
-                </h4>
-                <div
-                  style={{
-                    background: "#f8fafc",
-                    borderRadius: "12px",
-                    overflow: "hidden",
-                    border: "1px solid #e2e8f0",
-                  }}
-                >
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <div className="finance-cr-stats__block">
+                <p className="finance-cr-panel__sub">
+                  {language === "en"
+                    ? "Rider delivery share (by rider)"
+                    : "骑手送货费用明细（按骑手）"}
+                </p>
+                <div className="finance-cr-table-wrap">
+                  <table className="finance-cr-table finance-cr-table--compact">
                     <thead>
                       <tr style={{ background: "#f1f5f9" }}>
                         <th
@@ -1576,7 +930,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               >
                                 <span
                                   style={{
-                                    color: "#fd79a8",
+                                    color: "#0f172a",
                                     fontWeight: "bold",
                                   }}
                                 >
@@ -1601,25 +955,14 @@ const FinanceCourierRecordsTab: React.FC = () => {
                 </div>
               </div>
 
-              {/* 骑手当日送货费用明细表 */}
-              <div style={{ marginTop: "24px" }}>
-                <h4
-                  style={{
-                    color: "#0f172a",
-                    marginBottom: "12px",
-                  }}
-                >
-                  📄 骑手送货费用 (当日明细 - {cashCollectionDate})
-                </h4>
-                <div
-                  style={{
-                    background: "#f8fafc",
-                    borderRadius: "12px",
-                    overflow: "hidden",
-                    border: "1px solid #e2e8f0",
-                  }}
-                >
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <div className="finance-cr-stats__block">
+                <p className="finance-cr-panel__sub">
+                  {language === "en"
+                    ? `Delivery share on ${cashCollectionDate}`
+                    : `骑手送货费用（当日 ${cashCollectionDate}）`}
+                </p>
+                <div className="finance-cr-table-wrap">
+                  <table className="finance-cr-table finance-cr-table--compact">
                     <thead>
                       <tr style={{ background: "#f1f5f9" }}>
                         <th
@@ -1813,7 +1156,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                               <td
                                 style={{
                                   padding: "12px",
-                                  color: "#fd79a8",
+                                  color: "#0f172a",
                                   fontSize: "0.9rem",
                                   fontWeight: "bold",
                                 }}
@@ -1841,66 +1184,27 @@ const FinanceCourierRecordsTab: React.FC = () => {
                   </table>
                 </div>
               </div>
-            </div>
-
-            {/* 工资详情模态框 */}
+            </section>
             {showSalaryDetail && selectedSalary && (
               <div
-                style={{
-                  position: "fixed",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: "rgba(0, 0, 0, 0.8)",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  zIndex: 1000,
-                  padding: isMobile ? "12px" : "20px",
-                }}
+                className="admin-modal-scrim"
                 onClick={() => setShowSalaryDetail(false)}
               >
                 <div
-                  style={{
-                    background:
-                      "#ffffff",
-                    borderRadius: "20px",
-                    padding: "32px",
-                    maxWidth: "600px",
-                    width: "100%",
-                    maxHeight: "80vh",
-                    overflow: "auto",
-                    border: "1px solid #e2e8f0",
-                  }}
+                  className="admin-modal admin-modal--lg"
+                  role="dialog"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "24px",
-                    }}
-                  >
-                    <h2
-                      style={{ margin: 0, color: "#0f172a", fontSize: "1.5rem" }}
-                    >
-                      💰 工资详情
+                  <div className="finance-cr-modal__head">
+                    <h2>
+                      {language === "en" ? "Salary detail" : "工资详情"}
                     </h2>
                     <button
+                      type="button"
+                      className="admin-shell__btn"
                       onClick={() => setShowSalaryDetail(false)}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        border: "none",
-                        background: "#e2e8f0",
-                        color: "#0f172a",
-                        cursor: "pointer",
-                        fontSize: "0.9rem",
-                      }}
                     >
-                      关闭
+                      {language === "en" ? "Close" : "关闭"}
                     </button>
                   </div>
 
@@ -1998,7 +1302,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         </div>
                         <div
                           style={{
-                            color: "#fd79a8",
+                            color: "#0f172a",
                             fontSize: "1rem",
                             fontWeight: "600",
                           }}
@@ -2090,7 +1394,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           <span style={{ color: "#334155" }}>
                             绩效奖金
                           </span>
-                          <span style={{ color: "#55efc4", fontWeight: "600" }}>
+                          <span style={{ color: "#0f172a", fontWeight: "600" }}>
                             +{selectedSalary.performance_bonus.toLocaleString()}{" "}
                             MMK
                           </span>
@@ -2134,7 +1438,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         </span>
                         <span
                           style={{
-                            color: "#55efc4",
+                            color: "#0f172a",
                             fontSize: "1.3rem",
                             fontWeight: "bold",
                           }}
@@ -2148,96 +1452,35 @@ const FinanceCourierRecordsTab: React.FC = () => {
               </div>
             )}
 
-            {/* 发放工资模态框 */}
-            {/* 🚀 生成工资骑手选择弹窗 */}
             {showSalarySelectionModal && (
-              <div
-                style={{
-                  position: "fixed",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: "rgba(0, 0, 0, 0.75)",
-                  backdropFilter: "blur(8px)",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  zIndex: 2000,
-                  padding: "20px",
-                }}
-              >
-                <div
-                  style={{
-                    background:
-                      "#ffffff",
-                    borderRadius: "24px",
-                    padding: "32px",
-                    width: "100%",
-                    maxWidth: "600px",
-                    maxHeight: "80vh",
-                    display: "flex",
-                    flexDirection: "column",
-                    boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-                    border: "1px solid #f1f5f9",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "24px",
-                    }}
-                  >
-                    <h2
-                      style={{
-                        margin: 0,
-                        color: "#0f172a",
-                        fontSize: "1.5rem",
-                        fontWeight: 800,
-                      }}
-                    >
-                      选择生成工资的骑手
+              <div className="admin-modal-scrim">
+                <div className="admin-modal admin-modal--lg" role="dialog" aria-labelledby="finance-cr-salary-title">
+                  <div className="finance-cr-modal__head">
+                    <h2 id="finance-cr-salary-title">
+                      {language === "en" ? "Select riders" : "选择生成工资的骑手"}
                     </h2>
                     <button
+                      type="button"
+                      className="admin-modal__close"
                       onClick={() => setShowSalarySelectionModal(false)}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "#64748b",
-                        cursor: "pointer",
-                        fontSize: "1.5rem",
-                      }}
+                      aria-label="Close"
                     >
-                      ✕
+                      ×
                     </button>
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "12px 16px",
-                      background: "#f8fafc",
-                      borderRadius: "12px",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "#334155",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      本月有待结算订单的骑手:{" "}
-                      <strong style={{ color: "#4facfe" }}>
+                  <div className="finance-cr-pick-bar">
+                    <div>
+                      {language === "en"
+                        ? "Riders with unsettled delivered orders this month: "
+                        : "本月有待结算订单的骑手："}
+                      <strong>
                         {Object.keys(courierSalaryGroups).length}
-                      </strong>{" "}
-                      名
+                      </strong>
                     </div>
                     <button
+                      type="button"
+                      className="admin-shell__btn"
                       onClick={() => {
                         if (
                           selectedCouriersForSalary.size ===
@@ -2250,62 +1493,55 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           );
                         }
                       }}
-                      style={{
-                        background: "#f1f5f9",
-                        border: "1px solid #e2e8f0",
-                        padding: "6px 12px",
-                        borderRadius: "8px",
-                        color: "#0f172a",
-                        fontSize: "0.85rem",
-                        cursor: "pointer",
-                      }}
                     >
                       {selectedCouriersForSalary.size ===
                       Object.keys(courierSalaryGroups).length
-                        ? "取消全选"
-                        : "全选"}
+                        ? language === "en"
+                          ? "Clear"
+                          : "取消全选"
+                        : language === "en"
+                          ? "Select all"
+                          : "全选"}
                     </button>
                   </div>
 
-                  <div
-                    style={{
-                      flex: 1,
-                      overflowY: "auto",
-                      paddingRight: "8px",
-                      marginBottom: "24px",
-                    }}
-                  >
+                  <div className="finance-cr-pick-list">
                     {Object.keys(courierSalaryGroups).length === 0 ? (
-                      <div
-                        style={{
-                          textAlign: "center",
-                          padding: "40px",
-                          color: "#94a3b8",
-                        }}
-                      >
-                        暂无本月待结算的骑手数据
+                      <div className="finance-cr-empty">
+                        <p className="finance-cr-empty__title">
+                          {language === "en"
+                            ? "No riders to settle this month"
+                            : "暂无本月待结算的骑手"}
+                        </p>
                       </div>
                     ) : (
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr",
-                          gap: "10px",
-                        }}
-                      >
-                        {Object.entries(courierSalaryGroups).map(
-                          ([courierId, pkgs]) => {
-                            const isSelected =
-                              selectedCouriersForSalary.has(courierId);
-                            const totalKm = pkgs.reduce(
-                              (sum, pkg) => sum + (pkg.delivery_distance || 0),
-                              0,
-                            );
+                      Object.entries(courierSalaryGroups).map(
+                        ([courierId, pkgs]) => {
+                          const isSelected =
+                            selectedCouriersForSalary.has(courierId);
+                          const totalKm = pkgs.reduce(
+                            (sum, pkg) => sum + (pkg.delivery_distance || 0),
+                            0,
+                          );
 
-                            return (
-                              <div
-                                key={courierId}
-                                onClick={() => {
+                          return (
+                            <div
+                              key={courierId}
+                              role="button"
+                              tabIndex={0}
+                              className={`finance-cr-pick${isSelected ? " is-on" : ""}`}
+                              onClick={() => {
+                                const next = new Set(
+                                  selectedCouriersForSalary,
+                                );
+                                if (next.has(courierId))
+                                  next.delete(courierId);
+                                else next.add(courierId);
+                                setSelectedCouriersForSalary(next);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
                                   const next = new Set(
                                     selectedCouriersForSalary,
                                   );
@@ -2313,135 +1549,43 @@ const FinanceCourierRecordsTab: React.FC = () => {
                                     next.delete(courierId);
                                   else next.add(courierId);
                                   setSelectedCouriersForSalary(next);
-                                }}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "15px",
-                                  padding: "16px",
-                                  borderRadius: "12px",
-                                  background: isSelected
-                                    ? "rgba(59, 130, 246, 0.15)"
-                                    : "#f8fafc",
-                                  border: `1px solid ${isSelected ? "rgba(59, 130, 246, 0.4)" : "#f8fafc"}`,
-                                  cursor: "pointer",
-                                  transition: "all 0.2s",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: "24px",
-                                    height: "24px",
-                                    borderRadius: "6px",
-                                    border: isSelected
-                                      ? "none"
-                                      : "2px solid #e2e8f0",
-                                    background: isSelected
-                                      ? "#3b82f6"
-                                      : "transparent",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  {isSelected && (
-                                    <span
-                                      style={{
-                                        color: "#0f172a",
-                                        fontWeight: "bold",
-                                      }}
-                                    >
-                                      ✓
-                                    </span>
-                                  )}
+                                }
+                              }}
+                            >
+                              <span className="finance-cr-pick__check" aria-hidden />
+                              <div>
+                                <div className="finance-cr-pick__id">
+                                  {courierId}
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                  <div
-                                    style={{
-                                      color: "#0f172a",
-                                      fontWeight: 700,
-                                      fontSize: "1.05rem",
-                                    }}
-                                  >
-                                    {courierId}
-                                  </div>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      gap: "15px",
-                                      marginTop: "4px",
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        color: "#64748b",
-                                        fontSize: "0.8rem",
-                                      }}
-                                    >
-                                      📦 {pkgs.length} 单
-                                    </span>
-                                    <span
-                                      style={{
-                                        color: "#64748b",
-                                        fontSize: "0.8rem",
-                                      }}
-                                    >
-                                      🛣️ {totalKm.toFixed(1)} KM
-                                    </span>
-                                  </div>
+                                <div className="finance-cr-pick__meta">
+                                  <span>{pkgs.length} {t.packageSuffix || "单"}</span>
+                                  <span>{totalKm.toFixed(1)} KM</span>
                                 </div>
                               </div>
-                            );
-                          },
-                        )}
-                      </div>
+                            </div>
+                          );
+                        },
+                      )
                     )}
                   </div>
 
-                  <div style={{ display: "flex", gap: "12px" }}>
+                  <div className="admin-modal__actions">
                     <button
+                      type="button"
+                      className="admin-shell__btn"
                       onClick={() => setShowSalarySelectionModal(false)}
-                      style={{
-                        flex: 1,
-                        padding: "14px",
-                        borderRadius: "12px",
-                        border: "1px solid #e2e8f0",
-                        background: "#f8fafc",
-                        color: "#0f172a",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
                     >
-                      取消
+                      {t.cancel}
                     </button>
                     <button
+                      type="button"
+                      className="admin-shell__btn admin-shell__btn--primary"
                       onClick={generateMonthlySalaries}
                       disabled={selectedCouriersForSalary.size === 0}
-                      style={{
-                        flex: 2,
-                        padding: "14px",
-                        borderRadius: "12px",
-                        border: "none",
-                        background:
-                          selectedCouriersForSalary.size === 0
-                            ? "#e2e8f0"
-                            : "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                        color:
-                          selectedCouriersForSalary.size === 0
-                            ? "#94a3b8"
-                            : "#05223b",
-                        fontWeight: 800,
-                        cursor:
-                          selectedCouriersForSalary.size === 0
-                            ? "not-allowed"
-                            : "pointer",
-                        boxShadow:
-                          selectedCouriersForSalary.size === 0
-                            ? "none"
-                            : "0 10px 20px rgba(79, 172, 254, 0.3)",
-                      }}
                     >
-                      确认生成 ({selectedCouriersForSalary.size} 名)
+                      {language === "en"
+                        ? `Generate (${selectedCouriersForSalary.size})`
+                        : `确认生成（${selectedCouriersForSalary.size} 名）`}
                     </button>
                   </div>
                 </div>
@@ -2450,53 +1594,21 @@ const FinanceCourierRecordsTab: React.FC = () => {
 
             {showPaymentModal && (
               <div
-                style={{
-                  position: "fixed",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: "rgba(0, 0, 0, 0.8)",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  zIndex: 1000,
-                  padding: isMobile ? "12px" : "20px",
-                }}
+                className="admin-modal-scrim"
                 onClick={() => setShowPaymentModal(false)}
               >
                 <div
-                  style={{
-                    background:
-                      "#ffffff",
-                    borderRadius: "20px",
-                    padding: "32px",
-                    maxWidth: "500px",
-                    width: "100%",
-                    border: "1px solid #e2e8f0",
-                  }}
+                  className="admin-modal"
+                  role="dialog"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <h2
-                    style={{
-                      margin: "0 0 24px 0",
-                      color: "#0f172a",
-                      fontSize: "1.5rem",
-                    }}
-                  >
-                    💳 发放工资
+                  <h2>
+                    {language === "en" ? "Pay salaries" : "发放工资"}
                   </h2>
 
-                  <div style={{ marginBottom: "16px" }}>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "8px",
-                        color: "#0f172a",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      发放方式 *
+                  <div className="admin-modal__field">
+                    <label>
+                      {language === "en" ? "Payment method" : "发放方式"} *
                     </label>
                     <select
                       value={paymentForm.payment_method}
@@ -2506,15 +1618,6 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           payment_method: e.target.value,
                         })
                       }
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        borderRadius: "10px",
-                        border: "1px solid #e2e8f0",
-                        background: "#ffffff",
-                        color: "#0f172a",
-                        fontSize: "0.95rem",
-                      }}
                     >
                       <option value="cash">现金</option>
                       <option value="bank_transfer">银行转账</option>
@@ -2524,16 +1627,9 @@ const FinanceCourierRecordsTab: React.FC = () => {
                     </select>
                   </div>
 
-                  <div style={{ marginBottom: "16px" }}>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "8px",
-                        color: "#0f172a",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      支付凭证号
+                  <div className="admin-modal__field">
+                    <label>
+                      {language === "en" ? "Payment reference" : "支付凭证号"}
                     </label>
                     <input
                       type="text"
@@ -2545,28 +1641,12 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         })
                       }
                       placeholder="银行单号/交易号"
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: "#f8fafc",
-                        color: "#0f172a",
-                        fontSize: "0.95rem",
-                      }}
                     />
                   </div>
 
-                  <div style={{ marginBottom: "24px" }}>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "8px",
-                        color: "#0f172a",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      发放日期 *
+                  <div className="admin-modal__field">
+                    <label>
+                      {language === "en" ? "Payment date" : "发放日期"} *
                     </label>
                     <input
                       type="date"
@@ -2577,36 +1657,20 @@ const FinanceCourierRecordsTab: React.FC = () => {
                           payment_date: e.target.value,
                         })
                       }
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: "#f8fafc",
-                        color: "#0f172a",
-                        fontSize: "0.95rem",
-                      }}
                     />
                   </div>
 
-                  <div style={{ display: "flex", gap: "12px" }}>
+                  <div className="admin-modal__actions">
                     <button
+                      type="button"
+                      className="admin-shell__btn"
                       onClick={() => setShowPaymentModal(false)}
-                      style={{
-                        flex: 1,
-                        padding: "12px",
-                        borderRadius: "10px",
-                        border: "1px solid #e2e8f0",
-                        background: "transparent",
-                        color: "#0f172a",
-                        cursor: "pointer",
-                        fontSize: "0.95rem",
-                        fontWeight: "600",
-                      }}
                     >
-                      取消
+                      {t.cancel}
                     </button>
                     <button
+                      type="button"
+                      className="admin-shell__btn admin-shell__btn--primary"
                       onClick={async () => {
                         if (
                           !window.confirm(
@@ -2657,21 +1721,8 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         }
                       }}
                       disabled={loading}
-                      style={{
-                        flex: 1,
-                        padding: "12px",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: loading
-                          ? "rgba(240, 147, 251, 0.5)"
-                          : "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                        color: "#fff",
-                        cursor: loading ? "not-allowed" : "pointer",
-                        fontSize: "0.95rem",
-                        fontWeight: "600",
-                      }}
                     >
-                      确认发放
+                      {language === "en" ? "Confirm pay" : "确认发放"}
                     </button>
                   </div>
                 </div>

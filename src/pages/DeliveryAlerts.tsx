@@ -570,58 +570,21 @@ export default function DeliveryAlerts() {
 
   // 显示新警报通知
   const showNewAlertNotification = (newAlert: any) => {
-    const severityEmoji: { [key: string]: string } = {
-      'critical': '🚨',
-      'high': '⚠️',
-      'medium': '⚡',
-      'low': 'ℹ️'
-    };
-
-    const alertTypeEmoji: { [key: string]: string } = {
-      'distance_violation': '📍',
-      'suspicious_location': '🔍',
-      'location_unavailable': '📵',
-      'time_violation': '⏰',
-      'no_photo': '📸'
-    };
-
     const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: linear-gradient(135deg, #dc2626 0%, #f87171 100%);
-      color: white;
-      padding: 16px 20px;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-      z-index: 10000;
-      max-width: 400px;
-      animation: slideIn 0.3s ease-out;
-    `;
+    notification.className = 'da-toast';
 
-    const severityIcon = severityEmoji[newAlert.severity as string] || '🚨';
-    const alertTypeIcon = alertTypeEmoji[newAlert.alert_type as string] || '⚠️';
-    
-    // 使用安全的 HTML 设置（清理 XSS）
     const safeTitle = escapeHtml(newAlert.title || '');
     const safeCourierName = escapeHtml(newAlert.courier_name || '');
     notification.innerHTML = sanitizeHtml(`
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="font-size: 24px;">${severityIcon}</div>
-        <div>
-          <div style="font-weight: 600; font-size: 16px;">新警报</div>
-          <div style="font-size: 14px; opacity: 0.9;">${alertTypeIcon} ${safeTitle}</div>
-          <div style="font-size: 12px; opacity: 0.8;">骑手: ${safeCourierName}</div>
-        </div>
-      </div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px;">新警报</div>
+      <div style="font-size:13px;opacity:.9;">${safeTitle}</div>
+      <div style="font-size:12px;opacity:.7;margin-top:4px;">骑手: ${safeCourierName}</div>
     `);
 
     document.body.appendChild(notification);
 
-    // 5秒后自动移除
     setTimeout(() => {
-      notification.style.animation = 'slideOut 0.3s ease-in';
+      notification.classList.add('is-out');
       setTimeout(() => {
         if (notification.parentNode) {
           notification.parentNode.removeChild(notification);
@@ -809,92 +772,57 @@ export default function DeliveryAlerts() {
     document.body.removeChild(link);
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical':
-        return '#dc2626'; // 红色
-      case 'high':
-        return '#f59e0b'; // 橙色
-      case 'medium':
-        return '#eab308'; // 黄色
-      case 'low':
-        return '#3b82f6'; // 蓝色
-      default:
-        return '#6b7280'; // 灰色
-    }
-  };
 
   const getSeverityText = (severity: string) => {
     switch (severity) {
       case 'critical':
-        return '🚨 紧急';
+        return t.critical;
       case 'high':
-        return '⚠️ 高';
+        return t.high;
       case 'medium':
-        return '⚡ 中';
+        return t.medium;
       case 'low':
-        return 'ℹ️ 低';
+        return t.low;
       default:
         return severity;
     }
   };
 
-  // 获取违规类型文本
   const getViolationTypeText = (alertType: string) => {
     switch (alertType) {
       case 'location_violation':
-        return '📍 位置异常';
+        return '位置异常';
       case 'delivery_confirmation':
-        return '✅ 确认送达';
+        return '确认送达';
       case 'photo_violation':
-        return '📸 照片缺失';
+        return '照片缺失';
       case 'time_violation':
-        return '⏰ 时间异常';
+        return '时间异常';
       case 'route_violation':
-        return '🛣️ 路线偏差';
+        return '路线偏差';
       default:
-        return '⚠️ 其他记录';
-    }
-  };
-
-  // 获取违规类型颜色
-  const getViolationTypeColor = (alertType: string) => {
-    switch (alertType) {
-      case 'rider_report':
-        return '#3b82f6'; // 蓝色 - 骑手申报
-      case 'location_violation':
-        return '#e53e3e'; // 红色 - 位置违规
-      case 'delivery_confirmation':
-        return '#38a169'; // 绿色 - 正常操作记录
-      case 'photo_violation':
-        return '#d69e2e'; // 黄色 - 照片违规
-      case 'time_violation':
-        return '#3182ce'; // 蓝色 - 时间违规
-      case 'route_violation':
-        return '#805ad5'; // 紫色 - 路线违规
-      default:
-        return '#718096'; // 灰色 - 其他
+        return '其他记录';
     }
   };
 
   const getAlertTypeText = (type: string) => {
     switch (type) {
       case 'rider_report':
-        return '📢 骑手申报';
+        return '骑手申报';
       case 'location_violation':
-        return '📍 确认点过远';
+        return '确认点过远';
       case 'delivery_confirmation':
-        return '📱 手动确认';
+        return '手动确认';
       case 'distance_violation':
-        return '📍 距离违规';
+        return '距离违规';
       case 'suspicious_location':
-        return '🔍 可疑位置';
+        return '可疑位置';
       case 'location_unavailable':
-        return '📵 位置不可用';
+        return '位置不可用';
       case 'time_violation':
-        return '⏰ 时间异常';
+        return '时间异常';
       case 'no_photo':
-        return '📸 缺少照片';
+        return '缺少照片';
       default:
         return type;
     }
@@ -903,295 +831,162 @@ export default function DeliveryAlerts() {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'pending':
-        return '⏳ 待处理';
+        return t.pending;
       case 'acknowledged':
-        return '👀 已确认';
+        return language === 'en' ? 'Confirmed' : language === 'my' ? 'အတည်ပြုပြီး' : '已确认';
       case 'resolved':
-        return '✅ 已解决';
+        return t.resolved;
       case 'dismissed':
-        return '❌ 已忽略';
+        return t.dismissed;
       default:
         return status;
     }
   };
 
-  const pendingCount = alerts.filter(a => a.status === 'pending').length;
-  const criticalCount = alerts.filter(a => a.severity === 'critical' && a.status === 'pending').length;
+  const statusChipClass = (status: string) => {
+    if (status === 'pending') return 'da-chip da-chip--pending';
+    if (status === 'acknowledged') return 'da-chip da-chip--ack';
+    if (status === 'resolved') return 'da-chip da-chip--ok';
+    return 'da-chip da-chip--mute';
+  };
+
+  const sevChipClass = (severity: string) => {
+    if (severity === 'critical') return 'da-chip da-chip--critical';
+    if (severity === 'high') return 'da-chip da-chip--high';
+    if (severity === 'medium') return 'da-chip da-chip--medium';
+    return 'da-chip da-chip--low';
+  };
+
 
   return (
-    <div className="admin-page">
-      <div style={{
-        maxWidth: '1400px',
-        margin: '0 auto'
-      }}>
-        {/* 头部 */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          borderRadius: '16px',
-          padding: '24px',
-          marginBottom: '24px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-              <div>
-                <h1 style={{ margin: 0, fontSize: '2rem', color: '#1a202c', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  🚨 {t.title}
-                  {isRegionalUser && (
-                    <span style={{ 
-                      background: '#48bb78', 
-                      color: 'white', 
-                      padding: '4px 12px', 
-                      borderRadius: '8px', 
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                    }}>
-                      📍 {currentRegionPrefix}
-                    </span>
-                  )}
-                </h1>
-                <p style={{ margin: '8px 0 0 0', color: '#718096', fontSize: '1rem' }}>
-                  {t.subtitle}
-                </p>
-              </div>
-              
-              {/* 返回仪表板按钮 */}
-              <button
-                onClick={handleBackToDashboard}
-                style={{
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '14px 28px',
-                  borderRadius: '10px',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  transition: 'all 0.3s',
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-                }}
-              >
-                <span style={{ fontSize: '1.2rem' }}>← </span>
-                <span>{t.backToDashboard}</span>
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-              {/* 实时统计卡片 */}
-              <div style={{
-                background: 'linear-gradient(135deg, #dc2626 0%, #f87171 100%)',
-                color: 'white',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                textAlign: 'center',
-                position: 'relative'
-              }}>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.criticalAlerts}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.criticalAlerts}</div>
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  width: '8px',
-                  height: '8px',
-                  background: '#10b981',
-                  borderRadius: '50%',
-                  animation: 'pulse 2s infinite'
-                }}></div>
-              </div>
-              <div style={{
-                background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-                color: 'white',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.pendingAlerts}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.pendingAlerts}</div>
-              </div>
-              <div style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
-                color: 'white',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.totalAlerts}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.totalAlerts}</div>
-              </div>
-              <div style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-                color: 'white',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{realTimeStats.resolvedToday}</div>
-                <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.resolvedToday}</div>
-              </div>
-            </div>
+    <div className="admin-page da-page">
+        <div className="admin-page-head">
+          <div>
+            <h1>
+              {t.title}
+              {isRegionalUser && (
+                <span className="admin-page-head__region">{currentRegionPrefix}</span>
+              )}
+            </h1>
+            <p>{t.subtitle}</p>
           </div>
+          <div className="admin-page-actions">
+            <button
+              type="button"
+              className="admin-shell__btn"
+              onClick={handleBackToDashboard}
+            >
+              {t.backToDashboard}
+            </button>
+          </div>
+        </div>
 
-          {/* 筛选器 */}
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#4a5568' }}>
-                {t.filterByStatus}
-              </label>
+        <div className="da-metrics">
+          <div className="finance-ov-card finance-ov-card--out">
+            <div className="finance-ov-card__label">{t.criticalAlerts}</div>
+            <div className="finance-ov-card__value">{realTimeStats.criticalAlerts}</div>
+          </div>
+          <div className="finance-ov-card finance-ov-card--pending">
+            <div className="finance-ov-card__label">{t.pendingAlerts}</div>
+            <div className="finance-ov-card__value">{realTimeStats.pendingAlerts}</div>
+          </div>
+          <div className="finance-ov-card finance-ov-card--platform">
+            <div className="finance-ov-card__label">{t.totalAlerts}</div>
+            <div className="finance-ov-card__value">{realTimeStats.totalAlerts}</div>
+          </div>
+          <div className="finance-ov-card finance-ov-card--net">
+            <div className="finance-ov-card__label">{t.resolvedToday}</div>
+            <div className="finance-ov-card__value">{realTimeStats.resolvedToday}</div>
+          </div>
+        </div>
+
+        <div className="da-bar">
+            <div className="da-field">
+              <label htmlFor="da-filter-status">{t.filterByStatus}</label>
               <select
+                id="da-filter-status"
+                className="finance-cr-select"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  border: '2px solid #e2e8f0',
-                  fontSize: '1rem',
-                  minWidth: '150px'
-                }}
               >
-                <option value="all" style={{ color: '#000' }}>{t.all}</option>
-                <option value="pending" style={{ color: '#000' }}>{t.pending}</option>
-                <option value="resolved" style={{ color: '#000' }}>{t.resolved}</option>
-                <option value="dismissed" style={{ color: '#000' }}>{t.dismissed}</option>
+                <option value="all">{t.all}</option>
+                <option value="pending">{t.pending}</option>
+                <option value="resolved">{t.resolved}</option>
+                <option value="dismissed">{t.dismissed}</option>
               </select>
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#4a5568' }}>
-                {t.filterBySeverity}
-              </label>
+            <div className="da-field">
+              <label htmlFor="da-filter-sev">{t.filterBySeverity}</label>
               <select
+                id="da-filter-sev"
+                className="finance-cr-select"
                 value={severityFilter}
                 onChange={(e) => setSeverityFilter(e.target.value)}
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  border: '2px solid #e2e8f0',
-                  fontSize: '1rem',
-                  minWidth: '150px'
-                }}
               >
-                <option value="all" style={{ color: '#000' }}>{t.all}</option>
-                <option value="critical" style={{ color: '#000' }}>{t.critical}</option>
-                <option value="high" style={{ color: '#000' }}>{t.high}</option>
-                <option value="medium" style={{ color: '#000' }}>{t.medium}</option>
-                <option value="low" style={{ color: '#000' }}>{t.low}</option>
+                <option value="all">{t.all}</option>
+                <option value="critical">{t.critical}</option>
+                <option value="high">{t.high}</option>
+                <option value="medium">{t.medium}</option>
+                <option value="low">{t.low}</option>
               </select>
             </div>
 
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#4a5568' }}>
+            <div className="da-field da-field--search">
+              <label htmlFor="da-search">
                 {language === 'zh' ? '搜索骑手/包裹' : language === 'en' ? 'Search Courier/Package' : 'ရှာဖွေရန်'}
               </label>
               <input
+                id="da-search"
+                className="da-search"
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={language === 'zh' ? '搜索姓名、ID...' : language === 'en' ? 'Search name, ID...' : 'ရှာဖွေရန်...'}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  border: '2px solid #e2e8f0',
-                  fontSize: '1rem'
-                }}
               />
             </div>
 
+            <div className="da-tools">
             <button
+              type="button"
+              className={`admin-shell__btn${voiceEnabled ? ' admin-shell__btn--primary' : ''}`}
               onClick={() => setVoiceEnabled(!voiceEnabled)}
-              style={{
-                marginTop: '28px',
-                padding: '10px 24px',
-                borderRadius: '8px',
-                border: 'none',
-                background: voiceEnabled ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-                color: 'white',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                fontWeight: 500,
-                transition: 'all 0.3s'
-              }}
             >
-              {voiceEnabled ? '🔊 语音: 开启' : '🔇 语音: 关闭'}
+              {voiceEnabled
+                ? (language === 'en' ? 'Voice on' : '语音开启')
+                : (language === 'en' ? 'Voice off' : '语音关闭')}
             </button>
 
             <button
+              type="button"
+              className="admin-shell__btn"
               onClick={loadAlerts}
               disabled={loading}
-              style={{
-                marginTop: '28px',
-                padding: '10px 24px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                fontSize: '1rem',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontWeight: 500
-              }}
             >
-              {loading ? t.loading : '🔄 ' + t.refresh}
+              {loading ? t.loading : t.refresh}
             </button>
 
             <button
+              type="button"
+              className="admin-shell__btn admin-shell__btn--danger"
               onClick={handleDeleteAll}
               disabled={loading}
-              style={{
-                marginTop: '28px',
-                padding: '10px 24px',
-                borderRadius: '8px',
-                border: '1.5px solid #ef4444',
-                background: 'white',
-                color: '#ef4444',
-                fontSize: '1rem',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontWeight: 600,
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#ef4444';
-                e.currentTarget.style.color = 'white';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'white';
-                e.currentTarget.style.color = '#ef4444';
-              }}
             >
-              🗑️ {language === 'zh' ? '清空所有' : language === 'en' ? 'Clear All' : 'အားလုံးဖျက်မည်'}
+              {language === 'zh' ? '清空所有' : language === 'en' ? 'Clear All' : 'အားလုံးဖျက်မည်'}
             </button>
 
             <button
+              type="button"
+              className="admin-shell__btn"
               onClick={handleExportCSV}
               disabled={loading || alerts.length === 0}
-              style={{
-                marginTop: '28px',
-                padding: '10px 24px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
-                color: 'white',
-                fontSize: '1rem',
-                cursor: (loading || alerts.length === 0) ? 'not-allowed' : 'pointer',
-                fontWeight: 500,
-                transition: 'all 0.3s'
-              }}
             >
-              📥 {language === 'zh' ? '导出报表' : language === 'en' ? 'Export CSV' : 'အစီရင်ခံစာ ထုတ်ရန်'}
+              {language === 'zh' ? '导出报表' : language === 'en' ? 'Export CSV' : 'အစီရင်ခံစာ ထုတ်ရန်'}
             </button>
 
             <button
+              type="button"
+              className="admin-shell__btn admin-shell__btn--primary"
               onClick={() => {
                 const pendingIds = alerts.filter(a => a.status === 'pending').map(a => a.id);
                 if (pendingIds.length > 0) {
@@ -1203,243 +998,104 @@ export default function DeliveryAlerts() {
                 }
               }}
               disabled={loading || alerts.filter(a => a.status === 'pending').length === 0}
-              style={{
-                marginTop: '28px',
-                padding: '10px 24px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
-                color: 'white',
-                fontSize: '1rem',
-                cursor: (loading || alerts.filter(a => a.status === 'pending').length === 0) ? 'not-allowed' : 'pointer',
-                fontWeight: 500,
-                transition: 'all 0.3s'
-              }}
             >
-              ✅ {language === 'zh' ? '批量确认' : language === 'en' ? 'Bulk Acknowledge' : 'အစုလိုက်အတည်ပြုရန်'}
+              {language === 'zh' ? '批量确认' : language === 'en' ? 'Bulk Acknowledge' : 'အစုလိုက်အတည်ပြုရန်'}
             </button>
-          </div>
+            </div>
         </div>
 
-        {/* 警报列表 */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          borderRadius: '16px',
-          padding: '24px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-        }}>
+        <div className="da-panel">
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '48px' }}>
-              <div style={{ fontSize: '3rem' }}>⏳</div>
-              <p style={{ color: '#718096', marginTop: '16px' }}>加载警报中...</p>
-            </div>
+            <div className="da-empty">{t.loading}</div>
           ) : alerts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px' }}>
-              <div style={{ fontSize: '3rem' }}>✅</div>
-              <p style={{ color: '#718096', marginTop: '16px', fontSize: '1.125rem' }}>
-                {filter === 'pending' ? '暂无待处理警报' : '暂无警报记录'}
-              </p>
+            <div className="da-empty">
+              {filter === 'pending' ? '暂无待处理警报' : '暂无警报记录'}
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              {alerts.map((alert) => (
+            alerts.map((alert) => {
+              const stats = getCourierViolationStats(alert.courier_id);
+              return (
                 <div
                   key={alert.id}
+                  className={`da-item da-item--${alert.severity}${alert.status !== 'pending' ? ' is-done' : ''}`}
                   onClick={() => {
                     setSelectedAlert(alert);
                     setShowDetailModal(true);
                   }}
-                  style={{
-                    background: 'white',
-                    border: `3px solid ${getSeverityColor(alert.severity)}`,
-                    borderRadius: '12px',
-                    padding: '20px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: alert.status === 'pending' ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none',
-                    opacity: alert.status === 'pending' ? 1 : 0.7
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = alert.status === 'pending' ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none';
-                  }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{
-                          background: getSeverityColor(alert.severity),
-                          color: 'white',
-                          padding: '4px 12px',
-                          borderRadius: '6px',
-                          fontSize: '0.875rem',
-                          fontWeight: 600
-                        }}>
-                          {getSeverityText(alert.severity)}
-                        </span>
-                        <span style={{
-                          background: getViolationTypeColor(alert.alert_type),
-                          color: 'white',
-                          padding: '4px 12px',
-                          borderRadius: '6px',
-                          fontSize: '0.875rem',
-                          fontWeight: 600
-                        }}>
-                          {getViolationTypeText(alert.alert_type)}
-                        </span>
-                        <span style={{
-                          background: alert.status === 'pending' ? '#fef3c7' : '#e2e8f0',
-                          color: alert.status === 'pending' ? '#92400e' : '#4a5568',
-                          padding: '4px 12px',
-                          borderRadius: '6px',
-                          fontSize: '0.875rem'
-                        }}>
-                          {getStatusText(alert.status)}
-                        </span>
-                      </div>
-                      <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', color: '#1a202c' }}>
-                        {alert.title}
-                      </h3>
-                      <p style={{ margin: 0, color: '#4a5568', fontSize: '0.9375rem', whiteSpace: 'pre-line' }}>
-                        {alert.description.length > 200 ? alert.description.substring(0, 200) + '...' : alert.description}
-                      </p>
+                  <div>
+                    <div className="da-item__chips">
+                      <span className={sevChipClass(alert.severity)}>{getSeverityText(alert.severity)}</span>
+                      <span className="da-chip da-chip--mute">{getViolationTypeText(alert.alert_type)}</span>
+                      <span className={statusChipClass(alert.status)}>{getStatusText(alert.status)}</span>
                     </div>
-                    <div style={{ textAlign: 'right', minWidth: '200px' }}>
-                      <div style={{ fontSize: '0.875rem', color: '#718096' }}>
-                        {new Date(alert.created_at).toLocaleString('zh-CN')}
-                      </div>
-                      <div style={{ marginTop: '8px', fontSize: '0.875rem', color: '#4a5568' }}>
-                        <strong>{t.rider}:</strong> {alert.courier_name}
-                        {(() => {
-                          const stats = getCourierViolationStats(alert.courier_id);
-                          if (stats.totalViolations > 0) {
-                            return (
-                              <span style={{ 
-                                marginLeft: '8px', 
-                                padding: '2px 6px', 
-                                backgroundColor: stats.criticalViolations > 0 ? '#e53e3e' : '#d69e2e',
-                                color: 'white',
-                                borderRadius: '4px',
-                                fontSize: '10px'
-                              }}>
-                                ⚠️ {stats.totalViolations}{language === 'my' ? 'ကြိမ်ဖောက်ဖျက်မှု' : '次违规'} ({stats.totalPenaltyPoints}{language === 'my' ? 'မှတ်' : '分'})
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                      <div style={{ marginTop: '4px', fontSize: '0.875rem', color: '#4a5568' }}>
-                        <strong>{language === 'my' ? 'ပစ္စည်း' : '包裹'}:</strong> {alert.package_id}
-                      </div>
-                      {alert.distance_from_destination && (
-                        <div style={{
-                          marginTop: '8px',
-                          padding: '8px',
-                          background: '#fee2e2',
-                          borderRadius: '6px',
-                          fontSize: '0.875rem',
-                          color: '#991b1b',
-                          fontWeight: 600
-                        }}>
-                          {language === 'my' ? 'အကွာအဝေး' : '距离'}: {alert.distance_from_destination.toFixed(0)} {language === 'my' ? 'မီတာ' : '米'}
-                        </div>
-                      )}
+                    <h3 className="da-item__title">{alert.title}</h3>
+                    <p className="da-item__desc">
+                      {alert.description.length > 200 ? alert.description.substring(0, 200) + '...' : alert.description}
+                    </p>
+                  </div>
+                  <div className="da-item__side">
+                    <div>{new Date(alert.created_at).toLocaleString('zh-CN')}</div>
+                    <div>
+                      <strong>{t.rider}:</strong> {alert.courier_name}
                     </div>
+                    {stats.totalViolations > 0 && (
+                      <span className={stats.criticalViolations > 0 ? 'da-chip da-chip--critical' : 'da-chip da-chip--warn'}>
+                        {stats.totalViolations}{language === 'my' ? 'ကြိမ်ဖောက်ဖျက်မှု' : '次违规'} ({stats.totalPenaltyPoints}{language === 'my' ? 'မှတ်' : '分'})
+                      </span>
+                    )}
+                    <div>
+                      <strong>{language === 'my' ? 'ပစ္စည်း' : '包裹'}:</strong> {alert.package_id}
+                    </div>
+                    {alert.distance_from_destination ? (
+                      <div className="da-dist">
+                        {language === 'my' ? 'အကွာအဝေး' : '距离'}: {alert.distance_from_destination.toFixed(0)} {language === 'my' ? 'မီတာ' : '米'}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })
           )}
         </div>
-      </div>
 
-      {/* 包裹详情模态框 */}
       {showPackageDetail && selectedPackage && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1001,
-            padding: '24px'
-          }}
+          className="admin-modal-scrim da-scrim--top"
           onClick={() => setShowPackageDetail(false)}
         >
           <div
-            style={{
-              background: 'white',
-              borderRadius: '16px',
-              padding: '32px',
-              maxWidth: '800px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflow: 'auto'
-            }}
+            className="admin-modal da-modal"
+            role="dialog"
+            aria-labelledby="da-photo-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ margin: '0 0 24px 0', color: '#1a202c' }}>
-              📸 骑手拍照记录
-            </h2>
-            
+            <h2 id="da-photo-title">骑手拍照记录</h2>
+
             {loadingPhotos ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <div style={{ fontSize: '2rem' }}>⏳</div>
-                <p style={{ color: '#718096', marginTop: '8px' }}>加载照片中...</p>
-              </div>
+              <div className="da-empty">加载照片中...</div>
             ) : packagePhotos.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              <div className="da-photos">
                 {packagePhotos.map((photo, index) => (
-                  <div key={index} style={{ textAlign: 'center' }}>
-                    <img
-                      src={photo}
-                      alt={`包裹照片 ${index + 1}`}
-                      style={{
-                        width: '100%',
-                        height: '150px',
-                        objectFit: 'cover',
-                        borderRadius: '8px',
-                        border: '2px solid #e2e8f0',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => window.open(photo, '_blank')}
-                    />
-                    <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#4a5568' }}>
-                      照片 {index + 1}
-                    </p>
-                  </div>
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => window.open(photo, '_blank')}
+                  >
+                    <img src={photo} alt={`包裹照片 ${index + 1}`} />
+                    <span>照片 {index + 1}</span>
+                  </button>
                 ))}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '40px', background: '#f7fafc', borderRadius: '8px' }}>
-                <div style={{ fontSize: '2rem' }}>📷</div>
-                <p style={{ color: '#718096', marginTop: '8px' }}>暂无照片记录</p>
-              </div>
+              <div className="da-empty">暂无照片记录</div>
             )}
 
-            <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <div className="admin-modal__actions">
               <button
+                type="button"
+                className="admin-shell__btn"
                 onClick={() => setShowPackageDetail(false)}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: '2px solid #e2e8f0',
-                  background: 'white',
-                  color: '#4a5568',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  fontWeight: 500
-                }}
               >
                 关闭
               </button>
@@ -1448,351 +1104,181 @@ export default function DeliveryAlerts() {
         </div>
       )}
 
-      {/* 详情模态框 */}
       {showDetailModal && selectedAlert && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '24px'
-          }}
+          className="admin-modal-scrim"
           onClick={() => setShowDetailModal(false)}
         >
           <div
-            style={{
-              background: 'white',
-              borderRadius: '16px',
-              padding: '32px',
-              maxWidth: '800px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflow: 'auto'
-            }}
+            className="admin-modal da-modal"
+            role="dialog"
+            aria-labelledby="da-detail-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ margin: '0 0 24px 0', color: '#1a202c' }}>
-              警报详情
-            </h2>
+            <h2 id="da-detail-title">警报详情</h2>
 
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                <span style={{
-                  background: getSeverityColor(selectedAlert.severity),
-                  color: 'white',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  fontWeight: 600
-                }}>
-                  {getSeverityText(selectedAlert.severity)}
-                </span>
-                <span style={{
-                  background: '#e2e8f0',
-                  color: '#4a5568',
-                  padding: '8px 16px',
-                  borderRadius: '8px'
-                }}>
-                  {getAlertTypeText(selectedAlert.alert_type)}
-                </span>
-                <span style={{
-                  background: selectedAlert.status === 'pending' ? '#fef3c7' : '#e2e8f0',
-                  color: selectedAlert.status === 'pending' ? '#92400e' : '#4a5568',
-                  padding: '8px 16px',
-                  borderRadius: '8px'
-                }}>
-                  {getStatusText(selectedAlert.status)}
-                </span>
-              </div>
-
-              <h3 style={{ margin: '0 0 12px 0', fontSize: '1.5rem', color: '#1a202c' }}>
-                {selectedAlert.title}
-              </h3>
-              <p style={{ margin: '0 0 24px 0', color: '#4a5568', whiteSpace: 'pre-line', lineHeight: 1.6 }}>
-                {selectedAlert.description}
-              </p>
-
-              <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <strong style={{ color: '#4a5568' }}>包裹编号:</strong>
-                    <div style={{ marginTop: '4px', color: '#1a202c' }}>{selectedAlert.package_id}</div>
-                  </div>
-                  <div>
-                    <strong style={{ color: '#4a5568' }}>骑手:</strong>
-                    <div style={{ marginTop: '4px', color: '#1a202c' }}>{selectedAlert.courier_name}</div>
-                  </div>
-                  <div>
-                    <strong style={{ color: '#4a5568' }}>尝试操作:</strong>
-                    <div style={{ marginTop: '4px', color: '#1a202c' }}>
-                      {selectedAlert.action_attempted === 'mark_delivered' ? '标记已送达' : selectedAlert.action_attempted}
-                    </div>
-                  </div>
-                  <div>
-                    <strong style={{ color: '#4a5568' }}>创建时间:</strong>
-                    <div style={{ marginTop: '4px', color: '#1a202c' }}>
-                      {new Date(selectedAlert.created_at).toLocaleString('zh-CN')}
-                    </div>
-                  </div>
-                  {selectedAlert.distance_from_destination && (
-                    <div>
-                      <strong style={{ color: '#4a5568' }}>距离目标:</strong>
-                      <div style={{ marginTop: '4px', color: '#dc2626', fontWeight: 600, fontSize: '1.125rem' }}>
-                        {selectedAlert.distance_from_destination.toFixed(0)} 米
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {selectedAlert.courier_latitude && selectedAlert.courier_longitude && (
-                  <div style={{ marginTop: '16px' }}>
-                    <strong style={{ color: '#4a5568' }}>位置信息:</strong>
-                    <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ background: 'white', padding: '12px', borderRadius: '8px' }}>
-                        <div style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '4px' }}>骑手位置</div>
-                        <div style={{ fontSize: '0.875rem', fontFamily: 'monospace', color: '#1a202c' }}>
-                          {selectedAlert.courier_latitude.toFixed(6)}, {selectedAlert.courier_longitude.toFixed(6)}
-                        </div>
-                        <a
-                          href={`https://www.google.com/maps?q=${selectedAlert.courier_latitude},${selectedAlert.courier_longitude}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ fontSize: '0.875rem', color: '#3b82f6', marginTop: '4px', display: 'inline-block' }}
-                        >
-                          📍 在地图中查看
-                        </a>
-                      </div>
-                      {selectedAlert.destination_latitude && selectedAlert.destination_longitude && (
-                        <div style={{ background: 'white', padding: '12px', borderRadius: '8px' }}>
-                          <div style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '4px' }}>收件地址</div>
-                          <div style={{ fontSize: '0.875rem', fontFamily: 'monospace', color: '#1a202c' }}>
-                            {selectedAlert.destination_latitude.toFixed(6)}, {selectedAlert.destination_longitude.toFixed(6)}
-                          </div>
-                          <a
-                            href={`https://www.google.com/maps?q=${selectedAlert.destination_latitude},${selectedAlert.destination_longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ fontSize: '0.875rem', color: '#3b82f6', marginTop: '4px', display: 'inline-block' }}
-                          >
-                            📍 在地图中查看
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {selectedAlert.status === 'pending' && (
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#4a5568' }}>
-                    处理备注:
-                  </label>
-                  <textarea
-                    value={resolutionNotes}
-                    onChange={(e) => setResolutionNotes(e.target.value)}
-                    placeholder="输入处理备注..."
-                    style={{
-                      width: '100%',
-                      minHeight: '100px',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: '2px solid #e2e8f0',
-                      fontSize: '1rem',
-                      fontFamily: 'inherit',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-              )}
-
-              {selectedAlert.resolution_notes && (
-                <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', marginTop: '16px' }}>
-                  <strong style={{ color: '#166534' }}>处理备注:</strong>
-                  <p style={{ margin: '8px 0 0 0', color: '#15803d' }}>{selectedAlert.resolution_notes}</p>
-                  {selectedAlert.resolved_by && (
-                    <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#16a34a' }}>
-                      处理人: {selectedAlert.resolved_by} | 时间: {selectedAlert.resolved_at ? new Date(selectedAlert.resolved_at).toLocaleString('zh-CN') : ''}
-                    </p>
-                  )}
-                </div>
-              )}
+            <div className="da-item__chips">
+              <span className={sevChipClass(selectedAlert.severity)}>{getSeverityText(selectedAlert.severity)}</span>
+              <span className="da-chip da-chip--mute">{getAlertTypeText(selectedAlert.alert_type)}</span>
+              <span className={statusChipClass(selectedAlert.status)}>{getStatusText(selectedAlert.status)}</span>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <h3>{selectedAlert.title}</h3>
+            <p className="da-desc">{selectedAlert.description}</p>
+
+            <dl className="da-facts">
+              <div>
+                <dt>包裹编号</dt>
+                <dd>{selectedAlert.package_id}</dd>
+              </div>
+              <div>
+                <dt>骑手</dt>
+                <dd>{selectedAlert.courier_name}</dd>
+              </div>
+              <div>
+                <dt>尝试操作</dt>
+                <dd>
+                  {selectedAlert.action_attempted === 'mark_delivered' ? '标记已送达' : selectedAlert.action_attempted}
+                </dd>
+              </div>
+              <div>
+                <dt>创建时间</dt>
+                <dd>{new Date(selectedAlert.created_at).toLocaleString('zh-CN')}</dd>
+              </div>
+              {selectedAlert.distance_from_destination ? (
+                <div>
+                  <dt>距离目标</dt>
+                  <dd>{selectedAlert.distance_from_destination.toFixed(0)} 米</dd>
+                </div>
+              ) : null}
+            </dl>
+
+            {selectedAlert.courier_latitude && selectedAlert.courier_longitude ? (
+              <div className="admin-modal__field">
+                <label>位置信息</label>
+                <div className="da-maps">
+                  <div className="da-map">
+                    <div className="da-map__label">骑手位置</div>
+                    <div className="da-coords">
+                      {selectedAlert.courier_latitude.toFixed(6)}, {selectedAlert.courier_longitude.toFixed(6)}
+                    </div>
+                    <a
+                      href={`https://www.google.com/maps?q=${selectedAlert.courier_latitude},${selectedAlert.courier_longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      在地图中查看
+                    </a>
+                  </div>
+                  {selectedAlert.destination_latitude && selectedAlert.destination_longitude ? (
+                    <div className="da-map">
+                      <div className="da-map__label">收件地址</div>
+                      <div className="da-coords">
+                        {selectedAlert.destination_latitude.toFixed(6)}, {selectedAlert.destination_longitude.toFixed(6)}
+                      </div>
+                      <a
+                        href={`https://www.google.com/maps?q=${selectedAlert.destination_latitude},${selectedAlert.destination_longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        在地图中查看
+                      </a>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {selectedAlert.status === 'pending' && (
+              <div className="admin-modal__field">
+                <label htmlFor="da-resolution-notes">处理备注</label>
+                <textarea
+                  id="da-resolution-notes"
+                  className="da-notes"
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  placeholder="输入处理备注..."
+                />
+              </div>
+            )}
+
+            {selectedAlert.resolution_notes ? (
+              <div className="da-note">
+                <strong>处理备注</strong>
+                <p>{selectedAlert.resolution_notes}</p>
+                {selectedAlert.resolved_by ? (
+                  <p>
+                    处理人: {selectedAlert.resolved_by}
+                    {selectedAlert.resolved_at
+                      ? ` · ${new Date(selectedAlert.resolved_at).toLocaleString('zh-CN')}`
+                      : ''}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="da-modal-actions">
               <button
+                type="button"
+                className="admin-shell__btn"
                 onClick={() => setShowDetailModal(false)}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: '2px solid #e2e8f0',
-                  background: 'white',
-                  color: '#4a5568',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  fontWeight: 500
-                }}
               >
                 {t.cancel}
               </button>
               <button
+                type="button"
+                className="admin-shell__btn"
                 onClick={() => handleViewPackageDetail(selectedAlert)}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
               >
-                <span>📸</span>
-                <span>{language === 'my' ? 'ဓာတ်ပုံမှတ်တမ်း' : '骑手拍照记录'}</span>
+                {language === 'my' ? 'ဓာတ်ပုံမှတ်တမ်း' : '骑手拍照记录'}
               </button>
-              
               <button
+                type="button"
+                className="admin-shell__btn admin-shell__btn--danger"
                 onClick={() => handleCreateViolation(selectedAlert)}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#e53e3e',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
               >
-                <span>⚠️</span>
-                <span>{language === 'my' ? 'ဖောက်ဖျက်မှုမှတ်တမ်းပြုလုပ်ရန်' : '创建违规记录'}</span>
+                {language === 'my' ? 'ဖောက်ဖျက်မှုမှတ်တမ်းပြုလုပ်ရန်' : '创建违规记录'}
               </button>
-              
               <button
+                type="button"
+                className="admin-shell__btn"
                 onClick={() => handleViewCourierViolations(selectedAlert.courier_id)}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#d69e2e',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
               >
-                <span>📋</span>
-                <span>{language === 'my' ? 'ဖောက်ဖျက်မှုသမိုင်း' : '违规历史'}</span>
+                {language === 'my' ? 'ဖောက်ဖျက်မှုသမိုင်း' : '违规历史'}
               </button>
-              
-              {selectedAlert.status === 'pending' && (
-                <div style={{ display: 'flex', gap: '12px', marginTop: '12px', width: '100%' }}>
+              {selectedAlert.status === 'pending' ? (
+                <>
                   <button
+                    type="button"
+                    className="admin-shell__btn admin-shell__btn--primary"
                     onClick={() => handleUpdateStatus(selectedAlert.id, 'acknowledged')}
                     disabled={processing}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      cursor: processing ? 'not-allowed' : 'pointer',
-                      fontWeight: 500
-                    }}
                   >
-                    👀 {language === 'my' ? 'အတည်ပြုရန်' : '确认'}
+                    {language === 'my' ? 'အတည်ပြုရန်' : '确认'}
                   </button>
                   <button
+                    type="button"
+                    className="admin-shell__btn admin-shell__btn--primary"
                     onClick={() => handleUpdateStatus(selectedAlert.id, 'resolved')}
                     disabled={processing}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      cursor: processing ? 'not-allowed' : 'pointer',
-                      fontWeight: 500
-                    }}
                   >
-                    ✅ {t.resolve}
+                    {t.resolve}
                   </button>
                   <button
+                    type="button"
+                    className="admin-shell__btn"
                     onClick={() => handleUpdateStatus(selectedAlert.id, 'dismissed')}
                     disabled={processing}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)',
-                      color: 'white',
-                      fontSize: '1rem',
-                      cursor: processing ? 'not-allowed' : 'pointer',
-                      fontWeight: 500
-                    }}
                   >
-                    ❌ {t.dismiss}
+                    {t.dismiss}
                   </button>
-                </div>
-              )}
+                </>
+              ) : null}
             </div>
           </div>
         </div>
       )}
 
-      {/* CSS 动画样式 */}
-      <style>
-        {`
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-          }
-          
-          @keyframes slideIn {
-            from {
-              transform: translateX(100%);
-              opacity: 0;
-            }
-            to {
-              transform: translateX(0);
-              opacity: 1;
-            }
-          }
-          
-          @keyframes slideOut {
-            from {
-              transform: translateX(0);
-              opacity: 1;
-            }
-            to {
-              transform: translateX(100%);
-              opacity: 0;
-            }
-          }
-        `}
-      </style>
     </div>
   );
 }
-
