@@ -1181,7 +1181,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                         fontSize: "0.9rem",
                       }}
                     >
-                      骑手分得总额 (总费 - 起步价)
+                      骑手分得总额（准时达=总费−起步价；顺路递=固定额）
                     </div>
                   </div>
                   <div
@@ -1427,7 +1427,7 @@ const FinanceCourierRecordsTab: React.FC = () => {
                             fontSize: "0.9rem",
                           }}
                         >
-                          骑手收入 (总费 - 起步价)
+                          骑手收入（总费−起步价 / 顺路递固定额）
                         </th>
                         <th
                           style={{

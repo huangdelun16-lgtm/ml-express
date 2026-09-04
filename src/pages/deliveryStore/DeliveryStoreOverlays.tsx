@@ -21,6 +21,7 @@ import {
   buildAdminProductChanges,
   listingStatusLabel,
   ADMIN_PRODUCT_FIELD_LABELS,
+  ADMIN_PRODUCT_DIFF_KEYS,
   formatAdminProductFieldText,
   productNeedsAdminReview,
 } from './deliveryStoreShared';
@@ -664,252 +665,95 @@ const DeliveryStoreOverlays: React.FC = () => {
         </div>,
         document.body
       )}
-      {/* 店长收件码二维码模态框 */}
-      {showQRModal && currentStoreQR && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 3000
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #1a365d 0%, #2c5282 100%)',
-            padding: '2rem',
-            borderRadius: '20px',
-            width: '90%',
-            maxWidth: '500px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            {/* 头部 */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.5rem',
-              paddingBottom: '1rem',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-            }}>
-              <h2 style={{
-                margin: 0,
-                color: '#A5C7FF',
-                fontSize: '1.5rem',
-                fontWeight: 'bold'
-              }}>
-                📱 店长收件码
-              </h2>
-              <button
-                onClick={() => setShowQRModal(false)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  padding: '0.5rem',
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  fontSize: '1.2rem',
-                  width: '40px',
-                  height: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* 店铺信息 */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              padding: '1.5rem',
-              borderRadius: '15px',
-              marginBottom: '1.5rem'
-            }}>
-              <h3 style={{
-                margin: '0 0 1rem 0',
-                color: '#A5C7FF',
-                fontSize: '1.2rem'
-              }}>
-                店铺信息
-              </h3>
-              <div style={{
-                background: 'white',
-                padding: '1rem',
-                borderRadius: '10px',
-                marginBottom: '1rem'
-              }}>
-                <p style={{
-                  margin: '0 0 0.5rem 0',
-                  color: '#2c5282',
-                  fontSize: '1rem',
-                  fontWeight: 'bold'
-                }}>
-                  店铺名称: {currentStoreQR.store_name}
-                </p>
-                <p style={{
-                  margin: '0 0 0.5rem 0',
-                  color: '#2c5282',
-                  fontSize: '1rem',
-                  fontWeight: 'bold'
-                }}>
-                  店铺代码: {currentStoreQR.store_code}
-                </p>
-                <p style={{
-                  margin: '0 0 0.5rem 0',
-                  color: '#666',
-                  fontSize: '0.9rem'
-                }}>
-                  地址: {currentStoreQR.address}
-                </p>
-                <p style={{
-                  margin: 0,
-                  color: '#666',
-                  fontSize: '0.9rem'
-                }}>
-                  店长: {currentStoreQR.manager_name} ({currentStoreQR.manager_phone})
-                </p>
+      {showQRModal && currentStoreQR && createPortal(
+        <div
+          className="merchant-apps-modal-overlay store-receive-qr-overlay"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowQRModal(false);
+          }}
+        >
+          <div
+            className="merchant-apps-modal store-receive-qr"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="store-receive-qr-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="merchant-apps-modal__head">
+              <div className="merchant-apps-modal__head-main">
+                <div className="merchant-apps-modal__title-row">
+                  <h2 id="store-receive-qr-title" className="merchant-apps-modal__title">
+                    店长收件码
+                  </h2>
+                  <span className="store-receive-qr__code">{currentStoreQR.store_code}</span>
+                </div>
+                <div className="merchant-apps-modal__meta">
+                  <span>{currentStoreQR.store_name}</span>
+                </div>
               </div>
-            </div>
+              <button
+                type="button"
+                className="merchant-apps-modal__close"
+                onClick={() => setShowQRModal(false)}
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </header>
 
-            {/* 二维码显示 */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              padding: '1.5rem',
-              borderRadius: '15px',
-              marginBottom: '1.5rem',
-              textAlign: 'center'
-            }}>
-              <h3 style={{
-                margin: '0 0 1rem 0',
-                color: '#A5C7FF',
-                fontSize: '1.2rem'
-              }}>
-                收件码二维码
-              </h3>
-              <div style={{
-                background: 'white',
-                padding: '1rem',
-                borderRadius: '10px',
-                display: 'inline-block',
-                marginBottom: '1rem'
-              }}>
-                {qrCodeDataUrl ? (
-                  <img 
-                    src={qrCodeDataUrl} 
-                    alt="店长收件码" 
-                    style={{
-                      width: '200px',
-                      height: '200px',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(44, 82, 130, 0.3)'
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '200px',
-                    height: '200px',
-                    background: '#f8f9fa',
-                    border: '2px dashed #2c5282',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#666',
-                    fontSize: '0.9rem'
-                  }}>
-                    正在生成二维码...
+            <div className="merchant-apps-modal__body store-receive-qr__body">
+              <div className="store-receive-qr__hero">
+                <div className="store-receive-qr__plate">
+                  <div className="store-receive-qr__paper">
+                    {qrCodeDataUrl ? (
+                      <img src={qrCodeDataUrl} alt={`${currentStoreQR.store_name} 店长收件码`} />
+                    ) : (
+                      <div className="store-receive-qr__skeleton" aria-label="正在生成二维码" />
+                    )}
                   </div>
-                )}
+                </div>
+                <p className="store-receive-qr__hint">
+                  骑手送件时扫描此码，确认包裹已送达该店。请妥善保管，勿对外转发。
+                </p>
               </div>
-              <p style={{
-                margin: 0,
-                color: 'rgba(255, 255, 255, 0.8)',
-                fontSize: '0.9rem',
-                lineHeight: '1.5'
-              }}>
-                骑手送件时必须扫描此二维码<br/>
-                确认包裹送达至该店铺<br/>
-                请妥善保管此收件码
-              </p>
+
+              <dl className="merchant-apps-detail-grid store-receive-qr__meta">
+                <div className="merchant-apps-detail-item">
+                  <dt>店长</dt>
+                  <dd>{currentStoreQR.manager_name || '—'}</dd>
+                </div>
+                <div className="merchant-apps-detail-item">
+                  <dt>电话</dt>
+                  <dd>{currentStoreQR.manager_phone || '—'}</dd>
+                </div>
+                <div className="merchant-apps-detail-item merchant-apps-detail-item--full">
+                  <dt>地址</dt>
+                  <dd>{currentStoreQR.address || '—'}</dd>
+                </div>
+              </dl>
             </div>
 
-            {/* 操作按钮 */}
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'center'
-            }}>
+            <footer className="merchant-apps-modal__foot">
               <button
-                onClick={downloadQRCode}
-                disabled={!qrCodeDataUrl}
-                style={{
-                  background: !qrCodeDataUrl ? '#94a3b8' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '1rem 2rem',
-                  borderRadius: '10px',
-                  cursor: !qrCodeDataUrl ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  boxShadow: '0 4px 15px rgba(39, 174, 96, 0.3)',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-                onMouseOver={(e) => {
-                  if (qrCodeDataUrl) {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (qrCodeDataUrl) {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
-                  }
-                }}
-              >
-                📥 下载收件码
-              </button>
-              <button
+                type="button"
+                className="merchant-apps-btn merchant-apps-btn--ghost"
                 onClick={() => setShowQRModal(false)}
-                style={{
-                  background: '#e2e8f0',
-                  color: '#4a5568',
-                  border: 'none',
-                  padding: '1rem 2rem',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#cbd5e0'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#e2e8f0'}
               >
                 关闭
               </button>
-            </div>
+              <button
+                type="button"
+                className="merchant-apps-btn merchant-apps-btn--success"
+                onClick={downloadQRCode}
+                disabled={!qrCodeDataUrl}
+              >
+                下载收件码
+              </button>
+            </footer>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 包裹详情模态框 */}
@@ -2522,313 +2366,195 @@ const DeliveryStoreOverlays: React.FC = () => {
         </div>
       )}
 
-      {/* 🚀 新增：店铺商品详情弹窗 */}
-      {showProductsModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 3000,
-          backdropFilter: 'blur(8px)'
-        }}>
-          <div style={{
-            width: '90%',
-            maxWidth: '800px',
-            background: '#1e293b',
-            borderRadius: '24px',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            overflow: 'hidden',
-            maxHeight: '85vh',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-          }}>
-            <div style={{
-              padding: '24px',
-              background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-              color: 'white',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.5rem' }}>🛍️ {viewingStoreName} - 商品列表</h2>
-                <p style={{ margin: '4px 0 0 0', opacity: 0.8, fontSize: '0.9rem' }}>
-                  共 {productListCounts.all} 件 · 待审 {productListCounts.pending} · 已完成 {productListCounts.approved} · 已取消 {productListCounts.rejected}
-                </p>
+      {showProductsModal && createPortal(
+        <div
+          className="merchant-apps-modal-overlay store-products-overlay"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowProductsModal(false);
+              setViewingStoreId(null);
+              setSelectedAdminProductId(null);
+            }
+          }}
+        >
+          <div
+            className="merchant-apps-modal store-products-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="store-products-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="merchant-apps-modal__head">
+              <div className="merchant-apps-modal__head-main">
+                <div className="merchant-apps-modal__title-row">
+                  <h2 id="store-products-title" className="merchant-apps-modal__title">
+                    商品列表
+                  </h2>
+                </div>
+                <div className="merchant-apps-modal__meta">
+                  <span>{viewingStoreName || '合伙店铺'}</span>
+                  <span>
+                    共 {productListCounts.all} 件 · 待审 {productListCounts.pending} · 已完成 {productListCounts.approved} · 已取消 {productListCounts.rejected}
+                  </span>
+                </div>
               </div>
-              <button 
-                onClick={() => { setShowProductsModal(false); setViewingStoreId(null); setSelectedAdminProductId(null); }}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  border: 'none',
-                  color: 'white',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '20px',
-                  cursor: 'pointer',
-                  fontSize: '1.2rem',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center'
+              <button
+                type="button"
+                className="merchant-apps-modal__close"
+                aria-label="关闭"
+                onClick={() => {
+                  setShowProductsModal(false);
+                  setViewingStoreId(null);
+                  setSelectedAdminProductId(null);
                 }}
-              >✕</button>
-            </div>
+              >
+                ×
+              </button>
+            </header>
 
-            <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+            <div className="merchant-apps-modal__body store-products-modal__body">
               {loadingProducts ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    border: '4px solid rgba(255,255,255,0.1)',
-                    borderTop: '4px solid #3b82f6',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                    margin: '0 auto 16px'
-                  }} />
-                  <p style={{ color: 'white' }}>正在加载店铺商品...</p>
+                <div className="store-products-modal__state">
+                  <div className="store-products-modal__spinner" aria-hidden="true" />
+                  <p>正在加载店铺商品</p>
                 </div>
               ) : storeProducts.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px', color: 'rgba(255,255,255,0.4)' }}>
-                  <div style={{ fontSize: '4rem', marginBottom: '16px' }}>📦</div>
-                  <p style={{ fontSize: '1.2rem' }}>该店铺暂未添加任何商品</p>
+                <div className="store-products-modal__state">
+                  <p>该店铺暂未添加任何商品</p>
                 </div>
               ) : (
                 <>
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '10px',
-                  marginBottom: '20px'
-                }}>
-                  {([
-                    { key: 'all' as const, label: '全部' },
-                    { key: 'pending' as const, label: '待审核' },
-                    { key: 'approved' as const, label: '已完成' },
-                    { key: 'rejected' as const, label: '已取消' },
-                  ]).map(({ key, label }) => {
-                    const count = key === 'all' ? productListCounts.all : productListCounts[key];
-                    const active = productListFilter === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setProductListFilter(key)}
-                        style={{
-                          padding: '8px 14px',
-                          borderRadius: '10px',
-                          border: active ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.15)',
-                          background: active ? 'rgba(37, 99, 235, 0.4)' : 'rgba(255,255,255,0.06)',
-                          color: 'white',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {label} <span style={{ opacity: 0.75 }}>({count})</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                {filteredStoreProducts.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '48px', color: 'rgba(255,255,255,0.45)' }}>
-                    <p style={{ fontSize: '1.1rem', margin: 0 }}>该状态下暂无商品</p>
-                    <p style={{ fontSize: '0.85rem', marginTop: '8px', opacity: 0.7 }}>请切换上方状态或等待商家提交</p>
+                  <div className="store-products-modal__filters" role="tablist" aria-label="商品状态">
+                    {([
+                      { key: 'all' as const, label: '全部' },
+                      { key: 'pending' as const, label: '待审核' },
+                      { key: 'approved' as const, label: '已完成' },
+                      { key: 'rejected' as const, label: '已取消' },
+                    ]).map(({ key, label }) => {
+                      const count = key === 'all' ? productListCounts.all : productListCounts[key];
+                      const active = productListFilter === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          className={`store-products-modal__chip${active ? ' is-active' : ''}`}
+                          onClick={() => setProductListFilter(key)}
+                        >
+                          {label} <span>({count})</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                ) : (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                  gap: '20px'
-                }}>
-                  {filteredStoreProducts.map((product) => {
-                    const display = adminProductDisplay(product) as typeof product;
-                    const isEditPending =
-                      normalizeProductListingStatus(product) === 'approved' &&
-                      hasPendingProductUpdate(product);
-                    return (
-                    <div
-                      key={product.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedAdminProductId(product.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') setSelectedAdminProductId(product.id);
-                      }}
-                      style={{
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      borderRadius: '18px',
-                      padding: '16px',
-                      border: '1px solid rgba(148, 163, 184, 0.18)',
-                      transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease',
-                      boxShadow: '0 14px 35px rgba(2, 6, 23, 0.18)',
-                      cursor: 'pointer',
-                    }}
-                    onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
-                    >
-                      <div style={{
-                        width: '100%',
-                        aspectRatio: '1',
-                        borderRadius: '12px',
-                        background: 'rgba(2, 6, 23, 0.55)',
-                        marginBottom: '12px',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center'
-                      }}>
-                        {display.image_url ? (
-                          <img
-                            src={publicStorageUrl(display.image_url)}
-                            alt={display.name}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'contain',
-                              padding: '14px',
-                              background: 'transparent',
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              gap: '10px',
-                              color: 'rgba(255, 255, 255, 0.35)',
-                              fontWeight: 600,
-                            }}
-                          >
-                            <span style={{ fontSize: '1.6rem' }}>🖼️</span>
-                            <span style={{ fontSize: '0.85rem' }}>无图片</span>
-                          </div>
-                        )}
-                      </div>
-                      <h3
-                        style={{
-                          margin: '0 0 10px 0',
-                          fontSize: '1.05rem',
-                          color: 'white',
-                          minHeight: '2.6rem',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {display.name}
-                      </h3>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                        <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.2rem' }}>{display.price.toLocaleString()} MMK</span>
-                        <span style={{ 
-                          fontSize: '0.8rem', 
-                          padding: '2px 8px', 
-                          borderRadius: '6px',
-                          background: display.is_available ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                          color: display.is_available ? '#10b981' : '#ef4444'
-                        }}>
-                          {display.is_available ? '在售' : '下架'}
-                        </span>
-                      </div>
-                      <div style={{ marginTop: '8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          background:
-                            productNeedsAdminReview(product)
-                              ? 'rgba(245, 158, 11, 0.25)'
-                              : normalizeProductListingStatus(product) === 'rejected'
-                                ? 'rgba(239, 68, 68, 0.25)'
-                                : 'rgba(16, 185, 129, 0.2)',
-                          color:
-                            productNeedsAdminReview(product)
-                              ? '#fbbf24'
-                              : normalizeProductListingStatus(product) === 'rejected'
-                                ? '#f87171'
-                                : '#34d399',
-                        }}>
-                          {isEditPending
-                            ? '修改待审'
-                            : normalizeProductListingStatus(product) === 'pending'
-                            ? '待审核'
-                            : normalizeProductListingStatus(product) === 'rejected'
-                              ? '已取消'
-                              : '已完成'}
-                        </span>
-                      </div>
-                      {isEditPending && (
-                        <div style={{ marginTop: '6px', fontSize: '0.72rem', color: 'rgba(251, 191, 36, 0.85)' }}>
-                          线上仍显示旧内容，通过后更新为客户可见版本
-                        </div>
-                      )}
-                      {productNeedsAdminReview(product) && (
-                        <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
-                          <button
-                            type="button"
-                            disabled={productListingActionId === product.id}
-                            onClick={(e) => { e.stopPropagation(); updateProductListingStatus(product.id, 'approved'); }}
-                            style={{
-                              flex: 1,
-                              padding: '8px 10px',
-                              borderRadius: '10px',
-                              border: 'none',
-                              cursor: productListingActionId === product.id ? 'wait' : 'pointer',
-                              background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                              color: 'white',
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                            }}
-                          >
-                            {productListingActionId === product.id ? '…' : '通过上架'}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={productListingActionId === product.id}
-                            onClick={(e) => { e.stopPropagation(); updateProductListingStatus(product.id, 'rejected'); }}
-                            style={{
-                              flex: 1,
-                              padding: '8px 10px',
-                              borderRadius: '10px',
-                              border: '1px solid rgba(248, 113, 113, 0.5)',
-                              cursor: productListingActionId === product.id ? 'wait' : 'pointer',
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              color: '#fca5a5',
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                            }}
-                          >
-                            拒绝
-                          </button>
-                        </div>
-                      )}
-                      <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>
-                        库存: {display.stock === -1 ? '无限' : display.stock}
-                      </div>
-                      <div style={{ marginTop: '8px', fontSize: '0.72rem', color: 'rgba(148, 163, 184, 0.9)' }}>
-                        点击查看完整信息与变更详情
-                      </div>
+
+                  {filteredStoreProducts.length === 0 ? (
+                    <div className="store-products-modal__state">
+                      <p>该状态下暂无商品</p>
+                      <p>请切换上方状态或等待商家提交</p>
                     </div>
-                    );
-                  })}
-                </div>
-                )}
+                  ) : (
+                    <div className="store-products-grid">
+                      {filteredStoreProducts.map((product) => {
+                        const display = adminProductDisplay(product) as typeof product;
+                        const listing = normalizeProductListingStatus(product);
+                        const isEditPending = listing === 'approved' && hasPendingProductUpdate(product);
+                        const needsReview = productNeedsAdminReview(product);
+                        const priceNum = Number(display.price);
+                        const listingLabel = isEditPending
+                          ? '修改待审'
+                          : listing === 'pending'
+                            ? '待审核'
+                            : listing === 'rejected'
+                              ? '已取消'
+                              : '已完成';
+                        const listingClass = needsReview
+                          ? 'store-products-card__tag--pending'
+                          : listing === 'rejected'
+                            ? 'store-products-card__tag--rejected'
+                            : 'store-products-card__tag--ok';
+                        return (
+                          <div
+                            key={product.id}
+                            className="store-products-card"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSelectedAdminProductId(product.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setSelectedAdminProductId(product.id);
+                              }
+                            }}
+                          >
+                            <div className="store-products-card__media">
+                              {display.image_url ? (
+                                <img src={publicStorageUrl(display.image_url)} alt={display.name} />
+                              ) : (
+                                <span className="store-products-card__placeholder">无图片</span>
+                              )}
+                            </div>
+                            <h3 className="store-products-card__name">{display.name}</h3>
+                            <div className="store-products-card__row">
+                              <span className="store-products-card__price">
+                                {Number.isFinite(priceNum) ? `${priceNum.toLocaleString()} MMK` : '—'}
+                              </span>
+                            </div>
+                            <div className="store-products-card__tags">
+                              <span className={`store-products-card__tag ${display.is_available ? 'store-products-card__tag--live' : 'store-products-card__tag--off'}`}>
+                                {display.is_available ? '在售' : '下架'}
+                              </span>
+                              <span className={`store-products-card__tag ${listingClass}`}>
+                                {listingLabel}
+                              </span>
+                            </div>
+                            {isEditPending && (
+                              <p className="store-products-card__note">
+                                线上仍显示旧内容，通过后更新为客户可见版本
+                              </p>
+                            )}
+                            <p className="store-products-card__meta">
+                              库存 {display.stock === -1 ? '无限' : display.stock}
+                            </p>
+                            {needsReview && (
+                              <div className="store-products-card__actions">
+                                <button
+                                  type="button"
+                                  className="merchant-apps-btn merchant-apps-btn--success"
+                                  disabled={productListingActionId === product.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateProductListingStatus(product.id, 'approved');
+                                  }}
+                                >
+                                  {productListingActionId === product.id ? '…' : '通过上架'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="merchant-apps-btn merchant-apps-btn--danger"
+                                  disabled={productListingActionId === product.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateProductListingStatus(product.id, 'rejected');
+                                  }}
+                                >
+                                  拒绝
+                                </button>
+                              </div>
+                            )}
+                            <p className="store-products-card__hint">点击查看完整信息与变更详情</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {selectedAdminProduct && createPortal(

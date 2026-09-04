@@ -76,7 +76,7 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'pricing.base_fee',
     label: '基础起步价 (MMK)',
-    description: '所有订单的基础费用，适用于首公里或首重。',
+    description: '客户下单的平台起步价。准时达/急送达/定时达：平台收这笔起步价，剩余跑腿费归骑手。顺路递客户只付起步价（不加里程附加费）。',
     category: 'pricing',
     pricingGroup: 'client',
     type: 'number',
@@ -164,19 +164,9 @@ const settingDefinitions: SettingDefinition[] = [
     suffix: '公里'
   },
   {
-    key: 'pricing.courier_km_rate',
-    label: '骑手配送费 (MMK/KM)',
-    description: '结算给骑手的配送提成，按每公里送货距离计算。',
-    category: 'pricing',
-    pricingGroup: 'courier',
-    type: 'number',
-    defaultValue: 500,
-    suffix: 'MMK/公里'
-  },
-  {
     key: 'pricing.delivery_bonus_rate',
     label: '每单配送奖金 (MMK/单)',
-    description: '每完成一笔配送订单给予骑手的额外奖金。如果设置为 0 则代表不发放配送奖金。',
+    description: '每完成一笔配送订单额外加给骑手的奖金，与跑腿分成分开计算。设为 0 则不发奖金。',
     category: 'pricing',
     pricingGroup: 'courier',
     type: 'number',
@@ -186,11 +176,11 @@ const settingDefinitions: SettingDefinition[] = [
   {
     key: 'pricing.way_side_courier_per_order',
     label: '「顺路递」骑手配送费 (MMK/单)',
-    description: '顺路递（Eco Way）订单每单结算给骑手的金额；不超过该单客户实付跑腿费。设为 0 时仍按「跑腿费 − 该单起步价」计算骑手分成。',
+    description: '顺路递每单给骑手的固定金额，平台收「客户实付 − 该金额」。例：起步价 2000、本项 1000 → 平台 1000、骑手 1000。设为 0 时改按「客户实付 − 起步价」分成。',
     category: 'pricing',
     pricingGroup: 'courier',
     type: 'number',
-    defaultValue: 0,
+    defaultValue: 1000,
     suffix: 'MMK/单'
   },
   {
@@ -848,7 +838,7 @@ const SystemSettings: React.FC = () => {
                       <span>🚚</span> 骑手端计费
                     </h3>
                     <p>
-                      与骑手结算相关的参数（顺路递固定费、每单奖金等）。当前编辑
+                      骑手跑腿费按订单类型分成，不按公里计价。准时达等：骑手 = 客户实付 − 基础起步价（例 3600 − 2000 = 1600）。顺路递：骑手收下方固定额，平台收剩余（例各 1000）。当前编辑
                       <strong> {REGIONS.find((r) => r.id === selectedRegion)?.name ?? selectedRegion}</strong> 的规则，不影响其他领区。
                     </p>
                   </div>

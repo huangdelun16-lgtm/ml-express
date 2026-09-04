@@ -83,7 +83,7 @@ const FinanceOverviewTab: React.FC = () => {
               t.courierKmCost,
               summary.courierKmCost,
               language === "zh"
-                ? "骑手分得总额：按每单所属领区读取计费规则；普通单=跑腿费−起步价快照；顺路递可设固定 MMK/单。曼德勒改价不影响仰光单。"
+                ? "骑手分得总额：准时达等=客户实付−起步价快照；顺路递=固定 MMK/单（平台收剩余）。不按公里计价。曼德勒改价不影响仰光单。"
                 : "Rider share uses each package's region pricing (Admin billing regions). Mandalay changes do not affect Yangon orders.",
               "#fd79a8",
             )}

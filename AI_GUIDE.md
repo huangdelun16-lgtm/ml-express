@@ -177,7 +177,7 @@ App / 浏览器
 
 | 层 | 文件 | 要点 |
 |----|------|------|
-| Admin / 会员 Web / 商家 Web 浏览器 | `src/utils/supabaseBrowserUrl.ts`（及各 Web 副本） | 生产 `resolveBrowserSupabaseUrl` → `origin/__sb/`；本地 `localhost` 可直连上游 |
+| Admin / 会员 Web / 商家 Web 浏览器 | `src/utils/supabaseBrowserUrl.ts`（及各 Web 副本） | 生产与 Admin 本地 `npm start` 均 `origin/__sb/`。本地由 `src/setupProxy.js` 把 `/__sb` 转到线上 Admin BFF（缅甸勿直连 supabase.co）。`REACT_APP_SUPABASE_DIRECT=1` 才直连上游 |
 | Netlify Edge BFF | 各站 `netlify/edge-functions/supabase-bff.js` | `netlify.toml` `[[edge_functions]] path = "/__sb/*"`；**剥掉 `Set-Cookie __cf_bm`**（Firefox 会拒跨域 cookie）。Admin REST `no-store`；会员/商家 Storage 图可短缓存 |
 | Netlify rewrite | 各站 `netlify.toml` `from = "/__sb/*"` | Edge 未部署时的 200 rewrite 回退；**不能**升级 WebSocket |
 | Cloudflare Worker | `cloudflare/supabase-proxy/`；根脚本 `deploy:supabase-proxy` | 备份通道；Realtime 路径存在，但缅甸拨 Worker WS 同样会断 |
@@ -433,11 +433,26 @@ App / 浏览器
 
 系统设置中心（`SystemSettings.tsx`）写入 `system_settings` 后：
 
-- **计费规则**：各端读 `pricing.*`（真生效）
+- **计费规则**：各端读 `pricing.*`（真生效）。City 骑手分成见 **§4.3.1**（不按公里）
 - **自动化**：`courier-auto-dispatch` 每分钟读 `automation.*`，给待分配 City 单派骑手；超时未取件改派。商家「待确认」不派
 - **安全与合规**：闲置退出读 `security.session_timeout_minutes`；登录失败锁定与后台网页 IP 白名单走 `admin-password` / `verify-admin`（骑手 App 不走 IP 白名单）；审计保留天数由每日 `cleanup-delivery-photos` 删除过期 `audit_logs`
 - **实时跟踪**：刷新间隔 / 地图主题被跟踪页读取；`tracking.route_prediction_enabled` 开启后仅对已派的急送达、食品和饮料订单向 Google Directions 要沿路折线与 ETA（3 分钟缓存，每骑手一条，最多 8 条）
 - **基础信息**：目前主要给设置页自己展示
+
+### 4.3.1 City 骑手分成（财务 / 骑手 App）
+
+客户侧「客户端计费」算出订单 `packages.price`（客户实付跑腿费），并在下单时写入 `pricing_base_fee_mmk` 起步价快照。骑手结算**不读**已废弃的 `pricing.courier_km_rate`（旧「骑手配送费 MMK/KM」，设置页已隐藏，财务/骑手 App 从未按公里分成）。
+
+| 订单类型 | 平台收 | 骑手跑腿分成 |
+|----------|--------|----------------|
+| 准时达 / 急送达 / 定时达 | 该单起步价快照（无快照则用当前领区 `pricing.base_fee`） | `客户实付 − 起步价`。例：3600 − 2000 = 1600 |
+| 顺路递（Eco Way / တန်တန်လေးပို့） | `客户实付 − 固定骑手费` | `pricing.way_side_courier_per_order`（不超过客户实付）。例：客户只付起步价 2000、本项 1000 → 平台 1000、骑手 1000。该项为 0 时回退为「实付 − 起步价」 |
+
+实现：
+
+- Admin 财务：`src/pages/FinanceManagement.helpers.ts` → `getRiderDeliveryShareMmk`
+- 骑手 App 预估收入：`ml-express-mobile-app/screens/ProfileScreen.tsx` → `getRiderEstimatedShareMmk`
+- 设置页：`src/pages/SystemSettings.tsx` 骑手端计费只保留「顺路递骑手配送费」「每单配送奖金」；奖金与分成分开加总
 
 ### 4.4 独立全屏模块
 

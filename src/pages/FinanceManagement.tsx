@@ -822,7 +822,7 @@ const FinanceManagement: React.FC = () => {
 
       const packageCount = settledPackageCount;
 
-      // 快递员送货费用：每单按包裹所属领区计费（与系统设置分领区一致）
+      // 骑手跑腿分成：准时达=实付−起步价；顺路递=固定额；按订单领区读规则
       const courierKmCost = deliveredPackages.reduce((sum, pkg) => {
         const regional = getRegionalPricingForPackage(pkg, regionalPricingMap);
         const settingsBaseFee = regional.base_fee || 1500;

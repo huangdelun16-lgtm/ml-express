@@ -389,20 +389,20 @@ const DeliveryStoreManagement: React.FC = () => {
 
   // 生成店长收件码二维码
   const generateStoreQRCode = async (store: DeliveryStore) => {
+    setCurrentStoreQR(store);
+    setQrCodeDataUrl('');
+    setShowQRModal(true);
     try {
-      // 生成唯一的收件码，使用店铺ID确保唯一性
       const receiveCode = `STORE_${store.id}_${Date.now()}`;
       const qrCodeUrl = await QRCode.toDataURL(receiveCode, {
-        width: 200,
+        width: 280,
         margin: 2,
         color: {
-          dark: '#2c5282',
+          dark: '#0f172a',
           light: '#FFFFFF'
         }
       });
       setQrCodeDataUrl(qrCodeUrl);
-      setCurrentStoreQR(store);
-      setShowQRModal(true);
     } catch (error) {
       console.error('生成二维码失败:', error);
       setErrorMessage('生成二维码失败');
