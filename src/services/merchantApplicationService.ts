@@ -1,4 +1,8 @@
 import { adminAuthenticatedFetch } from './authService';
+import {
+  pickLicenseUrlsForStore,
+  type StoreLicenseLookup,
+} from '../utils/merchantLicenseDocs';
 
 export type MerchantApplicationStatus = 'pending' | 'approved' | 'rejected';
 
@@ -128,4 +132,28 @@ export async function rejectMerchantApplication(input: {
   });
   const payload = await parseJsonResponse(response);
   return payload.application as MerchantApplication;
+}
+
+export async function fetchStoreLicenseDocuments(
+  store: StoreLicenseLookup,
+): Promise<string[]> {
+  const storeId = String(store.id || '').trim();
+  const storeCode = String(store.store_code || '').trim();
+  const params = new URLSearchParams();
+  if (storeId) params.set('storeId', storeId);
+  if (storeCode) params.set('storeCode', storeCode);
+  if (store.phone) params.set('phone', String(store.phone));
+  if (store.store_name) params.set('storeName', String(store.store_name));
+
+  const targeted = await adminAuthenticatedFetch(
+    `/.netlify/functions/merchant-admin-applications?${params.toString()}`,
+    { credentials: 'include' },
+  );
+  const targetedPayload = await parseJsonResponse(targeted);
+  if (Array.isArray(targetedPayload.documents)) {
+    return targetedPayload.documents.map((url: unknown) => String(url || '').trim()).filter(Boolean);
+  }
+
+  const { applications } = await fetchMerchantApplications('all');
+  return pickLicenseUrlsForStore(applications, store);
 }

@@ -20,7 +20,7 @@ function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof window.location !== 'undefined';
 }
 
-/** Local `npm start` — keep env supabase.co / custom URL, skip Netlify /__sb proxy. */
+/** Local `npm start` — images still use the production merchant /__sb host. */
 function isLocalDevHost(): boolean {
   if (!isBrowser()) return false;
   const { hostname } = window.location;
@@ -32,9 +32,17 @@ function isLocalDevHost(): boolean {
   );
 }
 
-/** Production browser should use same-origin BFF when env is empty, upstream, or Worker. */
+function allowDirectSupabase(): boolean {
+  return process.env.REACT_APP_SUPABASE_DIRECT === '1';
+}
+
+/**
+ * Browser REST/Auth should use same-origin `/__sb` when env is empty, upstream, or Worker.
+ * Local CRA is included: `src/setupProxy.js` forwards `/__sb` to production merchant BFF
+ * so Myanmar does not dial `*.supabase.co`. Set REACT_APP_SUPABASE_DIRECT=1 to skip.
+ */
 export function shouldUseSameOriginProxy(configuredUrl = configuredEnvUrl()): boolean {
-  if (!isBrowser() || isLocalDevHost()) return false;
+  if (!isBrowser() || allowDirectSupabase()) return false;
   if (!configuredUrl) return true;
   if (configuredUrl.includes(SUPABASE_UPSTREAM_HOST)) return true;
   if (configuredUrl.includes(SUPABASE_WORKER_HOST)) return true;
@@ -45,7 +53,7 @@ export function shouldUseSameOriginProxy(configuredUrl = configuredEnvUrl()): bo
 
 /**
  * REST / Auth / Storage base URL for browser supabase-js.
- * Production Netlify sites: `https://<site>/__sb/` (proxied to supabase.co).
+ * Production Netlify sites and local CRA: `origin/__sb/` (proxied to supabase.co).
  */
 export function resolveBrowserSupabaseUrl(raw?: string): string {
   const configuredUrl = configuredEnvUrl(raw);
@@ -53,9 +61,6 @@ export function resolveBrowserSupabaseUrl(raw?: string): string {
     return `${window.location.origin}/__sb/`;
   }
   if (configuredUrl) return configuredUrl;
-  if (isBrowser() && isLocalDevHost()) {
-    return `https://${SUPABASE_UPSTREAM_HOST}`;
-  }
   return `https://${SUPABASE_UPSTREAM_HOST}`;
 }
 

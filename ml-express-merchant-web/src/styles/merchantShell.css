@@ -3,8 +3,8 @@
 .merchant-shell {
   display: flex;
   min-height: 100vh;
-  background: #0a0f1e;
-  color: #f8fafc;
+  background: #0b1220;
+  color: #f1f5f9;
 }
 
 html.has-rider-approach .merchant-shell {
@@ -41,12 +41,12 @@ html.has-rider-approach .merchant-shell__menu-btn {
   margin-left: 0;
   padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1.25rem, 3vw, 2.5rem);
   min-height: 100vh;
-  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.06) 0%, transparent 42%);
+  background: radial-gradient(circle at top right, rgba(44, 152, 166, 0.08) 0%, transparent 44%);
 }
 
 .merchant-shell__inner {
   width: 100%;
-  max-width: none;
+  max-width: 1080px;
   margin: 0;
   animation: merchant-fade-in 0.5s ease-out;
 }

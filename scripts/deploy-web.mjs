@@ -48,8 +48,8 @@ function prependPath(from, dir) {
   from[key] = `${dir}${delimiter}${from[key] || ""}`;
 }
 
-if (key === "admin") {
-  console.log("准备 Admin Edge 打包（缓存 Deno 2.4.2，避免再拉 dl.deno.land）…");
+if (key === "admin" || key === "client" || key === "merchant") {
+  console.log("准备 Edge 打包（缓存 Deno 2.4.2，避免再拉 dl.deno.land）…");
   const deno = await ensureNetlifyDeno();
   prependPath(env, deno.denoDir);
 }

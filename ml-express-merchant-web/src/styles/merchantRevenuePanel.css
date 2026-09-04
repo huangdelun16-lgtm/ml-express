@@ -1,0 +1,157 @@
+/* 商家端「经营概况」：深色看板，青绿主色，本年抬高、今日次之 */
+
+.merchant-revenue {
+  --mr-teal: #2c98a6;
+  --mr-teal-bright: #7edce6;
+  --mr-ink: #f1f5f9;
+  --mr-muted: rgba(148, 163, 184, 0.92);
+  margin-bottom: 2rem;
+  padding: 1.3rem 1.35rem 1.35rem;
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse 88% 70% at 0% 0%, rgba(44, 152, 166, 0.16) 0%, transparent 52%),
+    linear-gradient(180deg, rgba(18, 28, 48, 0.96) 0%, rgba(12, 18, 32, 0.96) 100%);
+  border: 1px solid rgba(44, 152, 166, 0.22);
+  box-shadow: 0 14px 32px rgba(2, 6, 23, 0.32);
+  color: var(--mr-ink);
+  text-align: left;
+}
+
+.merchant-revenue__head {
+  margin-bottom: 1.05rem;
+}
+
+.merchant-revenue__title {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.merchant-revenue__hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--mr-muted);
+}
+
+.merchant-revenue__grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.merchant-revenue__card {
+  min-width: 0;
+  padding: 0.88rem 0.95rem 0.92rem;
+  border-radius: 12px;
+  background: rgba(8, 12, 22, 0.42);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.merchant-revenue__card--year {
+  grid-column: span 3;
+}
+
+.merchant-revenue__card--today {
+  grid-column: span 3;
+  background: rgba(44, 152, 166, 0.12);
+  border-color: rgba(44, 152, 166, 0.3);
+}
+
+.merchant-revenue__card--yesterday,
+.merchant-revenue__card--count {
+  grid-column: span 2;
+}
+
+.merchant-revenue__label {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--mr-muted);
+  line-height: 1.35;
+}
+
+.merchant-revenue__value-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.28rem 0.38rem;
+}
+
+.merchant-revenue__value {
+  font-size: 1.32rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-revenue__card--today .merchant-revenue__value {
+  font-size: clamp(1.45rem, 2.4vw, 1.85rem);
+  color: var(--mr-teal-bright);
+}
+
+.merchant-revenue__card--year .merchant-revenue__value {
+  color: #d7f3f6;
+}
+
+.merchant-revenue__unit {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--mr-muted);
+}
+
+.merchant-revenue__skel {
+  display: block;
+  height: 1.35rem;
+  width: 62%;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.12) 0%,
+    rgba(148, 163, 184, 0.22) 50%,
+    rgba(148, 163, 184, 0.12) 100%
+  );
+  background-size: 140% 100%;
+}
+
+.merchant-revenue__card--today .merchant-revenue__skel {
+  height: 1.7rem;
+  width: 72%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .merchant-revenue__skel {
+    animation: merchant-revenue-skel 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes merchant-revenue-skel {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .merchant-revenue {
+    padding: 1.15rem 1.05rem 1.15rem;
+  }
+
+  .merchant-revenue__card--year,
+  .merchant-revenue__card--today,
+  .merchant-revenue__card--yesterday,
+  .merchant-revenue__card--count {
+    grid-column: span 6;
+  }
+
+  .merchant-revenue__card--yesterday,
+  .merchant-revenue__card--count {
+    grid-column: span 3;
+  }
+}

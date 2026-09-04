@@ -1,8 +1,7 @@
 .merchant-printer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(15px);
+  background: rgba(2, 6, 23, 0.72);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -11,58 +10,62 @@
 }
 
 .merchant-printer-panel {
-  background: #1e293b;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(18, 28, 48, 0.98) 0%, rgba(12, 18, 32, 0.98) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
   width: 100%;
   max-width: 720px;
   max-height: 92vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.45);
   overflow: hidden;
 }
 
 .merchant-printer-header {
-  padding: 20px 24px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1.05rem 1.25rem 0.95rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
   position: relative;
 }
 
 .merchant-printer-header h2 {
   margin: 0;
-  text-align: center;
-  color: #7dd3fc;
-  font-size: 1.35rem;
-  font-weight: 900;
+  text-align: left;
+  color: #f8fafc;
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  padding-right: 2.5rem;
 }
 
 .merchant-printer-header p {
-  margin: 8px 0 0;
-  text-align: center;
-  color: #94a3b8;
-  font-size: 0.85rem;
+  margin: 0.35rem 0 0;
+  text-align: left;
+  color: rgba(148, 163, 184, 0.95);
+  font-size: 0.8rem;
   line-height: 1.5;
+  padding-right: 2.5rem;
 }
 
 .merchant-printer-close {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(8, 12, 22, 0.4);
+  color: #e2e8f0;
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
 .merchant-printer-body {
   padding: 16px 20px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .merchant-printer-tabs {
@@ -73,10 +76,10 @@
 }
 
 .merchant-printer-tab {
-  border: 1px solid #475569;
-  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(8, 12, 22, 0.4);
   color: #94a3b8;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 10px 8px;
   font-weight: 800;
   font-size: 0.82rem;
@@ -84,15 +87,15 @@
 }
 
 .merchant-printer-tab.active {
-  border-color: #38bdf8;
-  background: #0c4a6e;
-  color: #e0f2fe;
+  border-color: rgba(44, 152, 166, 0.45);
+  background: rgba(44, 152, 166, 0.16);
+  color: #7edce6;
 }
 
 .merchant-printer-section {
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 16px;
+  background: rgba(8, 12, 22, 0.38);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
   padding: 14px;
   margin-bottom: 14px;
 }
@@ -134,8 +137,8 @@
 .merchant-printer-select {
   flex: 1;
   min-width: 140px;
-  background: #1e293b;
-  border: 1px solid #475569;
+  background: rgba(8, 12, 22, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   color: #e2e8f0;
   border-radius: 10px;
   padding: 10px 12px;
@@ -200,11 +203,13 @@
 }
 
 .merchant-printer-footer {
-  padding: 14px 20px 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  padding: 12px 20px 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  background: rgba(12, 18, 32, 0.98);
 }
 
 .merchant-printer-btn {
@@ -217,14 +222,18 @@
 }
 
 .merchant-printer-btn.primary {
-  background: #0284c7;
+  background: #2c98a6;
   color: white;
+}
+
+.merchant-printer-btn.primary:hover:not(:disabled) {
+  background: #238089;
 }
 
 .merchant-printer-btn.secondary {
   background: transparent;
   color: #e2e8f0;
-  border: 1px solid #475569;
+  border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .merchant-printer-btn:disabled {
@@ -245,6 +254,13 @@
 .merchant-printer-actions .merchant-printer-btn {
   flex: 1;
   min-width: 120px;
+}
+
+.merchant-printer-message {
+  margin: 0 0 4px;
+  color: #7edce6;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 @media (max-width: 640px) {

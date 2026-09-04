@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import NavigationBar from '../components/home/NavigationBar';
+import ClientInteriorShell from '../components/layout/ClientInteriorShell';
 import MerchantApplySuccess from '../components/merchant/MerchantApplySuccess';
 import PackingGuideModal from '../components/merchant/PackingGuideModal';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -722,6 +723,7 @@ const MerchantApplyPage: React.FC = () => {
   const submitDisabled = submitting || !packingAcked || uploadingDocs || readyDocUrls.length < 1 || !locationConfirmed;
 
   return (
+    <ClientInteriorShell>
     <div className="merchant-apply-page">
       <NavigationBar
         language={language}
@@ -737,14 +739,14 @@ const MerchantApplyPage: React.FC = () => {
       />
       <div className="merchant-apply-page__inner">
         <header className="merchant-apply-hero">
-          <span className="merchant-apply-hero__badge">{t.badge}</span>
-          <h1>{t.title}</h1>
-          <p>{t.subtitle}</p>
-          <div className="merchant-apply-steps" aria-hidden="true">
-            <span>{t.step1}</span>
-            <span>{t.step2}</span>
-            <span>{t.step3}</span>
-          </div>
+          <div className="client-page-accent-bar" />
+          <h1 className="client-page-title client-page-title--sm">{t.title}</h1>
+          <p className="client-page-subtitle">{t.subtitle}</p>
+          <ol className="merchant-apply-steps">
+            <li className="is-current">{t.step1}</li>
+            <li>{t.step2}</li>
+            <li>{t.step3}</li>
+          </ol>
         </header>
 
         <div className="merchant-apply-card">
@@ -764,17 +766,21 @@ const MerchantApplyPage: React.FC = () => {
                 </div>
               )}
 
-              <button
-                type="button"
-                className="merchant-apply-lookup-toggle"
-                onClick={() => setShowLookup((open) => !open)}
-              >
-                {showLookup ? t.hideStatus : t.checkStatus}
-              </button>
               {showLookup ? (
-                <form className="merchant-apply-lookup merchant-apply-lookup--card" onSubmit={handleLookup}>
-                  <h3>{t.successLookupTitle}</h3>
-                  <p>{t.successLookupHint}</p>
+                <form className="merchant-apply-lookup" onSubmit={handleLookup}>
+                  <div className="merchant-apply-lookup__head">
+                    <div>
+                      <h3>{t.successLookupTitle}</h3>
+                      <p>{t.successLookupHint}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="merchant-apply-lookup-toggle"
+                      onClick={() => setShowLookup(false)}
+                    >
+                      {t.hideStatus}
+                    </button>
+                  </div>
                   <label htmlFor="form_lookup_phone">{t.successLookupPhone}</label>
                   <div className="merchant-apply-lookup__row">
                     <input
@@ -805,13 +811,23 @@ const MerchantApplyPage: React.FC = () => {
                     </dl>
                   ) : null}
                 </form>
-              ) : null}
+              ) : (
+                <div className="merchant-apply-card__top">
+                  <button
+                    type="button"
+                    className="merchant-apply-lookup-toggle"
+                    onClick={() => setShowLookup(true)}
+                  >
+                    {t.checkStatus}
+                  </button>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit}>
                 <section className="merchant-apply-section merchant-apply-section--registration">
                   <div className="merchant-apply-section__head">
                     <span className="merchant-apply-section__icon" aria-hidden="true">
-                      📋
+                      1
                     </span>
                     <h2>{t.registration}</h2>
                   </div>
@@ -838,7 +854,7 @@ const MerchantApplyPage: React.FC = () => {
                         />
                         <span className="merchant-apply-date__hint">
                           {formatDateWeekday(form.application_date, isEn, isMy)}
-                          {formatDateWeekday(form.application_date, isEn, isMy) ? ' · ' : ''}
+                          {formatDateWeekday(form.application_date, isEn, isMy) ? ', ' : ''}
                           {dateDisplay}
                         </span>
                       </div>
@@ -919,7 +935,7 @@ const MerchantApplyPage: React.FC = () => {
                 <section className="merchant-apply-section">
                   <div className="merchant-apply-section__head">
                     <span className="merchant-apply-section__icon" aria-hidden="true">
-                      🏪
+                      2
                     </span>
                     <h2>{t.basic}</h2>
                   </div>
@@ -1259,6 +1275,7 @@ const MerchantApplyPage: React.FC = () => {
         }}
       />
     </div>
+    </ClientInteriorShell>
   );
 };
 

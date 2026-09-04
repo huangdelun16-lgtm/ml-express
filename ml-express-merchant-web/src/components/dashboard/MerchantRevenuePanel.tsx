@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { packageService } from '../../services/supabase';
 import { MERCHANT_ORDERS_REFRESH } from '../../utils/merchantOrderEvents';
 import LoggerService from '../../services/LoggerService';
+import '../../styles/merchantRevenuePanel.css';
 
 interface Props {
   language: string;
@@ -81,84 +82,39 @@ const MerchantRevenuePanel: React.FC<Props> = ({ language, storeId, storeName })
 
   const fmt = (n: number) => Math.round(n).toLocaleString();
 
-  return (
-    <div
-      style={{
-        marginBottom: '2rem',
-        padding: '1.35rem',
-        borderRadius: '20px',
-        background:
-          'linear-gradient(135deg, rgba(30, 58, 138, 0.25) 0%, rgba(15, 23, 42, 0.6) 100%)',
-        border: '1px solid rgba(96, 165, 250, 0.25)',
-        boxShadow: '0 12px 32px rgba(0,0,0,0.2)',
-      }}
-    >
-      <div style={{ marginBottom: '1rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc' }}>
-          📈 {copy.title}
-        </h2>
-        <p style={{ margin: '0.35rem 0 0', fontSize: '0.82rem', color: 'rgba(203,213,225,0.8)' }}>
-          {copy.hint}
-        </p>
-      </div>
+  const cards = [
+    { key: 'today', label: copy.today, value: stats?.todayRevenue ?? 0, isMoney: true, variant: 'today' },
+    { key: 'year', label: copy.year, value: stats?.revenueOneYear ?? 0, isMoney: true, variant: 'year' },
+    { key: 'yesterday', label: copy.yesterday, value: stats?.yesterdayRevenue ?? 0, isMoney: true, variant: 'yesterday' },
+    { key: 'ordersToday', label: copy.ordersToday, value: stats?.todayOrderCount ?? 0, isMoney: false, variant: 'count' },
+    { key: 'ordersYesterday', label: copy.ordersYesterday, value: stats?.yesterdayOrderCount ?? 0, isMoney: false, variant: 'count' },
+  ] as const;
 
-      {loading && !stats ? (
-        <p style={{ color: 'rgba(148,163,184,0.9)', margin: 0 }}>…</p>
-      ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-            gap: '0.75rem',
-          }}
-        >
-          {[
-            { label: copy.year, value: stats?.revenueOneYear ?? 0, accent: '#fbbf24', isMoney: true },
-            { label: copy.yesterday, value: stats?.yesterdayRevenue ?? 0, accent: '#a78bfa', isMoney: true },
-            { label: copy.today, value: stats?.todayRevenue ?? 0, accent: '#34d399', isMoney: true },
-            {
-              label: copy.ordersToday,
-              value: stats?.todayOrderCount ?? 0,
-              accent: '#38bdf8',
-              isMoney: false,
-            },
-            {
-              label: copy.ordersYesterday,
-              value: stats?.yesterdayOrderCount ?? 0,
-              accent: '#94a3b8',
-              isMoney: false,
-            },
-          ].map((card) => (
-            <div
-              key={card.label}
-              style={{
-                padding: '0.9rem 1rem',
-                borderRadius: '14px',
-                background: 'rgba(0,0,0,0.22)',
-                border: '1px solid rgba(255,255,255,0.08)',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  color: 'rgba(203,213,225,0.75)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  marginBottom: '0.35rem',
-                }}
-              >
-                {card.label}
+  return (
+    <section className="merchant-revenue" aria-busy={loading && !stats} aria-labelledby="merchant-revenue-title">
+      <header className="merchant-revenue__head">
+        <h2 id="merchant-revenue-title" className="merchant-revenue__title">
+          {copy.title}
+        </h2>
+        <p className="merchant-revenue__hint">{copy.hint}</p>
+      </header>
+
+      <div className="merchant-revenue__grid">
+        {cards.map((card) => (
+          <div key={card.key} className={`merchant-revenue__card merchant-revenue__card--${card.variant}`}>
+            <p className="merchant-revenue__label">{card.label}</p>
+            {loading && !stats ? (
+              <span className="merchant-revenue__skel" aria-hidden="true" />
+            ) : (
+              <div className="merchant-revenue__value-row">
+                <span className="merchant-revenue__value">{fmt(card.value)}</span>
+                {card.isMoney ? <span className="merchant-revenue__unit">{copy.mmk}</span> : null}
               </div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: card.accent }}>
-                {fmt(card.value)}
-                {card.isMoney ? ` ${copy.mmk}` : ''}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 };
 

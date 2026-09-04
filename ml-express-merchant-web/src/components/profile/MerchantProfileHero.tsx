@@ -19,15 +19,21 @@ const MerchantProfileHero: React.FC<MerchantProfileHeroProps> = ({
     className={`merchant-profile-header${visible ? ' merchant-profile-header--visible' : ''}`}
   >
     <section className="merchant-profile-brand-panel" aria-label="Company">
-      <Logo size="compact" clickable={false} />
-      {isPartnerStore && pendingConfirmation > 0 ? (
-        <span className="merchant-profile-hero__chip merchant-profile-hero__chip--alert">
-          🔔{' '}
-          {language === 'zh'
-            ? `待接单 ${pendingConfirmation}`
-            : `${pendingConfirmation} pending`}
-        </span>
-      ) : null}
+      <div className="merchant-profile-brand-panel__lead">
+        <Logo size="compact" clickable={false} />
+      </div>
+      <div className="merchant-profile-brand-panel__meta">
+        <p className="merchant-profile-header__page">
+          {language === 'zh' ? '我的账号' : language === 'my' ? 'ကျွန်ုပ်၏အကောင့်' : 'My account'}
+        </p>
+        {isPartnerStore && pendingConfirmation > 0 ? (
+          <span className="merchant-profile-hero__chip">
+            {language === 'zh'
+              ? `待接单 ${pendingConfirmation}`
+              : `${pendingConfirmation} pending`}
+          </span>
+        ) : null}
+      </div>
     </section>
   </div>
 );

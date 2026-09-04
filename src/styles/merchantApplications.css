@@ -192,6 +192,8 @@
   justify-content: center;
   padding: 1rem;
   z-index: 1200;
+  overflow: hidden;
+  overscroll-behavior: none;
   animation: merchant-apps-fade-in 0.18s ease;
 }
 
@@ -210,11 +212,12 @@
 }
 
 .merchant-apps-modal {
-  width: min(860px, 100%);
+  width: min(880px, 100%);
   max-height: min(92vh, 960px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #fff;
   border: 1px solid #e2e8f0;
   box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
@@ -238,7 +241,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.1rem 1.25rem;
+  padding: 1.2rem 1.5rem 1.05rem;
   border-bottom: 1px solid #e2e8f0;
   background: #fafafa;
   flex-shrink: 0;
@@ -268,9 +271,10 @@
 .merchant-apps-modal__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 0.85rem;
-  font-size: 0.78rem;
+  gap: 0.4rem 1rem;
+  font-size: 0.84rem;
   color: #64748b;
+  line-height: 1.45;
 }
 
 .merchant-apps-modal__meta span {
@@ -298,25 +302,44 @@
 }
 
 .merchant-apps-modal__body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
-  padding: 1rem 1.25rem 1.25rem;
+  overscroll-behavior: contain;
+  padding: 1.15rem 1.5rem 1.4rem;
+  scrollbar-gutter: stable;
+}
+
+.merchant-apps-modal__body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.merchant-apps-modal__body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #fff;
+}
+
+.merchant-apps-modal__body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .merchant-apps-modal__section {
-  margin-bottom: 1rem;
-  border-radius: 12px;
+  margin-bottom: 1.15rem;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  overflow: hidden;
+  background: #fff;
+}
+
+.merchant-apps-modal__section:last-child {
+  margin-bottom: 0;
 }
 
 .merchant-apps-modal__section-head {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.65rem 0.9rem;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 0.75rem 1.05rem 0.55rem;
   background: #fff;
 }
 
@@ -334,20 +357,20 @@
 }
 
 .merchant-apps-modal__section-body {
-  padding: 0.85rem 0.9rem;
+  padding: 0.15rem 1.05rem 1.05rem;
 }
 
 .merchant-apps-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
+  gap: 0.75rem;
 }
 
 .merchant-apps-detail-item {
-  padding: 0.55rem 0.65rem;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
 }
 
 .merchant-apps-detail-item--full {
@@ -675,7 +698,7 @@
   flex-wrap: wrap;
   gap: 0.55rem;
   justify-content: flex-end;
-  padding: 0.85rem 1.25rem 1.1rem;
+  padding: 0.9rem 1.5rem 1.15rem;
   border-top: 1px solid #e2e8f0;
   background: #fafafa;
 }

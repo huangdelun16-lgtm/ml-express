@@ -5,6 +5,7 @@
  */
 
 import { logger } from '../utils/logger';
+import { readNetlifyFunctionJson } from '../utils/netlifyFunctionJson';
 
 const TOKEN_STORAGE_KEY = 'admin_auth_token';
 
@@ -196,7 +197,7 @@ export async function verifyToken(
       }),
     });
 
-    const result = (await response.json()) as VerifyOk;
+    const result = await readNetlifyFunctionJson<VerifyOk>(response);
 
     if (result.valid && result.user) {
       lastVerifySuccess = {

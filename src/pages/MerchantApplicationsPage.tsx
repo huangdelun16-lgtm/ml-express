@@ -14,6 +14,7 @@ import {
 import { notifyAdminTodosRefresh } from '../utils/adminTodoBridge';
 import { getMerchantStoreTypeLabel } from '../constants/merchantStoreTypes';
 import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
+import MerchantLicenseDocCard from '../components/MerchantLicenseDocCard';
 import '../styles/merchantApplications.css';
 
 const REGION_LABELS: Record<string, string> = {
@@ -43,20 +44,6 @@ function statusLabel(status: MerchantApplicationStatus, isEn: boolean) {
   return '待审核';
 }
 
-function isPdfUrl(url: string) {
-  return /\.pdf($|\?)/i.test(url);
-}
-
-function docFileName(url: string, index: number) {
-  try {
-    const name = decodeURIComponent(url.split('/').pop()?.split('?')[0] || '');
-    if (name && name.length > 2) return name;
-  } catch {
-    /* ignore */
-  }
-  return `document-${index + 1}`;
-}
-
 function generatePassword(length = 8) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let out = '';
@@ -68,61 +55,6 @@ function generatePassword(length = 8) {
 
 function googleMapsUrl(lat: number, lng: number) {
   return `https://www.google.com/maps?q=${lat},${lng}`;
-}
-
-function LicenseDocCard({
-  url,
-  index,
-  isEn,
-  onOpen,
-}: {
-  url: string;
-  index: number;
-  isEn: boolean;
-  onOpen: (previewUrl: string) => void;
-}) {
-  const [failed, setFailed] = useState(false);
-  const pdf = isPdfUrl(url);
-  const name = docFileName(url, index);
-  const previewUrl = rewritePublicStorageUrl(url);
-
-  return (
-    <article className="merchant-apps-doc">
-      {pdf ? (
-        <a
-          className="merchant-apps-doc__thumb"
-          href={previewUrl}
-          target="_blank"
-          rel="noreferrer noopener"
-        >
-          <span className="merchant-apps-doc__pdf">PDF</span>
-        </a>
-      ) : failed ? (
-        <div className="merchant-apps-doc__thumb merchant-apps-doc__thumb--failed">
-          <span>{isEn ? 'Preview unavailable' : '无法预览'}</span>
-        </div>
-      ) : (
-        <button
-          type="button"
-          className="merchant-apps-doc__thumb merchant-apps-doc__thumb--btn"
-          onClick={() => onOpen(previewUrl)}
-        >
-          <img src={previewUrl} alt={name} loading="lazy" onError={() => setFailed(true)} />
-        </button>
-      )}
-      <span className="merchant-apps-doc__label" title={name}>
-        {name}
-      </span>
-      <div className="merchant-apps-doc__actions">
-        <a href={previewUrl} target="_blank" rel="noreferrer noopener">
-          {isEn ? 'Open' : '新窗口打开'}
-        </a>
-        <a href={previewUrl} download={name} target="_blank" rel="noreferrer noopener">
-          {isEn ? 'Download original' : '下载原件'}
-        </a>
-      </div>
-    </article>
-  );
 }
 
 function parsePackingAckFromNotes(notes?: string | null): string | null {
@@ -245,6 +177,7 @@ const MerchantApplicationsPage: React.FC = () => {
   const copyLabel = isEn ? 'Copy' : '复制';
   const submittingRef = useRef(false);
   const lastPendingCountRef = useRef<number | null>(null);
+  const reviewBodyRef = useRef<HTMLDivElement>(null);
 
   const showToast = useCallback(
     (message: string) => {
@@ -550,8 +483,21 @@ const MerchantApplicationsPage: React.FC = () => {
           onClick={(e) => {
             if (e.target === e.currentTarget) closeModal();
           }}
+          onWheel={(e) => {
+            e.stopPropagation();
+          }}
         >
-          <div className="merchant-apps-modal" role="dialog" aria-modal="true" aria-labelledby="merchant-review-title">
+          <div
+            className="merchant-apps-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="merchant-review-title"
+            onWheel={(e) => {
+              const body = reviewBodyRef.current;
+              if (!body || body.contains(e.target as Node)) return;
+              body.scrollTop += e.deltaY;
+            }}
+          >
             <header className="merchant-apps-modal__head">
               <div className="merchant-apps-modal__head-main">
                 <div className="merchant-apps-modal__title-row">
@@ -587,7 +533,7 @@ const MerchantApplicationsPage: React.FC = () => {
               </button>
             </header>
 
-            <div className="merchant-apps-modal__body">
+            <div className="merchant-apps-modal__body" ref={reviewBodyRef}>
               {credentials && (
                 <div className="merchant-apps-credentials">
                   <div className="merchant-apps-credentials__head">
@@ -703,7 +649,7 @@ const MerchantApplicationsPage: React.FC = () => {
                   </p>
                   <div className="merchant-apps-docs">
                     {selected.license_document_urls.map((url, index) => (
-                      <LicenseDocCard
+                      <MerchantLicenseDocCard
                         key={`${url}-${index}`}
                         url={url}
                         index={index}

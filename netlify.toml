@@ -10,6 +10,12 @@
   publish = "build"
   functions = "netlify/functions"
 
+# 本地完整栈（含 Functions）。只跑 `npm start` 时由 src/setupProxy.js 把
+# /.netlify/functions 转到线上 Admin，否则登录会 404 成 HTML。
+[dev]
+  framework = "create-react-app"
+  autoLaunch = false
+
 [[edge_functions]]
   function = "supabase-bff"
   path = "/__sb/*"

@@ -820,8 +820,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                           >
                             <div
                               style={{
-                                color: "#fef3c7",
+                                color: "#92400e",
                                 fontSize: "0.9rem",
+                                fontWeight: 600,
                                 marginBottom: "4px",
                               }}
                             >
@@ -859,8 +860,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                           >
                             <div
                               style={{
-                                color: "#fecaca",
+                                color: "#b91c1c",
                                 fontSize: "0.9rem",
+                                fontWeight: 600,
                                 marginBottom: "4px",
                               }}
                             >
@@ -905,8 +907,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                           >
                             <div
                               style={{
-                                color: "#1677ff",
+                                color: "#1d4ed8",
                                 fontSize: "0.9rem",
+                                fontWeight: 600,
                                 marginBottom: "4px",
                               }}
                             >
@@ -951,8 +954,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                           >
                             <div
                               style={{
-                                color: "#6ee7b7",
+                                color: "#047857",
                                 fontSize: "0.9rem",
+                                fontWeight: 600,
                                 marginBottom: "4px",
                               }}
                             >
@@ -997,8 +1001,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                           >
                             <div
                               style={{
-                                color: "#5eead4",
+                                color: "#0f766e",
                                 fontSize: "0.9rem",
+                                fontWeight: 600,
                                 marginBottom: "4px",
                               }}
                             >
@@ -1044,8 +1049,9 @@ const FinanceCashCollectionTab: React.FC = () => {
                           >
                             <div
                               style={{
-                                color: "#a7f3d0",
+                                color: "#047857",
                                 fontSize: "0.9rem",
+                                fontWeight: 600,
                                 marginBottom: "4px",
                               }}
                             >

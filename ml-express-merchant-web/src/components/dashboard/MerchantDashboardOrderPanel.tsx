@@ -2,6 +2,7 @@ import React from 'react';
 import { MERCHANT_ORDER_STATUS } from '../../constants/merchantOrderStatus';
 import { useNavigate } from 'react-router-dom';
 import { useMerchantOrdersOptional } from '../../contexts/MerchantOrderContext';
+import '../../styles/merchantDashboardOrderPanel.css';
 
 interface Props {
   language: string;
@@ -90,83 +91,27 @@ const MerchantDashboardOrderPanel: React.FC<Props> = ({
   ];
 
   return (
-    <div
-      style={{
-        background: 'rgba(255, 255, 255, 0.12)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '24px',
-        padding: '1.5rem',
-        border: '1px solid rgba(255, 255, 255, 0.22)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-        marginBottom: '2rem',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          marginBottom: '1rem',
-        }}
-      >
+    <div className="merchant-order-panel">
+      <div className="merchant-order-panel__top">
         <div>
-          <h2 style={{ color: '#fff', fontSize: '1.35rem', margin: '0 0 0.35rem', fontWeight: 800 }}>
-            {copy.title}
-          </h2>
-          <p style={{ margin: 0, color: 'rgba(226,232,240,0.75)', fontSize: '0.88rem' }}>{copy.hint}</p>
+          <h2 className="merchant-order-panel__title">{copy.title}</h2>
+          <p className="merchant-order-panel__hint">{copy.hint}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => go()}
-          style={{
-            padding: '0.65rem 1.25rem',
-            borderRadius: '12px',
-            border: 'none',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-            color: '#fff',
-            fontWeight: 800,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            boxShadow: '0 8px 20px rgba(37,99,235,0.35)',
-          }}
-        >
-          {copy.open} →
+        <button type="button" className="merchant-order-panel__open" onClick={() => go()}>
+          {copy.open}
         </button>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          gap: '0.75rem',
-        }}
-      >
+      <div className="merchant-order-panel__grid">
         {chips.map((chip) => (
           <button
             key={chip.key}
             type="button"
+            className={`merchant-order-panel__chip${chip.highlight ? ' is-alert' : ''}`}
             onClick={() => go(chip.status)}
-            style={{
-              textAlign: 'left',
-              padding: '0.85rem 1rem',
-              borderRadius: '14px',
-              border: chip.highlight
-                ? '2px solid #fbbf24'
-                : '1px solid rgba(255,255,255,0.12)',
-              background: chip.highlight
-                ? 'rgba(251,191,36,0.12)'
-                : 'rgba(255,255,255,0.06)',
-              color: '#f8fafc',
-              cursor: 'pointer',
-              transition: 'transform 0.15s ease',
-            }}
           >
-            <div style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '0.2rem' }}>
-              {chip.count}
-            </div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.85 }}>{chip.label}</div>
+            <div className="merchant-order-panel__count">{chip.count}</div>
+            <div className="merchant-order-panel__label">{chip.label}</div>
           </button>
         ))}
       </div>

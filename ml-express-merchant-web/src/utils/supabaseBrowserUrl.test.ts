@@ -19,16 +19,18 @@ describe('resolveBrowserSupabaseUrl', () => {
     });
   });
 
-  it('localhost / jsdom keeps supabase.co and custom URLs', () => {
+  it('localhost / jsdom uses same-origin /__sb for supabase and Worker URLs', () => {
+    const localSb = `${window.location.origin}/__sb/`;
     expect(window.location.hostname === 'localhost' || window.location.hostname === '').toBe(true);
-    expect(resolveBrowserSupabaseUrl(UPSTREAM)).toBe(UPSTREAM);
-    expect(resolveBrowserSupabaseUrl(SUPABASE_BROWSER_PROXY_URL)).toBe(SUPABASE_BROWSER_PROXY_URL);
+    expect(resolveBrowserSupabaseUrl(UPSTREAM)).toBe(localSb);
+    expect(resolveBrowserSupabaseUrl(SUPABASE_BROWSER_PROXY_URL)).toBe(localSb);
     expect(resolveBrowserSupabaseUrl('https://sb.example.com')).toBe('https://sb.example.com');
   });
 
-  it('empty falls back to upstream supabase.co (jsdom / local)', () => {
-    expect(resolveBrowserSupabaseUrl('')).toBe(UPSTREAM);
-    expect(resolveBrowserSupabaseUrl(undefined)).toBe(UPSTREAM);
+  it('empty also uses same-origin /__sb so localhost does not dial supabase.co', () => {
+    const localSb = `${window.location.origin}/__sb/`;
+    expect(resolveBrowserSupabaseUrl('')).toBe(localSb);
+    expect(resolveBrowserSupabaseUrl(undefined)).toBe(localSb);
   });
 
   it('mocked production admin host returns same-origin /__sb', () => {

@@ -27,12 +27,12 @@ export interface MerchantStoreTypeOption {
 /** 可选店铺类型（新建/筛选；不含五金店） */
 export const MERCHANT_STORE_TYPE_OPTIONS: MerchantStoreTypeOption[] = [
   { value: 'restaurant', zh: '餐厅', en: 'Restaurant', my: 'စားသောက်ဆိုင်' },
-  { value: 'drinks_snacks', zh: '饮料和小吃', en: 'Drink & Snack', my: 'Drink & Snack' },
+  { value: 'drinks_snacks', zh: '饮料和小吃', en: 'Drink & Snack', my: 'အဖျော်နှင့် အဆာပြေ' },
   { value: 'breakfast', zh: '早点铺', en: 'Breakfast Shop', my: 'မနက်စာဆိုင်' },
-  { value: 'cake_shop', zh: '蛋糕店', en: 'Cake Shop', my: 'ကိတ်မှုန့်ဆိုင်' },
+  { value: 'cake_shop', zh: '蛋糕店', en: 'Cake Shop', my: 'ကိတ်မုန့်ဆိုင်' },
   { value: 'tea_shop', zh: '茶铺', en: 'Tea Shop', my: 'လက်ဖက်ရည်ဆိုင်' },
   { value: 'flower_shop', zh: '花店', en: 'Flower Shop', my: 'ပန်းဆိုင်' },
-  { value: 'clothing_store', zh: '服装店', en: 'Clothing Store', my: 'အ၀တ်ဆိုင်' },
+  { value: 'clothing_store', zh: '服装店', en: 'Clothing Store', my: 'အဝတ်ဆိုင်' },
   { value: 'grocery', zh: '杂货店', en: 'Store', my: 'ကုန်စုံဆိုင်' },
   { value: 'supermarket', zh: '百货店', en: 'Department Store', my: 'ကုန်တိုက်' },
   { value: 'other', zh: '网购', en: 'Online Shop', my: 'အွန်လိုင်းဆိုင်' },

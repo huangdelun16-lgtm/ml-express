@@ -25,6 +25,7 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
       password: '安全密码',
       login: '立即登录系统',
       error: '登录失败，请检查店铺代码或密码',
+      network: '连不上数据库。请刷新后再试，或检查网络。',
       storePlaceholder: '请输入 MDY00X 格式代码',
       passPlaceholder: '请输入您的登录密码'
     },
@@ -35,6 +36,7 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
       password: 'Security Password',
       login: 'Login to System',
       error: 'Login failed, please check credentials',
+      network: 'Cannot reach the database. Refresh and try again.',
       storePlaceholder: 'Enter store code (e.g. MDY001)',
       passPlaceholder: 'Enter your password'
     },
@@ -45,6 +47,7 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
       password: 'စကားဝှက်',
       login: 'စနစ်သို့ဝင်ရောက်ရန်',
       error: 'ဝင်ရောက်မှု မအောင်မြင်ပါ၊ ကုဒ် သို့မဟုတ် စကားဝှက်ကို စစ်ဆေးပါ',
+      network: 'ဒေတာဘေ့စ်သို့ ချိတ်ဆက်မရပါ။ ပြန်လည်စမ်းကြည့်ပါ။',
       storePlaceholder: 'ဆိုင်ကုဒ် ရိုက်ထည့်ပါ',
       passPlaceholder: 'စကားဝှက် ရိုက်ထည့်ပါ'
     }
@@ -66,12 +69,15 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
         .eq('store_code', storeCode.trim().toUpperCase())
         .maybeSingle();
 
-      if (storeError || !store) {
-        throw new Error('Store not found');
+      if (storeError) {
+        const detail = String(storeError.message || '');
+        if (/failed to fetch|networkerror|load failed|err_connection|timeout/i.test(detail)) {
+          throw new Error(currentT.network);
+        }
+        throw new Error(currentT.error);
       }
-
-      if (storeError || !store) {
-        throw new Error('Store not found');
+      if (!store) {
+        throw new Error(currentT.error);
       }
 
       const blockReason = getMerchantLoginBlockReason(store, loginLang);
@@ -108,7 +114,12 @@ const LoginPage: React.FC<{ onLogin: (user: any) => void }> = ({ onLogin }) => {
       onLogin(merchantsUser);
       navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : currentT.error);
+      const raw = err instanceof Error ? err.message : '';
+      if (/failed to fetch|networkerror|load failed|err_connection|timeout/i.test(raw)) {
+        setError(currentT.network);
+      } else {
+        setError(raw || currentT.error);
+      }
     } finally {
       setLoading(false);
     }

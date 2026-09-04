@@ -12,6 +12,7 @@ import {
   buildProductNamePriceMap,
 } from '../../utils/parseOrderPackingItems';
 import { printMerchantReceipt } from '../../utils/printMerchantReceipt';
+import { loadPrinterSettings } from '../../services/printerSettings';
 import './OrderAlertModal.css';
 import { feedbackService } from '../../services/FeedbackService';
 import { packingAcceptFields } from '../../services/_shared/packingCountdown';
@@ -152,31 +153,33 @@ const OrderAlertModal: React.FC<OrderAlertModalProps> = ({
       }
 
       try {
-        await printMerchantReceipt(
-          {
-            id: String(accepted.id),
-            created_at: String(accepted.created_at || accepted.create_time || ''),
-            create_time: accepted.create_time ? String(accepted.create_time) : undefined,
-            description: accepted.description ? String(accepted.description) : undefined,
-            price: accepted.price != null ? String(accepted.price) : undefined,
-            payment_method: accepted.payment_method
-              ? String(accepted.payment_method)
-              : undefined,
-            sender_name: accepted.sender_name ? String(accepted.sender_name) : undefined,
-            sender_phone: accepted.sender_phone ? String(accepted.sender_phone) : undefined,
-            receiver_name: accepted.receiver_name ? String(accepted.receiver_name) : undefined,
-            receiver_phone: accepted.receiver_phone
-              ? String(accepted.receiver_phone)
-              : undefined,
-            receiver_address: accepted.receiver_address
-              ? String(accepted.receiver_address)
-              : undefined,
-            notes: accepted.notes ? String(accepted.notes) : undefined,
-            cod_amount: Number(accepted.cod_amount || 0),
-          },
-          priceMap,
-          language,
-        );
+        if (loadPrinterSettings().autoPrint) {
+          await printMerchantReceipt(
+            {
+              id: String(accepted.id),
+              created_at: String(accepted.created_at || accepted.create_time || ''),
+              create_time: accepted.create_time ? String(accepted.create_time) : undefined,
+              description: accepted.description ? String(accepted.description) : undefined,
+              price: accepted.price != null ? String(accepted.price) : undefined,
+              payment_method: accepted.payment_method
+                ? String(accepted.payment_method)
+                : undefined,
+              sender_name: accepted.sender_name ? String(accepted.sender_name) : undefined,
+              sender_phone: accepted.sender_phone ? String(accepted.sender_phone) : undefined,
+              receiver_name: accepted.receiver_name ? String(accepted.receiver_name) : undefined,
+              receiver_phone: accepted.receiver_phone
+                ? String(accepted.receiver_phone)
+                : undefined,
+              receiver_address: accepted.receiver_address
+                ? String(accepted.receiver_address)
+                : undefined,
+              notes: accepted.notes ? String(accepted.notes) : undefined,
+              cod_amount: Number(accepted.cod_amount || 0),
+            },
+            priceMap,
+            language,
+          );
+        }
       } catch (printErr) {
         LoggerService.warn('接单后打印打包清单失败', printErr);
         feedbackService.notify(

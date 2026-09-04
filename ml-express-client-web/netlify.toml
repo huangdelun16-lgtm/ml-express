@@ -10,6 +10,10 @@
   publish = "build"
   functions = "netlify/functions"
 
+[[edge_functions]]
+  function = "supabase-bff"
+  path = "/__sb/*"
+
 [build.environment]
   NODE_VERSION = "18"
   NPM_FLAGS = "--legacy-peer-deps"

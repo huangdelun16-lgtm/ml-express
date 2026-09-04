@@ -55,7 +55,6 @@ export const webPrinterService = {
     if (settings.type === 'bluetooth') {
       savePrinterSettings({
         ...settings,
-        enabled: settings.type !== 'bluetooth' ? settings.enabled : false,
         bleDeviceName: '',
         address: '',
       });
@@ -79,25 +78,41 @@ export const webPrinterService = {
     }, 1000);
   },
 
-  async printReceiptData(data: MerchantReceiptData): Promise<boolean> {
+  async printReceiptData(
+    data: MerchantReceiptData,
+    options?: { allowSystemFallback?: boolean },
+  ): Promise<boolean> {
     const settings = loadPrinterSettings();
     const paperWidth = loadReceiptPaperWidth();
+    const allowFallback = options?.allowSystemFallback === true;
 
     if (!settings.enabled && settings.type !== 'system') {
       return false;
     }
 
+    let type = settings.type;
+    if (type === 'bluetooth' && !isWebBluetoothConnected()) {
+      if (!allowFallback) throw new Error('BLE_PRINTER_NOT_CONNECTED');
+      LoggerService.warn('蓝牙小票机未连接，改用浏览器打印');
+      type = 'system';
+    }
+    if (type === 'wifi' && !settings.printBridgeUrl.trim()) {
+      if (!allowFallback) throw new Error('WIFI_BRIDGE_URL_REQUIRED');
+      LoggerService.warn('未配置打印桥接，改用浏览器打印');
+      type = 'system';
+    }
+
     try {
       const copies =
-        settings.type === 'system'
+        type === 'system'
           ? 1
           : Math.max(1, Math.min(Number(settings.copies) || 1, 5));
 
       for (let i = 0; i < copies; i += 1) {
-        if (settings.type === 'bluetooth') {
+        if (type === 'bluetooth') {
           const bytes = buildEscPosReceiptBytes(data, paperWidth);
           await sendEscPosViaWebBluetooth(bytes);
-        } else if (settings.type === 'wifi') {
+        } else if (type === 'wifi') {
           const bytes = buildEscPosReceiptBytes(data, paperWidth);
           await sendEscPosViaWifi(bytes, settings);
         } else {
@@ -118,7 +133,7 @@ export const webPrinterService = {
 
   async printSampleReceipt(storeName?: string, storePhone?: string): Promise<boolean> {
     const data = createSampleReceiptData({ storeName, storePhone });
-    return this.printReceiptData(data);
+    return this.printReceiptData(data, { allowSystemFallback: false });
   },
 
   async printOrder(
@@ -126,7 +141,7 @@ export const webPrinterService = {
     productPriceMap?: Record<string, number>,
   ): Promise<boolean> {
     const receipt = orderToMerchantReceipt(order, productPriceMap);
-    return this.printReceiptData(receipt);
+    return this.printReceiptData(receipt, { allowSystemFallback: true });
   },
 };
 

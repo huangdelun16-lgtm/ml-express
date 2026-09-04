@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import type { MerchantLanguage } from '../../constants/merchantOrderStatus';
 import {
   getReceiptPaperLabel,
+  RECEIPT_PAPER_PRESETS,
   RECEIPT_PAPER_WIDTH_OPTIONS,
   type ReceiptPaperWidthMm,
 } from '../../constants/receiptPaper';
@@ -57,10 +58,15 @@ function getCopy(language: MerchantLanguage) {
       : 'Requires Chrome/Edge + HTTPS. Web Bluetooth needs a user click each session.',
     wifiHost: zh ? '打印机 IP' : 'Printer IP',
     wifiPort: zh ? '端口' : 'Port',
-    wifiBridge: zh ? '打印桥接 URL（可选）' : 'Print bridge URL',
+    wifiBridge: zh ? '打印桥接 URL（必填）' : 'Print bridge URL (required)',
     wifiBridgeHint: zh
-      ? '浏览器无法直连 TCP:9100。若你有本地 Print Bridge 服务，填其 POST 地址；否则请用「浏览器打印」或将打印机添加到系统。'
-      : 'Browsers cannot open raw TCP :9100. Use a local print bridge POST URL, or use Browser print.',
+      ? '浏览器不能直接打到网口 9100。要用热敏机直打，必须先跑本地 Print Bridge，并把 POST 地址填在这里。没有桥接就改用「浏览器打印」，或把打印机添加到系统。'
+      : 'Browsers cannot open raw TCP :9100. A local Print Bridge POST URL is required for Wi-Fi thermal. Otherwise use Browser print.',
+    bleRemembered: zh ? '已记住，请重新连接' : 'Remembered — reconnect',
+    bleCancelled: zh ? '已取消选择打印机' : 'Printer selection cancelled',
+    wifiNeedBridge: zh ? '请先填写打印桥接 URL，再测试打印' : 'Enter the print bridge URL first',
+    wifiNeedHost: zh ? '请先填写打印机 IP' : 'Enter the printer IP first',
+    bleNeedConnect: zh ? '请先连接蓝牙小票机，再测试打印' : 'Connect the Bluetooth printer first',
     testPrint: zh ? '打印测试小票' : 'Print test receipt',
     preview: zh ? '小票预览' : 'Receipt preview',
     close: zh ? '关闭' : 'Close',
@@ -116,20 +122,43 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
     setSettings((prev) => ({ ...prev, ...patch }));
   };
 
-  const handleSave = () => {
+  const persistSettings = (nextSettings: WebPrinterSettings, nextPaper = paperWidth) => {
     const next: WebPrinterSettings = {
-      ...settings,
+      ...nextSettings,
       enabled: true,
       address:
-        settings.type === 'wifi'
-          ? `${settings.wifiHost}:${settings.wifiPort || 9100}`
-          : settings.type === 'bluetooth'
-            ? settings.address
+        nextSettings.type === 'wifi'
+          ? `${nextSettings.wifiHost}:${nextSettings.wifiPort || 9100}`
+          : nextSettings.type === 'bluetooth'
+            ? nextSettings.address
             : '',
     };
     webPrinterService.saveSettings(next);
-    saveReceiptPaperWidth(paperWidth);
+    saveReceiptPaperWidth(nextPaper);
+    return next;
+  };
+
+  const handleSave = () => {
+    persistSettings(settings);
     setMessage(t.saved);
+  };
+
+  const handleClose = () => {
+    persistSettings(settings);
+    onClose();
+  };
+
+  const printerMessage = (error: unknown) => {
+    const name = error instanceof Error ? error.name : '';
+    const code = error instanceof Error ? error.message : '';
+    if (name === 'NotFoundError' || /cancel/i.test(code)) return t.bleCancelled;
+    if (code === 'WIFI_BRIDGE_URL_REQUIRED' || code === 'WIFI_CONFIG_INCOMPLETE') return t.wifiNeedBridge;
+    if (code === 'BLE_PRINTER_NOT_CONNECTED') return t.bleNeedConnect;
+    if (code === 'WEB_BLUETOOTH_UNSUPPORTED') return t.unsupportedBle;
+    if (code === 'WIFI_PRINT_FAILED') return t.printFail;
+    return error instanceof Error && error.message && !/^[A-Z0-9_]+$/.test(error.message)
+      ? error.message
+      : t.printFail;
   };
 
   const handleTab = (type: PrinterConnectionType) => {
@@ -158,7 +187,7 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
       setBleConnected(true);
       setMessage(`${t.bleConnected}: ${device.name}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : t.printFail);
+      setMessage(printerMessage(error));
     } finally {
       setBusy(false);
     }
@@ -181,13 +210,21 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
     try {
       handleSave();
       if (settings.type === 'wifi') {
+        if (!settings.wifiHost.trim()) {
+          setMessage(t.wifiNeedHost);
+          return;
+        }
+        if (!settings.printBridgeUrl.trim()) {
+          setMessage(t.wifiNeedBridge);
+          return;
+        }
         await testWifiBridge({ ...settings, enabled: true });
       } else {
         await webPrinterService.printSampleReceipt(storeName, storePhone);
       }
       setMessage(t.printOk);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : t.printFail);
+      setMessage(printerMessage(error));
     } finally {
       setBusy(false);
     }
@@ -199,11 +236,11 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
   const bleLabel = settings.bleDeviceName || cachedBle?.name || '';
 
   return (
-    <div className="merchant-printer-overlay" onClick={onClose}>
+    <div className="merchant-printer-overlay" onClick={handleClose}>
       <div className="merchant-printer-panel" onClick={(e) => e.stopPropagation()}>
         <div className="merchant-printer-header">
-          <button type="button" className="merchant-printer-close" onClick={onClose}>✕</button>
-          <h2>🖨️ {t.title}</h2>
+          <button type="button" className="merchant-printer-close" onClick={handleClose}>✕</button>
+          <h2>{t.title}</h2>
           <p>{t.hint}</p>
         </div>
 
@@ -243,8 +280,12 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
                 <p className="merchant-printer-note warn">{t.secureWarn}</p>
               ) : null}
               <div className="merchant-printer-row">
-                <span className={`merchant-printer-status ${bleConnected || bleLabel ? 'on' : 'off'}`}>
-                  {bleConnected || bleLabel ? t.bleConnected : t.bleNotConnected}
+                <span className={`merchant-printer-status ${bleConnected ? 'on' : 'off'}`}>
+                  {bleConnected
+                    ? t.bleConnected
+                    : bleLabel
+                      ? t.bleRemembered
+                      : t.bleNotConnected}
                   {bleLabel ? ` · ${bleLabel}` : ''}
                 </span>
               </div>
@@ -315,7 +356,11 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
             <input
               type="checkbox"
               checked={settings.autoPrint}
-              onChange={(e) => updateSettings({ autoPrint: e.target.checked })}
+              onChange={(e) => {
+                const next = { ...settings, autoPrint: e.target.checked };
+                setSettings(next);
+                persistSettings(next);
+              }}
             />
           </div>
 
@@ -323,7 +368,7 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
             <h3>{t.preview}</h3>
             <div
               className="merchant-printer-preview"
-              style={{ maxWidth: `${paperWidth === 58 ? 220 : paperWidth === 80 ? 300 : 280}px` }}
+              style={{ maxWidth: `${RECEIPT_PAPER_PRESETS[paperWidth].previewWidth}px` }}
             >
               <div style={{ textAlign: 'center', fontWeight: 900 }}>MARKET LINK EXPRESS</div>
               <div style={{ textAlign: 'center', fontSize: 11 }}>*** PACKING LIST ***</div>
@@ -354,11 +399,11 @@ const MerchantPrinterModal: React.FC<MerchantPrinterModalProps> = ({
             </div>
           </div>
 
-          {message ? <p className="merchant-printer-note" style={{ color: '#7dd3fc' }}>{message}</p> : null}
+          {message ? <p className="merchant-printer-message">{message}</p> : null}
         </div>
 
         <div className="merchant-printer-footer">
-          <button type="button" className="merchant-printer-btn secondary" onClick={onClose}>{t.close}</button>
+          <button type="button" className="merchant-printer-btn secondary" onClick={handleClose}>{t.close}</button>
           <button type="button" className="merchant-printer-btn secondary" disabled={busy} onClick={handleSave}>{t.save}</button>
           <button type="button" className="merchant-printer-btn primary full" disabled={busy} onClick={handleTestPrint}>
             {t.testPrint}

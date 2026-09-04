@@ -2,6 +2,7 @@
  * Admin：商家入驻申请列表 / 审核
  * GET  ?status=pending|approved|rejected|all
  * GET  ?id=<uuid>
+ * GET  ?storeId=<uuid>&storeCode=&phone=&storeName=  → { documents }
  * POST { action: 'approve'|'reject', applicationId, review_notes?, password? }
  *
  * Approve/reject only updates status. Do not delete merchant_applications
@@ -85,6 +86,70 @@ exports.handler = async (event) => {
           statusCode: 200,
           headers,
           body: JSON.stringify({ application: data, suggested_store_code }),
+        };
+      }
+
+      const storeId = String(params.storeId || '').trim();
+      if (storeId) {
+        const storeCode = String(params.storeCode || '').trim().toUpperCase();
+        const storeName = String(params.storeName || '').trim().toLowerCase();
+        const storePhone = String(params.phone || '').replace(/\D/g, '');
+
+        let { data, error } = await supabase
+          .from('merchant_applications')
+          .select(APPLICATION_COLUMNS)
+          .eq('created_store_id', storeId)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+
+        if (!data?.length && storeCode) {
+          const fallback = await supabase
+            .from('merchant_applications')
+            .select(APPLICATION_COLUMNS)
+            .eq('provisioned_store_code', storeCode)
+            .order('created_at', { ascending: false });
+          if (fallback.error) throw fallback.error;
+          data = fallback.data;
+        }
+
+        if (!data?.length && storePhone && storeName) {
+          const fallback = await supabase
+            .from('merchant_applications')
+            .select(APPLICATION_COLUMNS)
+            .order('created_at', { ascending: false })
+            .limit(200);
+          if (fallback.error) throw fallback.error;
+          data = (fallback.data || []).filter((row) => {
+            const phone = String(row.phone || '').replace(/\D/g, '');
+            const name = String(row.store_name || '').trim().toLowerCase();
+            return phone === storePhone && name === storeName;
+          });
+        }
+
+        const ranked = [...(data || [])].sort((a, b) => {
+          const aApproved = a.status === 'approved' ? 1 : 0;
+          const bApproved = b.status === 'approved' ? 1 : 0;
+          if (aApproved !== bApproved) return bApproved - aApproved;
+          return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+        });
+
+        let documents = [];
+        let applicationId = null;
+        for (const app of ranked) {
+          const urls = (Array.isArray(app.license_document_urls) ? app.license_document_urls : [])
+            .map((url) => String(url || '').trim())
+            .filter(Boolean);
+          if (urls.length) {
+            documents = [...new Set(urls)];
+            applicationId = app.id;
+            break;
+          }
+        }
+
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ documents, applicationId, count: documents.length }),
         };
       }
 

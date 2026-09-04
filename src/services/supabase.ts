@@ -24,6 +24,8 @@ import {
   resolveBrowserSupabaseUrl,
   rewritePublicStorageUrl,
 } from '../utils/supabaseBrowserUrl';
+import { packageBelongsToStore } from '../utils/storePackages';
+import { readNetlifyFunctionJson } from '../utils/netlifyFunctionJson';
 export type { Banner, Tutorial, WelcomeScreen };
 export type { ProxyPurchaseRow as ProxyPurchaseWorkspaceRow };
 
@@ -877,88 +879,36 @@ export const packageService = {
     }
   },
 
-  // 获取与店铺相关的所有包裹（包括提交和送达的）
+  // 这家店自己的单：送到该店，或该店作为商家下的单。不按寄件坐标附近匹配。
   async getPackagesByStoreId(storeId: string): Promise<Package[]> {
+    const id = String(storeId || '').trim();
+    if (!id) return [];
     try {
-      // 先获取店铺信息以获取坐标
-      const { data: storeData, error: storeError } = await supabase
-        .from('delivery_stores')
-        .select('latitude, longitude, store_name')
-        .eq('id', storeId)
-        .single();
-
-      if (storeError || !storeData) {
-        console.error(`获取店铺信息失败:`, storeError);
-        // 如果获取店铺信息失败，只查询送达店铺的包裹
-        const { data, error } = await supabase
-          .from('packages')
-          .select('*')
-          .eq('delivery_store_id', storeId)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error(`获取店铺 ${storeId} 包裹失败:`, error);
-          return [];
-        }
-
-        return data || [];
-      }
-
-      // 计算距离函数（公里）
-      const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-        const R = 6371; // 地球半径（公里）
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLng = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-      };
-
-      // 查询所有包裹
-      const { data: allPackages, error } = await supabase
+      const orFilter = `delivery_store_id.eq.${id},customer_id.eq.${id}`;
+      let { data, error } = await supabase
         .from('packages')
         .select('*')
+        .or(orFilter)
         .order('created_at', { ascending: false });
 
+      if (error && /customer_id/i.test(String(error.message || ''))) {
+        const fallback = await supabase
+          .from('packages')
+          .select('*')
+          .eq('delivery_store_id', id)
+          .order('created_at', { ascending: false });
+        data = fallback.data;
+        error = fallback.error;
+      }
+
       if (error) {
-        console.error(`获取包裹列表失败:`, error);
+        console.error(`获取店铺 ${id} 包裹失败:`, error);
         return [];
       }
 
-      if (!allPackages) {
-        return [];
-      }
-
-      // 筛选与店铺相关的包裹：
-      // 1. 送达店铺ID匹配
-      // 2. 或者寄件地址在店铺附近（5公里内）
-      const relatedPackages = allPackages.filter(pkg => {
-        // 检查是否是送达店铺
-        if (pkg.delivery_store_id === storeId) {
-          return true;
-        }
-
-        // 检查寄件地址是否在店铺附近（5公里内）
-        if (pkg.sender_latitude && pkg.sender_longitude) {
-          const distance = calculateDistance(
-            storeData.latitude,
-            storeData.longitude,
-            pkg.sender_latitude,
-            pkg.sender_longitude
-          );
-          if (distance <= 5) { // 5公里内
-            return true;
-          }
-        }
-
-        return false;
-      });
-
-      return relatedPackages;
+      return (data || []).filter((pkg) => packageBelongsToStore(pkg, id));
     } catch (err) {
-      console.error(`获取店铺 ${storeId} 包裹异常:`, err);
+      console.error(`获取店铺 ${id} 包裹异常:`, err);
       return [];
     }
   },
@@ -1482,7 +1432,7 @@ export const systemSettingsService = {
       fragile_surcharge: 300,
       food_beverage_surcharge: 300,
       free_km_threshold: 3,
-      courier_km_rate: 500,
+      courier_km_rate: 500, // 已废弃，财务/骑手结算不读此项
       way_side_courier_per_order: 0
     };
 
@@ -1518,7 +1468,7 @@ export const systemSettingsService = {
       fragile_surcharge: 300,
       food_beverage_surcharge: 300,
       free_km_threshold: 3,
-      courier_km_rate: 500,
+      courier_km_rate: 500, // 已废弃，财务/骑手结算不读此项
       way_side_courier_per_order: 0,
       delivery_bonus_rate: 0,
     };
@@ -2058,7 +2008,12 @@ export const adminAccountService = {
         })
       });
 
-      const result = await response.json();
+      const result = await readNetlifyFunctionJson<{
+        success?: boolean;
+        account?: AdminAccount;
+        token?: string;
+        error?: string;
+      }>(response);
 
       if (!result.success || !result.account) {
         console.error('登录失败:', result.error || '未知错误');
@@ -2082,7 +2037,10 @@ export const adminAccountService = {
       };
     } catch (err) {
       console.error('登录异常:', err);
-      return { account: null, error: '登录失败，请检查网络连接' };
+      return {
+        account: null,
+        error: err instanceof Error ? err.message : '登录失败，请检查网络连接',
+      };
     }
   },
 
@@ -2434,23 +2392,77 @@ export const deliveryStoreService = {
     }
   },
 
-  // 删除快递店
-  async deleteStore(id: string): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('delivery_stores')
-        .delete()
-        .eq('id', id);
+  // 删除合伙店：清商品/评价/该店订单和头像，入驻申请留底。
+  async deleteStore(id: string): Promise<{ success: boolean; error?: string }> {
+    const storeId = String(id || '').trim();
+    if (!storeId) return { success: false, error: '缺少店铺 ID' };
 
-      if (error) {
-        console.error('删除快递店失败:', error);
-        return false;
+    const fail = (error: { message?: string } | null, fallback: string) => ({
+      success: false as const,
+      error: error?.message || fallback,
+    });
+
+    const ignoreMissing = (error: { message?: string; code?: string } | null) => {
+      const text = `${error?.code || ''} ${error?.message || ''}`;
+      return /PGRST204|42P01|does not exist|schema cache/i.test(text);
+    };
+
+    try {
+      const productsRes = await supabase.from('products').delete().eq('store_id', storeId);
+      if (productsRes.error && !ignoreMissing(productsRes.error)) {
+        return fail(productsRes.error, '清除店铺商品失败');
       }
 
-      return true;
+      const categoriesRes = await supabase.from('product_categories').delete().eq('store_id', storeId);
+      if (categoriesRes.error && !ignoreMissing(categoriesRes.error)) {
+        return fail(categoriesRes.error, '清除店铺分类失败');
+      }
+
+      const reviewsRes = await supabase.from('store_reviews').delete().eq('store_id', storeId);
+      if (reviewsRes.error && !ignoreMissing(reviewsRes.error)) {
+        return fail(reviewsRes.error, '清除店铺评价失败');
+      }
+
+      const ownOrdersRes = await supabase.from('packages').delete().eq('customer_id', storeId);
+      if (ownOrdersRes.error && !ignoreMissing(ownOrdersRes.error)) {
+        return fail(ownOrdersRes.error, '清除该店自己下的订单失败');
+      }
+
+      const inboundRes = await supabase
+        .from('packages')
+        .update({ delivery_store_id: null, delivery_store_name: null })
+        .eq('delivery_store_id', storeId);
+      if (inboundRes.error && !ignoreMissing(inboundRes.error)) {
+        return fail(inboundRes.error, '解除送到该店的包裹关联失败');
+      }
+
+      const appsRes = await supabase
+        .from('merchant_applications')
+        .update({ created_store_id: null })
+        .eq('created_store_id', storeId);
+      if (appsRes.error && !ignoreMissing(appsRes.error)) {
+        return fail(appsRes.error, '解绑入驻申请失败');
+      }
+
+      const avatarPath = `${storeId}/avatar.jpg`;
+      await Promise.all(
+        ['product_images', 'review_images'].map((bucket) =>
+          supabase.storage.from(bucket).remove([avatarPath]).catch(() => null),
+        ),
+      );
+
+      const { error } = await supabase.from('delivery_stores').delete().eq('id', storeId);
+      if (error) {
+        return fail(error, '删除店铺失败');
+      }
+
+      return { success: true };
     } catch (err) {
       console.error('删除快递店异常:', err);
-      return false;
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : '删除店铺失败',
+      };
     }
   },
 

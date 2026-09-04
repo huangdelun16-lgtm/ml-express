@@ -56,6 +56,7 @@ import TimeWheelPicker from "../components/profile/TimeWheelPicker";
 import MerchantProfileHero from "../components/profile/MerchantProfileHero";
 import MerchantDashboardOrderPanel from "../components/dashboard/MerchantDashboardOrderPanel";
 import MerchantRevenuePanel from "../components/dashboard/MerchantRevenuePanel";
+import MerchantStatTile from "../components/dashboard/MerchantStatTile";
 import { useMerchantOrdersOptional } from "../contexts/MerchantOrderContext";
 import { MERCHANT_ORDERS_REFRESH } from "../utils/merchantOrderEvents";
 import { ensureDesktopNotificationPermission } from "../utils/merchantOrderDesktopAlert";
@@ -2849,40 +2850,33 @@ const ProfilePage: React.FC = () => {
         {isPartnerStore ? (
           <button
             type="button"
+            className={`merchant-ops-strip${
+              todayCloseReport.outOfStockCount + todayCloseReport.lowStockCount > 0 ? " is-alert" : ""
+            }`}
             onClick={() => openCloseReport("view")}
-            style={{
-              width: "100%",
-              margin: "0 0 1rem",
-              padding: "0.95rem 1.1rem",
-              borderRadius: 18,
-              border:
-                todayCloseReport.outOfStockCount + todayCloseReport.lowStockCount > 0
-                  ? "1px solid rgba(251, 191, 36, 0.45)"
-                  : "1px solid rgba(255,255,255,0.1)",
-              background:
-                todayCloseReport.outOfStockCount + todayCloseReport.lowStockCount > 0
-                  ? "rgba(251, 191, 36, 0.12)"
-                  : "rgba(255,255,255,0.05)",
-              color: "#fff",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              cursor: "pointer",
-              textAlign: "left",
-            }}
           >
-            <span style={{ fontWeight: 800, fontSize: "0.92rem" }}>
-              {language === "zh"
-                ? `今日报表 · 新单 ${todayCloseReport.todayOrderCount} · 未完成 ${todayCloseReport.unfinishedCount}`
-                : `Today · ${todayCloseReport.todayOrderCount} new · ${todayCloseReport.unfinishedCount} open`}
-              {todayCloseReport.outOfStockCount + todayCloseReport.lowStockCount > 0
-                ? language === "zh"
-                  ? ` · 缺货 ${todayCloseReport.outOfStockCount} · 偏低 ${todayCloseReport.lowStockCount}`
-                  : ` · ${todayCloseReport.outOfStockCount} out · ${todayCloseReport.lowStockCount} low`
-                : ""}
+            <span className="merchant-ops-strip__kicker">
+              {language === "zh" ? "今日报表" : "Today"}
             </span>
-            <span style={{ fontWeight: 800, opacity: 0.7 }}>
+            <span className="merchant-ops-strip__metrics">
+              <span>
+                {language === "zh" ? "新单" : "New"} {todayCloseReport.todayOrderCount}
+              </span>
+              <span>
+                {language === "zh" ? "未完成" : "Open"} {todayCloseReport.unfinishedCount}
+              </span>
+              {todayCloseReport.outOfStockCount + todayCloseReport.lowStockCount > 0 ? (
+                <>
+                  <span className="is-warn">
+                    {language === "zh" ? "缺货" : "Out"} {todayCloseReport.outOfStockCount}
+                  </span>
+                  <span className="is-warn">
+                    {language === "zh" ? "偏低" : "Low"} {todayCloseReport.lowStockCount}
+                  </span>
+                </>
+              ) : null}
+            </span>
+            <span className="merchant-ops-strip__view">
               {language === "zh" ? "查看" : "View"}
             </span>
           </button>
@@ -2896,18 +2890,6 @@ const ProfilePage: React.FC = () => {
             transition: "opacity 0.55s ease 0.12s, transform 0.55s ease 0.12s",
           }}
         >
-          {/* 用户头像和基本信息 */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "1.5rem",
-              marginBottom: "2rem",
-              paddingBottom: "1.5rem",
-              borderBottom: "1px solid rgba(255,255,255,0.15)",
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
               <p className="merchant-profile-account-card__platform-tag">
                 {language === "zh"
                   ? "官方配送服务平台"
@@ -2915,26 +2897,12 @@ const ProfilePage: React.FC = () => {
                     ? "Official delivery platform"
                     : "တရားဝင် ပို့ဆောင်ရေးဝန်ဆောင်မှု"}
               </p>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: "1rem",
-                  flexWrap: "wrap",
-                  marginBottom: "0.5rem",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.8rem",
-                    flexWrap: "wrap",
-                  }}
-                >
+              <div className="merchant-profile-identity">
+                <div className="merchant-profile-identity__who">
                   <button
                     type="button"
+                    className="merchant-profile-avatar"
+                    disabled={uploadingAvatar}
                     onClick={() => {
                       if (uploadingAvatar) return;
                       avatarInputRef.current?.click();
@@ -2946,26 +2914,6 @@ const ProfilePage: React.FC = () => {
                           ? "ပုံပြောင်းရန်"
                           : "Change avatar"
                     }
-                    style={{
-                      width: "56px",
-                      height: "56px",
-                      borderRadius: "16px",
-                      background:
-                        "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      border: "3px solid rgba(255, 255, 255, 0.9)",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      fontSize: "1.4rem",
-                      fontWeight: "700",
-                      color: "#0284c7",
-                      flexShrink: 0,
-                      padding: 0,
-                      cursor: uploadingAvatar ? "wait" : "pointer",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
                   >
                     <StorageImg
                       src={storeAvatarSrc(
@@ -2973,11 +2921,6 @@ const ProfilePage: React.FC = () => {
                         storeInfo?.updated_at,
                       )}
                       alt=""
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
                       fallback={
                         <span>
                           {currentUser.name
@@ -2986,22 +2929,8 @@ const ProfilePage: React.FC = () => {
                         </span>
                       }
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 2,
-                        bottom: 2,
-                        width: 18,
-                        height: 18,
-                        borderRadius: 9,
-                        background: "#fff",
-                        color: "#0284c7",
-                        fontSize: 11,
-                        lineHeight: "18px",
-                        boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-                      }}
-                    >
-                      ✎
+                    <span className="merchant-profile-avatar__edit" aria-hidden="true">
+                      +
                     </span>
                     <input
                       ref={avatarInputRef}
@@ -3015,734 +2944,119 @@ const ProfilePage: React.FC = () => {
                       }}
                     />
                   </button>
-                  <div
-                    style={{
-                      color: "white",
-                      fontSize: "1.6rem",
-                      fontWeight: "900",
-                      letterSpacing: "0.5px",
-                    }}
-                  >
-                    {currentUser.name || "-"}
-                  </div>
-                  <div
-                    style={{
-                    background: isPartnerStore 
-                        ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
+                  <div>
+                    <p className="merchant-profile-identity__name">{currentUser.name || "-"}</p>
+                    <span className="merchant-profile-badge">
+                      {isPartnerStore
+                        ? "MERCHANTS"
                         : userBalance > 0 || currentUser.user_type === "vip"
-                          ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
+                          ? "VIP"
                           : currentUser.user_type === "admin"
-                            ? "linear-gradient(135deg, #f97316 0%, #ea580c 100%)"
+                            ? "Admin"
                             : currentUser.user_type === "courier"
-                              ? "linear-gradient(135deg, #a855f7 0%, #9333ea 100%)"
-                              : "linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%)",
-                    boxShadow: isPartnerStore 
-                        ? "0 4px 15px rgba(14, 165, 233, 0.4)"
-                        : userBalance > 0 || currentUser.user_type === "vip"
-                          ? "0 4px 15px rgba(251, 191, 36, 0.4)"
-                          : currentUser.user_type === "admin"
-                            ? "0 4px 15px rgba(249, 115, 22, 0.4)"
-                            : currentUser.user_type === "courier"
-                              ? "0 4px 15px rgba(168, 85, 247, 0.4)"
-                              : "0 4px 15px rgba(127, 140, 141, 0.4)",
-                      color: "white",
-                      padding: "0.4rem 1.2rem",
-                      borderRadius: "14px",
-                      fontSize: "0.85rem",
-                      fontWeight: "800",
-                      border: "1px solid rgba(255,255,255,0.3)",
-                      letterSpacing: "0.5px",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {isPartnerStore
-                      ? "MERCHANTS"
-                      : userBalance > 0 || currentUser.user_type === "vip"
-                        ? "VIP"
-                        : currentUser.user_type === "admin"
-                          ? "Admin"
-                          : currentUser.user_type === "courier"
-                            ? "Courier"
-                            : "MEMBER"}
+                              ? "Courier"
+                              : "MEMBER"}
+                    </span>
                   </div>
-
-                  {/* 🚀 新增：编辑按钮 (图标形式，匹配 App) */}
-                  {currentUser && (
-                    <button
-                      onClick={handleOpenEditProfile}
-                      style={{
-                        background: "rgba(255, 255, 255, 0.1)",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        width: "36px",
-                        height: "36px",
-                        borderRadius: "10px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                        marginLeft: "10px",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background =
-                          "rgba(255, 255, 255, 0.2)";
-                        e.currentTarget.style.transform = "scale(1.1)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background =
-                          "rgba(255, 255, 255, 0.1)";
-                        e.currentTarget.style.transform = "scale(1)";
-                      }}
-                      title={language === "zh" ? "编辑资料" : "Edit Profile"}
-                    >
-                      <span style={{ fontSize: "1.2rem" }}>📝</span>
-                    </button>
-                  )}
                 </div>
-
-                {/* 🚀 商家端：只显示商家资料，不显示会员/充值信息 */}
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "1rem" }}
-                >
-                  {/* 编辑资料按钮 */}
-                  <button
-                    onClick={handleOpenEditProfile}
-                    style={{
-                      background: "rgba(59, 130, 246, 0.1)",
-                      color: "white",
-                      border: "1px solid rgba(59, 130, 246, 0.3)",
-                      padding: "0.6rem 1.5rem",
-                      borderRadius: "14px",
-                      fontSize: "0.95rem",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s ease",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.6rem",
-                      whiteSpace: "nowrap",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(59, 130, 246, 0.2)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(59, 130, 246, 0.1)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <span style={{ fontSize: "1.1rem" }}>📝</span>
+                <div className="merchant-profile-actions">
+                  <button type="button" className="merchant-profile-action" onClick={handleOpenEditProfile}>
                     {language === "zh"
                       ? "编辑资料"
                       : language === "en"
                         ? "Edit Profile"
                         : "ကိုယ်ရေးအချက်အလက်ပြင်ဆင်ရန်"}
                   </button>
-
-                  {/* 安全设置按钮 */}
                   <button
+                    type="button"
+                    className="merchant-profile-action"
                     onClick={() => setShowPasswordModal(true)}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.1)",
-                      color: "white",
-                      border: "1px solid rgba(255, 255, 255, 0.3)",
-                      padding: "0.6rem 1.5rem",
-                      borderRadius: "14px",
-                      fontSize: "0.95rem",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s ease",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.6rem",
-                      whiteSpace: "nowrap",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.2)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.1)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
                   >
-                    <span style={{ fontSize: "1.1rem" }}>🔐</span>
                     {language === "zh"
                       ? "安全设置"
                       : language === "en"
                         ? "Security"
                         : "လုံခြုံရေး"}
                   </button>
-
-                  <button
-                    onClick={() => navigate("/products")}
-                    style={{
-                      background: "rgba(16, 185, 129, 0.1)",
-                      color: "white",
-                      border: "1px solid rgba(16, 185, 129, 0.3)",
-                      padding: "0.6rem 1.5rem",
-                      borderRadius: "14px",
-                      fontSize: "0.95rem",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s ease",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.6rem",
-                      whiteSpace: "nowrap",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(16, 185, 129, 0.2)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(16, 185, 129, 0.1)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <span style={{ fontSize: "1.1rem" }}>📦</span>
+                  <button type="button" className="merchant-profile-action" onClick={() => navigate("/products")}>
                     {language === "zh"
                       ? "管理商品"
                       : language === "en"
                         ? "Products"
                         : "ပစ္စည်းစီမံရန်"}
                   </button>
-
                   <button
+                    type="button"
+                    className="merchant-profile-action"
                     onClick={() => setShowPrinterModal(true)}
-                    style={{
-                      background: "rgba(14, 165, 233, 0.12)",
-                      color: "white",
-                      border: "1px solid rgba(14, 165, 233, 0.35)",
-                      padding: "0.6rem 1.5rem",
-                      borderRadius: "14px",
-                      fontSize: "0.95rem",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s ease",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.6rem",
-                      whiteSpace: "nowrap",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(14, 165, 233, 0.22)";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(14, 165, 233, 0.12)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
                   >
-                    <span style={{ fontSize: "1.1rem" }}>🖨️</span>
-                    {language === "zh"
-                      ? "打印机"
-                      : language === "en"
-                        ? "Printer"
-                        : "Printer"}
+                    {language === "zh" ? "打印机" : "Printer"}
                   </button>
                 </div>
               </div>
               
               {isPartnerStore && storeInfo ? (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      window.innerWidth < 768 ? "1fr" : "repeat(3, 1fr)",
-                    gap: "1.25rem",
-                    marginTop: "2rem",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    padding: "1.75rem",
-                    borderRadius: "28px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    backdropFilter: "blur(15px)",
-                    boxShadow: "inset 0 0 30px rgba(255, 255, 255, 0.03)",
-                  }}
-                >
-                  {/* 第一行：店铺代码, 店铺类型, 电话 */}
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.6rem",
-                      background: "rgba(255, 255, 255, 0.03)",
-                      padding: "1.25rem",
-                      borderRadius: "24px",
-                      border: "1px solid rgba(255, 255, 255, 0.05)",
-                      transition: "transform 0.3s ease",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          background: "rgba(255,255,255,0.1)",
-                          borderRadius: "10px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "1.1rem",
-                        }}
-                      >
-                        🆔
-                    </div>
-                      <span
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "rgba(255,255,255,0.5)",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          letterSpacing: "1px",
-                        }}
-                      >
-                        {t.storeCode}
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        color: "white",
-                        fontWeight: "800",
-                        fontFamily: "monospace",
-                        fontSize: "1.25rem",
-                        letterSpacing: "1px",
-                      }}
-                    >
+                <div className="merchant-profile-facts">
+                  <div className="merchant-profile-fact">
+                    <span className="merchant-profile-fact__label">{t.storeCode}</span>
+                    <span className="merchant-profile-fact__value merchant-profile-fact__value--mono">
                       {storeInfo.store_code}
                     </span>
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.6rem",
-                      background: "rgba(255, 255, 255, 0.03)",
-                      padding: "1.25rem",
-                      borderRadius: "24px",
-                      border: "1px solid rgba(255, 255, 255, 0.05)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          background: "rgba(255,255,255,0.1)",
-                          borderRadius: "10px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "1.1rem",
-                        }}
-                      >
-                        🏪
-                    </div>
-                      <span
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "rgba(255,255,255,0.5)",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          letterSpacing: "1px",
-                        }}
-                      >
-                        {t.storeType}
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        color: "white",
-                        fontWeight: "800",
-                        fontSize: "1.25rem",
-                      }}
-                    >
+                  <div className="merchant-profile-fact">
+                    <span className="merchant-profile-fact__label">{t.storeType}</span>
+                    <span className="merchant-profile-fact__value">
                       {getStoreTypeLabel(storeInfo.store_type)}
                     </span>
                   </div>
-                  
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.6rem",
-                      background: "rgba(255, 255, 255, 0.03)",
-                      padding: "1.25rem",
-                      borderRadius: "24px",
-                      border: "1px solid rgba(255, 255, 255, 0.05)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          background: "rgba(255,255,255,0.1)",
-                          borderRadius: "10px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "1.1rem",
-                        }}
-                      >
-                        📞
-                    </div>
-                      <span
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "rgba(255,255,255,0.5)",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          letterSpacing: "1px",
-                        }}
-                      >
-                        {t.phone}
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        color: "white",
-                        fontWeight: "800",
-                        fontSize: "1.25rem",
-                      }}
-                    >
+
+                  <div className="merchant-profile-fact">
+                    <span className="merchant-profile-fact__label">{t.phone}</span>
+                    <span className="merchant-profile-fact__value">
                       {storeInfo.phone ||
                         storeInfo.manager_phone ||
                         currentUser.phone}
                     </span>
                   </div>
 
-                  {/* 第二行：地址, 开户日期 */}
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.6rem",
-                      background: "rgba(255, 255, 255, 0.03)",
-                      padding: "1.25rem",
-                      borderRadius: "24px",
-                      border: "1px solid rgba(255, 255, 255, 0.05)",
-                      gridColumn: window.innerWidth < 768 ? "1" : "1 / span 2",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          background: "rgba(255,255,255,0.1)",
-                          borderRadius: "10px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "1.1rem",
-                        }}
-                      >
-                        📍
-                    </div>
-                      <span
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "rgba(255,255,255,0.5)",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          letterSpacing: "1px",
-                        }}
-                      >
-                        {t.address}
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        color: "white",
-                        fontWeight: "600",
-                        fontSize: "1.1rem",
-                        lineHeight: "1.5",
-                      }}
-                    >
-                      {storeInfo.address}
-                    </span>
+                  <div className="merchant-profile-fact merchant-profile-fact--wide">
+                    <span className="merchant-profile-fact__label">{t.address}</span>
+                    <span className="merchant-profile-fact__value">{storeInfo.address}</span>
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.6rem",
-                      background: "rgba(255, 255, 255, 0.03)",
-                      padding: "1.25rem",
-                      borderRadius: "24px",
-                      border: "1px solid rgba(255, 255, 255, 0.05)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          background: "rgba(255,255,255,0.1)",
-                          borderRadius: "10px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "1.1rem",
-                        }}
-                      >
-                        🗓️
-                    </div>
-                      <span
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "rgba(255,255,255,0.5)",
-                          fontWeight: "700",
-                          textTransform: "uppercase",
-                          letterSpacing: "1px",
-                        }}
-                      >
-                        {t.accountDate}
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        color: "white",
-                        fontWeight: "800",
-                        fontSize: "1.25rem",
-                      }}
-                    >
+                  <div className="merchant-profile-fact">
+                    <span className="merchant-profile-fact__label">{t.accountDate}</span>
+                    <span className="merchant-profile-fact__value">
                       {formatDate(storeInfo.created_at)}
                     </span>
                   </div>
                 </div>
               ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.8rem",
-                    }}
-                  >
-                    <span style={{ fontSize: "1.1rem", opacity: 0.9 }}>📧</span>
-                    <span
-                      style={{
-                        color: "rgba(255,255,255,0.95)",
-                        fontSize: "1rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      {currentUser.email || "未绑定邮箱"}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.8rem",
-                    }}
-                  >
-                    <span style={{ fontSize: "1.1rem", opacity: 0.9 }}>📞</span>
-                    <span
-                      style={{
-                        color: "rgba(255,255,255,0.95)",
-                        fontSize: "1rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      {currentUser.phone || "未绑定电话"}
-                    </span>
-                  </div>
+                <div className="merchant-profile-fallback">
+                  <span>{currentUser.email || "未绑定邮箱"}</span>
+                  <span>{currentUser.phone || "未绑定电话"}</span>
                 </div>
               )}
-            </div>
-            </div>
           </div>
 
-          {/* 订单统计卡片：auto-fill + minmax 避免英文/缅文下一行挤爆；窄屏自动换两行或多行 */}
-        <div
-          className="merchant-stat-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fill, minmax(min(100%, 152px), 1fr))",
-            gap: "1.5rem",
-            marginBottom: "3rem",
-            width: "100%",
-            minWidth: 0,
-          }}
-        >
-            {/* 全部订单 */}
-          <div
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.05) 100%)",
-              borderRadius: "24px",
-              padding: "1.75rem",
-              border: "1px solid rgba(59, 130, 246, 0.2)",
-              textAlign: "center",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "pointer",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
-            }}
+        <div className="merchant-stat-grid">
+          <MerchantStatTile
+            label={t.totalOrders}
+            value={orderStats.total}
             onClick={() => navigate("/orders")}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = "translateY(-5px)";
-              e.currentTarget.style.boxShadow =
-                "0 12px 25px rgba(59, 130, 246, 0.2)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.1)";
-            }}
-          >
-            <div style={{ fontSize: "2.2rem", marginBottom: "0.75rem" }}>
-              📦
-            </div>
-            <div
-              style={{
-                color: "white",
-                fontSize: "2.2rem",
-                fontWeight: "900",
-                marginBottom: "0.25rem",
-                letterSpacing: "-1px",
-              }}
-            >
-                {orderStats.total}
-              </div>
-            <div
-              className="stat-label"
-              style={{
-                color: "rgba(255,255,255,0.6)",
-                fontSize: "0.9rem",
-                fontWeight: "700",
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-              }}
-            >
-                {t.totalOrders}
-            </div>
-            </div>
+          />
 
-            {/* 待接单 (仅当是合伙店铺且有待接单订单时显示) */}
             {isPartnerStore && orderStats.pendingConfirmation > 0 && (
-            <div
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(217, 119, 6, 0.1) 100%)",
-                borderRadius: "24px",
-                padding: "1.75rem",
-                border: "2px solid #fbbf24",
-                textAlign: "center",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                cursor: "pointer",
-                boxShadow: "0 0 20px rgba(251, 191, 36, 0.3)",
-                animation: "pulse-border 2s infinite",
-                position: "relative",
-                overflow: "hidden",
-              }}
-              onClick={() => navigate("/orders?status=待确认")}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform =
-                  "translateY(-5px) scale(1.02)";
-                e.currentTarget.style.boxShadow =
-                  "0 15px 30px rgba(251, 191, 36, 0.4)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = "translateY(0) scale(1)";
-                e.currentTarget.style.boxShadow =
-                  "0 0 20px rgba(251, 191, 36, 0.3)";
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: "10px",
-                  right: "10px",
-                  fontSize: "1.2rem",
-                }}
+              <MerchantStatTile
+                label={t.pendingAccept}
+                value={orderStats.pendingConfirmation}
+                alert
+                onClick={() => navigate("/orders?status=待确认")}
               >
-                🚨
-              </div>
-              <div style={{ fontSize: "2.2rem", marginBottom: "0.75rem" }}>
-                🔔
-              </div>
-              <div
-                style={{
-                  color: "#fbbf24",
-                  fontSize: "2.2rem",
-                  fontWeight: "950",
-                  marginBottom: "0.25rem",
-                  letterSpacing: "-1px",
-                }}
-              >
-                  {orderStats.pendingConfirmation}
-                </div>
-              <div
-                className="stat-label"
-                style={{
-                  color: "white",
-                  fontSize: "0.9rem",
-                  fontWeight: "800",
-                  textTransform: "uppercase",
-                  letterSpacing: "1px",
-                }}
-              >
-                  {t.pendingAccept}
-                </div>
                 <button
                   type="button"
+                  className="merchant-stat-tile__extra"
                   onClick={(e) => {
                     e.stopPropagation();
                     void packageModals.handleAcceptMany(
@@ -3750,297 +3064,58 @@ const ProfilePage: React.FC = () => {
                     );
                   }}
                   disabled={packageModals.actionLoading}
-                  style={{
-                    marginTop: "0.85rem",
-                    padding: "8px 14px",
-                    border: "none",
-                    borderRadius: 12,
-                    fontWeight: 800,
-                    fontSize: "0.8rem",
-                    cursor: packageModals.actionLoading
-                      ? "not-allowed"
-                      : "pointer",
-                    color: "#1e293b",
-                    background: "#fbbf24",
-                  }}
                 >
                   {language === "zh" ? "全部接单" : "Accept all"}
                 </button>
-              </div>
+              </MerchantStatTile>
             )}
 
-            {/* 打包中 (仅限合伙店铺显示) */}
             {isPartnerStore && (
-            <div
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%)",
-                borderRadius: "24px",
-                padding: "1.75rem",
-                border: "1px solid rgba(16, 185, 129, 0.3)",
-                textAlign: "center",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                cursor: "pointer",
-                boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
-              }}
-              onClick={() => navigate("/orders?status=打包中")}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = "translateY(-5px)";
-                e.currentTarget.style.boxShadow =
-                  "0 12px 25px rgba(16, 185, 129, 0.2)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.1)";
-              }}
-            >
-              <div style={{ fontSize: "2.2rem", marginBottom: "0.75rem" }}>
-                📦
-              </div>
-              <div
-                style={{
-                  color: "#10b981",
-                  fontSize: "2.2rem",
-                  fontWeight: "900",
-                  marginBottom: "0.25rem",
-                  letterSpacing: "-1px",
-                }}
-              >
-                  {orderStats.packing}
-                </div>
-              <div
-                className="stat-label"
-                style={{
-                  color: "white",
-                  fontSize: "0.9rem",
-                  fontWeight: "800",
-                  textTransform: "uppercase",
-                  letterSpacing: "1px",
-                }}
-              >
-                {language === "zh"
-                  ? "打包中"
-                  : language === "en"
-                    ? "Packing"
-                    : "ထုပ်ပိုးနေသည်"}
-                </div>
-              </div>
+              <MerchantStatTile
+                label={
+                  language === "zh"
+                    ? "打包中"
+                    : language === "en"
+                      ? "Packing"
+                      : "ထုပ်ပိုးနေသည်"
+                }
+                value={orderStats.packing}
+                onClick={() => navigate("/orders?status=打包中")}
+              />
             )}
 
-            {/* 待取件 */}
-          <div
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.05) 100%)",
-              borderRadius: "24px",
-              padding: "1.75rem",
-              border: "1px solid rgba(245, 158, 11, 0.2)",
-              textAlign: "center",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "pointer",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
-            }}
+          <MerchantStatTile
+            label={t.pendingPickup}
+            value={orderStats.pendingPickup}
             onClick={() => navigate("/orders?status=待取件")}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = "translateY(-5px)";
-              e.currentTarget.style.boxShadow =
-                "0 12px 25px rgba(245, 158, 11, 0.2)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.1)";
-            }}
-          >
-            <div style={{ fontSize: "2.2rem", marginBottom: "0.75rem" }}>
-              ⏳
-            </div>
-            <div
-              style={{
-                color: "white",
-                fontSize: "2.2rem",
-                fontWeight: "900",
-                marginBottom: "0.25rem",
-                letterSpacing: "-1px",
-              }}
-            >
-                {orderStats.pendingPickup}
-              </div>
-            <div
-              className="stat-label"
-              style={{
-                color: "rgba(255,255,255,0.6)",
-                fontSize: "0.9rem",
-                fontWeight: "700",
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-              }}
-            >
-                {t.pendingPickup}
-              </div>
-            </div>
+          />
 
-            {/* 配送中 */}
-          <div
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.05) 100%)",
-              borderRadius: "24px",
-              padding: "1.75rem",
-              border: "1px solid rgba(139, 92, 246, 0.2)",
-              textAlign: "center",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "pointer",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
-            }}
+          <MerchantStatTile
+            label={t.inTransit}
+            value={orderStats.inTransit}
             onClick={() => navigate("/orders?status=运输中")}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = "translateY(-5px)";
-              e.currentTarget.style.boxShadow =
-                "0 12px 25px rgba(139, 92, 246, 0.2)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.1)";
-            }}
-          >
-            <div style={{ fontSize: "2.2rem", marginBottom: "0.75rem" }}>
-              🚚
-            </div>
-            <div
-              style={{
-                color: "white",
-                fontSize: "2.2rem",
-                fontWeight: "900",
-                marginBottom: "0.25rem",
-                letterSpacing: "-1px",
-              }}
-            >
-                {orderStats.inTransit}
-              </div>
-            <div
-              className="stat-label"
-              style={{
-                color: "rgba(255,255,255,0.6)",
-                fontSize: "0.9rem",
-                fontWeight: "700",
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-              }}
-            >
-                {t.inTransit}
-              </div>
-            </div>
+          />
 
-            {/* 已完成 */}
-          <div
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.05) 100%)",
-              borderRadius: "24px",
-              padding: "1.75rem",
-              border: "1px solid rgba(16, 185, 129, 0.2)",
-              textAlign: "center",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              cursor: "pointer",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
-            }}
+          <MerchantStatTile
+            label={t.completed}
+            value={orderStats.completed}
             onClick={() => navigate("/orders?status=已完成")}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = "translateY(-5px)";
-              e.currentTarget.style.boxShadow =
-                "0 12px 25px rgba(16, 185, 129, 0.2)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.1)";
-            }}
-          >
-            <div style={{ fontSize: "2.2rem", marginBottom: "0.75rem" }}>
-              ✅
-            </div>
-            <div
-              style={{
-                color: "white",
-                fontSize: "2.2rem",
-                fontWeight: "900",
-                marginBottom: "0.25rem",
-                letterSpacing: "-1px",
-              }}
-            >
-                {orderStats.completed}
-              </div>
-            <div
-              className="stat-label"
-              style={{
-                color: "rgba(255,255,255,0.6)",
-                fontSize: "0.9rem",
-                fontWeight: "700",
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-              }}
-            >
-                {t.completed}
-              </div>
-            </div>
+          />
 
-            {/* 🚀 新增：店铺评价 (仅限合伙店铺显示) */}
-            {isPartnerStore && (
-            <div
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(217, 119, 6, 0.05) 100%)",
-                borderRadius: "24px",
-                padding: "1.75rem",
-                border: "1px solid rgba(251, 191, 36, 0.3)",
-                textAlign: "center",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                cursor: "pointer",
-                boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
-              }}
-              onClick={() => setShowReviewsModal(true)}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = "translateY(-5px)";
-                e.currentTarget.style.boxShadow =
-                  "0 12px 25px rgba(251, 191, 36, 0.2)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.1)";
-              }}
-              >
-              <div style={{ fontSize: "2.2rem", marginBottom: "0.75rem" }}>
-                ⭐
-                </div>
-              <div
-                style={{
-                  color: "#fbbf24",
-                  fontSize: "2.2rem",
-                  fontWeight: "950",
-                  marginBottom: "0.25rem",
-                  letterSpacing: "-1px",
-                }}
-              >
-                {reviewStats.average || "0.0"}
-              </div>
-              <div
-                className="stat-label"
-                style={{
-                  color: "white",
-                  fontSize: "0.9rem",
-                  fontWeight: "800",
-                  textTransform: "uppercase",
-                  letterSpacing: "1px",
-                }}
-              >
-                {language === "zh"
+          {isPartnerStore && (
+            <MerchantStatTile
+              label={
+                language === "zh"
                   ? `${reviewStats.count} 条评价`
                   : language === "en"
                     ? `${reviewStats.count} Reviews`
-                    : `${reviewStats.count} ခု မှတ်ချက်`}
-                </div>
-              </div>
-            )}
-          </div>
+                    : `${reviewStats.count} ခု မှတ်ချက်`
+              }
+              value={reviewStats.average || "0.0"}
+              onClick={() => setShowReviewsModal(true)}
+            />
+          )}
+        </div>
 
           {isPartnerStore && (
             <MerchantRevenuePanel
@@ -4050,166 +3125,27 @@ const ProfilePage: React.FC = () => {
             />
           )}
 
-          {/* 代收款统计卡片 - 仅合伙店铺显示 */}
           {isPartnerStore && storeInfo && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "2rem",
-              marginBottom: "3rem",
-            }}
-          >
-              {/* 代收款统计 */}
-            <div
-              id="cod-stats-section"
-              style={{
-                background: "rgba(255, 255, 255, 0.15)",
-                backdropFilter: "blur(30px)",
-                borderRadius: "40px",
-                padding: "3rem",
-                border: "1px solid rgba(255, 255, 255, 0.25)",
-                boxShadow: "0 30px 60px rgba(0, 0, 0, 0.2)",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "1.5rem",
-                  flexWrap: "wrap",
-                  gap: "2rem",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.15)",
-                  paddingBottom: "2rem",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "1.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "64px",
-                      height: "64px",
-                      background:
-                        "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                      borderRadius: "22px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "2.2rem",
-                      boxShadow: "0 12px 24px rgba(245, 158, 11, 0.4)",
-                    }}
-                  >
-                    💰
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        color: "white",
-                        fontSize: "2.2rem",
-                        fontWeight: "950",
-                        margin: 0,
-                        textShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                        letterSpacing: "-0.5px",
-                      }}
-                    >
-                        {t.codStats}
-                      </h3>
-                      {/* 🚀 修正：上次结算日期 - 非卡片样式 */}
+          <div className="merchant-workspace-stack">
+            <div id="cod-stats-section" className="merchant-workspace-panel">
+              <div className="merchant-workspace-head">
+                <div>
+                  <h3 className="merchant-workspace-title">{t.codStats}</h3>
+                  <p className="merchant-workspace-meta">
+                    {t.lastSettledAt}：
+                    {merchantCODStats.lastSettledAt
+                      ? formatDate(merchantCODStats.lastSettledAt)
+                      : t.noSettlement}
+                  </p>
+                </div>
+                <div className="merchant-workspace-toolbar">
+                  <div className="merchant-cod-month">
+                    <button type="button" className="merchant-cod-month__nav" onClick={handlePrevMonth}>
+                      ‹
+                    </button>
                     <div
-                      style={{
-                        fontSize: "1rem",
-                        color: "rgba(255,255,255,0.6)",
-                        fontWeight: "700",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "15px",
-                      }}
-                    >
-                      <div
-                          style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <span>📅 {t.lastSettledAt}:</span>
-                        <span style={{ color: "#10b981" }}>
-                          {merchantCODStats.lastSettledAt
-                            ? formatDate(merchantCODStats.lastSettledAt)
-                            : t.noSettlement}
-                        </span>
-                      </div>
-                      </div>
-                    </div>
-                  </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "15px",
-                    background: "rgba(15, 23, 42, 0.6)",
-                    padding: "10px 24px",
-                    borderRadius: "22px",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                    boxShadow: "inset 0 4px 12px rgba(0,0,0,0.3)",
-                  }}
-                >
-                    <button 
-                      onClick={handlePrevMonth}
-                      style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      border: "none",
-                      borderRadius: "14px",
-                      width: "36px",
-                      height: "36px",
-                      color: "white",
-                      cursor: "pointer",
-                      fontSize: "1.4rem",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 0.2s ease",
-                      zIndex: 10,
-                    }}
-                    onMouseOver={(e) =>
-                      (e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.3)")
-                    }
-                    onMouseOut={(e) =>
-                      (e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.15)")
-                    }
-                  >
-                    ‹
-                  </button>
-                    
-                    <div 
+                      className="merchant-cod-month__value"
                       onClick={() => dateInputRef.current?.showPicker()}
-                      style={{ 
-                      color: "white",
-                      fontSize: "1.25rem",
-                      fontWeight: "900",
-                      cursor: "pointer",
-                      minWidth: "120px",
-                      textAlign: "center",
-                      fontFamily: "monospace",
-                      letterSpacing: "1px",
-                      }}
                     >
                       {selectedMonth}
                       <input
@@ -4217,50 +3153,21 @@ const ProfilePage: React.FC = () => {
                         type="month"
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(e.target.value)}
-                      style={{
-                        position: "absolute",
-                        opacity: 0,
-                        pointerEvents: "none",
-                        width: 0,
-                      }}
+                        style={{
+                          position: "absolute",
+                          opacity: 0,
+                          pointerEvents: "none",
+                          width: 0,
+                        }}
                       />
                     </div>
-
-                    <button 
-                      onClick={handleNextMonth}
-                      style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      border: "none",
-                      borderRadius: "14px",
-                      width: "36px",
-                      height: "36px",
-                      color: "white",
-                      cursor: "pointer",
-                      fontSize: "1.4rem",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 0.2s ease",
-                      zIndex: 10,
-                    }}
-                    onMouseOver={(e) =>
-                      (e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.3)")
-                    }
-                    onMouseOut={(e) =>
-                      (e.currentTarget.style.background =
-                        "rgba(255, 255, 255, 0.15)")
-                    }
-                  >
-                    ›
-                  </button>
+                    <button type="button" className="merchant-cod-month__nav" onClick={handleNextMonth}>
+                      ›
+                    </button>
                   </div>
-
-                <div
-                  style={{ display: "flex", gap: "12px", alignItems: "center" }}
-                >
-                  {/* 🚀 移动后的语音播报按钮 - 现在在最右侧 */}
                   <button
+                    type="button"
+                    className={`merchant-workspace-btn${isVoiceEnabled ? " is-on" : ""}`}
                     onClick={() => {
                       if (!isVoiceEnabled) {
                         speakNotification("语音提醒功能已开启");
@@ -4283,955 +3190,246 @@ const ProfilePage: React.FC = () => {
                       setIsVoiceEnabled(true);
                       merchantOrdersCtx?.setIsVoiceEnabled(true);
                     }}
-                    style={{
-                      background: isVoiceEnabled
-                        ? "rgba(16, 185, 129, 0.2)"
-                        : "rgba(255, 255, 255, 0.1)",
-                      color: isVoiceEnabled ? "#10b981" : "white",
-                      border: `1px solid ${isVoiceEnabled ? "rgba(16, 185, 129, 0.4)" : "rgba(255, 255, 255, 0.2)"}`,
-                      padding: "10px 20px",
-                      borderRadius: "14px",
-                      cursor: "pointer",
-                      fontSize: "0.9rem",
-                      fontWeight: "bold",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      transition: "all 0.3s ease",
-                      boxShadow: isVoiceEnabled
-                        ? "0 4px 12px rgba(16, 185, 129, 0.2)"
-                        : "none",
-                    }}
                   >
-                    {isVoiceEnabled ? "🔔" : "🔕"}{" "}
                     {isVoiceEnabled
                       ? language === "zh"
                         ? "语音监控中"
                         : t.voiceActive
                       : t.enableVoice}
                   </button>
-
-                  {/* 🚀 导出对账单按钮 */}
                   <button
+                    type="button"
+                    className="merchant-workspace-btn merchant-workspace-btn--accent"
                     onClick={() => setShowExportModal(true)}
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                      color: "white",
-                      border: "none",
-                      padding: "10px 24px",
-                      borderRadius: "18px",
-                      fontWeight: "900",
-                      fontSize: "1.1rem",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "10px",
-                      boxShadow: "0 10px 20px rgba(79, 70, 229, 0.3)",
-                      transition: "all 0.3s ease",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow =
-                        "0 15px 30px rgba(79, 70, 229, 0.4)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow =
-                        "0 10px 20px rgba(79, 70, 229, 0.3)";
-                    }}
                   >
-                    📊 {language === "zh" ? "导出对账单" : "Export Statement"}
+                    {language === "zh" ? "导出对账单" : "Export Statement"}
                   </button>
                 </div>
-                </div>
+              </div>
                 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    window.innerWidth < 768 ? "1fr" : "repeat(2, 1fr)",
-                  gap: "2.5rem",
-                }}
-              >
-                  {/* 本月已结清 */}
-                <div
-                  style={{
-                    background: "rgba(0, 0, 0, 0.3)",
-                    padding: "2.5rem 2rem",
-                    borderRadius: "35px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "1.2rem",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.4s ease",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "1.1rem",
-                        color: "rgba(255,255,255,0.8)",
-                        fontWeight: "800",
-                      }}
-                    >
+              <div className="merchant-cod-grid">
+                <div className="merchant-cod-card">
+                  <div className="merchant-cod-card__top">
+                    <span className="merchant-cod-card__label">
                       {language === "zh"
                         ? `${new Date().getFullYear()}年已结清订单`
                         : language === "en"
                           ? `Settled orders (${new Date().getFullYear()})`
                           : `ငွေရှင်းပြီး COD (${new Date().getFullYear()})`}
                     </span>
-                    </div>
-                  <div
-                    style={{
-                      fontSize: "2.8rem",
-                      fontWeight: "950",
-                      color: "white",
-                      flex: 1,
-                    }}
-                  >
-                    {merchantCODStats.settledCOD.toLocaleString()}{" "}
-                    <span style={{ fontSize: "1rem", opacity: 0.6 }}>MMK</span>
-                    </div>
-                    <button 
-                      onClick={() => handleViewCODOrders(true)}
-                      style={{ 
-                      padding: "10px 20px",
-                      borderRadius: "14px",
-                      background: "#3b82f6",
-                      border: "none",
-                      color: "white",
-                      fontSize: "1rem",
-                      fontWeight: "900",
-                      cursor: "pointer",
-                      boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
-                      alignSelf: "stretch",
-                      marginTop: "1rem",
-                      transition: "all 0.3s ease",
-                    }}
-                    onMouseOver={(e) =>
-                      (e.currentTarget.style.transform = "scale(1.02)")
-                    }
-                    onMouseOut={(e) =>
-                      (e.currentTarget.style.transform = "scale(1)")
-                    }
+                  </div>
+                  <div className="merchant-cod-card__value">
+                    {merchantCODStats.settledCOD.toLocaleString()} <span>MMK</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="merchant-workspace-btn"
+                    onClick={() => handleViewCODOrders(true)}
                   >
                     {t.view}
                   </button>
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: "-15px",
-                      bottom: "40px",
-                      fontSize: "6rem",
-                      opacity: 0.08,
-                      transform: "rotate(-15deg)",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    📈
-                  </div>
-                  </div>
+                </div>
 
-                  {/* 待结清金额 */}
-                <div
-                  style={{
-                    background: "rgba(0, 0, 0, 0.3)",
-                    padding: "2.5rem 2rem",
-                    borderRadius: "35px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "1.2rem",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "all 0.4s ease",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      gap: "1rem",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "1.1rem",
-                        color: "rgba(255,255,255,0.8)",
-                        fontWeight: "800",
-                      }}
-                    >
-                      {t.unclearedCOD}
+                <div className="merchant-cod-card">
+                  <div className="merchant-cod-card__top">
+                    <span className="merchant-cod-card__label">{t.unclearedCOD}</span>
+                    <span className="merchant-cod-card__chip">
+                      {merchantCODStats.unclearedCount} 笔待结算
                     </span>
-                    <div
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "#fbbf24",
-                        fontWeight: "900",
-                        background: "rgba(251, 191, 36, 0.2)",
-                        padding: "4px 14px",
-                        borderRadius: "12px",
-                      }}
-                    >
-                        {merchantCODStats.unclearedCount} 笔待结算
-                      </div>
-                    </div>
-                  <div
-                    style={{
-                      fontSize: "2.8rem",
-                      fontWeight: "950",
-                      color: "#fbbf24",
-                      flex: 1,
-                    }}
-                  >
-                    {merchantCODStats.unclearedCOD.toLocaleString()}{" "}
-                    <span style={{ fontSize: "1rem", opacity: 0.6 }}>MMK</span>
-                    </div>
-                    <button 
-                      onClick={() => handleViewCODOrders(false)}
-                      style={{ 
-                      padding: "10px 20px",
-                      borderRadius: "14px",
-                      background: "#f59e0b",
-                      border: "none",
-                      color: "white",
-                      fontSize: "1rem",
-                      fontWeight: "900",
-                      cursor: "pointer",
-                      boxShadow: "0 4px 12px rgba(245, 158, 11, 0.4)",
-                      alignSelf: "stretch",
-                      marginTop: "1rem",
-                      transition: "all 0.3s ease",
-                    }}
-                    onMouseOver={(e) =>
-                      (e.currentTarget.style.transform = "scale(1.02)")
-                    }
-                    onMouseOut={(e) =>
-                      (e.currentTarget.style.transform = "scale(1)")
-                    }
+                  </div>
+                  <div className="merchant-cod-card__value is-warn">
+                    {merchantCODStats.unclearedCOD.toLocaleString()} <span>MMK</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="merchant-workspace-btn"
+                    onClick={() => handleViewCODOrders(false)}
                   >
                     {t.view}
                   </button>
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: "-15px",
-                      bottom: "40px",
-                      fontSize: "6rem",
-                      opacity: 0.08,
-                      transform: "rotate(-15deg)",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    ⏳
-                  </div>
-                </div>
-                </div>
-              </div>
-
-              {/* 营业状态管理 */}
-            <div
-              style={{
-                background: "rgba(255, 255, 255, 0.15)",
-                backdropFilter: "blur(30px)",
-                borderRadius: "40px",
-                padding: "3rem 2.5rem",
-                border: "1px solid rgba(255, 255, 255, 0.25)",
-                boxShadow: "0 30px 60px rgba(0, 0, 0, 0.2)",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "2.5rem",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.15)",
-                  paddingBottom: "2rem",
-                  flexWrap: "wrap",
-                  gap: "1rem",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "1.25rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "56px",
-                      height: "56px",
-                      background:
-                        "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                      borderRadius: "18px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "2rem",
-                      boxShadow: "0 10px 20px rgba(239, 68, 68, 0.4)",
-                    }}
-                  >
-                    ⏰
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <h3
-                      style={{
-                        color: "white",
-                        fontSize: "1.8rem",
-                        fontWeight: "950",
-                        margin: 0,
-                        textShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                      }}
-                    >
-                      {t.businessManagement}
-                    </h3>
-                      {storeInfo?.updated_at && (
-                      <div
-                        style={{
-                          color: "rgba(255,255,255,0.4)",
-                          fontSize: "0.85rem",
-                          fontWeight: "600",
-                          marginTop: "4px",
-                        }}
-                      >
-                        ⏱️ {t.lastUpdated}:{" "}
-                        {new Date(storeInfo.updated_at).toLocaleString(
-                          language === "zh" ? "zh-CN" : "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          },
-                        )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                <div
-                  style={{ display: "flex", gap: "15px", alignItems: "center" }}
-                >
-                  {/* 今日营业开关 */}
-                  <div
-                      style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: "12px",
-                      background: "rgba(15, 23, 42, 0.4)",
-                      padding: "0 16px",
-                      width: "200px",
-                      height: "39px",
-                      borderRadius: "16px",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: "white",
-                        fontWeight: "800",
-                        fontSize: "0.85rem",
-                        lineHeight: "1",
-                        display: "flex",
-                        alignItems: "center",
-                        flex: 1,
-                        textAlign: "left",
-                      }}
-                    >
-                      {t.closedToday}
-                        </span>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        height: "100%",
-                      }}
-                    >
-                      <button 
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setBusinessStatus((prev) => ({
-                            ...prev,
-                            is_closed_today: !prev.is_closed_today,
-                          }));
-                        }}
-                        style={{
-                          width: "42px",
-                          height: "22px",
-                          borderRadius: "11px",
-                          backgroundColor: businessStatus.is_closed_today
-                            ? "#ef4444"
-                            : "rgba(255,255,255,0.2)",
-                          position: "relative",
-                          cursor: "pointer",
-                          border: "none",
-                          transition:
-                            "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-                          padding: 0,
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "16px",
-                            height: "16px",
-                            borderRadius: "8px",
-                            backgroundColor: "white",
-                            position: "absolute",
-                            top: "3px",
-                            left: businessStatus.is_closed_today
-                              ? "23px"
-                              : "3px",
-                            transition:
-                              "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-                            boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
-                          }}
-                        />
-                      </button>
-                    </div>
-                    </div>
-                  </div>
-                </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "2rem",
-                }}
-              >
-                  {/* 营业时间设置 */}
-                <div
-                  id="business-hours-section"
-                  style={{
-                    background: "rgba(15, 23, 42, 0.4)",
-                    padding: "2.5rem",
-                    borderRadius: "35px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "2rem",
-                    boxShadow: "0 20px 50px rgba(0,0,0,0.2)",
-                    position: "relative",
-                    overflow: "hidden",
-                  }}
-                >
-                    {/* 背景发光效果 */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-50px",
-                      right: "-50px",
-                      width: "150px",
-                      height: "150px",
-                      background:
-                        "radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)",
-                      zIndex: 0,
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      zIndex: 1,
-                      flexWrap: "wrap",
-                      gap: "2rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "2rem",
-                        flex: 1,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "white",
-                          fontWeight: "900",
-                          fontSize: "1.25rem",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "12px",
-                          minWidth: "140px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "40px",
-                            height: "40px",
-                            borderRadius: "12px",
-                            background: "rgba(255,255,255,0.1)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <span style={{ fontSize: "1.4rem" }}>⏰</span>
-                          </div>
-                          {t.operatingHours}
-                        </div>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "1.5rem",
-                          alignItems: "center",
-                        }}
-                      >
-                          <TimeWheelPicker 
-                            label="OPEN TIME"
-                            icon="🌅"
-                          value={
-                            (
-                              businessStatus.operating_hours || "09:00 - 21:00"
-                            ).split(" - ")[0] || "09:00"
-                          }
-                            onChange={(val) => {
-                            const parts = (
-                              businessStatus.operating_hours || "09:00 - 21:00"
-                            ).split(" - ");
-                            const end = parts[1] || "21:00";
-                            setBusinessStatus((prev) => ({
-                              ...prev,
-                              operating_hours: `${val} - ${end}`,
-                            }));
-                          }}
-                        />
-
-                        <div
-                          style={{
-                            color: "rgba(255,255,255,0.2)",
-                            fontSize: "1.2rem",
-                            fontWeight: "900",
-                          }}
-                        >
-                          →
-                        </div>
-
-                          <TimeWheelPicker 
-                            label="CLOSED TIME"
-                            icon="🌙"
-                          value={
-                            (
-                              businessStatus.operating_hours || "09:00 - 21:00"
-                            ).split(" - ")[1] || "21:00"
-                          }
-                            onChange={(val) => {
-                            const parts = (
-                              businessStatus.operating_hours || "09:00 - 21:00"
-                            ).split(" - ");
-                            const start = parts[0] || "09:00";
-                            setBusinessStatus((prev) => ({
-                              ...prev,
-                              operating_hours: `${start} - ${val}`,
-                            }));
-                            }}
-                          />
-
-                          {/* 营业时长预览 */}
-                          {(() => {
-                          const hours =
-                            businessStatus.operating_hours || "09:00 - 21:00";
-                          const parts = hours.split(" - ");
-                          const start = parts[0] || "09:00";
-                          const end = parts[1] || "21:00";
-
-                          const startParts = start.split(":");
-                          const endParts = end.split(":");
-
-                          if (startParts.length < 2 || endParts.length < 2)
-                            return null;
-
-                            const [sH, sM] = startParts.map(Number);
-                            const [eH, eM] = endParts.map(Number);
-                            
-                          if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM))
-                            return null;
-
-                          let duration = eH * 60 + eM - (sH * 60 + sM);
-                            if (duration < 0) duration += 24 * 60; // 跨天
-                            const h = Math.floor(duration / 60);
-                            const m = duration % 60;
-                            return (
-                            <div
-                              style={{
-                                background: "rgba(16, 185, 129, 0.15)",
-                                color: "#10b981",
-                                padding: "6px 15px",
-                                borderRadius: "12px",
-                                fontSize: "0.85rem",
-                                fontWeight: "800",
-                                marginLeft: "10px",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {language === "zh"
-                                ? `时长: ${h}h${m > 0 ? `${m}m` : ""}`
-                                : `Dur: ${h}h ${m > 0 ? `${m}m` : ""}`}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                    {/* 🚀 操作按钮组 - 移动到右侧 */}
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "12px",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        justifyContent: "flex-end",
-                        zIndex: 10,
-                      }}
-                    >
-                      {/* 延长打烊按钮 */}
-                      <button
-                        onClick={handleExtendHour}
-                        disabled={isSavingStatus}
-                        style={{
-                          width: "123px",
-                          height: "56px",
-                          background: "rgba(16, 185, 129, 0.1)",
-                          color: "#10b981",
-                          border: "1px solid rgba(16, 185, 129, 0.3)",
-                          padding: "4px",
-                          borderRadius: "18px",
-                          fontSize: "0.8rem",
-                          fontWeight: "800",
-                          cursor: isSavingStatus ? "not-allowed" : "pointer",
-                          transition: "all 0.3s ease",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "6px",
-                          boxShadow: "0 4px 12px rgba(16, 185, 129, 0.1)",
-                        }}
-                        onMouseOver={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.background =
-                              "rgba(16, 185, 129, 0.2)";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.background =
-                              "rgba(16, 185, 129, 0.1)";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }
-                        }}
-                      >
-                        ⏳ {language === "zh" ? "延长1h" : "Ext 1h"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => openCloseReport("view")}
-                        disabled={isSavingStatus}
-                        style={{
-                          width: "123px",
-                          height: "56px",
-                          background: "rgba(59, 130, 246, 0.12)",
-                          color: "#93c5fd",
-                          border: "1px solid rgba(59, 130, 246, 0.35)",
-                          padding: "4px",
-                          borderRadius: "18px",
-                          fontSize: "0.8rem",
-                          fontWeight: "800",
-                          cursor: isSavingStatus ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        📋 {language === "zh" ? "今日报表" : "Today"}
-                      </button>
-
-                      {/* 即刻打烊按钮 */}
-                      <button
-                        onClick={handleCloseImmediately}
-                        disabled={isSavingStatus}
-                        style={{
-                          width: "123px",
-                          height: "56px",
-                          background: "rgba(239, 68, 68, 0.1)",
-                          color: "#ef4444",
-                          border: "1px solid rgba(239, 68, 68, 0.3)",
-                          padding: "4px",
-                          borderRadius: "18px",
-                          fontSize: "0.8rem",
-                          fontWeight: "800",
-                          cursor: isSavingStatus ? "not-allowed" : "pointer",
-                          transition: "all 0.3s ease",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "6px",
-                          boxShadow: "0 4px 12px rgba(239, 68, 68, 0.1)",
-                        }}
-                        onMouseOver={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.background =
-                              "rgba(239, 68, 68, 0.2)";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.background =
-                              "rgba(239, 68, 68, 0.1)";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }
-                        }}
-                      >
-                        🛑 {language === "zh" ? "即刻打烊" : "Close Now"}
-                      </button>
-
-                      {/* 保存按钮 */}
-                      <button
-                        onClick={() => {
-                          if (
-                            businessStatus.is_closed_today &&
-                            !storeInfo?.is_closed_today
-                          ) {
-                            openCloseReport("close");
-                            return;
-                          }
-                          void handleUpdateStoreStatus(businessStatus);
-                        }}
-                        disabled={isSavingStatus}
-                        style={{
-                          width: "123px",
-                          height: "56px",
-                          background: isSavingStatus
-                            ? "rgba(255,255,255,0.1)"
-                            : "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "16px",
-                          padding: 0,
-                          fontSize: "0.95rem",
-                          fontWeight: "900",
-                          cursor: isSavingStatus ? "not-allowed" : "pointer",
-                          transition: "all 0.3s ease",
-                          boxShadow: isSavingStatus
-                            ? "none"
-                            : "0 8px 20px rgba(30, 64, 175, 0.3)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "8px",
-                          whiteSpace: "nowrap",
-                        }}
-                        onMouseOver={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                            e.currentTarget.style.boxShadow =
-                              "0 12px 25px rgba(30, 64, 175, 0.4)";
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (!isSavingStatus) {
-                            e.currentTarget.style.transform = "translateY(0)";
-                            e.currentTarget.style.boxShadow =
-                              "0 8px 20px rgba(30, 64, 175, 0.3)";
-                          }
-                        }}
-                      >
-                        {isSavingStatus ? (
-                          <>
-                            <div
-                              className="spinner"
-                              style={{
-                                width: "20px",
-                                height: "20px",
-                                border: "3px solid rgba(255,255,255,0.3)",
-                                borderTop: "3px solid white",
-                                borderRadius: "50%",
-                              }}
-                            ></div>
-                            <span>
-                              {language === "zh" ? "正在保存..." : "Saving..."}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span>💾</span> {t.save}
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
+
+            <div className={`merchant-workspace-panel${businessStatus.is_closed_today ? " is-paused" : ""}`}>
+              <div className="merchant-workspace-head">
+                <div>
+                  <h3 className="merchant-workspace-title">{t.businessManagement}</h3>
+                  {storeInfo?.updated_at ? (
+                    <p className="merchant-workspace-meta">
+                      {t.lastUpdated}：
+                      {new Date(storeInfo.updated_at).toLocaleString(
+                        language === "zh" ? "zh-CN" : "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        },
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="merchant-switch">
+                  <span className="merchant-switch__label">{t.closedToday}</span>
+                  <button
+                    type="button"
+                    className={`merchant-switch__track${businessStatus.is_closed_today ? " is-on" : ""}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setBusinessStatus((prev) => ({
+                        ...prev,
+                        is_closed_today: !prev.is_closed_today,
+                      }));
+                    }}
+                  >
+                    <span className="merchant-switch__knob" />
+                  </button>
+                </div>
+              </div>
+
+              <div id="business-hours-section" className="merchant-hours-block">
+                <div className="merchant-hours-block__bar">
+                  <p className="merchant-hours-block__title">{t.operatingHours}</p>
+                  {(() => {
+                    const hours = businessStatus.operating_hours || "09:00 - 21:00";
+                    const parts = hours.split(" - ");
+                    const start = parts[0] || "09:00";
+                    const end = parts[1] || "21:00";
+                    const startParts = start.split(":");
+                    const endParts = end.split(":");
+                    if (startParts.length < 2 || endParts.length < 2) return null;
+                    const [sH, sM] = startParts.map(Number);
+                    const [eH, eM] = endParts.map(Number);
+                    if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return null;
+                    let duration = eH * 60 + eM - (sH * 60 + sM);
+                    if (duration < 0) duration += 24 * 60;
+                    const h = Math.floor(duration / 60);
+                    const m = duration % 60;
+                    return (
+                      <span className="merchant-hours-duration">
+                        {language === "zh"
+                          ? `营业 ${h}h${m > 0 ? `${m}m` : ""}`
+                          : `${h}h${m > 0 ? ` ${m}m` : ""}`}
+                      </span>
+                    );
+                  })()}
+                </div>
+
+                <div className="merchant-hours-clocks">
+                  <TimeWheelPicker
+                    label={language === "zh" ? "开门" : "Open"}
+                    value={
+                      (businessStatus.operating_hours || "09:00 - 21:00").split(" - ")[0] ||
+                      "09:00"
+                    }
+                    onChange={(val) => {
+                      const parts = (businessStatus.operating_hours || "09:00 - 21:00").split(
+                        " - ",
+                      );
+                      const end = parts[1] || "21:00";
+                      setBusinessStatus((prev) => ({
+                        ...prev,
+                        operating_hours: `${val} - ${end}`,
+                      }));
+                    }}
+                  />
+                  <span className="merchant-hours-clocks__rule" aria-hidden="true" />
+                  <TimeWheelPicker
+                    label={language === "zh" ? "打烊" : "Close"}
+                    value={
+                      (businessStatus.operating_hours || "09:00 - 21:00").split(" - ")[1] ||
+                      "21:00"
+                    }
+                    onChange={(val) => {
+                      const parts = (businessStatus.operating_hours || "09:00 - 21:00").split(
+                        " - ",
+                      );
+                      const start = parts[0] || "09:00";
+                      setBusinessStatus((prev) => ({
+                        ...prev,
+                        operating_hours: `${start} - ${val}`,
+                      }));
+                    }}
+                  />
+                </div>
+
+                <div className="merchant-hours-actions">
+                  <button
+                    type="button"
+                    className="merchant-workspace-btn"
+                    onClick={handleExtendHour}
+                    disabled={isSavingStatus}
+                  >
+                    {language === "zh" ? "延长1h" : "Ext 1h"}
+                  </button>
+                  <button
+                    type="button"
+                    className="merchant-workspace-btn"
+                    onClick={() => openCloseReport("view")}
+                    disabled={isSavingStatus}
+                  >
+                    {language === "zh" ? "今日报表" : "Today"}
+                  </button>
+                  <button
+                    type="button"
+                    className="merchant-workspace-btn merchant-workspace-btn--danger"
+                    onClick={handleCloseImmediately}
+                    disabled={isSavingStatus}
+                  >
+                    {language === "zh" ? "即刻打烊" : "Close Now"}
+                  </button>
+                  <button
+                    type="button"
+                    className="merchant-workspace-btn merchant-workspace-btn--accent"
+                    onClick={() => {
+                      if (businessStatus.is_closed_today && !storeInfo?.is_closed_today) {
+                        openCloseReport("close");
+                        return;
+                      }
+                      void handleUpdateStoreStatus(businessStatus);
+                    }}
+                    disabled={isSavingStatus}
+                  >
+                    {isSavingStatus
+                      ? language === "zh"
+                        ? "正在保存..."
+                        : "Saving..."
+                      : t.save}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
           )}
 
-          {/* 详细信息网格 - 仅非合伙店铺显示 */}
           {!isPartnerStore && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.5rem",
-              padding: "1.75rem",
-              background: "rgba(255, 255, 255, 0.05)",
-              borderRadius: "24px",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              backdropFilter: "blur(10px)",
-              boxShadow: "inset 0 0 20px rgba(255, 255, 255, 0.02)",
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  window.innerWidth < 768 ? "1fr" : "repeat(2, 1fr)",
-                gap: "1.5rem",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "1.25rem",
-                  background: "rgba(255, 255, 255, 0.03)",
-                  padding: "1.25rem",
-                  borderRadius: "24px",
-                  border: "1px solid rgba(255, 255, 255, 0.05)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "1.8rem",
-                    background: "rgba(255,255,255,0.1)",
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  🗓️
-                </div>
-                  <div>
-                  <label
-                    style={{
-                      color: "rgba(255,255,255,0.5)",
-                      fontSize: "0.8rem",
-                      fontWeight: "700",
-                      display: "block",
-                      marginBottom: "0.2rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "1px",
-                    }}
-                  >
-                      {t.accountDate}
-                    </label>
-                  <div
-                    style={{
-                      color: "white",
-                      fontSize: "1.1rem",
-                      fontWeight: "700",
-                    }}
-                  >
-                      {currentUser.created_at 
-                      ? new Date(currentUser.created_at).toLocaleDateString(
-                          language === "zh"
-                            ? "zh-CN"
-                            : language === "en"
-                              ? "en-US"
-                              : "my-MM",
-                          {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          },
-                        )
-                      : "-"}
-                    </div>
-                  </div>
-                </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "1.25rem",
-                  background: "rgba(255, 255, 255, 0.03)",
-                  padding: "1.25rem",
-                  borderRadius: "24px",
-                  border: "1px solid rgba(255, 255, 255, 0.05)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "1.8rem",
-                    background: "rgba(255,255,255,0.1)",
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  📍
-                </div>
-                  <div>
-                  <label
-                    style={{
-                      color: "rgba(255,255,255,0.5)",
-                      fontSize: "0.8rem",
-                      fontWeight: "700",
-                      display: "block",
-                      marginBottom: "0.2rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "1px",
-                    }}
-                  >
-                      {t.address}
-                    </label>
-                  <div
-                    style={{
-                      color: "white",
-                      fontSize: "1.1rem",
-                      fontWeight: "700",
-                    }}
-                  >
-                    {currentUser.address || "-"}
-                    </div>
-                  </div>
-                </div>
+            <div className="merchant-profile-facts">
+              <div className="merchant-profile-fact">
+                <span className="merchant-profile-fact__label">{t.accountDate}</span>
+                <span className="merchant-profile-fact__value">
+                  {currentUser.created_at
+                    ? new Date(currentUser.created_at).toLocaleDateString(
+                        language === "zh"
+                          ? "zh-CN"
+                          : language === "en"
+                            ? "en-US"
+                            : "my-MM",
+                        {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        },
+                      )
+                    : "-"}
+                </span>
+              </div>
+              <div className="merchant-profile-fact merchant-profile-fact--wide">
+                <span className="merchant-profile-fact__label">{t.address}</span>
+                <span className="merchant-profile-fact__value">
+                  {currentUser.address || "-"}
+                </span>
               </div>
             </div>
           )}

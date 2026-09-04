@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS: WebPrinterSettings = {
   enabled: true,
   type: 'system',
   address: '',
-  autoPrint: true,
+    autoPrint: false,
   copies: 1,
   wifiHost: '',
   wifiPort: 9100,

@@ -218,7 +218,13 @@ export function useMerchantPackageModals({
         }
 
         const printerSettings = loadPrinterSettings();
-        if (printerSettings.autoPrint) {
+        if (printerSettings.autoPrint && printerSettings.type === 'system' && pending.length > 1) {
+          feedbackService.notify(
+            language === 'zh'
+              ? `已接单 ${result.ok} 笔。浏览器一次只能打一张，请到订单列表勾选后补打。`
+              : `Accepted ${result.ok}. Use Orders → Print for multiple browser receipts.`,
+          );
+        } else if (printerSettings.autoPrint) {
           const printed = await printOrdersSequentially(pending);
           feedbackService.notify(
             printed.printerOff || printed.failed > 0

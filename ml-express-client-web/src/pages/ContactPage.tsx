@@ -409,7 +409,7 @@ const ContactPage: React.FC<ContactPageProps> = ({ embedInLanding }) => {
                   background: contact.bgGradient,
                   borderRadius: '3px',
                   marginTop: '1.8rem',
-                  boxShadow: `0 2px 10px ${contact.bgGradient}`
+                  boxShadow: `0 2px 10px ${contact.color}`
                 }}></div>
               </div>
             ))}

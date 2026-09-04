@@ -1,0 +1,117 @@
+.merchant-time-wheel {
+  min-width: 0;
+  padding: 0.8rem 0.85rem 0.9rem;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(12, 20, 34, 0.92) 0%, rgba(7, 11, 20, 0.88) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.merchant-time-wheel__label {
+  margin: 0 0 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.merchant-time-wheel__face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.45rem 0.6rem;
+  border-radius: 10px;
+  background:
+    radial-gradient(120% 140% at 50% 0%, rgba(44, 152, 166, 0.14), transparent 52%),
+    #070b14;
+  border: 1px solid rgba(44, 152, 166, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(2, 6, 23, 0.35);
+}
+
+.merchant-time-wheel__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+}
+
+.merchant-time-wheel__spin {
+  width: 38px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.merchant-time-wheel__spin:hover {
+  background: rgba(44, 152, 166, 0.16);
+  border-color: rgba(44, 152, 166, 0.28);
+}
+
+.merchant-time-wheel__spin:hover .merchant-time-wheel__chevron {
+  border-color: #7edce6;
+}
+
+.merchant-time-wheel__spin:active {
+  transform: scale(0.96);
+}
+
+.merchant-time-wheel__chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1.8px solid #94a3b8;
+  border-bottom: 1.8px solid #94a3b8;
+  transform: rotate(45deg);
+  margin-top: -3px;
+}
+
+.merchant-time-wheel__chevron--up {
+  transform: rotate(-135deg);
+  margin-top: 4px;
+}
+
+.merchant-time-wheel__digit {
+  min-width: 1.35em;
+  text-align: center;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-time-wheel__colon {
+  color: #2c98a6;
+  font-size: 1.45rem;
+  font-weight: 800;
+  margin-top: -0.1rem;
+  animation: merchant-colon-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes merchant-colon-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.28;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .merchant-time-wheel__colon {
+    animation: none;
+  }
+}
