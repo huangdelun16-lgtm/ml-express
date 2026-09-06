@@ -8,6 +8,9 @@ import {
   formatMmkWithUnit,
   type FinanceTabKey,
 } from '../../utils/crossBorderFinanceTabs';
+import { formatCnyAmount, formatMmkAmount, mmkToCny } from '../../utils/crossBorderFx';
+import { sumSettledCustomerCny } from '../../utils/crossBorderFxLock';
+import type { FinanceLedgerEntry } from '../../types/financeLedger';
 import AppText from '../AppText';
 
 type Summary = {
@@ -31,11 +34,13 @@ function toneColor(tone: MetricTone): string {
 function MetricTile({
   label,
   value,
+  subValue,
   prefix,
   tone,
 }: {
   label: string;
   value: string;
+  subValue?: string | null;
   prefix?: string;
   tone: MetricTone;
 }) {
@@ -47,11 +52,37 @@ function MetricTile({
           {label}
         </AppText>
         <AppText style={[styles.metricValue, { color }]} numberOfLines={1} myanmarWeight="bold">
-          {`${prefix ?? ''}${value} MMK`}
+          {`${prefix ?? ''}${value}`}
         </AppText>
+        {subValue ? (
+          <AppText style={styles.metricSub} numberOfLines={1} myanmarWeight="semibold">
+            {subValue}
+          </AppText>
+        ) : null}
       </View>
     </View>
   );
+}
+
+function customerMetric(mmk: number, rate: number | null): { value: string; subValue: string | null } {
+  const cny = mmkToCny(mmk, rate);
+  if (cny == null) {
+    return { value: `${formatMmk(mmk)} MMK`, subValue: null };
+  }
+  return {
+    value: `¥${formatCnyAmount(cny)}`,
+    subValue: `${formatMmkAmount(mmk)} MMK`,
+  };
+}
+
+function customerMetricFromCny(mmk: number, cny: number | null): { value: string; subValue: string | null } {
+  if (cny == null) {
+    return { value: `${formatMmk(mmk)} MMK`, subValue: null };
+  }
+  return {
+    value: `¥${formatCnyAmount(cny)}`,
+    subValue: `${formatMmkAmount(mmk)} MMK`,
+  };
 }
 
 export default function FinanceSummaryHero({
@@ -71,6 +102,8 @@ export default function FinanceSummaryHero({
   exporting,
   onTabChange,
   onRetry,
+  mmkPerCny,
+  entries,
 }: {
   operatorName: string;
   hubCode: string;
@@ -88,8 +121,27 @@ export default function FinanceSummaryHero({
   exporting?: boolean;
   onTabChange: (next: FinanceTabKey) => void;
   onRetry: () => void;
+  mmkPerCny?: number | null;
+  entries?: FinanceLedgerEntry[];
 }) {
   const { t, fmt } = useTranslation();
+  const rate = mmkPerCny ?? null;
+  const customerLedgerMmk =
+    summary.collectedTotal + summary.pendingInflowTotal + summary.manualIncomeTotal;
+  const myanmarLedgerMmk =
+    summary.transportUnpaidTotal + summary.transportPaidTotal + summary.manualExpenseTotal;
+  const settledCny = sumSettledCustomerCny(entries ?? []);
+  const pendingCny = mmkToCny(summary.pendingInflowTotal, rate);
+  const manualCny = mmkToCny(summary.manualIncomeTotal, rate);
+  const collectedReady = summary.collectedTotal <= 0 || settledCny != null;
+  const floatingReady = summary.pendingInflowTotal + summary.manualIncomeTotal <= 0 || rate != null;
+  const customerCny =
+    collectedReady && floatingReady
+      ? (summary.collectedTotal > 0 ? settledCny ?? 0 : 0) + (pendingCny ?? 0) + (manualCny ?? 0)
+      : null;
+  const collected = customerMetricFromCny(summary.collectedTotal, settledCny);
+  const pending = customerMetric(summary.pendingInflowTotal, rate);
+  const manualIncome = customerMetric(summary.manualIncomeTotal, rate);
   const positive = netBalance >= 0;
 
   return (
@@ -111,19 +163,48 @@ export default function FinanceSummaryHero({
           </View>
         </View>
 
-        <AppText style={styles.netLabel} myanmarWeight="semibold">
-          {t.crossBorderFinance.balance}
-        </AppText>
-        <AppText
-          style={[styles.netValue, positive ? styles.netPositive : styles.netNegative]}
-          myanmarWeight="bold"
-        >
-          {positive ? '+' : '−'}
-          {formatMmkWithUnit(Math.abs(netBalance))}
-        </AppText>
-        <AppText style={styles.netHint} myanmarWeight="regular">
-          {t.crossBorderFinance.balanceFormula}
-        </AppText>
+        {customerCny != null ? (
+          <View style={styles.splitLedgers}>
+            <View style={styles.splitCol}>
+              <AppText style={styles.netLabel} myanmarWeight="semibold">
+                {t.crossBorderFinance.customerLedger}
+              </AppText>
+              <AppText style={[styles.netValue, styles.netValueSplit, styles.netPositive]} myanmarWeight="bold">
+                ¥{formatCnyAmount(customerCny)}
+              </AppText>
+              <AppText style={styles.netHint} myanmarWeight="regular">
+                {fmt(t.crossBorderFinance.bookedMmk, { amount: formatMmkAmount(customerLedgerMmk) })}
+              </AppText>
+            </View>
+            <View style={styles.splitCol}>
+              <AppText style={styles.netLabel} myanmarWeight="semibold">
+                {t.crossBorderFinance.myanmarLedger}
+              </AppText>
+              <AppText style={[styles.netValue, styles.netValueSplit, styles.netNegative]} myanmarWeight="bold">
+                {formatMmkWithUnit(myanmarLedgerMmk)}
+              </AppText>
+              <AppText style={styles.netHint} myanmarWeight="regular">
+                {t.crossBorderFinance.myanmarLedgerHint}
+              </AppText>
+            </View>
+          </View>
+        ) : (
+          <>
+            <AppText style={styles.netLabel} myanmarWeight="semibold">
+              {t.crossBorderFinance.balance}
+            </AppText>
+            <AppText
+              style={[styles.netValue, positive ? styles.netPositive : styles.netNegative]}
+              myanmarWeight="bold"
+            >
+              {positive ? '+' : '−'}
+              {formatMmkWithUnit(Math.abs(netBalance))}
+            </AppText>
+            <AppText style={styles.netHint} myanmarWeight="regular">
+              {t.crossBorderFinance.balanceFormula}
+            </AppText>
+          </>
+        )}
 
         <View style={styles.actionRow}>
           <Pressable
@@ -156,36 +237,39 @@ export default function FinanceSummaryHero({
         <View style={styles.metricsGrid}>
           <MetricTile
             label={t.crossBorderFinance.collected}
-            value={formatMmk(summary.collectedTotal)}
+            value={collected.value}
+            subValue={collected.subValue}
             prefix="+"
             tone="in"
           />
           <MetricTile
             label={t.crossBorderFinance.transportUnpaid}
-            value={formatMmk(summary.transportUnpaidTotal)}
+            value={`${formatMmk(summary.transportUnpaidTotal)} MMK`}
             prefix="−"
             tone="out"
           />
           <MetricTile
             label={t.crossBorderFinance.transportPaid}
-            value={formatMmk(summary.transportPaidTotal)}
+            value={`${formatMmk(summary.transportPaidTotal)} MMK`}
             tone="neutral"
           />
           <MetricTile
             label={t.crossBorderFinance.pendingInflow}
-            value={formatMmk(summary.pendingInflowTotal)}
+            value={pending.value}
+            subValue={pending.subValue}
             prefix="+"
             tone="in"
           />
           <MetricTile
             label={t.crossBorderFinance.manualIncome}
-            value={formatMmk(summary.manualIncomeTotal)}
+            value={manualIncome.value}
+            subValue={manualIncome.subValue}
             prefix="+"
             tone="in"
           />
           <MetricTile
             label={t.crossBorderFinance.manualExpense}
-            value={formatMmk(summary.manualExpenseTotal)}
+            value={`${formatMmk(summary.manualExpenseTotal)} MMK`}
             prefix="−"
             tone="out"
           />
@@ -305,6 +389,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   countChipText: { color: colors.slateSoft, fontSize: 11, fontWeight: '700' },
+  splitLedgers: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 2,
+  },
+  splitCol: { flex: 1, minWidth: 0 },
   netLabel: {
     color: colors.muted2,
     fontSize: 11,
@@ -318,6 +408,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     fontVariant: ['tabular-nums'],
   },
+  netValueSplit: { fontSize: 20 },
   netPositive: { color: colors.financeGreen },
   netNegative: { color: colors.danger },
   netHint: {
@@ -384,6 +475,13 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 14,
     fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  metricSub: {
+    color: colors.muted2,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
   agencyBar: {

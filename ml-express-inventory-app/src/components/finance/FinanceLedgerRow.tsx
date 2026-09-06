@@ -8,6 +8,8 @@ import {
   useTranslation,
 } from '../../i18n';
 import type { FinanceLedgerEntry } from '../../types/financeLedger';
+import { formatCnyAmount, formatMmkAmount, isCustomerLedgerCategory, mmkToCny } from '../../utils/crossBorderFx';
+import { displayRateForCustomerCategory } from '../../utils/crossBorderFxLock';
 import { regionDisplayLabel } from '../../constants/destinationOptions';
 import { colors, radius, space } from '../../theme';
 import AppText from '../AppText';
@@ -16,14 +18,29 @@ export default function FinanceLedgerRow({
   item,
   deleting,
   onDelete,
+  mmkPerCny,
 }: {
   item: FinanceLedgerEntry;
   deleting: boolean;
   onDelete?: () => void;
+  mmkPerCny?: number | null;
 }) {
   const { t } = useTranslation();
   const style = LEDGER_CATEGORY_STYLE[item.category];
   const when = formatTimeAgo(item.occurredAt, t);
+  const fallback = getLedgerAmountDisplay(t, item);
+  const displayRate = displayRateForCustomerCategory(
+    item.category,
+    item.fxMmkPerCny,
+    mmkPerCny ?? null,
+  );
+  const cny =
+    isCustomerLedgerCategory(item.category) && item.amount != null
+      ? mmkToCny(item.amount, displayRate)
+      : null;
+  const amountPrimary = cny != null ? `¥${formatCnyAmount(cny)}` : fallback;
+  const amountSecondary =
+    cny != null && item.amount != null ? `${formatMmkAmount(item.amount)} MMK` : null;
 
   return (
     <View style={styles.ledgerRow}>
@@ -33,13 +50,20 @@ export default function FinanceLedgerRow({
           <AppText style={styles.ledgerName} numberOfLines={1} myanmarWeight="bold">
             {item.itemName || item.barcode || item.title}
           </AppText>
-          <AppText
-            style={[styles.amountText, { color: style.accent }]}
-            numberOfLines={1}
-            myanmarWeight="bold"
-          >
-            {getLedgerAmountDisplay(t, item)}
-          </AppText>
+          <View style={styles.amountCol}>
+            <AppText
+              style={[styles.amountText, { color: style.accent }]}
+              numberOfLines={1}
+              myanmarWeight="bold"
+            >
+              {amountPrimary}
+            </AppText>
+            {amountSecondary ? (
+              <AppText style={styles.amountSub} numberOfLines={1} myanmarWeight="semibold">
+                {amountSecondary}
+              </AppText>
+            ) : null}
+          </View>
         </View>
         <View style={styles.tagRow}>
           <View style={[styles.catDot, { backgroundColor: style.accent }]} />
@@ -110,12 +134,19 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   ledgerName: { color: colors.text, fontSize: 15, fontWeight: '700', flex: 1, lineHeight: 20 },
+  amountCol: { maxWidth: '46%', alignItems: 'flex-end' },
   amountText: {
     fontSize: 15,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
-    maxWidth: '46%',
     textAlign: 'right',
+  },
+  amountSub: {
+    color: colors.muted2,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
   tagRow: {
     flexDirection: 'row',

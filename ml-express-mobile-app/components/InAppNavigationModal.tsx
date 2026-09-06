@@ -917,7 +917,11 @@ export default function InAppNavigationModal({
 
 const styles = StyleSheet.create({
   fullscreen: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     zIndex: 100,
     elevation: 100,
     backgroundColor: '#0f172a',
@@ -935,7 +939,11 @@ const styles = StyleSheet.create({
   mapPaused: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   mapPausedText: { color: '#94a3b8' },
   mapLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(226, 232, 240, 0.72)',
@@ -956,7 +964,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   mapRetryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end' },
+  overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'flex-end' },
   collapsedDock: {
     marginHorizontal: 12,
     marginBottom: Platform.OS === 'ios' ? 24 : 14,

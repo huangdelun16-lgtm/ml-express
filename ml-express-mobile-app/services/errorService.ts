@@ -78,8 +78,8 @@ export const errorService = {
     });
 
     // 2. 捕获未处理的 Promise Rejection
-    const originalHandler = (global as any).Promise.onUnhandledRejection;
-    (global as any).Promise.onUnhandledRejection = (id: string, error: any) => {
+    const originalHandler = (globalThis as any).Promise.onUnhandledRejection;
+    (globalThis as any).Promise.onUnhandledRejection = (id: string, error: any) => {
       logger.warn('未处理的 Promise 拒绝', error);
       this.saveErrorLog({
         message: error?.message || 'Unhandled Promise Rejection',

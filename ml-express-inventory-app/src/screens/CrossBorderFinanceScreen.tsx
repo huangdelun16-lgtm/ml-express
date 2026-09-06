@@ -39,6 +39,7 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, space } from '../theme';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { filterByTab, type FinanceTabKey } from '../utils/crossBorderFinanceTabs';
+import { fetchCrossBorderFxRate } from '../utils/crossBorderFx';
 import {
   buildFinanceExportCsv,
   buildFinanceExportFilename,
@@ -73,6 +74,7 @@ export default function CrossBorderFinanceScreen() {
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
 
   const tabs = useMemo(
     (): { key: FinanceTabKey; label: string }[] => [
@@ -118,8 +120,12 @@ export default function CrossBorderFinanceScreen() {
         setError('');
         const range =
           periodKind === 'all' ? null : resolveFinancePeriod(periodKind);
-        const result = await listCrossBorderFinance(store, hubCode, range);
+        const [result, rate] = await Promise.all([
+          listCrossBorderFinance(store, hubCode, range),
+          fetchCrossBorderFxRate(),
+        ]);
         applyFinanceResult(result);
+        setMmkPerCny(rate);
         if (range && (periodKind === 'day' || periodKind === 'month')) {
           const row = await fetchStationSettlement(store, hubCode, periodKind, range);
           setSettlement(row);
@@ -442,6 +448,8 @@ export default function CrossBorderFinanceScreen() {
                 exporting={exporting}
                 onTabChange={setTab}
                 onRetry={() => void load()}
+                mmkPerCny={mmkPerCny}
+                entries={entries}
               />
               {tab === 'agency' && agencyOutstanding.length > 0 && !periodLocked ? (
                 <View style={styles.remitBox}>
@@ -502,6 +510,7 @@ export default function CrossBorderFinanceScreen() {
               item={item}
               deleting={deletingId === item.manualEntryId}
               onDelete={item.deletable && !periodLocked ? () => confirmDelete(item) : undefined}
+              mmkPerCny={mmkPerCny}
             />
           )}
         />

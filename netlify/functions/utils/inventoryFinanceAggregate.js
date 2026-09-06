@@ -46,6 +46,74 @@ function normalizePaymentLabel(raw) {
   return p;
 }
 
+const FX_RATE_PART = /^(?:汇率|Rate|FX)\s+([\d.]+)$/i;
+const FX_PAID_MMK = /^(?:实收|Paid)\s+MMK$/i;
+const FX_PAID_CNY_AMT = /^(?:实收|Paid)\s+([\d.]+)\s*CNY$/i;
+const FX_PAID_CNY = /^(?:实收|Paid)\s+CNY$/i;
+
+function isFxLockNotePart(part) {
+  const trimmed = String(part || '').trim();
+  return (
+    FX_RATE_PART.test(trimmed) ||
+    FX_PAID_MMK.test(trimmed) ||
+    FX_PAID_CNY_AMT.test(trimmed) ||
+    FX_PAID_CNY.test(trimmed)
+  );
+}
+
+function parseFxLockFromNote(note) {
+  const parts = String(note || '')
+    .split(' · ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  let mmkPerCny;
+  let paidCurrency;
+  let paidCny;
+  for (const part of parts) {
+    const rateMatch = part.match(FX_RATE_PART);
+    if (rateMatch) {
+      const rate = Number(rateMatch[1]);
+      if (Number.isFinite(rate) && rate > 0) mmkPerCny = rate;
+      continue;
+    }
+    if (FX_PAID_MMK.test(part)) {
+      paidCurrency = 'MMK';
+      continue;
+    }
+    const cnyMatch = part.match(FX_PAID_CNY_AMT);
+    if (cnyMatch) {
+      paidCurrency = 'CNY';
+      const cny = Number(cnyMatch[1]);
+      if (Number.isFinite(cny) && cny > 0) paidCny = cny;
+      continue;
+    }
+    if (FX_PAID_CNY.test(part)) paidCurrency = 'CNY';
+  }
+  if (!mmkPerCny) return null;
+  return { paidCurrency: paidCurrency || 'MMK', mmkPerCny, paidCny };
+}
+
+function settledCnyFromEntries(entries) {
+  let total = 0;
+  let hasAmount = false;
+  for (const entry of entries || []) {
+    if (
+      entry.category !== 'order_prepaid' &&
+      entry.category !== 'order_collected' &&
+      entry.category !== 'collected'
+    ) {
+      continue;
+    }
+    const amt = Number(entry.amount) || 0;
+    if (amt <= 0) continue;
+    hasAmount = true;
+    const rate = Number(entry.fxMmkPerCny);
+    if (!(rate > 0)) return null;
+    total += amt / rate;
+  }
+  return hasAmount ? total : 0;
+}
+
 /** 与 Inventory App inboundMovementNote / financeLedgerAggregate 同源（中/英/缅） */
 function parseInboundMovementNote(note) {
   const trimmed = String(note || '').trim();
@@ -59,12 +127,13 @@ function parseInboundMovementNote(note) {
       totalFee = feeMatch[1];
       continue;
     }
+    if (isFxLockNotePart(part)) continue;
     const normalized = normalizePaymentLabel(part);
     if (normalized === '到付' || normalized === '预付') {
       paymentLabel = normalized;
     }
   }
-  return { totalFee, paymentLabel };
+  return { totalFee, paymentLabel, fxLock: parseFxLockFromNote(trimmed) || undefined };
 }
 
 function parsePackagingStockInLineBarcode(barcode) {
@@ -137,6 +206,7 @@ function collapsePackagingStockInOrderEntries(entries) {
         : 'order_income_cod';
     const primary =
       list.find((row) => parsePackagingStockInLineBarcode(row.barcode)?.index === 1) || list[0];
+    const lockRow = list.find((row) => Number(row.fxMmkPerCny) > 0);
     const title =
       category === 'order_prepaid'
         ? '订单 · 已付款'
@@ -148,6 +218,12 @@ function collapsePackagingStockInOrderEntries(entries) {
       id: `order:pack:${base}`,
       category,
       title,
+      fxMmkPerCny: lockRow?.fxMmkPerCny,
+      paidCurrency: lockRow?.paidCurrency,
+      paidCny:
+        lockRow?.paidCurrency === 'CNY' && Number(lockRow.fxMmkPerCny) > 0
+          ? amount / lockRow.fxMmkPerCny
+          : lockRow?.paidCny,
       amount,
       amountDisplay:
         amount > 0
@@ -246,6 +322,14 @@ function buildOrderLedgerEntry(params) {
   );
   const parsed = parseInboundMovementNote(enrichedNote);
   const fee = parseAmount(parsed.totalFee);
+  const fxLock = parseFxLockFromNote(params.itemNote) || parsed.fxLock;
+  const fxFields = fxLock
+    ? {
+        fxMmkPerCny: fxLock.mmkPerCny,
+        paidCurrency: fxLock.paidCurrency,
+        paidCny: fxLock.paidCny,
+      }
+    : {};
   const payment = parsed.paymentLabel || '';
   const dest = finalDestination || movement.destination || '';
   const originKey = movement.origin_store_code
@@ -259,6 +343,7 @@ function buildOrderLedgerEntry(params) {
 
   if (payment === '预付') {
     return {
+      ...fxFields,
       id: `order:prepaid:${barcode}`,
       category: 'order_prepaid',
       title: '订单 · 已付款',
@@ -277,6 +362,7 @@ function buildOrderLedgerEntry(params) {
   if (payment === '到付') {
     if (customerSigned) {
       return {
+        ...fxFields,
         id: `order:collected:${barcode}`,
         category: 'order_collected',
         title: '订单收入 · 已签收收款',
@@ -292,6 +378,7 @@ function buildOrderLedgerEntry(params) {
       };
     }
     return {
+      ...fxFields,
       id: `order:cod:${barcode}`,
       category: 'order_income_cod',
       title: '订单收入 · 到付待收',
@@ -309,6 +396,7 @@ function buildOrderLedgerEntry(params) {
 
   if (fee > 0 && dest) {
     return {
+      ...fxFields,
       id: `order:fee:${barcode}`,
       category: 'order_income_cod',
       title: '订单费用',
@@ -827,6 +915,7 @@ function buildCrossBorderFinanceSummary(entries, storeCode, hubCode) {
     collectedTotal: round(
       buckets.origin_prepaid + buckets.dest_local_collected + buckets.dest_agency_collected,
     ),
+    collectedCny: settledCnyFromEntries(entries),
     transportUnpaidTotal: round(buckets.transport_in_unpaid),
     transportPaidTotal: round(buckets.transport_in_paid),
     pendingInflowTotal: round(buckets.dest_pending_agency),
@@ -1028,6 +1117,7 @@ function buildAllFinanceEntries(store, dataset) {
     if (isCrossStationInbound(movement, finalDest, storeCode, hubCode)) {
       const entry = buildOrderLedgerEntry({
         movement,
+        itemNote: item.note,
         finalDestination: finalDest,
         customerSigned,
         customerName,
@@ -1157,6 +1247,7 @@ function buildAllFinanceEntries(store, dataset) {
         .toUpperCase();
       const entry = buildOrderLedgerEntry({
         movement: pseudoMovement,
+        itemNote: localItem?.note,
         finalDestination: orderDest,
         customerSigned,
         customerName: order.recipient_name,
@@ -1346,7 +1437,7 @@ async function loadFinanceDataset(supabase) {
     fetchAllRows(
       supabase,
       'inventory_stock_movements',
-      'id, barcode, type, note, destination, origin_store_code, recipient_name, item_name, created_at, item:inventory_store_items!inner(final_destination, recipient_name, customer_signed_at, barcode, packed_bundle_barcode)',
+      'id, barcode, type, note, destination, origin_store_code, recipient_name, item_name, created_at, item:inventory_store_items!inner(final_destination, recipient_name, customer_signed_at, barcode, packed_bundle_barcode, note)',
       {
         eq: { type: 'in' },
         order: [{ column: 'created_at', ascending: false }],
@@ -1464,7 +1555,7 @@ async function loadFinanceDataset(supabase) {
     const chunk = barcodeList.slice(i, i + 200);
     const { data: itemRows, error: itemErr } = await supabase
       .from('inventory_store_items')
-      .select('barcode, customer_signed_at, packed_bundle_barcode')
+      .select('barcode, note, customer_signed_at, packed_bundle_barcode')
       .in('barcode', chunk);
 
     if (itemErr) {
@@ -1527,6 +1618,9 @@ function mapLedgerToCrossBorderExpense(item, store, expenseCategory) {
     stationCode: store.store_code,
     stationName: store.store_name,
     statusLabel,
+    fxMmkPerCny: item.fxMmkPerCny ?? null,
+    paidCurrency: item.paidCurrency,
+    paidCny: item.paidCny,
   };
 }
 
@@ -1708,6 +1802,9 @@ function aggregateCrossBorderExpenses(transitStores, entriesCache, dataset) {
     summary: {
       entryCount: entries.length,
       collectedTotal: Math.round(collectedTotal),
+      collectedCny: settledCnyFromEntries(
+        entries.filter((row) => row.category === 'collected'),
+      ),
       transportUnpaidTotal: Math.round(transportUnpaidTotal),
       transportPaidTotal: Math.round(transportPaidTotal),
       pendingInflowTotal: Math.round(pendingInflowTotal),
@@ -1741,6 +1838,7 @@ function hqSummaryFromStore(store, financeEntries) {
   return {
     entryCount: financeEntries.length,
     collectedTotal: Math.round(s.collectedTotal),
+    collectedCny: s.collectedCny,
     transportUnpaidTotal: Math.round(s.transportUnpaidTotal),
     transportPaidTotal: Math.round(s.transportPaidTotal),
     pendingInflowTotal: Math.round(s.pendingInflowTotal),

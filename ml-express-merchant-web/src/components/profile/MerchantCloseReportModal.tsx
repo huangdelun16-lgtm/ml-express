@@ -86,8 +86,8 @@ const copy = {
   },
 };
 
-function money(n: number) {
-  return `${Math.round(n).toLocaleString()} MMK`;
+function moneyAmount(n: number) {
+  return Math.round(n).toLocaleString();
 }
 
 const MerchantCloseReportModal: React.FC<Props> = ({
@@ -144,11 +144,17 @@ const MerchantCloseReportModal: React.FC<Props> = ({
         <div className="merchant-close-report__money">
           <div>
             <span>{t.fee}</span>
-            <strong>{money(report.todayDeliveryFee)}</strong>
+            <strong>
+              {moneyAmount(report.todayDeliveryFee)}
+              <small>MMK</small>
+            </strong>
           </div>
           <div>
             <span>{t.cod}</span>
-            <strong>{money(report.todayCodAmount)}</strong>
+            <strong>
+              {moneyAmount(report.todayCodAmount)}
+              <small>MMK</small>
+            </strong>
           </div>
         </div>
 

@@ -631,7 +631,7 @@ export default function ScanScreen({ navigation }: any) {
                     accessibilityRole="none"
                   >
                   <CameraView
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                     facing="back"
                     onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                     barcodeScannerSettings={{

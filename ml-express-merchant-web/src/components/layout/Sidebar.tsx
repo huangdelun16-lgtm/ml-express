@@ -9,6 +9,7 @@ import {
   STORE_AVATAR_UPDATED_EVENT,
   storeAvatarSrc,
 } from "../../utils/storeAvatar";
+import "../../styles/merchantSidebar.css";
 
 const Sidebar: React.FC<{
   currentUser: any;
@@ -27,7 +28,6 @@ const Sidebar: React.FC<{
   );
   const [storeAvatarUpdatedAt, setStoreAvatarUpdatedAt] = useState("");
 
-  // 🚀 自动根据路径展开菜单
   useEffect(() => {
     if (location.pathname === "/") {
       setIsAccountExpanded(true);
@@ -67,9 +67,8 @@ const Sidebar: React.FC<{
         language === "zh"
           ? "我的账号"
           : language === "en"
-            ? "My Account"
+            ? "My account"
             : "ကျွန်ုပ်၏အကောင့်",
-      icon: "👤",
     },
     {
       id: "/orders",
@@ -79,7 +78,6 @@ const Sidebar: React.FC<{
           : language === "en"
             ? "Orders"
             : "အော်ဒါစာရင်း",
-      icon: "📋",
     },
     {
       id: "/products",
@@ -89,7 +87,6 @@ const Sidebar: React.FC<{
           : language === "en"
             ? "Products"
             : "ကုန်ပစ္စည်းစီမံမှု",
-      icon: "🛍️",
     },
   ];
 
@@ -100,9 +97,8 @@ const Sidebar: React.FC<{
         language === "zh"
           ? "代收款统计"
           : language === "en"
-            ? "COD Stats"
+            ? "COD stats"
             : "COD စာရင်းအင်း",
-      icon: "💰",
     },
     {
       id: "business-hours",
@@ -110,9 +106,8 @@ const Sidebar: React.FC<{
         language === "zh"
           ? "营业时间"
           : language === "en"
-            ? "Business Hours"
+            ? "Business hours"
             : "ဖွင့်ချိန်သတ်မှတ်ချက်",
-      icon: "⏰",
     },
   ];
 
@@ -123,9 +118,8 @@ const Sidebar: React.FC<{
         language === "zh"
           ? "全部订单"
           : language === "en"
-            ? "All Orders"
+            ? "All orders"
             : "အော်ဒါအားလုံး",
-      icon: "📦",
     },
     {
       id: MERCHANT_ORDER_STATUS.PENDING_CONFIRM,
@@ -133,19 +127,13 @@ const Sidebar: React.FC<{
         language === "zh"
           ? "待接单"
           : language === "en"
-            ? "Pending Accept"
+            ? "To accept"
             : "လက်ခံရန်စောင့်ဆိုင်း",
-      icon: "🔔",
     },
     {
       id: "打包中",
       label:
-        language === "zh"
-          ? "打包中"
-          : language === "en"
-            ? "Packing"
-            : "ထုပ်ပိုးနေသည်",
-      icon: "📦",
+        language === "zh" ? "打包中" : language === "en" ? "Packing" : "ထုပ်ပိုးနေသည်",
     },
     {
       id: "待取件",
@@ -153,9 +141,8 @@ const Sidebar: React.FC<{
         language === "zh"
           ? "待取件"
           : language === "en"
-            ? "Pending Pickup"
+            ? "Pickup"
             : "လာယူရန်စောင့်ဆိုင်း",
-      icon: "⏳",
     },
     {
       id: "运输中",
@@ -163,19 +150,13 @@ const Sidebar: React.FC<{
         language === "zh"
           ? "配送中"
           : language === "en"
-            ? "In Transit"
+            ? "In transit"
             : "ပို့ဆောင်နေသည်",
-      icon: "🚚",
     },
     {
       id: "已完成",
       label:
-        language === "zh"
-          ? "已完成"
-          : language === "en"
-            ? "Completed"
-            : "ပြီးစီးသည်",
-      icon: "✅",
+        language === "zh" ? "已完成" : language === "en" ? "Completed" : "ပြီးစီးသည်",
     },
     {
       id: "已取消",
@@ -185,14 +166,12 @@ const Sidebar: React.FC<{
           : language === "en"
             ? "Cancelled"
             : "ပယ်ဖျက်သည်",
-      icon: "❌",
     },
   ];
 
   const handleMenuClick = (id: string) => {
     onNavigate?.();
     if (id === "place-order") {
-      // 🚀 如果不在首页，先跳转到首页再触发
       if (location.pathname !== "/") {
         navigate("/", { state: { triggerOrder: true } });
       } else {
@@ -250,50 +229,28 @@ const Sidebar: React.FC<{
     }
   };
 
-  return (
-    <div style={sidebarStyle} className="merchant-sidebar-inner">
-      {/* 🚀 已根据要求删除 Sidebar 顶部的 Logo 和名称 */}
+  const storeRole =
+    language === "zh"
+      ? "店铺管理员"
+      : language === "en"
+        ? "Store admin"
+        : "ဆိုင်အက်ဒ်မင်";
 
-      <div style={menuContainerStyle}>
-        {/* 🚀 立即下单：改为在侧边栏显示 */}
+  return (
+    <div className="merchant-sidebar-inner">
+      <nav className="merchant-sidebar__nav" aria-label="Merchant">
         {currentUser?.user_type === "merchant" && (
-          <div
+          <button
+            type="button"
+            className="merchant-sidebar__order"
             onClick={() => handleMenuClick("place-order")}
-            style={{
-              margin: "0 1.5rem 1.5rem 1.5rem",
-              padding: "1rem",
-              background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-              borderRadius: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "10px",
-              cursor: "pointer",
-              boxShadow: "0 8px 20px rgba(245, 158, 11, 0.2)",
-              transition: "all 0.3s ease",
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow =
-                "0 12px 25px rgba(245, 158, 11, 0.3)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow =
-                "0 8px 20px rgba(245, 158, 11, 0.2)";
-            }}
           >
-            <span style={{ fontSize: "1.4rem" }}>🚀</span>
-            <span
-              style={{ fontWeight: "900", color: "white", fontSize: "1rem" }}
-            >
-              {language === "zh"
-                ? "立即下单"
-                : language === "en"
-                  ? "PLACE ORDER"
-                  : "အော်ဒါတင်မည်"}
-            </span>
-          </div>
+            {language === "zh"
+              ? "立即下单"
+              : language === "en"
+                ? "Place order"
+                : "အော်ဒါတင်မည်"}
+          </button>
         )}
 
         {mainMenuItems.map((item) => {
@@ -312,133 +269,69 @@ const Sidebar: React.FC<{
 
           return (
             <React.Fragment key={item.id}>
-              <div
+              <button
+                type="button"
+                className={`merchant-sidebar__item${isActive ? " is-active" : ""}${
+                  isExpanded ? " is-open" : ""
+                }`}
                 onClick={() => handleMenuClick(item.id)}
-                style={{
-                  ...menuItemStyle,
-                  background: isActive
-                    ? "rgba(59, 130, 246, 0.15)"
-                    : "transparent",
-                  color: isActive ? "#3b82f6" : "rgba(255,255,255,0.6)",
-                  borderLeft: isActive
-                    ? "4px solid #3b82f6"
-                    : "4px solid transparent",
-                }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    flex: 1,
-                  }}
-                >
-                  <span style={{ fontSize: "1.2rem" }}>{item.icon}</span>
-                  <span style={{ fontWeight: isActive ? "800" : "500" }}>
-                    {item.label}
-                  </span>
+                <span className="merchant-sidebar__item-main">
+                  <span>{item.label}</span>
                   {item.id === "/orders" && pendingBadge > 0 ? (
-                    <span
-                      style={{
-                        marginLeft: "auto",
-                        minWidth: "22px",
-                        height: "22px",
-                        padding: "0 6px",
-                        borderRadius: "999px",
-                        background: "#ef4444",
-                        color: "#fff",
-                        fontSize: "0.72rem",
-                        fontWeight: 800,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: "0 0 12px rgba(239,68,68,0.45)",
-                      }}
-                    >
+                    <span className="merchant-sidebar__badge">
                       {pendingBadge > 99 ? "99+" : pendingBadge}
                     </span>
                   ) : null}
-                </div>
-                {hasSubMenu && (
-                  <span
-                    style={{
-                      fontSize: "0.8rem",
-                      transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                      transition: "transform 0.3s ease",
-                      opacity: 0.5,
-                    }}
-                  >
-                    ▼
-                  </span>
-                )}
-              </div>
+                </span>
+                {hasSubMenu ? (
+                  <span className="merchant-sidebar__chevron" aria-hidden="true" />
+                ) : null}
+              </button>
 
-              {/* 🚀 我的账号子菜单 */}
-              {isAccount && isAccountExpanded && (
-                <div style={subMenuWrapperStyle}>
+              {isAccount && isAccountExpanded ? (
+                <div className="merchant-sidebar__sub">
                   {subMenuItems.map((sub) => (
-                    <div
+                    <button
                       key={sub.id}
+                      type="button"
+                      className="merchant-sidebar__sub-item"
                       onClick={() => handleMenuClick(sub.id)}
-                      style={subMenuItemStyle}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.color = "#3b82f6")
-                      }
-                      onMouseOut={(e) =>
-                        (e.currentTarget.style.color = "rgba(255,255,255,0.4)")
-                      }
                     >
-                      <span style={{ fontSize: "1rem" }}>{sub.icon}</span>
-                      <span>{sub.label}</span>
-                    </div>
+                      {sub.label}
+                    </button>
                   ))}
                 </div>
-              )}
+              ) : null}
 
-              {/* 🚀 订单状态子菜单 */}
-              {isOrders && isOrdersExpanded && (
-                <div style={subMenuWrapperStyle}>
+              {isOrders && isOrdersExpanded ? (
+                <div className="merchant-sidebar__sub">
                   {orderStatuses.map((status) => {
                     const searchParams = new URLSearchParams(location.search);
                     const currentStatus = searchParams.get("status") || "all";
                     const isStatusActive = currentStatus === status.id;
-
                     return (
-                      <div
+                      <button
                         key={status.id}
+                        type="button"
+                        className={`merchant-sidebar__sub-item${
+                          isStatusActive ? " is-active" : ""
+                        }`}
                         onClick={() => handleMenuClick(`status-${status.id}`)}
-                        style={{
-                          ...subMenuItemStyle,
-                          color: isStatusActive
-                            ? "#3b82f6"
-                            : "rgba(255,255,255,0.4)",
-                          fontWeight: isStatusActive ? "700" : "normal",
-                        }}
-                        onMouseOver={(e) => {
-                          if (!isStatusActive)
-                            e.currentTarget.style.color = "#3b82f6";
-                        }}
-                        onMouseOut={(e) => {
-                          if (!isStatusActive)
-                            e.currentTarget.style.color =
-                              "rgba(255,255,255,0.4)";
-                        }}
                       >
-                        <span style={{ fontSize: "1rem" }}>{status.icon}</span>
-                        <span>{status.label}</span>
-                      </div>
+                        {status.label}
+                      </button>
                     );
                   })}
                 </div>
-              )}
+              ) : null}
             </React.Fragment>
           );
         })}
-      </div>
+      </nav>
 
-      <div style={footerStyle}>
-        {/* 🚀 语言切换选择器 */}
-        <div style={languageSelectorStyle}>
+      <div className="merchant-sidebar__foot">
+        <div className="merchant-sidebar__langs">
           {[
             { id: "zh", label: "中" },
             { id: "en", label: "英" },
@@ -446,22 +339,17 @@ const Sidebar: React.FC<{
           ].map((lang) => (
             <button
               key={lang.id}
+              type="button"
+              className={`merchant-sidebar__lang${language === lang.id ? " is-on" : ""}`}
               onClick={() => setLanguage(lang.id)}
-              style={{
-                ...langButtonStyle,
-                background:
-                  language === lang.id ? "#3b82f6" : "rgba(255,255,255,0.05)",
-                color: language === lang.id ? "white" : "rgba(255,255,255,0.4)",
-                fontWeight: language === lang.id ? "bold" : "normal",
-              }}
             >
               {lang.label}
             </button>
           ))}
         </div>
 
-        <div style={userCardStyle}>
-          <div style={{ ...avatarStyle, overflow: "hidden", padding: 0 }}>
+        <div className="merchant-sidebar__store">
+          <div className="merchant-sidebar__avatar">
             <StorageImg
               src={storeAvatarSrc(storeAvatarUrl, storeAvatarUpdatedAt)}
               alt=""
@@ -469,148 +357,21 @@ const Sidebar: React.FC<{
               fallback={<span>{currentUser?.name?.charAt(0)}</span>}
             />
           </div>
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <div style={userNameStyle}>{currentUser?.name}</div>
-            <div style={userRoleStyle}>Store Admin</div>
+          <div className="merchant-sidebar__store-text">
+            <div className="merchant-sidebar__name">{currentUser?.name}</div>
+            <div className="merchant-sidebar__role">{storeRole}</div>
           </div>
         </div>
-        <button onClick={onLogout} style={logoutButtonStyle}>
+        <button type="button" className="merchant-sidebar__logout" onClick={onLogout}>
           {language === "zh"
             ? "安全退出"
             : language === "en"
-              ? "Logout"
+              ? "Log out"
               : "ထွက်ရန်"}
         </button>
       </div>
     </div>
   );
-};
-
-const sidebarStyle: React.CSSProperties = {
-  width: "260px",
-  height: "100vh",
-  background: "rgba(15, 23, 42, 0.95)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
-  borderRight: "1px solid rgba(255,255,255,0.05)",
-  display: "flex",
-  flexDirection: "column",
-  position: "sticky",
-  top: 0,
-  alignSelf: "flex-start",
-  zIndex: 100,
-  overflowY: "auto",
-  scrollbarWidth: "none",
-};
-
-const menuContainerStyle: React.CSSProperties = {
-  flex: 1,
-  padding: "2.5rem 0", // 🚀 增加顶部间距，补偿删除 Logo 后的空白
-};
-
-const menuItemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  padding: "0.8rem 1.5rem",
-  cursor: "pointer",
-  transition: "all 0.3s ease",
-  fontSize: "0.95rem",
-  marginBottom: "4px",
-};
-
-const subMenuWrapperStyle: React.CSSProperties = {
-  paddingLeft: "3.2rem",
-  marginBottom: "1rem",
-  display: "flex",
-  flexDirection: "column",
-  gap: "12px",
-  marginTop: "8px",
-  animation: "fadeIn 0.3s ease-out",
-};
-
-const subMenuItemStyle: React.CSSProperties = {
-  fontSize: "0.85rem",
-  color: "rgba(255,255,255,0.4)",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  transition: "color 0.2s ease",
-};
-
-const footerStyle: React.CSSProperties = {
-  padding: "1.5rem",
-  borderTop: "1px solid rgba(255,255,255,0.05)",
-  flexShrink: 0, // 🚀 确保底部不被压缩
-};
-
-const userCardStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "12px",
-  marginBottom: "1rem",
-  background: "rgba(255,255,255,0.03)",
-  padding: "10px",
-  borderRadius: "12px",
-};
-
-const avatarStyle: React.CSSProperties = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "10px",
-  background: "#3b82f6",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontWeight: "bold",
-  color: "white",
-};
-
-const userNameStyle: React.CSSProperties = {
-  fontSize: "0.9rem",
-  fontWeight: "700",
-  color: "white",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const userRoleStyle: React.CSSProperties = {
-  fontSize: "0.75rem",
-  color: "rgba(255,255,255,0.4)",
-};
-
-const logoutButtonStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "0.8rem",
-  background: "rgba(239, 68, 68, 0.1)",
-  color: "#ef4444",
-  border: "1px solid rgba(239, 68, 68, 0.2)",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontSize: "0.85rem",
-  fontWeight: "bold",
-  transition: "all 0.2s",
-};
-
-const languageSelectorStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "8px",
-  marginBottom: "1.5rem",
-  background: "rgba(255,255,255,0.02)",
-  padding: "4px",
-  borderRadius: "12px",
-  border: "1px solid rgba(255,255,255,0.05)",
-};
-
-const langButtonStyle: React.CSSProperties = {
-  flex: 1,
-  padding: "0.5rem",
-  border: "none",
-  borderRadius: "8px",
-  cursor: "pointer",
-  fontSize: "0.85rem",
-  transition: "all 0.2s ease",
 };
 
 export default Sidebar;

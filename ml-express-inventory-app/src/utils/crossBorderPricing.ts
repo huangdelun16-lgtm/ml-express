@@ -1,4 +1,10 @@
 import { isSupabaseConfigured, supabase } from '../services/supabase';
+import {
+  CROSS_BORDER_FX_SETTINGS_KEY,
+  formatCnyInput,
+  mmkToCny,
+  pickMmkPerCnyRate,
+} from './crossBorderFx';
 import { parseWeight } from './itemFieldFormat';
 
 const DEFAULT_PER_KG = 0;
@@ -176,6 +182,7 @@ export async function fetchCrossBorderRoutePerKg(
   fromCloud: boolean;
   usedLegacyFallback: boolean;
   usedCustomerRate: boolean;
+  mmkPerCny: number | null;
 }> {
   const originCode = normalizeRouteHubCode(originHub);
   const destinationCode = normalizeRouteHubCode(destination);
@@ -187,9 +194,11 @@ export async function fetchCrossBorderRoutePerKg(
     ? buildRoutePerKgSettingsKey(originCode, destinationCode, normalizedCustomer)
     : null;
   const globalKey = buildRoutePerKgSettingsKey(originCode, destinationCode);
-  const keys = [customerKey, globalKey].filter((key): key is string => Boolean(key));
+  const keys = [customerKey, globalKey, CROSS_BORDER_FX_SETTINGS_KEY].filter(
+    (key): key is string => Boolean(key),
+  );
 
-  if (!keys.length || !isSupabaseConfigured()) {
+  if (!isSupabaseConfigured()) {
     const legacy = await fetchLegacyDestinationBaseFee(destinationCode);
     return {
       perKg: legacy,
@@ -198,6 +207,7 @@ export async function fetchCrossBorderRoutePerKg(
       fromCloud: false,
       usedLegacyFallback: true,
       usedCustomerRate: false,
+      mmkPerCny: null,
     };
   }
 
@@ -205,6 +215,8 @@ export async function fetchCrossBorderRoutePerKg(
     .from('system_settings')
     .select('settings_key, settings_value')
     .in('settings_key', keys);
+
+  const mmkPerCny = !error && data?.length ? pickMmkPerCnyRate(data) : null;
 
   if (!error && data?.length) {
     const picked = pickRoutePerKgFromRows(data, originCode, destinationCode, normalizedCustomer);
@@ -216,6 +228,7 @@ export async function fetchCrossBorderRoutePerKg(
         fromCloud: true,
         usedLegacyFallback: false,
         usedCustomerRate: picked.usedCustomerRate,
+        mmkPerCny,
       };
     }
   }
@@ -228,6 +241,7 @@ export async function fetchCrossBorderRoutePerKg(
     fromCloud: false,
     usedLegacyFallback: true,
     usedCustomerRate: false,
+    mmkPerCny,
   };
 }
 
@@ -255,10 +269,19 @@ export function formatCrossBorderFeeHint(
   weightKg: number,
   usedLegacyFallback = false,
   customerCode = '',
+  mmkPerCny: number | null = null,
 ): string {
   const origin = originCode || '—';
   const dest = destinationCode || '—';
   const customerPrefix = customerCode ? `${customerCode} · ` : '';
+  const cnyPerKg = mmkToCny(perKg, mmkPerCny);
+  if (cnyPerKg != null) {
+    const cnyLabel = `¥${formatCnyInput(cnyPerKg)}/kg`;
+    if (usedLegacyFallback) {
+      return `${customerPrefix}${dest} 领区兜底 ${cnyLabel} · 入账 ${perKg} MMK/kg × ${weightKg} kg`;
+    }
+    return `${customerPrefix}${origin} → ${dest} ${cnyLabel} · 入账 ${perKg} MMK/kg × ${weightKg} kg`;
+  }
   if (usedLegacyFallback) {
     return `${customerPrefix}${dest} 领区兜底起步价 ${perKg} × ${weightKg} kg`;
   }

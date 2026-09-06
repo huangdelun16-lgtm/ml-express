@@ -1105,7 +1105,11 @@ export const meStyles = StyleSheet.create({
     height: 64,
   },
   avatarLoading: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(15,23,42,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1377,7 +1381,11 @@ export const meStyles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetDim: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(15,23,42,0.4)',
   },
   sheetDismissZone: {

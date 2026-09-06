@@ -7,6 +7,7 @@
  * - overview：账号列表 + 统计 + 车费合计（优先 inventory_admin_overview_stats RPC）
  * - finance：中转站财务 + 跨境财务（financePage / financePageSize 分页明细）
  * - packs：运输明细（packStatus）
+ * - orders：订单级追踪（orderStatus）
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -18,6 +19,8 @@ const { parseFinancePeriodQuery } = require('./utils/yangonFinancePeriod');
 const { buildTripFeeGroupMap } = require('./utils/tripTransportFee');
 const {
   PACK_DISPLAY_LABEL,
+  matchesPackTransportFilter,
+  packStatusesForQuery,
   resolvePackDisplayStatusFromTracking,
 } = require('./utils/packDisplayStatus');
 
@@ -301,14 +304,11 @@ async function loadRecentPacks(supabase, packStatus, warnings) {
     .order('updated_at', { ascending: false })
     .limit(500);
 
-  if (packStatus === 'in_transit') {
-    packsQuery = packsQuery.eq('status', 'in_transit');
-  } else if (packStatus === 'hub_received') {
-    packsQuery = packsQuery.eq('status', 'hub_received');
-  } else if (packStatus === 'completed') {
-    packsQuery = packsQuery.eq('status', 'completed');
-  } else if (packStatus === 'active') {
-    packsQuery = packsQuery.in('status', ['in_transit', 'hub_received', 'split_at_hub']);
+  const queryStatuses = packStatusesForQuery(packStatus);
+  if (queryStatuses?.length === 1) {
+    packsQuery = packsQuery.eq('status', queryStatuses[0]);
+  } else if (queryStatuses?.length) {
+    packsQuery = packsQuery.in('status', queryStatuses);
   }
 
   const { data: packRows, error: packsErr } = await packsQuery;
@@ -320,11 +320,63 @@ async function loadRecentPacks(supabase, packStatus, warnings) {
 
   const barcodes = (packRows || []).map((r) => r.pack_barcode);
   const qtyByBarcode = await loadPackedQtyByBarcode(supabase, barcodes);
-  return (packRows || []).map((row) => {
-    const code = String(row.pack_barcode || '').trim().toUpperCase();
-    const qtyOnHand = qtyByBarcode[code];
-    return normalizePackRow(row, qtyOnHand);
-  });
+  return (packRows || [])
+    .map((row) => {
+      const code = String(row.pack_barcode || '').trim().toUpperCase();
+      const qtyOnHand = qtyByBarcode[code];
+      return normalizePackRow(row, qtyOnHand);
+    })
+    .filter((pack) => matchesPackTransportFilter(pack, packStatus));
+}
+
+function normalizeOrderRow(row) {
+  return {
+    id: row.id,
+    pack_barcode: String(row.pack_barcode || '').trim(),
+    order_barcode: String(row.order_barcode || '').trim(),
+    express_barcode: String(row.express_barcode || '').trim(),
+    order_name: String(row.order_name || '').trim(),
+    destination_code: String(row.destination_code || '').trim().toUpperCase(),
+    qty: Number(row.qty) || 1,
+    status: row.status,
+    recipient_name: String(row.recipient_name || '').trim(),
+    recipient_phone: String(row.recipient_phone || '').trim(),
+    inbound_store_name: String(row.inbound_store_name || '').trim(),
+    hub_received_at: row.hub_received_at ?? null,
+    hub_received_by_store_code: row.hub_received_by_store_code ?? null,
+    hub_received_by_store_name: row.hub_received_by_store_name ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function loadRecentOrders(supabase, orderStatus, warnings) {
+  let ordersQuery = supabase
+    .from('inventory_order_tracking')
+    .select(
+      'id, pack_barcode, order_barcode, express_barcode, order_name, destination_code, qty, status, recipient_name, recipient_phone, inbound_store_name, hub_received_at, hub_received_by_store_code, hub_received_by_store_name, created_at, updated_at',
+    )
+    .order('updated_at', { ascending: false })
+    .limit(500);
+
+  if (orderStatus === 'in_transit') {
+    ordersQuery = ordersQuery.eq('status', 'in_transit');
+  } else if (orderStatus === 'hub_received') {
+    ordersQuery = ordersQuery.eq('status', 'hub_received');
+  } else if (orderStatus === 'released_at_hub') {
+    ordersQuery = ordersQuery.eq('status', 'released_at_hub');
+  } else if (orderStatus === 'active') {
+    ordersQuery = ordersQuery.in('status', ['in_transit', 'hub_received']);
+  }
+
+  const { data: orderRows, error: ordersErr } = await ordersQuery;
+  if (ordersErr) {
+    console.warn('inventory-admin-data: orders query failed', ordersErr.message);
+    warnings.push(`订单追踪表暂不可用：${ordersErr.message}`);
+    return [];
+  }
+
+  return (orderRows || []).map(normalizeOrderRow);
 }
 
 function attachFinanceToStores(storesList, financeByStoreCode) {
@@ -468,6 +520,18 @@ async function handlePacks(supabase, packStatus, warnings) {
   };
 }
 
+async function handleOrders(supabase, orderStatus, warnings) {
+  const recentOrders = await loadRecentOrders(supabase, orderStatus, warnings);
+  return {
+    ok: true,
+    at: new Date().toISOString(),
+    section: 'orders',
+    recentOrders,
+    orderStatusFilter: orderStatus,
+    warnings,
+  };
+}
+
 /** 兼容旧版：一次返回全部（较慢） */
 async function handleAll(supabase, packStatus, warnings, financePagination, financeScope) {
   const storesList = await loadTransitStores(supabase);
@@ -554,6 +618,11 @@ exports.handler = async (event) => {
   });
 
   const packStatus = (event.queryStringParameters?.packStatus || 'active').toLowerCase();
+  const orderStatus = (
+    event.queryStringParameters?.orderStatus ||
+    event.queryStringParameters?.packStatus ||
+    'active'
+  ).toLowerCase();
   const section = String(event.queryStringParameters?.section || 'overview').toLowerCase();
   const financePagination = parseFinancePagination(event.queryStringParameters);
   const financeScope = parseFinancePeriodQuery(event.queryStringParameters || {});
@@ -565,6 +634,8 @@ exports.handler = async (event) => {
       body = await handleFinance(supabase, warnings, financePagination, financeScope);
     } else if (section === 'packs') {
       body = await handlePacks(supabase, packStatus, warnings);
+    } else if (section === 'orders') {
+      body = await handleOrders(supabase, orderStatus, warnings);
     } else if (section === 'all') {
       body = await handleAll(supabase, packStatus, warnings, financePagination, financeScope);
     } else {

@@ -48,6 +48,8 @@ import { resolveTripNumberPrefix } from '../utils/tripNumber';
 import { inventoryOperationId } from '../utils/inventoryReliability';
 import { parseTransportFeeFromLoadNote } from '../utils/truckRouteFee';
 import { parseInboundMovementNote } from '../utils/inboundMovementNote';
+import { applyFxLockToNote, type CrossBorderFxLock } from '../utils/crossBorderFxLock';
+import { isSupabaseConfigured, supabase } from './supabase';
 import { preferConfirmedHubReceivePack } from '../utils/hubReceivePack';
 import { findParentPackForItem, resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
 import { isPackagingStockInLineBarcode } from '../utils/inboundBarcode';
@@ -762,6 +764,39 @@ export async function getItemFirstInboundDate(id: string): Promise<Date | null> 
   return m ? new Date(m.created_at) : null;
 }
 
+async function persistFxLockBestEffort(item: InventoryItem, lock: CrossBorderFxLock): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  try {
+    const moves = await cloudListMovementsForItem(item.id);
+    const inbound = moves.find((row) => row.type === 'in');
+    if (inbound?.id) {
+      const nextNote = applyFxLockToNote(inbound.note || '', lock);
+      if (nextNote !== (inbound.note || '')) {
+        await supabase.from('inventory_stock_movements').update({ note: nextNote }).eq('id', inbound.id);
+      }
+    }
+  } catch {
+    // 目的站可能写不了发站入库流水
+  }
+  const barcode = item.barcode.trim();
+  if (!barcode) return;
+  try {
+    const { data, error } = await supabase
+      .from('inventory_order_tracking')
+      .select('id, inbound_note')
+      .eq('order_barcode', barcode);
+    if (error || !data?.length) return;
+    for (const row of data as Array<{ id: string; inbound_note?: string | null }>) {
+      const current = String(row.inbound_note || '');
+      const nextNote = applyFxLockToNote(current, lock);
+      if (nextNote === current) continue;
+      await supabase.from('inventory_order_tracking').update({ inbound_note: nextNote }).eq('id', row.id);
+    }
+  } catch {
+    // 追踪备注写失败不影响签收
+  }
+}
+
 export async function markCustomerSigned(
   id: string,
   operator: string,
@@ -774,8 +809,10 @@ export async function markCustomerSigned(
   const validationError = validateCustomerSignReceipt(receipt);
   if (validationError) throw svc(validationError);
 
+  const fxLock = receipt.fxLock;
   await cloudUpsertItem({
     ...item,
+    note: fxLock ? applyFxLockToNote(item.note || '', fxLock) : item.note,
     customer_signed_at: nowIso(),
     qty_on_hand: 0,
     packed_at: '',
@@ -787,6 +824,9 @@ export async function markCustomerSigned(
     customer_signed_by_operator: operator.trim(),
     updated_at: nowIso(),
   }, actingStore);
+  if (fxLock) {
+    await persistFxLockBestEffort(item, fxLock);
+  }
 }
 
 export async function updateItemInboundProfile(

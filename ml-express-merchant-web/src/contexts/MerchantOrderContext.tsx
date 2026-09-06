@@ -64,13 +64,7 @@ export function MerchantOrderProvider({
   const { language } = useLanguage();
   const [pendingOrders, setPendingOrders] = useState<MerchantPendingOrder[]>([]);
   const [showOrderAlert, setShowOrderAlert] = useState(false);
-  const [isVoiceEnabled, setIsVoiceEnabledState] = useState(() => {
-    try {
-      return localStorage.getItem(VOICE_STORAGE_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
+  const [isVoiceEnabled, setIsVoiceEnabledState] = useState(true);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastVoiceAtRef = useRef(0);
   const knownPendingIdsRef = useRef<Set<string>>(new Set());
@@ -88,6 +82,14 @@ export function MerchantOrderProvider({
     if (enabled) {
       void ensureDesktopNotificationPermission();
       playNewOrderChime();
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VOICE_STORAGE_KEY, '1');
+    } catch {
+      /* ignore */
     }
   }, []);
 

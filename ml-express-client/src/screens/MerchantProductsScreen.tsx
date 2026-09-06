@@ -591,7 +591,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                 />
                 <LinearGradient
                   colors={['rgba(0,0,0,0.38)', 'transparent', 'rgba(0,0,0,0.18)']}
-                  style={StyleSheet.absoluteFillObject}
+                  style={StyleSheet.absoluteFill}
                   pointerEvents="none"
                 />
                 <TouchableOpacity
@@ -736,7 +736,7 @@ export default function MerchantProductsScreen({ route, navigation }: any) {
                   pointerEvents="none"
                   colors={['rgba(0,0,0,0)', 'rgba(15,23,42,0.25)', 'rgba(15,23,42,0.62)']}
                   locations={[0, 0.45, 1]}
-                  style={StyleSheet.absoluteFillObject}
+                  style={StyleSheet.absoluteFill}
                 />
                 <TouchableOpacity
                   style={styles.detailCloseBtn}

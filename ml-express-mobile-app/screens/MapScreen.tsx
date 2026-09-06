@@ -173,7 +173,7 @@ export default function MapScreen({ navigation }: any) {
   const [navManualPlanning, setNavManualPlanning] = useState(false);
   const [optimizedPackagesWithCoords, setOptimizedPackagesWithCoords] = useState<PackageWithExtras[]>([]);
   const [isLocationTracking, setIsLocationTracking] = useState(false);
-  const [locationUpdateInterval, setLocationUpdateInterval] = useState<NodeJS.Timeout | null>(null);
+  const [locationUpdateInterval, setLocationUpdateInterval] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showSingleMapModal, setShowSingleMapModal] = useState(false);
@@ -219,11 +219,11 @@ export default function MapScreen({ navigation }: any) {
   const packagesCache = useRef<PackageWithExtras[]>([]);
   const lastLoadTime = useRef<number>(0);
   const CACHE_DURATION = 30000;
-  const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const networkListenerRef = useRef<any>(null);
   const appStateListenerRef = useRef<any>(null);
   const lastUpdateLocation = useRef<{lat: number, lng: number, time: number} | null>(null);
-  const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const locationIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastLocationConfigRef = useRef<{ accuracy: Location.Accuracy; timeInterval: number; distanceInterval: number; mode: string } | null>(null);
   const packageStartTimes = useRef<Record<string, number>>({});
   const pulseAnimations = useRef<Record<string, Animated.Value>>({});

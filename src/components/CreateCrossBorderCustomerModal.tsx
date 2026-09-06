@@ -18,6 +18,7 @@ import {
   createCrossBorderRegisteredCustomer,
   fetchCrossBorderRegisteredCustomers,
   fetchCrossBorderSalespersons,
+  updateCrossBorderRegisteredCustomer,
   type CrossBorderRegisteredCustomer,
   type CrossBorderSalesperson,
 } from '../services/inventoryConsoleService';
@@ -27,6 +28,7 @@ import {
   DEFAULT_CUSTOMER_NOTIFY_METHOD,
   customerNotifyAccountLabel,
   customerNotifyAccountPlaceholder,
+  normalizeCustomerNotifyMethod,
   type CustomerNotifyMethod,
 } from '../utils/customerNotifyMethod';
 import '../styles/crossBorderLogistics.css';
@@ -37,7 +39,9 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onCreated: (customer: CrossBorderRegisteredCustomer) => void;
+  onUpdated?: (customer: CrossBorderRegisteredCustomer) => void;
   existingCustomers?: CrossBorderRegisteredCustomer[];
+  editingCustomer?: CrossBorderRegisteredCustomer | null;
 };
 
 type FormState = {
@@ -56,7 +60,9 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
   open,
   onClose,
   onCreated,
+  onUpdated,
   existingCustomers = [],
+  editingCustomer = null,
 }) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
@@ -88,26 +94,42 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
     setError(null);
     setSubmitting(false);
     setShowCustomerPricing(false);
-    const hub = hubForRegionId('mandalay');
-    setRegionId('mandalay');
-    setForm({
-      customer_name: '',
-      phone: '',
-      delivery_region_id: hub.regionId,
-      delivery_area_code: hub.prefix,
-      address_notes: '',
-      salesperson_employee_code: '',
-      application_date: todayIsoDate(),
-      notify_method: DEFAULT_CUSTOMER_NOTIFY_METHOD,
-      notify_account: '',
-    });
+    if (editingCustomer) {
+      const hub = hubForRegionId(editingCustomer.delivery_region_id);
+      setRegionId(hub.regionId);
+      setForm({
+        customer_name: editingCustomer.customer_name,
+        phone: editingCustomer.phone || '',
+        delivery_region_id: hub.regionId,
+        delivery_area_code: hub.prefix || editingCustomer.delivery_area_code,
+        address_notes: editingCustomer.address_notes || '',
+        salesperson_employee_code: editingCustomer.salesperson_employee_code,
+        application_date: String(editingCustomer.application_date || '').slice(0, 10),
+        notify_method: normalizeCustomerNotifyMethod(editingCustomer.notify_method),
+        notify_account: editingCustomer.notify_account || '',
+      });
+    } else {
+      const hub = hubForRegionId('mandalay');
+      setRegionId('mandalay');
+      setForm({
+        customer_name: '',
+        phone: '',
+        delivery_region_id: hub.regionId,
+        delivery_area_code: hub.prefix,
+        address_notes: '',
+        salesperson_employee_code: '',
+        application_date: todayIsoDate(),
+        notify_method: DEFAULT_CUSTOMER_NOTIFY_METHOD,
+        notify_account: '',
+      });
+    }
 
     setLoadingSalespersons(true);
     fetchCrossBorderSalespersons()
       .then((rows) => setSalespersons(rows.filter((row) => row.status === 'active')))
       .catch(() => setSalespersons([]))
       .finally(() => setLoadingSalespersons(false));
-  }, [open]);
+  }, [open, editingCustomer]);
 
   useEffect(() => {
     if (!open) return;
@@ -125,7 +147,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
   const datePart = formatApplicationDateCompact(form.application_date);
   const salespersonPart = salespersonNumericSuffix(form.salesperson_employee_code);
 
-  const customerCode = useMemo(
+  const generatedCustomerCode = useMemo(
     () =>
       buildCrossBorderCustomerCode(
         form.delivery_area_code,
@@ -135,6 +157,10 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
       ),
     [form.delivery_area_code, form.application_date, form.salesperson_employee_code, dailySeq],
   );
+  const isEditing = Boolean(editingCustomer);
+  const customerCode = isEditing
+    ? editingCustomer?.customer_code || ''
+    : generatedCustomerCode;
 
   const pricingDestination = useMemo(
     () => destinationHubFromCustomerCode(customerCode, form.delivery_area_code),
@@ -171,7 +197,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
       );
       return;
     }
-    if (!form.salesperson_employee_code.trim()) {
+    if (!isEditing && !form.salesperson_employee_code.trim()) {
       setError(isEn ? 'Select salesperson code.' : '请选择推销员编码。');
       return;
     }
@@ -183,22 +209,46 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
     setSubmitting(true);
     setError(null);
     try {
-      const created = await createCrossBorderRegisteredCustomer({
-        customer_name: form.customer_name.trim(),
-        phone: form.phone.trim(),
-        delivery_region_id: form.delivery_region_id,
-        delivery_area_code: form.delivery_area_code,
-        address_notes: form.address_notes.trim(),
-        salesperson_employee_code: form.salesperson_employee_code.trim(),
-        application_date: form.application_date,
-        customer_code: customerCode,
-        notify_method: form.notify_method,
-        notify_account: form.notify_account.trim(),
-      });
-      onCreated(created);
+      if (isEditing && editingCustomer) {
+        const updated = await updateCrossBorderRegisteredCustomer({
+          id: editingCustomer.id,
+          customer_name: form.customer_name.trim(),
+          phone: form.phone.trim(),
+          delivery_region_id: form.delivery_region_id,
+          delivery_area_code: form.delivery_area_code,
+          address_notes: form.address_notes.trim(),
+          notify_method: form.notify_method,
+          notify_account: form.notify_account.trim(),
+        });
+        onUpdated?.(updated);
+      } else {
+        const created = await createCrossBorderRegisteredCustomer({
+          customer_name: form.customer_name.trim(),
+          phone: form.phone.trim(),
+          delivery_region_id: form.delivery_region_id,
+          delivery_area_code: form.delivery_area_code,
+          address_notes: form.address_notes.trim(),
+          salesperson_employee_code: form.salesperson_employee_code.trim(),
+          application_date: form.application_date,
+          customer_code: customerCode,
+          notify_method: form.notify_method,
+          notify_account: form.notify_account.trim(),
+        });
+        onCreated(created);
+      }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : isEn ? 'Create failed' : '创建失败');
+      setError(
+        err instanceof Error
+          ? err.message
+          : isEditing
+            ? isEn
+              ? 'Save failed'
+              : '保存失败'
+            : isEn
+              ? 'Create failed'
+              : '创建失败',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -225,12 +275,22 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
               {isEn ? 'Cross-border logistics' : '跨境物流'}
             </p>
             <h2 id="cbl-customer-create-title" className="cbl-pricing-modal__title">
-              {isEn ? 'Add customer' : '添加客户'}
+              {isEditing
+                ? isEn
+                  ? 'Edit customer'
+                  : '编辑客户'
+                : isEn
+                  ? 'Add customer'
+                  : '添加客户'}
             </h2>
             <p className="cbl-pricing-modal__sub">
-              {isEn
-                ? 'Name, notify account, and delivery city. The customer code builds as you fill the form.'
-                : '填写姓名、通知账号和送货城市。客户编码会随表单自动生成。'}
+              {isEditing
+                ? isEn
+                  ? 'Update phone, notify, city, and notes. The customer code stays the same so Inventory App lookups still work.'
+                  : '可改电话、通知、送货城市和备注。客户编码不变，Inventory App 仍按原编码查找。'
+                : isEn
+                  ? 'Name, notify account, and delivery city. The customer code builds as you fill the form.'
+                  : '填写姓名、通知账号和送货城市。客户编码会随表单自动生成。'}
             </p>
           </div>
           <button
@@ -328,6 +388,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
                     value={form.application_date}
                     onChange={(e) => setForm({ ...form, application_date: e.target.value })}
                     required
+                    disabled={isEditing}
                   />
                 </label>
               </div>
@@ -337,7 +398,7 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
                   value={form.salesperson_employee_code}
                   onChange={(e) => setForm({ ...form, salesperson_employee_code: e.target.value })}
                   required
-                  disabled={loadingSalespersons}
+                  disabled={loadingSalespersons || isEditing}
                 >
                   <option value="">
                     {loadingSalespersons
@@ -348,6 +409,13 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
                         ? 'Select salesperson'
                         : '请选择推销员'}
                   </option>
+                  {isEditing &&
+                  form.salesperson_employee_code &&
+                  !salespersons.some((row) => row.employee_code === form.salesperson_employee_code) ? (
+                    <option value={form.salesperson_employee_code}>
+                      {formatSalespersonEmployeeCodeDisplay(form.salesperson_employee_code)}
+                    </option>
+                  ) : null}
                   {salespersons.map((row) => (
                     <option key={row.id} value={row.employee_code}>
                       {formatSalespersonEmployeeCodeDisplay(row.employee_code)} · {row.name}
@@ -370,7 +438,13 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
               </h3>
               <div className="cbl-customer-code-card">
                 <span className="cbl-customer-code-card__label">
-                  {isEn ? 'Generated customer code' : '已生成客户编码'}
+                  {isEditing
+                    ? isEn
+                      ? 'Customer code (unchanged)'
+                      : '客户编码（不改）'
+                    : isEn
+                      ? 'Generated customer code'
+                      : '已生成客户编码'}
                 </span>
                 <div className="cbl-customer-code-card__value">{customerCode || '—'}</div>
                 <div className="cbl-customer-code-card__parts">
@@ -439,7 +513,17 @@ const CreateCrossBorderCustomerModal: React.FC<Props> = ({
               className="cbl-btn cbl-btn--primary cbl-customer-create-modal__submit"
               disabled={submitting}
             >
-              {submitting ? (isEn ? 'Saving…' : '保存中…') : isEn ? 'Create customer' : '创建客户'}
+              {submitting
+                ? isEn
+                  ? 'Saving…'
+                  : '保存中…'
+                : isEditing
+                  ? isEn
+                    ? 'Save changes'
+                    : '保存修改'
+                  : isEn
+                    ? 'Create customer'
+                    : '创建客户'}
             </button>
           </footer>
         </form>

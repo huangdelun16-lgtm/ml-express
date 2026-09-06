@@ -1,6 +1,9 @@
 import { adminAuthenticatedFetch } from './authService';
 import { rewritePublicStorageUrl } from '../utils/supabaseBrowserUrl';
 import type { SettlementSnapshot } from '../utils/yangonFinancePeriod';
+import type { OrderStatusFilter } from '../utils/inventoryOrderTracking';
+
+export type { OrderStatusFilter } from '../utils/inventoryOrderTracking';
 
 export type FinanceOriginAttributionGroup = {
   originKey: string;
@@ -64,6 +67,7 @@ export type StationReconciliationDetail = StationReconciliationSummary & {
 
 export type CrossBorderStationSummary = {
   collectedTotal: number;
+  collectedCny?: number | null;
   transportUnpaidTotal: number;
   transportPaidTotal: number;
   pendingInflowTotal: number;
@@ -122,6 +126,25 @@ export type InventoryPackRow = {
   hub_received_by_store_code?: string | null;
   hub_received_by_store_name?: string | null;
   completed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InventoryOrderRow = {
+  id: string;
+  pack_barcode: string;
+  order_barcode: string;
+  express_barcode: string;
+  order_name: string;
+  destination_code: string;
+  qty: number;
+  status: 'in_transit' | 'hub_received' | 'released_at_hub';
+  recipient_name: string;
+  recipient_phone: string;
+  inbound_store_name: string;
+  hub_received_at: string | null;
+  hub_received_by_store_code: string | null;
+  hub_received_by_store_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -192,6 +215,9 @@ export type InventoryExceptionConsoleRow = {
   reported_store_code: string;
   reported_hub_code: string;
   reported_operator: string;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  resolve_note?: string | null;
   created_at: string;
   photos?: InventoryExceptionConsolePhoto[];
 };
@@ -202,7 +228,9 @@ export type InventoryConsoleData = {
   transitStores: InventoryTransitStore[];
   stats: InventoryConsoleStats;
   recentPacks: InventoryPackRow[];
+  recentOrders?: InventoryOrderRow[];
   packStatusFilter: string;
+  orderStatusFilter?: string;
   transportFeeTotal?: number;
   openExceptionCount?: number;
   openExceptions?: InventoryExceptionConsoleRow[];
@@ -235,11 +263,16 @@ export type CrossBorderExpenseRow = {
   stationCode: string;
   stationName: string;
   statusLabel: string;
+  fxMmkPerCny?: number | null;
+  paidCurrency?: 'MMK' | 'CNY';
+  paidCny?: number;
 };
 
 export type CrossBorderFinanceSummary = {
   entryCount: number;
   collectedTotal: number;
+  /** 已锁定签收/预付的人民币合计；有未锁旧单时为 null */
+  collectedCny?: number | null;
   transportUnpaidTotal: number;
   transportPaidTotal: number;
   pendingInflowTotal: number;
@@ -399,14 +432,16 @@ type ConsoleSectionResponse = InventoryConsoleData & {
 };
 
 async function fetchInventoryConsoleSection(
-  section: 'overview' | 'finance' | 'packs',
+  section: 'overview' | 'finance' | 'packs' | 'orders',
   packStatus?: PackStatusFilter,
   financePagination?: { page: number; pageSize: number },
   period?: FinancePeriodParams | null,
+  orderStatus?: OrderStatusFilter,
 ): Promise<ConsoleSectionResponse> {
   const url = new URL('/.netlify/functions/inventory-admin-data', window.location.origin);
   url.searchParams.set('section', section);
   if (packStatus) url.searchParams.set('packStatus', packStatus);
+  if (orderStatus) url.searchParams.set('orderStatus', orderStatus);
   if (financePagination) {
     url.searchParams.set('financePage', String(financePagination.page));
     url.searchParams.set('financePageSize', String(financePagination.pageSize));
@@ -486,6 +521,27 @@ export async function fetchInventoryConsolePacks(
   return {
     recentPacks: payload.recentPacks ?? [],
     packStatusFilter: payload.packStatusFilter,
+    warnings: payload.warnings,
+  };
+}
+
+export async function fetchInventoryConsoleOrders(
+  orderStatus: OrderStatusFilter = 'active',
+): Promise<{
+  recentOrders: InventoryOrderRow[];
+  orderStatusFilter?: string;
+  warnings?: string[];
+}> {
+  const payload = await fetchInventoryConsoleSection(
+    'orders',
+    undefined,
+    undefined,
+    undefined,
+    orderStatus,
+  );
+  return {
+    recentOrders: payload.recentOrders ?? [],
+    orderStatusFilter: payload.orderStatusFilter,
     warnings: payload.warnings,
   };
 }
@@ -699,7 +755,27 @@ export async function createCrossBorderManualEntry(
   }
 }
 
-export const INVENTORY_TEST_DATA_CONFIRM_PHRASE = '清空测试数据';
+export const INVENTORY_TEST_DATA_CONFIRM_PHRASE = '清空全部跨境业务数据';
+
+export type InventoryExceptionCloseStatus = 'resolved' | 'cancelled';
+
+export async function closeInventoryException(payload: {
+  id: string;
+  status: InventoryExceptionCloseStatus;
+  resolveNote?: string;
+}): Promise<InventoryExceptionConsoleRow> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-exceptions', {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `关单失败 (${response.status})`);
+  }
+  return body.exception as InventoryExceptionConsoleRow;
+}
 
 export type InventoryTestDataClearResult = {
   ok: boolean;
@@ -712,6 +788,10 @@ export type InventoryTestDataClearResult = {
     stockMovements: number;
     storeItems: number;
     crossBorderManualEntries: number;
+    stationSettlements?: number;
+    agencyRemittances?: number;
+    exceptionPhotos?: number;
+    exceptions?: number;
   };
   clearedAt: string;
   message?: string;
@@ -908,6 +988,33 @@ export async function createCrossBorderRegisteredCustomer(
     throw new Error(payload.error || `创建失败 (${response.status})`);
   }
   return payload.customer as CrossBorderRegisteredCustomer;
+}
+
+export type UpdateCrossBorderRegisteredCustomerPayload = {
+  id: string;
+  customer_name: string;
+  phone: string;
+  delivery_region_id: string;
+  delivery_area_code: string;
+  address_notes: string;
+  notify_method?: string;
+  notify_account?: string;
+};
+
+export async function updateCrossBorderRegisteredCustomer(
+  payload: UpdateCrossBorderRegisteredCustomerPayload,
+): Promise<CrossBorderRegisteredCustomer> {
+  const response = await adminAuthenticatedFetch('/.netlify/functions/inventory-admin-cross-border-customers', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `保存失败 (${response.status})`);
+  }
+  return body.customer as CrossBorderRegisteredCustomer;
 }
 
 export type StationSettlementRow = {

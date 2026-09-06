@@ -29,6 +29,10 @@ export interface FinanceLedgerEntry {
   remittanceId?: string;
   remitDirection?: 'in' | 'out';
   deletable?: boolean;
+  /** 签收锁定：1 CNY = X MMK。已收行有值后不再跟活汇率变 */
+  fxMmkPerCny?: number | null;
+  paidCurrency?: 'MMK' | 'CNY';
+  paidCny?: number;
 }
 
 export interface FinanceLedgerSummary {

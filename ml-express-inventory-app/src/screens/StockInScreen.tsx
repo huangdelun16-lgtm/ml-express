@@ -65,6 +65,7 @@ export default function StockInScreen({ route, navigation }: Props) {
   const [totalFee, setTotalFee] = useState('');
   const [totalFeeManual, setTotalFeeManual] = useState(false);
   const [feeFormulaHint, setFeeFormulaHint] = useState('');
+  const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
   const [payCod, setPayCod] = useState(false);
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [note, setNote] = useState('');
@@ -129,8 +130,9 @@ export default function StockInScreen({ route, navigation }: Props) {
     const originHub = hubCode ?? (store ? resolveStoreHubCode(store) : '');
     let cancelled = false;
     void fetchCrossBorderRoutePerKg(originHub, destination, customerCode).then(
-      ({ perKg, originCode, destinationCode, usedLegacyFallback }) => {
+      ({ perKg, originCode, destinationCode, usedLegacyFallback, mmkPerCny: rate }) => {
         if (cancelled) return;
+        setMmkPerCny(rate);
         setFeeFormulaHint(
           formatCrossBorderFeeHint(
             originCode,
@@ -139,6 +141,7 @@ export default function StockInScreen({ route, navigation }: Props) {
             weightKg,
             usedLegacyFallback,
             customerCode.trim().toUpperCase(),
+            rate,
           ),
         );
         setTotalFee(String(calculateCrossBorderTotalFee(perKg, weightStr)));
@@ -454,6 +457,7 @@ export default function StockInScreen({ route, navigation }: Props) {
             feeFormulaHint={feeFormulaHint}
             canAutoTotalFee={canAutoTotalFee}
             totalFeeManual={totalFeeManual}
+            mmkPerCny={mmkPerCny}
             note={note}
             chain={{
               detail: step3Chain.propsFor('detail', { multiline: true }),

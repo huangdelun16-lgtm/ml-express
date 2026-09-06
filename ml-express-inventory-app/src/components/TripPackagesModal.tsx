@@ -148,7 +148,11 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(15,23,42,0.82)',
   },
   sheet: {

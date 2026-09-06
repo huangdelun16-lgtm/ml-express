@@ -48,4 +48,10 @@ describe('formatCrossBorderFeeHint', () => {
       'MDY260812005 · RUI → MDY 18000 MMK/kg × 2 kg',
     );
   });
+
+  it('shows CNY/kg plus booked MMK/kg when a rate is set', () => {
+    expect(formatCrossBorderFeeHint('RUI', 'MDY', 23500, 8, false, 'MDY260824001', 5000)).toBe(
+      'MDY260824001 · RUI → MDY ¥4.7/kg · 入账 23500 MMK/kg × 8 kg',
+    );
+  });
 });

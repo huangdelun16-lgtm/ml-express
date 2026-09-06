@@ -1,3 +1,5 @@
+import type { CrossBorderFxLock } from '../utils/crossBorderFxLock';
+
 export type CustomerSignPickupType = 'self' | 'proxy';
 
 export type SignaturePoint = { x: number; y: number };
@@ -8,6 +10,8 @@ export type CustomerSignReceiptInput = {
   pickupType: CustomerSignPickupType;
   proxyName?: string;
   signatureStrokes: SignatureStroke[];
+  /** 签收时锁定的汇率与实收币种；没有总部汇率时可以不传 */
+  fxLock?: CrossBorderFxLock;
 };
 
 export type CustomerSignReceipt = CustomerSignReceiptInput & {

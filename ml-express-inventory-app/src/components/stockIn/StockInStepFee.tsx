@@ -8,6 +8,7 @@ import { sanitizeNumberInput, stockUnitLabel } from '../../utils/itemFieldFormat
 import { useTranslation } from '../../i18n';
 import { colors, radius, space } from '../../theme';
 import ScanRefBanner from './ScanRefBanner';
+import CrossBorderQuotePreview from './CrossBorderQuotePreview';
 
 /** 入库向导暂不展示；自动计费与写入流水仍保留，订单详情继续显示 */
 const SHOW_TOTAL_FEE_FIELD = false;
@@ -40,6 +41,7 @@ export default function StockInStepFee({
   onTogglePrepaid,
   onTotalFeeChange,
   onNoteChange,
+  mmkPerCny,
 }: {
   scan: string;
   destination: string;
@@ -75,6 +77,7 @@ export default function StockInStepFee({
   onTogglePrepaid: () => void;
   onTotalFeeChange: (v: string) => void;
   onNoteChange: (v: string) => void;
+  mmkPerCny: number | null;
 }) {
   const { t } = useTranslation();
 
@@ -187,7 +190,13 @@ export default function StockInStepFee({
               <Text style={styles.feeHint}>{feeFormulaHint}</Text>
             ) : null}
           </>
-        ) : null}
+        ) : (
+          <CrossBorderQuotePreview
+            totalFeeMmk={Number(totalFee)}
+            hint={canAutoTotalFee && !totalFeeManual ? feeFormulaHint : ''}
+            mmkPerCny={mmkPerCny}
+          />
+        )}
         <InboundFormField
           label={t.stockIn.noteOptional}
           value={note}

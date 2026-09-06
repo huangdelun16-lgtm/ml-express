@@ -4,6 +4,7 @@ import {
   normalizePaymentLabel,
   parseInboundMovementNote,
 } from './inboundMovementNote';
+import { pickFxLock } from './crossBorderFxLock';
 import { parsePackagingStockInLineBarcode } from './inboundBarcode';
 import { ownershipKeyFromStoreCode } from './storeOwnership';
 import {
@@ -20,6 +21,7 @@ import { yangonNoonIsoFromYmd } from './yangonFinancePeriod';
 export type FinanceItemRow = {
   id: string;
   barcode: string;
+  note?: string | null;
   final_destination?: string | null;
   recipient_name?: string | null;
   customer_signed_at?: string | null;
@@ -185,6 +187,17 @@ function orderEntry(
   );
   const parsed = parseInboundFinanceNote(enrichedNote);
   const amount = parseFinanceAmount(parsed.totalFee);
+  const fxLock = pickFxLock(
+    parseInboundMovementNote(String(item?.note || '')).fxLock,
+    parseInboundMovementNote(enrichedNote).fxLock,
+  );
+  const fxFields = fxLock
+    ? {
+        fxMmkPerCny: fxLock.mmkPerCny,
+        paidCurrency: fxLock.paidCurrency,
+        paidCny: fxLock.paidCny,
+      }
+    : {};
   const destination = String(item?.final_destination || movement.destination || '').trim();
   const originKey = ownershipKeyFromStoreCode(movement.origin_store_code || '') || currentKey;
   const originLabel = ownerLabel(originKey, String(movement.origin_store_name || ''));
@@ -203,6 +216,7 @@ function orderEntry(
   if (parsed.paymentLabel === '预付') {
     return {
       ...base,
+      ...fxFields,
       id: `order:prepaid:${barcode}`,
       category: 'order_prepaid',
       title: '订单 · 已付款',
@@ -215,6 +229,7 @@ function orderEntry(
     const collected = Boolean(String(item?.customer_signed_at || '').trim());
     return {
       ...base,
+      ...fxFields,
       id: `order:${collected ? 'collected' : 'cod'}:${barcode}`,
       category: collected ? 'order_collected' : 'order_income_cod',
       title: collected ? '订单收入 · 已签收收款' : '订单收入 · 到付待收',
@@ -226,6 +241,7 @@ function orderEntry(
   if (amount > 0 && destination) {
     return {
       ...base,
+      ...fxFields,
       id: `order:fee:${barcode}`,
       category: 'order_income_cod',
       title: '订单费用',
@@ -335,6 +351,7 @@ export function collapsePackagingStockInOrderEntries(
         : 'order_income_cod';
     const primary =
       list.find((row) => parsePackagingStockInLineBarcode(row.barcode)?.index === 1) ?? list[0];
+    const lockRow = list.find((row) => row.fxMmkPerCny != null && row.fxMmkPerCny > 0);
     const title =
       category === 'order_prepaid'
         ? '订单 · 已付款'
@@ -346,6 +363,12 @@ export function collapsePackagingStockInOrderEntries(
       id: `order:pack:${base}`,
       category,
       title,
+      fxMmkPerCny: lockRow?.fxMmkPerCny,
+      paidCurrency: lockRow?.paidCurrency,
+      paidCny:
+        lockRow?.paidCurrency === 'CNY' && lockRow.fxMmkPerCny
+          ? amount / lockRow.fxMmkPerCny
+          : lockRow?.paidCny,
       amount,
       amountDisplay:
         amount > 0

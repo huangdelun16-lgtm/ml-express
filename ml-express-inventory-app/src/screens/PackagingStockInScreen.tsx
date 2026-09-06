@@ -18,6 +18,7 @@ import OnlineRequiredBanner from '../components/OnlineRequiredBanner';
 import ScanInputBar from '../components/ScanInputBar';
 import OrderBarcodeModal, { type OrderBarcodeData } from '../components/OrderBarcodeModal';
 import { InboundWizardFooter, InboundWizardHeader, type WizardStep } from '../components/stockIn/InboundWizardChrome';
+import CrossBorderQuotePreview from '../components/stockIn/CrossBorderQuotePreview';
 import { DimensionSpecField, LockedSuffixField } from '../components/StructuredItemFields';
 import { useAuth } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -110,6 +111,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
   const [payPrepaid, setPayPrepaid] = useState(false);
   const [batchNote, setBatchNote] = useState('');
   const [feeFormulaHint, setFeeFormulaHint] = useState('');
+  const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [barcodeModalData, setBarcodeModalData] = useState<OrderBarcodeData | null>(null);
@@ -181,9 +183,10 @@ export default function PackagingStockInScreen({ navigation }: Props) {
     const dest = normalizePackDestination(batchDestination);
     const weightKg = Number(batchWeightN.trim()) || 0;
     void (async () => {
-      const { perKg, originCode, destinationCode, usedLegacyFallback } =
+      const { perKg, originCode, destinationCode, usedLegacyFallback, mmkPerCny: rate } =
         await fetchCrossBorderRoutePerKg(originHub, dest, customerCode);
       if (cancelled) return;
+      setMmkPerCny(rate);
       setFeeFormulaHint(
         formatCrossBorderFeeHint(
           originCode,
@@ -192,6 +195,7 @@ export default function PackagingStockInScreen({ navigation }: Props) {
           weightKg,
           usedLegacyFallback,
           customerCode.trim().toUpperCase(),
+          rate,
         ),
       );
       setTotalFee(String(calculateCrossBorderTotalFee(perKg, batchWeightStr)));
@@ -669,7 +673,13 @@ export default function PackagingStockInScreen({ navigation }: Props) {
                     </Text>
                   </View>
                 </>
-              ) : null}
+              ) : (
+                <CrossBorderQuotePreview
+                  totalFeeMmk={grandTotalFee}
+                  hint={canAutoTotalFee && !totalFeeManual ? feeFormulaHint : ''}
+                  mmkPerCny={mmkPerCny}
+                />
+              )}
               <InboundFormField
                 label={t.stockIn.noteOptional}
                 value={batchNote}

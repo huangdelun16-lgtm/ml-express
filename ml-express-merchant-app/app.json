@@ -8,11 +8,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "description": "MARKET LINK EXPRESS - 专业的快递配送服务平台，提供快速、安全、可靠的包裹配送服务。支持实时追踪、多语言界面和智能路线规划。",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2E86AB"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -117,7 +112,24 @@
           ],
           "bluetoothAlwaysPermission": "MARKET LINK MERCHANT 需要使用蓝牙扫描并连接附近的小票打印机、标签打印机等设备。"
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-camera",
+      "expo-font",
+      "expo-notifications",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "backgroundColor": "#2E86AB",
+          "resizeMode": "contain",
+          "enableFullScreenImage_legacy": true
+        }
+      ],
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {

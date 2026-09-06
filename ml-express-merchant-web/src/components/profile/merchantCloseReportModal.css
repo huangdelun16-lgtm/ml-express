@@ -31,15 +31,20 @@
 
 .merchant-close-report__head h2 {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 900;
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  color: #f8fafc;
 }
 
 .merchant-close-report__head p {
-  margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.85rem;
+  margin: 0.4rem 0 0;
+  color: rgba(203, 213, 225, 0.82);
+  font-size: 0.8rem;
   font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
 }
 
 .merchant-close-report__x {
@@ -73,17 +78,31 @@
 .merchant-close-report__stat span,
 .merchant-close-report__money span {
   display: block;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.75rem;
+  color: rgba(203, 213, 225, 0.88);
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .merchant-close-report__stat strong,
 .merchant-close-report__money strong {
   display: block;
-  margin-top: 4px;
-  font-size: 1.25rem;
-  font-weight: 900;
+  margin-top: 0.35rem;
+  font-size: 1.42rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-close-report__money strong small {
+  margin-left: 0.28rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(148, 163, 184, 0.95);
+  vertical-align: 0.12em;
 }
 
 .merchant-close-report__money {
@@ -111,8 +130,11 @@
   padding: 5px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  font-size: 0.75rem;
+  color: #e2e8f0;
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 .merchant-close-report__hint {
@@ -131,14 +153,18 @@
 
 .merchant-close-report__stock-head h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #e2e8f0;
 }
 
 .merchant-close-report__stock-head span,
 .merchant-close-report__empty {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.8rem;
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 0.78rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .merchant-close-report__stock ul {
@@ -154,7 +180,18 @@
   padding: 0.55rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   font-size: 0.88rem;
-  font-weight: 700;
+}
+
+.merchant-close-report__stock li > span {
+  color: #f1f5f9;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.merchant-close-report__stock em {
+  flex-shrink: 0;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .merchant-close-report__stock em.is-out {

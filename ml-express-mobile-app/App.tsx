@@ -314,7 +314,7 @@ const GlobalOrderMonitor = () => {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    let checkSessionTimer: NodeJS.Timeout | null = null;
+    let checkSessionTimer: ReturnType<typeof setTimeout> | null = null;
 
     const checkLoginStatus = async () => {
       try {

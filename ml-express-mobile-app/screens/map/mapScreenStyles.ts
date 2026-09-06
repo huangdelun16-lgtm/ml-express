@@ -312,7 +312,11 @@ export const mapScreenStyles = StyleSheet.create({
     justifyContent: 'center' 
   },
   mapPausedContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: '#0f172a',
     alignItems: 'center',
     justifyContent: 'center',

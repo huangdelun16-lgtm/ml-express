@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,12 @@ import type {
 import { validateCustomerSignReceipt } from '../types/customerSignReceipt';
 import { svc } from '../errors/serviceError';
 import { fmt, formatServiceError, useTranslation } from '../i18n';
+import { fetchCrossBorderFxRate, formatCnyAmount, formatMmkAmount, mmkToCny } from '../utils/crossBorderFx';
+import {
+  buildSignFxLock,
+  parseFeeMmk,
+  type CrossBorderPaidCurrency,
+} from '../utils/crossBorderFxLock';
 
 export type CustomerSignFlowRequest = {
   itemIds: string[];
@@ -38,6 +44,18 @@ type Props = {
   resolveError?: (error: unknown) => string;
 };
 
+function feeLineText(
+  feeRaw: string | undefined,
+  mmkPerCny: number | null,
+  missingLabel: string,
+): string {
+  const feeMmk = parseFeeMmk(feeRaw);
+  if (feeMmk <= 0) return missingLabel;
+  const cny = mmkToCny(feeMmk, mmkPerCny);
+  const mmkText = `${formatMmkAmount(feeMmk)} MMK`;
+  return cny != null ? `${mmkText} · ¥${formatCnyAmount(cny)}` : mmkText;
+}
+
 export default function CustomerSignFlowModal({
   request,
   onClose,
@@ -52,20 +70,26 @@ export default function CustomerSignFlowModal({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState<InventoryItemDetail | null>(null);
+  const [details, setDetails] = useState<InventoryItemDetail[]>([]);
   const [formReady, setFormReady] = useState(false);
   const [signPhone, setSignPhone] = useState('');
   const [pickupType, setPickupType] = useState<CustomerSignPickupType>('self');
   const [proxyName, setProxyName] = useState('');
   const [signatureStrokes, setSignatureStrokes] = useState<SignatureStroke[]>([]);
+  const [payCurrency, setPayCurrency] = useState<CrossBorderPaidCurrency>('MMK');
+  const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
 
   useEffect(() => {
     if (!visible || !request || itemIds.length === 0) {
       setDetail(null);
+      setDetails([]);
       setFormReady(false);
       setSignPhone('');
       setPickupType('self');
       setProxyName('');
       setSignatureStrokes([]);
+      setPayCurrency('MMK');
+      setMmkPerCny(null);
       setLoading(false);
       setSubmitting(false);
       return;
@@ -77,22 +101,28 @@ export default function CustomerSignFlowModal({
 
     void (async () => {
       try {
-        const details = await Promise.all(itemIds.map((id) => getItemDetail(id)));
+        const [loadedRows, rate] = await Promise.all([
+          Promise.all(itemIds.map((id) => getItemDetail(id))),
+          fetchCrossBorderFxRate(),
+        ]);
         if (cancelled) return;
-        const loaded = details.find(Boolean);
+        const loadedDetails = loadedRows.filter((row): row is InventoryItemDetail => Boolean(row));
+        const loaded = loadedDetails[0];
         if (!loaded) throw svc('orderNotFoundOrDeleted');
         setDetail(loaded);
+        setDetails(loadedDetails);
+        setMmkPerCny(rate);
+        setPayCurrency('MMK');
 
-        const codItems = details.filter((row) => row?.payment_label === '到付');
+        const codItems = loadedDetails.filter((row) => row.payment_label === '到付');
         if (codItems.length > 0) {
           const feeLines = codItems
             .map((row, index) => {
-              const feeRaw = row?.total_fee?.trim();
-              const feeLine = feeRaw ? `${feeRaw} MMK` : t.hubReceive.feeNotRegistered;
+              const feeLine = feeLineText(row.total_fee, rate, t.hubReceive.feeNotRegistered);
               return batchCount > 1
                 ? fmt(t.sign.batchFeeLine, {
                     index: index + 1,
-                    name: row?.name ?? t.sign.orderFallback,
+                    name: row.name ?? t.sign.orderFallback,
                     fee: feeLine,
                   })
                 : fmt(t.sign.totalFeeLine, { fee: feeLine });
@@ -124,8 +154,21 @@ export default function CustomerSignFlowModal({
     };
   }, [visible, request, itemIds.join(','), batchCount, onClose, onError, resolveError, t]);
 
+  const hasCod = details.some((row) => row.payment_label === '到付');
+  const hasPrepaid = details.some((row) => row.payment_label === '预付');
+  const feeMmk = useMemo(
+    () => details.reduce((sum, row) => sum + parseFeeMmk(row.total_fee), 0),
+    [details],
+  );
+  const collectCny = mmkToCny(feeMmk, mmkPerCny);
+
   const submit = async () => {
     if (!request || !detail || submitting || itemIds.length === 0) return;
+
+    if (payCurrency === 'CNY' && (mmkPerCny == null || mmkPerCny <= 0)) {
+      feedbackService.notify(t.sign.needComplete, t.sign.cnyNeedsRate);
+      return;
+    }
 
     const payload: CustomerSignReceiptInput = {
       signPhone:
@@ -145,7 +188,16 @@ export default function CustomerSignFlowModal({
     setSubmitting(true);
     try {
       for (const id of itemIds) {
-        await markCustomerSigned(id, request.operator, request.store, payload);
+        const row = details.find((item) => item.id === id) ?? detail;
+        const lock = buildSignFxLock({
+          feeMmk: parseFeeMmk(row.total_fee),
+          currency: payCurrency,
+          mmkPerCny,
+        });
+        await markCustomerSigned(id, request.operator, request.store, {
+          ...payload,
+          fxLock: lock ?? undefined,
+        });
       }
       const refreshed = await getItemDetail(itemIds[0]);
       if (refreshed) onSuccess?.(refreshed, itemIds.length);
@@ -196,6 +248,73 @@ export default function CustomerSignFlowModal({
                   )}
                 </View>
               ) : null}
+
+              <View style={styles.payBox}>
+                <Text style={styles.fieldLabel}>{t.sign.payCurrency}</Text>
+                <View style={styles.choiceRow}>
+                  <Pressable
+                    style={[styles.choiceBtn, payCurrency === 'MMK' && styles.choiceBtnActive]}
+                    onPress={() => setPayCurrency('MMK')}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceBtnText,
+                        payCurrency === 'MMK' && styles.choiceBtnTextActive,
+                      ]}
+                    >
+                      {t.sign.payMmk}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.choiceBtn,
+                      payCurrency === 'CNY' && styles.choiceBtnActive,
+                      mmkPerCny == null && styles.choiceBtnDisabled,
+                    ]}
+                    onPress={() => {
+                      if (mmkPerCny == null) {
+                        feedbackService.notify(t.sign.needComplete, t.sign.cnyNeedsRate);
+                        return;
+                      }
+                      setPayCurrency('CNY');
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceBtnText,
+                        payCurrency === 'CNY' && styles.choiceBtnTextActive,
+                      ]}
+                    >
+                      {t.sign.payCny}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {feeMmk > 0 ? (
+                  <Text style={styles.payAmount}>
+                    {payCurrency === 'CNY' && collectCny != null
+                      ? fmt(t.sign.collectCny, { amount: formatCnyAmount(collectCny) })
+                      : fmt(t.sign.collectMmk, { amount: formatMmkAmount(feeMmk) })}
+                  </Text>
+                ) : null}
+
+                {mmkPerCny != null ? (
+                  <>
+                    <Text style={styles.payMeta}>
+                      {fmt(t.sign.rateLine, { rate: formatMmkAmount(mmkPerCny) })}
+                    </Text>
+                    <Text style={styles.payHint}>{t.sign.fxLockedHint}</Text>
+                  </>
+                ) : (
+                  <Text style={styles.payHint}>{t.sign.noRateHint}</Text>
+                )}
+
+                {hasPrepaid ? (
+                  <Text style={styles.payHint}>
+                    {hasCod ? t.sign.prepaidMixedHint : t.sign.prepaidLockHint}
+                  </Text>
+                ) : null}
+              </View>
 
               <Text style={styles.fieldLabel}>{t.sign.pickupMethod}</Text>
               <View style={styles.choiceRow}>
@@ -313,10 +432,21 @@ const styles = StyleSheet.create({
     borderColor: '#1f2937',
     gap: 4,
   },
+  payBox: {
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    gap: 8,
+  },
   batchBadge: { color: '#6ee7b7', fontSize: 12, fontWeight: '800', marginBottom: 2 },
   summaryTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '800' },
   summaryMeta: { color: '#94a3b8', fontSize: 13 },
   fieldLabel: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', marginTop: 4 },
+  payAmount: { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
+  payMeta: { color: '#7dd3fc', fontSize: 13, fontWeight: '700' },
+  payHint: { color: '#94a3b8', fontSize: 12, lineHeight: 18 },
   input: {
     backgroundColor: '#111827',
     borderWidth: 1,
@@ -338,6 +468,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111827',
   },
   choiceBtnActive: { borderColor: '#38bdf8', backgroundColor: '#172554' },
+  choiceBtnDisabled: { opacity: 0.45 },
   choiceBtnText: { color: '#94a3b8', fontSize: 14, fontWeight: '700' },
   choiceBtnTextActive: { color: '#bae6fd' },
   selfHint: { color: '#64748b', fontSize: 12, lineHeight: 18, marginTop: 2 },

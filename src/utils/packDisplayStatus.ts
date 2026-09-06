@@ -1,5 +1,35 @@
 export type PackDisplayStatus = 'pending_load' | 'loaded' | 'arrived' | 'completed';
 
+export type PackTransportFilter =
+  | 'active'
+  | 'in_transit'
+  | 'hub_received'
+  | 'completed'
+  | 'all';
+
+export function isPackDisplayFinished(pack: {
+  status?: string | null;
+  display_status?: PackDisplayStatus | null;
+}): boolean {
+  return pack.display_status === 'completed' || pack.status === 'completed';
+}
+
+/** 运输「进行中」跟展示状态走，已完成包归入「已完成」。 */
+export function matchesPackTransportFilter(
+  pack: {
+    status?: string | null;
+    display_status?: PackDisplayStatus | null;
+  },
+  packStatus: PackTransportFilter,
+): boolean {
+  if (!packStatus || packStatus === 'all') return true;
+  if (pack.status === 'cancelled') return false;
+  const finished = isPackDisplayFinished(pack);
+  if (packStatus === 'active') return !finished;
+  if (packStatus === 'completed') return finished;
+  return pack.status === packStatus;
+}
+
 export const PACK_DISPLAY_STATUS_LABELS: Record<PackDisplayStatus, { zh: string; en: string }> = {
   pending_load: { zh: '未装车', en: 'Not loaded' },
   loaded: { zh: '已装车', en: 'Loaded' },

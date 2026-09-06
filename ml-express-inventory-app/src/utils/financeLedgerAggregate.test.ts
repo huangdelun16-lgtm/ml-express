@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../services/supabase', () => ({
+  isSupabaseConfigured: () => false,
+  supabase: {},
+}));
+
 import type { FinanceLedgerEntry } from '../types/financeLedger';
 import {
   buildFinanceLedgerEntries,
@@ -32,6 +38,7 @@ describe('buildFinanceLedgerEntries', () => {
             final_destination: 'MDY',
             recipient_name: '客户',
             customer_signed_at: '2026-07-15T10:00:00Z',
+            note: '实收 MMK · 汇率 5000',
           },
         ],
         movements: [
@@ -88,6 +95,11 @@ describe('buildFinanceLedgerEntries', () => {
       'transport_cost',
       'manual_expense',
     ]);
+    expect(finance.find((entry) => entry.category === 'order_collected')).toMatchObject({
+      amount: 50000,
+      fxMmkPerCny: 5000,
+      paidCurrency: 'MMK',
+    });
     expect(finance.find((entry) => entry.category === 'transport_cost')).toMatchObject({
       barcode: 'PKG-1',
       paid: true,

@@ -147,7 +147,7 @@ const ProfilePage: React.FC = () => {
   const [lastOrderCheckTime, setLastOrderCheckTime] = useState<number>(
     Date.now(),
   ); // 🚀 新增：上次订单检测时间
-  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // 🚀 新增：是否开启语音提醒
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [pendingMerchantOrdersCount, setPendingMerchantOrdersCount] =
     useState(0); // 🚀 新增：待处理订单数
   const [productPriceMap, setProductPriceMap] = useState<

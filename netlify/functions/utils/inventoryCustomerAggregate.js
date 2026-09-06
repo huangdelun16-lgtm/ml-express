@@ -42,6 +42,9 @@ function parseInboundMovementNote(note) {
       totalFee = feeMatch[1];
       continue;
     }
+    if (/^(?:汇率|Rate|FX)\s+[\d.]+$/i.test(part) || /^(?:实收|Paid)\s+(?:MMK|CNY|[\d.]+\s*CNY)$/i.test(part)) {
+      continue;
+    }
     const normalized = normalizePaymentLabel(part);
     if (normalized === '到付' || normalized === '预付') {
       paymentLabel = normalized;

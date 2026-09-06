@@ -188,7 +188,7 @@ async function loadFinanceDataset(
         supabase
           .from('inventory_store_items')
           .select(
-            'id, barcode, final_destination, recipient_name, customer_signed_at, packed_bundle_barcode',
+            'id, barcode, note, final_destination, recipient_name, customer_signed_at, packed_bundle_barcode',
           )
           .or(itemScope)
           .order('updated_at', { ascending: false })

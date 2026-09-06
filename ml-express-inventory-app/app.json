@@ -8,11 +8,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "description": "Business logistics app for transit stations: inbound stock, packing, truck loading, hub receive, barcode scanning, and Supabase-backed inventory. Download from the App Store and sign in with your station store code.",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0f172a"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mlexpress.inventory",
@@ -72,7 +67,19 @@
           ],
           "bluetoothAlwaysPermission": "ML Inventory uses Bluetooth to scan nearby devices such as label printers."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "backgroundColor": "#0f172a",
+          "resizeMode": "contain",
+          "enableFullScreenImage_legacy": true
+        }
+      ],
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {

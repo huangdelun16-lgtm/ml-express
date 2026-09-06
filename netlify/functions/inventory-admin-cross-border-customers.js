@@ -2,6 +2,7 @@
  * Admin 跨境物流 — 登记客户 CRUD
  * GET  — 列表
  * POST — 创建
+ * PUT  — 编辑（不改客户编码 / 推销员 / 申请日期）
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -52,13 +53,13 @@ function parseBody(event) {
 
 exports.handler = async (event) => {
   const preflightResponse = handleCorsPreflight(event, {
-    allowedMethods: ['GET', 'POST', 'OPTIONS'],
+    allowedMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
   if (preflightResponse) return preflightResponse;
 
   const headers = getCorsHeaders(event, {
-    allowedMethods: ['GET', 'POST', 'OPTIONS'],
+    allowedMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
@@ -251,6 +252,92 @@ exports.handler = async (event) => {
         statusCode: 200,
         headers,
         body: JSON.stringify({ ok: true, customer: data }),
+      };
+    }
+
+    if (event.httpMethod === 'PUT') {
+      const body = parseBody(event);
+      const id = String(body.id || '').trim();
+      const customer_name = String(body.customer_name || '').trim();
+      const phone = String(body.phone || '').trim();
+      const delivery_region_id = String(body.delivery_region_id || '').trim();
+      const delivery_area_code = String(body.delivery_area_code || '').trim().toUpperCase();
+      const address_notes = String(body.address_notes || '').trim();
+      const notify_method = normalizeNotifyMethod(body.notify_method);
+      const notify_account = String(body.notify_account || '').trim();
+
+      if (!id) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: '缺少客户 id' }),
+        };
+      }
+      if (!customer_name) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: '请填写客户名称' }),
+        };
+      }
+      if (!delivery_region_id || !delivery_area_code) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: '请选择送货地址（城市）' }),
+        };
+      }
+
+      const now = new Date().toISOString();
+      const payload = {
+        customer_name,
+        phone,
+        delivery_region_id,
+        delivery_area_code,
+        address_notes,
+        notify_method,
+        notify_account,
+        updated_at: now,
+      };
+
+      let updated = await supabase
+        .from('cross_border_customers')
+        .update(payload)
+        .eq('id', id)
+        .select(CUSTOMER_SELECT)
+        .maybeSingle();
+      if (updated.error && isMissingNotifyAccountColumn(updated.error)) {
+        const { notify_account: _droppedAccount, ...withoutAccount } = payload;
+        updated = await supabase
+          .from('cross_border_customers')
+          .update(withoutAccount)
+          .eq('id', id)
+          .select(CUSTOMER_SELECT_WITHOUT_ACCOUNT)
+          .maybeSingle();
+      }
+      if (updated.error && isMissingNotifyMethodColumn(updated.error)) {
+        const { notify_method: _droppedMethod, notify_account: _droppedAccount, ...withoutNotify } =
+          payload;
+        updated = await supabase
+          .from('cross_border_customers')
+          .update(withoutNotify)
+          .eq('id', id)
+          .select(CUSTOMER_SELECT_WITHOUT_NOTIFY)
+          .maybeSingle();
+      }
+      if (updated.error) throw updated.error;
+      if (!updated.data) {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ error: '未找到该登记客户' }),
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ ok: true, customer: updated.data }),
       };
     }
 

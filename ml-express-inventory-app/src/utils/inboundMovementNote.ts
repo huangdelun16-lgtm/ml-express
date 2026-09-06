@@ -1,5 +1,7 @@
 /** 解析入库流水 note（总费用 · 付款方式 · 用户备注）— 支持中/英/缅入库标签 */
 
+import { isFxLockNotePart, parseFxLockFromNote, type CrossBorderFxLock } from './crossBorderFxLock';
+
 const FEE_LABEL_PATTERN = /^(?:总费用|Total fee|ပို့ဆောင်ခ)\s+([\d.]+)\s*MMK$/i;
 
 /** 付款方式归一化为中文业务标签（到付 / 预付） */
@@ -16,6 +18,7 @@ export function parseInboundMovementNote(note: string): {
   totalFee?: string;
   paymentLabel?: string;
   userNote?: string;
+  fxLock?: CrossBorderFxLock;
 } {
   const trimmed = note.trim();
   if (!trimmed) return {};
@@ -31,6 +34,9 @@ export function parseInboundMovementNote(note: string): {
       totalFee = feeMatch[1];
       continue;
     }
+    if (isFxLockNotePart(part)) {
+      continue;
+    }
     const normalized = normalizePaymentLabel(part);
     if (normalized === '到付' || normalized === '预付') {
       paymentLabel = normalized;
@@ -39,10 +45,12 @@ export function parseInboundMovementNote(note: string): {
     userParts.push(part);
   }
 
+  const fxLock = parseFxLockFromNote(trimmed);
   return {
     totalFee,
     paymentLabel,
     userNote: userParts.length ? userParts.join(' · ') : undefined,
+    fxLock: fxLock ?? undefined,
   };
 }
 

@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../services/supabase', () => ({
+  isSupabaseConfigured: () => false,
+  supabase: {},
+}));
+
 import { inboundNoteHasFeeOrPayment, parseInboundMovementNote } from './inboundMovementNote';
 
 describe('parseInboundMovementNote', () => {
@@ -24,5 +30,17 @@ describe('parseInboundMovementNote', () => {
   it('detects fee or payment in note', () => {
     expect(inboundNoteHasFeeOrPayment('Total fee 100 MMK · Prepaid')).toBe(true);
     expect(inboundNoteHasFeeOrPayment('仅备注')).toBe(false);
+  });
+
+  it('keeps FX lock out of the user note and still reads the MMK fee', () => {
+    const parsed = parseInboundMovementNote('总费用 188000 MMK · 到付 · 实收 37.6 CNY · 汇率 5000');
+    expect(parsed.totalFee).toBe('188000');
+    expect(parsed.paymentLabel).toBe('到付');
+    expect(parsed.userNote).toBeUndefined();
+    expect(parsed.fxLock).toEqual({
+      paidCurrency: 'CNY',
+      mmkPerCny: 5000,
+      paidCny: 37.6,
+    });
   });
 });

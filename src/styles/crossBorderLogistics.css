@@ -157,6 +157,34 @@
   color: #94a3b8;
 }
 
+button.cbl-stat,
+.cbl-stat--btn {
+  font-family: inherit;
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cbl-stat--btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(14, 165, 233, 0.45);
+}
+
+.cbl-stat--btn.is-active {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.22);
+}
+
+.cbl-view-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-right: 10px;
+  margin-right: 2px;
+  border-right: 1px solid rgba(148, 163, 184, 0.28);
+}
+
 .cbl-io-overview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -206,7 +234,7 @@
   color: #dc2626;
 }
 
-.cbl-io-overview-card__amount span {
+.cbl-io-overview-card__amount > span:not(.cbl-money) {
   font-size: 0.85rem;
   font-weight: 700;
   color: #94a3b8;
@@ -1376,6 +1404,7 @@
   border: 1px solid var(--cbl-border);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
   overflow: hidden;
+  scroll-margin-top: 16px;
 }
 
 .cbl-card__head {
@@ -1568,8 +1597,15 @@
   color: #0f172a;
 }
 
+@media (max-width: 1100px) {
+  .cbl-page--standalone .cbl-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
-  .cbl-stats {
+  .cbl-stats,
+  .cbl-page--standalone .cbl-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1587,7 +1623,8 @@
     padding: 16px;
   }
 
-  .cbl-stats {
+  .cbl-stats,
+  .cbl-page--standalone .cbl-stats {
     grid-template-columns: 1fr;
   }
 }
@@ -1861,6 +1898,17 @@
   max-width: min(420px, 80vw);
 }
 
+.cbl-pricing-modal__filter--fx input {
+  width: 110px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .cbl-pricing-modal__customer-lock {
   font-size: 0.88rem;
   font-weight: 700;
@@ -1943,8 +1991,15 @@
   color: #94a3b8;
 }
 
+.cbl-pricing-modal__matrix-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .cbl-pricing-modal__matrix-input {
-  width: 72px;
+  width: 80px;
   max-width: 100%;
   padding: 6px 4px;
   border-radius: 8px;
@@ -1953,6 +2008,13 @@
   font-size: 0.78rem;
   text-align: right;
   color: #0f172a;
+}
+
+.cbl-pricing-modal__matrix-mmk {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
 }
 
 .cbl-pricing-modal__matrix-input:focus {
@@ -2156,8 +2218,88 @@
 .cbl-standalone-header__meta {
   margin: 8px 0 0;
   font-size: 0.78rem;
-  font-weight: 500;
-  color: rgba(148, 163, 184, 0.95);
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.cbl-fx-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cbl-fx-bar__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.cbl-fx-bar__input {
+  width: 110px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(226, 232, 240, 0.45);
+  background: rgba(15, 23, 42, 0.45);
+  color: #f8fafc;
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cbl-fx-bar__input:focus {
+  outline: none;
+  border-color: #5eead4;
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.25);
+}
+
+.cbl-fx-bar__unit,
+.cbl-fx-bar__hint {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.cbl-fx-bar__save {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
+.cbl-money {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cbl-money-ccy {
+  font-size: 0.72em;
+  font-weight: 700;
+  color: inherit;
+  opacity: 0.72;
+}
+
+.cbl-money-sub {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.cbl-page--standalone .cbl-money-sub {
+  color: #cbd5e1;
+}
+
+.cbl-io-overview-card__amount .cbl-money-main {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.cbl-io-overview-card__amount .cbl-money-sub {
+  margin-top: 4px;
+  font-size: 0.82rem;
 }
 
 .cbl-standalone-header__actions {
@@ -2240,6 +2382,11 @@
   letter-spacing: -0.01em;
 }
 
+.cbl-page--standalone .cbl-customer-section-title {
+  color: #f8fafc;
+  font-weight: 750;
+}
+
 .cbl-page--standalone .cbl-card__head {
   background: transparent;
   border-bottom-color: rgba(148, 163, 184, 0.18);
@@ -2251,21 +2398,37 @@
 
 .cbl-page--standalone .cbl-card-hint,
 .cbl-page--standalone .cbl-finance-hint {
-  color: #cbd5e1;
+  color: #f1f5f9;
   font-size: 0.82rem;
   line-height: 1.55;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.cbl-page--standalone .cbl-dim {
-  color: #94a3b8;
-  font-weight: 500;
+.cbl-page--standalone .cbl-dim,
+.cbl-page--standalone .cbl-table td.cbl-dim {
+  color: #e2e8f0;
+  font-weight: 600;
 }
 
 .cbl-page--standalone .cbl-empty {
-  color: #cbd5e1;
-  font-size: 0.88rem;
+  color: #f8fafc;
+  font-size: 0.9rem;
   line-height: 1.55;
+  font-weight: 600;
+}
+
+.cbl-page--standalone .cbl-customer-name-btn,
+.cbl-page--standalone .cbl-customer-name-btn__name {
+  color: #5eead4;
+}
+
+.cbl-page--standalone .cbl-customer-name-btn__phone {
+  color: #e2e8f0;
+}
+
+.cbl-page--standalone .cbl-customer-name-btn:hover,
+.cbl-page--standalone .cbl-customer-name-btn:hover .cbl-customer-name-btn__name {
+  color: #99f6e4;
 }
 
 .cbl-page--standalone .cbl-table th {
@@ -2285,6 +2448,10 @@
 
 .cbl-page--standalone .cbl-table tbody tr:hover td {
   background: rgba(30, 41, 59, 0.45);
+}
+
+.cbl-page--standalone .cbl-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .cbl-page--standalone .cbl-stat,
@@ -2314,6 +2481,27 @@
   font-weight: 550;
 }
 
+.cbl-page--standalone .cbl-stat--btn.is-active {
+  border-color: #2c98a6;
+  box-shadow: 0 0 0 2px rgba(44, 152, 166, 0.35);
+}
+
+.cbl-page--standalone .cbl-chip {
+  background: rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.42);
+}
+
+.cbl-page--standalone .cbl-chip.is-active {
+  background: #2c98a6;
+  border-color: #2c98a6;
+  color: #fff;
+}
+
+.cbl-page--standalone .cbl-view-switch {
+  border-right-color: rgba(148, 163, 184, 0.35);
+}
+
 .cbl-page--standalone .cbl-io-overview-card__title {
   font-weight: 800;
   color: #334155;
@@ -2334,7 +2522,7 @@
 }
 
 .cbl-page--standalone .cbl-expense-summary__label {
-  color: #cbd5e1;
+  color: #f1f5f9;
   font-weight: 600;
 }
 
@@ -2353,8 +2541,9 @@
   font-weight: 700;
 }
 
-.cbl-page--standalone .cbl-expense-detail__sub {
-  color: #94a3b8;
+.cbl-page--standalone .cbl-expense-detail__sub,
+.cbl-page--standalone .cbl-finance-unit {
+  color: #e2e8f0;
 }
 
 .cbl-page--standalone .cbl-finance-count {
@@ -2362,8 +2551,25 @@
   font-weight: 800;
 }
 
-.cbl-page--standalone .cbl-finance-unit {
-  color: #94a3b8;
+.cbl-page--standalone .cbl-finance-cell--collected,
+.cbl-page--standalone .cbl-finance-btn--collected {
+  color: #7dd3fc;
+}
+
+.cbl-page--standalone .cbl-io-cell__sub {
+  color: #e2e8f0;
+}
+
+.cbl-page--standalone .cbl-io-cell__main--in {
+  color: #4ade80;
+}
+
+.cbl-page--standalone .cbl-io-cell__main--out {
+  color: #f87171;
+}
+
+.cbl-page--standalone .cbl-finance-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .cbl-page--standalone .cbl-code {
@@ -2381,20 +2587,28 @@
 
 .cbl-page--standalone .cbl-pagination__info,
 .cbl-page--standalone .cbl-pagination__size {
-  color: #cbd5e1;
+  color: #f1f5f9;
   font-weight: 600;
 }
 
 .cbl-page--standalone .cbl-pagination__btn,
 .cbl-page--standalone .cbl-pagination__size select {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(148, 163, 184, 0.35);
-  color: #f1f5f9;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(226, 232, 240, 0.45);
+  color: #f8fafc;
+  font-weight: 700;
+  opacity: 1;
 }
 
 .cbl-page--standalone .cbl-pagination__btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.cbl-page--standalone .cbl-pagination__btn:disabled {
+  opacity: 1;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(226, 232, 240, 0.38);
 }
 
 .cbl-page--standalone .cbl-alert--error {
@@ -3175,6 +3389,33 @@
   color: #334155;
   font-size: 0.92rem;
   line-height: 1.5;
+}
+
+.cbl-exception-close-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: #475569;
+}
+
+.cbl-exception-close-field textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+  color: #0f172a;
+}
+
+.cbl-exception-close-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .cbl-exception-photos-grid {

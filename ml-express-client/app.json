@@ -8,11 +8,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "description": "MARKET LINK EXPRESS - 专业的快递配送服务平台，提供快速、安全、可靠的包裹配送服务。支持实时追踪、多语言界面和智能路线规划。",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2C98A6"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -101,7 +96,23 @@
         {
           "locationWhenInUsePermission": "MARKET LINK EXPRESS needs access to your location to provide accurate delivery services and track packages."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-camera",
+      "expo-font",
+      "expo-notifications",
+      "expo-sqlite",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "backgroundColor": "#2C98A6",
+          "resizeMode": "contain",
+          "enableFullScreenImage_legacy": true
+        }
+      ],
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {

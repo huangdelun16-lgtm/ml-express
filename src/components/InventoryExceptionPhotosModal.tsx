@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { InventoryExceptionConsoleRow } from '../services/inventoryConsoleService';
+import {
+  closeInventoryException,
+  type InventoryExceptionCloseStatus,
+  type InventoryExceptionConsoleRow,
+} from '../services/inventoryConsoleService';
 import '../styles/crossBorderLogistics.css';
 
 type Props = {
@@ -9,6 +13,7 @@ type Props = {
   isEn: boolean;
   typeLabel: string;
   onClose: () => void;
+  onClosed?: (row: InventoryExceptionConsoleRow) => void;
 };
 
 const InventoryExceptionPhotosModal: React.FC<Props> = ({
@@ -17,24 +22,54 @@ const InventoryExceptionPhotosModal: React.FC<Props> = ({
   isEn,
   typeLabel,
   onClose,
+  onClosed,
 }) => {
   const [enlargedUrl, setEnlargedUrl] = useState<string | null>(null);
+  const [resolveNote, setResolveNote] = useState('');
+  const [busyStatus, setBusyStatus] = useState<InventoryExceptionCloseStatus | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!open) setEnlargedUrl(null);
+    if (!open) {
+      setEnlargedUrl(null);
+      setResolveNote('');
+      setBusyStatus(null);
+      setError('');
+    }
   }, [open]);
 
   if (!open || !row) return null;
 
   const photos = row.photos ?? [];
   const barcode = row.express_barcode || row.item_barcode;
+  const canClose = row.status === 'open';
+  const busy = busyStatus != null;
+
+  const handleCloseException = async (status: InventoryExceptionCloseStatus) => {
+    if (!canClose || busy) return;
+    setBusyStatus(status);
+    setError('');
+    try {
+      const updated = await closeInventoryException({
+        id: row.id,
+        status,
+        resolveNote,
+      });
+      onClosed?.(updated);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : isEn ? 'Close failed' : '关单失败');
+    } finally {
+      setBusyStatus(null);
+    }
+  };
 
   return createPortal(
     <div
       className="store-form-overlay cbl-create-overlay"
       role="presentation"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !busy) onClose();
       }}
     >
       <div
@@ -47,7 +82,7 @@ const InventoryExceptionPhotosModal: React.FC<Props> = ({
         <header className="cbl-pricing-modal__head">
           <div>
             <h2 id="cbl-exception-photos-title" className="cbl-pricing-modal__title">
-              {isEn ? 'Exception photos' : '异常件现场照片'}
+              {isEn ? 'Exception review' : '异常件处理'}
             </h2>
             <p className="cbl-pricing-modal__sub">
               {typeLabel}
@@ -59,6 +94,7 @@ const InventoryExceptionPhotosModal: React.FC<Props> = ({
             type="button"
             className="cbl-pricing-modal__close"
             onClick={onClose}
+            disabled={busy}
             aria-label={isEn ? 'Close' : '关闭'}
           >
             ✕
@@ -88,7 +124,61 @@ const InventoryExceptionPhotosModal: React.FC<Props> = ({
               ))}
             </div>
           )}
+
+          {canClose ? (
+            <label className="cbl-exception-close-field">
+              <span>{isEn ? 'HQ note (optional)' : '总部备注（可选）'}</span>
+              <textarea
+                rows={2}
+                value={resolveNote}
+                onChange={(e) => setResolveNote(e.target.value)}
+                disabled={busy}
+                placeholder={
+                  isEn
+                    ? 'Visible to station staff after close'
+                    : '关单后站点 App 可见'
+                }
+              />
+            </label>
+          ) : null}
+
+          {error ? (
+            <div className="cbl-pricing-modal__alert cbl-pricing-modal__alert--error">{error}</div>
+          ) : null}
         </div>
+
+        {canClose ? (
+          <footer className="cbl-pricing-modal__foot cbl-exception-close-foot">
+            <button
+              type="button"
+              className="cbl-btn cbl-btn--danger-outline"
+              disabled={busy}
+              onClick={() => void handleCloseException('cancelled')}
+            >
+              {busyStatus === 'cancelled'
+                ? isEn
+                  ? 'Rejecting…'
+                  : '驳回中…'
+                : isEn
+                  ? 'Reject'
+                  : '驳回'}
+            </button>
+            <button
+              type="button"
+              className="cbl-btn cbl-btn--primary"
+              disabled={busy}
+              onClick={() => void handleCloseException('resolved')}
+            >
+              {busyStatus === 'resolved'
+                ? isEn
+                  ? 'Closing…'
+                  : '关单中…'
+                : isEn
+                  ? 'Mark resolved'
+                  : '关单'}
+            </button>
+          </footer>
+        ) : null}
       </div>
 
       {enlargedUrl ? (

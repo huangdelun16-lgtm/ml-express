@@ -39,9 +39,37 @@ function resolvePackDisplayStatusFromTracking(packRow, qtyOnHand) {
   return resolvePackDisplayStatus({ loaded }, packRow.status);
 }
 
+/**
+ * 运输筛选跟展示状态走：App 把「已装车且到站/拆包」标成已完成，
+ * 这类包不能再出现在「进行中」。
+ */
+function packStatusesForQuery(packStatus) {
+  if (packStatus === 'in_transit') return ['in_transit'];
+  if (packStatus === 'hub_received') return ['hub_received'];
+  if (packStatus === 'completed') return ['completed', 'hub_received', 'split_at_hub'];
+  if (packStatus === 'active') return ['in_transit', 'hub_received', 'split_at_hub'];
+  return null;
+}
+
+function isPackDisplayFinished(pack) {
+  return pack.display_status === 'completed' || pack.status === 'completed';
+}
+
+function matchesPackTransportFilter(pack, packStatus) {
+  if (!packStatus || packStatus === 'all') return true;
+  if (pack.status === 'cancelled') return false;
+  const finished = isPackDisplayFinished(pack);
+  if (packStatus === 'active') return !finished;
+  if (packStatus === 'completed') return finished;
+  return pack.status === packStatus;
+}
+
 module.exports = {
   PACK_DISPLAY_LABEL,
   resolvePackDisplayStatus,
   inferPackLoadedFromTracking,
   resolvePackDisplayStatusFromTracking,
+  packStatusesForQuery,
+  isPackDisplayFinished,
+  matchesPackTransportFilter,
 };

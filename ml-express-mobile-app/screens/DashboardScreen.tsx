@@ -872,7 +872,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   cardOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
   moduleIconContainer: {

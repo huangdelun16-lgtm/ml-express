@@ -1,6 +1,7 @@
 /**
- * Admin 跨境物流 — 一键清空 Inventory 云端全部跨境业务数据
- * （快递明细、包装、到站签收、在途追踪、流水、跨境会计手工账）
+ * Admin 跨境物流 — 一键清空云端全部跨境业务数据
+ * （快递明细、包装、到站签收、在途追踪、流水、跨境会计、结算、代转、异常件）
+ * 不删中转站账号、推销员、登记客户、计费。
  * 需 admin 角色 + 登录密码 + 确认短语
  */
 
@@ -10,7 +11,7 @@ const { getAdminTokenFromEvent } = require('./utils/adminToken');
 const { verifyLogin } = require('./admin-password');
 const { getCorsHeaders, handleCorsPreflight } = require('./utils/cors');
 
-const CONFIRM_PHRASE = '清空测试数据';
+const CONFIRM_PHRASE = '清空全部跨境业务数据';
 
 
 function parseBody(event) {
@@ -125,6 +126,8 @@ exports.handler = async (event) => {
       crossBorderManualEntries: 0,
       stationSettlements: 0,
       agencyRemittances: 0,
+      exceptionPhotos: 0,
+      exceptions: 0,
     };
 
     deleted.orderTracking = await wipeTable(supabase, 'inventory_order_tracking');
@@ -144,6 +147,8 @@ exports.handler = async (event) => {
     );
     deleted.stationSettlements = await wipeTable(supabase, 'inventory_station_settlements');
     deleted.agencyRemittances = await wipeTable(supabase, 'inventory_agency_remittances');
+    deleted.exceptionPhotos = await wipeTable(supabase, 'inventory_exception_photos');
+    deleted.exceptions = await wipeTable(supabase, 'inventory_exceptions');
 
     const clearedAt = new Date().toISOString();
     const { error: settingsErr } = await supabase.from('system_settings').upsert(
@@ -152,7 +157,7 @@ exports.handler = async (event) => {
         settings_key: 'inventory.platform_test_data_cleared_at',
         settings_value: clearedAt,
         description:
-          'Admin 清空跨境物流测试数据；Inventory App 同步时会清除本机缓存并避免把旧数据推回云端',
+          'Admin 清空全部跨境业务数据；Inventory App 同步时会清除本机缓存并避免把旧数据推回云端',
         updated_by: auth.user.username,
         updated_at: clearedAt,
       },
@@ -170,7 +175,7 @@ exports.handler = async (event) => {
         deleted,
         clearedAt,
         message:
-          '云端跨境物流数据已清空（快递明细、包装、到站签收、在途追踪、流水、跨境会计）。请在各 Inventory App（APK/Expo）打开「设置 → 立即同步」，本机对应数据将一并移除。',
+          '云端全部跨境业务数据已清空（快递明细、包装、到站/在途追踪、流水、跨境会计、结算、代转、异常件）。中转站账号、推销员、登记客户和计费保留。请在各 Inventory App 打开「设置 → 立即同步」。',
       }),
     };
   } catch (error) {

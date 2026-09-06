@@ -152,13 +152,21 @@ const PackageLoadingAnimation: React.FC<PackageLoadingAnimationProps> = ({
 
 const styles = StyleSheet.create({
   overlayWrap: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(232,244,250,0.72)',
   },
   card: {
