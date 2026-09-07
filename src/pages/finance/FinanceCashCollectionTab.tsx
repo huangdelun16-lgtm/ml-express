@@ -1,6 +1,6 @@
 // @ts-nocheck — 从 FinanceManagement 原样搬出的 Tab JSX；类型由父组件工作区承担。
 import React from "react";
-import { packageService, Package } from "../../services/supabase";
+import { packageService } from "../../services/supabase";
 import { feedbackService } from "../../services/FeedbackService";
 import {
   REGIONS,
@@ -13,7 +13,6 @@ import { useFinanceWorkspace } from "./FinanceWorkspace";
 
 const FinanceCashCollectionTab: React.FC = () => {
   const {
-    activeTab,
     cashCollectionDate,
     cashDetailDateFilter,
     cashDetailEndDate,
@@ -23,7 +22,6 @@ const FinanceCashCollectionTab: React.FC = () => {
     couriers,
     currentRegionPrefix,
     deliveryStores,
-    extrasLoading,
     getCashDetailDeliveryLineCashOnly,
     getCashDetailMerchantRiderCodMmk,
     getCashDetailPlatformDeliveryBalanceMmk,
@@ -49,7 +47,6 @@ const FinanceCashCollectionTab: React.FC = () => {
     showCashSettlementReminder,
     showYesterdayCashUnsettledReminder,
     t,
-    width
   } = useFinanceWorkspace();
 
   return (

@@ -22,9 +22,11 @@ import { listInventoryExceptions } from '../services/inventoryExceptionService';
 import type { InventoryExceptionRecord } from '../types/inventoryException';
 import type { InventoryItemDetail } from '../types/inventory';
 import { exceptionTargetFromItem } from '../utils/inventoryException';
-import { canMarkCustomerSigned } from '../utils/customerSign';
+import { canMarkCustomerSigned, isDestinationHubViewer } from '../utils/customerSign';
 import type { ArrivalNotifyTarget } from '../utils/arrivalNotify';
 import { resolvePackagingStockInItemLabel } from '../utils/packItemSequence';
+import { fetchCrossBorderFxRate } from '../utils/crossBorderFx';
+import { pickNotesFxLock } from '../utils/inboundMovementNote';
 
 type Props = {
   visible: boolean;
@@ -33,7 +35,11 @@ type Props = {
   onSigned?: () => void;
 };
 
-function mapDetailToInvoice(detail: InventoryItemDetail): InboundInvoiceData {
+function mapDetailToInvoice(
+  detail: InventoryItemDetail,
+  liveRate: number | null,
+  showCnyQuote: boolean,
+): InboundInvoiceData {
   return {
     barcode: detail.barcode,
     inputBarcode: detail.input_barcode?.trim() || undefined,
@@ -52,6 +58,10 @@ function mapDetailToInvoice(detail: InventoryItemDetail): InboundInvoiceData {
     note: detail.inbound_note,
     storeName: detail.inbound_store_name?.trim() || undefined,
     signReceipt: detail.sign_receipt,
+    signed: Boolean(detail.customer_signed_at?.trim() || detail.sign_receipt),
+    fxLock: pickNotesFxLock(detail.note, detail.inbound_movement_note),
+    liveRate,
+    showCnyQuote,
     packItemLabel: resolvePackagingStockInItemLabel(
       detail.id,
       detail.barcode,
@@ -69,10 +79,18 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
   const [exceptions, setExceptions] = useState<InventoryExceptionRecord[]>([]);
   const [reportOpen, setReportOpen] = useState(false);
   const [notifyTarget, setNotifyTarget] = useState<ArrivalNotifyTarget | null>(null);
+  const [liveRate, setLiveRate] = useState<number | null>(null);
 
   const invoiceData = useMemo(
-    () => (detail ? mapDetailToInvoice(detail) : null),
-    [detail],
+    () =>
+      detail
+        ? mapDetailToInvoice(
+            detail,
+            liveRate,
+            Boolean(store && isDestinationHubViewer(store, detail)),
+          )
+        : null,
+    [detail, liveRate, store],
   );
 
   const loadExceptions = (barcode?: string) => {
@@ -91,10 +109,14 @@ export default function ItemViewModal({ visible, itemId, onClose, onSigned }: Pr
       setExceptions([]);
       setReportOpen(false);
       setNotifyTarget(null);
+      setLiveRate(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
+    void fetchCrossBorderFxRate().then((rate) => {
+      if (!cancelled) setLiveRate(rate);
+    });
     void getItemDetail(itemId).then((d) => {
       if (!cancelled) {
         setDetail(d);

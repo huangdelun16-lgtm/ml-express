@@ -19,6 +19,49 @@ function parseAmount(raw) {
 }
 
 const FEE_LABEL_PATTERN = /^(?:总费用|Total fee|ပို့ဆောင်ခ)\s+([\d.]+)\s*MMK$/i;
+const FX_RATE_PART = /^(?:汇率|Rate|FX)\s+([\d.]+)$/i;
+const FX_PAID_MMK = /^(?:实收|Paid)\s+MMK$/i;
+const FX_PAID_CNY_AMT = /^(?:实收|Paid)\s+([\d.]+)\s*CNY$/i;
+const FX_PAID_CNY = /^(?:实收|Paid)\s+CNY$/i;
+
+function parseFxLockFromNote(note) {
+  const parts = String(note || '')
+    .split(' · ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  let mmkPerCny;
+  let paidCurrency;
+  let paidCny;
+  for (const part of parts) {
+    const rateMatch = part.match(FX_RATE_PART);
+    if (rateMatch) {
+      const rate = Number(rateMatch[1]);
+      if (Number.isFinite(rate) && rate > 0) mmkPerCny = rate;
+      continue;
+    }
+    if (FX_PAID_MMK.test(part)) {
+      paidCurrency = 'MMK';
+      continue;
+    }
+    const cnyMatch = part.match(FX_PAID_CNY_AMT);
+    if (cnyMatch) {
+      paidCurrency = 'CNY';
+      const cny = Number(cnyMatch[1]);
+      if (Number.isFinite(cny) && cny > 0) paidCny = cny;
+      continue;
+    }
+    if (FX_PAID_CNY.test(part)) paidCurrency = 'CNY';
+  }
+  if (!mmkPerCny) return null;
+  return { paidCurrency: paidCurrency || 'MMK', mmkPerCny, paidCny };
+}
+
+function pickFxLock(...locks) {
+  for (const lock of locks) {
+    if (lock && Number(lock.mmkPerCny) > 0) return lock;
+  }
+  return null;
+}
 
 function normalizePaymentLabel(raw) {
   const p = String(raw || '').trim();
@@ -42,7 +85,7 @@ function parseInboundMovementNote(note) {
       totalFee = feeMatch[1];
       continue;
     }
-    if (/^(?:汇率|Rate|FX)\s+[\d.]+$/i.test(part) || /^(?:实收|Paid)\s+(?:MMK|CNY|[\d.]+\s*CNY)$/i.test(part)) {
+    if (FX_RATE_PART.test(part) || FX_PAID_MMK.test(part) || FX_PAID_CNY_AMT.test(part) || FX_PAID_CNY.test(part)) {
       continue;
     }
     const normalized = normalizePaymentLabel(part);
@@ -299,6 +342,11 @@ function buildExpressItemRow(item, inbound, trackingNote) {
   const fee = parseAmount(merged.totalFee);
   const customerSigned = isCustomerSignedItem(item);
   const packedBundleBarcode = String(item.packed_bundle_barcode || '').trim().toUpperCase();
+  const fxLock = pickFxLock(
+    parseFxLockFromNote(item.note),
+    parseFxLockFromNote(inbound?.note),
+    parseFxLockFromNote(trackingNote),
+  );
 
   return {
     id: item.id,
@@ -323,6 +371,9 @@ function buildExpressItemRow(item, inbound, trackingNote) {
     packageStatus: derivePackageStatus(item),
     transportStatus: deriveTransportStatus(item, inbound, destination),
     paymentLabel: merged.paymentLabel || '',
+    fxMmkPerCny: fxLock?.mmkPerCny ?? null,
+    paidCurrency: fxLock?.paidCurrency,
+    paidCny: fxLock?.paidCny,
     ownerStoreCode: String(item.owner_store_code || '').trim(),
     inboundAt: inbound?.created_at || '',
     updatedAt: item.updated_at || inbound?.created_at || '',
@@ -335,7 +386,7 @@ async function loadExpressItemsDataset(supabase) {
   const { data: items, error: itemsErr } = await supabase
     .from('inventory_store_items')
     .select(
-      'id, barcode, input_barcode, name, weight, qty_on_hand, recipient_name, final_destination, owner_store_code, updated_at, packed_at, packed_bundle_barcode, hub_arrived_at, customer_signed_at, hub_transit_released_at, hub_transit_shipped_at',
+      'id, barcode, input_barcode, name, weight, qty_on_hand, recipient_name, final_destination, owner_store_code, updated_at, packed_at, packed_bundle_barcode, hub_arrived_at, customer_signed_at, hub_transit_released_at, hub_transit_shipped_at, note',
     )
     .not('barcode', 'ilike', 'PKG%')
     .order('updated_at', { ascending: false })

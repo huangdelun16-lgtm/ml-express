@@ -44,12 +44,10 @@ function salaryStatusLabel(status: string, t: any, language: string) {
 
 const FinanceCourierRecordsTab: React.FC = () => {
   const {
-    activeTab,
     cashCollectionDate,
     courierSalaries,
     courierSalaryGroups,
     currentRegionPrefix,
-    extrasLoading,
     formatMonthDisplay,
     generateMonthlySalaries,
     getAvailableMonths,
@@ -63,7 +61,6 @@ const FinanceCourierRecordsTab: React.FC = () => {
     packages,
     paymentForm,
     pricingSettingsDisplay,
-    records,
     regionalPricingMap,
     salaryFilterStatus,
     selectedCouriersForSalary,
@@ -72,7 +69,6 @@ const FinanceCourierRecordsTab: React.FC = () => {
     selectedSalaryMonth,
     setLoading,
     setPaymentForm,
-    setSalaryDetails,
     setSalaryFilterStatus,
     setSelectedCouriersForSalary,
     setSelectedSalaries,
@@ -86,7 +82,6 @@ const FinanceCourierRecordsTab: React.FC = () => {
     showSalarySelectionModal,
     summary,
     t,
-    width
   } = useFinanceWorkspace();
 
   return (
@@ -532,13 +527,8 @@ const FinanceCourierRecordsTab: React.FC = () => {
                             <button
                               type="button"
                               className="admin-shell__btn"
-                              onClick={async () => {
+                              onClick={() => {
                                 setSelectedSalary(salary);
-                                const details =
-                                  await courierSalaryService.getSalaryDetails(
-                                    salary.id!,
-                                  );
-                                setSalaryDetails(details);
                                 setShowSalaryDetail(true);
                               }}
                             >

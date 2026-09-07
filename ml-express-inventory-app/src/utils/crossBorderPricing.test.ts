@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../services/supabase', () => ({
   isSupabaseConfigured: () => false,
+  getSupabaseUrl: () => '',
+  getSupabaseAnonKey: () => '',
   supabase: {},
 }));
 

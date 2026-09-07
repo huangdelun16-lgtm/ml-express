@@ -12,6 +12,15 @@ function isServiceErrorCode(value: string, t: TranslationDict): value is Service
   return value in t.serviceErrors;
 }
 
+/** Hermes / JSC 引擎噪音，不应直接展示给仓库人员 */
+export function isJsEngineNoiseMessage(message: string): boolean {
+  return /cannot read propert(y|ies)/i.test(message)
+    || /undefined is not an object/i.test(message)
+    || /null is not an object/i.test(message)
+    || /is not a function/i.test(message)
+    || /has no property/i.test(message);
+}
+
 export function formatServiceError(
   t: TranslationDict,
   code: ServiceErrorCode,
@@ -48,6 +57,9 @@ export function resolveAppError(t: TranslationDict, error: unknown): string {
     }
     if (/network|fetch|timeout|failed to fetch|offline|LIST_PAGE_LIMIT/i.test(error.message)) {
       return formatServiceError(t, 'syncNetworkFailed');
+    }
+    if (isJsEngineNoiseMessage(error.message)) {
+      return formatServiceError(t, 'unknown');
     }
     const devHint = __DEV__ ? getSupabaseConfigHint() : '';
     if (devHint && error.message.includes('Supabase')) {

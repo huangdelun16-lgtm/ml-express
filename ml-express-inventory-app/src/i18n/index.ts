@@ -26,7 +26,7 @@ export function getPackStatusLabel(
 
 export { formatTimeAgo, getEditDeniedMessage, getExceptionStatusLabel, getExceptionTypeLabel, getItemCustomerProfileEditDeniedMessage, getLedgerAmountDisplay, getLedgerCategoryLabel, getOrderStatusLabel, getPaymentLabelDisplay, getPkgStatusLabel, getTransportFeeDisplay, formatOrderNotFoundHint, formatPkgNotFoundHint, LEDGER_CATEGORY_STYLE } from './helpers';
 
-export { resolveAppError, formatServiceError } from './resolveAppError';
+export { resolveAppError, formatServiceError, isJsEngineNoiseMessage } from './resolveAppError';
 
 export { fmt } from './format';
 

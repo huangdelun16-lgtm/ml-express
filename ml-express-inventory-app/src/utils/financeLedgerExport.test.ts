@@ -37,8 +37,16 @@ const LABELS: FinanceExportLabels = {
   colOrigin: '发站',
   colFee: '车费',
   colPaid: '已付',
+  colCny: '人民币',
+  colFxRate: '汇率',
+  colPaidCcy: '实收币种',
+  colFxLock: '汇率状态',
+  collectedCny: '已收人民币',
   paidYes: '是',
   paidNo: '否',
+  fxLocked: '锁定',
+  fxLive: '活汇率',
+  fxLegacy: '旧单无锁',
 };
 
 function entry(
@@ -123,6 +131,9 @@ describe('buildFinanceExportCsv', () => {
     destination: 'YGN',
     originLabel: 'RUILI',
     originKey: 'RUI001',
+    fxMmkPerCny: 5000,
+    paidCurrency: 'CNY',
+    paidCny: 0.3,
   });
   const transport = entry({
     id: 't1',
@@ -167,6 +178,7 @@ describe('buildFinanceExportCsv', () => {
     labels: LABELS,
     categoryLabel: (e) => (e.category === 'order_collected' ? '已签收' : '车费'),
     amountDisplay: (e) => e.amountDisplay || (e.paid ? '已支付' : '待登记车费'),
+    liveRate: 5000,
   });
 
   it('带 UTF-8 BOM，Excel 能开中文', () => {
@@ -182,6 +194,7 @@ describe('buildFinanceExportCsv', () => {
     expect(csv).toContain('明细条数,3');
     expect(csv).toContain('结余,1425');
     expect(csv).toContain('已收包裹费,1500');
+    expect(csv).toContain('已收人民币,0.30');
     expect(csv).toContain('待付车费,200');
     expect(csv).toContain('已付车费,80');
     expect(csv).toContain('代收应转,300');
@@ -210,7 +223,18 @@ describe('buildFinanceExportCsv', () => {
 
   it('列标题齐全', () => {
     expect(csv).toContain(
-      '时间,分类,标题,说明,条码,商品,金额,金额展示,目的地,发站,车费,已付',
+      '时间,分类,标题,说明,条码,商品,金额,金额展示,目的地,发站,车费,已付,人民币,汇率,实收币种,汇率状态',
     );
+  });
+
+  it('已收行带锁定人民币与汇率，车费行人民币留空', () => {
+    expect(csv).toContain('0.30');
+    expect(csv).toContain('5000');
+    expect(csv).toContain('CNY');
+    expect(csv).toContain('锁定');
+    const transportLine = csv.split('\n').find((line) => line.includes('TRIP-1'));
+    expect(transportLine).toBeTruthy();
+    expect(transportLine).not.toContain('锁定');
+    expect(transportLine).not.toContain('活汇率');
   });
 });

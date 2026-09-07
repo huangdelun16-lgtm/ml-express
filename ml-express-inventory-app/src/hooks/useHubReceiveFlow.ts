@@ -85,13 +85,17 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   }, []);
 
   const refreshTransportFeePaid = useCallback(async (packBarcode: string) => {
-    const packCode = packBarcode.trim().toUpperCase();
-    const siblings = await resolveTripSiblingBarcodes(packCode);
-    const groupKey = await resolveTripGroupKey(packCode);
-    const anchor = claimTripFeeAnchorIfUnset(groupKey, packCode);
-    setTripPackCount(siblings.length);
-    setTripFeeAnchorPack(anchor === packCode);
-    setTransportFeePaid(await isHubTransportFeePaid(packCode));
+    try {
+      const packCode = packBarcode.trim().toUpperCase();
+      const siblings = await resolveTripSiblingBarcodes(packCode);
+      const groupKey = await resolveTripGroupKey(packCode);
+      const anchor = claimTripFeeAnchorIfUnset(groupKey, packCode);
+      setTripPackCount(siblings.length);
+      setTripFeeAnchorPack(anchor === packCode);
+      setTransportFeePaid(await isHubTransportFeePaid(packCode));
+    } catch {
+      // 车费状态刷新失败不挡到站 / 入库 / 支付
+    }
   }, []);
 
   const refreshCloudStatus = useCallback(async () => {
@@ -182,7 +186,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         }
       }
 
-      const refreshed = await getPkgTrackingDetail(pkg.pack_barcode);
+      const refreshed = await getPkgTrackingDetail(pkg.pack_barcode).catch(() => null);
       const latest = refreshed ?? pkg;
       setActivePack(latest);
       await applyOrderSuccess(latest, { skipPackImport: true });
@@ -221,6 +225,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
 
   const openPackOrdersModal = useCallback(
     async (detail: PkgTrackingDetail): Promise<PkgTrackingDetail> => {
+      setError('');
       let pkg = detail;
       if (store && detail.status !== 'in_transit') {
         try {
@@ -301,7 +306,11 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         hubCode,
         operator,
       });
-      await finishInboundFlow(pkg);
+      try {
+        await finishInboundFlow(pkg);
+      } catch {
+        // 入库已成功，刷新列表失败不回滚
+      }
       queueArrivalNotify([order]);
       return pkg;
     },
@@ -401,7 +410,11 @@ export function useHubReceiveFlow(openPackBarcode: string) {
         t.hubReceive.inboundSuccess,
         fmt(t.hubReceive.inboundSuccessMsg, { barcode: order.order_barcode }),
       );
-      await finishInboundFlow(pkg);
+      try {
+        await finishInboundFlow(pkg);
+      } catch {
+        // 入库已成功
+      }
       queueArrivalNotify([order]);
       setScan('');
     } catch (e: unknown) {
@@ -526,8 +539,12 @@ export function useHubReceiveFlow(openPackBarcode: string) {
           operator,
         });
       }
-      await finishInboundFlow(latest);
-      const refreshed = await getPkgTrackingDetail(latest.pack_barcode);
+      try {
+        await finishInboundFlow(latest);
+      } catch {
+        // 批量入库已成功，刷新失败仍进入车费步骤
+      }
+      const refreshed = await getPkgTrackingDetail(latest.pack_barcode).catch(() => null);
       if (refreshed) setActivePack(refreshed);
       const successMsg = fmt(t.hubReceive.batchInboundSuccessMsg, { count: pendingOrders.length });
       setModalSuccess(successMsg);
@@ -631,6 +648,7 @@ export function useHubReceiveFlow(openPackBarcode: string) {
   const closeOrdersModal = () => {
     setOrdersModalVisible(false);
     setModalSuccess('');
+    setError('');
   };
 
   return {

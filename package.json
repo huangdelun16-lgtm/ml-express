@@ -40,7 +40,7 @@
     "prebuild": "npm run sync:shared",
     "start": "react-scripts start",
     "dev": "netlify dev",
-    "build": "react-scripts build",
+    "build": "node --max-old-space-size=8192 ./node_modules/react-scripts/bin/react-scripts.js build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "deploy:netlify": "node scripts/deploy-web.mjs admin",

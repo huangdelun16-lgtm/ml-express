@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
@@ -6,17 +6,21 @@ import {
   type InventoryCustomerExpressItem,
   type InventoryCustomerSummary,
 } from '../services/inventoryConsoleService';
+import DualMoney from './DualMoney';
+import {
+  customerExpressLedgerCategory,
+  displayRateForCustomerCategory,
+  isSettledCustomerCategory,
+  resolveCustomerFeeCny,
+} from '../utils/crossBorderFx';
 import '../styles/crossBorderLogistics.css';
 
 type Props = {
   open: boolean;
   onClose: () => void;
   customer: InventoryCustomerSummary | null;
+  fxRate?: number | null;
 };
-
-function formatMmK(n: number): string {
-  return Math.round(n).toLocaleString('en-US');
-}
 
 function paymentStatusClass(status: string): string {
   if (status === '已付款' || status === '已收款') return 'cbl-status-pill cbl-status-pill--green';
@@ -47,13 +51,37 @@ function formatInboundDate(isEn: boolean, value?: string | null): string {
   });
 }
 
-const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer }) => {
+const CustomerExpressItemsModal: React.FC<Props> = ({
+  open,
+  onClose,
+  customer,
+  fxRate = null,
+}) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<InventoryCustomerExpressItem[]>([]);
+
+  const headerCny = useMemo(() => {
+    if (!items.length) return undefined;
+    let total = 0;
+    for (const item of items) {
+      if (item.fee <= 0) continue;
+      const category = customerExpressLedgerCategory(item);
+      const cny = resolveCustomerFeeCny({
+        category,
+        mmk: item.fee,
+        lockedRate: item.fxMmkPerCny,
+        paidCny: item.paidCny,
+        liveRate: fxRate,
+      });
+      if (cny == null) return null;
+      total += cny;
+    }
+    return total;
+  }, [items, fxRate]);
 
   useEffect(() => {
     if (!open || !customer) return;
@@ -116,9 +144,15 @@ const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer })
                 </span>
                 <span className="cbl-customer-modal__stat cbl-customer-modal__stat--fee">
                   <span className="cbl-customer-modal__stat-label">
-                    {isEn ? 'Total MMK' : '总费用'}
+                    {isEn ? 'Total fee' : '总费用'}
                   </span>
-                  <strong>{formatMmK(customer.totalFee)}</strong>
+                  <strong>
+                    <DualMoney
+                      mmk={customer.totalFee}
+                      rate={items.length ? null : fxRate}
+                      cny={items.length ? headerCny : undefined}
+                    />
+                  </strong>
                 </span>
               </div>
             </div>
@@ -165,7 +199,7 @@ const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer })
                       <th>{isEn ? 'Destination' : '目的地'}</th>
                       <th>{isEn ? 'Weight' : '重量'}</th>
                       <th>{isEn ? 'Qty' : '数量'}</th>
-                      <th className="cbl-col-num">{isEn ? 'Fee MMK' : '费用MMK'}</th>
+                      <th className="cbl-col-num">{isEn ? 'Fee' : '费用'}</th>
                       <th>{isEn ? 'Payment' : '付款状态'}</th>
                       <th>{isEn ? 'Package' : '包裹状态'}</th>
                       <th>{isEn ? 'Transport' : '运输状态'}</th>
@@ -186,7 +220,36 @@ const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer })
                         <td>{item.weight}</td>
                         <td className="cbl-col-num">{item.qty}</td>
                         <td className="cbl-col-num cbl-col-fee">
-                          {item.fee > 0 ? formatMmK(item.fee) : '—'}
+                          {item.fee > 0 ? (
+                            <>
+                              <DualMoney
+                                mmk={item.fee}
+                                rate={displayRateForCustomerCategory(
+                                  customerExpressLedgerCategory(item),
+                                  item.fxMmkPerCny,
+                                  fxRate,
+                                )}
+                                cny={
+                                  item.paidCny != null && item.paidCny > 0
+                                    ? item.paidCny
+                                    : undefined
+                                }
+                              />
+                              {isSettledCustomerCategory(customerExpressLedgerCategory(item)) ? (
+                                <span className="cbl-fx-lock-hint">
+                                  {item.fxMmkPerCny || (item.paidCny != null && item.paidCny > 0)
+                                    ? isEn
+                                      ? 'Locked FX'
+                                      : '锁定汇率'
+                                    : isEn
+                                      ? 'MMK only'
+                                      : '旧单无锁'}
+                                </span>
+                              ) : null}
+                            </>
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td>
                           <span className={paymentStatusClass(item.paymentStatus)}>
@@ -219,7 +282,9 @@ const CustomerExpressItemsModal: React.FC<Props> = ({ open, onClose, customer })
 
         <footer className="cbl-pricing-modal__foot cbl-customer-modal__foot">
           <span className="cbl-customer-modal__foot-hint">
-            {isEn ? 'Express details from Inventory App' : '数据来自 Inventory App 快递明细'}
+            {isEn
+              ? 'Express details from Inventory App. Pending uses live FX; collected uses the locked rate.'
+              : '数据来自 Inventory App。待收用活汇率，已收用锁定汇率；旧单无锁只显示缅币。'}
           </span>
           <button type="button" className="cbl-btn cbl-btn--primary" onClick={onClose}>
             {isEn ? 'Close' : '关闭'}

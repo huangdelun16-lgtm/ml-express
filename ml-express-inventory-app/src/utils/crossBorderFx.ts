@@ -1,4 +1,9 @@
-import { isSupabaseConfigured, supabase } from '../services/supabase';
+import {
+  getSupabaseAnonKey,
+  getSupabaseUrl,
+  isSupabaseConfigured,
+  supabase,
+} from '../services/supabase';
 
 export const CROSS_BORDER_FX_SETTINGS_KEY = 'pricing.cross_border.fx.mmk_per_cny';
 
@@ -75,13 +80,68 @@ export function isCustomerLedgerCategory(category: string): boolean {
   return CUSTOMER_LEDGER_CATEGORIES.has(category);
 }
 
-export async function fetchCrossBorderFxRate(): Promise<number | null> {
-  if (!isSupabaseConfigured()) return null;
+type FxRateCache = { value: number; at: number };
+
+const FX_RATE_CACHE_MS = 5 * 60 * 1000;
+let fxRateCache: FxRateCache | null = null;
+
+function cacheFxRate(rate: number | null): number | null {
+  if (rate != null && rate > 0) {
+    fxRateCache = { value: rate, at: Date.now() };
+  }
+  return rate;
+}
+
+async function queryFxRateViaClient(): Promise<number | null> {
   const { data, error } = await supabase
     .from('system_settings')
-    .select('settings_key, settings_value')
+    .select('settings_key, settings_value, updated_at')
     .eq('settings_key', CROSS_BORDER_FX_SETTINGS_KEY)
-    .maybeSingle();
-  if (error || !data) return null;
-  return parseMmkPerCnyRate((data as { settings_value?: unknown }).settings_value);
+    .limit(1);
+  if (error || !data?.length) return null;
+  return pickMmkPerCnyRate(data);
+}
+
+/** 只用 anon key，避开店铺 JWT / maybeSingle 的 406 代理缓存 */
+async function queryFxRateViaAnon(): Promise<number | null> {
+  const url = getSupabaseUrl().replace(/\/$/, '');
+  const key = getSupabaseAnonKey();
+  if (!url || !key) return null;
+  const endpoint =
+    `${url}/rest/v1/system_settings?settings_key=eq.${encodeURIComponent(CROSS_BORDER_FX_SETTINGS_KEY)}` +
+    '&select=settings_key,settings_value,updated_at&limit=1';
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: 'application/json',
+      'Cache-Control': 'no-store',
+      Pragma: 'no-cache',
+    },
+  });
+  if (!response.ok) return null;
+  const rows = (await response.json()) as unknown;
+  if (Array.isArray(rows)) return pickMmkPerCnyRate(rows);
+  if (rows && typeof rows === 'object') {
+    return pickMmkPerCnyRate([rows as { settings_key?: string; settings_value?: unknown }]);
+  }
+  return null;
+}
+
+export async function fetchCrossBorderFxRate(options?: { force?: boolean }): Promise<number | null> {
+  const force = Boolean(options?.force);
+  if (!force && fxRateCache && Date.now() - fxRateCache.at < FX_RATE_CACHE_MS) {
+    return fxRateCache.value;
+  }
+  if (!isSupabaseConfigured()) return null;
+
+  let rate = await queryFxRateViaClient();
+  if (rate == null) {
+    try {
+      rate = await queryFxRateViaAnon();
+    } catch {
+      rate = null;
+    }
+  }
+  return cacheFxRate(rate);
 }

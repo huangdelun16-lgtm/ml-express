@@ -15,6 +15,10 @@ const PAID_CNY = /^(?:实收|Paid)\s+CNY$/i;
 
 const SETTLED_CATEGORIES = new Set(['order_collected', 'order_prepaid', 'collected']);
 
+export function isSettledCustomerCategory(category: string): boolean {
+  return SETTLED_CATEGORIES.has(category);
+}
+
 export function parseFeeMmk(raw: string | number | null | undefined): number {
   const n = Number(String(raw ?? '').replace(/[^\d.]/g, ''));
   return Number.isFinite(n) && n > 0 ? n : 0;
@@ -123,6 +127,43 @@ export function displayRateForCustomerCategory(
     return lockedRate != null && lockedRate > 0 ? lockedRate : null;
   }
   return liveRate != null && liveRate > 0 ? liveRate : null;
+}
+
+export type InvoiceFeeDisplay = {
+  mmk: number;
+  cny: number | null;
+  /** 已签收且当时锁了汇率 */
+  usedLock: boolean;
+  /** 已签收但没有锁定记录：只显示缅币，禁止用今天活汇率 */
+  legacySignedMmkOnly: boolean;
+};
+
+/** 发票 / 订单详情：未签收用活汇率；已签收用锁定；旧单无锁只显示 MMK。 */
+export function resolveInvoiceFeeDisplay(params: {
+  feeMmk: number;
+  signed: boolean;
+  lockedRate?: number | null;
+  paidCny?: number | null;
+  liveRate: number | null;
+}): InvoiceFeeDisplay {
+  const mmk = Number.isFinite(params.feeMmk) && params.feeMmk > 0 ? params.feeMmk : 0;
+  const category = params.signed ? 'order_collected' : 'pending_inflow';
+  const rate = displayRateForCustomerCategory(category, params.lockedRate, params.liveRate);
+  if (
+    params.signed &&
+    params.paidCny != null &&
+    Number.isFinite(params.paidCny) &&
+    params.paidCny > 0
+  ) {
+    return { mmk, cny: params.paidCny, usedLock: true, legacySignedMmkOnly: false };
+  }
+  const cny = mmk > 0 ? mmkToCny(mmk, rate) : null;
+  return {
+    mmk,
+    cny,
+    usedLock: params.signed && rate != null,
+    legacySignedMmkOnly: params.signed && mmk > 0 && rate == null,
+  };
 }
 
 export function sumSettledCustomerCny(

@@ -24,7 +24,10 @@ import { listItems, listPackedShipments, trackOrderByCode } from '../services/in
 import { findTrackingByAnyCode } from '../services/trackingService';
 import type { InventoryItemListRow, PackedShipmentDetail, TrackOrderResult } from '../types/inventory';
 import type { OrderTrackingRecord, PkgTrackingDetail } from '../types/tracking';
-import { canMarkCustomerSigned } from '../utils/customerSign';
+import { canMarkCustomerSigned, isDestinationHubViewer } from '../utils/customerSign';
+import { formatCnyAmount, formatMmkAmount, fetchCrossBorderFxRate } from '../utils/crossBorderFx';
+import { parseFeeMmk, resolveInvoiceFeeDisplay } from '../utils/crossBorderFxLock';
+import { parseInboundMovementNote, pickNotesFxLock } from '../utils/inboundMovementNote';
 import { stockUnitLabel } from '../utils/itemFieldFormat';
 import { regionDisplayLabel } from '../constants/destinationOptions';
 import { pickupTypeLabel } from '../types/customerSignReceipt';
@@ -166,6 +169,8 @@ function TrackResultPanel({
   canSignDelivered,
   signing,
   onSignDelivered,
+  liveRate,
+  showCnyQuote,
 }: {
   result: TrackOrderResult;
   cloudPkg: PkgTrackingDetail | null;
@@ -173,11 +178,30 @@ function TrackResultPanel({
   canSignDelivered?: boolean;
   signing?: boolean;
   onSignDelivered?: () => void;
+  liveRate: number | null;
+  showCnyQuote: boolean;
 }) {
   const { t, fmt } = useTranslation();
   const { detail, parentPack, truckLoad } = result;
   const activePack = detail.pack ?? parentPack;
   const showSign = canSignDelivered && onSignDelivered;
+  const feeMmk = parseFeeMmk(detail.total_fee);
+  const signed = Boolean(detail.customer_signed_at?.trim() || detail.sign_receipt);
+  const fxLock = pickNotesFxLock(detail.note, detail.inbound_movement_note);
+  const feeDisplay =
+    feeMmk > 0
+      ? resolveInvoiceFeeDisplay({
+          feeMmk,
+          signed,
+          lockedRate: fxLock?.mmkPerCny,
+          paidCny: fxLock?.paidCny,
+          liveRate,
+        })
+      : null;
+  const userNote =
+    parseInboundMovementNote(detail.note || '').userNote ||
+    detail.inbound_note?.trim() ||
+    '';
 
   const movementTypeLabel = (type: string) => {
     if (type === 'in') return t.common.inbound;
@@ -226,6 +250,30 @@ function TrackResultPanel({
         <DetailRow label={t.trackExpress.phone} value={detail.recipient_phone} />
         <DetailRow label={t.trackExpress.destination} value={regionDisplayLabel(detail.destination ?? '')} />
         <DetailRow label={t.trackExpress.packaging} value={detail.packaging} />
+        {feeDisplay ? (
+          showCnyQuote && feeDisplay.cny != null ? (
+            <>
+              <DetailRow
+                label={feeDisplay.usedLock ? t.invoice.settledCny : t.invoice.quoteCny}
+                value={`¥${formatCnyAmount(feeDisplay.cny)}`}
+              />
+              <DetailRow
+                label={t.invoice.totalFee}
+                value={fmt(t.invoice.bookedMmk, { amount: formatMmkAmount(feeDisplay.mmk) })}
+              />
+            </>
+          ) : (
+            <>
+              <DetailRow
+                label={t.invoice.totalFee}
+                value={`${formatMmkAmount(feeDisplay.mmk)} MMK`}
+              />
+              {showCnyQuote && feeDisplay.legacySignedMmkOnly ? (
+                <Text style={styles.feeHint}>{t.invoice.legacySignedMmkOnly}</Text>
+              ) : null}
+            </>
+          )
+        ) : null}
       </Section>
 
       {detail.sign_receipt ? (
@@ -270,10 +318,10 @@ function TrackResultPanel({
         <DetailRow label={t.trackExpress.inboundBarcode} value={detail.barcode} />
       </Section>
 
-      {detail.note ? (
+      {userNote ? (
         <Section title={t.trackExpress.sectionNote}>
           <Text style={styles.noteText} selectable>
-            {detail.note}
+            {userNote}
           </Text>
         </Section>
       ) : null}
@@ -351,6 +399,11 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
   const [keywordMatches, setKeywordMatches] = useState<InventoryItemListRow[]>([]);
   const [keywordTotal, setKeywordTotal] = useState(0);
   const [notFound, setNotFound] = useState(false);
+  const [liveRate, setLiveRate] = useState<number | null>(null);
+
+  useEffect(() => {
+    void fetchCrossBorderFxRate().then(setLiveRate);
+  }, []);
 
   const search = useCallback(async (raw: string) => {
     const q = raw.trim();
@@ -437,6 +490,7 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
       itemIds: [result.detail.id],
       operator: operatorName ?? t.common.operator,
       store,
+      liveRate,
     });
   };
 
@@ -512,6 +566,8 @@ export default function TrackExpressScreen({ route }: { route?: Route }) {
           canSignDelivered={canSign}
           signing={signRequest != null}
           onSignDelivered={handleSign}
+          liveRate={liveRate}
+          showCnyQuote={Boolean(store && isDestinationHubViewer(store, result.detail))}
         />
       ) : null}
       {!result && keywordMatches.length === 0 && cloudPkg ? (
@@ -616,6 +672,7 @@ const styles = StyleSheet.create({
   rowLabel: { color: '#64748b', fontSize: 11, fontWeight: '700' },
   rowValue: { color: '#e2e8f0', fontSize: 15, fontWeight: '700', fontFamily: 'monospace' },
   noteText: { color: '#cbd5e1', fontSize: 14, lineHeight: 21 },
+  feeHint: { color: '#94a3b8', fontSize: 12, fontWeight: '600', textAlign: 'right' as const, marginTop: 4 },
   packHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   packLine: {
     paddingVertical: 6,

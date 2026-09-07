@@ -2,6 +2,57 @@ import { regionDisplayLabel } from '../constants/destinationOptions';
 import type { TranslationDict } from '../i18n/translations';
 import type { FinanceLedgerEntry } from '../types/financeLedger';
 
+const CUSTOMER_LEDGER_CATEGORIES = new Set([
+  'pending_inflow',
+  'collected',
+  'manual_income',
+  'order_income_cod',
+  'order_prepaid',
+  'order_collected',
+]);
+const SETTLED_CATEGORIES = new Set(['order_collected', 'order_prepaid', 'collected']);
+
+function isCustomerLedgerCategory(category: string): boolean {
+  return CUSTOMER_LEDGER_CATEGORIES.has(category);
+}
+
+function isSettledCustomerCategory(category: string): boolean {
+  return SETTLED_CATEGORIES.has(category);
+}
+
+function mmkToCny(mmk: number, rate: number | null): number | null {
+  if (rate == null || rate <= 0 || !Number.isFinite(rate) || !Number.isFinite(mmk)) return null;
+  return mmk / rate;
+}
+
+function displayRateForCustomerCategory(
+  category: string,
+  lockedRate: number | null | undefined,
+  liveRate: number | null,
+): number | null {
+  if (isSettledCustomerCategory(category)) {
+    return lockedRate != null && lockedRate > 0 ? lockedRate : null;
+  }
+  return liveRate != null && liveRate > 0 ? liveRate : null;
+}
+
+function sumSettledCustomerCny(
+  rows: Array<{ category: string; amount: number | null; fxMmkPerCny?: number | null }>,
+): number | null {
+  let total = 0;
+  let hasAmount = false;
+  for (const row of rows) {
+    if (!isSettledCustomerCategory(row.category)) continue;
+    const mmk = Number(row.amount) || 0;
+    if (mmk <= 0) continue;
+    hasAmount = true;
+    const cny = mmkToCny(mmk, row.fxMmkPerCny ?? null);
+    if (cny == null) return null;
+    total += cny;
+  }
+  return hasAmount ? total : 0;
+}
+
 export type FinanceExportLabels = {
   metaTitle: string;
   hub: string;
@@ -29,8 +80,16 @@ export type FinanceExportLabels = {
   colOrigin: string;
   colFee: string;
   colPaid: string;
+  colCny: string;
+  colFxRate: string;
+  colPaidCcy: string;
+  colFxLock: string;
+  collectedCny: string;
   paidYes: string;
   paidNo: string;
+  fxLocked: string;
+  fxLive: string;
+  fxLegacy: string;
 };
 
 export type FinanceExportSummaryBlock = {
@@ -120,8 +179,16 @@ export function financeExportLabelsFromT(t: TranslationDict): FinanceExportLabel
     colOrigin: f.csvColOrigin,
     colFee: f.csvColFee,
     colPaid: f.csvColPaid,
+    colCny: f.csvColCny,
+    colFxRate: f.csvColFxRate,
+    colPaidCcy: f.csvColPaidCcy,
+    colFxLock: f.csvColFxLock,
+    collectedCny: f.csvCollectedCny,
     paidYes: f.csvPaidYes,
     paidNo: f.csvPaidNo,
+    fxLocked: f.csvFxLocked,
+    fxLive: f.csvFxLive,
+    fxLegacy: f.csvFxLegacy,
   };
 }
 
@@ -152,6 +219,39 @@ function destCell(entry: FinanceLedgerEntry): string {
   return dest ? regionDisplayLabel(dest) : '';
 }
 
+function entryCny(entry: FinanceLedgerEntry, liveRate: number | null): string {
+  if (!isCustomerLedgerCategory(entry.category)) return '';
+  if (entry.paidCny != null && Number.isFinite(entry.paidCny) && entry.paidCny > 0) {
+    return formatFinanceExportAmount(entry.paidCny);
+  }
+  const rate = displayRateForCustomerCategory(entry.category, entry.fxMmkPerCny, liveRate);
+  const mmk = entry.amount != null && Number.isFinite(entry.amount) ? entry.amount : null;
+  if (mmk == null) return '';
+  const cny = mmkToCny(mmk, rate);
+  return cny == null ? '' : formatFinanceExportAmount(cny);
+}
+
+function entryFxRate(entry: FinanceLedgerEntry, liveRate: number | null): string {
+  if (!isCustomerLedgerCategory(entry.category)) return '';
+  const rate = displayRateForCustomerCategory(entry.category, entry.fxMmkPerCny, liveRate);
+  return rate == null ? '' : formatFinanceExportAmount(rate);
+}
+
+function entryPaidCcy(entry: FinanceLedgerEntry): string {
+  if (!isCustomerLedgerCategory(entry.category)) return '';
+  return entry.paidCurrency || '';
+}
+
+function entryFxLock(entry: FinanceLedgerEntry, labels: FinanceExportLabels): string {
+  if (!isCustomerLedgerCategory(entry.category)) return '';
+  if (isSettledCustomerCategory(entry.category)) {
+    return entry.fxMmkPerCny || (entry.paidCny != null && entry.paidCny > 0)
+      ? labels.fxLocked
+      : labels.fxLegacy;
+  }
+  return labels.fxLive;
+}
+
 export function buildFinanceExportCsv(params: {
   entries: FinanceLedgerEntry[];
   summary: FinanceExportSummaryBlock;
@@ -160,8 +260,11 @@ export function buildFinanceExportCsv(params: {
   labels: FinanceExportLabels;
   categoryLabel: (entry: FinanceLedgerEntry) => string;
   amountDisplay: (entry: FinanceLedgerEntry) => string;
+  liveRate?: number | null;
 }): string {
   const { entries, summary, netBalance, meta, labels } = params;
+  const liveRate = params.liveRate ?? null;
+  const collectedCny = sumSettledCustomerCny(entries);
   const headerBlock = [
     toCsvRow([labels.metaTitle]),
     toCsvRow([labels.hub, meta.hub]),
@@ -171,6 +274,7 @@ export function buildFinanceExportCsv(params: {
     toCsvRow([labels.recordCount, entries.length]),
     toCsvRow([labels.balance, formatFinanceExportAmount(netBalance)]),
     toCsvRow([labels.collected, formatFinanceExportAmount(summary.collectedTotal)]),
+    toCsvRow([labels.collectedCny, formatFinanceExportAmount(collectedCny)]),
     toCsvRow([labels.transportUnpaid, formatFinanceExportAmount(summary.transportUnpaidTotal)]),
     toCsvRow([labels.transportPaid, formatFinanceExportAmount(summary.transportPaidTotal)]),
     toCsvRow([labels.pendingInflow, formatFinanceExportAmount(summary.pendingInflowTotal)]),
@@ -191,6 +295,10 @@ export function buildFinanceExportCsv(params: {
       labels.colOrigin,
       labels.colFee,
       labels.colPaid,
+      labels.colCny,
+      labels.colFxRate,
+      labels.colPaidCcy,
+      labels.colFxLock,
     ]),
   ];
   const dataRows = entries.map((entry) =>
@@ -207,6 +315,10 @@ export function buildFinanceExportCsv(params: {
       originCell(entry),
       formatFinanceExportAmount(entry.transportFee),
       paidCell(entry, labels),
+      entryCny(entry, liveRate),
+      entryFxRate(entry, liveRate),
+      entryPaidCcy(entry),
+      entryFxLock(entry, labels),
     ]),
   );
   return `\uFEFF${[...headerBlock, ...dataRows].join('\n')}`;

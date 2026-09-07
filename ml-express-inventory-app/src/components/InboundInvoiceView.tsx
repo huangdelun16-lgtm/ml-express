@@ -9,6 +9,9 @@ import { callPhoneNumber } from '../utils/phoneCall';
 import type { CustomerSignReceipt } from '../types/customerSignReceipt';
 import { pickupTypeLabel } from '../types/customerSignReceipt';
 import { getPaymentLabelDisplay, useTranslation } from '../i18n';
+import { formatCnyAmount, formatMmkAmount } from '../utils/crossBorderFx';
+import { resolveInvoiceFeeDisplay } from '../utils/crossBorderFxLock';
+import type { CrossBorderFxLock } from '../utils/crossBorderFxLock';
 
 export type InboundInvoiceData = {
   barcode: string;
@@ -28,6 +31,11 @@ export type InboundInvoiceData = {
   note?: string;
   storeName?: string;
   signReceipt?: CustomerSignReceipt;
+  signed?: boolean;
+  fxLock?: CrossBorderFxLock | null;
+  liveRate?: number | null;
+  /** 收货站才展示人民币报价；发货站只看缅币入账 */
+  showCnyQuote?: boolean;
   /** 多个入库包内序号，如 3-1 */
   packItemLabel?: string;
 };
@@ -69,8 +77,19 @@ export function InboundInvoiceContent({
   /** 包内序号行标签，默认「包内序号」 */
   packItemSeqLabel?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, fmt } = useTranslation();
   const pickupLabels = { self: t.sign.pickupSelf, proxy: t.sign.pickupProxy };
+  const feeMmk = Number(String(data.totalFee ?? '').replace(/[^\d.]/g, ''));
+  const feeDisplay =
+    Number.isFinite(feeMmk) && feeMmk > 0
+      ? resolveInvoiceFeeDisplay({
+          feeMmk,
+          signed: Boolean(data.signed || data.signReceipt),
+          lockedRate: data.fxLock?.mmkPerCny,
+          paidCny: data.fxLock?.paidCny,
+          liveRate: data.liveRate ?? null,
+        })
+      : null;
   return (
     <>
       <View style={styles.invoiceHeader}>
@@ -97,8 +116,30 @@ export function InboundInvoiceContent({
       {data.spec ? <InvoiceRow label={t.invoice.spec} value={data.spec} /> : null}
       {data.weight ? <InvoiceRow label={t.invoice.weight} value={data.weight} /> : null}
       <InvoiceRow label={t.invoice.qty} value={`${data.qty} ${stockUnitLabel()}`} />
-      {data.totalFee ? (
-        <InvoiceRow label={t.invoice.totalFee} value={`${data.totalFee} MMK`} highlight />
+      {feeDisplay ? (
+        data.showCnyQuote && feeDisplay.cny != null ? (
+          <View style={styles.feeBlock}>
+            <InvoiceRow
+              label={feeDisplay.usedLock ? t.invoice.settledCny : t.invoice.quoteCny}
+              value={`¥${formatCnyAmount(feeDisplay.cny)}`}
+              highlight
+            />
+            <Text style={styles.feeBooked}>
+              {fmt(t.invoice.bookedMmk, { amount: formatMmkAmount(feeDisplay.mmk) })}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.feeBlock}>
+            <InvoiceRow
+              label={t.invoice.totalFee}
+              value={`${formatMmkAmount(feeDisplay.mmk)} MMK`}
+              highlight
+            />
+            {data.showCnyQuote && feeDisplay.legacySignedMmkOnly ? (
+              <Text style={styles.feeHint}>{t.invoice.legacySignedMmkOnly}</Text>
+            ) : null}
+          </View>
+        )
       ) : null}
       {data.paymentLabel ? (
         <InvoiceRow label={t.invoice.payment} value={getPaymentLabelDisplay(t, data.paymentLabel)} />
@@ -286,6 +327,23 @@ export const inboundInvoiceStyles = StyleSheet.create({
     textAlign: 'right',
   },
   rowValueHighlight: { color: '#059669', fontSize: 16 },
+  feeBlock: { marginBottom: 4 },
+  feeBooked: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'right',
+    marginTop: -4,
+    marginBottom: 8,
+  },
+  feeHint: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'right',
+    marginTop: -2,
+    marginBottom: 8,
+  },
   signReceiptSection: {
     marginTop: 8,
     marginBottom: 8,

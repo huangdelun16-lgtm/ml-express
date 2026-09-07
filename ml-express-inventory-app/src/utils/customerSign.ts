@@ -1,5 +1,6 @@
 import type { InventoryStoreSession } from '../services/authService';
 import { svc, type ServiceError } from '../errors/serviceError';
+import { destinationCodesMatch } from './destinationCode';
 import { resolveStoreHubCode } from './storeZone';
 import {
   isAdminStore,
@@ -35,6 +36,17 @@ function resolveItemDestinationKey(item: CustomerSignItemRef): string {
 
 function resolveHubKeyForStore(store: InventoryStoreSession): string {
   return normalizeOwnerKey(resolveStoreHubCode(store));
+}
+
+/** 当前登录站是否为该订单最终目的站（收货站才展示客户报价 / 收款人民币） */
+export function isDestinationHubViewer(
+  store: InventoryStoreSession,
+  item: Pick<CustomerSignItemRef, 'final_destination' | 'destination'>,
+): boolean {
+  if (isAdminStore(store)) return true;
+  const dest = (item.final_destination || item.destination || '').trim();
+  if (!dest) return false;
+  return destinationCodesMatch(dest, resolveStoreHubCode(store));
 }
 
 /** 目的站是否可对当前订单执行客户签收 */

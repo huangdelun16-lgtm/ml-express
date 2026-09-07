@@ -194,6 +194,10 @@ export type InventoryCustomerExpressItem = {
   ownerStoreCode: string;
   inboundAt: string;
   updatedAt: string;
+  customerSigned?: boolean;
+  fxMmkPerCny?: number | null;
+  paidCurrency?: 'MMK' | 'CNY';
+  paidCny?: number;
 };
 
 export type InventoryExceptionConsolePhoto = {
@@ -329,6 +333,9 @@ export type FinanceLedgerEntryRow = {
   originKey?: string;
   paid?: boolean;
   transportFee?: number;
+  fxMmkPerCny?: number | null;
+  paidCurrency?: 'MMK' | 'CNY';
+  paidCny?: number;
 };
 
 export type FinanceBreakdownGroup = {

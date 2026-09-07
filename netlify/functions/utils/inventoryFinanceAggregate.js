@@ -421,6 +421,7 @@ function buildLocalOriginInboundEntry(
   packedBundleBarcode,
   packNotesByBarcode,
   packFeeAssigned,
+  itemNote,
 ) {
   const currentKey = ownershipKeyFromStoreCode(storeCode);
   const originKey = String(movement.origin_store_code || '').trim()
@@ -436,6 +437,14 @@ function buildLocalOriginInboundEntry(
   );
   const parsed = parseInboundMovementNote(enrichedNote);
   const fee = parseAmount(parsed.totalFee);
+  const fxLock = parseFxLockFromNote(itemNote) || parsed.fxLock;
+  const fxFields = fxLock
+    ? {
+        fxMmkPerCny: fxLock.mmkPerCny,
+        paidCurrency: fxLock.paidCurrency,
+        paidCny: fxLock.paidCny,
+      }
+    : {};
   const payment = parsed.paymentLabel || '';
   const dest = String(movement.destination || '').trim();
   const customer = String(movement.recipient_name || '').trim() || '未登记客户';
@@ -446,6 +455,7 @@ function buildLocalOriginInboundEntry(
 
   if (payment === '预付' && fee > 0) {
     return {
+      ...fxFields,
       id: `origin:prepaid:${barcode}`,
       category: 'order_prepaid',
       title: '本站入库 · 已收款',
@@ -462,6 +472,7 @@ function buildLocalOriginInboundEntry(
   }
   if (payment === '到付') {
     return {
+      ...fxFields,
       id: `origin:cod:${barcode}`,
       category: 'order_income_cod',
       title: '本站入库 · 到付',
@@ -1139,6 +1150,7 @@ function buildAllFinanceEntries(store, dataset) {
       packedBundle,
       packNotesByBarcode,
       packFeeAssigned,
+      item.note,
     );
     if (originEntry && !orderSeen.has(barcode)) {
       orderSeen.add(barcode);

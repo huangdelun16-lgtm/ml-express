@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../services/supabase', () => ({
   isSupabaseConfigured: () => false,
+  getSupabaseUrl: () => '',
+  getSupabaseAnonKey: () => '',
   supabase: {},
 }));
 
@@ -11,6 +13,7 @@ import {
   displayRateForCustomerCategory,
   parseFeeMmk,
   parseFxLockFromNote,
+  resolveInvoiceFeeDisplay,
   sumSettledCustomerCny,
 } from './crossBorderFxLock';
 
@@ -59,6 +62,44 @@ describe('crossBorderFxLock', () => {
     expect(displayRateForCustomerCategory('order_collected', null, 5200)).toBeNull();
     expect(displayRateForCustomerCategory('order_income_cod', null, 5200)).toBe(5200);
     expect(parseFeeMmk('188000')).toBe(188000);
+  });
+
+  it('shows live CNY on unsigned invoices and never rewrites old signed rows', () => {
+    expect(
+      resolveInvoiceFeeDisplay({
+        feeMmk: 188000,
+        signed: false,
+        liveRate: 5000,
+      }),
+    ).toEqual({ mmk: 188000, cny: 37.6, usedLock: false, legacySignedMmkOnly: false });
+
+    expect(
+      resolveInvoiceFeeDisplay({
+        feeMmk: 188000,
+        signed: true,
+        lockedRate: 4800,
+        liveRate: 5200,
+      }),
+    ).toEqual({ mmk: 188000, cny: 188000 / 4800, usedLock: true, legacySignedMmkOnly: false });
+
+    expect(
+      resolveInvoiceFeeDisplay({
+        feeMmk: 188000,
+        signed: true,
+        paidCny: 37.6,
+        lockedRate: 5000,
+        liveRate: 5200,
+      }),
+    ).toEqual({ mmk: 188000, cny: 37.6, usedLock: true, legacySignedMmkOnly: false });
+
+    expect(
+      resolveInvoiceFeeDisplay({
+        feeMmk: 188000,
+        signed: true,
+        lockedRate: null,
+        liveRate: 5200,
+      }),
+    ).toEqual({ mmk: 188000, cny: null, usedLock: false, legacySignedMmkOnly: true });
   });
 
   it('refuses to invent a collected CNY total when any settled row is unlocked', () => {

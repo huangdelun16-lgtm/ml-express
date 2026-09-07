@@ -34,6 +34,8 @@ export type CustomerSignFlowRequest = {
   itemIds: string[];
   operator: string;
   store: InventoryStoreSession;
+  /** 调用方已拉到的活汇率，拉取失败时作兜底 */
+  liveRate?: number | null;
 };
 
 type Props = {
@@ -78,6 +80,7 @@ export default function CustomerSignFlowModal({
   const [signatureStrokes, setSignatureStrokes] = useState<SignatureStroke[]>([]);
   const [payCurrency, setPayCurrency] = useState<CrossBorderPaidCurrency>('MMK');
   const [mmkPerCny, setMmkPerCny] = useState<number | null>(null);
+  const [rateBusy, setRateBusy] = useState(false);
 
   useEffect(() => {
     if (!visible || !request || itemIds.length === 0) {
@@ -90,6 +93,7 @@ export default function CustomerSignFlowModal({
       setSignatureStrokes([]);
       setPayCurrency('MMK');
       setMmkPerCny(null);
+      setRateBusy(false);
       setLoading(false);
       setSubmitting(false);
       return;
@@ -111,14 +115,15 @@ export default function CustomerSignFlowModal({
         if (!loaded) throw svc('orderNotFoundOrDeleted');
         setDetail(loaded);
         setDetails(loadedDetails);
-        setMmkPerCny(rate);
+        const resolvedRate = rate ?? request.liveRate ?? null;
+        setMmkPerCny(resolvedRate);
         setPayCurrency('MMK');
 
         const codItems = loadedDetails.filter((row) => row.payment_label === '到付');
         if (codItems.length > 0) {
           const feeLines = codItems
             .map((row, index) => {
-              const feeLine = feeLineText(row.total_fee, rate, t.hubReceive.feeNotRegistered);
+              const feeLine = feeLineText(row.total_fee, resolvedRate, t.hubReceive.feeNotRegistered);
               return batchCount > 1
                 ? fmt(t.sign.batchFeeLine, {
                     index: index + 1,
@@ -161,6 +166,31 @@ export default function CustomerSignFlowModal({
     [details],
   );
   const collectCny = mmkToCny(feeMmk, mmkPerCny);
+
+  const selectPayCurrency = async (currency: CrossBorderPaidCurrency) => {
+    if (currency === 'MMK') {
+      setPayCurrency('MMK');
+      return;
+    }
+    let rate = mmkPerCny;
+    if (rate == null || rate <= 0) {
+      setRateBusy(true);
+      try {
+        rate = await fetchCrossBorderFxRate({ force: true });
+        if (rate == null && request?.liveRate != null && request.liveRate > 0) {
+          rate = request.liveRate;
+        }
+        setMmkPerCny(rate);
+      } finally {
+        setRateBusy(false);
+      }
+    }
+    if (rate == null || rate <= 0) {
+      feedbackService.notify(t.sign.needComplete, t.sign.cnyNeedsRate);
+      return;
+    }
+    setPayCurrency('CNY');
+  };
 
   const submit = async () => {
     if (!request || !detail || submitting || itemIds.length === 0) return;
@@ -254,7 +284,7 @@ export default function CustomerSignFlowModal({
                 <View style={styles.choiceRow}>
                   <Pressable
                     style={[styles.choiceBtn, payCurrency === 'MMK' && styles.choiceBtnActive]}
-                    onPress={() => setPayCurrency('MMK')}
+                    onPress={() => void selectPayCurrency('MMK')}
                   >
                     <Text
                       style={[
@@ -269,15 +299,10 @@ export default function CustomerSignFlowModal({
                     style={[
                       styles.choiceBtn,
                       payCurrency === 'CNY' && styles.choiceBtnActive,
-                      mmkPerCny == null && styles.choiceBtnDisabled,
+                      mmkPerCny == null && !rateBusy && styles.choiceBtnMuted,
                     ]}
-                    onPress={() => {
-                      if (mmkPerCny == null) {
-                        feedbackService.notify(t.sign.needComplete, t.sign.cnyNeedsRate);
-                        return;
-                      }
-                      setPayCurrency('CNY');
-                    }}
+                    onPress={() => void selectPayCurrency('CNY')}
+                    disabled={rateBusy}
                   >
                     <Text
                       style={[
@@ -285,7 +310,7 @@ export default function CustomerSignFlowModal({
                         payCurrency === 'CNY' && styles.choiceBtnTextActive,
                       ]}
                     >
-                      {t.sign.payCny}
+                      {rateBusy ? t.sign.loadingRate : t.sign.payCny}
                     </Text>
                   </Pressable>
                 </View>
@@ -468,7 +493,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111827',
   },
   choiceBtnActive: { borderColor: '#38bdf8', backgroundColor: '#172554' },
-  choiceBtnDisabled: { opacity: 0.45 },
+  choiceBtnMuted: { opacity: 0.72 },
   choiceBtnText: { color: '#94a3b8', fontSize: 14, fontWeight: '700' },
   choiceBtnTextActive: { color: '#bae6fd' },
   selfHint: { color: '#64748b', fontSize: 12, lineHeight: 18, marginTop: 2 },

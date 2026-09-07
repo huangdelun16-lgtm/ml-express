@@ -419,6 +419,19 @@
   border-color: #fdba74;
 }
 
+.sys-settings__section-banner--apps {
+  background: linear-gradient(135deg, #f5f3ff, #f8fafc);
+  border-color: #c4b5fd;
+}
+
+.sys-settings__section-banner code {
+  font-size: 0.72rem;
+  background: #fff;
+  border: 1px solid var(--sys-border);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+
 .sys-settings__section-banner h3 {
   margin: 0;
   font-size: 0.88rem;

@@ -21,9 +21,6 @@ import {
   Package,
   courierSalaryService,
   CourierSalary,
-  CourierSalaryDetail,
-  CourierPaymentRecord,
-  CourierPerformance,
   adminAccountService,
   AdminAccount,
   deliveryStoreService,
@@ -38,7 +35,6 @@ import {
   getRegionalPricingForPackage,
   getDateKey,
   getLocalDateYYYYMMDD,
-  getRiderShareBaseFeeMmk,
   getRiderDeliveryShareMmk,
   getPlatformPaymentAmountFromDescription,
   getMerchantUnclearedAmountMmk,
@@ -59,8 +55,6 @@ import {
   currencyOptions,
   paymentOptions,
   getCategoryOptions,
-  statusColors,
-  typeColors,
   combineRidersFromAdminAccounts,
   type TabKey,
   type FilterStatus,
@@ -100,19 +94,12 @@ const FinanceManagement: React.FC = () => {
     localStorage.getItem("currentUserRegion") ||
     "";
 
-  const isFinance = currentUserRole === "finance";
-
   const getDetectedRegion = () =>
     detectFinanceRegionPrefix(currentUser, currentUserRegion);
 
   const currentRegionPrefix = getDetectedRegion();
   const isRegionalUser =
     currentUserRole !== "admin" && currentRegionPrefix !== "";
-
-  const isMDYFinance = isFinance && currentRegionPrefix === "MDY";
-  const isYGNFinance = isFinance && currentRegionPrefix === "YGN";
-
-  const isRegionalFinance = isMDYFinance || isYGNFinance;
 
   const categoryOptions = useMemo(
     () => getCategoryOptions(language),
@@ -122,7 +109,7 @@ const FinanceManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>(
     isRegionalUser ? "records" : "overview",
   );
-  const { isMobile, isTablet, isDesktop, width } = useResponsive();
+  const { isMobile } = useResponsive();
   const [cashCollectionDate, setCashCollectionDate] = useState(
     getLocalDateYYYYMMDD(),
   );
@@ -146,12 +133,10 @@ const FinanceManagement: React.FC = () => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [showSalaryForm, setShowSalaryForm] = useState<boolean>(false);
   const [showSalaryDetail, setShowSalaryDetail] = useState<boolean>(false);
   const [selectedSalary, setSelectedSalary] = useState<CourierSalary | null>(
     null,
   );
-  const [salaryDetails, setSalaryDetails] = useState<CourierSalaryDetail[]>([]);
   const [selectedSalaries, setSelectedSalaries] = useState<number[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [showSalarySelectionModal, setShowSalarySelectionModal] =
@@ -1941,7 +1926,6 @@ const FinanceManagement: React.FC = () => {
     setPackageRecordsPage,
     setPackageRecordsPerPage,
     setPaymentForm,
-    setSalaryDetails,
     setSalaryFilterStatus,
     setSearchTerm,
     setSelectedCashPackages,
@@ -1962,7 +1946,6 @@ const FinanceManagement: React.FC = () => {
     showYesterdayCashUnsettledReminder,
     summary,
     t,
-    width
   };
 
   return (

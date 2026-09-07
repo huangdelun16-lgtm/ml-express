@@ -6,7 +6,9 @@
 # =============================================================================
 
 [build]
-  command = "npm install --legacy-peer-deps && npm run build"
+  # 本机 CLI 已有 node_modules；再 npm install 会把 Windows 上 react-scripts
+  # 打到 0xC0000409（exit 3221226505）崩溃。云端会先自己装依赖。
+  command = "npm run build"
   publish = "build"
   functions = "netlify/functions"
 
@@ -25,6 +27,8 @@
   NPM_FLAGS = "--legacy-peer-deps"
   NETLIFY_SKIP_PLUGINS = "true"
   CI = "false"
+  GENERATE_SOURCEMAP = "false"
+  NODE_OPTIONS = "--max-old-space-size=8192"
 
 # SPA重定向配置 - 解决React Router路由问题
 [[redirects]]

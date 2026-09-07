@@ -2,9 +2,19 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SystemSetting, systemSettingsService } from '../services/supabase';
 import SecurityVerificationModal from '../components/SecurityVerificationModal';
+import {
+  INVENTORY_ANDROID_RELEASE_CATEGORY,
+  INVENTORY_ANDROID_RELEASE_FIELDS,
+  INVENTORY_ANDROID_RELEASE_KEY,
+  buildAndroidReleaseSettingsValue,
+  fieldsFromAndroidRelease,
+  isInventoryAndroidReleaseField,
+  parseAndroidReleaseSettings,
+  validateAndroidReleaseSettings,
+} from '../utils/androidReleaseSettings';
 import '../styles/adminSystemSettings.css';
 
-type SettingCategory = 'general' | 'pricing' | 'automation' | 'tracking' | 'security';
+type SettingCategory = 'general' | 'pricing' | 'apps' | 'automation' | 'tracking' | 'security';
 
 type SettingFieldType = 'text' | 'number' | 'textarea' | 'switch' | 'select';
 
@@ -304,11 +314,49 @@ const settingDefinitions: SettingDefinition[] = [
     defaultValue: '',
     placeholder: '192.168.0.1\n203.0.113.0/24',
     helpText: '支持 IPv4、IPv6，CIDR 段示例：203.0.113.0/24'
+  },
+  {
+    key: INVENTORY_ANDROID_RELEASE_FIELDS.version,
+    label: 'Inventory 版本号',
+    description: '展示给仓库端的版本名，例如 2.1.2。需与 APK 内 version 一致。',
+    category: 'apps',
+    type: 'text',
+    defaultValue: '',
+    placeholder: '2.1.2'
+  },
+  {
+    key: INVENTORY_ANDROID_RELEASE_FIELDS.versionCode,
+    label: 'Inventory versionCode',
+    description: 'Android 整数构建号。手机上已装版本低于此值时才会提示更新。',
+    category: 'apps',
+    type: 'number',
+    defaultValue: '',
+    placeholder: '37'
+  },
+  {
+    key: INVENTORY_ANDROID_RELEASE_FIELDS.apkUrl,
+    label: 'Inventory APK 下载地址',
+    description: '公开 https 链接。仓库 App「检查更新」会打开这个地址下载。',
+    category: 'apps',
+    type: 'text',
+    defaultValue: '',
+    placeholder: 'https://…/inventory.apk',
+    helpText: '常用 Supabase Storage 公开桶或 EAS artifact 链接。保存后写入 inventory.android.latest_release。'
+  },
+  {
+    key: INVENTORY_ANDROID_RELEASE_FIELDS.releaseNotes,
+    label: '更新说明',
+    description: '可选。仓库端检查更新时展示的简要说明。',
+    category: 'apps',
+    type: 'textarea',
+    defaultValue: '',
+    placeholder: '例如：到站签收加速、条码扫描修复'
   }
 ];
 
 const categories: Array<{ id: SettingCategory; name: string; description: string; icon: string }> = [
   { id: 'general', name: '基础信息', description: '公司信息、营业时间与客服渠道配置', icon: '🏢' },
+  { id: 'apps', name: '应用更新', description: 'Inventory Android APK 版本与下载地址', icon: '📦' },
   { id: 'pricing', name: '计费规则', description: '客户端运费规则与骑手结算参数（分区配置）', icon: '💸' },
   { id: 'automation', name: '自动化', description: '派单策略、超时改派等自动化流程', icon: '🤖' },
   { id: 'tracking', name: '实时跟踪', description: '地图刷新、路线预测与数据推送', icon: '🗺️' },
@@ -364,6 +412,18 @@ const SystemSettings: React.FC = () => {
     const metadata: Record<string, { updated_at?: string | null; updated_by?: string | null }> = {};
 
     incoming.forEach(setting => {
+      if (setting.settings_key === INVENTORY_ANDROID_RELEASE_KEY) {
+        const parsed = parseAndroidReleaseSettings(setting.settings_value);
+        if (parsed) {
+          Object.assign(mergedValues, fieldsFromAndroidRelease(parsed));
+          metadata[INVENTORY_ANDROID_RELEASE_FIELDS.version] = {
+            updated_at: setting.updated_at,
+            updated_by: setting.updated_by
+          };
+        }
+        return;
+      }
+
       let def = definitionMap[setting.settings_key];
       let settingsKey = setting.settings_key;
 
@@ -480,8 +540,7 @@ const SystemSettings: React.FC = () => {
   };
 
   const handleSave = async () => {
-    // 🚀 安全优化：修改计费规则时需要二次验证
-    if (activeTab === 'pricing') {
+    if (activeTab === 'pricing' || activeTab === 'apps') {
       setShowVerificationModal(true);
       return;
     }
@@ -510,6 +569,8 @@ const SystemSettings: React.FC = () => {
     const payload: Array<Omit<SystemSetting, 'id'>> = [];
 
     for (const def of settingDefinitions) {
+      if (isInventoryAndroidReleaseField(def.key)) continue;
+
       const rawValue = settingsValues[def.key];
       let parsedValue: any = rawValue;
 
@@ -543,6 +604,25 @@ const SystemSettings: React.FC = () => {
         settings_key: settingsKey,
         settings_value: parsedValue,
         description: def.description,
+        updated_by: 'admin-dashboard'
+      });
+    }
+
+    const inventoryRelease = buildAndroidReleaseSettingsValue(settingsValues);
+    if (activeTab === 'apps') {
+      const releaseError = validateAndroidReleaseSettings(settingsValues);
+      if (releaseError) {
+        setErrorMessage(releaseError);
+        setSaving(false);
+        return;
+      }
+    }
+    if (inventoryRelease) {
+      payload.push({
+        category: INVENTORY_ANDROID_RELEASE_CATEGORY,
+        settings_key: INVENTORY_ANDROID_RELEASE_KEY,
+        settings_value: inventoryRelease,
+        description: 'Inventory Android 最新 APK（version / versionCode / 下载地址）',
         updated_by: 'admin-dashboard'
       });
     }
@@ -631,7 +711,9 @@ const SystemSettings: React.FC = () => {
         type={def.type === 'number' ? 'number' : 'text'}
         value={String(value ?? '')}
         placeholder={def.placeholder}
-        onChange={event => handleValueChange(def.key, def.type === 'number' ? event.target.value : event.target.value)}
+        min={def.key === INVENTORY_ANDROID_RELEASE_FIELDS.versionCode ? 1 : undefined}
+        step={def.key === INVENTORY_ANDROID_RELEASE_FIELDS.versionCode ? 1 : undefined}
+        onChange={event => handleValueChange(def.key, event.target.value)}
       />
     );
   };
@@ -844,6 +926,19 @@ const SystemSettings: React.FC = () => {
                   </div>
                   {pricingCourierDefinitions.map(renderSettingCard)}
                 </>
+              ) : activeTab === 'apps' ? (
+                <>
+                  <div className="sys-settings__section-banner sys-settings__section-banner--apps">
+                    <h3>
+                      <span>📦</span> Inventory Android APK
+                    </h3>
+                    <p>
+                      仓库端读 <code>inventory.android.latest_release</code>。versionCode 必须大于手机上已装版本才会提示更新。
+                      下载地址必须是 https 公开链接。保存本页需要管理员密码。
+                    </p>
+                  </div>
+                  {currentDefinitions.map(renderSettingCard)}
+                </>
               ) : (
                 currentDefinitions.map(renderSettingCard)
               )}
@@ -856,8 +951,12 @@ const SystemSettings: React.FC = () => {
         visible={showVerificationModal}
         onClose={() => setShowVerificationModal(false)}
         onVerifySuccess={executeSave}
-        title="修改计费规则验证"
-        description="修改计费规则将影响客户端运费与骑手结算相关参数，请验证您的管理员密码以确认此操作。"
+        title={activeTab === 'apps' ? '发布 Inventory APK 验证' : '修改计费规则验证'}
+        description={
+          activeTab === 'apps'
+            ? '将更新仓库 App 的检查更新地址与 versionCode。填错下载链接会导致员工装到错误安装包，请验证管理员密码。'
+            : '修改计费规则将影响客户端运费与骑手结算相关参数，请验证您的管理员密码以确认此操作。'
+        }
       />
     </div>
   );

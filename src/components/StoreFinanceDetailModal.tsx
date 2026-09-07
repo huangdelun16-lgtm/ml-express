@@ -9,6 +9,13 @@ import {
   type StoreFinanceDetailMode,
   type FinancePeriodParams,
 } from '../services/inventoryConsoleService';
+import DualMoney from './DualMoney';
+import {
+  displayRateForCustomerCategory,
+  isCustomerLedgerCategory,
+  isSettledCustomerCategory,
+  resolveCustomerFeeCny,
+} from '../utils/crossBorderFx';
 import '../styles/crossBorderLogistics.css';
 
 const CATEGORY_LABEL: Record<string, { zh: string; en: string; accent: string }> = {
@@ -28,6 +35,7 @@ type Props = {
   store: InventoryTransitStore | null;
   mode: StoreFinanceDetailMode;
   period?: FinancePeriodParams | null;
+  fxRate?: number | null;
 };
 
 function formatMmK(n: number): string {
@@ -48,14 +56,59 @@ function formatWhen(iso: string, lang: string): string {
   }
 }
 
+function incomePrefix(category: string): string {
+  if (category === 'manual_expense' || category === 'transport_cost' || category === 'agency_remit') {
+    return '−';
+  }
+  if (isCustomerLedgerCategory(category)) return '+';
+  return '';
+}
+
+function blendGroupCny(group: FinanceBreakdownGroup, liveRate: number | null, mode: StoreFinanceDetailMode): number | null {
+  if (mode === 'transport') return null;
+  if (mode === 'cod') {
+    return resolveCustomerFeeCny({
+      category: 'order_income_cod',
+      mmk: group.totalAmount,
+      liveRate,
+    });
+  }
+  let total = 0;
+  for (const item of group.items) {
+    const mmk = Number(item.amount) || 0;
+    if (mmk <= 0) continue;
+    const cny = resolveCustomerFeeCny({
+      category: item.category,
+      mmk,
+      lockedRate: item.fxMmkPerCny,
+      paidCny: item.paidCny,
+      liveRate: null,
+    });
+    if (cny == null) return null;
+    total += cny;
+  }
+  return total;
+}
+
 function LedgerEntryLine({
   entry,
   isEn,
+  liveRate,
 }: {
   entry: FinanceLedgerEntryRow;
   isEn: boolean;
+  liveRate: number | null;
 }) {
   const meta = CATEGORY_LABEL[entry.category] ?? CATEGORY_LABEL.stock_op;
+  const customerRow = isCustomerLedgerCategory(entry.category) && entry.amount != null;
+  const displayRate = customerRow
+    ? displayRateForCustomerCategory(entry.category, entry.fxMmkPerCny, liveRate)
+    : null;
+  const paidCny = entry.paidCny != null && entry.paidCny > 0 ? entry.paidCny : undefined;
+  const settled = isSettledCustomerCategory(entry.category);
+  const usedLock = Boolean(customerRow && settled && (displayRate != null || paidCny != null));
+  const legacySigned = Boolean(customerRow && settled && (entry.amount ?? 0) > 0 && !usedLock);
+
   return (
     <div className="cbl-finance-entry">
       <div className="cbl-finance-entry__main">
@@ -64,7 +117,22 @@ function LedgerEntryLine({
           <div className="cbl-finance-entry__sub">{entry.subtitle || entry.title}</div>
         </div>
         <div className="cbl-finance-entry__amount" style={{ color: meta.accent }}>
-          {entry.amountDisplay}
+          {customerRow ? (
+            <DualMoney
+              mmk={entry.amount}
+              rate={displayRate}
+              cny={paidCny}
+              prefix={incomePrefix(entry.category)}
+            />
+          ) : (
+            entry.amountDisplay
+          )}
+          {usedLock ? (
+            <span className="cbl-fx-lock-hint">{isEn ? 'Locked FX' : '锁定汇率'}</span>
+          ) : null}
+          {legacySigned ? (
+            <span className="cbl-fx-lock-hint">{isEn ? 'MMK only' : '旧单无锁'}</span>
+          ) : null}
         </div>
       </div>
       <div className="cbl-finance-entry__meta">
@@ -83,11 +151,16 @@ function BreakdownGroupBlock({
   group,
   isEn,
   amountPrefix,
+  liveRate,
+  mode,
 }: {
   group: FinanceBreakdownGroup;
   isEn: boolean;
   amountPrefix?: string;
+  liveRate: number | null;
+  mode: StoreFinanceDetailMode;
 }) {
+  const groupCny = blendGroupCny(group, liveRate, mode);
   return (
     <div className="cbl-finance-group">
       <div className="cbl-finance-group__head">
@@ -96,19 +169,38 @@ function BreakdownGroupBlock({
           {group.count} {isEn ? 'items' : '件'}
         </span>
         <span className="cbl-finance-group__amount">
-          {amountPrefix}{formatMmK(group.totalAmount)}
+          {mode === 'transport' ? (
+            <>
+              {amountPrefix}
+              {formatMmK(group.totalAmount)}
+            </>
+          ) : (
+            <DualMoney
+              mmk={group.totalAmount}
+              rate={mode === 'cod' ? liveRate : null}
+              cny={mode === 'collected' ? groupCny : undefined}
+              prefix={amountPrefix}
+            />
+          )}
         </span>
       </div>
       <div className="cbl-finance-group__items">
         {group.items.map((entry) => (
-          <LedgerEntryLine key={entry.id} entry={entry} isEn={isEn} />
+          <LedgerEntryLine key={entry.id} entry={entry} isEn={isEn} liveRate={liveRate} />
         ))}
       </div>
     </div>
   );
 }
 
-const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode, period }) => {
+const StoreFinanceDetailModal: React.FC<Props> = ({
+  open,
+  onClose,
+  store,
+  mode,
+  period,
+  fxRate = null,
+}) => {
   const { language } = useLanguage();
   const isEn = language === 'en';
 
@@ -142,8 +234,8 @@ const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode, 
     if (!store) return '';
     const base = `${store.store_code} · ${store.store_name}`;
     if (mode === 'ledger') return isEn ? `${base} · Ledger` : `${base} · 财务流水`;
-    if (mode === 'cod') return isEn ? `${base} · COD MMK` : `${base} · 到付MMK明细`;
-    if (mode === 'collected') return isEn ? `${base} · Collected MMK` : `${base} · 已收金额MMK明细`;
+    if (mode === 'cod') return isEn ? `${base} · COD pending` : `${base} · 到付待收明细`;
+    if (mode === 'collected') return isEn ? `${base} · Collected` : `${base} · 已收明细`;
     return isEn ? `${base} · Transport MMK` : `${base} · 运输成本MMK明细`;
   }, [store, mode, isEn]);
 
@@ -172,15 +264,15 @@ const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode, 
             <p className="cbl-pricing-modal__sub">
               {mode === 'ledger'
                 ? isEn
-                  ? 'Same rules as Inventory App「Movements」— cloud synced data.'
-                  : '与 Inventory App「流水」页同源，基于云端同步数据。'
+                  ? 'Same rules as Inventory App「Movements」— cloud synced data. Pending uses live FX; collected uses the locked rate.'
+                  : '与 Inventory App「流水」页同源。待入账用活汇率，已收用签收锁定汇率。'
                 : mode === 'transport'
                   ? isEn
-                    ? 'Grouped by route. Amounts in MMK.'
-                    : '按装车路线分组，金额单位为 MMK。'
+                    ? 'Grouped by route. Truck fees stay in MMK.'
+                    : '按装车路线分组，车费只记缅币。'
                   : isEn
-                    ? 'Grouped by origin station — agency collections are owed to that origin.'
-                    : '按发站归属分组；「代 XX」款项需与该发站对账结算。'}
+                    ? 'Grouped by origin. Pending uses live FX; collected uses the locked rate (legacy unsigned stays MMK).'
+                    : '按发站归属分组。待入账用活汇率，已收用锁定汇率；旧单无锁只显示缅币。'}
             </p>
           </div>
           <button
@@ -203,7 +295,7 @@ const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode, 
           ) : mode === 'ledger' ? (
             entries.length ? (
               entries.map((entry) => (
-                <LedgerEntryLine key={entry.id} entry={entry} isEn={isEn} />
+                <LedgerEntryLine key={entry.id} entry={entry} isEn={isEn} liveRate={fxRate} />
               ))
             ) : (
               <div className="cbl-empty">{isEn ? 'No ledger entries.' : '暂无流水记录。'}</div>
@@ -214,6 +306,8 @@ const StoreFinanceDetailModal: React.FC<Props> = ({ open, onClose, store, mode, 
                 key={group.label}
                 group={group}
                 isEn={isEn}
+                liveRate={fxRate}
+                mode={mode}
                 amountPrefix={mode === 'transport' ? '−' : mode === 'cod' ? '+' : ''}
               />
             ))

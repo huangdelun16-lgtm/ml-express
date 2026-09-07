@@ -2,12 +2,16 @@ import {
   CROSS_BORDER_FX_SETTINGS_KEY,
   buildCrossBorderFxSetting,
   cnyToMmk,
+  customerExpressLedgerCategory,
+  displayRateForCustomerCategory,
   formatCnyAmount,
   formatCnyInput,
   isCustomerLedgerCategory,
+  isSettledCustomerCategory,
   mmkToCny,
   parseMmkPerCnyRate,
   pickMmkPerCnyRate,
+  resolveCustomerFeeCny,
 } from './crossBorderFx';
 
 describe('crossBorderFx', () => {
@@ -62,6 +66,37 @@ describe('crossBorderFx', () => {
     expect(isCustomerLedgerCategory('transport_unpaid')).toBe(false);
     expect(isCustomerLedgerCategory('manual_expense')).toBe(false);
     expect(isCustomerLedgerCategory('agency_remit')).toBe(false);
+  });
+
+  it('uses locked rate for collected and live rate for pending', () => {
+    expect(isSettledCustomerCategory('collected')).toBe(true);
+    expect(isSettledCustomerCategory('order_prepaid')).toBe(true);
+    expect(isSettledCustomerCategory('pending_inflow')).toBe(false);
+    expect(displayRateForCustomerCategory('collected', 4700, 5000)).toBe(4700);
+    expect(displayRateForCustomerCategory('collected', null, 5000)).toBeNull();
+    expect(displayRateForCustomerCategory('pending_inflow', 4700, 5000)).toBe(5000);
+    expect(resolveCustomerFeeCny({
+      category: 'collected',
+      mmk: 188000,
+      lockedRate: 5000,
+      paidCny: 37.6,
+      liveRate: 4000,
+    })).toBe(37.6);
+    expect(resolveCustomerFeeCny({
+      category: 'order_collected',
+      mmk: 188000,
+      liveRate: 5000,
+    })).toBeNull();
+    expect(resolveCustomerFeeCny({
+      category: 'pending_inflow',
+      mmk: 188000,
+      liveRate: 5000,
+    })).toBe(37.6);
+    expect(customerExpressLedgerCategory({ paymentLabel: '预付' })).toBe('order_prepaid');
+    expect(customerExpressLedgerCategory({ paymentStatus: '已收款', customerSigned: true })).toBe(
+      'order_collected',
+    );
+    expect(customerExpressLedgerCategory({ paymentStatus: '到付待收' })).toBe('order_income_cod');
   });
 
   it('builds the system_settings payload', () => {

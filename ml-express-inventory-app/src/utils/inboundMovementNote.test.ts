@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../services/supabase', () => ({
   isSupabaseConfigured: () => false,
+  getSupabaseUrl: () => '',
+  getSupabaseAnonKey: () => '',
   supabase: {},
 }));
 
-import { inboundNoteHasFeeOrPayment, parseInboundMovementNote } from './inboundMovementNote';
+import { inboundNoteHasFeeOrPayment, parseInboundMovementNote, pickNotesFxLock } from './inboundMovementNote';
 
 describe('parseInboundMovementNote', () => {
   it('parses Chinese fee and prepaid', () => {
@@ -42,5 +44,11 @@ describe('parseInboundMovementNote', () => {
       mmkPerCny: 5000,
       paidCny: 37.6,
     });
+  });
+
+  it('prefers the item-note lock when inbound movement has none', () => {
+    expect(
+      pickNotesFxLock('实收 MMK · 汇率 5000', '总费用 188000 MMK · 到付'),
+    ).toEqual({ paidCurrency: 'MMK', mmkPerCny: 5000 });
   });
 });

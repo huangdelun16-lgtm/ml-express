@@ -68,6 +68,58 @@ export function isCustomerLedgerCategory(category: string): boolean {
   return CUSTOMER_LEDGER_CATEGORIES.has(category);
 }
 
+const SETTLED_CUSTOMER_CATEGORIES = new Set(['order_collected', 'order_prepaid', 'collected']);
+
+export function isSettledCustomerCategory(category: string): boolean {
+  return SETTLED_CUSTOMER_CATEGORIES.has(category);
+}
+
+/** 已收/预付用锁定汇率；待入账用活汇率。已收但没锁则返回 null，禁止用今天汇率改历史。 */
+export function displayRateForCustomerCategory(
+  category: string,
+  lockedRate: number | null | undefined,
+  liveRate: number | null,
+): number | null {
+  if (isSettledCustomerCategory(category)) {
+    return lockedRate != null && lockedRate > 0 ? lockedRate : null;
+  }
+  return liveRate != null && liveRate > 0 ? liveRate : null;
+}
+
+export function customerExpressLedgerCategory(item: {
+  paymentLabel?: string | null;
+  paymentStatus?: string | null;
+  customerSigned?: boolean;
+}): string {
+  if (item.paymentLabel === '预付' || item.paymentStatus === '已付款') return 'order_prepaid';
+  if (item.customerSigned || item.paymentStatus === '已收款') return 'order_collected';
+  return 'order_income_cod';
+}
+
+/** 客户账人民币：已收优先用实收 CNY，否则按锁定/活汇率折算；旧单无锁为 null。 */
+export function resolveCustomerFeeCny(params: {
+  category: string;
+  mmk?: number | null;
+  lockedRate?: number | null;
+  paidCny?: number | null;
+  liveRate: number | null;
+}): number | null {
+  if (
+    isSettledCustomerCategory(params.category) &&
+    params.paidCny != null &&
+    Number.isFinite(params.paidCny) &&
+    params.paidCny > 0
+  ) {
+    return params.paidCny;
+  }
+  const mmk = Number(params.mmk);
+  if (!Number.isFinite(mmk)) return null;
+  return mmkToCny(
+    mmk,
+    displayRateForCustomerCategory(params.category, params.lockedRate, params.liveRate),
+  );
+}
+
 export function buildCrossBorderFxSetting(rate: number): {
   category: 'pricing';
   settings_key: string;

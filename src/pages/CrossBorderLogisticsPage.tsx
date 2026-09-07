@@ -42,10 +42,11 @@ import {
   orderTrackingStatusLabel,
 } from '../utils/inventoryOrderTracking';
 import { CROSS_BORDER_HUBS } from '../utils/crossBorderHubs';
+import DualMoney from '../components/DualMoney';
 import {
   CROSS_BORDER_FX_SETTINGS_KEY,
   buildCrossBorderFxSetting,
-  formatCnyAmount,
+  displayRateForCustomerCategory,
   isCustomerLedgerCategory,
   mmkToCny,
   parseMmkPerCnyRate,
@@ -128,38 +129,6 @@ function formatIsoDate(value?: string | null, lang: string = 'zh'): string {
 function formatMmK(n?: number | null): string {
   if (n == null || !Number.isFinite(n)) return '—';
   return Math.round(n).toLocaleString('en-US');
-}
-
-function DualMoney({
-  mmk,
-  rate,
-  cny,
-  prefix = '',
-}: {
-  mmk?: number | null;
-  rate: number | null;
-  cny?: number | null;
-  prefix?: string;
-}) {
-  const value = mmk ?? 0;
-  const converted = cny !== undefined ? cny : mmkToCny(value, rate);
-  if (converted == null) {
-    return (
-      <span className="cbl-money">
-        {prefix}
-        {formatMmK(value)} <span className="cbl-money-ccy">MMK</span>
-      </span>
-    );
-  }
-  return (
-    <span className="cbl-money cbl-money--dual">
-      <span className="cbl-money-main">
-        {prefix}
-        {formatCnyAmount(converted)} <span className="cbl-money-ccy">CNY</span>
-      </span>
-      <span className="cbl-money-sub">{formatMmK(value)} MMK</span>
-    </span>
-  );
 }
 
 function formatPackTransportFee(fee?: number | null): string {
@@ -772,6 +741,7 @@ const CrossBorderLogisticsPage: FC = () => {
         periodLabel: `${periodKind} ${periodDate}`,
         stationLabel: financeStoreCode || (isEn ? 'All stations' : '全部站点'),
         isEn,
+        liveRate: fxRate,
       });
       downloadCsv(
         `ML-finance-${periodKind}-${periodDate.slice(0, 10)}.csv`,
@@ -782,7 +752,7 @@ const CrossBorderLogisticsPage: FC = () => {
     } finally {
       setExportingCsv(false);
     }
-  }, [periodKind, periodDate, financeStoreCode, isEn]);
+  }, [periodKind, periodDate, financeStoreCode, isEn, fxRate]);
 
   /** 总收入/总支出与下方「跨境财务」同源：全站汇总 */
   const totalIncomeAllStations = useMemo(() => {
@@ -1443,7 +1413,14 @@ const CrossBorderLogisticsPage: FC = () => {
                             {isCustomerLedgerCategory(row.category) ? (
                               <DualMoney
                                 mmk={row.amount}
-                                rate={row.category === 'collected' ? row.fxMmkPerCny ?? null : fxRate}
+                                rate={displayRateForCustomerCategory(
+                                  row.category,
+                                  row.fxMmkPerCny,
+                                  fxRate,
+                                )}
+                                cny={
+                                  row.paidCny != null && row.paidCny > 0 ? row.paidCny : undefined
+                                }
                                 prefix={isIncomeExpenseRow(row.category) || row.category === 'pending_inflow' ? '+' : ''}
                               />
                             ) : (
@@ -2121,6 +2098,7 @@ const CrossBorderLogisticsPage: FC = () => {
           open={customerModalTarget != null}
           onClose={() => setCustomerModalTarget(null)}
           customer={customerModalTarget}
+          fxRate={fxRate}
         />
       </CblLazyModal>
 
@@ -2152,6 +2130,7 @@ const CrossBorderLogisticsPage: FC = () => {
           store={financeModalStore}
           mode={financeModalMode}
           period={statementPeriod}
+          fxRate={fxRate}
         />
       </CblLazyModal>
 

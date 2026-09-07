@@ -328,6 +328,7 @@ export default function CrossBorderFinanceScreen() {
         labels: financeExportLabelsFromT(t),
         categoryLabel: (entry) => getCrossBorderCategoryLabel(t, entry.category),
         amountDisplay: (entry) => getLedgerAmountDisplay(t, entry),
+        liveRate: mmkPerCny,
       });
       const filename = buildFinanceExportFilename({ hub: hubCode, tab, at: new Date() });
       const method = await shareFinanceCsvFile({
@@ -343,7 +344,7 @@ export default function CrossBorderFinanceScreen() {
     } finally {
       setExporting(false);
     }
-  }, [displayed, exporting, hubCode, netBalance, store, summary, t, tab, tabs]);
+  }, [displayed, exporting, hubCode, mmkPerCny, netBalance, store, summary, t, tab, tabs]);
 
   if (!store || !hubCode) {
     return (
